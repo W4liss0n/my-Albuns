@@ -23,6 +23,10 @@
     "test:ui-acceptance": "node --test scripts/Test-UiAcceptance.mjs",
     "ui:acceptance": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Run-UiAcceptance.ps1",
     "ui:acceptance:review": "node scripts/Review-UiAcceptance.mjs",
+    "test:productive-journey": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-ProductiveJourney.ps1",
+    "test:session-recovery-journey": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-SessionRecoveryJourney.ps1",
+    "test:opening-lock": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-Issue14OpeningLockGate.ps1",
+    "test:save-as-journey": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-SaveAsJourney.ps1",
     "test:windows-path": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-WindowsPathGate.ps1",
     "preview": "vite preview",
     "tauri": "tauri"

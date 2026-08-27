@@ -17,7 +17,9 @@ try {
         exit $LASTEXITCODE
     }
 
-    $launcher = Join-Path $script:WorkspaceRoot 'target\debug\myalbuns-dev.exe'
+    $launcher = Join-Path `
+        (Resolve-MyAlbunsCargoTargetDirectory) `
+        'debug\myalbuns-dev.exe'
     if (-not (Test-Path -LiteralPath $launcher -PathType Leaf)) {
         throw "The development supervisor was not produced at $launcher."
     }

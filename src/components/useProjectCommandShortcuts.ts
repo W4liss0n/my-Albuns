@@ -10,6 +10,7 @@ interface ProjectCommandShortcutHandlers {
   disabled: boolean;
   redo(): void;
   save(): void;
+  saveAs(): void;
   undo(): void;
 }
 
@@ -20,6 +21,7 @@ export function useProjectCommandShortcuts({
   disabled,
   redo,
   save,
+  saveAs,
   undo,
 }: ProjectCommandShortcutHandlers) {
   useEffect(() => {
@@ -42,14 +44,15 @@ export function useProjectCommandShortcuts({
         command === "redo";
       if (!handledCommand) return;
 
-      // Save as remains an explicit placeholder. Consume its accepted desktop
-      // shortcut so it cannot accidentally invoke Save or browser chrome.
       event.preventDefault();
-      if (event.repeat || disabled || command === "save-as") return;
+      if (event.repeat || disabled) return;
 
       switch (command) {
         case "save":
           save();
+          break;
+        case "save-as":
+          saveAs();
           break;
         case "close":
           closeProject();
@@ -64,5 +67,5 @@ export function useProjectCommandShortcuts({
     };
     window.addEventListener("keydown", handleProjectCommand);
     return () => window.removeEventListener("keydown", handleProjectCommand);
-  }, [canRedo, canUndo, closeProject, disabled, redo, save, undo]);
+  }, [canRedo, canUndo, closeProject, disabled, redo, save, saveAs, undo]);
 }

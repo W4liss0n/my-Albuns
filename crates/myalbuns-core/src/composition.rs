@@ -2,21 +2,21 @@ use std::collections::HashMap;
 
 use crate::model::{
     AlbumSnapshot, ComposedBackground, ComposedColor, ComposedDecorative, ComposedFrame,
-    ComposedPhoto, ComposedSheet, CompositionPlan, Matrix2, MediaCatalogItem, MediaUsage,
-    NormalizedPan, NumberRange, PHOTO_PAN_MAX, PHOTO_PAN_MIN, PHOTO_ZOOM_MAX, PHOTO_ZOOM_MIN,
-    PhotoPlacement, PhotoPlacementPlan, PhotoSnapshot, ProjectedActiveSides, ProjectedBackground,
-    ProjectedBackgroundContent, ProjectedFrameBorder, ProjectedOverlay, ProjectedOverlayContent,
-    RENDER_SNAPSHOT_SCHEMA_VERSION, RectUm, RenderSnapshot, SizeUm, VectorUm,
+    ComposedPhoto, ComposedSheet, CompositionPlan, EditorProjection, EditorState, Matrix2,
+    MediaCatalogItem, MediaId, MediaUsage, NormalizedPan, NumberRange, PHOTO_PAN_MAX,
+    PHOTO_PAN_MIN, PHOTO_ZOOM_MAX, PHOTO_ZOOM_MIN, PhotoPlacement, PhotoPlacementPlan,
+    PhotoSnapshot, ProjectedActiveSides, ProjectedBackground, ProjectedBackgroundContent,
+    ProjectedFrameBorder, ProjectedOverlay, ProjectedOverlayContent, RectUm, SizeUm, VectorUm,
 };
 
-pub(crate) struct CompositionCore;
+struct CompositionCore;
 
 impl CompositionCore {
-    pub(crate) fn compose(album: &AlbumSnapshot) -> CompositionPlan {
+    fn compose(album: &AlbumSnapshot) -> CompositionPlan {
         let media_by_id = album
             .media
             .iter()
-            .map(|media| (media.id.as_str(), media))
+            .map(|media| (media.id, media))
             .collect::<HashMap<_, _>>();
         CompositionPlan {
             frame_border: album.visual_defaults.frame_border.clone(),
@@ -39,7 +39,7 @@ impl CompositionCore {
                             z_index: frame.z_index,
                             photo: frame.photo.as_ref().map(|photo| {
                                 let media = media_by_id
-                                    .get(photo.media_id.as_str())
+                                    .get(&photo.media_id)
                                     .copied()
                                     .expect("validated Frame media reference");
                                 compose_photo(&frame.rect, photo, media)
@@ -127,11 +127,8 @@ pub(crate) fn compose_frame_border_fill_rects(
     ]
 }
 
-pub(crate) fn derive_media_usage(
-    album: &AlbumSnapshot,
-    composition: &CompositionPlan,
-) -> Vec<MediaUsage> {
-    let mut counts = HashMap::<&str, usize>::new();
+fn derive_media_usage(album: &AlbumSnapshot, composition: &CompositionPlan) -> Vec<MediaUsage> {
+    let mut counts = HashMap::<MediaId, usize>::new();
     for media_id in composition
         .sheets
         .iter()
@@ -144,10 +141,21 @@ pub(crate) fn derive_media_usage(
         .media
         .iter()
         .map(|media| MediaUsage {
-            media_id: media.id.clone(),
-            count: counts.get(media.id.as_str()).copied().unwrap_or_default(),
+            media_id: media.id,
+            count: counts.get(&media.id).copied().unwrap_or_default(),
         })
         .collect()
+}
+
+/// The crate's only entry point that resolves an Album into a CompositionPlan.
+pub(crate) fn resolve_editor_projection(state: EditorState) -> EditorProjection {
+    let composition = CompositionCore::compose(&state.album);
+    let media_usage = derive_media_usage(&state.album, &composition);
+    EditorProjection {
+        state,
+        composition,
+        media_usage,
+    }
 }
 
 fn active_surface_rect(
@@ -189,7 +197,7 @@ fn compose_backgrounds(
     active_sides: ProjectedActiveSides,
     full_width_um: i64,
     height_um: i64,
-    media_by_id: &HashMap<&str, &MediaCatalogItem>,
+    media_by_id: &HashMap<MediaId, &MediaCatalogItem>,
 ) -> Vec<ComposedBackground> {
     let surface = active_surface_rect(active_sides, full_width_um, height_um);
     match background {
@@ -217,7 +225,7 @@ fn compose_backgrounds(
 fn compose_background(
     content: &ProjectedBackgroundContent,
     draw_rect: RectUm,
-    media_by_id: &HashMap<&str, &MediaCatalogItem>,
+    media_by_id: &HashMap<MediaId, &MediaCatalogItem>,
 ) -> ComposedBackground {
     match content {
         ProjectedBackgroundContent::Color { rgb } => ComposedBackground::Color {
@@ -226,11 +234,11 @@ fn compose_background(
         },
         ProjectedBackgroundContent::Media { media_id } => {
             let media = media_by_id
-                .get(media_id.as_str())
+                .get(media_id)
                 .copied()
                 .expect("validated Background media reference");
             ComposedBackground::Media {
-                media_id: media.id.clone(),
+                media_id: media.id,
                 name: media.name.clone(),
                 draw_rect,
             }
@@ -243,7 +251,7 @@ fn compose_overlays(
     active_sides: ProjectedActiveSides,
     full_width_um: i64,
     height_um: i64,
-    media_by_id: &HashMap<&str, &MediaCatalogItem>,
+    media_by_id: &HashMap<MediaId, &MediaCatalogItem>,
 ) -> Vec<ComposedDecorative> {
     let surface = active_surface_rect(active_sides, full_width_um, height_um);
     match overlay {
@@ -283,35 +291,17 @@ fn compose_overlays(
 fn compose_overlay(
     content: &ProjectedOverlayContent,
     draw_rect: RectUm,
-    media_by_id: &HashMap<&str, &MediaCatalogItem>,
+    media_by_id: &HashMap<MediaId, &MediaCatalogItem>,
 ) -> ComposedDecorative {
     let ProjectedOverlayContent::Media { media_id } = content;
     let media = media_by_id
-        .get(media_id.as_str())
+        .get(media_id)
         .copied()
         .expect("validated Overlay media reference");
     ComposedDecorative {
-        media_id: media.id.clone(),
+        media_id: media.id,
         name: media.name.clone(),
         draw_rect,
-    }
-}
-
-pub(crate) fn build_render_snapshot(
-    project_id: &str,
-    project_name: &str,
-    revision: u64,
-    dpi: u32,
-    album: &AlbumSnapshot,
-) -> RenderSnapshot {
-    RenderSnapshot {
-        schema_version: RENDER_SNAPSHOT_SCHEMA_VERSION,
-        project_id: project_id.into(),
-        project_name: project_name.into(),
-        revision,
-        dpi,
-        unit: "micrometers".into(),
-        composition: CompositionCore::compose(album),
     }
 }
 
@@ -366,6 +356,7 @@ fn compose_photo(frame: &RectUm, photo: &PhotoSnapshot, media: &MediaCatalogItem
     let horizontal_zoom_delta = scale_vector(&horizontal_direction, draw_width_at_fill / 2.0);
     let vertical_zoom_delta = scale_vector(&vertical_direction, draw_height_at_fill / 2.0);
     let placement = PhotoPlacementPlan {
+        base_fill_zoom: fill_scale,
         current_pan,
         current_zoom,
         pan_range: NumberRange {
@@ -387,7 +378,7 @@ fn compose_photo(frame: &RectUm, photo: &PhotoSnapshot, media: &MediaCatalogItem
     };
 
     ComposedPhoto {
-        media_id: photo.media_id.clone(),
+        media_id: photo.media_id,
         name: media.name.clone(),
         draw_rect: RectUm {
             x: frame.x + (current.center.x - current.size.width / 2.0).round() as i64,

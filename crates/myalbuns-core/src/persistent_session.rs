@@ -1,15 +1,16 @@
 use crate::{
-    model::{CoreError, ProjectIntent},
+    model::{CoreError, ProjectIntent, RelinkMedia},
     project_document::{MAX_SAFE_INTEGER, ProjectDocument, ProjectRevision},
 };
 use uuid::Uuid;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct PersistentProjectSession {
     current: ProjectRevision,
     latest_revision: u64,
     saved_revision: u64,
     schema_upgrade_required: bool,
+    recovered_unsaved: bool,
     undo: Vec<ProjectRevision>,
     redo: Vec<ProjectRevision>,
 }
@@ -23,6 +24,20 @@ impl PersistentProjectSession {
             latest_revision,
             saved_revision,
             schema_upgrade_required,
+            recovered_unsaved: false,
+            undo: Vec::new(),
+            redo: Vec::new(),
+        }
+    }
+
+    pub(crate) fn from_recovery(current: ProjectRevision, saved_revision: u64) -> Self {
+        let latest_revision = current.revision.max(saved_revision);
+        Self {
+            current,
+            latest_revision,
+            saved_revision,
+            schema_upgrade_required: false,
+            recovered_unsaved: true,
             undo: Vec::new(),
             redo: Vec::new(),
         }
@@ -49,7 +64,7 @@ impl PersistentProjectSession {
     }
 
     pub(crate) fn has_unsaved_changes(&self) -> bool {
-        self.current.revision != self.saved_revision
+        self.recovered_unsaved || self.current.revision != self.saved_revision
     }
 
     pub(crate) fn requires_save(&self) -> bool {
@@ -64,33 +79,109 @@ impl PersistentProjectSession {
         !self.redo.is_empty()
     }
 
-    pub(crate) fn apply(&mut self, intent: ProjectIntent) -> Result<(), CoreError> {
+    pub(crate) fn apply(&mut self, intent: ProjectIntent) -> Result<Option<Uuid>, CoreError> {
+        let mut affected_frame_id = None;
+        self.commit_edit(|project| match intent {
+            ProjectIntent::SetAlbumInformation { information } => project
+                .with_album_information(information)
+                .map_err(CoreError::InvalidAlbumInformation),
+            ProjectIntent::SetVisualDefaults { visual_defaults } => project
+                .with_visual_defaults(visual_defaults)
+                .map_err(|()| CoreError::InvalidVisualDefaults),
+            ProjectIntent::SetDpi { dpi } => project
+                .with_dpi(dpi)
+                .map_err(|()| CoreError::InvalidDpi(dpi)),
+            ProjectIntent::TransformPhoto {
+                frame_id,
+                delta_pan_x,
+                delta_pan_y,
+                delta_zoom,
+            } => {
+                let parsed = parse_uuid(&frame_id)
+                    .map_err(|()| CoreError::FrameNotFound(frame_id.clone()))?;
+                let next = project
+                    .with_transformed_photo(parsed, delta_pan_x, delta_pan_y, delta_zoom)
+                    .map_err(|()| CoreError::FrameNotFound(frame_id))?;
+                affected_frame_id = Some(parsed);
+                Ok(next)
+            }
+            ProjectIntent::AddPhoto {
+                sheet_id,
+                media_id,
+                mode,
+            } => {
+                let parsed_sheet = parse_uuid(&sheet_id)
+                    .map_err(|()| CoreError::SheetNotFound(sheet_id.clone()))?;
+                let (next, frame_id) = project
+                    .with_added_photo(parsed_sheet, media_id.into_uuid(), mode)
+                    .map_err(|()| {
+                        CoreError::InvalidProject(
+                            "não foi possível adicionar a Foto à Lâmina".into(),
+                        )
+                    })?;
+                affected_frame_id = Some(frame_id);
+                Ok(next)
+            }
+            ProjectIntent::DropPhoto {
+                sheet_id,
+                media_id,
+                x_um,
+                y_um,
+                mode,
+            } => {
+                let parsed_sheet = parse_uuid(&sheet_id)
+                    .map_err(|()| CoreError::SheetNotFound(sheet_id.clone()))?;
+                let (next, frame_id) = project
+                    .with_dropped_photo(parsed_sheet, media_id.into_uuid(), x_um, y_um, mode)
+                    .map_err(|()| {
+                        CoreError::InvalidProject("o alvo da Foto não é válido".into())
+                    })?;
+                affected_frame_id = Some(frame_id);
+                Ok(next)
+            }
+        })?;
+        Ok(affected_frame_id)
+    }
+
+    pub(crate) fn import_photo(
+        &mut self,
+        media_id: Uuid,
+        path: std::path::PathBuf,
+    ) -> Result<(), CoreError> {
+        self.commit_edit(move |project| {
+            project.with_imported_photo(media_id, path).map_err(|()| {
+                CoreError::InvalidProject("o vínculo externo da Foto não é válido".into())
+            })
+        })
+    }
+
+    pub(crate) fn relink_media(&mut self, command: RelinkMedia) -> Result<(), CoreError> {
+        self.commit_edit(move |project| {
+            if !project
+                .media()
+                .iter()
+                .any(|media| media.id() == command.media_id.into_uuid())
+            {
+                return Err(CoreError::MediaNotFound(command.media_id.to_string()));
+            }
+            project
+                .with_relinked_media(command.media_id.into_uuid(), command.replacement_path)
+                .map_err(|()| {
+                    CoreError::InvalidProject("a nova referência de mídia não é válida".into())
+                })
+        })
+    }
+
+    fn commit_edit(
+        &mut self,
+        edit: impl FnOnce(&ProjectDocument) -> Result<ProjectDocument, CoreError>,
+    ) -> Result<(), CoreError> {
         let next_revision = self
             .latest_revision
             .checked_add(1)
             .filter(|revision| *revision <= MAX_SAFE_INTEGER)
             .ok_or(CoreError::RevisionSpaceExhausted)?;
-        let project = match intent {
-            ProjectIntent::SetAlbumInformation { information } => self
-                .current
-                .project
-                .with_album_information(information)
-                .map_err(CoreError::InvalidAlbumInformation)?,
-            ProjectIntent::SetVisualDefaults { visual_defaults } => self
-                .current
-                .project
-                .with_visual_defaults(visual_defaults)
-                .map_err(|()| CoreError::InvalidVisualDefaults)?,
-            ProjectIntent::SetDpi { dpi } => self
-                .current
-                .project
-                .with_dpi(dpi)
-                .map_err(|()| CoreError::InvalidDpi(dpi))?,
-            ProjectIntent::TransformPhoto { .. }
-            | ProjectIntent::FillLeftmostPlaceholder { .. } => {
-                return Err(CoreError::UnsupportedProjectIntent);
-            }
-        };
+        let project = edit(&self.current.project)?;
 
         self.undo.push(self.current.clone());
         self.redo.clear();
@@ -119,6 +210,29 @@ impl PersistentProjectSession {
         }
         self.saved_revision = candidate.revision;
         self.schema_upgrade_required = false;
+        self.recovered_unsaved = false;
         Ok(())
     }
+
+    pub(crate) fn adopt_saved_as(&mut self, candidate: &ProjectRevision) -> Result<(), ()> {
+        if self.current.revision != candidate.revision || self.current.project != candidate.project
+        {
+            return Err(());
+        }
+        self.current.project_id = candidate.project_id;
+        for revision in self.undo.iter_mut().chain(self.redo.iter_mut()) {
+            revision.project_id = candidate.project_id;
+        }
+        self.saved_revision = candidate.revision;
+        self.schema_upgrade_required = false;
+        self.recovered_unsaved = false;
+        Ok(())
+    }
+}
+
+fn parse_uuid(source: &str) -> Result<Uuid, ()> {
+    let parsed = Uuid::parse_str(source).map_err(|_| ())?;
+    (parsed.hyphenated().to_string() == source)
+        .then_some(parsed)
+        .ok_or(())
 }

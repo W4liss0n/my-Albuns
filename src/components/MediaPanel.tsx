@@ -65,6 +65,14 @@ interface MediaPanelProps {
   mediaItems: readonly MediaCatalogItem[];
   mediaUsage: readonly MediaUsage[];
   onFillPhoto(mediaId: string): void;
+  selectedMediaId: string | null;
+  onImportPhoto(): void;
+  onSelectMedia(mediaId: string): void;
+  onPhotoDragStart(mediaId: string): void;
+  onPhotoDragEnd(): void;
+  onRelinkMedia(mediaId: string): void;
+  onRetryUnavailableMedia(mediaId: string): Promise<void>;
+  relinkDisabled?: boolean;
   preferences: MediaPanelPreferenceMode;
   previewSource: MediaPanelPreviewSource;
 }
@@ -78,6 +86,14 @@ export function MediaPanel({
   mediaItems,
   mediaUsage,
   onFillPhoto,
+  selectedMediaId,
+  onImportPhoto,
+  onSelectMedia,
+  onPhotoDragStart,
+  onPhotoDragEnd,
+  onRelinkMedia,
+  onRetryUnavailableMedia,
+  relinkDisabled = false,
   preferences: preferenceMode,
   previewSource,
 }: MediaPanelProps) {
@@ -156,6 +172,7 @@ export function MediaPanel({
         ? "filtered"
         : null;
   const gridRef = useRef<HTMLDivElement>(null);
+  const transparentDragImageRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     if (!controlledThumbnailSizes) return;
@@ -196,6 +213,12 @@ export function MediaPanel({
       current && visibleMediaIdSet.has(current) ? current : null,
     );
   }, [visibleMediaIdSet]);
+
+  useEffect(() => {
+    if (!selectedMediaId || !visibleMediaIdSet.has(selectedMediaId)) return;
+    setSelectedMediaIds(new Set([selectedMediaId]));
+    setSelectionAnchorId(selectedMediaId);
+  }, [selectedMediaId, visibleMediaIdSet]);
 
   useEffect(() => {
     if (!onMediaDemandChange) return;
@@ -292,6 +315,7 @@ export function MediaPanel({
     mediaId: string,
     event: MouseEvent<HTMLButtonElement>,
   ) {
+    onSelectMedia(mediaId);
     if (
       event.shiftKey &&
       selectionAnchorId &&
@@ -359,11 +383,27 @@ export function MediaPanel({
       aria-label="Painel de imagens"
       onKeyDown={selectAllVisibleMedia}
     >
+      <canvas
+        aria-hidden="true"
+        height={1}
+        ref={transparentDragImageRef}
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: 1,
+          height: 1,
+          pointerEvents: "none",
+        }}
+        width={1}
+      />
       <MediaPanelToolbar
         activeMediaKind={activeMediaKind}
         itemCount={activeMediaItems.length}
         preferences={preferences}
         search={search}
+        importDisabled={relinkDisabled}
+        onImportPhoto={onImportPhoto}
         onActiveMediaKindChange={setActiveMediaKind}
         onPreferencesChange={updatePreferences}
         onSearchChange={(nextSearch) =>
@@ -402,12 +442,9 @@ export function MediaPanel({
             const isUsed = usageCount > 0;
             const isSelected = selectedMediaIds.has(media.id);
             const preview = mediaPreviews[media.id];
-            const availabilityLabel =
-              preview?.state !== "unavailable"
-                ? null
-                : preview.url
-                  ? "Indisponível · prévia anterior"
-                  : "Indisponível";
+            const availabilityLabel = preview
+              ? mediaAvailabilityLabel(preview)
+              : null;
             const accessibleLabel = [
               media.name,
               isUsed ? "Já usada" : null,
@@ -416,19 +453,37 @@ export function MediaPanel({
               .filter(Boolean)
               .join(". ");
             return (
-              <MediaPreviewCard
+              <div className="media-card-shell" key={media.id}>
+                <MediaPreviewCard
                 aria-label={accessibleLabel}
                 aria-pressed={isSelected}
                 data-media-id={media.id}
                 data-used={String(isUsed)}
                 dimmed={isUsed}
-                key={media.id}
+                draggable={media.kind === "photo"}
                 kind="media"
                 media={media}
                 previewUrl={preview?.url ?? undefined}
                 selected={isSelected}
                 onClick={(event) => selectMedia(media.id, event)}
                 onContextMenu={() => selectMediaForContextMenu(media.id)}
+                onDragStart={
+                  media.kind === "photo"
+                    ? (event) => {
+                        event.dataTransfer.effectAllowed = "copy";
+                        const dragImage = transparentDragImageRef.current;
+                        if (dragImage) event.dataTransfer.setDragImage(dragImage, 0, 0);
+                        event.dataTransfer.setData(
+                          "application/x-myalbuns-photo",
+                          media.id,
+                        );
+                        onPhotoDragStart(media.id);
+                      }
+                    : undefined
+                }
+                onDragEnd={
+                  media.kind === "photo" ? onPhotoDragEnd : undefined
+                }
                 onDoubleClick={
                   media.kind === "photo"
                     ? () => onFillPhoto(media.id)
@@ -440,24 +495,58 @@ export function MediaPanel({
                     : undefined
                 }
               >
-                {preview?.state === "unavailable" && (
+                {availabilityLabel && (
                   <span
                     aria-label={availabilityLabel ?? undefined}
                     className="media-availability"
                     role="status"
                   >
-                    {preview.url
-                      ? "Indisponível · prévia anterior"
-                      : "Indisponível"}
+                    {availabilityLabel}
                   </span>
                 )}
-              </MediaPreviewCard>
+                </MediaPreviewCard>
+                {preview?.state === "absent" && (
+                  <button
+                    aria-label={`Religar arquivo de ${media.name}`}
+                    className="media-recovery-action"
+                    disabled={relinkDisabled}
+                    type="button"
+                    onClick={() => onRelinkMedia(media.id)}
+                  >
+                    Religar
+                  </button>
+                )}
+                {preview?.state === "unavailable" && (
+                  <button
+                    aria-label={`Tentar novamente o arquivo de ${media.name}`}
+                    className="media-recovery-action"
+                    type="button"
+                    onClick={() => void onRetryUnavailableMedia(media.id)}
+                  >
+                    Tentar novamente
+                  </button>
+                )}
+              </div>
             );
           })
         )}
       </div>
     </section>
   );
+}
+
+function mediaAvailabilityLabel(preview: MediaPreview) {
+  const previous = preview.url ? " · prévia anterior" : "";
+  switch (preview.state) {
+    case "absent":
+      return `Arquivo ausente${previous}`;
+    case "unavailable":
+      return `Indisponível${previous}`;
+    case "cache_unavailable":
+      return `Prévia indisponível${previous}`;
+    case "ready":
+      return null;
+  }
 }
 
 function initialPreferences(

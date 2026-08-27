@@ -24,6 +24,13 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
         mediaItems={mediaItems}
         mediaUsage={mediaUsage}
         onFillPhoto={() => undefined}
+        selectedMediaId={null}
+        onImportPhoto={() => undefined}
+        onSelectMedia={() => undefined}
+        onPhotoDragStart={() => undefined}
+        onPhotoDragEnd={() => undefined}
+        onRelinkMedia={() => undefined}
+        onRetryUnavailableMedia={async () => undefined}
         preferences={{ kind: "local" }}
         previewSource={{ kind: "static", previews: mediaPreviews }}
       />

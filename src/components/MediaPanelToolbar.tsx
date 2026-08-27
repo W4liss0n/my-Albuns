@@ -21,7 +21,9 @@ import { useDismissableSurface } from "../ui/useDismissableSurface";
 
 interface MediaPanelToolbarProps {
   activeMediaKind: MediaKind;
+  importDisabled?: boolean;
   itemCount: number;
+  onImportPhoto(): void;
   onActiveMediaKindChange(mediaKind: MediaKind): void;
   onPreferencesChange(preferences: Partial<MediaPanelViewPreferences>): void;
   onSearchChange(search: string): void;
@@ -34,7 +36,9 @@ type OpenPopup = "import" | "options" | null;
 
 export function MediaPanelToolbar({
   activeMediaKind,
+  importDisabled = false,
   itemCount,
+  onImportPhoto,
   onActiveMediaKindChange,
   onPreferencesChange,
   onSearchChange,
@@ -114,15 +118,16 @@ export function MediaPanelToolbar({
             className="ui-floating-surface media-popup media-import-popup"
             role="menu"
           >
-            {/* PLACEHOLDER UI: import commands await their application port. */}
             <button
-              data-placeholder-feature="import-media-files"
-              disabled
+              disabled={activeMediaKind !== "photo" || importDisabled}
               role="menuitem"
-              title={PLACEHOLDER_TITLE}
               type="button"
+              onClick={() => {
+                setOpenPopup(null);
+                onImportPhoto();
+              }}
             >
-              Arquivos…
+              Arquivo JPEG…
             </button>
             <button
               data-placeholder-feature="import-media-folder"

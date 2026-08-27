@@ -3,6 +3,7 @@ use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow, WindowEvent};
 
 use crate::{
+    desktop_webview_policy,
     ipc_contract::{
         ProjectDialogAction, ProjectDialogActionEvent, ProjectDialogDetail,
         ProjectDialogPresentation, ProjectDialogProgress, ProjectDialogState,
@@ -194,13 +195,31 @@ pub(crate) async fn present_project_dialog(
             native_dialog_window::encode_unbounded_component(&serialized)
         );
         let (width, height) = state.initial_dimensions();
+        #[cfg(debug_assertions)]
+        let browser_arguments = desktop_webview_policy::replacement_webview_debug_arguments(
+            std::env::var_os(desktop_webview_policy::PROJECT_DIALOG_WEBVIEW_DEBUG_PORT_ENV),
+        )
+        .map_err(|error| error.to_string())?;
+        #[cfg(debug_assertions)]
+        let browser_data_directory = desktop_webview_policy::project_dialog_debug_data_directory(
+            std::env::var_os(desktop_webview_policy::PROJECT_DIALOG_WEBVIEW_DATA_DIRECTORY_ENV),
+        )
+        .map_err(|error| error.to_string())?;
+        #[cfg(not(debug_assertions))]
+        let browser_arguments: Option<String> = None;
+        #[cfg(not(debug_assertions))]
+        let browser_data_directory: Option<std::path::PathBuf> = None;
         let dialog = native_dialog_window::build_hidden_owned_window(
             &app,
             &owner,
-            PROJECT_DIALOG_LABEL,
-            &url,
-            width,
-            height,
+            native_dialog_window::HiddenOwnedWindowConfig {
+                label: PROJECT_DIALOG_LABEL,
+                url: &url,
+                width,
+                height,
+                browser_arguments: browser_arguments.as_deref(),
+                browser_data_directory: browser_data_directory.as_deref(),
+            },
         )
         .await
         .map_err(|error| error.to_string())?;

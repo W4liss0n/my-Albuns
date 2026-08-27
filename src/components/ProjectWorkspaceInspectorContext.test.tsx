@@ -2,7 +2,8 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 
 import type {
-  ExportPort,
+  ExportPipelinePort,
+  ProjectCorePort,
   ProjectWindowPort,
 } from "../application/projectPorts";
 import type { ProjectDialogPort } from "../application/projectDialogPort";
@@ -33,13 +34,45 @@ vi.mock("./AlbumDesignForm", () => ({
   AlbumDesignForm: () => <div>Conteúdo de Design do Álbum</div>,
 }));
 
-const exportPort: ExportPort = {
+const exportPipelinePort: ExportPipelinePort = {
   startSheet: () => ({
     cancel: async () => "not_found",
     completion: Promise.resolve({
       status: "completed",
       result: { widthPx: 1, heightPx: 1 },
     }),
+  }),
+};
+
+const projectCorePort: ProjectCorePort = {
+  load: async () => representativeProjection,
+  validateAlbumInformation: async () => ({
+    errors: [],
+    impact: { heightPx: 3_543, pageWidthPx: 3_543, sheetWidthPx: 7_087 },
+  }),
+  apply: async () => representativeProjection,
+  applyWithOutcome: async () => ({
+    projection: representativeProjection,
+    affectedFrameId: null,
+  }),
+  importPhoto: async () => ({
+    kind: "cancelled",
+    projection: representativeProjection,
+  }),
+  resolvePhotoDropTarget: async () => ({ kind: "invalid" }),
+  relink: async () => representativeProjection,
+  undo: async () => representativeProjection,
+  redo: async () => representativeProjection,
+  save: async () => ({
+    outcome: {
+      kind: "alreadyCurrent",
+      revision: representativeProjection.state.revision,
+    },
+    projection: representativeProjection,
+  }),
+  saveAs: async () => ({
+    outcome: { kind: "cancelled" },
+    projection: representativeProjection,
   }),
 };
 
@@ -59,27 +92,21 @@ const projectWindowPort: ProjectWindowPort = {
 test("derives Album, Sheet and Frame Inspector contexts from the editing state", () => {
   render(
     <ProjectWorkspace
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projectDialogPort={projectDialogPort}
+      projectCorePort={projectCorePort}
       projectWindowPort={projectWindowPort}
       projection={representativeProjection}
       mediaPreviews={{}}
       onGraphicsUnavailable={() => undefined}
       onMediaDemandChange={() => undefined}
+      onRetryUnavailableMedia={async () => undefined}
       onPreferencesReady={() => undefined}
       workspacePreferences={{ kind: "memory" }}
       runProjectMutation={{
         run: async () => ({ status: "obsolete" }),
         waitForIdle: async () => null,
       }}
-      validateAlbumInformation={async () => ({
-        errors: [],
-        impact: {
-          heightPx: 3_543,
-          pageWidthPx: 3_543,
-          sheetWidthPx: 7_087,
-        },
-      })}
       onProjectionChange={() => undefined}
     />,
   );

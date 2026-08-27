@@ -12,6 +12,7 @@ import "./ui/ui.css";
 import "./global/GlobalShell.css";
 
 const projectPort: GlobalProjectPort = {
+  onActivationTerminal: async () => () => undefined,
   completeGraphicsGate: async () => null,
   openProject: async () => {
     if (new URLSearchParams(window.location.search).has("progress")) {
@@ -19,6 +20,7 @@ const projectPort: GlobalProjectPort = {
     }
     return { status: "cancelled" };
   },
+  saveExternalCopyAs: async () => ({ status: "cancelled" }),
   listRecentProjects: async () => [
     { id: "p1", name: "Formatura Medicina 2026 — Turma B" },
     { id: "p2", name: "Casamento Marina & Téo" },

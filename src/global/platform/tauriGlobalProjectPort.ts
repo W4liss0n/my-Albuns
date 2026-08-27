@@ -1,15 +1,22 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
 import type {
   GlobalProjectPort,
   ProjectLaunchFailure,
+  ProjectLaunchOutcome,
   RecentProjectSummary,
 } from "../application/globalProjectPort";
+import { hasOnlyIpcKeys, isIpcRecord } from "../../platform/ipcGuards";
 import {
+  parseProjectLaunchOutcome,
   settleProjectLaunch,
   toProjectLaunchFailure,
   toProjectLaunchOutcome,
 } from "./projectLaunchBridge";
+
+export const GLOBAL_ACTIVATION_TERMINAL_EVENT =
+  "myalbuns://global-activation-terminal";
 
 const openFallbackFailure: ProjectLaunchFailure = {
   code: "open_project_unavailable",
@@ -17,11 +24,38 @@ const openFallbackFailure: ProjectLaunchFailure = {
   action: "Tente novamente. Se o problema continuar, reinicie o MyAlbuns.",
 };
 
+const saveCopyFallbackFailure: ProjectLaunchFailure = {
+  code: "save_copy_unavailable",
+  message: "Não foi possível salvar a Cópia externa.",
+  action: "Tente novamente. Se o problema continuar, reabra a cópia.",
+};
 const graphicsGateFallbackFailure: ProjectLaunchFailure = {
   code: "graphics_gate_unavailable",
   message: "Não foi possível confirmar o requisito gráfico do editor.",
   action: "Reinicie o MyAlbuns e tente novamente.",
 };
+
+interface GlobalActivationTerminal {
+  sequence: number;
+  outcome: ProjectLaunchOutcome;
+}
+
+function parseActivationTerminal(
+  value: unknown,
+): GlobalActivationTerminal | null {
+  if (
+    !isIpcRecord(value) ||
+    !hasOnlyIpcKeys(value, ["sequence", "outcome"]) ||
+    !Number.isSafeInteger(value.sequence) ||
+    Number(value.sequence) <= 0
+  ) {
+    return null;
+  }
+  const outcome = parseProjectLaunchOutcome(value.outcome);
+  return outcome
+    ? { sequence: Number(value.sequence), outcome }
+    : null;
+}
 
 function toRecentProjectSummaries(
   result: unknown,
@@ -38,6 +72,25 @@ function toRecentProjectSummaries(
 }
 
 export const tauriGlobalProjectPort: GlobalProjectPort = {
+  onActivationTerminal: async (listener) => {
+    let lastSequence = 0;
+    const deliver = (value: unknown) => {
+      const terminal = parseActivationTerminal(value);
+      if (!terminal || terminal.sequence <= lastSequence) return;
+      lastSequence = terminal.sequence;
+      listener(terminal.outcome);
+    };
+    const unlisten = await listen<unknown>(
+      GLOBAL_ACTIVATION_TERMINAL_EVENT,
+      (event) => deliver(event.payload),
+    );
+    try {
+      deliver(await invoke<unknown>("latest_global_activation_terminal"));
+    } catch {
+      // The live listener remains authoritative when the snapshot is unavailable.
+    }
+    return unlisten;
+  },
   completeGraphicsGate: async (supported) => {
     try {
       const result = await invoke<unknown>("complete_graphics_gate", {
@@ -57,6 +110,11 @@ export const tauriGlobalProjectPort: GlobalProjectPort = {
     settleProjectLaunch(
       () => invoke<unknown>("open_project"),
       openFallbackFailure,
+    ),
+  saveExternalCopyAs: () =>
+    settleProjectLaunch(
+      () => invoke<unknown>("save_external_copy_as"),
+      saveCopyFallbackFailure,
     ),
   listRecentProjects: async () => {
     try {

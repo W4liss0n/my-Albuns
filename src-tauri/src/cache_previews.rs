@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    path::Path,
     sync::{Arc, Mutex},
 };
 
@@ -7,7 +8,7 @@ use myalbuns_imaging_protocol::{CacheArtifact, CacheArtifactFormat};
 use myalbuns_paths::AppPaths;
 
 use crate::{
-    cache_engine::AuthorizedCacheNamespace,
+    cache_engine::{AuthorizedCacheNamespace, CacheSourceBinding},
     ipc_contract::{MediaPreview, MediaPreviewState},
     opaque_image_protocol::{
         ImageFormat, ImagePayload, ImageRequestError, opaque_image_url, read_image,
@@ -25,7 +26,7 @@ pub(crate) struct CachePreviewRegistry {
 
 #[derive(Default)]
 struct CachePreviewPublication {
-    tokens_by_media: HashMap<String, (String, String)>,
+    tokens_by_media: HashMap<String, (String, CacheSourceBinding, String)>,
     previews_by_token: HashMap<String, Arc<PreparedCachePreview>>,
 }
 
@@ -64,6 +65,7 @@ impl CachePreviewRegistry {
         app_paths: &AppPaths,
         namespace: &AuthorizedCacheNamespace,
         artifact: &CacheArtifact,
+        source_path: &Path,
     ) -> Result<MediaPreview, CachePreviewError> {
         let storage = app_paths
             .prepare_cache_storage(namespace.paths())
@@ -93,8 +95,11 @@ impl CachePreviewRegistry {
             .publication
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        if let Some((generation_id, token)) = publication.tokens_by_media.get(&artifact.media_id)
+        let source_binding = CacheSourceBinding::for_path(source_path);
+        if let Some((generation_id, published_binding, token)) =
+            publication.tokens_by_media.get(&artifact.media_id)
             && generation_id == &artifact.generation_id
+            && published_binding == &source_binding
         {
             return Ok(MediaPreview {
                 media_id: artifact.media_id.clone(),
@@ -102,7 +107,8 @@ impl CachePreviewRegistry {
                 url: Some(opaque_image_url(CACHE_MEDIA_PROTOCOL_SCHEME, token)),
             });
         }
-        if let Some((_, previous_token)) = publication.tokens_by_media.remove(&artifact.media_id) {
+        if let Some((_, _, previous_token)) = publication.tokens_by_media.remove(&artifact.media_id)
+        {
             publication.previews_by_token.remove(&previous_token);
         }
         let token = format!(
@@ -112,7 +118,11 @@ impl CachePreviewRegistry {
         );
         publication.tokens_by_media.insert(
             artifact.media_id.clone(),
-            (artifact.generation_id.clone(), token.clone()),
+            (
+                artifact.generation_id.clone(),
+                source_binding,
+                token.clone(),
+            ),
         );
         publication.previews_by_token.insert(
             token.clone(),
@@ -139,7 +149,7 @@ impl CachePreviewRegistry {
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut removed = 0;
         for media_id in media_ids {
-            if let Some((_, token)) = publication.tokens_by_media.remove(media_id.as_ref()) {
+            if let Some((_, _, token)) = publication.tokens_by_media.remove(media_id.as_ref()) {
                 publication.previews_by_token.remove(&token);
                 removed += 1;
             }
@@ -147,16 +157,31 @@ impl CachePreviewRegistry {
         removed
     }
 
+    pub(crate) fn revoke_all(&self) -> usize {
+        let mut publication = self
+            .publication
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let removed = publication.previews_by_token.len();
+        publication.tokens_by_media.clear();
+        publication.previews_by_token.clear();
+        removed
+    }
+
     pub(crate) fn retained_preview(
         &self,
         media_id: &str,
+        source_path: &Path,
         state: MediaPreviewState,
     ) -> Option<MediaPreview> {
         let publication = self
             .publication
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let (_, token) = publication.tokens_by_media.get(media_id)?;
+        let (_, source_binding, token) = publication.tokens_by_media.get(media_id)?;
+        if !source_binding.matches_source_path(source_path) {
+            return None;
+        }
         Some(MediaPreview {
             media_id: media_id.to_owned(),
             state,
@@ -247,7 +272,7 @@ mod tests {
         let local_root = root.path().join("local");
         std::fs::create_dir_all(&roaming_root).expect("the roaming root is available");
         std::fs::create_dir_all(&local_root).expect("the local root is available");
-        let app_paths = AppPaths::from_roots(&roaming_root, &local_root, root.path());
+        let app_paths = AppPaths::from_roots(&roaming_root, &local_root);
         let namespace = AuthorizedCacheNamespace::mount(&app_paths, project.identity_authority())
             .expect("the authority mounts the Cache namespace");
         let derived_path = namespace
@@ -278,7 +303,7 @@ mod tests {
         let registry = CachePreviewRegistry::new("main");
 
         let preview = registry
-            .publish(&app_paths, &namespace, &artifact)
+            .publish(&app_paths, &namespace, &artifact, &original_path)
             .expect("the validated derived artifact is published");
         let url = preview.url.expect("a ready preview has one opaque URL");
         assert!(url.starts_with("http://myalbuns-cache.localhost/"));
@@ -304,6 +329,16 @@ mod tests {
         );
         assert_eq!(response.body(), &derived_bytes);
         assert_ne!(response.body().as_slice(), original_bytes);
+        assert!(
+            registry
+                .retained_preview(
+                    "media-photo",
+                    &root.path().join("Outro Original.png"),
+                    crate::ipc_contract::MediaPreviewState::Unavailable,
+                )
+                .is_none(),
+            "resident bytes cannot cross a relink, Undo, or discarded binding"
+        );
 
         assert_eq!(registry.invalidate_media(["media-photo"]), 1);
         let revoked_request = Request::builder()

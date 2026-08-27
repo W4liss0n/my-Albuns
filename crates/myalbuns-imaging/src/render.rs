@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use image::{Rgba, RgbaImage};
-use myalbuns_core::{ComposedBackground, ComposedFrame, ProjectedFrameBorder, RectUm};
+use myalbuns_core::{ComposedBackground, ComposedFrame, MediaId, ProjectedFrameBorder, RectUm};
 use myalbuns_imaging_protocol::{
     ImagingFailure, ImagingFailureCode, ImagingPathCode, ImagingProgressStage, ImagingRequest,
     RenderCompletion,
@@ -141,7 +141,7 @@ pub(crate) fn render_request(
 fn load_render_sources(
     request: &ImagingRequest,
     progress: &mut dyn FnMut(ImagingProgressStage, u32, u32) -> Result<(), String>,
-) -> Result<(HashMap<String, RgbaImage>, u64), RenderFailure> {
+) -> Result<(HashMap<MediaId, RgbaImage>, u64), RenderFailure> {
     let mut opened = Vec::new();
     opened
         .try_reserve_exact(request.sources.len())
@@ -166,7 +166,7 @@ fn load_render_sources(
             .map_err(|error| {
                 RenderFailure::typed(
                     ImagingFailureCode::SourceUnavailable,
-                    Some(source.media_id().to_owned()),
+                    Some(source.media_id().to_string()),
                     Some(ImagingPathCode::from_resolve_error(error)),
                     format!("não foi possível aplicar o plano de caminhos: {error}"),
                 )
@@ -174,7 +174,7 @@ fn load_render_sources(
         let opened_source = open_render_source(&resolved).map_err(|failure| {
             RenderFailure::typed(
                 failure.code,
-                Some(source.media_id().to_owned()),
+                Some(source.media_id().to_string()),
                 failure.path_code,
                 failure.message,
             )
@@ -184,7 +184,7 @@ fn load_render_sources(
             .ok_or_else(|| {
                 RenderFailure::typed(
                     ImagingFailureCode::ResourceLimitExceeded,
-                    Some(source.media_id().to_owned()),
+                    Some(source.media_id().to_string()),
                     None,
                     "o tamanho total das fontes excedeu o limite",
                 )
@@ -193,7 +193,7 @@ fn load_render_sources(
             .checked_add(opened_source.pixel_count().map_err(|failure| {
                 RenderFailure::typed(
                     failure.code,
-                    Some(source.media_id().to_owned()),
+                    Some(source.media_id().to_string()),
                     failure.path_code,
                     failure.message,
                 )
@@ -201,7 +201,7 @@ fn load_render_sources(
             .ok_or_else(|| {
                 RenderFailure::typed(
                     ImagingFailureCode::ResourceLimitExceeded,
-                    Some(source.media_id().to_owned()),
+                    Some(source.media_id().to_string()),
                     None,
                     "a soma dos pixels das fontes excedeu o intervalo seguro",
                 )
@@ -209,14 +209,14 @@ fn load_render_sources(
         if source_pixels > MAX_DECODED_SOURCE_PIXELS_TOTAL {
             return Err(RenderFailure::typed(
                 ImagingFailureCode::ResourceLimitExceeded,
-                Some(source.media_id().to_owned()),
+                Some(source.media_id().to_string()),
                 None,
                 format!(
                     "as fontes teriam {source_pixels} pixels e excedem o limite de {MAX_DECODED_SOURCE_PIXELS_TOTAL}"
                 ),
             ));
         }
-        opened.push((source.media_id().to_owned(), opened_source));
+        opened.push((source.media_id(), opened_source));
     }
 
     let mut decoded = HashMap::new();
@@ -232,7 +232,7 @@ fn load_render_sources(
         let image = opened_source.decode().map_err(|failure| {
             RenderFailure::typed(
                 failure.code,
-                Some(media_id.clone()),
+                Some(media_id.to_string()),
                 failure.path_code,
                 failure.message,
             )
@@ -255,7 +255,7 @@ fn draw_frame(
     image: &mut RgbaImage,
     frame: &ComposedFrame,
     pixels_per_micrometer: f64,
-    sources: &HashMap<String, RgbaImage>,
+    sources: &HashMap<MediaId, RgbaImage>,
 ) -> Result<(), String> {
     let left = to_pixels_signed(frame.clip_rect.x, pixels_per_micrometer).max(0) as u32;
     let top = to_pixels_signed(frame.clip_rect.y, pixels_per_micrometer).max(0) as u32;

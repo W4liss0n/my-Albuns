@@ -2,26 +2,31 @@ use std::collections::{HashMap, HashSet};
 
 use myalbuns_imaging_protocol::CacheMediaSource;
 use myalbuns_paths::AppPaths;
-use tauri::{AppHandle, Emitter, State, WebviewWindow};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
 
 use crate::{
     cache_activity_gate::{CacheCancellation, CacheCancellationReason},
     cache_engine::{
-        self, AuthorizedCacheNamespace, CacheEngine, CacheFailure, CacheFailureStage,
-        CacheFlightClaim, CacheWork,
+        self, AuthorizedCacheNamespace, CACHE_PROCESSOR_SUSPENDED_MESSAGE, CacheEngine,
+        CacheFailure, CacheFailureStage, CacheFlightClaim, CacheProcessorStatus, CacheWork,
     },
     cache_previews::{CachePreviewError, CachePreviewRegistry},
+    cache_service::ActiveCacheNamespace,
     imaging_processor::{
         ImagingProcessor, InvocationContext, InvocationFailureStage, TauriImagingTransport,
     },
     ipc_contract::{
-        LinkedMediaChanged, MediaPreview, MediaPreviewCommandError, MediaPreviewCommandErrorCode,
-        MediaPreviewDemand, MediaPreviewState,
+        CacheProcessorState, CacheProcessorWarning, LinkedMediaChanged, MediaPreview,
+        MediaPreviewCommandError, MediaPreviewCommandErrorCode, MediaPreviewDemand,
+        MediaPreviewState,
     },
     logging::LoggingState,
     media_runtime::{MediaAvailability, MediaMonitor, MediaRuntime},
     path_io,
-    product_runtime::{LINKED_MEDIA_CHANGED_EVENT, PROJECT_WINDOW_LABEL},
+    product_runtime::{
+        CACHE_PROCESSOR_WARNING_EVENT, LINKED_MEDIA_CHANGED_EVENT, PROJECT_WINDOW_LABEL,
+        refresh_project_photos_for_media_update,
+    },
     project_host::ProjectHost,
 };
 
@@ -47,6 +52,93 @@ impl MediaPreviewCommandError {
             message: "Não foi possível preparar as representações reduzidas do Projeto.".into(),
         }
     }
+
+    fn retry_failed(error: impl std::fmt::Display) -> Self {
+        Self {
+            code: MediaPreviewCommandErrorCode::ReadFailed,
+            message: format!("Não foi possível tentar novamente a inspeção da mídia: {error}"),
+        }
+    }
+}
+
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn retry_unavailable_media(
+    media_id: String,
+    window: WebviewWindow,
+    app: AppHandle,
+    project_host: State<'_, ProjectHost>,
+    engine: State<'_, CacheEngine>,
+    registry: State<'_, CachePreviewRegistry>,
+    media_runtime: State<'_, MediaRuntime>,
+    media_monitor: State<'_, MediaMonitor>,
+    namespace_owner: State<'_, ActiveCacheNamespace>,
+) -> Result<MediaPreview, MediaPreviewCommandError> {
+    if window.label() != PROJECT_WINDOW_LABEL {
+        return Err(MediaPreviewCommandError::read_failed());
+    }
+    let _causal_cache_permit = engine
+        .begin_cancellable_work(CacheCancellation::default())
+        .await;
+    let catalog = project_host
+        .authorized_media_catalog()
+        .map_err(MediaPreviewCommandError::retry_failed)?;
+    let retry_namespace = namespace_owner.namespace();
+    if catalog.project_id != retry_namespace.project_id() {
+        return Err(MediaPreviewCommandError::read_failed());
+    }
+    let binding = catalog
+        .bindings
+        .into_iter()
+        .find(|binding| binding.media_id == media_id)
+        .ok_or_else(MediaPreviewCommandError::read_failed)?;
+    let source_path = binding.logical_path.clone();
+    let monitor = media_monitor.inner().clone();
+    let runtime = media_runtime.inner().clone();
+    let retry_app = app.clone();
+    let retry_registry = registry.inner().clone();
+    let retry_host = project_host.inner().clone();
+    let (inspection, refreshed_photo_ids) = tauri::async_runtime::spawn_blocking(move || {
+        let inspection = monitor.retry_unavailable(&runtime, &binding, |update| {
+            retry_app.state::<CacheEngine>().apply_monitor_media_update(
+                &retry_namespace,
+                &retry_registry,
+                update,
+            );
+        })?;
+        let refreshed_photo_ids = refresh_project_photos_for_media_update(
+            &retry_host,
+            std::slice::from_ref(&binding),
+            inspection.update(),
+        );
+        Ok::<_, crate::media_runtime::MediaRetryError>((inspection, refreshed_photo_ids))
+    })
+    .await
+    .map_err(MediaPreviewCommandError::retry_failed)?
+    .map_err(MediaPreviewCommandError::retry_failed)?;
+    tracing::info!(
+        target: "myalbuns.desktop",
+        media_id,
+        changed = !inspection.update().changed_media_ids().is_empty(),
+        invalidated = !inspection.update().invalidated_media_ids().is_empty(),
+        event = "linked_media_retry_adopted",
+    );
+    if let Some(change) =
+        linked_media_change_for_update(inspection.update(), &refreshed_photo_ids, true)
+    {
+        window
+            .emit(LINKED_MEDIA_CHANGED_EVENT, change)
+            .map_err(|_| MediaPreviewCommandError::read_failed())?;
+    }
+    let state = preview_state(inspection.availability());
+    let retained = (state != MediaPreviewState::Ready)
+        .then(|| registry.retained_preview(&media_id, &source_path, state))
+        .flatten();
+    Ok(retained.unwrap_or(MediaPreview {
+        media_id,
+        state,
+        url: None,
+    }))
 }
 
 #[tauri::command]
@@ -63,10 +155,14 @@ pub(crate) async fn prepare_media_previews(
     processor: State<'_, ImagingProcessor>,
     logging: State<'_, LoggingState>,
     app_paths: State<'_, AppPaths>,
+    namespace_owner: State<'_, ActiveCacheNamespace>,
 ) -> Result<Option<Vec<MediaPreview>>, MediaPreviewCommandError> {
     if window.label() != PROJECT_WINDOW_LABEL {
         return Err(MediaPreviewCommandError::read_failed());
     }
+    let causal_cache_permit = engine
+        .begin_cancellable_work(CacheCancellation::default())
+        .await;
     let catalog = project_host
         .authorized_media_catalog()
         .map_err(|_| MediaPreviewCommandError::read_failed())?;
@@ -82,8 +178,10 @@ pub(crate) async fn prepare_media_previews(
     {
         return Err(MediaPreviewCommandError::read_failed());
     }
-    let namespace = AuthorizedCacheNamespace::mount(&app_paths, &catalog.authority)
-        .map_err(|_| MediaPreviewCommandError::read_failed())?;
+    let namespace = namespace_owner.namespace();
+    if catalog.project_id != namespace.project_id() {
+        return Err(MediaPreviewCommandError::read_failed());
+    }
     let mut demand_revision = engine.reconcile_preview_demand(
         registry.inner(),
         namespace.project_id(),
@@ -100,9 +198,17 @@ pub(crate) async fn prepare_media_previews(
     let monitor = media_monitor.inner().clone();
     let runtime = media_runtime.inner().clone();
     let bindings = catalog.bindings.clone();
-    let poll = tauri::async_runtime::spawn_blocking(move || monitor.poll(&runtime, &bindings))
-        .await
-        .map_err(|_| MediaPreviewCommandError::read_failed())?;
+    let demand_host = project_host.inner().clone();
+    let (poll, refreshed_photo_ids) = tauri::async_runtime::spawn_blocking(move || {
+        let poll = monitor.poll(&runtime, &bindings);
+        let refreshed_photo_ids = poll
+            .update()
+            .map(|update| refresh_project_photos_for_media_update(&demand_host, &bindings, update))
+            .unwrap_or_default();
+        (poll, refreshed_photo_ids)
+    })
+    .await
+    .map_err(|_| MediaPreviewCommandError::read_failed())?;
     let runtime_update = poll.update().cloned();
     let observations = poll
         .confirmed_observation()
@@ -118,23 +224,19 @@ pub(crate) async fn prepare_media_previews(
         && (!runtime_update.changed_media_ids().is_empty()
             || !runtime_update.invalidated_media_ids().is_empty())
     {
-        let cache_update = engine
-            .apply_demand_media_update(
-                &app_paths,
-                &namespace,
-                registry.inner(),
-                &mut demand_revision,
-                runtime_update,
-            )
-            .map_err(|_| MediaPreviewCommandError::read_failed())?;
-        if cache_update.retry_required() {
+        let cache_update = engine.apply_demand_media_update(
+            &namespace,
+            registry.inner(),
+            &mut demand_revision,
+            runtime_update,
+        );
+        if let Some(change) = linked_media_change_for_update(
+            runtime_update,
+            &refreshed_photo_ids,
+            cache_update.retry_required(),
+        ) {
             window
-                .emit(
-                    LINKED_MEDIA_CHANGED_EVENT,
-                    LinkedMediaChanged {
-                        media_ids: runtime_update.changed_media_ids().to_vec(),
-                    },
-                )
+                .emit(LINKED_MEDIA_CHANGED_EVENT, change)
                 .map_err(|_| MediaPreviewCommandError::read_failed())?;
         }
         if !cache_update.demand_can_resume() {
@@ -144,39 +246,16 @@ pub(crate) async fn prepare_media_previews(
     if !engine.demand_is_current(&demand_revision) {
         return Ok(Some(Vec::new()));
     }
+    drop(causal_cache_permit);
     let mut previews = Vec::with_capacity(ordered_demand.len());
     for media_id in ordered_demand {
         if !engine.demand_is_current(&demand_revision) {
             return Ok(Some(Vec::new()));
         }
-        let availability = observations
-            .get(media_id.as_str())
-            .copied()
-            .unwrap_or(MediaAvailability::Unavailable);
-        if availability != MediaAvailability::Candidate {
-            let state = match availability {
-                MediaAvailability::Absent => MediaPreviewState::Absent,
-                MediaAvailability::Candidate => unreachable!(),
-                MediaAvailability::Unavailable => MediaPreviewState::Unavailable,
-            };
-            previews.push(if state == MediaPreviewState::Unavailable {
-                unavailable_preview(
-                    &engine,
-                    &registry,
-                    &app_paths,
-                    &namespace,
-                    &demand_revision,
-                    media_id,
-                )
-            } else {
-                MediaPreview {
-                    media_id,
-                    state,
-                    url: None,
-                }
-            });
+        let Some(state) = projected_preview_state(observations.get(media_id.as_str()).copied())
+        else {
             continue;
-        }
+        };
         let binding = catalog_by_id
             .get(media_id.as_str())
             .expect("validated demand remains in the immutable catalog");
@@ -186,6 +265,18 @@ pub(crate) async fn prepare_media_previews(
             binding.logical_path.clone(),
         )
         .map_err(|_| MediaPreviewCommandError::read_failed())?;
+        if state != MediaPreviewState::Ready {
+            previews.push(contextual_preview(
+                &engine,
+                &registry,
+                &app_paths,
+                &namespace,
+                &demand_revision,
+                &source,
+                state,
+            ));
+            continue;
+        }
         let root_bindings = match path_io::capture_root_bindings(vec![
             namespace.paths().root().to_path_buf(),
             source.source_path().to_path_buf(),
@@ -194,19 +285,25 @@ pub(crate) async fn prepare_media_previews(
         {
             Ok(root_bindings) => root_bindings,
             Err(_) => {
-                previews.push(unavailable_preview(
+                previews.push(contextual_preview(
                     &engine,
                     &registry,
                     &app_paths,
                     &namespace,
                     &demand_revision,
-                    media_id,
+                    &source,
+                    cache_failure_state(),
                 ));
                 continue;
             }
         };
         let request_id = format!("cache-{}", uuid::Uuid::new_v4().simple());
-        let work = CacheWork::new(request_id.clone(), namespace.clone(), source, root_bindings);
+        let work = CacheWork::new(
+            request_id.clone(),
+            namespace.clone(),
+            source.clone(),
+            root_bindings,
+        );
         let Some(claim) = engine.claim_demanded(&demand_revision, &work) else {
             return Ok(Some(Vec::new()));
         };
@@ -245,13 +342,49 @@ pub(crate) async fn prepare_media_previews(
                 let Some(preview) = engine.commit_claimed_preview_if_demanded(
                     &demand_revision,
                     &preview_publication_authority,
-                    || registry.publish(&app_paths, &namespace, execution.artifact()),
+                    || {
+                        registry.publish(
+                            &app_paths,
+                            &namespace,
+                            execution.artifact(),
+                            source.source_path(),
+                        )
+                    },
                 ) else {
                     return Ok(Some(Vec::new()));
                 };
-                previews.push(preview.map_err(MediaPreviewCommandError::from)?);
+                previews.push(cache_publication_or_context(
+                    preview,
+                    media_id.as_str(),
+                    || {
+                        contextual_preview(
+                            &engine,
+                            &registry,
+                            &app_paths,
+                            &namespace,
+                            &demand_revision,
+                            &source,
+                            cache_failure_state(),
+                        )
+                    },
+                ));
             }
             Err(failure) => {
+                if engine.processor_status() == CacheProcessorStatus::Suspended
+                    && let Err(error) = window.emit(
+                        CACHE_PROCESSOR_WARNING_EVENT,
+                        CacheProcessorWarning {
+                            state: CacheProcessorState::Suspended,
+                            message: CACHE_PROCESSOR_SUSPENDED_MESSAGE.into(),
+                        },
+                    )
+                {
+                    tracing::warn!(
+                        target: "myalbuns.desktop",
+                        error = %error,
+                        event = "cache_processor_warning_emit_failed",
+                    );
+                }
                 tracing::warn!(
                     target: "myalbuns.desktop",
                     stage = ?failure.stage,
@@ -260,13 +393,14 @@ pub(crate) async fn prepare_media_previews(
                     media_id,
                     event = "cache_media_unavailable",
                 );
-                previews.push(unavailable_preview(
+                previews.push(contextual_preview(
                     &engine,
                     &registry,
                     &app_paths,
                     &namespace,
                     &demand_revision,
-                    media_id,
+                    &source,
+                    cache_failure_state(),
                 ));
             }
         }
@@ -274,19 +408,68 @@ pub(crate) async fn prepare_media_previews(
     Ok(Some(previews))
 }
 
-fn unavailable_preview(
+fn preview_state(availability: MediaAvailability) -> MediaPreviewState {
+    match availability {
+        MediaAvailability::Candidate => MediaPreviewState::Ready,
+        MediaAvailability::Absent => MediaPreviewState::Absent,
+        MediaAvailability::Unavailable => MediaPreviewState::Unavailable,
+    }
+}
+
+fn linked_media_change_for_update(
+    update: &crate::media_runtime::MediaRuntimeUpdate,
+    refreshed_photo_ids: &[String],
+    refresh_all_changed_media_ids: bool,
+) -> Option<LinkedMediaChanged> {
+    let media_ids = if refresh_all_changed_media_ids {
+        update.changed_media_ids().to_vec()
+    } else {
+        refreshed_photo_ids.to_vec()
+    };
+    (!media_ids.is_empty()).then_some(LinkedMediaChanged { media_ids })
+}
+
+fn projected_preview_state(availability: Option<MediaAvailability>) -> Option<MediaPreviewState> {
+    availability.map(preview_state)
+}
+
+fn cache_failure_state() -> MediaPreviewState {
+    MediaPreviewState::CacheUnavailable
+}
+
+fn cache_publication_or_context(
+    publication: Result<MediaPreview, CachePreviewError>,
+    media_id: &str,
+    context: impl FnOnce() -> MediaPreview,
+) -> MediaPreview {
+    match publication {
+        Ok(preview) => preview,
+        Err(error) => {
+            tracing::warn!(
+                target: "myalbuns.desktop",
+                media_id,
+                error = %error,
+                event = "cache_preview_publication_failed",
+            );
+            context()
+        }
+    }
+}
+
+fn contextual_preview(
     engine: &CacheEngine,
     registry: &CachePreviewRegistry,
     app_paths: &AppPaths,
     namespace: &AuthorizedCacheNamespace,
     demand: &cache_engine::CacheDemandRevision,
-    media_id: String,
+    source: &CacheMediaSource,
+    state: MediaPreviewState,
 ) -> MediaPreview {
     engine
-        .retain_last_known_preview(app_paths, namespace, registry, demand, media_id.as_str())
+        .retain_last_known_preview(app_paths, namespace, registry, demand, source, state)
         .unwrap_or(MediaPreview {
-            media_id,
-            state: MediaPreviewState::Unavailable,
+            media_id: source.media_id().to_owned(),
+            state,
             url: None,
         })
 }
@@ -385,9 +568,16 @@ async fn execute_owned_cache(
 
 #[cfg(test)]
 mod tests {
-    use crate::ipc_contract::MediaPreviewDemand;
+    use crate::{
+        cache_previews::CachePreviewError,
+        ipc_contract::{MediaPreviewDemand, MediaPreviewState},
+        media_runtime::{MediaAvailability, MediaRuntimeUpdate},
+    };
 
-    use super::ordered_demand;
+    use super::{
+        cache_failure_state, cache_publication_or_context, linked_media_change_for_update,
+        ordered_demand, projected_preview_state,
+    };
 
     #[test]
     fn visible_media_precedes_preload_and_equivalent_demands_are_grouped() {
@@ -400,6 +590,85 @@ mod tests {
         assert_eq!(
             ordered_demand(&demand),
             ["photo-visible", "shared", "photo-preload"]
+        );
+    }
+
+    #[test]
+    fn only_authoritative_media_availability_is_projected_to_the_product() {
+        assert_eq!(
+            projected_preview_state(None),
+            None,
+            "an unconsolidated first sample cannot authorize a source recovery action"
+        );
+        assert_eq!(
+            projected_preview_state(Some(MediaAvailability::Candidate)),
+            Some(MediaPreviewState::Ready)
+        );
+        assert_eq!(
+            projected_preview_state(Some(MediaAvailability::Absent)),
+            Some(MediaPreviewState::Absent)
+        );
+        assert_eq!(
+            projected_preview_state(Some(MediaAvailability::Unavailable)),
+            Some(MediaPreviewState::Unavailable)
+        );
+        assert_ne!(
+            projected_preview_state(Some(MediaAvailability::Unavailable)),
+            Some(MediaPreviewState::CacheUnavailable),
+            "a Cache failure is not an authoritative statement about the Original"
+        );
+        assert_eq!(cache_failure_state(), MediaPreviewState::CacheUnavailable);
+        assert_ne!(
+            cache_failure_state(),
+            MediaPreviewState::Unavailable,
+            "Processor, validation and Cache storage failures do not classify the Original"
+        );
+    }
+
+    #[test]
+    fn registry_publication_failure_becomes_cache_unavailable_without_source_retry() {
+        let preview = cache_publication_or_context(
+            Err(CachePreviewError::InvalidDerivedArtifact),
+            "photo-a",
+            || crate::ipc_contract::MediaPreview {
+                media_id: "photo-a".into(),
+                state: cache_failure_state(),
+                url: None,
+            },
+        );
+
+        assert_eq!(preview.media_id, "photo-a");
+        assert_eq!(preview.state, MediaPreviewState::CacheUnavailable);
+        assert_ne!(preview.state, MediaPreviewState::Unavailable);
+        assert!(preview.url.is_none());
+    }
+
+    #[test]
+    fn adopted_photo_refreshes_projection_and_retry_refreshes_changed_media() {
+        let changed = MediaRuntimeUpdate::for_test_preserving_previews(
+            17,
+            vec!["photo-a".into(), "photo-b".into()],
+        );
+
+        assert_eq!(
+            linked_media_change_for_update(&changed, &["photo-a".into()], false)
+                .expect("an adopted change refreshes the WebView projection")
+                .media_ids,
+            ["photo-a"]
+        );
+        assert!(
+            linked_media_change_for_update(&changed, &[], false).is_none(),
+            "a change that did not rehydrate the Project does not reload its Projection"
+        );
+        assert_eq!(
+            linked_media_change_for_update(&changed, &[], true)
+                .expect("an explicit or causal retry refreshes every changed medium")
+                .media_ids,
+            ["photo-a", "photo-b"]
+        );
+        assert!(
+            linked_media_change_for_update(&MediaRuntimeUpdate::default(), &[], false).is_none(),
+            "an unchanged observation does not schedule redundant Project loads"
         );
     }
 }

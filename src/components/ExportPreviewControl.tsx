@@ -14,9 +14,10 @@ import type {
 } from "../application/projectDialogPort";
 import type {
   ExportAttempt,
-  ExportPort,
+  ExportPipelinePort,
   ExportProgressEvent,
   ExportProgressStage,
+  ExportSheetSelection,
 } from "../application/projectPorts";
 import { ActionButton } from "../ui";
 import "./ExportPreviewControl.css";
@@ -24,10 +25,10 @@ import "./ExportPreviewControl.css";
 interface ExportPreviewControlProps {
   dialogPort: ProjectDialogPort;
   disabled?: boolean;
-  exportPort: ExportPort;
+  exportPipelinePort: ExportPipelinePort;
   onActiveChange?(active: boolean): void;
   projectId: string;
-  sheetId: string | null;
+  selection: ExportSheetSelection | null;
 }
 
 export interface ExportPreviewControlHandle {
@@ -41,10 +42,10 @@ export const ExportPreviewControl = forwardRef<
   {
     dialogPort,
     disabled = false,
-    exportPort,
+    exportPipelinePort,
     onActiveChange,
     projectId,
-    sheetId,
+    selection,
   },
   ref,
 ) {
@@ -106,7 +107,7 @@ export const ExportPreviewControl = forwardRef<
   }, [dialogPort, projectId]);
 
   function startExport() {
-    if (disabled || !sheetId || currentAttemptId.current !== null) {
+    if (disabled || !selection || currentAttemptId.current !== null) {
       return;
     }
 
@@ -118,7 +119,7 @@ export const ExportPreviewControl = forwardRef<
 
     let attempt: ExportAttempt;
     try {
-      attempt = exportPort.startSheet(sheetId, (event) => {
+      attempt = exportPipelinePort.startSheet(selection, (event) => {
         if (currentAttemptId.current !== attemptId) {
           return;
         }
@@ -329,7 +330,7 @@ export const ExportPreviewControl = forwardRef<
       <ActionButton
         aria-label="Exportar Lâmina"
         className="export-preview-trigger"
-        disabled={disabled || !sheetId || phase !== "idle"}
+        disabled={disabled || !selection || phase !== "idle"}
         onClick={startExport}
         variant="primary"
       >

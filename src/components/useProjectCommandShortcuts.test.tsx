@@ -8,6 +8,7 @@ function handlers() {
     closeProject: vi.fn(),
     redo: vi.fn(),
     save: vi.fn(),
+    saveAs: vi.fn(),
     undo: vi.fn(),
   };
 }
@@ -42,6 +43,9 @@ test("dispatches the implemented Project command for every accepted shortcut", (
   );
 
   expect(dispatchShortcut("s").defaultPrevented).toBe(true);
+  expect(
+    dispatchShortcut("s", { shiftKey: true }).defaultPrevented,
+  ).toBe(true);
   expect(dispatchShortcut("z").defaultPrevented).toBe(true);
   expect(
     dispatchShortcut("z", { shiftKey: true }).defaultPrevented,
@@ -50,12 +54,13 @@ test("dispatches the implemented Project command for every accepted shortcut", (
   expect(dispatchShortcut("w").defaultPrevented).toBe(true);
 
   expect(actions.save).toHaveBeenCalledOnce();
+  expect(actions.saveAs).toHaveBeenCalledOnce();
   expect(actions.undo).toHaveBeenCalledOnce();
   expect(actions.redo).toHaveBeenCalledTimes(2);
   expect(actions.closeProject).toHaveBeenCalledOnce();
 });
 
-test("keeps placeholder Save as distinct from Save", () => {
+test("dispatches Save as distinctly from Save", () => {
   const actions = handlers();
   renderHook(() =>
     useProjectCommandShortcuts({
@@ -70,6 +75,7 @@ test("keeps placeholder Save as distinct from Save", () => {
 
   expect(event.defaultPrevented).toBe(true);
   expect(actions.save).not.toHaveBeenCalled();
+  expect(actions.saveAs).toHaveBeenCalledOnce();
 });
 
 test("leaves contextual Ctrl+E to the active photo owner", () => {

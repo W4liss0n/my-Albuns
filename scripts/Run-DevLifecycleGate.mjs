@@ -6,12 +6,12 @@ import {
   readdirSync,
   writeFileSync,
 } from "node:fs";
-import net from "node:net";
 import path from "node:path";
 
 import {
   assertCausalHandoffObserved,
   isCausalHandoffObserved,
+  isOwnedHostForestObserved,
   observesLogEvent,
   observesTypedCleanupTerminal,
 } from "./DevLifecycleGateObservations.mjs";
@@ -30,6 +30,10 @@ import {
   waitForChildProcessClose,
   waitForProcessInstance,
 } from "./DevLifecycleProcessInstances.mjs";
+import {
+  createWebDriverClient,
+  findFreeTcpPort,
+} from "./GateWebDriver.mjs";
 
 const [
   workspaceArgument,
@@ -87,20 +91,6 @@ mkdirSync(processDataRoot, { recursive: true });
 const delay = (milliseconds) =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
 
-async function freePort() {
-  return new Promise((resolve, reject) => {
-    const server = net.createServer();
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      server.close((error) => {
-        if (error) reject(error);
-        else resolve(address.port);
-      });
-    });
-  });
-}
-
 function collectOutput(child) {
   let output = "";
   child.stdout?.on("data", (chunk) => {
@@ -126,26 +116,6 @@ async function waitForHttp(url, timeoutMilliseconds, label) {
     await delay(100);
   }
   throw lastError ?? new Error(`${label} did not become ready`);
-}
-
-function webdriverClient(baseUrl) {
-  return async (method, endpoint, body, timeout = 5_000) => {
-    const response = await fetch(`${baseUrl}${endpoint}`, {
-      method,
-      headers:
-        body === undefined ? undefined : { "content-type": "application/json" },
-      body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(timeout),
-    });
-    const text = await response.text();
-    const payload = text ? JSON.parse(text) : { value: null };
-    if (!response.ok || payload.value?.error) {
-      throw new Error(
-        `${method} ${endpoint} failed (${response.status}): ${JSON.stringify(payload)}`,
-      );
-    }
-    return payload.value;
-  };
 }
 
 function applicationProcesses() {
@@ -334,8 +304,8 @@ if (frontendServerProcessId() !== null || (await frontendResponds())) {
   );
 }
 
-const driverPort = await freePort();
-const hostDebugPort = await freePort();
+const driverPort = await findFreeTcpPort();
+const hostDebugPort = await findFreeTcpPort();
 
 function supervisorEnvironment() {
   return {
@@ -625,7 +595,9 @@ try {
     30_000,
     "Microsoft Edge WebDriver",
   );
-  const request = webdriverClient(driverBaseUrl);
+  const request = createWebDriverClient(driverBaseUrl, {
+    defaultTimeoutMilliseconds: 5_000,
+  });
   const session = await request(
     "POST",
     "/session",
@@ -684,26 +656,42 @@ try {
   }
   writeFileSync(screenshotPath, Buffer.from(screenshot, "base64"));
 
-  const normalApplications = applicationProcesses();
-  const normalHostForestInstances = processForestInstances([hostInstance]);
-  const normalHostForest = normalHostForestInstances.map(
-    (instance) => instance.processId,
-  );
-  const normalTreeInstances = captureDevelopmentForest(
-    supervisorInstance,
-    normalApplications,
-    [globalInstance, hostInstance],
-  );
-  const normalTree = normalTreeInstances.map((instance) => instance.processId);
-  if (
-    !normalTree.includes(supervisorPid) ||
-    !normalTree.includes(hostPid) ||
-    !normalTreeInstances.some((entry) =>
-      sameProcessInstance(entry, viteInstance),
-    ) ||
-    normalHostForest.length < 2 ||
-    !normalHostForest.every((processId) => normalTree.includes(processId))
-  ) {
+  let normalTreeInstances = [];
+  let normalTree = [];
+  let normalHostForest = [];
+  let normalForestObserved = false;
+  const normalForestDeadline = Date.now() + 30_000;
+  while (Date.now() < normalForestDeadline) {
+    const normalApplications = applicationProcesses();
+    normalHostForest = processForestInstances([hostInstance]).map(
+      (instance) => instance.processId,
+    );
+    normalTreeInstances = captureDevelopmentForest(
+      supervisorInstance,
+      normalApplications,
+      [globalInstance, hostInstance],
+    );
+    normalTree = normalTreeInstances.map((instance) => instance.processId);
+    normalForestObserved =
+      normalTree.includes(supervisorPid) &&
+      normalTree.includes(hostPid) &&
+      normalTreeInstances.some((entry) =>
+        sameProcessInstance(entry, viteInstance),
+      ) &&
+      isOwnedHostForestObserved({
+        hostProcessId: hostPid,
+        hostForest: normalHostForest,
+        developmentForest: normalTree,
+      });
+    if (normalForestObserved) break;
+    if (
+      aliveProcessInstances([supervisorInstance, hostInstance]).length !== 2
+    ) {
+      break;
+    }
+    await delay(100);
+  }
+  if (!normalForestObserved) {
     throw new Error(
       `The normal lifecycle forest was incomplete before shutdown: ${JSON.stringify({ normalTree, normalHostForest, supervisorPid, globalPid, hostPid, vitePid })}`,
     );

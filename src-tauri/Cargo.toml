@@ -27,7 +27,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "~2.11", features = ["protocol-asset"] }
+tauri = { version = "~2.11", features = ["protocol-asset", "unstable"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-shell = "2"
 myalbuns-core = { path = "../crates/myalbuns-core" }
@@ -42,7 +42,7 @@ tracing.workspace = true
 ts-rs.workspace = true
 uuid.workspace = true
 windows-sys.workspace = true
-image = { workspace = true, features = ["jpeg", "png"] }
+image = { workspace = true, features = ["jpeg", "png", "tiff"] }
 
 [target.'cfg(windows)'.dependencies]
 webview2-com = "0.38"

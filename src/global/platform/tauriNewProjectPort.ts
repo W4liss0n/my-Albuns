@@ -70,4 +70,11 @@ export const tauriNewProjectPort: NewProjectPort = {
       // The process-scoped registry is also cleared when this window closes.
     }
   },
+  clearProvisionalDecoratives: async () => {
+    try {
+      await invoke<void>("clear_provisional_decoratives");
+    } catch {
+      // The process-scoped registry is also cleared when this window closes.
+    }
+  },
 };

@@ -158,6 +158,41 @@ try {
     if ($cleanupAttempts.Count -ne 3) {
         throw 'Gate scratch cleanup did not retry a transient file lock.'
     }
+
+    $processProbeAttempts = [System.Collections.Generic.List[int]]::new()
+    Wait-GatePathProcessesExit `
+        -Path $runnerOutputRoot `
+        -MaximumAttempts 3 `
+        -RetryDelayMilliseconds 0 `
+        -GetProcessesOperation {
+            param([string] $Candidate)
+            $processProbeAttempts.Add(1)
+            if ($processProbeAttempts.Count -lt 3) {
+                return @([pscustomobject]@{ ProcessId = 42; Path = $Candidate })
+            }
+            return @()
+        }
+    if ($processProbeAttempts.Count -ne 3) {
+        throw 'Gate process cleanup did not await a transient scratch-bound process.'
+    }
+
+    $persistentProcessFailure = $null
+    try {
+        Wait-GatePathProcessesExit `
+            -Path $runnerOutputRoot `
+            -MaximumAttempts 2 `
+            -RetryDelayMilliseconds 0 `
+            -GetProcessesOperation {
+                return @([pscustomobject]@{ ProcessId = 84 })
+            }
+    }
+    catch {
+        $persistentProcessFailure = $_.Exception.Message
+    }
+    if ($persistentProcessFailure -notmatch 'remained alive after 2 observations') {
+        throw 'Gate process cleanup did not fail closed after exhausting observations.'
+    }
+
     $persistentCleanupRoot = Join-Path $fixtureRoot '.scratch\persistent-lock'
     New-Item -ItemType Directory -Force -Path $persistentCleanupRoot | Out-Null
     $persistentFailure = $null
@@ -186,7 +221,7 @@ try {
         throw 'A runner-shaped cleanup did not restore a clean evidence input tree.'
     }
 
-    Write-Output 'Gate source provenance: 9 assertions passed.'
+    Write-Output 'Gate source provenance: 11 assertions passed.'
 }
 finally {
     Remove-GateScratchDirectory `

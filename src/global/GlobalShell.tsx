@@ -45,6 +45,7 @@ interface GlobalShellProps {
 
 const recentCoverVariants = [1, 2, 1, 3, 4, 1, 2] as const;
 const portraitCoverIndexes = new Set([1, 4, 6]);
+type LaunchOutcomeContext = "opening" | "externalCopyResolution";
 
 export function GlobalShell({
   failureDialogPort,
@@ -53,6 +54,7 @@ export function GlobalShell({
   projectPort,
 }: GlobalShellProps) {
   const [isOpening, setIsOpening] = useState(false);
+  const [externalCopyPending, setExternalCopyPending] = useState(false);
   const [surface, setSurface] = useState<"welcome" | "newProject">(
     "welcome",
   );
@@ -64,20 +66,48 @@ export function GlobalShell({
   const newProjectTriggerRef = useRef<HTMLButtonElement>(null);
   const restoreNewProjectTriggerFocus = useRef(false);
 
-  useEffect(() => {
-    if (graphicsGateReported.current) return;
-    graphicsGateReported.current = true;
-    void projectPort
-      .completeGraphicsGate(graphicsDiagnostic.supported)
-      .then((outcome) => {
-        if (outcome?.status === "failed") {
-          void failureDialogPort.present({
+  const handleLaunchOutcome = useCallback(
+    async (
+      outcome: OpenProjectOutcome,
+      context: LaunchOutcomeContext = "opening",
+    ) => {
+      switch (outcome.status) {
+        case "failed":
+          if (context === "externalCopyResolution") {
+            setExternalCopyPending(false);
+          }
+          await failureDialogPort.present({
             context: "projectOpening",
             error: outcome.error,
           });
-        }
+          return;
+        case "externalCopyNotWritable":
+          setExternalCopyPending(true);
+          return;
+        case "opened":
+        case "focused":
+          setExternalCopyPending(false);
+          return;
+        case "cancelled":
+          if (context === "externalCopyResolution") {
+            setExternalCopyPending(false);
+          }
+      }
+    },
+    [failureDialogPort],
+  );
+
+  useEffect(() => {
+    if (graphicsGateReported.current) return;
+    graphicsGateReported.current = true;
+    const graphicsAttempt = openingAttempt.current;
+    void projectPort
+      .completeGraphicsGate(graphicsDiagnostic.supported)
+      .then((outcome) => {
+        if (openingAttempt.current !== graphicsAttempt || !outcome) return;
+        void handleLaunchOutcome(outcome);
       });
-  }, [failureDialogPort, graphicsDiagnostic.supported, projectPort]);
+  }, [graphicsDiagnostic.supported, handleLaunchOutcome, projectPort]);
 
   useEffect(() => {
     let active = true;
@@ -104,20 +134,44 @@ export function GlobalShell({
     };
   }, [failureDialogPort, projectPort]);
 
+  useEffect(() => {
+    let active = true;
+    let unlisten: (() => void) | undefined;
+    void projectPort
+      .onActivationTerminal((outcome) => {
+        if (!active) return;
+        openingAttempt.current += 1;
+        setIsOpening(false);
+        void handleLaunchOutcome(outcome);
+      })
+      .then((release) => {
+        if (active) {
+          unlisten = release;
+        } else {
+          release();
+        }
+      })
+      .catch(() => {
+        // Direct commands still report their own terminal outcome.
+      });
+    return () => {
+      active = false;
+      unlisten?.();
+    };
+  }, [handleLaunchOutcome, projectPort]);
+
   const runOpening = useCallback(
-    async (attempt: () => Promise<OpenProjectOutcome>) => {
+    async (
+      attempt: () => Promise<OpenProjectOutcome>,
+      context: LaunchOutcomeContext = "opening",
+    ) => {
       openingAttempt.current += 1;
       setIsOpening(true);
       const outcome = await attempt();
-      if (outcome.status === "failed") {
-        await failureDialogPort.present({
-          context: "projectOpening",
-          error: outcome.error,
-        });
-      }
+      await handleLaunchOutcome(outcome, context);
       setIsOpening(false);
     },
-    [failureDialogPort],
+    [handleLaunchOutcome],
   );
 
   const openProject = useCallback(
@@ -128,15 +182,26 @@ export function GlobalShell({
   const openRecentProject = (id: string) =>
     runOpening(() => projectPort.openRecentProject(id));
 
+  const saveExternalCopyAs = useCallback(
+    () =>
+      runOpening(
+        () => projectPort.saveExternalCopyAs(),
+        "externalCopyResolution",
+      ),
+    [projectPort, runOpening],
+  );
+
   const startCreation = useCallback(() => {
     openingAttempt.current += 1;
+    setExternalCopyPending(false);
     setSurface("newProject");
   }, []);
 
   const cancelCreation = useCallback(() => {
+    void newProjectPort.clearProvisionalDecoratives();
     restoreNewProjectTriggerFocus.current = true;
     setSurface("welcome");
-  }, []);
+  }, [newProjectPort]);
 
   useLayoutEffect(() => {
     if (
@@ -303,6 +368,21 @@ export function GlobalShell({
             </ActionButton>
           </div>
           <div aria-hidden="true" className="global-action-divider" />
+          {externalCopyPending ? (
+            <section className="global-copy-resolution">
+              <h2>Cópia externa somente leitura</h2>
+              <p>
+                Escolha outro local para criar uma cópia editável sem alterar
+                o arquivo original.
+              </p>
+              <ActionButton
+                disabled={isOpening}
+                onClick={saveExternalCopyAs}
+              >
+                Salvar cópia como…
+              </ActionButton>
+            </section>
+          ) : null}
           <div className="global-secondary-actions">
             {/* PLACEHOLDER UI: ainda não existe uma porta de Exportação em lote. */}
             <button

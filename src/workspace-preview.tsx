@@ -8,9 +8,9 @@ import type {
 } from "./application/graphics";
 import { silentLogger } from "./application/logging";
 import type {
-  ExportPort,
+  ExportPipelinePort,
   MediaPreviewPort,
-  ProjectSessionPort,
+  ProjectCorePort,
   ProjectStartupPort,
   ProjectWindowPort,
 } from "./application/projectPorts";
@@ -32,7 +32,7 @@ const decorativeContext = previewParameters.get("decorative");
 const unavailableDecorativeId = "decorative-preview-unavailable";
 let projection = createPreviewProjection(frameContext, decorativeContext);
 
-const projectSessionPort: ProjectSessionPort = {
+const projectCorePort: ProjectCorePort = {
   load: async () => projection,
   validateAlbumInformation: async () => ({
     errors: [],
@@ -43,10 +43,21 @@ const projectSessionPort: ProjectSessionPort = {
     },
   }),
   apply: async () => projection,
+  applyWithOutcome: async () => ({
+    projection,
+    affectedFrameId: null,
+  }),
+  importPhoto: async () => ({ kind: "cancelled", projection }),
+  resolvePhotoDropTarget: async () => ({ kind: "invalid" }),
+  relink: async () => projection,
   undo: async () => projection,
   redo: async () => projection,
   save: async () => ({
     outcome: { kind: "saved", revision: projection.state.revision },
+    projection,
+  }),
+  saveAs: async () => ({
+    outcome: { kind: "cancelled" },
     projection,
   }),
 };
@@ -62,10 +73,16 @@ const mediaPreviewPort: MediaPreviewPort = {
           },
         ]
       : null,
+  retryUnavailableMedia: async (mediaId) => ({
+    mediaId,
+    state: "unavailable",
+    url: null,
+  }),
   onMediaChanged: async () => () => undefined,
+  onCacheProcessorWarning: async () => () => undefined,
 };
 
-const exportPort: ExportPort = {
+const exportPipelinePort: ExportPipelinePort = {
   startSheet: () => ({
     completion: Promise.resolve({
       status: "completed",
@@ -89,6 +106,8 @@ const projectDialogPort: ProjectDialogPort = {
 };
 
 const projectStartupPort: ProjectStartupPort = {
+  recoveryStatus: async () => ({ kind: "none" }),
+  resolveRecovery: async () => ({ kind: "deferred" }),
   confirmUiReady: async () => undefined,
 };
 
@@ -127,12 +146,12 @@ const workspacePreferencesPort = createPreviewWorkspacePreferencesPort(
 
 const appProps = {
   canvasGraphicsDiagnosticProbe,
-  exportPort,
+  exportPipelinePort,
   graphicsProbe,
   logger: silentLogger,
   mediaPreviewPort,
   projectDialogPort,
-  projectSessionPort,
+  projectCorePort,
   projectStartupPort,
   projectWindowPort,
 };

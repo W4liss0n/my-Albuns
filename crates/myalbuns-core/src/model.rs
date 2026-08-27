@@ -1,17 +1,111 @@
-use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 use thiserror::Error;
 use ts_rs::TS;
+use uuid::{Uuid, Version};
 
 use crate::project_document::{
     AlbumInformation, DisplayUnit, DocumentSettings, ProjectConfigurationValidationError,
 };
 
-pub(crate) const PROJECT_DOCUMENT_SCHEMA_VERSION: u32 = 4;
 pub(crate) const RENDER_SNAPSHOT_SCHEMA_VERSION: u32 = 6;
 pub(crate) const PHOTO_PAN_MIN: f32 = -1.0;
 pub(crate) const PHOTO_PAN_MAX: f32 = 1.0;
 pub(crate) const PHOTO_ZOOM_MIN: f32 = 1.0;
 pub(crate) const PHOTO_ZOOM_MAX: f32 = 4.0;
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct MediaId(Uuid);
+
+#[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
+#[error("Identidade de mídia inválida; esperado UUID v4 canônico")]
+pub struct ParseMediaIdError;
+
+impl MediaId {
+    pub(crate) fn from_uuid(value: Uuid) -> Self {
+        Self::try_from(value).expect("a identidade interna de mídia deve ser UUID v4")
+    }
+
+    pub const fn into_uuid(self) -> Uuid {
+        self.0
+    }
+}
+
+impl TryFrom<Uuid> for MediaId {
+    type Error = ParseMediaIdError;
+
+    fn try_from(value: Uuid) -> Result<Self, Self::Error> {
+        if value.get_version() != Some(Version::Random) {
+            return Err(ParseMediaIdError);
+        }
+        Ok(Self(value))
+    }
+}
+
+impl std::fmt::Display for MediaId {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+impl std::str::FromStr for MediaId {
+    type Err = ParseMediaIdError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        let parsed = Uuid::parse_str(value).map_err(|_| ParseMediaIdError)?;
+        if parsed.get_version() != Some(Version::Random) || parsed.hyphenated().to_string() != value
+        {
+            return Err(ParseMediaIdError);
+        }
+        Ok(Self(parsed))
+    }
+}
+
+impl From<MediaId> for String {
+    fn from(value: MediaId) -> Self {
+        value.to_string()
+    }
+}
+
+/// A creative command that changes one persisted media occurrence.
+///
+/// The native path deliberately has no serde or TypeScript representation, so
+/// only the trusted Host can construct this command after `MediaResolver`
+/// validates a user-selected file.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RelinkMedia {
+    pub(crate) media_id: MediaId,
+    pub(crate) replacement_path: PathBuf,
+}
+
+impl RelinkMedia {
+    pub fn new(media_id: MediaId, replacement_path: PathBuf) -> Self {
+        Self {
+            media_id,
+            replacement_path,
+        }
+    }
+}
+
+impl Serialize for MediaId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.0.hyphenated().to_string())
+    }
+}
+
+impl<'de> Deserialize<'de> for MediaId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        value.parse().map_err(de::Error::custom)
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -68,7 +162,10 @@ pub struct PhotoPlacement {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
+/// A placement keeps the minimum Frame-filling scale separate from the
+/// user's relative Zoom (`current_zoom == 1.0` means no adjustment).
 pub struct PhotoPlacementPlan {
+    pub base_fill_zoom: f64,
     pub current_pan: NormalizedPan,
     pub current_zoom: f64,
     pub pan_range: NumberRange,
@@ -107,17 +204,9 @@ impl Default for MediaTransform {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct PhotoSnapshot {
-    pub media_id: String,
+    #[ts(type = "string")]
+    pub media_id: MediaId,
     pub transform: MediaTransform,
-}
-
-impl PhotoSnapshot {
-    pub(crate) fn for_media(media_id: String) -> Self {
-        Self {
-            media_id,
-            transform: MediaTransform::default(),
-        }
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
@@ -178,8 +267,13 @@ pub enum MediaKind {
 )]
 #[ts(tag = "kind")]
 pub enum ProjectedBackgroundContent {
-    Color { rgb: String },
-    Media { media_id: String },
+    Color {
+        rgb: String,
+    },
+    Media {
+        #[ts(type = "string")]
+        media_id: MediaId,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
@@ -207,7 +301,10 @@ pub enum ProjectedBackground {
 )]
 #[ts(tag = "kind")]
 pub enum ProjectedOverlayContent {
-    Media { media_id: String },
+    Media {
+        #[ts(type = "string")]
+        media_id: MediaId,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
@@ -277,7 +374,8 @@ pub struct SheetSnapshot {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct MediaCatalogItem {
-    pub id: String,
+    #[ts(type = "string")]
+    pub id: MediaId,
     pub kind: MediaKind,
     pub name: String,
     pub source_width_px: Option<u32>,
@@ -315,10 +413,6 @@ impl DocumentSnapshot {
             safety_um: settings.safety_um(),
         }
     }
-
-    pub(crate) fn neutral() -> Self {
-        Self::from_settings(&DocumentSettings::neutral())
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
@@ -338,7 +432,8 @@ pub struct EditorState {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct ComposedPhoto {
-    pub media_id: String,
+    #[ts(type = "string")]
+    pub media_id: MediaId,
     pub name: String,
     pub draw_rect: RectUm,
     pub placement: PhotoPlacementPlan,
@@ -360,7 +455,8 @@ pub struct ComposedFrame {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct ComposedDecorative {
-    pub media_id: String,
+    #[ts(type = "string")]
+    pub media_id: MediaId,
     pub name: String,
     pub draw_rect: RectUm,
 }
@@ -385,7 +481,8 @@ pub enum ComposedBackground {
         draw_rect: RectUm,
     },
     Media {
-        media_id: String,
+        #[ts(type = "string")]
+        media_id: MediaId,
         name: String,
         draw_rect: RectUm,
     },
@@ -406,24 +503,20 @@ pub struct ComposedSheet {
 }
 
 impl ComposedSheet {
-    pub fn referenced_media_ids(&self) -> impl Iterator<Item = &str> {
+    pub fn referenced_media_ids(&self) -> impl Iterator<Item = MediaId> + '_ {
         self.backgrounds
             .iter()
             .filter_map(|background| match background {
                 ComposedBackground::Color { .. } => None,
-                ComposedBackground::Media { media_id, .. } => Some(media_id.as_str()),
+                ComposedBackground::Media { media_id, .. } => Some(*media_id),
             })
             .chain(
                 self.frames
                     .iter()
                     .filter_map(|frame| frame.photo.as_ref())
-                    .map(|photo| photo.media_id.as_str()),
+                    .map(|photo| photo.media_id),
             )
-            .chain(
-                self.overlays
-                    .iter()
-                    .map(|overlay| overlay.media_id.as_str()),
-            )
+            .chain(self.overlays.iter().map(|overlay| overlay.media_id))
     }
 }
 
@@ -450,7 +543,8 @@ impl ComposedOutputUnit {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct MediaUsage {
-    pub media_id: String,
+    #[ts(type = "string")]
+    pub media_id: MediaId,
     pub count: usize,
 }
 
@@ -460,6 +554,164 @@ pub struct EditorProjection {
     pub state: EditorState,
     pub composition: CompositionPlan,
     pub media_usage: Vec<MediaUsage>,
+}
+
+/// Runtime-only presentation facts observed or assigned for the linked
+/// Original while its opaque preview is resolved.
+///
+/// This type deliberately has no serde representation. It can enrich a
+/// projection, but can never become part of the Project document.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PhotoSourceMetadata {
+    source_width_px: u32,
+    source_height_px: u32,
+    palette: [String; 3],
+}
+
+impl PhotoSourceMetadata {
+    pub fn new(
+        source_width_px: u32,
+        source_height_px: u32,
+        palette: [String; 3],
+    ) -> Result<Self, CoreError> {
+        if source_width_px == 0
+            || source_height_px == 0
+            || palette.iter().any(|color| !is_canonical_rgb(color))
+        {
+            return Err(CoreError::InvalidPhotoSourceMetadata);
+        }
+        Ok(Self {
+            source_width_px,
+            source_height_px,
+            palette,
+        })
+    }
+
+    pub const fn source_width_px(&self) -> u32 {
+        self.source_width_px
+    }
+
+    pub const fn source_height_px(&self) -> u32 {
+        self.source_height_px
+    }
+
+    pub fn palette(&self) -> &[String; 3] {
+        &self.palette
+    }
+}
+
+fn is_canonical_rgb(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    bytes.len() == 7
+        && bytes[0] == b'#'
+        && bytes[1..]
+            .iter()
+            .all(|byte| byte.is_ascii_digit() || (b'A'..=b'F').contains(byte))
+}
+
+/// Trusted native import command. The Host constructs it only after the
+/// selected JPEG has passed path and codec inspection.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ImportPhoto {
+    pub(crate) path: PathBuf,
+    pub(crate) source_metadata: PhotoSourceMetadata,
+}
+
+impl ImportPhoto {
+    pub fn new(path: PathBuf, source_metadata: PhotoSourceMetadata) -> Self {
+        Self {
+            path,
+            source_metadata,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum PhotoPlacementMode {
+    Normal,
+    Edit,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectMutationOutcome {
+    pub projection: EditorProjection,
+    pub affected_frame_id: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ImportPhotoOutcome {
+    pub projection: EditorProjection,
+    pub media_id: MediaId,
+    pub disposition: ImportPhotoDisposition,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ImportPhotoDisposition {
+    Imported,
+    Existing,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+#[ts(tag = "kind")]
+pub enum PhotoDropTarget {
+    Frame { frame_id: String },
+    Sheet { sheet_id: String },
+    Invalid,
+}
+
+/// Borrowed rendering envelope over one already resolved CompositionPlan.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RenderSnapshotRef<'a> {
+    pub schema_version: u32,
+    pub project_id: &'a str,
+    pub project_name: &'a str,
+    pub revision: u64,
+    pub dpi: u32,
+    pub unit: &'static str,
+    pub composition: &'a CompositionPlan,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct RenderSnapshotMetadata<'a> {
+    project_id: &'a str,
+    project_name: &'a str,
+    revision: u64,
+    dpi: u32,
+}
+
+impl<'a> From<&'a EditorState> for RenderSnapshotMetadata<'a> {
+    fn from(state: &'a EditorState) -> Self {
+        Self {
+            project_id: &state.project_id,
+            project_name: &state.project_name,
+            revision: state.revision,
+            dpi: state.document.dpi,
+        }
+    }
+}
+
+impl<'a> RenderSnapshotRef<'a> {
+    pub(crate) fn from_resolved(
+        metadata: RenderSnapshotMetadata<'a>,
+        composition: &'a CompositionPlan,
+    ) -> Self {
+        Self {
+            schema_version: RENDER_SNAPSHOT_SCHEMA_VERSION,
+            project_id: metadata.project_id,
+            project_name: metadata.project_name,
+            revision: metadata.revision,
+            dpi: metadata.dpi,
+            unit: "micrometers",
+            composition,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -475,6 +727,21 @@ pub struct RenderSnapshot {
 }
 
 impl RenderSnapshot {
+    pub(crate) fn from_resolved(
+        metadata: RenderSnapshotMetadata<'_>,
+        composition: CompositionPlan,
+    ) -> Self {
+        Self {
+            schema_version: RENDER_SNAPSHOT_SCHEMA_VERSION,
+            project_id: metadata.project_id.to_owned(),
+            project_name: metadata.project_name.to_owned(),
+            revision: metadata.revision,
+            dpi: metadata.dpi,
+            unit: "micrometers".into(),
+            composition,
+        }
+    }
+
     pub fn validate(&self) -> Result<(), CoreError> {
         crate::validation::validate_render_snapshot(self)
     }
@@ -517,9 +784,19 @@ pub enum ProjectIntent {
         delta_pan_y: f32,
         delta_zoom: f32,
     },
-    FillLeftmostPlaceholder {
+    AddPhoto {
         sheet_id: String,
-        media_id: String,
+        #[ts(type = "string")]
+        media_id: MediaId,
+        mode: PhotoPlacementMode,
+    },
+    DropPhoto {
+        sheet_id: String,
+        #[ts(type = "string")]
+        media_id: MediaId,
+        x_um: i64,
+        y_um: i64,
+        mode: PhotoPlacementMode,
     },
 }
 
@@ -537,6 +814,8 @@ pub enum CoreError {
     RevisionSpaceExhausted,
     #[error("A intenção não é compatível com o Documento de Projeto v1")]
     UnsupportedProjectIntent,
+    #[error("Os metadados observados da Foto não são válidos")]
+    InvalidPhotoSourceMetadata,
     #[error("Frame não encontrado: {0}")]
     FrameNotFound(String),
     #[error("O Frame não contém uma Foto: {0}")]

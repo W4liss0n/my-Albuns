@@ -15,13 +15,15 @@ use super::{DecodeFailure, DocumentFailure, PathFailure};
 use crate::MediaKind;
 use crate::project_document::{
     ActiveSides, Background, BackgroundContent, DisplayUnit, DocumentSettings, FrameBorder,
-    MAX_SAFE_INTEGER, MediaRef, Overlay, OverlayContent, ProjectDocument, ProjectRevision,
-    ProjectSheet, Rgb, VisualDefaults, frame_border_width_is_valid, validate_project_state,
+    MAX_SAFE_INTEGER, MediaRef, Overlay, OverlayContent, ProjectDocument, ProjectFrame,
+    ProjectPhoto, ProjectPhotoTransform, ProjectRect, ProjectRevision, ProjectSheet, Rgb,
+    VisualDefaults, frame_border_width_is_valid, validate_project_state,
 };
 
 const DOCUMENT_TYPE: &str = "myalbuns.project";
 const SCHEMA_VERSION_V1: u32 = 1;
 pub(super) const SCHEMA_VERSION_V2: u32 = 2;
+pub(super) const SCHEMA_VERSION_V3: u32 = 3;
 const UTF8_BOM: &[u8] = &[0xEF, 0xBB, 0xBF];
 
 pub(super) struct DecodedProjectRevision {
@@ -38,9 +40,14 @@ pub(super) fn decode(bytes: &[u8]) -> Result<DecodedProjectRevision, DecodeFailu
         SCHEMA_VERSION_V1 => {
             let document: ProjectDocumentV1 = serde_json::from_slice(bytes)
                 .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))?;
-            migrate_v1_to_v2(document)?
+            migrate_v2_to_v3(migrate_v1_to_v2(document)?)?
         }
-        SCHEMA_VERSION_V2 => serde_json::from_slice::<ProjectDocumentV2>(bytes)
+        SCHEMA_VERSION_V2 => {
+            let document = serde_json::from_slice::<ProjectDocumentV2>(bytes)
+                .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))?;
+            migrate_v2_to_v3(document)?
+        }
+        SCHEMA_VERSION_V3 => serde_json::from_slice::<ProjectDocumentV3>(bytes)
             .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))?,
         _ => unreachable!("classify_header accepts only supported public schemas"),
     };
@@ -57,11 +64,44 @@ pub(super) fn encode(revision: &ProjectRevision) -> Result<Vec<u8>, DecodeFailur
     if revision.revision > MAX_SAFE_INTEGER {
         return Err(document_failure(DocumentFailure::InvalidProjectDocument));
     }
-    let dto = ProjectDocumentV2::from_domain(revision)?;
+    let dto = ProjectDocumentV3::from_domain(revision)?;
     let mut bytes = serde_json::to_vec_pretty(&dto)
         .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))?;
     bytes.push(b'\n');
     Ok(bytes)
+}
+
+pub(super) fn rewrite_project_id(
+    bytes: &[u8],
+    project_id: Uuid,
+) -> Result<(Vec<u8>, ProjectRevision), DecodeFailure> {
+    let source = decode(bytes)?;
+    let project_id = project_id.hyphenated().to_string();
+    let mut rewritten = match source.source_schema_version {
+        SCHEMA_VERSION_V1 => {
+            let mut document: ProjectDocumentV1 = serde_json::from_slice(bytes)
+                .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))?;
+            document.project_id = project_id;
+            serde_json::to_vec_pretty(&document)
+        }
+        SCHEMA_VERSION_V2 => {
+            let mut document: ProjectDocumentV2 = serde_json::from_slice(bytes)
+                .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))?;
+            document.project_id = project_id;
+            serde_json::to_vec_pretty(&document)
+        }
+        SCHEMA_VERSION_V3 => {
+            let mut document: ProjectDocumentV3 = serde_json::from_slice(bytes)
+                .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))?;
+            document.project_id = project_id;
+            serde_json::to_vec_pretty(&document)
+        }
+        _ => unreachable!("decode accepts only supported public schemas"),
+    }
+    .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))?;
+    rewritten.push(b'\n');
+    let candidate = decode(&rewritten)?.revision;
+    Ok((rewritten, candidate))
 }
 
 fn classify_header(bytes: &[u8]) -> Result<u32, DecodeFailure> {
@@ -79,7 +119,7 @@ fn classify_header(bytes: &[u8]) -> Result<u32, DecodeFailure> {
         return Err(document_failure(DocumentFailure::InvalidProjectDocument));
     };
     match version {
-        SCHEMA_VERSION_V1 | SCHEMA_VERSION_V2 => Ok(version),
+        SCHEMA_VERSION_V1 | SCHEMA_VERSION_V2 | SCHEMA_VERSION_V3 => Ok(version),
         0 => Err(document_failure(DocumentFailure::UnsupportedLegacySchema {
             version,
         })),
@@ -89,8 +129,8 @@ fn classify_header(bytes: &[u8]) -> Result<u32, DecodeFailure> {
     }
 }
 
-fn map_document(document: ProjectDocumentV2) -> Result<ProjectRevision, DecodeFailure> {
-    if document.document_type != DOCUMENT_TYPE || document.schema_version != SCHEMA_VERSION_V2 {
+fn map_document(document: ProjectDocumentV3) -> Result<ProjectRevision, DecodeFailure> {
+    if document.document_type != DOCUMENT_TYPE || document.schema_version != SCHEMA_VERSION_V3 {
         return Err(document_failure(DocumentFailure::InvalidProjectDocument));
     }
     if document.revision > MAX_SAFE_INTEGER {
@@ -110,7 +150,7 @@ fn map_document(document: ProjectDocumentV2) -> Result<ProjectRevision, DecodeFa
         .project
         .sheets
         .into_iter()
-        .map(map_sheet)
+        .map(map_sheet_v3)
         .collect::<Result<Vec<_>, _>>()?;
     let project = ProjectDocument::new(settings, visual_defaults, media, sheets);
     validate_project_state(&project)
@@ -204,10 +244,43 @@ fn map_media(media: MediaRefV2) -> Result<MediaRef, DecodeFailure> {
     Ok(MediaRef::new(parse_uuid_v4(&media.id)?, kind, path))
 }
 
-fn map_sheet(sheet: SheetV1) -> Result<ProjectSheet, DecodeFailure> {
-    Ok(ProjectSheet::new(
+fn map_sheet_v3(sheet: SheetV3) -> Result<ProjectSheet, DecodeFailure> {
+    let frames = sheet
+        .frames
+        .into_iter()
+        .map(map_frame_v3)
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(ProjectSheet::with_frames(
         parse_uuid_v4(&sheet.id)?,
         sheet.active_sides.into(),
+        frames,
+    ))
+}
+
+fn map_frame_v3(frame: FrameV3) -> Result<ProjectFrame, DecodeFailure> {
+    let photo = frame
+        .photo
+        .map(|photo| {
+            Ok(ProjectPhoto::new(
+                parse_uuid_v4(&photo.media_id)?,
+                ProjectPhotoTransform::new(
+                    photo.transform.pan_x,
+                    photo.transform.pan_y,
+                    photo.transform.user_zoom,
+                )
+                .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))?,
+            ))
+        })
+        .transpose()?;
+    Ok(ProjectFrame::new(
+        parse_uuid_v4(&frame.id)?,
+        ProjectRect::new(
+            frame.rect.x,
+            frame.rect.y,
+            frame.rect.width,
+            frame.rect.height,
+        ),
+        photo,
     ))
 }
 
@@ -341,14 +414,24 @@ struct ProjectDocumentV2 {
     project: ProjectPayloadV2,
 }
 
-impl ProjectDocumentV2 {
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProjectDocumentV3 {
+    document_type: String,
+    schema_version: u32,
+    project_id: String,
+    revision: u64,
+    project: ProjectPayloadV3,
+}
+
+impl ProjectDocumentV3 {
     fn from_domain(revision: &ProjectRevision) -> Result<Self, DecodeFailure> {
         Ok(Self {
             document_type: DOCUMENT_TYPE.into(),
-            schema_version: SCHEMA_VERSION_V2,
+            schema_version: SCHEMA_VERSION_V3,
             project_id: revision.project_id.hyphenated().to_string(),
             revision: revision.revision,
-            project: ProjectPayloadV2::from_domain(&revision.project)?,
+            project: ProjectPayloadV3::from_domain(&revision.project)?,
         })
     }
 }
@@ -371,7 +454,16 @@ struct ProjectPayloadV2 {
     sheets: Vec<SheetV1>,
 }
 
-impl ProjectPayloadV2 {
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProjectPayloadV3 {
+    document: DocumentSettingsV1,
+    visual_defaults: VisualDefaultsV1,
+    media: Vec<MediaRefV2>,
+    sheets: Vec<SheetV3>,
+}
+
+impl ProjectPayloadV3 {
     fn from_domain(project: &ProjectDocument) -> Result<Self, DecodeFailure> {
         Ok(Self {
             document: DocumentSettingsV1::from_domain(project.document()),
@@ -381,7 +473,7 @@ impl ProjectPayloadV2 {
                 .iter()
                 .map(MediaRefV2::from_domain)
                 .collect(),
-            sheets: project.sheets().iter().map(SheetV1::from_domain).collect(),
+            sheets: project.sheets().iter().map(SheetV3::from_domain).collect(),
         })
     }
 }
@@ -406,6 +498,30 @@ fn migrate_v1_to_v2(document: ProjectDocumentV1) -> Result<ProjectDocumentV2, De
             visual_defaults,
             media: media.into_iter().map(MediaRefV2::from_v1).collect(),
             sheets,
+        },
+    })
+}
+
+fn migrate_v2_to_v3(document: ProjectDocumentV2) -> Result<ProjectDocumentV3, DecodeFailure> {
+    if document.document_type != DOCUMENT_TYPE || document.schema_version != SCHEMA_VERSION_V2 {
+        return Err(document_failure(DocumentFailure::InvalidProjectDocument));
+    }
+    let ProjectPayloadV2 {
+        document: settings,
+        visual_defaults,
+        media,
+        sheets,
+    } = document.project;
+    Ok(ProjectDocumentV3 {
+        document_type: document.document_type,
+        schema_version: SCHEMA_VERSION_V3,
+        project_id: document.project_id,
+        revision: document.revision,
+        project: ProjectPayloadV3 {
+            document: settings,
+            visual_defaults,
+            media,
+            sheets: sheets.into_iter().map(SheetV3::from_v2).collect(),
         },
     })
 }
@@ -664,11 +780,100 @@ struct SheetV1 {
     active_sides: ActiveSidesV1,
 }
 
-impl SheetV1 {
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SheetV3 {
+    id: String,
+    active_sides: ActiveSidesV1,
+    frames: Vec<FrameV3>,
+}
+
+impl SheetV3 {
+    fn from_v2(sheet: SheetV1) -> Self {
+        Self {
+            id: sheet.id,
+            active_sides: sheet.active_sides,
+            frames: Vec::new(),
+        }
+    }
+
     fn from_domain(sheet: &ProjectSheet) -> Self {
         Self {
             id: sheet.id().hyphenated().to_string(),
             active_sides: sheet.active_sides().into(),
+            frames: sheet.frames().iter().map(FrameV3::from_domain).collect(),
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct FrameV3 {
+    id: String,
+    rect: RectV3,
+    photo: Option<PhotoV3>,
+}
+
+impl FrameV3 {
+    fn from_domain(frame: &ProjectFrame) -> Self {
+        Self {
+            id: frame.id().hyphenated().to_string(),
+            rect: RectV3::from_domain(frame.rect()),
+            photo: frame.photo().map(PhotoV3::from_domain),
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct RectV3 {
+    x: u64,
+    y: u64,
+    width: u64,
+    height: u64,
+}
+
+impl RectV3 {
+    fn from_domain(rect: ProjectRect) -> Self {
+        Self {
+            x: rect.x(),
+            y: rect.y(),
+            width: rect.width(),
+            height: rect.height(),
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct PhotoV3 {
+    media_id: String,
+    transform: PhotoTransformV3,
+}
+
+impl PhotoV3 {
+    fn from_domain(photo: &ProjectPhoto) -> Self {
+        Self {
+            media_id: photo.media_id().hyphenated().to_string(),
+            transform: PhotoTransformV3::from_domain(photo.transform()),
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct PhotoTransformV3 {
+    pan_x: f32,
+    pan_y: f32,
+    user_zoom: f32,
+}
+
+impl PhotoTransformV3 {
+    fn from_domain(transform: ProjectPhotoTransform) -> Self {
+        Self {
+            pan_x: transform.pan_x(),
+            pan_y: transform.pan_y(),
+            user_zoom: transform.user_zoom(),
         }
     }
 }

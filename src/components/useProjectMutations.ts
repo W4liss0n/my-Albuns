@@ -26,6 +26,7 @@ interface ProjectMutationsInput {
   projection: EditorProjection;
   runProjectMutation: ProjectMutationRunner;
   onProjectionChange(projection: EditorProjection): void;
+  onAffectedFrame(frameId: string): void;
 }
 
 function messageFromError(error: unknown) {
@@ -36,6 +37,7 @@ export function useProjectMutations({
   projection,
   runProjectMutation,
   onProjectionChange,
+  onAffectedFrame,
 }: ProjectMutationsInput) {
   const [message, setMessage] = useState<string | null>(null);
   const feedbackTokenRef = useRef(0);
@@ -62,6 +64,7 @@ export function useProjectMutations({
     ) {
       setMessage(messageFromError(outcome.error));
     }
+    return outcome.status === "completed";
   }
 
   function applyIntent(intent: ProjectIntent) {
@@ -75,6 +78,18 @@ export function useProjectMutations({
         ),
       ),
     );
+  }
+
+  async function applyPhotoWithStatus(intent: ProjectIntent) {
+    let affectedFrameId: string | null = null;
+    const completed = await runWithErrorFeedback(
+      async (port) => {
+        const result = await port.applyWithOutcome(intent);
+        affectedFrameId = result.affectedFrameId;
+        return result.projection;
+      },
+    );
+    if (completed && affectedFrameId) onAffectedFrame(affectedFrameId);
   }
 
   function saveVisibleRevision() {
@@ -101,6 +116,19 @@ export function useProjectMutations({
           return Promise.resolve(effectiveProjection);
         }
         return port[operation]();
+      },
+      true,
+    );
+  }
+
+  function saveVisibleRevisionAs() {
+    const visibleRevision = projection.state.revision;
+    return runWithErrorFeedback(
+      async (port, latestProjection) => {
+        const expectedRevision =
+          latestProjection?.state.revision ?? visibleRevision;
+        const result = await port.saveAs(expectedRevision);
+        return result.projection;
       },
       true,
     );
@@ -212,7 +240,46 @@ export function useProjectMutations({
     applyAlbumInformation: commitAlbumInformation,
     applyAlbumDesign: (draft: AlbumDesignProjectDraft) =>
       commitProjectSettingsDraft(draft),
+    applyPhotoWithStatus,
+    importPhoto: async () => {
+      let selectedMediaId: string | null = null;
+      const completed = await runWithErrorFeedback(
+        async (port) => {
+          const result = await port.importPhoto();
+          if (result.kind !== "cancelled") selectedMediaId = result.mediaId;
+          return result.projection;
+        },
+      );
+      return completed ? selectedMediaId : null;
+    },
+    dropPhoto: async (intent: ProjectIntent) => {
+      setMessage(null);
+      let affectedFrameId: string | null = null;
+      const outcome = await runProjectMutation.run(async (port) => {
+        const result = await port.applyWithOutcome(intent);
+        affectedFrameId = result.affectedFrameId;
+        return result.projection;
+      });
+      if (outcome.status === "completed") {
+        onProjectionChange(outcome.projection);
+        if (affectedFrameId) onAffectedFrame(affectedFrameId);
+        return true;
+      }
+      if (outcome.status === "failed") setMessage(messageFromError(outcome.error));
+      return false;
+    },
+    applyDpi: async (dpi: number) => {
+      await commitInteraction({
+        kind: "setDpi",
+        dpi,
+      });
+    },
+    relinkMedia: (mediaId: string) =>
+      void runWithErrorFeedback((port) =>
+        port.relink(mediaId),
+      ),
     save: () => void saveVisibleRevision(),
+    saveAs: () => void saveVisibleRevisionAs(),
     undo: () => void runHistoryCommand("canUndo", "undo"),
     redo: () => void runHistoryCommand("canRedo", "redo"),
     dismissFeedback: () => {

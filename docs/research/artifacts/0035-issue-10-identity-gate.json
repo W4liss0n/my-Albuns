@@ -1,0 +1,128 @@
+{
+    "schemaVersion":  1,
+    "collectedAtUtc":  "2026-08-18T06:32:46.9213288Z",
+    "gitCommit":  "06c479a2bdd58b3a679e1c32727f84d89d05ff18",
+    "sourceInputsDirty":  false,
+    "platform":  {
+                     "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
+                     "architecture":  "X64",
+                     "uncProvider":  "loopback-administrative-share"
+                 },
+    "checks":  [
+                   {
+                       "name":  "public-project-core-gate-build",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "mixed-file-id-domains-fail-closed",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "zero-extended-file-id-sentinel-fails-closed",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "ones-extended-file-id-sentinel-fails-closed",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "legacy-file-id-provenance-fails-closed",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "refs-and-unknown-legacy-ids-fail-closed",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "unexpected-file-id-query-error-has-no-fallback",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "documented-ntfs-legacy-fallback-remains-authoritative",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "native-volume-serial-widths-fail-closed-across-file-id-domains",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "real-ntfs-handle-volume-serial-widths-fail-closed",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "incompatible-lease-identity-never-focuses",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "a-to-b-success-race-fails-closed",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "write-protected-volume-offers-save-copy-as",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "real-loopback-unc-and-mapped-drive",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "mapped-and-unc-aliases-focus-real-owner-process",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "writable-copy-persists-new-identity-before-session",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "pending-creative-change-not-in-technical-identity-write",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "simultaneous-original-and-copy-editing-isolated",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "rename-and-movement-preserve-identity-and-namespace",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "read-only-copy-blocked-with-save-copy-as-offer",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "save-copy-as-preserves-source-revision-and-publishes-current-schema",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "failed-save-copy-as-creates-no-editable-session",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "unavailable-previous-root-fails-closed",
+                       "passed":  true
+                   }
+               ],
+    "evidence":  {
+                     "originalProjectId":  "00caeb15-0819-44c6-ae33-4f3fc880c551",
+                     "promotedCopyProjectId":  "172420dd-4e88-413b-961f-b966594b778b",
+                     "saveCopyAsProjectId":  "1ca1edfd-3f79-4138-a86b-9c49827650ca",
+                     "ownerProcess":  {
+                                          "processId":  17324,
+                                          "creationTime":  134315083659666426
+                                      },
+                     "mappedAliasOutcome":  "focusExisting",
+                     "uncAliasOutcome":  "focusExisting",
+                     "movedNamespaceReused":  true,
+                     "writableCopyNamespaceIsolated":  true,
+                     "persistedDpiExcludedPending240":  300,
+                     "isolatedCopyDpi":  600,
+                     "isolatedOriginalDpi":  300,
+                     "readOnlySourceSha256":  "9dd1a88dcf887a350b839db0d39a747fa23f53d072e999722a3e3b9e55215d8f",
+                     "readOnlySourcePreserved":  true,
+                     "saveCopyAsSourceSchema":  1,
+                     "saveCopyAsDestinationSchema":  2,
+                     "saveCopyAsRevision":  7,
+                     "unavailableOriginOutcome":  "identityIndeterminate",
+                     "unavailableCandidatePreserved":  true
+                 }
+}

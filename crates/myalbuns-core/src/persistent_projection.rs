@@ -1,28 +1,28 @@
-use uuid::Uuid;
+use std::{collections::HashMap, path::PathBuf};
 
 use crate::{
-    composition::{CompositionCore, derive_media_usage},
+    composition::resolve_editor_projection,
     model::{
-        AlbumSnapshot, DocumentSnapshot, EditorProjection, EditorState, MediaCatalogItem,
-        MediaKind, ProjectedActiveSides, ProjectedBackground, ProjectedBackgroundContent,
+        AlbumSnapshot, DocumentSnapshot, EditorProjection, EditorState, FrameSnapshot,
+        MediaCatalogItem, MediaId, MediaKind, MediaTransform, PhotoSnapshot, PhotoSourceMetadata,
+        ProjectedActiveSides, ProjectedBackground, ProjectedBackgroundContent,
         ProjectedFrameBorder, ProjectedOverlay, ProjectedOverlayContent, ProjectedVisualDefaults,
-        SheetRole, SheetSnapshot,
+        RectUm, SheetRole, SheetSnapshot,
     },
+    persistent_session::PersistentProjectSession,
     project_document::{
         ActiveSides, Background, BackgroundContent, FrameBorder, Overlay, OverlayContent,
-        ProjectDocument, VisualDefaults,
+        VisualDefaults,
     },
 };
 
 pub(crate) fn editor_projection(
-    project_id: Uuid,
-    revision: u64,
-    saved_revision: u64,
-    can_undo: bool,
-    can_redo: bool,
+    session: &PersistentProjectSession,
+    history_enabled: bool,
     project_name: &str,
-    project: &ProjectDocument,
+    photo_sources: &HashMap<MediaId, HashMap<PathBuf, PhotoSourceMetadata>>,
 ) -> EditorProjection {
+    let project = session.project();
     let settings = project.document();
     let last_sheet = project.sheets().len().saturating_sub(1);
     let mut next_page_number = 1;
@@ -54,50 +54,88 @@ pub(crate) fn editor_projection(
                     page_numbers,
                     width_um: settings.sheet_width_um() as i64,
                     height_um: settings.sheet_height_um() as i64,
-                    frames: Vec::new(),
+                    frames: sheet
+                        .frames()
+                        .iter()
+                        .enumerate()
+                        .map(|(z_index, frame)| FrameSnapshot {
+                            id: frame.id().hyphenated().to_string(),
+                            rect: RectUm {
+                                x: i64::try_from(frame.rect().x())
+                                    .expect("validated Frame x fits i64"),
+                                y: i64::try_from(frame.rect().y())
+                                    .expect("validated Frame y fits i64"),
+                                width: i64::try_from(frame.rect().width())
+                                    .expect("validated Frame width fits i64"),
+                                height: i64::try_from(frame.rect().height())
+                                    .expect("validated Frame height fits i64"),
+                            },
+                            z_index: u32::try_from(z_index)
+                                .expect("validated Frame stack fits u32"),
+                            photo: frame.photo().map(|photo| PhotoSnapshot {
+                                media_id: MediaId::from_uuid(photo.media_id()),
+                                transform: MediaTransform {
+                                    pan_x: photo.transform().pan_x(),
+                                    pan_y: photo.transform().pan_y(),
+                                    user_zoom: photo.transform().user_zoom(),
+                                    quarter_turns: 0,
+                                    fine_rotation_degrees: 0.0,
+                                    mirror_x: false,
+                                },
+                            }),
+                        })
+                        .collect(),
                 }
             })
             .collect(),
         media: project
             .media()
             .iter()
-            .map(|media| MediaCatalogItem {
-                id: media.id().hyphenated().to_string(),
-                kind: media.kind(),
-                name: media
-                    .path()
-                    .file_name()
-                    .map(|name| name.to_string_lossy().into_owned())
-                    .filter(|name| !name.is_empty())
-                    .unwrap_or_else(|| match media.kind() {
-                        MediaKind::Photo => "Foto".into(),
-                        MediaKind::Decorative => "Decorativo".into(),
+            .map(|media| {
+                let media_id = MediaId::from_uuid(media.id());
+                let source = photo_sources
+                    .get(&media_id)
+                    .and_then(|observations| observations.get(media.path()));
+                MediaCatalogItem {
+                    id: media_id,
+                    kind: media.kind(),
+                    name: media
+                        .path()
+                        .file_name()
+                        .map(|name| name.to_string_lossy().into_owned())
+                        .filter(|name| !name.is_empty())
+                        .unwrap_or_else(|| match media.kind() {
+                            MediaKind::Photo => "Foto".into(),
+                            MediaKind::Decorative => "Decorativo".into(),
+                        }),
+                    source_width_px: (media.kind() == MediaKind::Photo)
+                        .then(|| source.map_or(1, PhotoSourceMetadata::source_width_px)),
+                    source_height_px: (media.kind() == MediaKind::Photo)
+                        .then(|| source.map_or(1, PhotoSourceMetadata::source_height_px)),
+                    palette: (media.kind() == MediaKind::Photo).then(|| {
+                        source
+                            .map(|source| source.palette().clone())
+                            .unwrap_or_else(|| {
+                                ["#D8DEE2".into(), "#BBC4CA".into(), "#929EA6".into()]
+                            })
                     }),
-                source_width_px: None,
-                source_height_px: None,
-                palette: None,
+                }
             })
             .collect(),
         visual_defaults: projected_visual_defaults(project.visual_defaults()),
     };
     let state = EditorState {
-        project_id: project_id.hyphenated().to_string(),
+        project_id: session.project_id().hyphenated().to_string(),
         project_name: project_name.into(),
         document: DocumentSnapshot::from_settings(settings),
-        revision,
-        saved_revision,
-        dirty: revision != saved_revision,
-        can_undo,
-        can_redo,
+        revision: session.revision(),
+        saved_revision: session.saved_revision(),
+        dirty: session.has_unsaved_changes(),
+        can_undo: history_enabled && session.can_undo(),
+        can_redo: history_enabled && session.can_redo(),
         album,
     };
-    let composition = CompositionCore::compose(&state.album);
-    let media_usage = derive_media_usage(&state.album, &composition);
-    EditorProjection {
-        composition,
-        state,
-        media_usage,
-    }
+    resolve_editor_projection(state)
 }
 
 fn projected_active_sides(active_sides: ActiveSides) -> ProjectedActiveSides {
@@ -144,7 +182,7 @@ fn projected_background_content(content: &BackgroundContent) -> ProjectedBackgro
             rgb: rgb.canonical_hex(),
         },
         BackgroundContent::Media { media_id } => ProjectedBackgroundContent::Media {
-            media_id: media_id.hyphenated().to_string(),
+            media_id: MediaId::from_uuid(*media_id),
         },
     }
 }
@@ -152,7 +190,7 @@ fn projected_background_content(content: &BackgroundContent) -> ProjectedBackgro
 fn projected_overlay_content(content: &OverlayContent) -> ProjectedOverlayContent {
     match content {
         OverlayContent::Media { media_id } => ProjectedOverlayContent::Media {
-            media_id: media_id.hyphenated().to_string(),
+            media_id: MediaId::from_uuid(*media_id),
         },
     }
 }
@@ -167,7 +205,7 @@ mod tests {
     use super::*;
     use crate::project_document::{
         Background, BackgroundContent, DocumentSettings, FrameBorder, MediaRef, Overlay,
-        OverlayContent, ProjectSheet, Rgb, VisualDefaults,
+        OverlayContent, ProjectDocument, ProjectRevision, ProjectSheet, Rgb, VisualDefaults,
     };
 
     #[test]
@@ -222,15 +260,15 @@ mod tests {
             ],
         );
 
-        let projection = editor_projection(
-            Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").expect("project id"),
-            0,
-            0,
+        let session = PersistentProjectSession::from_persisted(
+            ProjectRevision::new(
+                Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").expect("project id"),
+                0,
+                project,
+            ),
             false,
-            false,
-            "Projeto",
-            &project,
         );
+        let projection = editor_projection(&session, true, "Projeto", &HashMap::new());
         let value = serde_json::to_value(&projection).expect("projection serializes");
 
         assert_eq!(

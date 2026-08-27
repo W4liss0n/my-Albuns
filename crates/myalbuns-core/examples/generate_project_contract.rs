@@ -1,6 +1,9 @@
 use std::{env, path::PathBuf};
 
-use myalbuns_core::{AlbumInformationValidation, EditorProjection, ProjectIntent};
+use myalbuns_core::{
+    AlbumInformationValidation, EditorProjection, PhotoDropTarget, ProjectIntent,
+    ProjectMutationOutcome,
+};
 use ts_rs::{Config, TS};
 
 fn main() {
@@ -18,4 +21,7 @@ fn main() {
     ProjectIntent::export_all(&config).expect("ProjectIntent bindings should be generated");
     AlbumInformationValidation::export_all(&config)
         .expect("AlbumInformationValidation bindings should be generated");
+    ProjectMutationOutcome::export_all(&config)
+        .expect("Project mutation outcome bindings should be generated");
+    PhotoDropTarget::export_all(&config).expect("Photo drop target bindings should be generated");
 }

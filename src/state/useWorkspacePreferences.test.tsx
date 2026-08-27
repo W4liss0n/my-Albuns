@@ -256,8 +256,12 @@ test("migrates legacy panel geometry only when the StateStore has no authoritati
     persisted = applyWorkspacePreferenceChange(persisted, change);
     return persisted;
   });
+  const migrationPort: WorkspacePreferencesPort = {
+    load: async () => persisted,
+    update,
+  };
   const migrated = renderHook(() =>
-    useWorkspacePreferences({ load: async () => persisted, update }),
+    useWorkspacePreferences(migrationPort),
   );
 
   await waitFor(() =>
@@ -282,11 +286,12 @@ test("migrates legacy panel geometry only when the StateStore has no authoritati
       media: null,
     },
   });
+  const authoritativePort: WorkspacePreferencesPort = {
+    load: async () => authoritative,
+    update: vi.fn(),
+  };
   const preserved = renderHook(() =>
-    useWorkspacePreferences({
-      load: async () => authoritative,
-      update: vi.fn(),
-    }),
+    useWorkspacePreferences(authoritativePort),
   );
   await waitFor(() =>
     expect(preserved.result.current.preferences.workspacePanels.inspector).toEqual(

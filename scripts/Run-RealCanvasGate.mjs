@@ -7,9 +7,13 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import net from "node:net";
 import path from "node:path";
 import { stripVTControlCharacters } from "node:util";
+
+import {
+  createWebDriverClient,
+  findFreeTcpPort,
+} from "./GateWebDriver.mjs";
 
 const [
   evidenceDirectoryArgument,
@@ -106,20 +110,6 @@ const initialDesktopLogOffsets = desktopLogOffsets();
 const delay = (milliseconds) =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
 
-async function freePort() {
-  return new Promise((resolve, reject) => {
-    const server = net.createServer();
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      server.close((error) => {
-        if (error) reject(error);
-        else resolve(address.port);
-      });
-    });
-  });
-}
-
 function collectOutput(child) {
   let output = "";
   child.stdout?.on("data", (chunk) => {
@@ -158,29 +148,11 @@ async function waitForDriver(baseUrl, timeoutMilliseconds) {
   throw lastError ?? new Error("tauri-driver did not become ready");
 }
 
-function webdriverClient(baseUrl) {
-  return async (method, endpoint, body) => {
-    const response = await fetch(`${baseUrl}${endpoint}`, {
-      method,
-      headers: body === undefined ? undefined : { "content-type": "application/json" },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
-    const text = await response.text();
-    const payload = text ? JSON.parse(text) : { value: null };
-    if (!response.ok || payload.value?.error) {
-      throw new Error(
-        `${method} ${endpoint} failed (${response.status}): ${JSON.stringify(payload)}`,
-      );
-    }
-    return payload.value;
-  };
-}
-
 process.env.MYALBUNS_TAURI_WEBDRIVER_PROJECT = projectPath;
 process.env.TAURI_WEBVIEW_AUTOMATION = "true";
 
-const driverPort = await freePort();
-const nativePort = await freePort();
+const driverPort = await findFreeTcpPort();
+const nativePort = await findFreeTcpPort();
 const driver = spawn(
   tauriDriverPath,
   [
@@ -199,7 +171,7 @@ const driver = spawn(
 );
 const driverOutput = collectOutput(driver);
 const baseUrl = `http://127.0.0.1:${driverPort}`;
-const request = webdriverClient(baseUrl);
+const request = createWebDriverClient(baseUrl);
 let sessionId;
 let driverTerminationConfirmed = false;
 

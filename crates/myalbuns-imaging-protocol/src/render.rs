@@ -1,4 +1,4 @@
-use myalbuns_core::ComposedOutputUnit;
+use myalbuns_core::{ComposedOutputUnit, MediaId};
 use myalbuns_paths::{NativePathDto, RootBindingPlan};
 use serde::{Deserialize, Serialize};
 
@@ -126,25 +126,22 @@ pub fn validate_render_content(
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RenderSource {
-    media_id: String,
+    media_id: MediaId,
     source_path: NativePathDto,
 }
 
 impl RenderSource {
-    pub fn new(
-        media_id: impl Into<String>,
-        source_path: impl Into<NativePathDto>,
-    ) -> Result<Self, String> {
+    pub fn new(media_id: MediaId, source_path: impl Into<NativePathDto>) -> Result<Self, String> {
         let source = Self {
-            media_id: media_id.into(),
+            media_id,
             source_path: source_path.into(),
         };
         source.validate()?;
         Ok(source)
     }
 
-    pub fn media_id(&self) -> &str {
-        &self.media_id
+    pub fn media_id(&self) -> MediaId {
+        self.media_id
     }
 
     pub fn source_path(&self) -> &std::path::Path {
@@ -152,7 +149,13 @@ impl RenderSource {
     }
 
     fn validate(&self) -> Result<(), String> {
-        validate_media_identity_path(&self.media_id, self.source_path())
+        if !self.source_path().is_absolute() {
+            return Err(format!(
+                "o caminho da mídia {} não é absoluto",
+                self.media_id
+            ));
+        }
+        Ok(())
     }
 }
 

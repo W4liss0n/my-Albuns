@@ -5,17 +5,20 @@ import type {
   AlbumInformation,
   AlbumInformationValidation,
   EditorProjection,
+  PhotoDropTarget,
   ProjectIntent,
+  ProjectMutationOutcome,
 } from "../domain/project";
 import {
   MediaPreviewError,
   SaveProjectError,
-  type ExportPort,
+  type ExportPipelinePort,
   type ExportProgressEvent,
-  type MediaPreviewRequest,
   type MediaPreviewPort,
   type ProjectStartupPort,
-  type ProjectSessionPort,
+  type ProjectCorePort,
+  type SaveAsProjectOutcome as ApplicationSaveAsProjectOutcome,
+  type SaveAsProjectResult as ApplicationSaveAsProjectResult,
   type SaveProjectOutcome as ApplicationSaveProjectOutcome,
   type SaveProjectResult as ApplicationSaveProjectResult,
 } from "../application/projectPorts";
@@ -27,20 +30,32 @@ import type {
 import { createWorkspacePreferences } from "../application/workspacePreferences";
 import type { ApplicationSettings as IpcApplicationSettings } from "./generated/ApplicationSettings";
 import type { CancelDisposition as IpcCancelDisposition } from "./generated/CancelDisposition";
+import type { CacheProcessorWarning as IpcCacheProcessorWarning } from "./generated/CacheProcessorWarning";
 import type { ExportCommandError as IpcExportCommandError } from "./generated/ExportCommandError";
 import type { ExportEvent as IpcExportEvent } from "./generated/ExportEvent";
 import type { ExportResult as IpcExportResult } from "./generated/ExportResult";
+import type { ImportPhotoResult as IpcImportPhotoResult } from "./generated/ImportPhotoResult";
 import type { LinkedMediaChanged as IpcLinkedMediaChanged } from "./generated/LinkedMediaChanged";
+import type { MediaPreview as IpcMediaPreview } from "./generated/MediaPreview";
+import type { MediaPreviewCommandError as IpcMediaPreviewCommandError } from "./generated/MediaPreviewCommandError";
+import type { ProjectRecoveryDecision as IpcProjectRecoveryDecision } from "./generated/ProjectRecoveryDecision";
+import type { ProjectRecoveryResolution as IpcProjectRecoveryResolution } from "./generated/ProjectRecoveryResolution";
+import type { ProjectRecoveryStatus as IpcProjectRecoveryStatus } from "./generated/ProjectRecoveryStatus";
+import type { SaveProjectOutcome as IpcSaveProjectOutcome } from "./generated/SaveProjectOutcome";
+import type { SaveProjectResult as IpcSaveProjectResult } from "./generated/SaveProjectResult";
+import type { SaveAsProjectOutcome as IpcSaveAsProjectOutcome } from "./generated/SaveAsProjectOutcome";
+import type { SaveAsProjectResult as IpcSaveAsProjectResult } from "./generated/SaveAsProjectResult";
 import type { WorkspacePreferenceChange as IpcWorkspacePreferenceChange } from "./generated/WorkspacePreferenceChange";
 import type { WorkspacePreferences as IpcWorkspacePreferences } from "./generated/WorkspacePreferences";
 import type { SettingsPreferenceChange as IpcSettingsPreferenceChange } from "./generated/SettingsPreferenceChange";
-import type { MediaPreview as IpcMediaPreview } from "./generated/MediaPreview";
-import type { MediaPreviewCommandError as IpcMediaPreviewCommandError } from "./generated/MediaPreviewCommandError";
-import type { MediaPreviewDemand as IpcMediaPreviewDemand } from "./generated/MediaPreviewDemand";
-import type { SaveProjectOutcome as IpcSaveProjectOutcome } from "./generated/SaveProjectOutcome";
-import type { SaveProjectResult as IpcSaveProjectResult } from "./generated/SaveProjectResult";
-import { isIpcRecord, isIpcRevision } from "./ipcGuards";
+import {
+  hasOnlyIpcKeys,
+  isIpcEditorProjection,
+  isIpcRecord,
+  isIpcRevision,
+} from "./ipcGuards";
 import { parseProjectSaveFailure } from "./projectSaveFailure";
+import { parseProjectSaveAsFailure } from "./projectSaveAsFailure";
 
 function isMediaPreviewCommandError(
   error: unknown,
@@ -68,16 +83,6 @@ function normalizeMediaPreviewError(error: unknown) {
     "read_failed",
     "Não foi possível preparar as Prévias de mídia vinculada.",
   );
-}
-
-function toIpcMediaPreviewDemand(
-  demand: MediaPreviewRequest,
-): IpcMediaPreviewDemand {
-  return {
-    preloadMediaIds: [...demand.preloadMediaIds],
-    revision: demand.revision,
-    visibleMediaIds: [...demand.visibleMediaIds],
-  };
 }
 
 function isCancelledExportError(
@@ -109,11 +114,151 @@ function toSaveProjectError(error: unknown): SaveProjectError {
   );
 }
 
+function parseProjectRecoveryStatus(value: unknown): IpcProjectRecoveryStatus {
+  if (
+    !isIpcRecord(value) ||
+    !hasOnlyIpcKeys(value, ["kind"]) ||
+    (value.kind !== "none" && value.kind !== "available")
+  ) {
+    throw new Error("Não foi possível verificar a Recuperação do Projeto.");
+  }
+  return { kind: value.kind };
+}
+
+function parseProjectRecoveryResolution(
+  value: unknown,
+): IpcProjectRecoveryResolution {
+  if (!isIpcRecord(value)) {
+    throw new Error("Não foi possível confirmar a escolha de Recuperação.");
+  }
+  if (value.kind === "deferred" && hasOnlyIpcKeys(value, ["kind"])) {
+    return { kind: "deferred" };
+  }
+  if (
+    (value.kind !== "recovered" && value.kind !== "openedLastSaved") ||
+    !hasOnlyIpcKeys(value, ["kind", "projection"]) ||
+    !isIpcEditorProjection(value.projection)
+  ) {
+    throw new Error("Não foi possível confirmar a escolha de Recuperação.");
+  }
+  return {
+    kind: value.kind,
+    projection: value.projection,
+  };
+}
+
 function invalidSaveResponse() {
   return new SaveProjectError(
     "invalid_response",
     "Não foi possível confirmar o resultado do Salvamento.",
   );
+}
+
+function toSaveAsProjectError(error: unknown): SaveProjectError {
+  const failure = parseProjectSaveAsFailure(error);
+  if (!failure) {
+    return new SaveProjectError(
+      "save_unavailable",
+      "Não foi possível iniciar Salvar como.",
+    );
+  }
+  return new SaveProjectError(failure.code, failure.message, failure.context);
+}
+
+function invalidSaveAsResponse() {
+  return new SaveProjectError(
+    "invalid_response",
+    "Não foi possível confirmar o resultado de Salvar como.",
+  );
+}
+
+function isProjectionIdentity(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0;
+}
+
+function isCanonicalProjectIdentity(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
+      value,
+    )
+  );
+}
+
+function parseIpcSaveAsProjectResult(
+  value: unknown,
+  expectedRevision: number,
+): IpcSaveAsProjectResult {
+  if (!isIpcRecord(value) || !isIpcRecord(value.outcome)) {
+    throw invalidSaveAsResponse();
+  }
+
+  const { outcome, projection } = value;
+  if (
+    !isIpcEditorProjection(projection)
+  ) {
+    throw invalidSaveAsResponse();
+  }
+
+  if (outcome.kind === "cancelled") {
+    if (projection.state.revision !== expectedRevision) {
+      throw invalidSaveAsResponse();
+    }
+    return {
+      outcome: { kind: "cancelled" },
+      projection: projection as IpcSaveAsProjectResult["projection"],
+    };
+  }
+  if (
+    outcome.kind !== "savedAs" ||
+    !isProjectionIdentity(outcome.previousProjectId) ||
+    !isCanonicalProjectIdentity(outcome.projectId) ||
+    outcome.previousProjectId === outcome.projectId ||
+    !isIpcRevision(outcome.revision) ||
+    outcome.revision !== expectedRevision ||
+    projection.state.projectId !== outcome.projectId ||
+    projection.state.revision !== outcome.revision ||
+    projection.state.savedRevision !== outcome.revision ||
+    projection.state.dirty !== false ||
+    typeof projection.state.projectName !== "string" ||
+    projection.state.projectName.length === 0
+  ) {
+    throw invalidSaveAsResponse();
+  }
+
+  return {
+    outcome: {
+      kind: "savedAs",
+      previousProjectId: outcome.previousProjectId,
+      projectId: outcome.projectId,
+      revision: outcome.revision,
+    },
+    projection: projection as IpcSaveAsProjectResult["projection"],
+  };
+}
+
+function toApplicationSaveAsProjectOutcome(
+  outcome: IpcSaveAsProjectOutcome,
+): ApplicationSaveAsProjectOutcome {
+  return outcome.kind === "cancelled"
+    ? { kind: "cancelled" }
+    : {
+        kind: "savedAs",
+        previousProjectId: outcome.previousProjectId,
+        projectId: outcome.projectId,
+        revision: outcome.revision,
+      };
+}
+
+function toSaveAsProjectResult(
+  value: unknown,
+  expectedRevision: number,
+): ApplicationSaveAsProjectResult {
+  const ipcResult = parseIpcSaveAsProjectResult(value, expectedRevision);
+  return {
+    outcome: toApplicationSaveAsProjectOutcome(ipcResult.outcome),
+    projection: ipcResult.projection,
+  };
 }
 
 function parseIpcSaveProjectResult(value: unknown): IpcSaveProjectResult {
@@ -126,11 +271,7 @@ function parseIpcSaveProjectResult(value: unknown): IpcSaveProjectResult {
     (outcome.kind !== "saved" &&
       outcome.kind !== "alreadyCurrent") ||
     !isIpcRevision(outcome.revision) ||
-    !isIpcRecord(projection) ||
-    !isIpcRecord(projection.state) ||
-    typeof projection.state.projectId !== "string" ||
-    !isIpcRevision(projection.state.revision) ||
-    !isIpcRevision(projection.state.savedRevision) ||
+    !isIpcEditorProjection(projection) ||
     projection.state.revision !== outcome.revision ||
     projection.state.savedRevision !== outcome.revision
   ) {
@@ -167,15 +308,34 @@ function toSaveProjectResult(value: unknown): ApplicationSaveProjectResult {
   };
 }
 
-export const tauriProjectSessionPort: ProjectSessionPort = {
+export const tauriProjectCorePort: ProjectCorePort = {
   load: (operationId) =>
     invoke<EditorProjection>("project_state", { operationId }),
   validateAlbumInformation: (information: AlbumInformation) =>
     invoke<AlbumInformationValidation>("validate_album_information", {
       information,
     }),
-  apply: (intent: ProjectIntent) =>
-    invoke<EditorProjection>("apply_project_intent", { intent }),
+  apply: async (intent: ProjectIntent) =>
+    (
+      await invoke<ProjectMutationOutcome>("apply_project_intent", {
+        intent,
+      })
+    ).projection,
+  applyWithOutcome: (intent: ProjectIntent) =>
+    invoke<ProjectMutationOutcome>("apply_project_intent", { intent }),
+  importPhoto: () => invoke<IpcImportPhotoResult>("import_photo"),
+  resolvePhotoDropTarget: (
+    sheetId: string,
+    xUm: number,
+    yUm: number,
+  ) =>
+    invoke<PhotoDropTarget>("photo_drop_target", {
+      sheetId,
+      xUm,
+      yUm,
+    }),
+  relink: (mediaId) =>
+    invoke<EditorProjection>("relink_media", { mediaId }),
   undo: () => invoke<EditorProjection>("undo_project"),
   redo: () => invoke<EditorProjection>("redo_project"),
   save: async (expectedRevision) => {
@@ -189,6 +349,32 @@ export const tauriProjectSessionPort: ProjectSessionPort = {
         : toSaveProjectError(error);
     }
   },
+  saveAs: async (expectedRevision) => {
+    try {
+      return toSaveAsProjectResult(
+        await invoke<unknown>("save_project_as", { expectedRevision }),
+        expectedRevision,
+      );
+    } catch (error: unknown) {
+      throw error instanceof SaveProjectError
+        ? error
+        : toSaveAsProjectError(error);
+    }
+  },
+};
+
+export const tauriProjectStartupPort: ProjectStartupPort = {
+  recoveryStatus: async () =>
+    parseProjectRecoveryStatus(
+      await invoke<unknown>("project_recovery_status"),
+    ),
+  resolveRecovery: async (decision) =>
+    parseProjectRecoveryResolution(
+      await invoke<unknown>("resolve_project_recovery", {
+        decision: decision satisfies IpcProjectRecoveryDecision,
+      }),
+    ),
+  confirmUiReady: () => invoke<void>("project_ui_ready"),
 };
 
 async function loadWorkspacePreferences(): Promise<WorkspacePreferences> {
@@ -196,13 +382,6 @@ async function loadWorkspacePreferences(): Promise<WorkspacePreferences> {
     invoke<IpcWorkspacePreferences>("workspace_preferences"),
     invoke<IpcApplicationSettings>("application_settings"),
   ]);
-  return composeWorkspacePreferences(state, settings);
-}
-
-function composeWorkspacePreferences(
-  state: IpcWorkspacePreferences,
-  settings: IpcApplicationSettings,
-) {
   return createWorkspacePreferences({
     inspectorSections: state.inspectorSections,
     mediaPanel: settings.mediaPanel,
@@ -230,27 +409,40 @@ export const tauriWorkspacePreferencesPort: WorkspacePreferencesPort = {
   },
 };
 
-export const tauriProjectStartupPort: ProjectStartupPort = {
-  confirmUiReady: () => invoke<void>("project_ui_ready"),
-};
-
 export const tauriMediaPreviewPort: MediaPreviewPort = {
   prepareMediaPreviews: (demand) =>
     invoke<IpcMediaPreview[] | null>("prepare_media_previews", {
-      demand: toIpcMediaPreviewDemand(demand),
-    }).catch((error: unknown) => {
-      throw normalizeMediaPreviewError(error);
-    }),
+      demand: {
+        revision: demand.revision,
+        visibleMediaIds: [...demand.visibleMediaIds],
+        preloadMediaIds: [...demand.preloadMediaIds],
+      },
+    }).catch(
+      (error: unknown) => {
+        throw normalizeMediaPreviewError(error);
+      },
+    ),
+  retryUnavailableMedia: (mediaId) =>
+    invoke<IpcMediaPreview>("retry_unavailable_media", { mediaId }).catch(
+      (error: unknown) => {
+        throw normalizeMediaPreviewError(error);
+      },
+    ),
   onMediaChanged: (listener) =>
     listen<IpcLinkedMediaChanged>(
       "myalbuns://linked-media-changed",
       ({ payload }) => listener(payload.mediaIds),
     ),
+  onCacheProcessorWarning: (listener) =>
+    listen<IpcCacheProcessorWarning>(
+      "myalbuns://cache-processor-warning",
+      ({ payload }) => listener(payload),
+    ),
 };
 
-export const tauriExportPort: ExportPort = {
+export const tauriExportPipelinePort: ExportPipelinePort = {
   startSheet: (
-    sheetId: string,
+    { projectName, sheetId, sheetNumber },
     emitEvent: (event: ExportProgressEvent) => void,
   ) => {
     const onEvent = new Channel<IpcExportEvent>();
@@ -288,7 +480,9 @@ export const tauriExportPort: ExportPort = {
       });
     };
     const completion = invoke<IpcExportResult>("export_sheet", {
+      projectName,
       sheetId,
+      sheetNumber,
       onEvent,
     })
       .then((result) => ({

@@ -9,10 +9,13 @@ interface EditorViewState {
   selectedFrameId: string | null;
   focusedSheetId: string | null;
   centeredSheetId: string | null;
+  editingSheetId: string | null;
   viewport: ViewportState;
   selectFrame(frameId: string | null): void;
   focusSheet(sheetId: string): void;
   centerSheet(sheetId: string): void;
+  enterSheetEdit(sheetId: string, preserveSelectedFrame?: boolean): void;
+  exitSheetEdit(): void;
   setViewport(viewport: ViewportState): void;
   synchronizeProject(
     projectId: string,
@@ -26,12 +29,22 @@ export const useEditorView = create<EditorViewState>((set) => ({
   selectedFrameId: null,
   focusedSheetId: null,
   centeredSheetId: null,
+  editingSheetId: null,
   viewport: {
     offsetX: 0,
   },
   selectFrame: (selectedFrameId) => set({ selectedFrameId }),
   focusSheet: (focusedSheetId) => set({ focusedSheetId }),
   centerSheet: (centeredSheetId) => set({ centeredSheetId }),
+  enterSheetEdit: (editingSheetId, preserveSelectedFrame = false) =>
+    set((state) => ({
+      editingSheetId,
+      focusedSheetId: editingSheetId,
+      centeredSheetId: editingSheetId,
+      selectedFrameId: preserveSelectedFrame ? state.selectedFrameId : null,
+    })),
+  exitSheetEdit: () =>
+    set({ editingSheetId: null, selectedFrameId: null }),
   setViewport: (viewport) => set({ viewport }),
   synchronizeProject: (projectId, sheetIds, frameIds) =>
     set((state) => {
@@ -42,6 +55,7 @@ export const useEditorView = create<EditorViewState>((set) => ({
           selectedFrameId: null,
           focusedSheetId: firstSheetId,
           centeredSheetId: firstSheetId,
+          editingSheetId: null,
           viewport: { offsetX: 0 },
         };
       }
@@ -62,6 +76,10 @@ export const useEditorView = create<EditorViewState>((set) => ({
           sheetIds.includes(state.centeredSheetId)
             ? state.centeredSheetId
             : firstSheetId,
+        editingSheetId:
+          state.editingSheetId && sheetIds.includes(state.editingSheetId)
+            ? state.editingSheetId
+            : null,
       };
     }),
 }));

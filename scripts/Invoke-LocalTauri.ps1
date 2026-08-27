@@ -20,7 +20,9 @@ try {
             exit $LASTEXITCODE
         }
 
-        $launcher = Join-Path $script:WorkspaceRoot 'target\debug\myalbuns-dev.exe'
+        $launcher = Join-Path `
+            (Resolve-MyAlbunsCargoTargetDirectory) `
+            'debug\myalbuns-dev.exe'
         $previousWorkspace = $env:MYALBUNS_DEV_WORKSPACE_ROOT
         $previousProject = $env:MYALBUNS_DEV_PROJECT_PATH
         try {

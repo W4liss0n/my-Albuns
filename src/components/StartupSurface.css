@@ -56,6 +56,34 @@
   animation: loading-spin 700ms linear infinite;
 }
 
+.recovery-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-top: var(--ui-space-5);
+  gap: var(--ui-space-2);
+}
+
+.recovery-actions button {
+  min-height: var(--ui-control-height);
+  padding: 0 var(--ui-space-3);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+}
+
+.recovery-actions button:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+.recovery-actions .recovery-primary {
+  border-color: var(--ui-accent);
+  color: var(--ui-on-accent);
+  background: var(--ui-accent);
+}
+
 @keyframes loading-spin {
   to {
     transform: rotate(360deg);

@@ -193,6 +193,34 @@ test("reports the live Photo transform while Pan is moving", async () => {
   expect(onTransformCommit).not.toHaveBeenCalled();
 });
 
+test("keeps a crash-interrupted continuous gesture in memory without committing it", async () => {
+  const onTransformPreview = vi.fn();
+  const onTransformCommit = vi.fn(
+    async (_delta: PhotoTransformDelta) => true,
+  );
+  const view = renderCanvas({
+    compositionPlan: interactiveComposition,
+    onTransformPreview,
+    onTransformCommit,
+  });
+  await finishPixiInitialization();
+
+  displayWithHandler("pointerdown").emit("pointerdown", {
+    altKey: true,
+    global: { x: 0, y: 0 },
+    stopPropagation: vi.fn(),
+  });
+  pixiLifecycle.instances[0].stage.emit("globalpointermove", {
+    global: { x: 40, y: 0 },
+  });
+  expect(onTransformPreview).toHaveBeenCalled();
+  expect(onTransformCommit).not.toHaveBeenCalled();
+
+  view.unmount();
+
+  expect(onTransformCommit).not.toHaveBeenCalled();
+});
+
 test("keeps every frame corner covered while panning a rotated photo", async () => {
   const onTransformCommit = vi.fn(
     async (_delta: PhotoTransformDelta) => true,
@@ -533,4 +561,39 @@ test("cancels pending Pan and Zoom gestures when the Project changes", async () 
   expect(world.children[0]).not.toBe(sheetB);
   expect(commitB).not.toHaveBeenCalled();
   expect(commitC).not.toHaveBeenCalled();
+});
+
+test("does not route Alt Pan or Zoom to a Photo while editing the sheet", async () => {
+  vi.useFakeTimers();
+  const onTransformCommit = vi.fn(
+    async (_delta: PhotoTransformDelta) => true,
+  );
+  renderCanvas({
+    compositionPlan: interactiveComposition,
+    mode: { kind: "sheet-editing", sheetId: "sheet-001" },
+    onTransformCommit,
+  });
+  await finishPixiInitialization();
+
+  displayWithHandler("wheel").emit("wheel", {
+    altKey: true,
+    deltaY: -100,
+    preventDefault: vi.fn(),
+  });
+  latestDisplayWithHandler("pointerdown").emit("pointerdown", {
+    altKey: true,
+    global: { x: 0, y: 0 },
+    stopPropagation: vi.fn(),
+  });
+  pixiLifecycle.instances[0].stage.emit("globalpointermove", {
+    global: { x: 40, y: 0 },
+  });
+  pixiLifecycle.instances[0].stage.emit("pointerup", {
+    global: { x: 40, y: 0 },
+  });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(600);
+  });
+
+  expect(onTransformCommit).not.toHaveBeenCalled();
 });

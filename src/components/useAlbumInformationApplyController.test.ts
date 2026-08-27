@@ -1,4 +1,4 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 
 import type {
@@ -99,9 +99,10 @@ test("uses the selected Unit for changed measurements without unrelated raster d
   ]);
 });
 
-function dialogHarness() {
+function dialogHarness(
+  dismiss: () => Promise<void> = vi.fn(async () => undefined),
+) {
   let listener: ((action: ProjectDialogAction) => void) | null = null;
-  const dismiss = vi.fn(async () => undefined);
   const present = vi.fn(async () => undefined);
   const port: ProjectDialogPort = {
     acquire: (nextListener) => {
@@ -155,6 +156,46 @@ test("completes the Apply request only after the owned confirmation commits", as
   expect(onApply).toHaveBeenCalledOnce();
   expect(result.current.active).toBe(false);
   expect(dialog.dismiss).toHaveBeenCalledOnce();
+});
+
+test("keeps commands blocked until the owned confirmation releases its window", async () => {
+  let releaseDialog!: () => void;
+  const dismiss = vi.fn(
+    () =>
+      new Promise<void>((resolve) => {
+        releaseDialog = resolve;
+      }),
+  );
+  const dialog = dialogHarness(dismiss);
+  const { result } = renderHook(() =>
+    useAlbumInformationApplyController({
+      projectDialogPort: dialog.port,
+      onApply: vi.fn(async () => ({ kind: "completed" as const })),
+      onError: vi.fn(),
+    }),
+  );
+
+  let completion!: Promise<boolean>;
+  await act(async () => {
+    completion = result.current.requestApply(changedDraft, impact);
+    await Promise.resolve();
+    dialog.emit("confirmAlbumInformation");
+  });
+  await waitFor(() => expect(dismiss).toHaveBeenCalledOnce());
+
+  expect(result.current.active).toBe(true);
+  let completed = false;
+  void completion.then(() => {
+    completed = true;
+  });
+  await Promise.resolve();
+  expect(completed).toBe(false);
+
+  await act(async () => {
+    releaseDialog();
+    await expect(completion).resolves.toBe(true);
+  });
+  expect(result.current.active).toBe(false);
 });
 
 test("resolves cancellation and a rejected commit without orphaning command blocking", async () => {

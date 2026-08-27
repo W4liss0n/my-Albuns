@@ -1,8 +1,23 @@
 use std::sync::{Arc, Mutex};
 
+#[cfg(debug_assertions)]
+use std::{ffi::OsString, io, path::PathBuf};
+
 use tauri::{WebviewWindow, webview::PageLoadEvent};
 
 const TAURI_WEBVIEW_AUTOMATION_ENV: &str = "TAURI_WEBVIEW_AUTOMATION";
+#[cfg(debug_assertions)]
+pub(crate) const SAVE_AS_WEBVIEW_DEBUG_PORT_ENV: &str = "MYALBUNS_DEV_SAVE_AS_WEBVIEW_DEBUG_PORT";
+#[cfg(debug_assertions)]
+pub(crate) const PROJECT_DIALOG_WEBVIEW_DEBUG_PORT_ENV: &str =
+    "MYALBUNS_DEV_PROJECT_DIALOG_WEBVIEW_DEBUG_PORT";
+#[cfg(debug_assertions)]
+pub(crate) const PROJECT_DIALOG_WEBVIEW_DATA_DIRECTORY_ENV: &str =
+    "MYALBUNS_DEV_PROJECT_DIALOG_WEBVIEW_DATA_DIRECTORY";
+
+#[cfg(debug_assertions)]
+const WRY_DEFAULT_DISABLED_FEATURES: &str =
+    "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection";
 
 #[cfg(windows)]
 use {
@@ -30,12 +45,16 @@ pub(crate) fn page_load_handshake() -> (WebviewPolicyLoadSignal, WebviewPolicyRe
 
 impl WebviewPolicyLoadSignal {
     pub(crate) fn observe(&self, window: &WebviewWindow, event: PageLoadEvent) {
+        self.observe_webview(window.as_ref(), event);
+    }
+
+    pub(crate) fn observe_webview(&self, webview: &tauri::Webview, event: PageLoadEvent) {
         if event != PageLoadEvent::Finished {
             return;
         }
         let sender = self.sender.lock().ok().and_then(|mut sender| sender.take());
         if let Some(sender) = sender {
-            let _ = sender.send(enforce_on_main_thread(window));
+            let _ = sender.send(enforce_webview(webview));
         }
     }
 }
@@ -48,11 +67,11 @@ impl WebviewPolicyReadiness {
     }
 }
 
-fn enforce_on_main_thread(window: &WebviewWindow) -> std::io::Result<()> {
+pub(crate) fn enforce_webview(webview: &tauri::Webview) -> std::io::Result<()> {
     #[cfg(windows)]
     {
         let (sender, receiver) = std::sync::mpsc::sync_channel(1);
-        window
+        webview
             .with_webview(move |webview| {
                 let result = enforce_windows_policy(&webview).map_err(|error| error.to_string());
                 let _ = sender.send(result);
@@ -72,13 +91,119 @@ fn enforce_on_main_thread(window: &WebviewWindow) -> std::io::Result<()> {
     }
 
     #[cfg(not(windows))]
-    let _ = window;
+    let _ = webview;
 
     Ok(())
 }
 
 pub(crate) fn automation_enabled() -> bool {
     cfg!(debug_assertions) && std::env::var_os(TAURI_WEBVIEW_AUTOMATION_ENV).is_some()
+}
+
+#[cfg(debug_assertions)]
+pub(crate) fn remote_debugging_argument(port: Option<OsString>) -> io::Result<Option<OsString>> {
+    let Some(port) = port else {
+        return Ok(None);
+    };
+    let port = port
+        .to_str()
+        .and_then(|port| port.parse::<u16>().ok())
+        .filter(|port| *port != 0)
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "invalid WebView debug port"))?;
+    Ok(Some(OsString::from(format!(
+        "--remote-debugging-port={port}"
+    ))))
+}
+
+#[cfg(debug_assertions)]
+pub(crate) fn replacement_webview_debug_arguments(
+    port: Option<OsString>,
+) -> io::Result<Option<String>> {
+    remote_debugging_argument(port).map(|argument| {
+        argument.map(|argument| {
+            format!(
+                "{WRY_DEFAULT_DISABLED_FEATURES} {}",
+                argument.to_string_lossy()
+            )
+        })
+    })
+}
+
+#[cfg(debug_assertions)]
+pub(crate) fn project_dialog_debug_data_directory(
+    directory: Option<OsString>,
+) -> io::Result<Option<PathBuf>> {
+    let Some(directory) = directory else {
+        return Ok(None);
+    };
+    let directory = PathBuf::from(directory);
+    if !directory.is_absolute() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "the Project dialog WebView data directory must be absolute",
+        ));
+    }
+    Ok(Some(directory))
+}
+
+#[cfg(debug_assertions)]
+pub(crate) fn retire_inherited_debug_arguments_before_replacement() -> io::Result<()> {
+    if std::env::var_os(SAVE_AS_WEBVIEW_DEBUG_PORT_ENV).is_none()
+        && std::env::var_os(PROJECT_DIALOG_WEBVIEW_DEBUG_PORT_ENV).is_none()
+    {
+        return Ok(());
+    }
+
+    #[cfg(windows)]
+    {
+        use std::os::windows::ffi::OsStrExt;
+
+        let name = std::ffi::OsStr::new("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS")
+            .encode_wide()
+            .chain(Some(0))
+            .collect::<Vec<_>>();
+        let succeeded = unsafe {
+            windows_sys::Win32::System::Environment::SetEnvironmentVariableW(
+                name.as_ptr(),
+                std::ptr::null(),
+            )
+        };
+        if succeeded == 0 {
+            return Err(io::Error::last_os_error());
+        }
+    }
+
+    Ok(())
+}
+
+#[cfg(all(test, debug_assertions))]
+mod tests {
+    use std::{ffi::OsString, path::PathBuf};
+
+    #[test]
+    fn replacement_debug_arguments_override_the_process_port_last() {
+        let arguments = super::replacement_webview_debug_arguments(Some(OsString::from("48123")))
+            .expect("valid replacement debug port")
+            .expect("replacement debug arguments");
+
+        assert_eq!(
+            arguments,
+            "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --remote-debugging-port=48123"
+        );
+    }
+
+    #[test]
+    fn project_dialog_debug_data_directory_requires_an_absolute_path() {
+        let directory = super::project_dialog_debug_data_directory(Some(OsString::from(
+            r"C:\gate\project-dialog",
+        )))
+        .expect("absolute debug data directory");
+
+        assert_eq!(directory, Some(PathBuf::from(r"C:\gate\project-dialog")));
+        assert!(
+            super::project_dialog_debug_data_directory(Some(OsString::from("relative"))).is_err()
+        );
+    }
 }
 
 #[cfg(windows)]

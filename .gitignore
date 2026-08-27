@@ -5,6 +5,7 @@ target/
 src-tauri/target/
 src-tauri/binaries/*.exe
 .scratch/cargo-target-tests/
+.scratch/windows-path-gate/
 .scratch/topology-spike-target/
 .scratch/topology-corpus/
 .scratch/ui-acceptance/

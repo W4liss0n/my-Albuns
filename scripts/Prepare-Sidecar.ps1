@@ -43,16 +43,23 @@ try {
     ).Path
     $binaryDirectory = Join-Path $script:WorkspaceRoot 'src-tauri\binaries'
     $destination = Join-Path $binaryDirectory 'myalbuns-imaging-x86_64-pc-windows-msvc.exe'
+    $runtimeDirectory = Join-Path $baseTargetDirectory $Profile
+    $runtimeDestination = Join-Path $runtimeDirectory 'myalbuns-imaging.exe'
 
     if (-not $source.StartsWith($script:WorkspaceRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
-        throw "Origem inesperada do sidecar: $source"
+        throw "Unexpected sidecar source: $source"
     }
     if (-not $destination.StartsWith($script:WorkspaceRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
-        throw "Destino inesperado do sidecar: $destination"
+        throw "Unexpected sidecar destination: $destination"
+    }
+    if (-not $runtimeDestination.StartsWith($script:WorkspaceRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Unexpected sidecar runtime destination: $runtimeDestination"
     }
 
     New-Item -ItemType Directory -Force -Path $binaryDirectory | Out-Null
+    New-Item -ItemType Directory -Force -Path $runtimeDirectory | Out-Null
     Copy-Item -LiteralPath $source -Destination $destination -Force
+    Copy-Item -LiteralPath $source -Destination $runtimeDestination -Force
 }
 finally {
     Pop-Location

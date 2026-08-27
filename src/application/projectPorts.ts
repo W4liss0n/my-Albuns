@@ -2,10 +2,16 @@ import type {
   AlbumInformation,
   AlbumInformationValidation,
   EditorProjection,
+  PhotoDropTarget,
   ProjectIntent,
+  ProjectMutationOutcome,
 } from "../domain/project";
 
-export type MediaPreviewState = "ready" | "absent" | "unavailable";
+export type MediaPreviewState =
+  | "ready"
+  | "absent"
+  | "unavailable"
+  | "cache_unavailable";
 
 export interface MediaPreview {
   mediaId: string;
@@ -20,6 +26,11 @@ export interface MediaPreviewDemand {
 
 export interface MediaPreviewRequest extends MediaPreviewDemand {
   revision: number;
+}
+
+export interface CacheProcessorWarning {
+  state: "suspended";
+  message: string;
 }
 
 export type MediaPreviewErrorCode =
@@ -102,10 +113,25 @@ export interface SaveProjectResult {
   projection: EditorProjection;
 }
 
+export type SaveAsProjectOutcome =
+  | { kind: "cancelled" }
+  | {
+      kind: "savedAs";
+      previousProjectId: string;
+      projectId: string;
+      revision: number;
+    };
+
+export interface SaveAsProjectResult {
+  outcome: SaveAsProjectOutcome;
+  projection: EditorProjection;
+}
+
 export type SaveProjectFailureCode =
   | "stale_revision"
   | "persisted_baseline_conflict"
   | "save_state_indeterminate"
+  | "recovery_cleanup_failed"
   | "session_unavailable"
   | "not_found"
   | "unavailable"
@@ -113,7 +139,13 @@ export type SaveProjectFailureCode =
   | "invalid_path"
   | "unexpected_object_type"
   | "conflict"
-  | "io_failure";
+  | "io_failure"
+  | "same_target"
+  | "destination_conflict"
+  | "project_in_use"
+  | "identity_indeterminate"
+  | "save_as_state_indeterminate"
+  | "dialog_unavailable";
 
 export type SaveProjectErrorCode =
   | SaveProjectFailureCode
@@ -168,32 +200,71 @@ export interface ProjectWindowPort {
 }
 
 export interface ProjectStartupPort {
+  recoveryStatus(): Promise<ProjectRecoveryStatus>;
+  resolveRecovery(
+    decision: ProjectRecoveryDecision,
+  ): Promise<ProjectRecoveryResolution>;
   confirmUiReady(): Promise<void>;
 }
 
-export interface ProjectSessionPort {
+export type ProjectRecoveryStatus = { kind: "none" } | { kind: "available" };
+
+export type ProjectRecoveryDecision =
+  | "reopenAndRecover"
+  | "discardCheckpointAndOpenLastSaved"
+  | "nowNot";
+
+export type ProjectRecoveryResolution =
+  | { kind: "recovered"; projection: EditorProjection }
+  | { kind: "openedLastSaved"; projection: EditorProjection }
+  | { kind: "deferred" };
+
+export interface ProjectCorePort {
   load(operationId: string): Promise<EditorProjection>;
   validateAlbumInformation(
     information: AlbumInformation,
   ): Promise<AlbumInformationValidation>;
   apply(intent: ProjectIntent): Promise<EditorProjection>;
+  applyWithOutcome(intent: ProjectIntent): Promise<ProjectMutationOutcome>;
+  importPhoto(): Promise<
+    | { kind: "cancelled"; projection: EditorProjection }
+    | { kind: "imported"; projection: EditorProjection; mediaId: string }
+    | { kind: "selected"; projection: EditorProjection; mediaId: string }
+  >;
+  resolvePhotoDropTarget(
+    sheetId: string,
+    xUm: number,
+    yUm: number,
+  ): Promise<PhotoDropTarget>;
+  relink(mediaId: string): Promise<EditorProjection>;
   undo(): Promise<EditorProjection>;
   redo(): Promise<EditorProjection>;
   save(expectedRevision: number): Promise<SaveProjectResult>;
+  saveAs(expectedRevision: number): Promise<SaveAsProjectResult>;
 }
 
 export interface MediaPreviewPort {
   prepareMediaPreviews(
     demand: MediaPreviewRequest,
   ): Promise<readonly MediaPreview[] | null>;
+  retryUnavailableMedia(mediaId: string): Promise<MediaPreview>;
   onMediaChanged(
     listener: (mediaIds: readonly string[]) => void,
   ): Promise<() => void>;
+  onCacheProcessorWarning(
+    listener: (warning: CacheProcessorWarning) => void,
+  ): Promise<() => void>;
 }
 
-export interface ExportPort {
+export interface ExportSheetSelection {
+  projectName: string;
+  sheetId: string;
+  sheetNumber: number;
+}
+
+export interface ExportPipelinePort {
   startSheet(
-    sheetId: string,
+    selection: ExportSheetSelection,
     onEvent: (event: ExportProgressEvent) => void,
   ): ExportAttempt;
 }

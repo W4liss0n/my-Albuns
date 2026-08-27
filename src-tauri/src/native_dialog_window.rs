@@ -2,6 +2,7 @@ use std::{
     collections::HashMap,
     fmt::Write as _,
     io,
+    path::Path,
     sync::{
         Mutex, OnceLock,
         atomic::{AtomicU64, Ordering},
@@ -187,10 +188,14 @@ pub(crate) async fn show_launch_progress(
     let window = build_hidden_owned_window(
         app,
         &owner,
-        OPENING_PROGRESS_LABEL,
-        kind.url(),
-        DIALOG_WIDTH,
-        126.0 + OWNED_WINDOW_TITLEBAR_HEIGHT,
+        HiddenOwnedWindowConfig {
+            label: OPENING_PROGRESS_LABEL,
+            url: kind.url(),
+            width: DIALOG_WIDTH,
+            height: 126.0 + OWNED_WINDOW_TITLEBAR_HEIGHT,
+            browser_arguments: None,
+            browser_data_directory: None,
+        },
     )
     .await?;
 
@@ -223,10 +228,14 @@ pub(crate) async fn show_project_failure(
     let window = match build_hidden_owned_window(
         app,
         &owner,
-        PROJECT_FAILURE_LABEL,
-        &url,
-        DIALOG_WIDTH,
-        210.0 + OWNED_WINDOW_TITLEBAR_HEIGHT,
+        HiddenOwnedWindowConfig {
+            label: PROJECT_FAILURE_LABEL,
+            url: &url,
+            width: DIALOG_WIDTH,
+            height: 210.0 + OWNED_WINDOW_TITLEBAR_HEIGHT,
+            browser_arguments: None,
+            browser_data_directory: None,
+        },
     )
     .await
     {
@@ -260,14 +269,28 @@ fn owned_window(app: &AppHandle, label: &str) -> io::Result<WebviewWindow> {
         .ok_or_else(|| io::Error::other(format!("the {label} owner window is unavailable")))
 }
 
+pub(crate) struct HiddenOwnedWindowConfig<'a> {
+    pub(crate) label: &'a str,
+    pub(crate) url: &'a str,
+    pub(crate) width: f64,
+    pub(crate) height: f64,
+    pub(crate) browser_arguments: Option<&'a str>,
+    pub(crate) browser_data_directory: Option<&'a Path>,
+}
+
 pub(crate) async fn build_hidden_owned_window(
     app: &AppHandle,
     owner: &WebviewWindow,
-    label: &str,
-    url: &str,
-    width: f64,
-    height: f64,
+    config: HiddenOwnedWindowConfig<'_>,
 ) -> io::Result<WebviewWindow> {
+    let HiddenOwnedWindowConfig {
+        label,
+        url,
+        width,
+        height,
+        browser_arguments,
+        browser_data_directory,
+    } = config;
     if let Some(existing) = app.get_webview_window(label) {
         let _ = existing.destroy();
     }
@@ -279,7 +302,7 @@ pub(crate) async fn build_hidden_owned_window(
     let ready_url =
         append_query_parameter(url, OWNED_WINDOW_READY_PARAMETER, &ready_token.to_string());
     let (policy_signal, policy_readiness) = desktop_webview_policy::page_load_handshake();
-    let builder = WebviewWindowBuilder::new(app, label, WebviewUrl::App(ready_url.into()))
+    let mut builder = WebviewWindowBuilder::new(app, label, WebviewUrl::App(ready_url.into()))
         .title("MyAlbuns")
         .inner_size(width, height)
         .resizable(false)
@@ -293,6 +316,12 @@ pub(crate) async fn build_hidden_owned_window(
         .visible(false)
         .center()
         .prevent_overflow();
+    if let Some(arguments) = browser_arguments {
+        builder = builder.additional_browser_args(arguments);
+    }
+    if let Some(directory) = browser_data_directory {
+        builder = builder.data_directory(directory.to_path_buf());
+    }
     let builder = builder.parent(owner).map_err(io::Error::other)?;
     let window = match builder
         .on_page_load(move |window, payload| {

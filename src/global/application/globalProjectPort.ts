@@ -7,6 +7,8 @@ export interface ProjectLaunchFailure {
 
 export type ProjectLaunchOutcome =
   | { status: "opened" }
+  | { status: "focused" }
+  | { status: "externalCopyNotWritable" }
   | { status: "cancelled" }
   | { status: "failed"; error: ProjectLaunchFailure };
 
@@ -128,10 +130,14 @@ export interface RecentProjectSummary {
 }
 
 export interface GlobalProjectPort {
+  onActivationTerminal(
+    listener: (outcome: ProjectLaunchOutcome) => void,
+  ): Promise<() => void>;
   completeGraphicsGate(
     supported: boolean,
   ): Promise<ProjectLaunchOutcome | null>;
   openProject(): Promise<OpenProjectOutcome>;
+  saveExternalCopyAs(): Promise<ProjectLaunchOutcome>;
   listRecentProjects(): Promise<readonly RecentProjectSummary[]>;
   openRecentProject(id: string): Promise<OpenProjectOutcome>;
   startupOpenFailure(): Promise<OpenProjectFailure | null>;
@@ -146,5 +152,6 @@ export interface NewProjectPort {
   ): Promise<ProjectLaunchOutcome>;
   chooseProvisionalDecorative(): Promise<ProvisionalDecorativeSelectionOutcome>;
   releaseProvisionalDecorative(selectionId: string): Promise<void>;
+  clearProvisionalDecoratives(): Promise<void>;
 }
 import type { ScopedValue } from "../../application/scopedValues";

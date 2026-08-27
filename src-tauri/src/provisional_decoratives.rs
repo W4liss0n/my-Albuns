@@ -429,6 +429,13 @@ pub(crate) fn release_provisional_decorative(
     Ok(registry.release(&selection_id))
 }
 
+#[tauri::command]
+pub(crate) fn clear_provisional_decoratives(
+    registry: State<'_, ProvisionalDecorativeRegistry>,
+) -> usize {
+    registry.clear()
+}
+
 pub(crate) fn respond_to_preview_request<R: Runtime>(
     registry: ProvisionalDecorativeRegistry,
     context: UriSchemeContext<'_, R>,

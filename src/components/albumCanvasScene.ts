@@ -210,6 +210,41 @@ export class AlbumCanvasScene {
     this.input?.onTransformPreview(null);
   }
 
+  resolvePhotoDropPoint(
+    clientX: number,
+    clientY: number,
+  ): { sheetId: string; xUm: number; yUm: number } | null {
+    if (!this.input || this.canvasScale <= 0) return null;
+    const bounds = this.app.canvas.getBoundingClientRect();
+    if (bounds.width <= 0 || bounds.height <= 0) return null;
+    const canvasX =
+      (clientX - bounds.left) * (this.app.screen.width / bounds.width);
+    const canvasY =
+      (clientY - bounds.top) * (this.app.screen.height / bounds.height);
+    const worldX = (canvasX - this.world.position.x) / this.canvasScale;
+    const worldY = (canvasY - this.world.position.y) / this.canvasScale;
+    for (const [sheetId, node] of this.sheetNodes) {
+      const sheet = this.input.composition.sheets.find(
+        (candidate) => candidate.sheetId === sheetId,
+      );
+      if (!sheet) continue;
+      const localX =
+        worldX - node.container.position.x - node.activeOffsetXPx;
+      const localY = worldY - node.container.position.y;
+      const width = sheet.widthUm * MICROMETER_TO_CANVAS_PIXEL;
+      const height = sheet.heightUm * MICROMETER_TO_CANVAS_PIXEL;
+      if (localX < 0 || localY < 0 || localX >= width || localY >= height) {
+        continue;
+      }
+      return {
+        sheetId,
+        xUm: Math.floor(localX / MICROMETER_TO_CANVAS_PIXEL),
+        yUm: Math.floor(localY / MICROMETER_TO_CANVAS_PIXEL),
+      };
+    }
+    return null;
+  }
+
   private resetProjectScene() {
     this.resetTransientInteractions();
     this.clearMaterializedSheets();
@@ -471,8 +506,16 @@ export class AlbumCanvasScene {
     if (!this.input) return;
     for (const [sheetId, node] of this.sheetNodes) {
       node.focusOutline.visible = sheetId === this.input.focusedSheetId;
+      node.sheetDropOutline.visible =
+        this.input.photoDropHighlight?.kind === "sheet" &&
+        this.input.photoDropHighlight.sheetId === sheetId;
       for (const [frameId, selection] of node.frameSelections) {
         selection.container.visible = frameId === this.input.selectedFrameId;
+      }
+      for (const [frameId, outline] of node.frameDropOutlines) {
+        outline.visible =
+          this.input.photoDropHighlight?.kind === "frame" &&
+          this.input.photoDropHighlight.frameId === frameId;
       }
     }
   }

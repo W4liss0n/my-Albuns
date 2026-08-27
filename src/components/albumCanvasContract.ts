@@ -1,4 +1,7 @@
-import type { CompositionPlan } from "../domain/project";
+import type {
+  CompositionPlan,
+  PhotoDropTarget,
+} from "../domain/project";
 import type { GraphicsDiagnostic } from "../application/graphics";
 import type { MediaPreviewDemand } from "../application/projectPorts";
 import type { ViewportState } from "../state/viewport";
@@ -43,6 +46,11 @@ export type AlbumCanvasMode =
   | { kind: "normal" }
   | { kind: "sheet-editing"; sheetId: string };
 
+export interface CanvasPhotoDropPoint {
+  sheetId: string;
+  xUm: number;
+  yUm: number;
+}
 export interface AlbumCanvasProps {
   projectId: string;
   mode: AlbumCanvasMode;
@@ -55,6 +63,8 @@ export interface AlbumCanvasProps {
   focusedSheetId: string | null;
   centeredSheetId: string | null;
   viewport: ViewportState;
+  draggedPhotoId?: string | null;
+  photoDropHighlight?: PhotoDropTarget | null;
   photoZoomPreview?: PhotoZoomPreview | null;
   onSelectFrame(frameId: string | null): void;
   onEditSheet(sheetId: string): void;
@@ -63,6 +73,15 @@ export interface AlbumCanvasProps {
   onViewportChange(viewport: ViewportState): void;
   onTransformPreview(preview: PhotoTransformPreview | null): void;
   onTransformCommit(delta: PhotoTransformDelta): Promise<boolean>;
+  onResolvePhotoDropTarget?(
+    mediaId: string,
+    point: CanvasPhotoDropPoint,
+  ): Promise<PhotoDropTarget>;
+  onDropPhoto?(
+    mediaId: string,
+    point: CanvasPhotoDropPoint,
+  ): Promise<boolean>;
+  onPhotoDragCancel?(): void;
   onCanvasMetricsChange?(metrics: CanvasMetrics): void;
   onMediaDemandChange?(demand: MediaPreviewDemand): void;
   onGraphicsUnavailable?(diagnostic: GraphicsDiagnostic): void;

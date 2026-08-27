@@ -14,16 +14,14 @@ use myalbuns_paths::{
 use crate::project_document::ProjectRevision;
 
 pub(crate) use editable_store::{
-    CreateStoreError, OpenStoreError, ProjectStore, SaveStoreError, SaveStoreResult, create_only,
-    open_editable, prepare_replacement,
+    CreateStoreError, OpenStoreError, OpenedProject, ProjectStore, SaveStoreError, SaveStoreResult,
+    create_only, open_editable, prepare_replacement,
 };
-#[cfg(test)]
-pub(crate) use editable_store::{
-    inject_post_publication_indeterminate_for_current_thread,
-    release_post_publication_indeterminate_for_current_thread,
-};
+#[cfg(windows)]
+pub(crate) use editable_store::{create_only_excluding, prepare_replacement_excluding};
 pub(crate) use identity_lease::{
-    IdentityLeaseError, IdentityLeaseObservation, ProjectIdentityLease,
+    IdentityLeaseError, IdentityLeaseObservation, IdentityTargetBinder,
+    PendingProjectIdentityLease, ProjectIdentityLease,
 };
 pub(crate) use identity_registry::{IdentityRegistryLookup, ProjectIdentityRegistry};
 
@@ -141,11 +139,11 @@ pub(crate) fn decode(bytes: &[u8]) -> Result<ProjectRevision, DecodeFailure> {
 pub(crate) fn decode_with_metadata(bytes: &[u8]) -> Result<DecodedStoredRevision, DecodeFailure> {
     versioned_codec::decode(bytes).map(|decoded| DecodedStoredRevision {
         revision: decoded.revision,
-        requires_schema_upgrade: decoded.source_schema_version < versioned_codec::SCHEMA_VERSION_V2,
+        requires_schema_upgrade: decoded.source_schema_version < versioned_codec::SCHEMA_VERSION_V3,
     })
 }
 
-fn encode(revision: &ProjectRevision) -> Result<Vec<u8>, DecodeFailure> {
+pub(crate) fn encode(revision: &ProjectRevision) -> Result<Vec<u8>, DecodeFailure> {
     versioned_codec::encode(revision)
 }
 

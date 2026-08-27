@@ -1,7 +1,7 @@
 import { act, fireEvent, renderHook } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 
-import type { ProjectSessionPort } from "../application/projectPorts";
+import type { ProjectCorePort } from "../application/projectPorts";
 import { useEditorView } from "../state/editorView";
 import {
   createTwoSheetProjection,
@@ -10,7 +10,7 @@ import {
 import { useProjectEditorController } from "./useProjectEditorController";
 import type { ProjectMutationRunner } from "./useProjectMutationRunner";
 
-function projectSessionPort(): ProjectSessionPort {
+function projectCorePort(): ProjectCorePort {
   return {
     load: async () => representativeProjection,
     validateAlbumInformation: async () => ({
@@ -18,10 +18,23 @@ function projectSessionPort(): ProjectSessionPort {
       impact: { sheetWidthPx: 7_087, pageWidthPx: 3_543, heightPx: 3_543 },
     }),
     apply: async () => representativeProjection,
+    applyWithOutcome: async () => ({
+      projection: representativeProjection,
+      affectedFrameId: null,
+    }),
+    importPhoto: async () => ({
+      kind: "cancelled",
+      projection: representativeProjection,
+    }),
+    resolvePhotoDropTarget: async () => ({ kind: "invalid" }),
+    relink: async () => representativeProjection,
     undo: async () => representativeProjection,
     redo: async () => representativeProjection,
     save: async () => {
       throw new Error("Salvamento não configurado neste teste.");
+    },
+    saveAs: async () => {
+      throw new Error("Salvar como não configurado neste teste.");
     },
   };
 }
@@ -32,12 +45,13 @@ beforeEach(() => {
     selectedFrameId: null,
     focusedSheetId: "sheet-001",
     centeredSheetId: "sheet-001",
+    editingSheetId: null,
     viewport: { offsetX: 0 },
   });
 });
 
 test("routes editor changes through the shared Project mutation runner", async () => {
-  const port = projectSessionPort();
+  const port = projectCorePort();
   const apply = vi.spyOn(port, "apply");
   const run = vi.fn<ProjectMutationRunner["run"]>(async (operation) => ({
     status: "completed",
@@ -50,6 +64,7 @@ test("routes editor changes through the shared Project mutation runner", async (
   const view = renderHook(() =>
     useProjectEditorController({
       projection: representativeProjection,
+      projectCorePort: port,
       runProjectMutation,
       onProjectionChange: vi.fn(),
     }),
@@ -78,6 +93,7 @@ test("enters the centered Sheet Edit Mode with Enter and returns to normal mode 
   const view = renderHook(() =>
     useProjectEditorController({
       projection: representativeProjection,
+      projectCorePort: projectCorePort(),
       runProjectMutation: {
         run: vi.fn(),
         waitForIdle: async () => null,
@@ -118,6 +134,7 @@ test("targets the edited Sheet when leaving Sheet Edit Mode", () => {
   const view = renderHook(() =>
     useProjectEditorController({
       projection,
+      projectCorePort: projectCorePort(),
       runProjectMutation: {
         run: vi.fn(),
         waitForIdle: async () => null,

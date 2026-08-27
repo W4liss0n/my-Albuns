@@ -161,11 +161,7 @@ mod tests {
 
     fn store() -> (tempfile::TempDir, AppPaths, SettingsStore) {
         let root = tempfile::tempdir().expect("temporary application data root");
-        let paths = AppPaths::from_roots(
-            &root.path().join("Roaming"),
-            &root.path().join("Local"),
-            root.path(),
-        );
+        let paths = AppPaths::from_roots(&root.path().join("Roaming"), &root.path().join("Local"));
         let store = SettingsStore::new(&paths);
         (root, paths, store)
     }

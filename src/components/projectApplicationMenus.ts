@@ -20,6 +20,7 @@ interface ProjectApplicationMenuOptions {
   mediaPanelVisible: boolean;
   redo(): void;
   save(): void;
+  saveAs(): void;
   undo(): void;
   toggleContextualPanel(): void;
   toggleMediaPanel(): void;
@@ -35,6 +36,7 @@ export function createProjectApplicationMenus({
   mediaPanelVisible,
   redo,
   save,
+  saveAs,
   undo,
   toggleContextualPanel,
   toggleMediaPanel,
@@ -50,7 +52,7 @@ export function createProjectApplicationMenus({
         placeholder("open-project", "project-window"),
         separator("file-project-separator"),
         implemented("save", "project-window", save),
-        placeholder("save-as", "project-window"),
+        implemented("save-as", "project-window", saveAs),
         separator("file-export-separator"),
         implemented("export-sheet", "sheet", exportSheet, !canExport),
         placeholder("export", "project-window"),

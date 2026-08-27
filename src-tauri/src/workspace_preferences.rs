@@ -260,7 +260,7 @@ mod tests {
 
     fn store() -> (tempfile::TempDir, AppPaths, WorkspacePreferencesStore) {
         let root = tempfile::tempdir().expect("temporary application data root");
-        let paths = AppPaths::from_roots(root.path(), root.path(), root.path());
+        let paths = AppPaths::from_roots(root.path(), root.path());
         let store = WorkspacePreferencesStore::new(&paths);
         (root, paths, store)
     }

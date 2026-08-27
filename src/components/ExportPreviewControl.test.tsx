@@ -11,7 +11,7 @@ import type {
   ExportAttempt,
   ExportCancelStatus,
   ExportOutcome,
-  ExportPort,
+  ExportPipelinePort,
   ExportProgressEvent,
 } from "../application/projectPorts";
 import { ExportPreviewControl } from "./ExportPreviewControl";
@@ -25,7 +25,7 @@ interface AttemptHarness {
 
 function createExportHarness() {
   const attempts: AttemptHarness[] = [];
-  const startSheet = vi.fn<ExportPort["startSheet"]>((_sheetId, onEvent) => {
+  const startSheet = vi.fn<ExportPipelinePort["startSheet"]>((_selection, onEvent) => {
     let resolve!: (outcome: ExportOutcome) => void;
     let reject!: (error: unknown) => void;
     const completion = new Promise<ExportOutcome>((resolvePromise, rejectPromise) => {
@@ -40,7 +40,7 @@ function createExportHarness() {
 
   return {
     attempts,
-    port: { startSheet } satisfies ExportPort,
+    port: { startSheet } satisfies ExportPipelinePort,
     startSheet,
   };
 }
@@ -93,10 +93,14 @@ function renderControl({
   const view = render(
     <ExportPreviewControl
       dialogPort={dialog.port}
-      exportPort={exportHarness.port}
+      exportPipelinePort={exportHarness.port}
       onActiveChange={onActiveChange}
       projectId={projectId}
-      sheetId="sheet-001"
+      selection={{
+        projectName: "Projeto de teste",
+        sheetId: "sheet-001",
+        sheetNumber: 1,
+      }}
     />,
   );
   return { dialog, exportHarness, view };
@@ -112,7 +116,11 @@ test("waits for the backend started event before opening the native progress win
   await user.click(screen.getByRole("button", { name: "Exportar Lâmina" }));
 
   expect(exportHarness.startSheet).toHaveBeenCalledWith(
-    "sheet-001",
+    {
+      projectName: "Projeto de teste",
+      sheetId: "sheet-001",
+      sheetNumber: 1,
+    },
     expect.any(Function),
   );
   expect(dialog.present).not.toHaveBeenCalled();
@@ -331,10 +339,14 @@ test("retires the attempt and native presentation when the Project changes", asy
   view.rerender(
     <ExportPreviewControl
       dialogPort={dialog.port}
-      exportPort={exportHarness.port}
+      exportPipelinePort={exportHarness.port}
       onActiveChange={onActiveChange}
       projectId="project-b"
-      sheetId="sheet-001"
+      selection={{
+        projectName: "Projeto de teste",
+        sheetId: "sheet-001",
+        sheetNumber: 1,
+      }}
     />,
   );
 

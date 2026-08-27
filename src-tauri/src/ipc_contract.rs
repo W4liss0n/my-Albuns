@@ -469,6 +469,7 @@ pub enum MediaPreviewState {
     Ready,
     Absent,
     Unavailable,
+    CacheUnavailable,
 }
 
 #[derive(Deserialize, TS)]
@@ -493,11 +494,94 @@ pub struct LinkedMediaChanged {
     pub(crate) media_ids: Vec<String>,
 }
 
+#[derive(Serialize, TS)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+#[ts(tag = "kind")]
+pub enum ImportPhotoResult {
+    Cancelled {
+        #[ts(type = "import(\"../../domain/project\").EditorProjection")]
+        projection: EditorProjection,
+    },
+    Imported {
+        #[ts(type = "import(\"../../domain/project\").EditorProjection")]
+        projection: EditorProjection,
+        media_id: String,
+    },
+    Selected {
+        #[ts(type = "import(\"../../domain/project\").EditorProjection")]
+        projection: EditorProjection,
+        media_id: String,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+pub enum CacheProcessorState {
+    Suspended,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct CacheProcessorWarning {
+    pub(crate) state: CacheProcessorState,
+    pub(crate) message: String,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct CacheServiceStatus {
+    pub(crate) occupied_bytes: u64,
+    pub(crate) releasable_bytes: u64,
+    pub(crate) namespace_count: usize,
+    pub(crate) releasable_namespace_count: usize,
+    pub(crate) clear_all_scheduled: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct CacheFreeResult {
+    pub(crate) measured_releasable_bytes: u64,
+    pub(crate) freed_bytes: u64,
+    pub(crate) removed_namespace_count: usize,
+    pub(crate) skipped_active_namespace_count: usize,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+#[ts(tag = "kind")]
+pub enum CacheClearAllOutcome {
+    Cleared { result: CacheFreeResult },
+    Scheduled,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+pub enum CacheServiceCommandErrorCode {
+    Busy,
+    StorageUnavailable,
+    ReservationUnavailable,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct CacheServiceCommandError {
+    pub(crate) code: CacheServiceCommandErrorCode,
+    pub(crate) message: String,
+}
+
 #[cfg(test)]
 mod media_change_contract_tests {
     use serde_json::json;
 
-    use super::LinkedMediaChanged;
+    use super::{CacheProcessorState, CacheProcessorWarning, LinkedMediaChanged};
 
     #[test]
     fn stable_media_change_event_exposes_only_opaque_media_identities() {
@@ -508,6 +592,22 @@ mod media_change_contract_tests {
         assert_eq!(
             serde_json::to_value(event).expect("the event serializes"),
             json!({ "mediaIds": ["photo-a", "overlay-a"] })
+        );
+    }
+
+    #[test]
+    fn cache_processor_warning_is_typed_and_does_not_block_project_commands() {
+        let warning = CacheProcessorWarning {
+            state: CacheProcessorState::Suspended,
+            message: "O Cache foi suspenso.".into(),
+        };
+
+        assert_eq!(
+            serde_json::to_value(warning).expect("the warning serializes"),
+            json!({
+                "state": "suspended",
+                "message": "O Cache foi suspenso."
+            })
         );
     }
 }
@@ -547,6 +647,58 @@ pub struct SaveProjectResult {
     pub(crate) projection: EditorProjection,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, TS)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+#[ts(tag = "kind")]
+pub enum SaveAsProjectOutcome {
+    Cancelled,
+    SavedAs {
+        previous_project_id: String,
+        project_id: String,
+        revision: u64,
+    },
+}
+
+#[derive(Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveAsProjectResult {
+    pub(crate) outcome: SaveAsProjectOutcome,
+    #[ts(type = "import(\"../../domain/project\").EditorProjection")]
+    pub(crate) projection: EditorProjection,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]
+#[serde(
+    tag = "code",
+    rename_all = "snake_case",
+    rename_all_fields = "camelCase"
+)]
+#[ts(tag = "code")]
+pub enum SaveAsProjectCommandError {
+    StaleRevision {
+        expected_revision: u64,
+        current_revision: u64,
+    },
+    SameTarget,
+    DestinationConflict,
+    ProjectInUse,
+    IdentityIndeterminate,
+    NotFound,
+    Unavailable,
+    AccessDenied,
+    InvalidPath,
+    UnexpectedObjectType,
+    Conflict,
+    IoFailure,
+    SaveAsStateIndeterminate,
+    SessionUnavailable,
+    DialogUnavailable,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]
 #[serde(
     tag = "code",
@@ -568,6 +720,7 @@ pub enum SaveProjectCommandError {
     Conflict,
     IoFailure,
     SaveStateIndeterminate,
+    RecoveryCleanupFailed,
     SessionUnavailable,
 }
 
@@ -643,6 +796,55 @@ mod save_contract_tests {
 }
 
 #[cfg(test)]
+mod save_as_contract_tests {
+    use serde_json::json;
+
+    use super::{SaveAsProjectCommandError, SaveAsProjectOutcome};
+
+    #[test]
+    fn save_as_outcomes_keep_cancellation_and_adopted_identity_explicit() {
+        assert_eq!(
+            serde_json::to_value(SaveAsProjectOutcome::Cancelled)
+                .expect("the cancelled outcome serializes"),
+            json!({ "kind": "cancelled" })
+        );
+        assert_eq!(
+            serde_json::to_value(SaveAsProjectOutcome::SavedAs {
+                previous_project_id: "4b594571-6b51-4cad-a37c-8fd8cedb7dd2".into(),
+                project_id: "81f68858-c8f5-4fcb-8e0f-185c3ff45cf5".into(),
+                revision: 7,
+            })
+            .expect("the SavedAs outcome serializes"),
+            json!({
+                "kind": "savedAs",
+                "previousProjectId": "4b594571-6b51-4cad-a37c-8fd8cedb7dd2",
+                "projectId": "81f68858-c8f5-4fcb-8e0f-185c3ff45cf5",
+                "revision": 7
+            })
+        );
+    }
+
+    #[test]
+    fn save_as_errors_are_stable_structured_data_without_messages() {
+        let serialized = serde_json::to_value(SaveAsProjectCommandError::StaleRevision {
+            expected_revision: 3,
+            current_revision: 4,
+        })
+        .expect("the stale-revision error serializes");
+
+        assert_eq!(
+            serialized,
+            json!({
+                "code": "stale_revision",
+                "expectedRevision": 3,
+                "currentRevision": 4
+            })
+        );
+        assert!(serialized.get("message").is_none());
+    }
+}
+
+#[cfg(test)]
 mod close_contract_tests {
     use serde_json::json;
 
@@ -668,6 +870,91 @@ mod close_contract_tests {
             serde_json::to_value(ProjectCloseResolution::Closed)
                 .expect("the resolution serializes"),
             json!({ "kind": "closed" })
+        );
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+#[ts(tag = "kind")]
+pub enum ProjectRecoveryStatus {
+    None,
+    Available,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum ProjectRecoveryDecision {
+    ReopenAndRecover,
+    DiscardCheckpointAndOpenLastSaved,
+    NowNot,
+}
+
+#[derive(Serialize, TS)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+#[ts(tag = "kind")]
+pub enum ProjectRecoveryResolution {
+    Recovered {
+        #[ts(type = "import(\"../../domain/project\").EditorProjection")]
+        projection: Box<EditorProjection>,
+    },
+    OpenedLastSaved {
+        #[ts(type = "import(\"../../domain/project\").EditorProjection")]
+        projection: Box<EditorProjection>,
+    },
+    Deferred,
+}
+
+#[cfg(test)]
+mod recovery_contract_tests {
+    use serde_json::json;
+
+    use super::{ProjectRecoveryDecision, ProjectRecoveryResolution, ProjectRecoveryStatus};
+
+    #[test]
+    fn recovery_status_and_decisions_are_closed_and_stable() {
+        assert_eq!(
+            serde_json::to_value(ProjectRecoveryStatus::Available)
+                .expect("the available status serializes"),
+            json!({ "kind": "available" })
+        );
+        assert_eq!(
+            serde_json::from_value::<ProjectRecoveryDecision>(json!("reopenAndRecover"))
+                .expect("the recover decision deserializes"),
+            ProjectRecoveryDecision::ReopenAndRecover
+        );
+        assert_eq!(
+            serde_json::from_value::<ProjectRecoveryDecision>(json!(
+                "discardCheckpointAndOpenLastSaved"
+            ))
+            .expect("the confirmed discard decision deserializes"),
+            ProjectRecoveryDecision::DiscardCheckpointAndOpenLastSaved
+        );
+        assert_eq!(
+            serde_json::from_value::<ProjectRecoveryDecision>(json!("nowNot"))
+                .expect("the defer decision deserializes"),
+            ProjectRecoveryDecision::NowNot
+        );
+        assert!(serde_json::from_value::<ProjectRecoveryDecision>(json!("openLastSaved")).is_err());
+        assert!(
+            serde_json::from_value::<ProjectRecoveryDecision>(json!({
+                "choice": "openLastSaved",
+                "checkpointDiscardConfirmed": true
+            }))
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn deferred_recovery_has_no_creative_payload() {
+        assert_eq!(
+            serde_json::to_value(ProjectRecoveryResolution::Deferred)
+                .expect("the deferred resolution serializes"),
+            json!({ "kind": "deferred" })
         );
     }
 }

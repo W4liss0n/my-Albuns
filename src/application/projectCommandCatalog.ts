@@ -112,8 +112,7 @@ const DEFINITIONS = [
     description: "Salva o Projeto em uma nova Localização.",
     kind: "application",
     contexts: ["project-window"],
-    availability: "placeholder",
-    placeholderFeature: "save-project-as",
+    availability: "implemented",
     shortcuts: [
       shortcut("s", "Ctrl+Shift+S", { ctrlKey: true, shiftKey: true }),
     ],

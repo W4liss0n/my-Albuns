@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type DragEvent,
+} from "react";
 import { Layers3 } from "lucide-react";
 import { Application } from "pixi.js";
 
@@ -7,10 +13,12 @@ import {
   logReasonFromError,
 } from "../application/logging";
 import type { GraphicsDiagnostic } from "../application/graphics";
+import type { PhotoDropTarget } from "../domain/project";
 import { AppIcon, EmptyState } from "../ui";
 import { AlbumCanvasScene } from "./albumCanvasScene";
 import type {
   AlbumCanvasProps,
+  CanvasPhotoDropPoint,
   CanvasMetrics,
 } from "./albumCanvasContract";
 import { CanvasHorizontalScrollbar } from "./CanvasHorizontalScrollbar";
@@ -28,6 +36,7 @@ const isOpaqueCachePreview = (url: string) =>
 export type {
   AlbumCanvasMode,
   AlbumCanvasProps,
+  CanvasPhotoDropPoint,
   CanvasMetrics,
   CanvasTechnicalGuides,
   PhotoTransformDelta,
@@ -37,6 +46,12 @@ export type {
 } from "./albumCanvasContract";
 
 export function AlbumCanvas(props: AlbumCanvasProps) {
+  const [resolvedPhotoDrop, setResolvedPhotoDrop] = useState<{
+    request: number;
+    mediaId: string;
+    point: CanvasPhotoDropPoint;
+    target: PhotoDropTarget;
+  } | null>(null);
   const logger = useLogger();
   const canvasGraphicsDiagnosticProbe =
     useCanvasGraphicsDiagnosticProbe();
@@ -57,6 +72,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
   }, []);
   const sceneProps = {
     ...props,
+    photoDropHighlight: resolvedPhotoDrop?.target ?? null,
     onCanvasMetricsChange: handleCanvasMetricsChange,
   };
   const latestPropsRef = useRef(sceneProps);
@@ -72,6 +88,25 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
   const ready = graphicsState === "ready";
   const [, setPreviewTextureRevision] = useState(0);
   const hasSheets = props.composition.sheets.length > 0;
+  const dragRequestRef = useRef(0);
+
+  useEffect(() => {
+    if (!props.draggedPhotoId) {
+      dragRequestRef.current += 1;
+      setResolvedPhotoDrop(null);
+    }
+  }, [props.draggedPhotoId]);
+
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || !props.draggedPhotoId) return;
+      dragRequestRef.current += 1;
+      setResolvedPhotoDrop(null);
+      props.onPhotoDragCancel?.();
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [props.draggedPhotoId, props.onPhotoDragCancel]);
 
   useEffect(() => {
     if (!hostRef.current || !hasSheets) return;
@@ -345,6 +380,70 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
     }
   });
 
+  function handlePhotoDragOver(event: DragEvent<HTMLDivElement>) {
+    const mediaId = props.draggedPhotoId;
+    const point = sceneRef.current?.resolvePhotoDropPoint(
+      event.clientX,
+      event.clientY,
+    );
+    if (!mediaId || !point || !props.onResolvePhotoDropTarget) {
+      dragRequestRef.current += 1;
+      setResolvedPhotoDrop(null);
+      return;
+    }
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    const request = dragRequestRef.current + 1;
+    dragRequestRef.current = request;
+    setResolvedPhotoDrop(null);
+    void props.onResolvePhotoDropTarget(mediaId, point).then(
+      (target) => {
+        if (
+          dragRequestRef.current === request &&
+          props.draggedPhotoId === mediaId
+        ) {
+          setResolvedPhotoDrop(
+            target.kind === "invalid"
+              ? null
+              : { request, mediaId, point, target },
+          );
+        }
+      },
+      () => {
+        if (dragRequestRef.current === request) setResolvedPhotoDrop(null);
+      },
+    );
+  }
+
+  function handlePhotoDragLeave(event: DragEvent<HTMLDivElement>) {
+    if (event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      return;
+    }
+    dragRequestRef.current += 1;
+    setResolvedPhotoDrop(null);
+  }
+
+  function handlePhotoDrop(event: DragEvent<HTMLDivElement>) {
+    const mediaId = props.draggedPhotoId;
+    const point = sceneRef.current?.resolvePhotoDropPoint(
+      event.clientX,
+      event.clientY,
+    );
+    const validTarget =
+      resolvedPhotoDrop !== null &&
+      resolvedPhotoDrop.request === dragRequestRef.current &&
+      resolvedPhotoDrop.mediaId === mediaId &&
+      resolvedPhotoDrop.point.sheetId === point?.sheetId &&
+      Object.is(resolvedPhotoDrop.point.xUm, point?.xUm) &&
+      Object.is(resolvedPhotoDrop.point.yUm, point?.yUm);
+    dragRequestRef.current += 1;
+    setResolvedPhotoDrop(null);
+    props.onPhotoDragCancel?.();
+    if (!mediaId || !point || !validTarget || !props.onDropPhoto) return;
+    event.preventDefault();
+    void props.onDropPhoto(mediaId, point);
+  }
+
   if (!hasSheets) {
     return (
       <EmptyState
@@ -358,7 +457,13 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
 
   return (
     <div className="canvas-shell">
-      <div className="canvas-host" ref={hostRef}>
+      <div
+        className="canvas-host"
+        ref={hostRef}
+        onDragLeave={handlePhotoDragLeave}
+        onDragOver={handlePhotoDragOver}
+        onDrop={handlePhotoDrop}
+      >
         <div
           aria-label="Ações da Barra da Lâmina"
           className="ui-visually-hidden"

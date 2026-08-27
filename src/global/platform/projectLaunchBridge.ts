@@ -6,22 +6,22 @@ import {
   type ProjectLaunchOutcome,
   type ProvisionalDecorativeSelection,
 } from "../application/globalProjectPort";
+import { hasOnlyIpcKeys, isIpcRecord } from "../../platform/ipcGuards";
 
 const validationCodes = new Set<ProjectConfigurationValidationCode>(
   PROJECT_CONFIGURATION_VALIDATION_CODES,
 );
 
-export function toProjectLaunchFailure(
+function parseProjectLaunchFailure(
   error: unknown,
-  fallback: ProjectLaunchFailure,
-): ProjectLaunchFailure {
-  if (typeof error !== "object" || error === null) return fallback;
-  const candidate = error as Record<string, unknown>;
+): ProjectLaunchFailure | null {
+  if (!isIpcRecord(error)) return null;
+  const candidate = error;
   if (
     typeof candidate.code !== "string" ||
     typeof candidate.message !== "string"
   ) {
-    return fallback;
+    return null;
   }
   return {
     code: candidate.code,
@@ -35,24 +35,46 @@ export function toProjectLaunchFailure(
   };
 }
 
+export function toProjectLaunchFailure(
+  error: unknown,
+  fallback: ProjectLaunchFailure,
+): ProjectLaunchFailure {
+  return parseProjectLaunchFailure(error) ?? fallback;
+}
+
+export function parseProjectLaunchOutcome(
+  value: unknown,
+): ProjectLaunchOutcome | null {
+  if (!isIpcRecord(value) || typeof value.status !== "string") {
+    return null;
+  }
+  if (
+    (value.status === "opened" ||
+      value.status === "focused" ||
+      value.status === "externalCopyNotWritable" ||
+      value.status === "cancelled") &&
+    hasOnlyIpcKeys(value, ["status"])
+  ) {
+    return { status: value.status };
+  }
+  if (
+    value.status === "failed" &&
+    hasOnlyIpcKeys(value, ["status", "error"])
+  ) {
+    const error = parseProjectLaunchFailure(value.error);
+    return error ? { status: "failed", error } : null;
+  }
+  return null;
+}
+
 export function toProjectLaunchOutcome(
   result: unknown,
   fallback: ProjectLaunchFailure,
 ): ProjectLaunchOutcome {
-  if (typeof result !== "object" || result === null) {
-    return { status: "failed", error: fallback };
-  }
-  const candidate = result as Record<string, unknown>;
-  if (candidate.status === "opened" || candidate.status === "cancelled") {
-    return { status: candidate.status };
-  }
-  if (candidate.status === "failed") {
-    return {
-      status: "failed",
-      error: toProjectLaunchFailure(candidate.error, fallback),
-    };
-  }
-  return { status: "failed", error: fallback };
+  return parseProjectLaunchOutcome(result) ?? {
+    status: "failed",
+    error: fallback,
+  };
 }
 
 export async function settleProjectLaunch(

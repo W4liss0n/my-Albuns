@@ -8,9 +8,6 @@ use serde::Deserialize;
 
 pub(crate) const GRAPHICS_GATE_TIMEOUT: Duration = Duration::from_secs(10);
 
-#[cfg(debug_assertions)]
-const PROCESS_GATE_GRAPHICS_SUPPORTED_ENV: &str = "MYALBUNS_PROCESS_GATE_GRAPHICS_SUPPORTED";
-
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase", tag = "status", deny_unknown_fields)]
 pub(crate) enum GraphicsGateReport {
@@ -27,7 +24,7 @@ enum GraphicsGateStatus {
 
 struct GraphicsLaunchGateState {
     status: GraphicsGateStatus,
-    direct_project: Option<PathBuf>,
+    activation_projects: Vec<PathBuf>,
 }
 
 #[derive(Clone)]
@@ -36,17 +33,17 @@ pub(crate) struct GraphicsLaunchGate {
 }
 
 pub(crate) enum GraphicsGateCompletion {
-    Ready(Option<PathBuf>),
+    Ready(Vec<PathBuf>),
     Rejected,
     AlreadyFinal,
 }
 
 impl GraphicsLaunchGate {
-    pub(crate) fn new(direct_project: Option<PathBuf>) -> Self {
+    pub(crate) fn new(activation_projects: Vec<PathBuf>) -> Self {
         Self {
             state: Arc::new(Mutex::new(GraphicsLaunchGateState {
                 status: GraphicsGateStatus::Pending,
-                direct_project,
+                activation_projects,
             })),
         }
     }
@@ -62,11 +59,11 @@ impl GraphicsLaunchGate {
         match report {
             GraphicsGateReport::Supported {} => {
                 state.status = GraphicsGateStatus::Supported;
-                GraphicsGateCompletion::Ready(state.direct_project.take())
+                GraphicsGateCompletion::Ready(std::mem::take(&mut state.activation_projects))
             }
             GraphicsGateReport::Unsupported {} => {
                 state.status = GraphicsGateStatus::Rejected;
-                state.direct_project.take();
+                state.activation_projects.clear();
                 GraphicsGateCompletion::Rejected
             }
         }
@@ -81,7 +78,7 @@ impl GraphicsLaunchGate {
             return false;
         }
         state.status = GraphicsGateStatus::Rejected;
-        state.direct_project.take();
+        state.activation_projects.clear();
         true
     }
 
@@ -93,23 +90,20 @@ impl GraphicsLaunchGate {
             == GraphicsGateStatus::Supported
     }
 
-    pub(crate) fn has_pending_direct_project(&self) -> bool {
+    pub(crate) fn is_pending(&self) -> bool {
+        self.state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .status
+            == GraphicsGateStatus::Pending
+    }
+
+    pub(crate) fn has_pending_activation(&self) -> bool {
         let state = self
             .state
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        state.status == GraphicsGateStatus::Pending && state.direct_project.is_some()
-    }
-}
-
-#[cfg(debug_assertions)]
-pub(crate) fn debug_process_gate_report() -> GraphicsGateReport {
-    if std::env::var_os(PROCESS_GATE_GRAPHICS_SUPPORTED_ENV).as_deref()
-        == Some(std::ffi::OsStr::new("1"))
-    {
-        GraphicsGateReport::Supported {}
-    } else {
-        GraphicsGateReport::Unsupported {}
+        state.status == GraphicsGateStatus::Pending && !state.activation_projects.is_empty()
     }
 }
 
@@ -129,7 +123,7 @@ mod tests {
             .is_err()
         );
 
-        let rejected = GraphicsLaunchGate::new(Some(PathBuf::from("Projeto.myalbuns")));
+        let rejected = GraphicsLaunchGate::new(vec![PathBuf::from("Projeto.myalbuns")]);
         assert!(matches!(
             rejected.complete(GraphicsGateReport::Unsupported {}),
             GraphicsGateCompletion::Rejected
@@ -140,12 +134,26 @@ mod tests {
         ));
         assert!(!rejected.allows_project_host());
 
-        let expired = GraphicsLaunchGate::new(Some(PathBuf::from("Projeto.myalbuns")));
+        let expired = GraphicsLaunchGate::new(vec![PathBuf::from("Projeto.myalbuns")]);
         assert!(expired.expire());
         assert!(matches!(
             expired.complete(GraphicsGateReport::Supported {}),
             GraphicsGateCompletion::AlreadyFinal
         ));
         assert!(!expired.allows_project_host());
+    }
+
+    #[test]
+    fn supported_gate_releases_the_full_native_activation_in_order() {
+        let projects = vec![
+            PathBuf::from(r"C:\Projetos\Primeiro.myalbuns"),
+            PathBuf::from(r"\\servidor\Albuns\Segundo.myalbuns"),
+        ];
+        let gate = GraphicsLaunchGate::new(projects.clone());
+
+        assert!(matches!(
+            gate.complete(GraphicsGateReport::Supported {}),
+            GraphicsGateCompletion::Ready(released) if released == projects
+        ));
     }
 }

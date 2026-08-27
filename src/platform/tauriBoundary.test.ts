@@ -9,6 +9,8 @@ import messageDialogWindowPermission from "../../src-tauri/permissions/message-d
 import ownedDialogWindowPermission from "../../src-tauri/permissions/owned-dialog-window.json?raw";
 import projectWindowPermission from "../../src-tauri/permissions/project-window.json?raw";
 import projectDialogWindowPermission from "../../src-tauri/permissions/project-dialog-window.json?raw";
+import productRuntimeSource from "../../src-tauri/src/product_runtime.rs?raw";
+import projectCommandsSource from "../../src-tauri/src/project_commands.rs?raw";
 
 const sourceFiles = import.meta.glob("../**/*.{ts,tsx}", {
   eager: true,
@@ -46,6 +48,11 @@ const platformDirectories = [
   "../global/platform/",
   "../project-dialog/platform/",
 ];
+const issue16GlobalCacheCommands = new Set([
+  "cache_service_status",
+  "free_closed_project_cache",
+  "clear_all_cache",
+]);
 
 function findOffenders(
   isOffender: (path: string, source: string) => boolean,
@@ -166,6 +173,10 @@ test("keeps the project-window capability aligned with the invoked commands", ()
 
 test("keeps the global-window capability isolated from project commands", () => {
   const globalCommands = extractInvokedCommands(tauriCommandSources.global);
+  const explicitGlobalSurface = new Set([
+    ...globalCommands,
+    ...issue16GlobalCacheCommands,
+  ]);
   const projectCommands = extractInvokedCommands([
     ...tauriCommandSources.shared,
     ...tauriCommandSources.project,
@@ -176,7 +187,19 @@ test("keeps the global-window capability isolated from project commands", () => 
   );
 
   expect(capability.windows).toEqual(["global"]);
-  expect([...allowedCommands].sort()).toEqual([...globalCommands].sort());
+  expect(capability.permissions).toEqual([
+    "global-window-commands",
+    "core:window:allow-close",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-start-dragging",
+    "core:window:allow-internal-toggle-maximize",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+  ]);
+  expect([...allowedCommands].sort()).toEqual(
+    [...explicitGlobalSurface].sort(),
+  );
   expect(
     [...allowedCommands].filter((command) => projectCommands.has(command)),
   ).toEqual([]);
@@ -269,5 +292,24 @@ test("uses only the minimal Tauri core, event, and window bridges", () => {
     "@tauri-apps/api/event",
     "@tauri-apps/api/window",
   ]);
+  expect(projectWindowCapability).not.toContain("dialog:");
+});
+
+test("consumes the generated import result at the Tauri boundary", () => {
+  const projectPortSource = sourceFiles["./tauriProjectPorts.ts"];
+
+  expect(projectPortSource).toContain(
+    'import type { ImportPhotoResult as IpcImportPhotoResult } from "./generated/ImportPhotoResult";',
+  );
+  expect(projectPortSource).toContain(
+    'invoke<IpcImportPhotoResult>("import_photo")',
+  );
+});
+
+test("initializes the native dialog used by the productive relink command", () => {
+  expect(projectCommandsSource).toContain("app.dialog()");
+  expect(productRuntimeSource).toContain(
+    ".plugin(tauri_plugin_dialog::init())",
+  );
   expect(projectWindowCapability).not.toContain("dialog:");
 });

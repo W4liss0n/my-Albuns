@@ -43,7 +43,6 @@ impl ProjectFileLock {
     pub fn try_acquire(path: &Path) -> Result<Self, ProjectFileLockError> {
         let file = OpenOptions::new()
             .read(true)
-            .write(true)
             .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE)
             .open(path)
             .map_err(classify_lock_error)?;

@@ -1,7 +1,7 @@
 ---
 status: accepted
 document: design
-updated: 2026-08-11
+updated: 2026-08-21
 ---
 
 # Armazenamento local e Cache
@@ -190,13 +190,14 @@ O `RootBindingPlan` e os contextos locais que reutilizam uma raiz durante Import
 
 - schema e versão da representação;
 - Identidade do Projeto e último uso;
-- `mediaId`, `generationId` e nome do artefato;
+- `mediaId`, marca opaca SHA-256 do caminho lógico que originou a geração,
+  `generationId` e nome do artefato;
 - dimensões, formato, orientação EXIF e quantidade de páginas quando aplicável;
 - perfil de cor básico (`srgb` nesta política medida);
 - tamanho e datas do original;
 - fingerprint versionado.
 
-Identidade da mídia, caminho original, categoria e decisões do usuário pertencem ao Projeto. Ausência ou corrupção do índice exige reconstrução, nunca perda de conteúdo.
+Identidade da mídia, caminho original, categoria e decisões do usuário pertencem ao Projeto. A marca opaca não serializa o caminho textual: ela apenas impede que uma geração produzida depois de Religação seja reutilizada quando Undo, Descartar ou Recuperação restaurarem outro vínculo para o mesmo `mediaId`. Ausência ou corrupção do índice exige reconstrução, nunca perda de conteúdo.
 
 O fingerprint v1 é `sha256-full-file-v1`: SHA-256 dos bytes integrais abertos
 pelo Processador, acompanhado pelo tamanho e pelas datas de criação e

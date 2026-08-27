@@ -1,15 +1,19 @@
 use std::{env, path::PathBuf};
 
 use myalbuns_desktop_lib::ipc_contract::{
-    ApplicationSettings, CancelDisposition, ExportCommandError, ExportEvent, ExportResult,
-    FrontendLogEvent, LinkedMediaChanged, MediaPanelSettings, MediaPanelTabSettings,
-    MediaPreferenceKind, MediaPreview, MediaPreviewCommandError, MediaPreviewDemand,
-    MediaPreviewState, MediaSortDirection, MediaThumbnailSizes, MediaUsageFilter,
-    ProjectCloseChoice, ProjectCloseRequestOutcome, ProjectCloseResolution, ProjectDialogAction,
+    ApplicationSettings, CacheClearAllOutcome, CacheFreeResult, CacheProcessorState,
+    CacheProcessorWarning, CacheServiceCommandError, CacheServiceStatus, CancelDisposition,
+    ExportCommandError, ExportEvent, ExportResult, FrontendLogEvent, ImportPhotoResult,
+    LinkedMediaChanged, MediaPanelSettings, MediaPanelTabSettings, MediaPreferenceKind,
+    MediaPreview, MediaPreviewCommandError, MediaPreviewDemand, MediaPreviewState,
+    MediaSortDirection, MediaThumbnailSizes, MediaUsageFilter, ProjectCloseChoice,
+    ProjectCloseRequestOutcome, ProjectCloseResolution, ProjectDialogAction,
     ProjectDialogActionEvent, ProjectDialogPresentation, ProjectDialogState,
-    SaveProjectCommandError, SaveProjectOutcome, SaveProjectResult, SettingsPreferenceChange,
-    WorkspacePanelKind, WorkspacePanelPreference, WorkspacePanelPreferences,
-    WorkspacePreferenceChange, WorkspacePreferences,
+    ProjectRecoveryDecision, ProjectRecoveryResolution, ProjectRecoveryStatus,
+    SaveAsProjectCommandError, SaveAsProjectOutcome, SaveAsProjectResult, SaveProjectCommandError,
+    SaveProjectOutcome, SaveProjectResult, SettingsPreferenceChange, WorkspacePanelKind,
+    WorkspacePanelPreference, WorkspacePanelPreferences, WorkspacePreferenceChange,
+    WorkspacePreferences,
 };
 use ts_rs::{Config, TS};
 
@@ -24,6 +28,17 @@ fn main() {
 
     CancelDisposition::export_all(&config)
         .expect("cancel disposition bindings should be generated");
+    CacheClearAllOutcome::export_all(&config)
+        .expect("Cache clear outcome bindings should be generated");
+    CacheFreeResult::export_all(&config).expect("Cache free result bindings should be generated");
+    CacheProcessorState::export_all(&config)
+        .expect("Cache processor state bindings should be generated");
+    CacheProcessorWarning::export_all(&config)
+        .expect("Cache processor warning bindings should be generated");
+    CacheServiceCommandError::export_all(&config)
+        .expect("Cache service error bindings should be generated");
+    CacheServiceStatus::export_all(&config)
+        .expect("Cache service status bindings should be generated");
     ExportCommandError::export_all(&config).expect("export error bindings should be generated");
     ExportEvent::export_all(&config).expect("export event bindings should be generated");
     ExportResult::export_all(&config).expect("export result bindings should be generated");
@@ -36,6 +51,7 @@ fn main() {
         .expect("media panel settings bindings should be generated");
     MediaPanelTabSettings::export_all(&config)
         .expect("media panel tab settings bindings should be generated");
+    ImportPhotoResult::export_all(&config).expect("Photo import bindings should be generated");
     MediaPreview::export_all(&config).expect("media preview bindings should be generated");
     MediaPreviewDemand::export_all(&config)
         .expect("media preview demand bindings should be generated");
@@ -64,6 +80,12 @@ fn main() {
         .expect("Project close request outcome bindings should be generated");
     ProjectCloseResolution::export_all(&config)
         .expect("Project close resolution bindings should be generated");
+    ProjectRecoveryDecision::export_all(&config)
+        .expect("Project Recovery decision bindings should be generated");
+    ProjectRecoveryResolution::export_all(&config)
+        .expect("Project Recovery resolution bindings should be generated");
+    ProjectRecoveryStatus::export_all(&config)
+        .expect("Project Recovery status bindings should be generated");
     SaveProjectCommandError::export_all(&config)
         .expect("Save Project error bindings should be generated");
     SaveProjectOutcome::export_all(&config)
@@ -82,4 +104,10 @@ fn main() {
         .expect("workspace preference change bindings should be generated");
     WorkspacePreferences::export_all(&config)
         .expect("workspace preference bindings should be generated");
+    SaveAsProjectCommandError::export_all(&config)
+        .expect("Save As Project error bindings should be generated");
+    SaveAsProjectOutcome::export_all(&config)
+        .expect("Save As Project outcome bindings should be generated");
+    SaveAsProjectResult::export_all(&config)
+        .expect("Save As Project result bindings should be generated");
 }

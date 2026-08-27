@@ -81,9 +81,12 @@ export interface SheetRenderNode {
   placeholderLabels: Text[];
   inactiveSideGradient: FillGradient | null;
   frameSelections: Map<string, FrameSelectionRenderNode>;
+  frameDropOutlines: Map<string, Graphics>;
   focusOutline: Graphics;
+  sheetDropOutline: Graphics;
   sheetBar: SheetBarRenderNode;
   viewBounds: CanvasBounds;
+  activeOffsetXPx: number;
 }
 
 interface SheetRenderNodeCallbacks {
@@ -212,6 +215,7 @@ export function createSheetRenderNode(
   if (centerLine) sheetContainer.addChild(centerLine);
 
   const frameSelections = new Map<string, FrameSelectionRenderNode>();
+  const frameDropOutlines = new Map<string, Graphics>();
   const frameSelectionLayer = new Container();
   frameSelectionLayer.label = `frame-selection-layer-${sheet.sheetId}`;
   frameSelectionLayer.eventMode = "none";
@@ -343,6 +347,18 @@ export function createSheetRenderNode(
     frameSelections.set(frame.frameId, frameSelection);
     frameSelectionLayer.addChild(frameSelection.container);
 
+    const frameDropOutline = new Graphics()
+      .rect(frameX, frameY, frameWidth, frameHeight)
+      .stroke({
+        ...SHEET_VISUAL_STYLE.technicalOutlineStroke,
+        width: 2,
+      });
+    frameDropOutline.label = `frame-photo-drop-${frame.frameId}`;
+    frameDropOutline.eventMode = "none";
+    frameDropOutline.visible = false;
+    frameDropOutlines.set(frame.frameId, frameDropOutline);
+    frameSelectionLayer.addChild(frameDropOutline);
+
     frameContainer.on("pointertap", (event: FederatedPointerEvent) => {
       event.stopPropagation();
       if (dispatchSheetDoubleTap(event)) return;
@@ -463,6 +479,22 @@ export function createSheetRenderNode(
   focusOutline.visible = false;
   sheetContainer.addChild(focusOutline);
 
+  const sheetDropOutline = new Graphics()
+    .rect(
+      viewGeometry.activeBounds.x,
+      viewGeometry.activeBounds.y,
+      viewGeometry.activeBounds.width,
+      viewGeometry.activeBounds.height,
+    )
+    .stroke({
+      ...SHEET_VISUAL_STYLE.technicalOutlineStroke,
+      width: 2,
+    });
+  sheetDropOutline.label = `sheet-photo-drop-${sheet.sheetId}`;
+  sheetDropOutline.eventMode = "none";
+  sheetDropOutline.visible = false;
+  sheetContainer.addChild(sheetDropOutline);
+
   return {
     container: sheetContainer,
     signature,
@@ -470,9 +502,12 @@ export function createSheetRenderNode(
     placeholderLabels,
     inactiveSideGradient: inactiveSide?.gradient ?? null,
     frameSelections,
+    frameDropOutlines,
     focusOutline,
+    sheetDropOutline,
     sheetBar,
     viewBounds: viewGeometry.visibleOuterBounds,
+    activeOffsetXPx: presentation.activeOffsetXPx,
   };
 }
 

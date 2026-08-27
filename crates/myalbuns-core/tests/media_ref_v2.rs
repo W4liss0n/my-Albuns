@@ -3,8 +3,8 @@
 use std::fs;
 
 use myalbuns_core::{
-    DocumentFailure, LoadProjectError, MediaKind, OpenProjectRequest, ProjectCore, ProjectIntent,
-    ProjectLocation, SaveProjectOutcome,
+    DocumentFailure, LoadProjectError, MediaId, MediaKind, OpenProjectRequest, ProjectCore,
+    ProjectIntent, ProjectLocation, RelinkMedia, RenderSnapshotRef, SaveProjectOutcome,
 };
 use myalbuns_paths::OperationPathContext;
 
@@ -12,6 +12,8 @@ const PROJECT_V1_MIGRATION_INPUT: &[u8] =
     include_bytes!("fixtures/project_document_v1_migration_input.myalbuns");
 const PROJECT_V2_MIGRATION_EXPECTED: &[u8] =
     include_bytes!("fixtures/project_document_v2_migration_expected.myalbuns");
+const PROJECT_V3_MIGRATION_EXPECTED: &[u8] =
+    include_bytes!("fixtures/project_document_v3_migration_expected.myalbuns");
 
 const PROJECT_WITH_PHOTO_AND_DECORATIVE_V2: &str = r##"{
   "documentType": "myalbuns.project",
@@ -152,7 +154,7 @@ fn v2_rejects_a_photo_as_background_or_overlay() {
 }
 
 #[test]
-fn an_authorized_editable_v2_project_keeps_its_schema_and_opaque_identity_authority() {
+fn an_authorized_editable_v2_project_promotes_to_v3_and_keeps_opaque_identity_authority() {
     let root = tempfile::tempdir().expect("temporary editable v2 Project");
     let project_path = root.path().join("Projeto tracer.myalbuns");
     fs::write(&project_path, PROJECT_WITH_PHOTO_AND_DECORATIVE_V2)
@@ -180,9 +182,117 @@ fn an_authorized_editable_v2_project_keeps_its_schema_and_opaque_identity_author
     let persisted: serde_json::Value =
         serde_json::from_slice(&fs::read(&project_path).expect("the saved v2 Project is readable"))
             .expect("the saved v2 Project remains JSON");
-    assert_eq!(persisted["schemaVersion"], 2);
+    assert_eq!(persisted["schemaVersion"], 3);
     assert_eq!(persisted["project"]["media"][0]["kind"], "photo");
     assert_eq!(persisted["project"]["media"][1]["kind"], "decorative");
+}
+
+#[test]
+fn public_relink_command_updates_only_the_selected_occurrence_and_participates_in_history() {
+    let root = tempfile::tempdir().expect("temporary relink Project");
+    let project_path = root.path().join("Projeto religado.myalbuns");
+    fs::write(&project_path, PROJECT_WITH_PHOTO_AND_DECORATIVE_V2)
+        .expect("the v2 fixture is written");
+    let mut project = ProjectCore::new()
+        .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"))
+        .open_editable(OpenProjectRequest::new(location(&project_path)))
+        .expect("the v2 Project is positively authorized");
+    let selected_id: MediaId = "00000000-0000-4000-8000-000000000010"
+        .parse()
+        .expect("the selected occurrence has a canonical identity");
+    let replacement = root.path().join("Foto religada.jpg");
+    let untouched_path = project.project().media()[1].path().to_path_buf();
+
+    let relinked = project
+        .relink_media(RelinkMedia::new(selected_id, replacement.clone()))
+        .expect("the public Session command relinks the selected occurrence");
+
+    assert_eq!(relinked.state.revision, 1);
+    assert!(relinked.state.dirty);
+    assert!(relinked.state.can_undo);
+    assert_eq!(project.project().media()[0].path(), replacement);
+    assert_eq!(project.project().media()[1].path(), untouched_path);
+
+    project.undo().expect("RelinkMedia participates in Undo");
+    assert_ne!(project.project().media()[0].path(), replacement);
+    project.redo().expect("RelinkMedia participates in Redo");
+    assert_eq!(project.project().media()[0].path(), replacement);
+    project
+        .save(project.revision())
+        .expect("RelinkMedia persists through the normal Save handshake");
+    drop(project);
+
+    let reopened = ProjectCore::new()
+        .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"))
+        .open_editable(OpenProjectRequest::new(location(&project_path)))
+        .expect("the relinked Project reopens");
+    assert_eq!(reopened.project().media()[0].path(), replacement);
+    assert_eq!(reopened.project().media()[1].path(), untouched_path);
+}
+
+#[test]
+fn frozen_rendering_borrows_one_resolved_plan_for_canvas_and_export() {
+    let root = tempfile::tempdir().expect("temporary frozen v2 Project");
+    let project_path = root.path().join("Projeto congelado.myalbuns");
+    fs::write(&project_path, PROJECT_WITH_PHOTO_AND_DECORATIVE_V2)
+        .expect("the v2 fixture is written");
+    let project = ProjectCore::new()
+        .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"))
+        .open_editable(OpenProjectRequest::new(location(&project_path)))
+        .expect("the v2 Project is positively authorized");
+    let selected_sheet_id = "00000000-0000-4000-8000-000000000002".to_owned();
+
+    let frozen = project.freeze_rendering();
+    let snapshot: RenderSnapshotRef<'_> = frozen.render_snapshot();
+    assert!(
+        std::ptr::eq(snapshot.composition, &frozen.projection().composition),
+        "Canvas and Export must borrow the same resolved CompositionPlan"
+    );
+    assert_eq!(snapshot.project_id, "550e8400-e29b-41d4-a716-446655440000");
+    assert_eq!(snapshot.project_name, "Projeto congelado");
+    assert_eq!(snapshot.revision, 0);
+    assert_eq!(snapshot.dpi, 300);
+    assert_eq!(snapshot.composition.sheets.len(), 2);
+    assert_eq!(snapshot.composition.sheets[1].sheet_id, selected_sheet_id);
+    assert_eq!(snapshot.composition.sheets[1].width_um, 600_000);
+    assert_eq!(snapshot.composition.sheets[1].height_um, 300_000);
+    let canvas_sheet = &frozen.projection().composition.sheets[1];
+    assert_eq!(canvas_sheet.sheet_id, selected_sheet_id);
+    assert_eq!(canvas_sheet.number, 2);
+    assert_eq!(canvas_sheet.width_um, 600_000);
+    assert_eq!(canvas_sheet.height_um, 300_000);
+    let frozen_sheet = frozen
+        .into_sheet(&selected_sheet_id)
+        .expect("the selected sheet owns its exact sources");
+
+    assert_eq!(frozen_sheet.output_unit().sheet.sheet_id, selected_sheet_id);
+    let referenced = frozen_sheet
+        .output_unit()
+        .sheet
+        .referenced_media_ids()
+        .collect::<Vec<MediaId>>();
+    assert_eq!(
+        referenced.len(),
+        2,
+        "background and overlay both reference media"
+    );
+    assert!(
+        referenced
+            .iter()
+            .all(|media_id| media_id.to_string() == "00000000-0000-4000-8000-000000000011")
+    );
+    assert_eq!(
+        frozen_sheet
+            .sources()
+            .iter()
+            .map(|source| (source.kind(), source.path()))
+            .collect::<Vec<_>>(),
+        vec![(
+            MediaKind::Decorative,
+            std::path::Path::new(r"C:\Fotos\Overlay.png"),
+        ),],
+        "the unreferenced Foto is not frozen for this output unit",
+    );
 }
 
 #[test]
@@ -207,7 +317,39 @@ fn v1_migrates_only_in_memory_and_read_only_loading_preserves_the_source_bytes()
 }
 
 #[test]
-fn explicit_save_promotes_an_open_v1_project_to_the_versioned_v2_golden_result() {
+fn the_v1_to_v2_golden_step_remains_exact_and_publicly_readable() {
+    let v1 =
+        std::str::from_utf8(PROJECT_V1_MIGRATION_INPUT).expect("the normative v1 fixture is UTF-8");
+    let expected_v2 = v1.replacen("\"schemaVersion\": 1", "\"schemaVersion\": 2", 1);
+    assert_eq!(
+        PROJECT_V2_MIGRATION_EXPECTED,
+        expected_v2.as_bytes(),
+        "the accepted v1 -> v2 step changes only schemaVersion"
+    );
+
+    let root = tempfile::tempdir().expect("temporary v2 golden Project");
+    let project_path = root.path().join("Projeto legado v2.myalbuns");
+    fs::write(&project_path, PROJECT_V2_MIGRATION_EXPECTED)
+        .expect("the normative v2 result is written");
+    let loaded = ProjectCore::new()
+        .load_persisted_revision(myalbuns_core::LoadProjectRequest::new(location(
+            &project_path,
+        )))
+        .expect("the preserved v2 result participates in the current public chain");
+
+    assert_eq!(loaded.revision(), 7);
+    assert_eq!(loaded.project().media()[0].kind(), MediaKind::Decorative);
+    assert!(
+        loaded
+            .project()
+            .sheets()
+            .iter()
+            .all(|sheet| sheet.frames().is_empty())
+    );
+}
+
+#[test]
+fn explicit_save_promotes_an_open_v1_project_to_the_versioned_v3_golden_result() {
     let root = tempfile::tempdir().expect("temporary editable migration Project");
     let project_path = root.path().join("Projeto legado.myalbuns");
     fs::write(&project_path, PROJECT_V1_MIGRATION_INPUT).expect("the v1 fixture is written");
@@ -233,7 +375,7 @@ fn explicit_save_promotes_an_open_v1_project_to_the_versioned_v2_golden_result()
     assert!(!project.has_unsaved_changes());
     assert_eq!(
         fs::read(&project_path).expect("the migrated Project is readable"),
-        PROJECT_V2_MIGRATION_EXPECTED
+        PROJECT_V3_MIGRATION_EXPECTED
     );
 }
 

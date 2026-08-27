@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 
-import type { ProjectSessionPort } from "../application/projectPorts";
+import type { ProjectCorePort } from "../application/projectPorts";
 import { createAlbumDesignProjectDraft } from "../application/projectSettingsDraft";
 import type { EditorProjection } from "../domain/project";
 import { representativeProjection } from "../test/projectFixtures";
@@ -19,9 +19,9 @@ function deferredProjection() {
 }
 
 function projectSessionPort(
-  apply: ProjectSessionPort["apply"],
-  undo: ProjectSessionPort["undo"],
-): ProjectSessionPort {
+  apply: ProjectCorePort["apply"],
+  undo: ProjectCorePort["undo"],
+): ProjectCorePort {
   return {
     load: async () => representativeProjection,
     validateAlbumInformation: async () => ({
@@ -29,6 +29,16 @@ function projectSessionPort(
       impact: { sheetWidthPx: 7_087, pageWidthPx: 3_543, heightPx: 3_543 },
     }),
     apply,
+    applyWithOutcome: async (intent) => ({
+      projection: await apply(intent),
+      affectedFrameId: null,
+    }),
+    importPhoto: async () => ({
+      kind: "cancelled",
+      projection: representativeProjection,
+    }),
+    resolvePhotoDropTarget: async () => ({ kind: "invalid" }),
+    relink: async () => representativeProjection,
     undo,
     redo: async () => representativeProjection,
     save: async () => ({
@@ -36,6 +46,10 @@ function projectSessionPort(
         kind: "alreadyCurrent",
         revision: representativeProjection.state.revision,
       },
+      projection: representativeProjection,
+    }),
+    saveAs: async () => ({
+      outcome: { kind: "cancelled" },
       projection: representativeProjection,
     }),
   };
@@ -69,10 +83,10 @@ test("preserves Redo when preceding History already materialized the Album Desig
       },
     },
   };
-  const apply = vi.fn<ProjectSessionPort["apply"]>(async () => afterUndo);
-  const undo = vi.fn<ProjectSessionPort["undo"]>(() => pendingUndo.promise);
+  const apply = vi.fn<ProjectCorePort["apply"]>(async () => afterUndo);
+  const undo = vi.fn<ProjectCorePort["undo"]>(() => pendingUndo.promise);
   const port = projectSessionPort(apply, undo);
-  const redo = vi.fn<ProjectSessionPort["redo"]>(async () =>
+  const redo = vi.fn<ProjectCorePort["redo"]>(async () =>
     representativeProjection,
   );
   port.redo = redo;
@@ -90,6 +104,7 @@ test("preserves Redo when preceding History already materialized the Album Desig
       projection: representativeProjection,
       runProjectMutation: runner,
       onProjectionChange,
+      onAffectedFrame: () => undefined,
     });
   });
 

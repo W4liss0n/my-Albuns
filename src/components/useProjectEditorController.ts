@@ -1,13 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 
+import type { ProjectCorePort } from "../application/projectPorts";
 import type { EditorProjection } from "../domain/project";
 import type {
   AlbumCanvasMode,
   AlbumCanvasProps,
 } from "./albumCanvasContract";
-import {
-  useCanvasModeKeyboardShortcuts,
-} from "./useCanvasModeKeyboardShortcuts";
+import { useCanvasModeKeyboardShortcuts } from "./useCanvasModeKeyboardShortcuts";
 import { usePhotoGestures } from "./usePhotoGestures";
 import { useProjectMutations } from "./useProjectMutations";
 import type { ProjectMutationRunner } from "./useProjectMutationRunner";
@@ -17,6 +16,7 @@ interface ProjectEditorControllerInput {
   interactionBlocked?: boolean;
   projection: EditorProjection;
   runProjectMutation: ProjectMutationRunner;
+  projectCorePort: ProjectCorePort;
   onProjectionChange(projection: EditorProjection): void;
 }
 
@@ -24,16 +24,25 @@ export function useProjectEditorController({
   interactionBlocked = false,
   projection,
   runProjectMutation,
+  projectCorePort,
   onProjectionChange,
 }: ProjectEditorControllerInput) {
   const navigation = useProjectNavigation(projection);
-  const [canvasMode, setCanvasMode] = useState<AlbumCanvasMode>({
-    kind: "normal",
-  });
+  const canvasMode = useMemo<AlbumCanvasMode>(
+    () =>
+      navigation.editingSheetId
+        ? {
+            kind: "sheet-editing",
+            sheetId: navigation.editingSheetId,
+          }
+        : { kind: "normal" },
+    [navigation.editingSheetId],
+  );
   const mutations = useProjectMutations({
     projection,
     runProjectMutation,
     onProjectionChange,
+    onAffectedFrame: navigation.selectFrame,
   });
   const selectedFrame = useMemo(
     () =>
@@ -60,74 +69,39 @@ export function useProjectEditorController({
   });
 
   const exitSheetEditing = useCallback(() => {
-    const editedSheetId =
-      canvasMode.kind === "sheet-editing" ? canvasMode.sheetId : null;
-    navigation.selectFrame(null);
+    const editedSheetId = navigation.editingSheetId;
+    navigation.exitSheetEdit();
     if (editedSheetId) {
       navigation.focusSheet(editedSheetId);
       navigation.centerSheet(editedSheetId);
     }
-    setCanvasMode({ kind: "normal" });
   }, [
-    canvasMode,
     navigation.centerSheet,
+    navigation.editingSheetId,
+    navigation.exitSheetEdit,
     navigation.focusSheet,
-    navigation.selectFrame,
   ]);
 
   const enterSheetEditing = useCallback(
     (sheetId: string) => {
       if (
         interactionBlocked ||
-        canvasMode.kind !== "normal" ||
+        navigation.editingSheetId !== null ||
         !projection.state.album.sheets.some(
           (sheet) => sheet.id === sheetId,
         )
       ) {
         return;
       }
-      const selectedFrameBelongsToTarget =
-        navigation.selectedFrameId === null ||
-        projection.state.album.sheets.some(
-          (sheet) =>
-            sheet.id === sheetId &&
-            sheet.frames.some(
-              (frame) => frame.id === navigation.selectedFrameId,
-            ),
-        );
-      if (!selectedFrameBelongsToTarget) {
-        navigation.selectFrame(null);
-      }
-      navigation.focusSheet(sheetId);
-      setCanvasMode({ kind: "sheet-editing", sheetId });
+      navigation.enterSheetEdit(sheetId);
     },
     [
-      canvasMode.kind,
       interactionBlocked,
-      navigation.focusSheet,
-      navigation.selectFrame,
-      navigation.selectedFrameId,
+      navigation.editingSheetId,
+      navigation.enterSheetEdit,
       projection.state.album.sheets,
     ],
   );
-
-  useEffect(() => {
-    setCanvasMode({ kind: "normal" });
-  }, [projection.state.projectId]);
-
-  useEffect(() => {
-    const editingSheetStillExists =
-      canvasMode.kind === "normal" ||
-      projection.state.album.sheets.some(
-        (sheet) => sheet.id === canvasMode.sheetId,
-      );
-    if (editingSheetStillExists) return;
-    exitSheetEditing();
-  }, [
-    canvasMode,
-    exitSheetEditing,
-    projection.state.album.sheets,
-  ]);
 
   useCanvasModeKeyboardShortcuts({
     implicitSheetId: navigation.implicitSheetId,
@@ -161,6 +135,21 @@ export function useProjectEditorController({
     onViewportChange: navigation.setViewport,
     onTransformPreview: photoGestures.onTransformPreview,
     onTransformCommit: photoGestures.onTransformCommit,
+    onResolvePhotoDropTarget: async (_mediaId, point) =>
+      projectCorePort.resolvePhotoDropTarget(
+        point.sheetId,
+        point.xUm,
+        point.yUm,
+      ),
+    onDropPhoto: (mediaId, point) =>
+      mutations.dropPhoto({
+        kind: "dropPhoto",
+        sheetId: point.sheetId,
+        mediaId,
+        xUm: point.xUm,
+        yUm: point.yUm,
+        mode: canvasMode.kind === "sheet-editing" ? "edit" : "normal",
+      }),
     onCanvasMetricsChange: navigation.handleCanvasMetricsChange,
   };
 
@@ -179,15 +168,20 @@ export function useProjectEditorController({
     finishZoomGesture: photoGestures.finishZoomGesture,
     applyAlbumInformation: mutations.applyAlbumInformation,
     applyAlbumDesign: mutations.applyAlbumDesign,
+    applyDpi: mutations.applyDpi,
+    relinkMedia: mutations.relinkMedia,
+    importPhoto: mutations.importPhoto,
     save: mutations.save,
+    saveAs: mutations.saveAs,
     undo: mutations.undo,
     redo: mutations.redo,
     fillMedia: (mediaId: string) => {
       if (navigation.implicitSheetId) {
-        void mutations.applyIntent({
-          kind: "fillLeftmostPlaceholder",
+        void mutations.applyPhotoWithStatus({
+          kind: "addPhoto",
           sheetId: navigation.implicitSheetId,
           mediaId,
+          mode: canvasMode.kind === "sheet-editing" ? "edit" : "normal",
         });
       }
     },

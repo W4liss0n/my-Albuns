@@ -31,21 +31,12 @@ function Test-FilesEqual {
         [string] $Right
     )
 
-    function Get-Sha256 {
-        param([string] $Path)
-
-        $stream = [System.IO.File]::OpenRead($Path)
-        $algorithm = [System.Security.Cryptography.SHA256]::Create()
-        try {
-            [System.BitConverter]::ToString($algorithm.ComputeHash($stream))
-        }
-        finally {
-            $algorithm.Dispose()
-            $stream.Dispose()
-        }
-    }
-
-    (Get-Sha256 -Path $Left) -eq (Get-Sha256 -Path $Right)
+    $leftBytes = [System.IO.File]::ReadAllBytes($Left)
+    $rightBytes = [System.IO.File]::ReadAllBytes($Right)
+    [System.Collections.StructuralComparisons]::StructuralEqualityComparer.Equals(
+        $leftBytes,
+        $rightBytes
+    )
 }
 
 function Compare-GeneratedContract {

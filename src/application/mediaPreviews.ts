@@ -8,7 +8,7 @@ interface MediaPreviewRenderingCandidate {
 export function renderableMediaPreviewUrl(
   preview: MediaPreviewRenderingCandidate,
 ): string | null {
-  if (preview.state !== "ready" && preview.state !== "unavailable") {
+  if (preview.state === "pending") {
     return null;
   }
   const url = preview.url?.trim();

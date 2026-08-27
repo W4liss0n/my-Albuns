@@ -6,6 +6,7 @@ export function createNewProjectPortStub(
 ): NewProjectPort {
   return {
     chooseProvisionalDecorative: async () => ({ status: "cancelled" }),
+    clearProvisionalDecoratives: async () => undefined,
     createProject: async () => ({ status: "cancelled" }),
     releaseProvisionalDecorative: async () => undefined,
     validateProjectConfiguration: async () => ({ status: "valid" }),

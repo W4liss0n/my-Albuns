@@ -11,11 +11,10 @@ use myalbuns_paths::{
 };
 
 #[test]
-fn derives_temporary_application_roots_from_injected_roots() {
+fn derives_application_roots_from_injected_known_folders() {
     let paths = AppPaths::from_roots(
         Path::new(r"C:\Users\Pessoa\AppData\Roaming"),
         Path::new(r"C:\Users\Pessoa\AppData\Local"),
-        Path::new(r"C:\Users\Pessoa\AppData\Local\Temp"),
     );
 
     assert_eq!(
@@ -29,28 +28,8 @@ fn derives_temporary_application_roots_from_injected_roots() {
 }
 
 #[test]
-fn prepares_the_export_preview_directory_through_the_central_path_policy() {
-    let root = tempfile::tempdir().expect("temporary known folders");
-    let paths = AppPaths::from_roots(root.path(), root.path(), root.path());
-
-    let directory = paths
-        .prepare_export_preview_directory()
-        .expect("the central path policy prepares its preview directory");
-
-    assert_eq!(
-        directory.path(),
-        root.path().join("MyAlbuns2").join("ExportPreview")
-    );
-    assert!(directory.path().is_dir());
-}
-
-#[test]
 fn exposes_each_data_category_under_its_approved_root() {
-    let paths = AppPaths::from_roots(
-        Path::new(r"C:\Roaming"),
-        Path::new(r"C:\Local"),
-        Path::new(r"C:\Temp"),
-    );
+    let paths = AppPaths::from_roots(Path::new(r"C:\Roaming"), Path::new(r"C:\Local"));
 
     assert_eq!(
         paths.settings_file(),
@@ -65,6 +44,12 @@ fn exposes_each_data_category_under_its_approved_root() {
         paths.recovery_dir(),
         Path::new(r"C:\Local\MyAlbuns2\Recovery")
     );
+    assert_eq!(
+        paths
+            .project_recovery_checkpoint("project-safe")
+            .expect("the Project recovery namespace is valid"),
+        Path::new(r"C:\Local\MyAlbuns2\Recovery\Projects\project-safe.json")
+    );
     assert_eq!(paths.state_dir(), Path::new(r"C:\Local\MyAlbuns2\State"));
     assert_eq!(
         paths
@@ -77,11 +62,7 @@ fn exposes_each_data_category_under_its_approved_root() {
 
 #[test]
 fn derives_the_recent_projects_state_file_from_the_central_local_root() {
-    let paths = AppPaths::from_roots(
-        Path::new(r"C:\Roaming"),
-        Path::new(r"C:\Local"),
-        Path::new(r"C:\Temp"),
-    );
+    let paths = AppPaths::from_roots(Path::new(r"C:\Roaming"), Path::new(r"C:\Local"));
 
     assert_eq!(
         paths.recent_projects_file(),
@@ -91,11 +72,7 @@ fn derives_the_recent_projects_state_file_from_the_central_local_root() {
 
 #[test]
 fn derives_the_workspace_preferences_state_file_from_the_central_local_root() {
-    let paths = AppPaths::from_roots(
-        Path::new(r"C:\Roaming"),
-        Path::new(r"C:\Local"),
-        Path::new(r"C:\Temp"),
-    );
+    let paths = AppPaths::from_roots(Path::new(r"C:\Roaming"), Path::new(r"C:\Local"));
 
     assert_eq!(
         paths.workspace_preferences_file(),
@@ -105,11 +82,7 @@ fn derives_the_workspace_preferences_state_file_from_the_central_local_root() {
 
 #[test]
 fn derives_the_project_identity_lease_root_from_the_central_local_state() {
-    let paths = AppPaths::from_roots(
-        Path::new(r"C:\Roaming"),
-        Path::new(r"C:\Local"),
-        Path::new(r"C:\Temp"),
-    );
+    let paths = AppPaths::from_roots(Path::new(r"C:\Roaming"), Path::new(r"C:\Local"));
 
     assert_eq!(
         paths.project_identity_leases_dir(),
@@ -119,11 +92,7 @@ fn derives_the_project_identity_lease_root_from_the_central_local_state() {
 
 #[test]
 fn derives_only_safe_webview_host_namespaces() {
-    let paths = AppPaths::from_roots(
-        Path::new(r"C:\Roaming"),
-        Path::new(r"C:\Local"),
-        Path::new(r"C:\Temp"),
-    );
+    let paths = AppPaths::from_roots(Path::new(r"C:\Roaming"), Path::new(r"C:\Local"));
 
     for unsafe_namespace in [
         "",
@@ -146,11 +115,7 @@ fn derives_only_safe_webview_host_namespaces() {
 
 #[test]
 fn project_identity_derives_stable_isolated_internal_namespaces() {
-    let paths = AppPaths::from_roots(
-        Path::new(r"C:\Roaming"),
-        Path::new(r"C:\Local"),
-        Path::new(r"C:\Temp"),
-    );
+    let paths = AppPaths::from_roots(Path::new(r"C:\Roaming"), Path::new(r"C:\Local"));
     let first = project_data_namespace("project-01");
 
     assert_eq!(
@@ -173,11 +138,7 @@ fn project_identity_derives_stable_isolated_internal_namespaces() {
 
 #[test]
 fn derives_only_safe_project_cache_namespaces() {
-    let paths = AppPaths::from_roots(
-        Path::new(r"C:\Roaming"),
-        Path::new(r"C:\Local"),
-        Path::new(r"C:\Temp"),
-    );
+    let paths = AppPaths::from_roots(Path::new(r"C:\Roaming"), Path::new(r"C:\Local"));
 
     let cache = paths
         .project_cache("project-01.ABC")
@@ -280,11 +241,7 @@ fn derives_only_safe_project_cache_namespaces() {
 
 #[test]
 fn validates_cache_artifacts_without_choosing_a_transport_protocol() {
-    let paths = AppPaths::from_roots(
-        Path::new(r"C:\Roaming"),
-        Path::new(r"C:\Local"),
-        Path::new(r"C:\Temp"),
-    );
+    let paths = AppPaths::from_roots(Path::new(r"C:\Roaming"), Path::new(r"C:\Local"));
     let preview = paths
         .project_cache("project-01")
         .expect("project namespace is safe")
@@ -623,7 +580,7 @@ fn a_publication_failure_discards_only_its_preparation() {
 #[test]
 fn prepares_the_cache_only_as_directories_below_the_authorized_root() {
     let root = tempfile::tempdir().expect("temporary LocalAppData root");
-    let paths = AppPaths::from_roots(root.path(), root.path(), root.path());
+    let paths = AppPaths::from_roots(root.path(), root.path());
     let cache = paths
         .project_cache("project-01")
         .expect("the Cache plan is valid");
@@ -637,15 +594,93 @@ fn prepares_the_cache_only_as_directories_below_the_authorized_root() {
 }
 
 #[test]
+fn guarded_writer_claim_storage_publishes_reads_and_conditionally_removes_by_handle() {
+    let root = tempfile::tempdir().expect("temporary LocalAppData root");
+    let paths = AppPaths::from_roots(root.path(), root.path());
+    let cache = paths
+        .project_cache("project-claim")
+        .expect("the Cache plan is valid");
+    drop(
+        paths
+            .prepare_cache_storage(&cache)
+            .expect("the Cache directory chain is created"),
+    );
+    let storage = paths
+        .open_cache_writer_claim_storage(&cache)
+        .expect("the physical Cache chain is valid")
+        .expect("the Cache namespace exists");
+    let expected = br#"{"schemaVersion":1,"process":{"processId":42,"creationTime":99}}"#;
+
+    storage
+        .publish_claim(expected)
+        .expect("the create-only claim is renamed relative to the guarded directory handle");
+    assert_eq!(
+        storage.read_claim().unwrap().as_deref(),
+        Some(expected.as_slice())
+    );
+    assert!(storage.publish_claim(b"other").is_err());
+    assert!(!storage.remove_claim_if_matches(b"other").unwrap());
+    assert_eq!(
+        storage.read_claim().unwrap().as_deref(),
+        Some(expected.as_slice())
+    );
+    assert!(storage.remove_claim_if_matches(expected).unwrap());
+    assert_eq!(storage.read_claim().unwrap(), None);
+}
+
+#[test]
+fn inspects_only_direct_cache_namespaces_and_measures_their_files() {
+    let root = tempfile::tempdir().expect("temporary LocalAppData root");
+    let paths = AppPaths::from_roots(root.path(), root.path());
+    let first = paths
+        .project_cache("project-first")
+        .expect("the first Cache plan is valid");
+    let second = paths
+        .project_cache("project-second")
+        .expect("the second Cache plan is valid");
+    let first_storage = paths
+        .prepare_cache_storage(&first)
+        .expect("the first namespace is prepared");
+    let second_storage = paths
+        .prepare_cache_storage(&second)
+        .expect("the second namespace is prepared");
+    let first_preview = first
+        .preview_file("media-a", "generation-a", CacheArtifactFormat::Jpeg)
+        .expect("the first preview path is valid");
+    let second_preview = second
+        .preview_file("media-b", "generation-b", CacheArtifactFormat::Png)
+        .expect("the second preview path is valid");
+    std::fs::write(first.metadata_file(), b"meta").expect("the first metadata is writable");
+    std::fs::write(first_preview, b"preview-one").expect("the first preview is writable");
+    std::fs::write(second_preview, b"preview-two-two").expect("the second preview is writable");
+    drop(first_storage);
+    drop(second_storage);
+
+    let namespaces = paths
+        .list_cache_namespaces()
+        .expect("namespace enumeration succeeds without measuring their contents");
+    assert_eq!(namespaces, vec![first.clone(), second.clone()]);
+    let first_usage = paths
+        .inspect_cache_namespace(&first)
+        .expect("the reserved namespace can be inspected separately")
+        .expect("the first namespace still exists");
+    assert_eq!(first_usage.paths(), &first);
+    assert_eq!(first_usage.bytes(), 15);
+
+    let second_usage = paths
+        .inspect_cache_namespace(&second)
+        .expect("the second reserved namespace can be inspected separately")
+        .expect("the second namespace still exists");
+    assert_eq!(second_usage.paths(), &second);
+    assert_eq!(second_usage.bytes(), 15);
+}
+
+#[test]
 fn rejects_a_cache_plan_from_another_local_data_root() {
     let authorized_root = tempfile::tempdir().expect("authorized LocalAppData root");
     let other_root = tempfile::tempdir().expect("different LocalAppData root");
-    let paths = AppPaths::from_roots(
-        authorized_root.path(),
-        authorized_root.path(),
-        authorized_root.path(),
-    );
-    let other_paths = AppPaths::from_roots(other_root.path(), other_root.path(), other_root.path());
+    let paths = AppPaths::from_roots(authorized_root.path(), authorized_root.path());
+    let other_paths = AppPaths::from_roots(other_root.path(), other_root.path());
     let other_cache = other_paths
         .project_cache("project-01")
         .expect("the other Cache plan is structurally valid");
@@ -659,7 +694,7 @@ fn rejects_a_cache_plan_from_another_local_data_root() {
 #[test]
 fn creates_and_publishes_cache_files_below_the_held_directory() {
     let root = tempfile::tempdir().expect("temporary LocalAppData root");
-    let paths = AppPaths::from_roots(root.path(), root.path(), root.path());
+    let paths = AppPaths::from_roots(root.path(), root.path());
     let cache = paths
         .project_cache("project-01")
         .expect("the Cache plan is valid");
@@ -704,10 +739,155 @@ fn creates_and_publishes_cache_files_below_the_held_directory() {
     );
 }
 
+#[cfg(windows)]
+#[test]
+fn held_cache_storage_creates_and_drops_temporaries_in_the_physical_namespace() {
+    let root = tempfile::tempdir().expect("temporary guarded Cache root");
+    let external = tempfile::tempdir().expect("external junction target");
+    let paths = AppPaths::from_roots(root.path(), root.path());
+    let cache = paths
+        .project_cache("project-guarded-create")
+        .expect("the Cache plan is valid");
+    let storage = paths
+        .prepare_cache_storage(&cache)
+        .expect("the physical directory chain is held");
+    let temporary = cache
+        .preview_temporary_file("media-01", "generation-01", CacheArtifactFormat::Jpeg, 42)
+        .expect("the temporary path is valid");
+    let published = cache
+        .preview_file("media-01", "generation-01", CacheArtifactFormat::Jpeg)
+        .expect("the final path is valid");
+    let external_temporary = external
+        .path()
+        .join(temporary.file_name().expect("the temporary has one name"));
+    std::fs::write(&external_temporary, b"external temporary sentinel")
+        .expect("the external sentinel exists");
+    let displaced = replace_directory_with_junction(&cache.media_directory(), external.path());
+
+    let mut publication = storage
+        .begin_file_publication(&temporary, &published)
+        .expect("creation is relative to the held physical directory");
+    publication
+        .write_all(b"internal temporary")
+        .expect("the held temporary is writable");
+    drop(publication);
+
+    assert_eq!(
+        std::fs::read(&external_temporary).expect("the external sentinel survives"),
+        b"external temporary sentinel"
+    );
+    assert!(
+        !displaced
+            .join(temporary.file_name().expect("the temporary has one name"))
+            .exists(),
+        "drop deletes the exact held temporary"
+    );
+    drop(storage);
+    restore_replaced_directory(&cache.media_directory(), &displaced);
+}
+
+#[cfg(windows)]
+#[test]
+fn held_cache_storage_removes_only_the_physical_file_after_a_junction_swap() {
+    let root = tempfile::tempdir().expect("temporary guarded Cache root");
+    let external = tempfile::tempdir().expect("external junction target");
+    let paths = AppPaths::from_roots(root.path(), root.path());
+    let cache = paths
+        .project_cache("project-guarded-remove")
+        .expect("the Cache plan is valid");
+    let storage = paths
+        .prepare_cache_storage(&cache)
+        .expect("the physical directory chain is held");
+    let removed = cache
+        .preview_file("media-01", "generation-old", CacheArtifactFormat::Jpeg)
+        .expect("the final path is valid");
+    std::fs::write(&removed, b"internal generation").expect("the internal generation exists");
+    let external_removed = external
+        .path()
+        .join(removed.file_name().expect("the generation has one name"));
+    std::fs::write(&external_removed, b"external generation sentinel")
+        .expect("the external sentinel exists");
+    let displaced = replace_directory_with_junction(&cache.media_directory(), external.path());
+
+    assert!(
+        storage
+            .remove_existing_file(&removed)
+            .expect("removal is relative to the held physical directory")
+    );
+
+    assert_eq!(
+        std::fs::read(&external_removed).expect("the external sentinel survives"),
+        b"external generation sentinel"
+    );
+    assert!(
+        !displaced
+            .join(removed.file_name().expect("the generation has one name"))
+            .exists(),
+        "only the physical held generation is removed"
+    );
+    drop(storage);
+    restore_replaced_directory(&cache.media_directory(), &displaced);
+}
+
+#[cfg(windows)]
+#[test]
+fn held_cache_storage_replaces_only_the_physical_file_after_a_junction_swap() {
+    let root = tempfile::tempdir().expect("temporary guarded Cache root");
+    let external = tempfile::tempdir().expect("external junction target");
+    let paths = AppPaths::from_roots(root.path(), root.path());
+    let cache = paths
+        .project_cache("project-guarded-replace")
+        .expect("the Cache plan is valid");
+    let storage = paths
+        .prepare_cache_storage(&cache)
+        .expect("the physical directory chain is held");
+    let temporary = cache
+        .preview_temporary_file("media-01", "generation-new", CacheArtifactFormat::Jpeg, 42)
+        .expect("the temporary path is valid");
+    let published = cache
+        .preview_file("media-01", "generation-new", CacheArtifactFormat::Jpeg)
+        .expect("the final path is valid");
+    std::fs::write(&published, b"previous internal metadata")
+        .expect("the previous internal publication exists");
+    let external_published = external
+        .path()
+        .join(published.file_name().expect("the publication has one name"));
+    std::fs::write(&external_published, b"external metadata sentinel")
+        .expect("the external sentinel exists");
+    let displaced = replace_directory_with_junction(&cache.media_directory(), external.path());
+    let mut publication = storage
+        .begin_file_publication(&temporary, &published)
+        .expect("the physical temporary is opened");
+    publication
+        .write_all(b"replacement metadata")
+        .expect("the replacement is writable");
+    let synchronized = publication
+        .sync()
+        .expect("the physical temporary is synchronized");
+
+    synchronized
+        .publish()
+        .expect("rename and replacement stay relative to the held directory");
+
+    assert_eq!(
+        std::fs::read(&external_published).expect("the external sentinel survives"),
+        b"external metadata sentinel"
+    );
+    assert_eq!(
+        std::fs::read(
+            displaced.join(published.file_name().expect("the publication has one name"),)
+        )
+        .expect("the held publication is visible in the physical namespace"),
+        b"replacement metadata"
+    );
+    drop(storage);
+    restore_replaced_directory(&cache.media_directory(), &displaced);
+}
+
 #[test]
 fn dropping_a_synchronized_cache_file_discards_only_its_temporary() {
     let root = tempfile::tempdir().expect("temporary LocalAppData root");
-    let paths = AppPaths::from_roots(root.path(), root.path(), root.path());
+    let paths = AppPaths::from_roots(root.path(), root.path());
     let cache = paths
         .project_cache("project-incomplete")
         .expect("the Cache plan is valid");
@@ -744,7 +924,7 @@ fn dropping_a_synchronized_cache_file_discards_only_its_temporary() {
 #[test]
 fn removes_only_one_validated_cache_artifact_from_the_held_namespace() {
     let root = tempfile::tempdir().expect("temporary LocalAppData root");
-    let paths = AppPaths::from_roots(root.path(), root.path(), root.path());
+    let paths = AppPaths::from_roots(root.path(), root.path());
     let cache = paths
         .project_cache("project-targeted-cleanup")
         .expect("the Cache plan is valid");
@@ -782,7 +962,7 @@ fn removes_only_one_validated_cache_artifact_from_the_held_namespace() {
 #[test]
 fn sweeps_only_unreferenced_final_generations_below_the_held_media_directory() {
     let root = tempfile::tempdir().expect("temporary LocalAppData root");
-    let paths = AppPaths::from_roots(root.path(), root.path(), root.path());
+    let paths = AppPaths::from_roots(root.path(), root.path());
     let cache = paths
         .project_cache("project-orphan-sweep")
         .expect("the Cache plan is valid");
@@ -821,7 +1001,7 @@ fn sweeps_only_unreferenced_final_generations_below_the_held_media_directory() {
 #[test]
 fn rejects_using_the_same_cache_path_as_temporary_and_final() {
     let root = tempfile::tempdir().expect("temporary LocalAppData root");
-    let paths = AppPaths::from_roots(root.path(), root.path(), root.path());
+    let paths = AppPaths::from_roots(root.path(), root.path());
     let cache = paths
         .project_cache("project-same-path")
         .expect("the Cache plan is valid");
@@ -841,7 +1021,7 @@ fn rejects_using_the_same_cache_path_as_temporary_and_final() {
 #[test]
 fn discards_only_cache_temporaries_left_by_a_terminated_processor() {
     let root = tempfile::tempdir().expect("temporary LocalAppData root");
-    let paths = AppPaths::from_roots(root.path(), root.path(), root.path());
+    let paths = AppPaths::from_roots(root.path(), root.path());
     let cache = paths
         .project_cache("project-recovery")
         .expect("the Cache plan is valid");
@@ -896,31 +1076,55 @@ fn discards_only_cache_temporaries_left_by_a_terminated_processor() {
 }
 
 #[test]
-fn rejects_an_export_preview_namespace_redirected_by_a_directory_link() {
-    let root = tempfile::tempdir().expect("temporary path roots");
-    let external = tempfile::tempdir().expect("external directory");
-    let paths = AppPaths::from_roots(root.path(), root.path(), root.path());
-    let application_root = root.path().join("MyAlbuns2");
-    if let Err(error) = create_directory_link(external.path(), &application_root) {
-        if error.kind() == std::io::ErrorKind::PermissionDenied
-            || error.raw_os_error() == Some(1314)
-        {
-            return;
-        }
-        panic!("the directory link could not be created: {error}");
+fn exclusive_owner_recovery_discards_all_well_formed_abandoned_temporaries() {
+    let root = tempfile::tempdir().expect("temporary LocalAppData root");
+    let paths = AppPaths::from_roots(root.path(), root.path());
+    let cache = paths
+        .project_cache("project-owner-recovery")
+        .expect("the Cache plan is valid");
+    let storage = paths
+        .prepare_cache_storage(&cache)
+        .expect("the Cache directory chain is held");
+    let published = cache
+        .preview_file("media-01", "generation-live", CacheArtifactFormat::Jpeg)
+        .expect("the published path is valid");
+    let first_preview = cache
+        .preview_temporary_file("media-01", "generation-a", CacheArtifactFormat::Png, 4_242)
+        .expect("the first temporary path is valid");
+    let second_preview = cache
+        .preview_temporary_file("media-02", "generation-b", CacheArtifactFormat::Jpeg, 4_343)
+        .expect("the second temporary path is valid");
+    let metadata_temporary = cache.metadata_temporary_file(4_444);
+    let unrelated = cache.media_directory().join("notes.tmp-4242");
+    for path in [
+        &published,
+        &first_preview,
+        &second_preview,
+        &metadata_temporary,
+        &unrelated,
+    ] {
+        std::fs::write(path, b"fixture").expect("the recovery fixture is writable");
     }
+    drop(storage);
 
     assert_eq!(
-        paths.prepare_export_preview_directory().unwrap_err(),
-        AppPathsError::ExportStorageOutsideDestination
+        paths
+            .discard_abandoned_project_cache_temporaries(&cache)
+            .expect("the exclusive owner discards abandoned temporaries"),
+        3
     );
+    assert!(published.is_file());
+    assert!(unrelated.is_file());
+    assert!(!first_preview.exists());
+    assert!(!second_preview.exists());
+    assert!(!metadata_temporary.exists());
 }
 
 #[test]
 fn rejects_a_cache_namespace_redirected_by_a_directory_link() {
     let root = tempfile::tempdir().expect("temporary LocalAppData root");
     let external = tempfile::tempdir().expect("external directory");
-    let paths = AppPaths::from_roots(root.path(), root.path(), root.path());
+    let paths = AppPaths::from_roots(root.path(), root.path());
     let cache = paths
         .project_cache("project-01")
         .expect("the Cache plan is valid");
@@ -944,6 +1148,40 @@ fn rejects_a_cache_namespace_redirected_by_a_directory_link() {
 #[cfg(windows)]
 fn create_directory_link(source: &Path, destination: &Path) -> std::io::Result<()> {
     std::os::windows::fs::symlink_dir(source, destination)
+}
+
+#[cfg(windows)]
+fn replace_directory_with_junction(directory: &Path, external: &Path) -> PathBuf {
+    use std::process::Command;
+
+    let displaced = directory.with_file_name(format!(
+        "{}-displaced-{}",
+        directory
+            .file_name()
+            .and_then(|name| name.to_str())
+            .expect("the Cache namespace has one UTF-8 component"),
+        uuid::Uuid::new_v4().simple()
+    ));
+    std::fs::rename(directory, &displaced).expect("the physical Cache namespace is displaced");
+    let output = Command::new("cmd")
+        .args(["/c", "mklink", "/J"])
+        .arg(directory)
+        .arg(external)
+        .output()
+        .expect("the junction command starts");
+    assert!(
+        output.status.success(),
+        "the junction is created: stdout={}, stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    displaced
+}
+
+#[cfg(windows)]
+fn restore_replaced_directory(directory: &Path, displaced: &Path) {
+    std::fs::remove_dir(directory).expect("the injected junction is removed");
+    std::fs::rename(displaced, directory).expect("the physical Cache namespace is restored");
 }
 
 #[cfg(unix)]

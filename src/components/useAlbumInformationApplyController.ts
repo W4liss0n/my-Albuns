@@ -30,7 +30,7 @@ interface AlbumInformationApplyControllerOptions {
   onError(message: string): void;
 }
 
-type Phase = "idle" | "deciding" | "applying";
+type Phase = "idle" | "deciding" | "applying" | "closing";
 
 interface PendingAlbumInformation {
   draft: AlbumInformationProjectDraft;
@@ -55,15 +55,16 @@ export function useAlbumInformationApplyController({
     () => undefined,
   );
 
-  const finish = useCallback((completed: boolean) => {
-    phaseRef.current = "idle";
+  const finish = useCallback(async (completed: boolean) => {
+    phaseRef.current = "closing";
     pendingRef.current = null;
     const completion = completionRef.current;
     completionRef.current = null;
-    setActive(false);
     const session = dialogSessionRef.current;
     dialogSessionRef.current = null;
-    void session?.dismiss().catch(() => undefined);
+    await session?.dismiss().catch(() => undefined);
+    phaseRef.current = "idle";
+    setActive(false);
     completion?.resolve(completed);
   }, []);
 
@@ -118,7 +119,7 @@ export function useAlbumInformationApplyController({
     phaseRef.current = "applying";
     const session = dialogSessionRef.current;
     if (!session) {
-      finish(false);
+      await finish(false);
       return;
     }
     try {
@@ -130,7 +131,7 @@ export function useAlbumInformationApplyController({
     } catch (error: unknown) {
       if (dialogSessionRef.current !== session) return;
       onError(messageFromError(error));
-      finish(false);
+      await finish(false);
       return;
     }
     if (
@@ -145,7 +146,7 @@ export function useAlbumInformationApplyController({
       result = await onApply(pending.draft, pending.review);
     } catch (error: unknown) {
       onError(messageFromError(error));
-      finish(false);
+      await finish(false);
       return;
     }
     if (result.kind === "reviewRequired") {
@@ -159,16 +160,16 @@ export function useAlbumInformationApplyController({
         });
       } catch (error: unknown) {
         onError(messageFromError(error));
-        finish(false);
+        await finish(false);
       }
       return;
     }
-    finish(result.kind === "completed");
+    await finish(result.kind === "completed");
   }, [finish, onApply, onError]);
 
   actionListenerRef.current = (action) => {
     if (action === "cancelAlbumInformation" && phaseRef.current === "deciding") {
-      finish(false);
+      void finish(false);
     }
     if (action === "confirmAlbumInformation") {
       void confirm();

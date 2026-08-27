@@ -19,7 +19,17 @@ const mediaUsage: readonly MediaUsage[] = [
   { count: 0, mediaId: "decorative-overlay" },
 ];
 
-test("matches the reference toolbar and exposes unavailable import actions as placeholders", async () => {
+const mediaPanelInteractions = {
+  selectedMediaId: null,
+  onImportPhoto: () => undefined,
+  onSelectMedia: () => undefined,
+  onPhotoDragStart: () => undefined,
+  onPhotoDragEnd: () => undefined,
+  onRelinkMedia: () => undefined,
+  onRetryUnavailableMedia: async () => undefined,
+};
+
+test("matches the reference toolbar and marks only unavailable import actions as placeholders", async () => {
   const user = userEvent.setup();
   renderPanel();
 
@@ -53,19 +63,23 @@ test("matches the reference toolbar and exposes unavailable import actions as pl
 
   await user.click(screen.getByRole("button", { name: "Importar" }));
   const importMenu = screen.getByRole("menu", { name: "Importar" });
-  for (const [name, feature] of [
-    ["Arquivos…", "import-media-files"],
-    ["Pasta…", "import-media-folder"],
-  ] as const) {
-    const item = within(importMenu).getByRole("menuitem", { name });
-    expect(item).toBeDisabled();
-    expect(item).toHaveAttribute("data-placeholder-feature", feature);
-  }
+  expect(
+    within(importMenu).getByRole("menuitem", { name: "Arquivo JPEG…" }),
+  ).toBeEnabled();
+  const folderItem = within(importMenu).getByRole("menuitem", {
+    name: "Pasta…",
+  });
+  expect(folderItem).toBeDisabled();
+  expect(folderItem).toHaveAttribute(
+    "data-placeholder-feature",
+    "import-media-folder",
+  );
 });
 
 test("renders only centered copy when the media catalog is empty", () => {
   render(
     <MediaPanel
+      {...mediaPanelInteractions}
       mediaItems={[]}
       mediaUsage={[]}
       onFillPhoto={vi.fn()}
@@ -231,6 +245,7 @@ test("hydrates per-tab thumbnail sizes and publishes later changes", async () =>
   const onThumbnailSizeChange = vi.fn();
   render(
     <MediaPanel
+      {...mediaPanelInteractions}
       mediaItems={mediaItems}
       mediaUsage={mediaUsage}
       onFillPhoto={vi.fn()}
@@ -274,6 +289,7 @@ test("hydrates authoritative per-tab settings and publishes only the changed fie
   const onUsageFilterChange = vi.fn();
   render(
     <MediaPanel
+      {...mediaPanelInteractions}
       mediaItems={mediaItems}
       mediaUsage={mediaUsage}
       onFillPhoto={vi.fn()}
@@ -330,6 +346,7 @@ test("clears preview demand when the panel unmounts", () => {
   const onMediaDemandChange = vi.fn();
   const view = render(
     <MediaPanel
+      {...mediaPanelInteractions}
       mediaItems={mediaItems}
       mediaUsage={mediaUsage}
       onFillPhoto={vi.fn()}
@@ -355,6 +372,7 @@ test("clears preview demand when the panel unmounts", () => {
 test("uses image orientation and opacity without visible names or usage counts", () => {
   render(
     <MediaPanel
+      {...mediaPanelInteractions}
       mediaItems={mediaItems}
       previewSource={{
         kind: "static",
@@ -526,6 +544,7 @@ test("uses the intrinsic preview ratio when source dimensions are unavailable", 
   );
   render(
     <MediaPanel
+      {...mediaPanelInteractions}
       mediaItems={[mediaWithoutDimensions]}
       previewSource={{
         kind: "static",
@@ -565,6 +584,7 @@ test("uses the intrinsic preview ratio when source dimensions are unavailable", 
 function renderPanel() {
   return render(
     <MediaPanel
+      {...mediaPanelInteractions}
       mediaItems={mediaItems}
       mediaUsage={mediaUsage}
       onFillPhoto={vi.fn()}

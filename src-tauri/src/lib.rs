@@ -1,6 +1,7 @@
 mod cache_activity_gate;
 mod cache_engine;
 mod cache_previews;
+mod cache_service;
 mod desktop_webview_policy;
 #[cfg(debug_assertions)]
 mod dev_descendant_job;
@@ -9,12 +10,11 @@ mod dev_host_registration;
 #[cfg(debug_assertions)]
 mod dev_job;
 #[cfg(debug_assertions)]
-mod dev_process_identity;
-#[cfg(debug_assertions)]
 mod dev_supervisor_protocol;
 mod export_attempts;
 mod export_commands;
 mod export_pipeline;
+mod global_activation;
 mod global_runtime;
 mod graphics_launch_gate;
 mod imaging_processor;
@@ -24,6 +24,7 @@ pub mod ipc_contract;
 mod logging;
 mod media_preview_commands;
 mod media_runtime;
+mod named_mutex;
 mod native_dialog_window;
 mod native_project_dialog;
 mod opaque_image_protocol;
@@ -31,22 +32,21 @@ mod operation_gate;
 mod operation_lease;
 mod path_io;
 mod preference_store_io;
+mod processor_lifetime;
 mod product_runtime;
 mod project_bootstrap;
 mod project_close_commands;
 mod project_commands;
 mod project_dialog_window;
 mod project_host;
+mod project_recovery;
+mod project_webview_authority;
 mod project_window_lifecycle;
 mod provisional_decoratives;
 mod recent_projects;
 mod runtime_role;
-#[cfg(test)]
-#[path = "../../tests/support/sample_project.rs"]
-mod sample_project;
 mod settings_preferences;
 mod workspace_preferences;
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     #[cfg(debug_assertions)]
@@ -73,7 +73,9 @@ pub fn run() {
 
 fn run_selected_runtime_role() -> Result<(), Box<dyn std::error::Error>> {
     match runtime_role::parse_runtime_role(std::env::args_os()) {
-        runtime_role::RuntimeRole::Global { direct_project } => global_runtime::run(direct_project),
+        runtime_role::RuntimeRole::Global { direct_projects } => {
+            global_runtime::run(direct_projects)
+        }
         runtime_role::RuntimeRole::ProjectHost => run_project_host(),
     }
 }
@@ -103,8 +105,8 @@ fn run_project_host() -> Result<(), Box<dyn std::error::Error>> {
     use std::io;
 
     use project_bootstrap::{
-        FailureCode, FailureStage, HostTerminal, bootstrap_host_project, read_bootstrap_request,
-        write_host_terminal,
+        FailureCode, FailureStage, HostBootstrap, HostTerminal, bootstrap_host_project_or_pending,
+        read_bootstrap_request, read_save_external_copy_request, write_host_terminal,
     };
 
     let request = match read_bootstrap_request(io::stdin().lock()) {
@@ -127,8 +129,28 @@ fn run_project_host() -> Result<(), Box<dyn std::error::Error>> {
             return Ok(());
         }
     };
-    match bootstrap_host_project(request, &app_paths) {
-        Ok(opened) => product_runtime::run(opened, app_paths),
+    match bootstrap_host_project_or_pending(request, &app_paths) {
+        Ok(HostBootstrap::Ready(opened)) => product_runtime::run(opened, app_paths),
+        Ok(HostBootstrap::ExternalCopyNotWritable(pending)) => {
+            write_host_terminal(io::stdout().lock(), &pending.terminal())?;
+            let continuation = match read_save_external_copy_request(io::stdin().lock()) {
+                Ok(continuation) => continuation,
+                Err(_) => {
+                    write_host_terminal(
+                        io::stdout().lock(),
+                        &pending.invalid_continuation_terminal(),
+                    )?;
+                    return Ok(());
+                }
+            };
+            match pending.save_copy_as(continuation) {
+                Ok(opened) => product_runtime::run(opened, app_paths),
+                Err(terminal) => {
+                    write_host_terminal(io::stdout().lock(), &terminal)?;
+                    Ok(())
+                }
+            }
+        }
         Err(terminal) => {
             write_host_terminal(io::stdout().lock(), &terminal)?;
             Ok(())
@@ -249,7 +271,9 @@ mod tests {
                 "core:window:allow-minimize",
                 "core:window:allow-toggle-maximize",
                 "core:window:allow-start-dragging",
-                "core:window:allow-internal-toggle-maximize"
+                "core:window:allow-internal-toggle-maximize",
+                "core:event:allow-listen",
+                "core:event:allow-unlisten"
             ])
         );
         assert_eq!(
@@ -318,6 +342,56 @@ mod tests {
                 .iter()
                 .all(|window| { window["decorations"] == serde_json::Value::Bool(false) })
         );
+    }
+
+    #[test]
+    fn global_cache_service_commands_are_explicitly_allowed_only_to_global_window() {
+        let project_permission: serde_json::Value =
+            serde_json::from_str(include_str!("../permissions/project-window.json"))
+                .expect("valid project permission");
+        let global_permission: serde_json::Value =
+            serde_json::from_str(include_str!("../permissions/global-window.json"))
+                .expect("valid global permission");
+        let project_commands = allowed_commands(&project_permission);
+        let global_commands = allowed_commands(&global_permission);
+
+        for command in [
+            "cache_service_status",
+            "free_closed_project_cache",
+            "clear_all_cache",
+        ] {
+            assert!(
+                global_commands.contains(command),
+                "the Global capability must explicitly allow {command}"
+            );
+            assert!(
+                !project_commands.contains(command),
+                "the Project capability must not inherit {command}"
+            );
+        }
+    }
+
+    #[test]
+    fn recovery_commands_are_explicitly_allowed_only_to_project_window() {
+        let project_permission: serde_json::Value =
+            serde_json::from_str(include_str!("../permissions/project-window.json"))
+                .expect("valid project permission");
+        let global_permission: serde_json::Value =
+            serde_json::from_str(include_str!("../permissions/global-window.json"))
+                .expect("valid global permission");
+        let project_commands = allowed_commands(&project_permission);
+        let global_commands = allowed_commands(&global_permission);
+
+        for command in ["project_recovery_status", "resolve_project_recovery"] {
+            assert!(
+                project_commands.contains(command),
+                "the Project capability must explicitly allow {command}"
+            );
+            assert!(
+                !global_commands.contains(command),
+                "the Global capability must not inherit {command}"
+            );
+        }
     }
 
     #[test]

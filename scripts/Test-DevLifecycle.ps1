@@ -42,7 +42,7 @@ try {
 
     $fixturePath = Join-Path `
         $workspaceRoot `
-        'crates\myalbuns-core\tests\fixtures\project_document_v2_migration_expected.myalbuns'
+        'crates\myalbuns-core\tests\fixtures\project_document_v3_migration_expected.myalbuns'
     $fixture = Get-Content -LiteralPath $fixturePath -Raw -Encoding UTF8 |
         ConvertFrom-Json
     $fixture.projectId = [guid]::NewGuid().ToString()

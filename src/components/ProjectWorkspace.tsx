@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
-  ExportPort,
+  ExportPipelinePort,
   MediaPreview,
   MediaPreviewDemand,
+  ProjectCorePort,
   ProjectWindowPort,
-  ProjectSessionPort,
 } from "../application/projectPorts";
 import {
   createFallbackWorkspacePreferencesPort,
@@ -47,12 +47,13 @@ import {
 interface ProjectWorkspaceProps {
   projection: EditorProjection;
   projectDialogPort: ProjectDialogPort;
-  exportPort: ExportPort;
+  exportPipelinePort: ExportPipelinePort;
   projectWindowPort: ProjectWindowPort;
   runProjectMutation: ProjectMutationRunner;
-  validateAlbumInformation: ProjectSessionPort["validateAlbumInformation"];
+  projectCorePort: ProjectCorePort;
   mediaPreviews: Readonly<Record<string, MediaPreview>>;
   onMediaDemandChange(demand: MediaPreviewDemand): void;
+  onRetryUnavailableMedia(mediaId: string): Promise<void>;
   onProjectionChange(projection: EditorProjection): void;
   onGraphicsUnavailable(diagnostic: GraphicsDiagnostic): void;
   onPreferencesReady(projectId: string): void;
@@ -66,12 +67,13 @@ const SHEET_EDITING_MEDIA_PANEL_HEIGHT = 120;
 export function ProjectWorkspace({
   projection,
   projectDialogPort,
-  exportPort,
+  exportPipelinePort,
   projectWindowPort,
   runProjectMutation,
-  validateAlbumInformation,
+  projectCorePort,
   mediaPreviews,
   onMediaDemandChange,
+  onRetryUnavailableMedia,
   onProjectionChange,
   onGraphicsUnavailable,
   onPreferencesReady,
@@ -95,9 +97,22 @@ export function ProjectWorkspace({
   );
   const projectId = projection.state.projectId;
   useEffect(() => {
+    setSelectedMediaId(null);
+    setDraggedPhotoId(null);
+  }, [projectId]);
+  useEffect(() => {
+    setSelectedMediaId((current) =>
+      current && projection.state.album.media.some((media) => media.id === current)
+        ? current
+        : null,
+    );
+  }, [projection.state.album.media]);
+  useEffect(() => {
     if (workspacePreferences.ready) onPreferencesReady(projectId);
   }, [onPreferencesReady, projectId, workspacePreferences.ready]);
   const [exportActive, setExportActive] = useState(false);
+  const [draggedPhotoId, setDraggedPhotoId] = useState<string | null>(null);
+  const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
   const [closeMessage, setCloseMessage] = useState<string | null>(null);
   const [presentationUnitOverride, setPresentationUnitOverride] = useState<{
     projectId: string;
@@ -166,6 +181,7 @@ export function ProjectWorkspace({
     interactionBlocked: exportActive || projectClose.interactionBlocked,
     projection,
     runProjectMutation,
+    projectCorePort,
     onProjectionChange,
   });
   const albumInformationApply = useAlbumInformationApplyController({
@@ -253,6 +269,16 @@ export function ProjectWorkspace({
       ? { kind: "sheet", sheet: editingSheet }
       : { kind: "album" };
   const projectMetadata = projectAlbumMetadata(projection, presentationUnit);
+  const exportSheet = projection.composition.sheets.find(
+    (sheet) => sheet.sheetId === controller.canvasProps.centeredSheetId,
+  );
+  const exportSelection = exportSheet
+    ? {
+        projectName: projection.state.projectName,
+        sheetId: exportSheet.sheetId,
+        sheetNumber: exportSheet.number,
+      }
+    : null;
   const commandsBlocked =
     exportActive ||
     projectClose.interactionBlocked ||
@@ -264,6 +290,7 @@ export function ProjectWorkspace({
     disabled: commandsBlocked,
     redo: controller.redo,
     save: controller.save,
+    saveAs: controller.saveAs,
     undo: controller.undo,
   });
   const applicationMenus = createProjectApplicationMenus({
@@ -276,6 +303,7 @@ export function ProjectWorkspace({
     mediaPanelVisible: workspacePanels.panels.media.visible,
     redo: () => void controller.redo(),
     save: () => void controller.save(),
+    saveAs: () => void controller.saveAs(),
     undo: () => void controller.undo(),
     toggleContextualPanel: () =>
       workspacePanels.setPanelVisibility(
@@ -306,10 +334,10 @@ export function ProjectWorkspace({
           ref={exportControlRef}
           dialogPort={projectDialogPort}
           disabled={projectClose.interactionBlocked}
-          exportPort={exportPort}
+          exportPipelinePort={exportPipelinePort}
           onActiveChange={setExportActive}
           projectId={projection.state.projectId}
-          sheetId={controller.canvasProps.centeredSheetId}
+          selection={exportSelection}
         />
       </div>
 
@@ -325,6 +353,8 @@ export function ProjectWorkspace({
         >
           <AlbumCanvas
             {...controller.canvasProps}
+            draggedPhotoId={draggedPhotoId}
+            onPhotoDragCancel={() => setDraggedPhotoId(null)}
             mediaPreviewUrls={mediaPreviewUrls}
             technicalGuides={{
               bleedUm: projection.state.document.bleedUm,
@@ -376,7 +406,7 @@ export function ProjectWorkspace({
           onApplyAlbumInformation={albumInformationApply.requestApply}
           onApplyAlbumDesign={controller.applyAlbumDesign}
           onPresentationUnitChange={changePresentationUnit}
-          onValidateAlbumInformation={validateAlbumInformation}
+          onValidateAlbumInformation={projectCorePort.validateAlbumInformation}
           onNavigateToSheet={controller.navigateToSheet}
           sectionState={{
             kind: "controlled",
@@ -394,6 +424,18 @@ export function ProjectWorkspace({
           mediaItems={projection.state.album.media}
           mediaUsage={projection.mediaUsage}
           onFillPhoto={controller.fillMedia}
+          selectedMediaId={selectedMediaId}
+          onImportPhoto={() => {
+            void controller.importPhoto().then((mediaId) => {
+              if (mediaId) setSelectedMediaId(mediaId);
+            });
+          }}
+          onSelectMedia={setSelectedMediaId}
+          onPhotoDragStart={setDraggedPhotoId}
+          onPhotoDragEnd={() => setDraggedPhotoId(null)}
+          onRelinkMedia={controller.relinkMedia}
+          onRetryUnavailableMedia={onRetryUnavailableMedia}
+          relinkDisabled={commandsBlocked}
           preferences={{
             kind: "controlled",
             persistent: workspacePreferences.preferences.mediaPanel,
