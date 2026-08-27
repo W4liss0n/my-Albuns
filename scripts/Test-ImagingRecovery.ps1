@@ -6,6 +6,14 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Gate-SourceProvenance.ps1')
 . (Join-Path $PSScriptRoot 'Gate-ScratchDirectory.ps1')
 Initialize-MyAlbunsToolchain
+$nodePath = (Get-Command node.exe -ErrorAction Stop).Source
+$privacyOracleTest = Join-Path `
+    $PSScriptRoot `
+    'Test-RealCanvasGatePrivacy.mjs'
+& $nodePath --test $privacyOracleTest
+if ($LASTEXITCODE -ne 0) {
+    throw "The Imaging recovery privacy oracle regressions failed with exit code $LASTEXITCODE."
+}
 $cargoTargetDirectory = Resolve-MyAlbunsCargoTargetDirectory
 
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {
@@ -260,7 +268,6 @@ try {
             -or -not (Test-Path -LiteralPath $overlayPreviewPath -PathType Leaf)) {
         throw 'The real Canvas journey did not retain its derived replay evidence.'
     }
-    $nodePath = (Get-Command node.exe -ErrorAction Stop).Source
     $canvasGateRunner = Join-Path `
         $script:WorkspaceRoot `
         'scripts\Run-RealCanvasGate.mjs'

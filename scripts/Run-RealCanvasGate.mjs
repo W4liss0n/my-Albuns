@@ -14,6 +14,7 @@ import {
   createWebDriverClient,
   findFreeTcpPort,
 } from "./GateWebDriver.mjs";
+import { assertOriginalPathsRemainOutsideWebView } from "./RealCanvasGatePrivacy.mjs";
 
 const [
   evidenceDirectoryArgument,
@@ -58,6 +59,23 @@ const projectDocument = JSON.parse(readFileSync(projectPath, "utf8"));
 if (typeof projectDocument.projectId !== "string" || !projectDocument.projectId) {
   throw new Error("The retained Tauri Project has no projectId");
 }
+const projectMedia = projectDocument.project?.media;
+if (!Array.isArray(projectMedia) || projectMedia.length === 0) {
+  throw new Error("The retained Tauri Project has no Original media paths");
+}
+const originalMediaPaths = projectMedia.map((media) => {
+  const nativePath = media?.path;
+  if (
+    nativePath?.encoding !== "windowsUtf16" ||
+    !Array.isArray(nativePath.units) ||
+    nativePath.units.some(
+      (unit) => !Number.isInteger(unit) || unit < 0 || unit > 0xffff,
+    )
+  ) {
+    throw new Error("The retained Tauri Project has an invalid Original media path");
+  }
+  return String.fromCharCode(...nativePath.units);
+});
 const expectedPreviewCount = canvasEvidence.compositionMediaOrder.length;
 const processDataRoot = path.resolve(
   process.env.MYALBUNS_PROCESS_GATE_DATA_ROOT ?? "",
@@ -266,12 +284,7 @@ try {
     `/session/${sessionId}/element/${encodeURIComponent(elementId)}/rect`,
   );
   const pageSource = await request("GET", `/session/${sessionId}/source`);
-  const originalPathExposed = ["background-original.png", "overlay-original.png"].some(
-    (name) => pageSource.includes(name),
-  );
-  if (originalPathExposed) {
-    throw new Error("An Original pathname crossed the productive WebView boundary");
-  }
+  assertOriginalPathsRemainOutsideWebView(pageSource, originalMediaPaths);
 
   // Texture production can include a cold Processador build/start. Keep it
   // inside the same explicit end-to-end budget as WebView startup instead of
