@@ -21,6 +21,16 @@
   background: var(--ui-surface-raised);
 }
 
+.visual-default-picker__tile--add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-color: var(--ui-text-muted);
+  border-style: dashed;
+  color: var(--ui-text-muted);
+  background: transparent;
+}
+
 .visual-default-picker__option:hover,
 .visual-default-picker__option:focus-visible {
   color: var(--ui-text);

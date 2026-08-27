@@ -28,13 +28,3 @@
   scrollbar-gutter: stable;
   user-select: none;
 }
-
-.visual-default-picker__tile--add {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-color: var(--ui-text-muted);
-  border-style: dashed;
-  color: var(--ui-text-muted);
-  background: transparent;
-}

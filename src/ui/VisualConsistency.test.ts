@@ -273,6 +273,24 @@ test("keeps compact visual-default focus independent from selection", () => {
   );
 });
 
+test("centers the empty Decorative tile after the shared tile geometry", () => {
+  const sharedTileRule = visualDefaultPickerStyles.indexOf(
+    ".visual-default-picker__tile {",
+  );
+  const addTileRule = visualDefaultPickerStyles.indexOf(
+    ".visual-default-picker__tile--add {",
+  );
+
+  expect(sharedTileRule).toBeGreaterThanOrEqual(0);
+  expect(addTileRule).toBeGreaterThan(sharedTileRule);
+  expect(visualDefaultPickerStyles).toMatch(
+    /\.visual-default-picker__tile--add\s*\{[^}]*display:\s*flex;[^}]*align-items:\s*center;[^}]*justify-content:\s*center;/s,
+  );
+  expect(decorativePickerStyles).not.toContain(
+    ".visual-default-picker__tile--add",
+  );
+});
+
 test("keeps physical Sheet previews straight in every surface", () => {
   expect(readStyles("src/components/SheetPreview.css")).toMatch(
     /\.sheet-preview\s*\{[^}]*border-radius:\s*0;/s,
