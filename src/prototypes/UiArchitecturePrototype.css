@@ -219,10 +219,36 @@ button {
   cursor: pointer;
 }
 
+.editor-prototype__mode-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .editor-prototype__toolbar button[aria-pressed="true"] {
   border-color: #8f5c3e;
   background: #8f5c3e;
   color: #fff;
+}
+
+.editor-prototype--edit {
+  grid-template-columns: minmax(540px, 1fr) 276px;
+  grid-template-rows: 44px minmax(300px, 1fr);
+}
+
+.editor-prototype--edit .editor-prototype__canvas {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.editor-prototype--edit .prototype-frame-inspector {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.editor-prototype--edit .prototype-layout-lock-feedback {
+  grid-column: 1;
+  grid-row: 2;
 }
 
 .prototype-reorder {
@@ -575,5 +601,9 @@ button {
 
   .editor-prototype {
     grid-template-columns: 190px minmax(500px, 1fr) 240px;
+  }
+
+  .editor-prototype--edit {
+    grid-template-columns: minmax(500px, 1fr) 240px;
   }
 }

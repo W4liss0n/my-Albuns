@@ -7,13 +7,16 @@ import {
 } from "react";
 
 export type UiArchitecturePrototypeView = "editor" | "map";
+export type UiArchitecturePrototypeEditorMode = "edit" | "normal";
 
 type UiArchitecturePrototypeProps = {
+  initialEditorMode?: UiArchitecturePrototypeEditorMode;
   initialView?: UiArchitecturePrototypeView;
 };
 
 const fitZoom = 1;
 const maximumZoom = 4;
+const reorderDragThreshold = 5;
 const zoomStep = 0.25;
 
 const canonicalSurfaces = [
@@ -29,7 +32,7 @@ const canonicalSurfaces = [
     availability: "Integrado",
     href: "/welcome-preview.html",
     id: "global.new-project.configuration",
-    owner: "#16",
+    owner: "#9",
     parent: "Novo Projeto",
     title: "Configurações",
   },
@@ -37,7 +40,7 @@ const canonicalSurfaces = [
     availability: "Integrado",
     href: "/welcome-preview.html",
     id: "global.new-project.personalization",
-    owner: "#16",
+    owner: "#21",
     parent: "Novo Projeto",
     title: "Personalização",
   },
@@ -45,7 +48,7 @@ const canonicalSurfaces = [
     availability: "Janela nativa do Windows",
     href: "/docs/design/0003-criacao-de-projeto.md",
     id: "native.project-name-location",
-    owner: "#16",
+    owner: "#13",
     parent: "Sistema operacional",
     title: "Nome e local",
   },
@@ -131,6 +134,14 @@ type ReorderGesture = {
   targetId: string;
 };
 
+type ReorderPointer = {
+  origin: ReorderSurface;
+  pointerId: number;
+  sourceId: string;
+  startX: number;
+  startY: number;
+};
+
 type ReorderResult = {
   origin: ReorderSurface;
   state: "cancelled" | "committed" | "invalid";
@@ -163,6 +174,12 @@ type ZoomInput =
   | "reset"
   | "wheel-in"
   | "wheel-out";
+
+type ViewportTransform = {
+  offsetX: number;
+  offsetY: number;
+  zoom: number;
+};
 
 const resizeHandles = [
   { id: "nw", label: "canto superior esquerdo" },
@@ -230,9 +247,17 @@ function isValidSheetOrder(order: string[]): boolean {
 
 type ReorderStripProps = {
   gesture: ReorderGesture | null;
-  onPointerDown: (surface: ReorderSurface, sheetId: string) => void;
-  onPointerMove: (surface: ReorderSurface, sheetId: string) => void;
-  onPointerUp: (surface: ReorderSurface, sheetId: string) => void;
+  onPointerDown: (
+    surface: ReorderSurface,
+    sheetId: string,
+    event: ReactPointerEvent<HTMLElement>,
+  ) => void;
+  onPointerMove: (
+    surface: ReorderSurface,
+    sheetId: string,
+    event: ReactPointerEvent<HTMLElement>,
+  ) => void;
+  onPointerUp: (surface: ReorderSurface) => void;
   order: string[];
   result: ReorderResult | null;
   surface: ReorderSurface;
@@ -272,10 +297,9 @@ function ReorderStrip({
       data-reorder-state={state}
       data-reorder-surface={surface}
       data-sheet-order={order.join(",")}
-      onPointerUp={() => {
-        if (gesture?.origin === surface) {
-          onPointerUp(surface, gesture.targetId);
-        }
+      onPointerUp={(event) => {
+        event.stopPropagation();
+        onPointerUp(surface);
       }}
     >
       <header>
@@ -315,9 +339,9 @@ function ReorderStrip({
                 data-sheet-id={sheetId}
                 onPointerDown={(event) => {
                   if (event.button !== 0) return;
-                  onPointerDown(surface, sheetId);
+                  onPointerDown(surface, sheetId, event);
                 }}
-                onPointerMove={() => onPointerMove(surface, sheetId)}
+                onPointerMove={(event) => onPointerMove(surface, sheetId, event)}
                 type="button"
               >
                 <span>{sheet?.label}</span>
@@ -341,19 +365,31 @@ function ReorderStrip({
 }
 
 export function UiArchitecturePrototype({
+  initialEditorMode = "edit",
   initialView = "map",
 }: UiArchitecturePrototypeProps) {
   const [view, setView] = useState<UiArchitecturePrototypeView>(initialView);
-  const [zoom, setZoom] = useState(fitZoom);
+  const [editorMode, setEditorMode] =
+    useState<UiArchitecturePrototypeEditorMode>(initialEditorMode);
+  const [viewport, setViewport] = useState<ViewportTransform>({
+    offsetX: 0,
+    offsetY: 0,
+    zoom: fitZoom,
+  });
+  const zoom = viewport.zoom;
   const [lastZoomInput, setLastZoomInput] = useState<ZoomInput | null>(null);
   const [zoomAnchor, setZoomAnchor] = useState<"center" | "cursor">("center");
+  const [zoomOrigin, setZoomOrigin] = useState({ x: 50, y: 50 });
   const [sheetOrder, setSheetOrder] = useState<string[]>(() =>
     prototypeSheets.map((sheet) => sheet.id),
   );
   const [reorderGesture, setReorderGesture] =
     useState<ReorderGesture | null>(null);
+  const [reorderPointer, setReorderPointer] =
+    useState<ReorderPointer | null>(null);
   const [reorderResult, setReorderResult] =
     useState<ReorderResult | null>(null);
+  const [centeredSheetId, setCenteredSheetId] = useState("sheet-003");
   const [historyCount, setHistoryCount] = useState(0);
   const [frames, setFrames] = useState(initialFrames);
   const [selectedFrameIds, setSelectedFrameIds] = useState<string[]>([]);
@@ -365,10 +401,21 @@ export function UiArchitecturePrototype({
     delta: number,
     input: ZoomInput,
     anchor: "center" | "cursor",
+    anchorPoint = { x: 0, y: 0 },
   ) => {
-    setZoom((current) => clampZoom(current + delta));
+    setViewport((current) => {
+      const nextZoom = clampZoom(current.zoom + delta);
+      const ratio = nextZoom / current.zoom;
+      const point = anchor === "cursor" ? anchorPoint : { x: 0, y: 0 };
+      return {
+        offsetX: point.x - ratio * (point.x - current.offsetX),
+        offsetY: point.y - ratio * (point.y - current.offsetY),
+        zoom: nextZoom,
+      };
+    });
     setLastZoomInput(input);
     setZoomAnchor(anchor);
+    if (anchor === "center") setZoomOrigin({ x: 50, y: 50 });
   };
 
   const handleCanvasKeyDown = (event: KeyboardEvent<HTMLElement>) => {
@@ -381,36 +428,106 @@ export function UiArchitecturePrototype({
       changeZoom(-zoomStep, "keyboard-out", "center");
     } else if (event.key === "0") {
       event.preventDefault();
-      setZoom(fitZoom);
+      setViewport({ offsetX: 0, offsetY: 0, zoom: fitZoom });
       setLastZoomInput("reset");
       setZoomAnchor("center");
+      setZoomOrigin({ x: 50, y: 50 });
     }
   };
 
   const handleCanvasWheel = (event: WheelEvent<HTMLElement>) => {
     if (!event.ctrlKey || event.deltaY === 0) return;
     event.preventDefault();
+    const bounds = event.currentTarget.getBoundingClientRect();
+    let anchorPoint = { x: 0, y: 0 };
+    if (bounds.width > 0 && bounds.height > 0) {
+      anchorPoint = {
+        x: event.clientX - (bounds.left + bounds.width / 2),
+        y: event.clientY - (bounds.top + bounds.height / 2),
+      };
+      setZoomOrigin({
+        x: Math.min(
+          100,
+          Math.max(0, ((event.clientX - bounds.left) / bounds.width) * 100),
+        ),
+        y: Math.min(
+          100,
+          Math.max(0, ((event.clientY - bounds.top) / bounds.height) * 100),
+        ),
+      });
+    }
     changeZoom(
       event.deltaY < 0 ? zoomStep : -zoomStep,
       event.deltaY < 0 ? "wheel-in" : "wheel-out",
       "cursor",
+      anchorPoint,
     );
   };
 
-  const startReorder = (origin: ReorderSurface, sourceId: string) => {
-    setReorderGesture({ origin, sourceId, targetId: sourceId });
+  const changeEditorMode = (nextMode: UiArchitecturePrototypeEditorMode) => {
+    setEditorMode(nextMode);
+    setReorderGesture(null);
+    setReorderPointer(null);
+    setReorderResult(null);
+    setFrameGesture(null);
+    setLayoutLockFeedback(false);
+    if (nextMode === "normal") {
+      setViewport({ offsetX: 0, offsetY: 0, zoom: fitZoom });
+      setLastZoomInput(null);
+      setZoomAnchor("center");
+      setZoomOrigin({ x: 50, y: 50 });
+      setLayoutLocked(false);
+      setSelectedFrameIds([]);
+    }
+  };
+
+  const startReorder = (
+    origin: ReorderSurface,
+    sourceId: string,
+    event: ReactPointerEvent<HTMLElement>,
+  ) => {
+    setReorderPointer({
+      origin,
+      pointerId: event.pointerId,
+      sourceId,
+      startX: event.clientX,
+      startY: event.clientY,
+    });
+    setReorderGesture(null);
     setReorderResult(null);
   };
 
-  const previewReorder = (origin: ReorderSurface, targetId: string) => {
+  const previewReorder = (
+    origin: ReorderSurface,
+    targetId: string,
+    event: ReactPointerEvent<HTMLElement>,
+  ) => {
+    if (!reorderPointer || reorderPointer.origin !== origin) return;
+    if (reorderPointer.pointerId !== event.pointerId) return;
+    const distance = Math.hypot(
+      event.clientX - reorderPointer.startX,
+      event.clientY - reorderPointer.startY,
+    );
+    if (!reorderGesture && distance < reorderDragThreshold) return;
     setReorderGesture((current) =>
-      current && current.origin === origin ? { ...current, targetId } : current,
+      current && current.origin === origin
+        ? { ...current, targetId }
+        : {
+            origin,
+            sourceId: reorderPointer.sourceId,
+            targetId,
+          },
     );
   };
 
-  const finishReorder = (origin: ReorderSurface, targetId: string) => {
-    if (!reorderGesture || reorderGesture.origin !== origin) return;
-    const finalGesture = { ...reorderGesture, targetId };
+  const finishReorder = (origin: ReorderSurface) => {
+    if (!reorderPointer || reorderPointer.origin !== origin) return;
+    if (!reorderGesture || reorderGesture.origin !== origin) {
+      setCenteredSheetId(reorderPointer.sourceId);
+      setReorderPointer(null);
+      return;
+    }
+    const finalGesture = reorderGesture;
     const nextOrder = moveBefore(
       sheetOrder,
       finalGesture.sourceId,
@@ -427,11 +544,13 @@ export function UiArchitecturePrototype({
       setReorderResult({ origin, state: "committed" });
     }
     setReorderGesture(null);
+    setReorderPointer(null);
   };
 
   useEffect(() => {
     const cancelReorder = (event: globalThis.KeyboardEvent) => {
       if (event.key !== "Escape") return;
+      setReorderPointer(null);
       setReorderGesture((current) => {
         if (current) {
           setReorderResult({ origin: current.origin, state: "cancelled" });
@@ -442,6 +561,26 @@ export function UiArchitecturePrototype({
     document.addEventListener("keydown", cancelReorder);
     return () => document.removeEventListener("keydown", cancelReorder);
   }, []);
+
+  useEffect(() => {
+    const cancelExternalDrop = (event: globalThis.PointerEvent) => {
+      if (!reorderPointer) return;
+      if (reorderGesture) {
+        setReorderResult({
+          origin: reorderGesture.origin,
+          state: event.type === "pointercancel" ? "cancelled" : "invalid",
+        });
+      }
+      setReorderGesture(null);
+      setReorderPointer(null);
+    };
+    window.addEventListener("pointercancel", cancelExternalDrop);
+    window.addEventListener("pointerup", cancelExternalDrop);
+    return () => {
+      window.removeEventListener("pointercancel", cancelExternalDrop);
+      window.removeEventListener("pointerup", cancelExternalDrop);
+    };
+  }, [reorderGesture, reorderPointer]);
 
   const selectedFrames = frames.filter((frame) =>
     selectedFrameIds.includes(frame.id),
@@ -570,7 +709,7 @@ export function UiArchitecturePrototype({
             onClick={() => setView("editor")}
             type="button"
           >
-            Modo de edição
+            Interações do editor
           </button>
         </nav>
       </header>
@@ -619,39 +758,65 @@ export function UiArchitecturePrototype({
         </section>
       ) : (
         <section
-          aria-label="Modo de edição"
-          className="editor-prototype"
+          aria-label={editorMode === "edit" ? "Modo de edição" : "Modo normal"}
+          className={`editor-prototype editor-prototype--${editorMode}`}
+          data-centered-sheet-id={centeredSheetId}
+          data-editor-mode={editorMode}
           data-history-count={String(historyCount)}
           data-layout-locked={String(layoutLocked)}
         >
           <header className="editor-prototype__toolbar">
-            <strong>Modo de edição · Lâmina 03</strong>
+            <strong>
+              {editorMode === "edit"
+                ? "Modo de edição · Lâmina 03"
+                : "Modo normal · reordenação de Lâminas"}
+            </strong>
             <output aria-live="polite" className="prototype-visually-hidden">
               {zoom === fitZoom
                 ? "Visualização ajustada à Lâmina"
                 : "Visualização ampliada"}
             </output>
-            <button
-              aria-label="Layout travado"
-              aria-pressed={layoutLocked}
-              onClick={() => {
-                setLayoutLocked((current) => !current);
-                setLayoutLockFeedback(false);
-              }}
-              type="button"
-            >
-              Layout travado
-            </button>
+            <div className="editor-prototype__mode-actions">
+              <button
+                aria-pressed={editorMode === "normal"}
+                onClick={() => changeEditorMode("normal")}
+                type="button"
+              >
+                Modo normal
+              </button>
+              <button
+                aria-pressed={editorMode === "edit"}
+                onClick={() => changeEditorMode("edit")}
+                type="button"
+              >
+                Modo de edição
+              </button>
+              {editorMode === "edit" ? (
+                <button
+                  aria-label="Layout travado"
+                  aria-pressed={layoutLocked}
+                  onClick={() => {
+                    setLayoutLocked((current) => !current);
+                    setLayoutLockFeedback(false);
+                  }}
+                  type="button"
+                >
+                  Layout travado
+                </button>
+              ) : null}
+            </div>
           </header>
-          <ReorderStrip
-            gesture={reorderGesture}
-            onPointerDown={startReorder}
-            onPointerMove={previewReorder}
-            onPointerUp={finishReorder}
-            order={sheetOrder}
-            result={reorderResult}
-            surface="bar"
-          />
+          {editorMode === "normal" ? (
+            <ReorderStrip
+              gesture={reorderGesture}
+              onPointerDown={startReorder}
+              onPointerMove={previewReorder}
+              onPointerUp={finishReorder}
+              order={sheetOrder}
+              result={reorderResult}
+              surface="bar"
+            />
+          ) : null}
           <section
             aria-label="Canvas do protótipo"
             className="editor-prototype__canvas"
@@ -659,16 +824,24 @@ export function UiArchitecturePrototype({
             data-zoom-anchor={zoomAnchor}
             data-zoom-cap={String(maximumZoom)}
             data-zoom-level={String(zoom)}
+            data-zoom-offset-x={String(Number(viewport.offsetX.toFixed(2)))}
+            data-zoom-offset-y={String(Number(viewport.offsetY.toFixed(2)))}
+            data-zoom-origin-x={String(Number(zoomOrigin.x.toFixed(2)))}
+            data-zoom-origin-y={String(Number(zoomOrigin.y.toFixed(2)))}
             data-zoom-state={
               zoom === fitZoom ? "fit" : zoom === maximumZoom ? "cap" : "raised"
             }
-            onKeyDown={handleCanvasKeyDown}
-            onWheel={handleCanvasWheel}
+            onKeyDown={editorMode === "edit" ? handleCanvasKeyDown : undefined}
+            onWheel={editorMode === "edit" ? handleCanvasWheel : undefined}
             tabIndex={0}
           >
             <div
               className="editor-prototype__sheet"
-              style={{ transform: `scale(${zoom})` }}
+              data-testid="prototype-editing-sheet"
+              style={{
+                transform: `translate(${viewport.offsetX}px, ${viewport.offsetY}px) scale(${zoom})`,
+                transformOrigin: "50% 50%",
+              }}
             >
               <span>Lâmina 03</span>
               <div
@@ -699,7 +872,9 @@ export function UiArchitecturePrototype({
                         if (!selected && !event.ctrlKey) {
                           setSelectedFrameIds([frame.id]);
                         }
-                        startFrameGesture(frame.id, "move");
+                        if (editorMode === "edit") {
+                          startFrameGesture(frame.id, "move");
+                        }
                       }}
                       style={{
                         height: `${renderedFrame.height}%`,
@@ -743,7 +918,9 @@ export function UiArchitecturePrototype({
                         : undefined
                     }
                   >
-                    {selectedFrameIds.length === 1 && !layoutLocked
+                    {editorMode === "edit" &&
+                    selectedFrameIds.length === 1 &&
+                    !layoutLocked
                       ? resizeHandles.map((handle) => (
                           <button
                             aria-label={`Redimensionar Frame 0${frames.findIndex((frame) => frame.id === selectedFrameIds[0]) + 1} pelo ${handle.label}`}
@@ -761,26 +938,30 @@ export function UiArchitecturePrototype({
                       : null}
                   </div>
                 ) : null}
-                <span
-                  aria-hidden="true"
-                  className="prototype-frame-gesture-target prototype-frame-gesture-target--move"
-                  data-delta-x="8"
-                  data-delta-y="6"
-                  data-frame-gesture-target="move"
-                  data-testid="frame-move-target"
-                />
-                <span
-                  aria-hidden="true"
-                  className="prototype-frame-gesture-target prototype-frame-gesture-target--resize"
-                  data-delta-height="8"
-                  data-delta-width="10"
-                  data-frame-gesture-target="resize"
-                  data-testid="frame-resize-target"
-                />
+                {editorMode === "edit" ? (
+                  <>
+                    <span
+                      aria-hidden="true"
+                      className="prototype-frame-gesture-target prototype-frame-gesture-target--move"
+                      data-delta-x="8"
+                      data-delta-y="6"
+                      data-frame-gesture-target="move"
+                      data-testid="frame-move-target"
+                    />
+                    <span
+                      aria-hidden="true"
+                      className="prototype-frame-gesture-target prototype-frame-gesture-target--resize"
+                      data-delta-height="8"
+                      data-delta-width="10"
+                      data-frame-gesture-target="resize"
+                      data-testid="frame-resize-target"
+                    />
+                  </>
+                ) : null}
               </div>
             </div>
           </section>
-          {layoutLocked ? (
+          {editorMode === "edit" && layoutLocked ? (
             <p
               className="prototype-layout-lock-feedback"
               data-blocked={String(layoutLockFeedback)}
@@ -858,15 +1039,17 @@ export function UiArchitecturePrototype({
               </div>
             ) : null}
           </section>
-          <ReorderStrip
-            gesture={reorderGesture}
-            onPointerDown={startReorder}
-            onPointerMove={previewReorder}
-            onPointerUp={finishReorder}
-            order={sheetOrder}
-            result={reorderResult}
-            surface="grid"
-          />
+          {editorMode === "normal" ? (
+            <ReorderStrip
+              gesture={reorderGesture}
+              onPointerDown={startReorder}
+              onPointerMove={previewReorder}
+              onPointerUp={finishReorder}
+              order={sheetOrder}
+              result={reorderResult}
+              surface="grid"
+            />
+          ) : null}
           <output data-testid="prototype-history-count">
             {historyCount}
           </output>

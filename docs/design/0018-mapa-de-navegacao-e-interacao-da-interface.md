@@ -40,9 +40,9 @@ O fixed point que originou esta consolidação é
 | ID estável | Nome visível e fonte navegável | Runtime owner | Owner de implementação | Estado atual |
 | --- | --- | --- | --- | --- |
 | `global.welcome` | [Boas-vindas](0002-tela-de-boas-vindas.md) | processo global | #13 | integrada; não oferece Configurações/Ajuda sem ligação |
-| `global.new-project.configuration` | [Novo Projeto — Configurações](0003-criacao-de-projeto.md) | Boas-vindas | #16 | integrada |
-| `global.new-project.personalization` | [Novo Projeto — Personalização](0003-criacao-de-projeto.md) | Boas-vindas | #16 | integrada |
-| `native.project-name-location` | [Nome e local](0003-criacao-de-projeto.md) | diálogo nativo pertencente à Boas-vindas | #16 | abre somente após `Criar Projeto` |
+| `global.new-project.configuration` | [Novo Projeto — Configurações](0003-criacao-de-projeto.md) | Boas-vindas | #9 | integrada |
+| `global.new-project.personalization` | [Novo Projeto — Personalização](0003-criacao-de-projeto.md) | Boas-vindas | #21 | integrada |
+| `native.project-name-location` | [Nome e local](0003-criacao-de-projeto.md) | diálogo nativo pertencente à Boas-vindas | #13 | abre somente após `Criar Projeto` |
 | `project.normal` | [Janela do Projeto — Modo normal](0001-estrutura-da-janela-do-projeto.md) | Janela do Projeto | #9 | integrada em cortes incrementais |
 | `project.edit` | [Janela do Projeto — Modo de edição](0001-estrutura-da-janela-do-projeto.md) | Janela do Projeto | #20 e #22 | contrato aceito e protótipo verificável |
 | `project.export` | [Exportação](0004-exportacao-normal.md) | Janela do Projeto originadora | #35 | contrato aceito; resultados pertencem à tentativa |
@@ -119,6 +119,9 @@ para essas superfícies não criam um owner global compartilhado.
 
 - O Canvas contínuo mantém todas as Lâminas interativas e sem Zoom manual.
 - Barra da Lâmina e Grade navegam e iniciam a mesma operação de reordenação.
+- Clique sem vencer o limiar de arraste centraliza a Lâmina; somente depois do
+  limiar surgem placeholder, ghost e deslocamento intermediário. Soltar fora da
+  superfície originadora ou receber `pointercancel` cancela sem commit.
 - A ordem confirmada não muda durante a prévia. A representação oposta não
   anima e só sincroniza no drop válido.
 - Reordenação e demais comandos estruturais pertencem ao owner #9.
@@ -128,7 +131,9 @@ para essas superfícies não criam um owner global compartilhado.
 - A Lâmina isolada inicia em `Ajustar Lâmina`. A `ViewportTransform` pertence à
   interface, não ao Projeto, Histórico ou Exportação.
 - `Ctrl` + `+`, `Ctrl` + `−` e `Ctrl` + roda alteram o Zoom; `Ctrl` + `0`
-  retorna ao ajuste. Teclado ancora no centro e roda ancora sob o cursor.
+  retorna ao ajuste. Teclado ancora no centro e roda ancora sob o cursor: a
+  `ViewportTransform` recalcula o deslocamento para que o mesmo ponto da
+  Lâmina permaneça sob o cursor, inclusive após gestos sucessivos.
 - `Ajustar Lâmina` é o mínimo e **`4× Ajustar Lâmina` é o teto calibrado**. O
   valor é limitado por clamp, não cria controle ou percentual permanente e é
   descartado ao sair. A calibração mantém uma faixa útil para examinar bordas e

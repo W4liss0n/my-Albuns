@@ -389,7 +389,7 @@ test("the manifest proves every Program 05 closeout interaction through the isol
   const wheelZoom = scenariosById.get("editor-zoom-wheel");
   assert.deepEqual(wheelZoom.actions[0], {
     type: "wheel",
-    selector: '[aria-label="Canvas do protótipo"]',
+    selector: '[data-frame-gesture-target="resize"]',
     deltaY: -120,
     modifiers: ["Control"],
   });
@@ -410,6 +410,17 @@ test("the manifest proves every Program 05 closeout interaction through the isol
     "frame-layout-locked",
   ]) {
     assert.equal(scenariosById.get(id).actions.at(-1).phase, "drop");
+  }
+  for (const id of [
+    "sheet-reorder-bar-preview",
+    "sheet-reorder-bar-commit",
+    "sheet-reorder-grid-preview",
+    "sheet-reorder-grid-commit",
+    "sheet-reorder-cancelled",
+    "sheet-reorder-invalid-drop",
+  ]) {
+    assert.match(scenariosById.get(id).implementationPath, /mode=normal/u);
+    assert.match(scenariosById.get(id).readySelector, /data-editor-mode/u);
   }
 });
 

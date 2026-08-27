@@ -35,13 +35,37 @@ test("exposes every canonical surface as a navigable, stable map node", () => {
   expect(screen.getByTestId("surface-transition-map")).toHaveTextContent(
     "Boas-vindas → Configurações → Personalização → Nome e local → Projeto",
   );
+  expect(
+    within(
+      nodes.find(
+        (node) => node.dataset.surfaceId === "global.new-project.configuration",
+      ) as HTMLElement,
+    ).getByText("#9"),
+  ).toBeInTheDocument();
+  expect(
+    within(
+      nodes.find(
+        (node) => node.dataset.surfaceId === "global.new-project.personalization",
+      ) as HTMLElement,
+    ).getByText("#21"),
+  ).toBeInTheDocument();
+  expect(
+    within(
+      nodes.find(
+        (node) => node.dataset.surfaceId === "native.project-name-location",
+      ) as HTMLElement,
+    ).getByText("#13"),
+  ).toBeInTheDocument();
 });
 
 test("applies only Ctrl zoom gestures between Ajustar Lâmina and the calibrated 4× cap", () => {
   render(<UiArchitecturePrototype initialView="editor" />);
 
   const canvas = screen.getByRole("region", { name: "Canvas do protótipo" });
+  const sheet = screen.getByTestId("prototype-editing-sheet");
   expect(canvas).toHaveAttribute("data-zoom-level", "1");
+  expect(screen.queryByRole("region", { name: "Barra de Lâminas" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("region", { name: "Grade de Lâminas" })).not.toBeInTheDocument();
 
   fireEvent.keyDown(canvas, { ctrlKey: true, key: "+" });
   expect(canvas).toHaveAttribute("data-zoom-level", "1.25");
@@ -50,10 +74,36 @@ test("applies only Ctrl zoom gestures between Ajustar Lâmina and the calibrated
   fireEvent.keyDown(canvas, { ctrlKey: true, key: "-" });
   expect(canvas).toHaveAttribute("data-zoom-level", "1");
 
-  fireEvent.wheel(canvas, { ctrlKey: true, deltaY: -120 });
+  Object.defineProperty(canvas, "getBoundingClientRect", {
+    configurable: true,
+    value: () => ({
+      bottom: 450,
+      height: 400,
+      left: 100,
+      right: 900,
+      top: 50,
+      width: 800,
+      x: 100,
+      y: 50,
+    }),
+  });
+  fireEvent.wheel(canvas, {
+    clientX: 700,
+    clientY: 150,
+    ctrlKey: true,
+    deltaY: -120,
+  });
   expect(canvas).toHaveAttribute("data-zoom-level", "1.25");
   expect(canvas).toHaveAttribute("data-last-zoom-input", "wheel-in");
   expect(canvas).toHaveAttribute("data-zoom-anchor", "cursor");
+  expect(canvas).toHaveAttribute("data-zoom-origin-x", "75");
+  expect(canvas).toHaveAttribute("data-zoom-origin-y", "25");
+  expect(canvas).toHaveAttribute("data-zoom-offset-x", "-50");
+  expect(canvas).toHaveAttribute("data-zoom-offset-y", "25");
+  expect(sheet).toHaveStyle({
+    transform: "translate(-50px, 25px) scale(1.25)",
+    transformOrigin: "50% 50%",
+  });
 
   fireEvent.wheel(canvas, { deltaY: -120 });
   expect(canvas).toHaveAttribute("data-zoom-level", "1.25");
@@ -62,17 +112,22 @@ test("applies only Ctrl zoom gestures between Ajustar Lâmina and the calibrated
     fireEvent.keyDown(canvas, { ctrlKey: true, key: "+" });
   }
   expect(canvas).toHaveAttribute("data-zoom-level", "4");
+  expect(canvas).toHaveAttribute("data-zoom-anchor", "center");
 
   fireEvent.keyDown(canvas, { ctrlKey: true, key: "0" });
   expect(canvas).toHaveAttribute("data-zoom-level", "1");
   expect(canvas).toHaveAttribute("data-last-zoom-input", "reset");
   expect(canvas).toHaveAttribute("data-zoom-state", "fit");
+  expect(canvas).toHaveAttribute("data-zoom-offset-x", "0");
+  expect(canvas).toHaveAttribute("data-zoom-offset-y", "0");
   expect(screen.queryByText(/\d+%/u)).not.toBeInTheDocument();
   expect(screen.queryByText(/Ctrl\+/u)).not.toBeInTheDocument();
 });
 
 test("previews, cancels, and commits one synchronized reorder from the Barra", () => {
-  render(<UiArchitecturePrototype initialView="editor" />);
+  render(
+    <UiArchitecturePrototype initialEditorMode="normal" initialView="editor" />,
+  );
 
   const bar = screen.getByRole("region", { name: "Barra de Lâminas" });
   const grid = screen.getByRole("region", { name: "Grade de Lâminas" });
@@ -81,6 +136,11 @@ test("previews, cancels, and commits one synchronized reorder from the Barra", (
 
   expect(bar).toHaveAttribute("data-sheet-order", originalOrder);
   expect(grid).toHaveAttribute("data-sheet-order", originalOrder);
+  expect(screen.getByText("Modo normal · reordenação de Lâminas")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Layout travado" })).not.toBeInTheDocument();
+  const canvas = screen.getByRole("region", { name: "Canvas do protótipo" });
+  fireEvent.keyDown(canvas, { ctrlKey: true, key: "+" });
+  expect(canvas).toHaveAttribute("data-zoom-level", "1");
 
   const source = within(bar).getByRole("button", {
     name: "Reordenar Lâmina 04 pela Barra",
@@ -89,7 +149,18 @@ test("previews, cancels, and commits one synchronized reorder from the Barra", (
     name: "Reordenar Lâmina 02 pela Barra",
   });
   fireEvent.pointerDown(source, { clientX: 10, clientY: 10, pointerId: 1 });
-  fireEvent.pointerMove(target, { clientX: 40, clientY: 40, pointerId: 1 });
+  fireEvent.pointerMove(source, { clientX: 12, clientY: 12, pointerId: 1 });
+  expect(bar).toHaveAttribute("data-reorder-state", "idle");
+  expect(within(bar).queryByTestId("reorder-ghost")).not.toBeInTheDocument();
+  fireEvent.pointerUp(source, { clientX: 12, clientY: 12, pointerId: 1 });
+  expect(screen.getByRole("region", { name: "Modo normal" })).toHaveAttribute(
+    "data-centered-sheet-id",
+    "sheet-004",
+  );
+  expect(screen.getByTestId("prototype-history-count")).toHaveTextContent("0");
+
+  fireEvent.pointerDown(source, { clientX: 10, clientY: 10, pointerId: 2 });
+  fireEvent.pointerMove(target, { clientX: 40, clientY: 40, pointerId: 2 });
 
   expect(bar).toHaveAttribute("data-reorder-state", "preview");
   expect(bar).toHaveAttribute("data-preview-order", reordered);
@@ -103,9 +174,26 @@ test("previews, cancels, and commits one synchronized reorder from the Barra", (
   expect(bar).toHaveAttribute("data-sheet-order", originalOrder);
   expect(within(bar).queryByTestId("reorder-placeholder")).not.toBeInTheDocument();
 
-  fireEvent.pointerDown(source, { clientX: 10, clientY: 10, pointerId: 2 });
-  fireEvent.pointerMove(target, { clientX: 40, clientY: 40, pointerId: 2 });
-  fireEvent.pointerUp(bar, { clientX: 40, clientY: 40, pointerId: 2 });
+  fireEvent.pointerDown(source, { clientX: 10, clientY: 10, pointerId: 3 });
+  fireEvent.pointerMove(target, { clientX: 40, clientY: 40, pointerId: 3 });
+  fireEvent.pointerUp(document.body, {
+    clientX: 1400,
+    clientY: 880,
+    pointerId: 3,
+  });
+  expect(bar).toHaveAttribute("data-reorder-state", "invalid");
+  expect(bar).toHaveAttribute("data-sheet-order", originalOrder);
+  expect(within(bar).queryByTestId("reorder-ghost")).not.toBeInTheDocument();
+
+  fireEvent.pointerDown(source, { clientX: 10, clientY: 10, pointerId: 4 });
+  fireEvent.pointerMove(target, { clientX: 40, clientY: 40, pointerId: 4 });
+  fireEvent.pointerCancel(document.body, { pointerId: 4 });
+  expect(bar).toHaveAttribute("data-reorder-state", "cancelled");
+  expect(bar).toHaveAttribute("data-sheet-order", originalOrder);
+
+  fireEvent.pointerDown(source, { clientX: 10, clientY: 10, pointerId: 5 });
+  fireEvent.pointerMove(target, { clientX: 40, clientY: 40, pointerId: 5 });
+  fireEvent.pointerUp(bar, { clientX: 40, clientY: 40, pointerId: 5 });
 
   expect(bar).toHaveAttribute("data-reorder-state", "committed");
   expect(bar).toHaveAttribute("data-sheet-order", reordered);
@@ -114,7 +202,9 @@ test("previews, cancels, and commits one synchronized reorder from the Barra", (
 });
 
 test("keeps the Canvas stable during a Grade preview and rejects an interior Página única drop", () => {
-  render(<UiArchitecturePrototype initialView="editor" />);
+  render(
+    <UiArchitecturePrototype initialEditorMode="normal" initialView="editor" />,
+  );
 
   const bar = screen.getByRole("region", { name: "Barra de Lâminas" });
   const grid = screen.getByRole("region", { name: "Grade de Lâminas" });
