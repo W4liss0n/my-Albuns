@@ -40,6 +40,16 @@ function projectCorePort(): ProjectCorePort {
   };
 }
 
+function deferredValue<Value>() {
+  let resolve!: (value: Value) => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<Value>((resolver, rejecter) => {
+    resolve = resolver;
+    reject = rejecter;
+  });
+  return { promise, reject, resolve };
+}
+
 beforeEach(() => {
   useEditorView.setState({
     projectId: representativeProjection.state.projectId,
@@ -222,6 +232,70 @@ test("maps Sheet structure commands to explicit intents and falls back to the im
     { kind: "reorderSheet", sheetId: "sheet-002", targetIndex: 0 },
   ]);
 });
+
+test.each(["completed", "failed"] as const)(
+  "rejects an adjacent structural invocation before the pending state renders when the predecessor %s",
+  async (predecessorOutcome) => {
+    const projection = createTwoSheetProjection();
+    const port = projectCorePort();
+    const pending = deferredValue<
+      Awaited<ReturnType<ProjectCorePort["applyWithOutcome"]>>
+    >();
+    const applyWithOutcome = vi
+      .spyOn(port, "applyWithOutcome")
+      .mockImplementation(() => pending.promise);
+    const runProjectMutation: ProjectMutationRunner = {
+      run: vi.fn(async (operation) => {
+        try {
+          return {
+            status: "completed" as const,
+            projection: await operation(port, null),
+          };
+        } catch (error: unknown) {
+          return { status: "failed" as const, error };
+        }
+      }),
+      waitForIdle: async () => null,
+    };
+    const view = renderHook(() =>
+      useProjectEditorController({
+        projection,
+        projectCorePort: port,
+        runProjectMutation,
+        onProjectionChange: vi.fn(),
+      }),
+    );
+
+    let predecessor!: Promise<boolean>;
+    let adjacent!: Promise<boolean>;
+    act(() => {
+      predecessor = view.result.current.deleteSheet("sheet-001");
+      adjacent = view.result.current.addSheetAfter("sheet-001");
+    });
+
+    expect(await adjacent).toBe(false);
+    expect(applyWithOutcome).toHaveBeenCalledOnce();
+    expect(view.result.current.structuralMutationPending).toBe(true);
+
+    let completed = false;
+    await act(async () => {
+      if (predecessorOutcome === "completed") {
+        pending.resolve({
+          projection,
+          affectedFrameId: null,
+          affectedSheetId: null,
+        });
+      } else {
+        pending.reject(new Error("Falha estrutural controlada."));
+      }
+      completed = await predecessor;
+    });
+
+    expect(completed).toBe(predecessorOutcome === "completed");
+    expect(view.result.current.structuralMutationPending).toBe(false);
+    expect(applyWithOutcome).toHaveBeenCalledOnce();
+  },
+);
 
 test("navigates to a newly affected Sheet after its projection becomes visible", async () => {
   const projection = createTwoSheetProjection();

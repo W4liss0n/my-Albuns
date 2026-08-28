@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ProjectCorePort } from "../application/projectPorts";
-import type { EditorProjection } from "../domain/project";
+import type { EditorProjection, ProjectIntent } from "../domain/project";
 import type {
   AlbumCanvasMode,
   AlbumCanvasProps,
@@ -20,6 +20,13 @@ interface ProjectEditorControllerInput {
   onProjectionChange(projection: EditorProjection): void;
   onSaveAsBarrierChange?(active: boolean): void;
 }
+
+type StructuralProjectIntent = Extract<
+  ProjectIntent,
+  {
+    kind: "addSheet" | "convertEdgeSheet" | "deleteSheet" | "reorderSheet";
+  }
+>;
 
 export function useProjectEditorController({
   interactionBlocked = false,
@@ -40,6 +47,10 @@ export function useProjectEditorController({
         : { kind: "normal" },
     [navigation.editingSheetId],
   );
+  const structuralMutationAttemptRef = useRef(0);
+  const structuralMutationPendingRef = useRef(false);
+  const [structuralMutationPending, setStructuralMutationPending] =
+    useState(false);
   const structuralCommandsDisabled =
     interactionBlocked || canvasMode.kind === "sheet-editing";
   const [pendingAffectedSheetId, setPendingAffectedSheetId] = useState<
@@ -47,6 +58,9 @@ export function useProjectEditorController({
   >(null);
 
   useEffect(() => {
+    structuralMutationAttemptRef.current += 1;
+    structuralMutationPendingRef.current = false;
+    setStructuralMutationPending(false);
     setPendingAffectedSheetId(null);
   }, [projection.state.projectId]);
 
@@ -184,9 +198,27 @@ export function useProjectEditorController({
     onCanvasMetricsChange: navigation.handleCanvasMetricsChange,
   };
 
+  async function applyStructuralIntent(intent: StructuralProjectIntent) {
+    if (structuralCommandsDisabled || structuralMutationPendingRef.current) {
+      return false;
+    }
+    const attempt = structuralMutationAttemptRef.current + 1;
+    structuralMutationAttemptRef.current = attempt;
+    structuralMutationPendingRef.current = true;
+    setStructuralMutationPending(true);
+    try {
+      return await mutations.applyWithOutcome(intent);
+    } finally {
+      if (structuralMutationAttemptRef.current === attempt) {
+        structuralMutationPendingRef.current = false;
+        setStructuralMutationPending(false);
+      }
+    }
+  }
+
   const addSheetBefore = (sheetId = navigation.implicitSheetId) => {
-    if (structuralCommandsDisabled || !sheetId) return Promise.resolve(false);
-    return mutations.applyWithOutcome({
+    if (!sheetId) return Promise.resolve(false);
+    return applyStructuralIntent({
       kind: "addSheet",
       anchorSheetId: sheetId,
       position: "before",
@@ -194,8 +226,8 @@ export function useProjectEditorController({
   };
 
   const addSheetAfter = (sheetId = navigation.implicitSheetId) => {
-    if (structuralCommandsDisabled || !sheetId) return Promise.resolve(false);
-    return mutations.applyWithOutcome({
+    if (!sheetId) return Promise.resolve(false);
+    return applyStructuralIntent({
       kind: "addSheet",
       anchorSheetId: sheetId,
       position: "after",
@@ -203,18 +235,17 @@ export function useProjectEditorController({
   };
 
   const deleteSheet = (sheetId = navigation.implicitSheetId) => {
-    if (structuralCommandsDisabled || !sheetId) return Promise.resolve(false);
-    return mutations.applyWithOutcome({ kind: "deleteSheet", sheetId });
+    if (!sheetId) return Promise.resolve(false);
+    return applyStructuralIntent({ kind: "deleteSheet", sheetId });
   };
 
   const convertEdge = (sheetId = navigation.implicitSheetId) => {
-    if (structuralCommandsDisabled || !sheetId) return Promise.resolve(false);
-    return mutations.applyWithOutcome({ kind: "convertEdgeSheet", sheetId });
+    if (!sheetId) return Promise.resolve(false);
+    return applyStructuralIntent({ kind: "convertEdgeSheet", sheetId });
   };
 
   const reorderSheet = (sheetId: string, targetIndex: number) => {
-    if (structuralCommandsDisabled) return Promise.resolve(false);
-    return mutations.applyWithOutcome({
+    return applyStructuralIntent({
       kind: "reorderSheet",
       sheetId,
       targetIndex,
@@ -230,6 +261,7 @@ export function useProjectEditorController({
     zoomCommitting: photoGestures.zoomCommitting,
     sheetCount: projection.state.album.sheets.length,
     structuralCommandsDisabled,
+    structuralMutationPending,
     canvasProps,
     navigateToSheet: navigation.navigateToSheet,
     beginZoomGesture: photoGestures.beginZoomGesture,

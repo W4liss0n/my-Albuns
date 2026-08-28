@@ -4,33 +4,43 @@ import { matchProjectCommandShortcut } from "../application/projectCommandCatalo
 import { isTextEntryTarget } from "./isTextEntryTarget";
 
 interface ProjectCommandShortcutHandlers {
+  canDeleteSheet: boolean;
   canRedo: boolean;
   canUndo: boolean;
   closeProject(): void;
+  deleteSheet(): void;
   disabled: boolean;
   redo(): void;
   save(): void;
   saveAs(): void;
+  sheetCommandsDisabled: boolean;
   undo(): void;
 }
 
 export function useProjectCommandShortcuts({
+  canDeleteSheet,
   canRedo,
   canUndo,
   closeProject,
+  deleteSheet,
   disabled,
   redo,
   save,
   saveAs,
+  sheetCommandsDisabled,
   undo,
 }: ProjectCommandShortcutHandlers) {
   useEffect(() => {
     const handleProjectCommand = (event: KeyboardEvent) => {
       if (event.defaultPrevented) return;
-      const command = matchProjectCommandShortcut(event, "project-window");
+      const command =
+        matchProjectCommandShortcut(event, "project-window") ??
+        matchProjectCommandShortcut(event, "sheet");
       if (command === null) return;
       if (
-        (command === "undo" || command === "redo") &&
+        (command === "undo" ||
+          command === "redo" ||
+          command === "delete-sheet") &&
         isTextEntryTarget(event.target)
       ) {
         return;
@@ -41,7 +51,8 @@ export function useProjectCommandShortcuts({
         command === "save-as" ||
         command === "close" ||
         command === "undo" ||
-        command === "redo";
+        command === "redo" ||
+        command === "delete-sheet";
       if (!handledCommand) return;
 
       event.preventDefault();
@@ -63,9 +74,24 @@ export function useProjectCommandShortcuts({
         case "redo":
           if (canRedo) redo();
           break;
+        case "delete-sheet":
+          if (canDeleteSheet && !sheetCommandsDisabled) deleteSheet();
+          break;
       }
     };
     window.addEventListener("keydown", handleProjectCommand);
     return () => window.removeEventListener("keydown", handleProjectCommand);
-  }, [canRedo, canUndo, closeProject, disabled, redo, save, saveAs, undo]);
+  }, [
+    canDeleteSheet,
+    canRedo,
+    canUndo,
+    closeProject,
+    deleteSheet,
+    disabled,
+    redo,
+    save,
+    saveAs,
+    sheetCommandsDisabled,
+    undo,
+  ]);
 }

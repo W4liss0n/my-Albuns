@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 
 import { SheetContextMenu } from "./SheetContextMenu";
@@ -148,5 +148,79 @@ describe("SheetContextMenu", () => {
     fireEvent.keyDown(document, { key: "Escape" });
     expect(dismiss).toHaveBeenCalledOnce();
     expect(deleteSheet).not.toHaveBeenCalled();
+  });
+
+  test("keeps the floating surface inside all four viewport corners", async () => {
+    const width = vi.spyOn(window, "innerWidth", "get").mockReturnValue(800);
+    const height = vi.spyOn(window, "innerHeight", "get").mockReturnValue(600);
+    const bounds = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockImplementation(function (this: HTMLElement) {
+        const menu = this.classList.contains(
+          "sheet-context-menu",
+        );
+        const measuredWidth = menu ? 220 : 0;
+        const measuredHeight = menu ? 200 : 0;
+        return {
+          bottom: measuredHeight,
+          height: measuredHeight,
+          left: 0,
+          right: measuredWidth,
+          top: 0,
+          width: measuredWidth,
+          x: 0,
+          y: 0,
+          toJSON: () => ({}),
+        };
+      });
+    const props = {
+      availability: {
+        canAddAfter: true,
+        canAddBefore: true,
+        canConvertEdge: true,
+        canDelete: true,
+      },
+      sheetNumber: 2,
+      onAddAfter: vi.fn(),
+      onAddBefore: vi.fn(),
+      onConvertEdge: vi.fn(),
+      onDelete: vi.fn(),
+      onDismiss: vi.fn(),
+    };
+
+    try {
+      const view = render(
+        <SheetContextMenu {...props} position={{ x: 0, y: 0 }} />,
+      );
+      const menu = screen.getByRole("menu", {
+        name: "Ações da Lâmina 02",
+      });
+      const corners = [
+        { position: { x: 0, y: 0 }, expected: { left: "8px", top: "8px" } },
+        {
+          position: { x: 800, y: 0 },
+          expected: { left: "572px", top: "8px" },
+        },
+        {
+          position: { x: 0, y: 600 },
+          expected: { left: "8px", top: "392px" },
+        },
+        {
+          position: { x: 800, y: 600 },
+          expected: { left: "572px", top: "392px" },
+        },
+      ];
+
+      for (const corner of corners) {
+        view.rerender(
+          <SheetContextMenu {...props} position={corner.position} />,
+        );
+        await waitFor(() => expect(menu).toHaveStyle(corner.expected));
+      }
+    } finally {
+      bounds.mockRestore();
+      height.mockRestore();
+      width.mockRestore();
+    }
   });
 });

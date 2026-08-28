@@ -623,6 +623,118 @@ test("routes implicit menu and explicit context actions to their intended Sheets
   ).not.toBeInTheDocument();
 });
 
+test("routes Delete to the centered Sheet and guards text entry, Edit Mode, and the minimum", async () => {
+  const physicalProjection = createThreeSheetProjection();
+  const port = projectCorePortWithApply(async () => physicalProjection);
+  const applyWithOutcome = vi.fn(async () => ({
+    projection: physicalProjection,
+    affectedFrameId: null,
+    affectedSheetId: null,
+  }));
+  port.applyWithOutcome = applyWithOutcome;
+  const view = render(
+    <ProjectWorkspace
+      exportPipelinePort={exportPipelinePort}
+      projection={physicalProjection}
+      projectCorePort={port}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  act(() => canvasHarness.props?.onCenteredSheetChange?.("sheet-002"));
+  fireEvent.keyDown(window, { key: "Delete" });
+  await waitFor(() =>
+    expect(applyWithOutcome).toHaveBeenCalledWith({
+      kind: "deleteSheet",
+      sheetId: "sheet-002",
+    }),
+  );
+
+  const input = document.createElement("input");
+  document.body.append(input);
+  try {
+    fireEvent.keyDown(input, { key: "Delete" });
+    expect(applyWithOutcome).toHaveBeenCalledOnce();
+  } finally {
+    input.remove();
+  }
+
+  act(() => canvasHarness.props?.onEditSheet?.("sheet-002"));
+  fireEvent.keyDown(window, { key: "Delete" });
+  expect(applyWithOutcome).toHaveBeenCalledOnce();
+  view.unmount();
+
+  const minimumProjection = createTwoSheetProjection();
+  const minimumPort = projectCorePortWithApply(async () => minimumProjection);
+  const minimumApply = vi.fn(async () => ({
+    projection: minimumProjection,
+    affectedFrameId: null,
+    affectedSheetId: null,
+  }));
+  minimumPort.applyWithOutcome = minimumApply;
+  render(
+    <ProjectWorkspace
+      exportPipelinePort={exportPipelinePort}
+      projection={minimumProjection}
+      projectCorePort={minimumPort}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  fireEvent.keyDown(window, { key: "Delete" });
+  expect(minimumApply).not.toHaveBeenCalled();
+});
+
+test.each(["completed", "failed"] as const)(
+  "blocks adjacent structural commands while a predecessor is pending and then %s",
+  async (predecessorOutcome) => {
+    const physicalProjection = createThreeSheetProjection();
+    const pendingDelete = deferredValue<
+      Awaited<ReturnType<ProjectCorePort["applyWithOutcome"]>>
+    >();
+    const port = projectCorePortWithApply(async () => physicalProjection);
+    port.applyWithOutcome = vi.fn(() => pendingDelete.promise);
+    render(
+      <ProjectWorkspace
+        exportPipelinePort={exportPipelinePort}
+        projection={physicalProjection}
+        projectCorePort={port}
+        onProjectionChange={() => undefined}
+      />,
+    );
+
+    fireEvent.click(getApplicationCommand("Lâmina", "Excluir"));
+    await waitFor(() => expect(port.applyWithOutcome).toHaveBeenCalledOnce());
+
+    const adjacentCommand = getApplicationCommand(
+      "Lâmina",
+      "Adicionar depois",
+    );
+    expect(adjacentCommand).toBeDisabled();
+    fireEvent.click(adjacentCommand);
+
+    await act(async () => {
+      if (predecessorOutcome === "completed") {
+        pendingDelete.resolve({
+          projection: physicalProjection,
+          affectedFrameId: null,
+          affectedSheetId: null,
+        });
+      } else {
+        pendingDelete.reject(new Error("Falha estrutural controlada."));
+      }
+      await pendingDelete.promise.catch(() => undefined);
+    });
+
+    await waitFor(() => expect(port.applyWithOutcome).toHaveBeenCalledOnce());
+    await waitFor(() =>
+      expect(
+        getApplicationCommand("Lâmina", "Adicionar depois"),
+      ).toBeEnabled(),
+    );
+  },
+);
+
 test("routes implicit and explicit empty-edge conversions to their intended Sheet", async () => {
   const physicalProjection = createThreeSheetProjection();
   const port = projectCorePortWithApply(async () => physicalProjection);

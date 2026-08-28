@@ -5,10 +5,13 @@ import { useProjectCommandShortcuts } from "./useProjectCommandShortcuts";
 
 function handlers() {
   return {
+    canDeleteSheet: true,
     closeProject: vi.fn(),
+    deleteSheet: vi.fn(),
     redo: vi.fn(),
     save: vi.fn(),
     saveAs: vi.fn(),
+    sheetCommandsDisabled: false,
     undo: vi.fn(),
   };
 }
@@ -76,6 +79,55 @@ test("dispatches Save as distinctly from Save", () => {
   expect(event.defaultPrevented).toBe(true);
   expect(actions.save).not.toHaveBeenCalled();
   expect(actions.saveAs).toHaveBeenCalledOnce();
+});
+
+test("dispatches Delete only for an available Sheet outside text entry and Edit Mode", () => {
+  const actions = handlers();
+  const view = renderHook(
+    ({ canDeleteSheet, sheetCommandsDisabled }) =>
+      useProjectCommandShortcuts({
+        ...actions,
+        canDeleteSheet,
+        canRedo: true,
+        canUndo: true,
+        disabled: false,
+        sheetCommandsDisabled,
+      }),
+    {
+      initialProps: {
+        canDeleteSheet: true,
+        sheetCommandsDisabled: false,
+      },
+    },
+  );
+
+  expect(dispatchShortcut("Delete", { ctrlKey: false }).defaultPrevented).toBe(
+    true,
+  );
+  expect(actions.deleteSheet).toHaveBeenCalledOnce();
+
+  const input = document.createElement("input");
+  document.body.append(input);
+  try {
+    expect(
+      dispatchShortcut("Delete", { ctrlKey: false }, input).defaultPrevented,
+    ).toBe(false);
+    expect(actions.deleteSheet).toHaveBeenCalledOnce();
+  } finally {
+    input.remove();
+  }
+
+  view.rerender({ canDeleteSheet: false, sheetCommandsDisabled: false });
+  expect(dispatchShortcut("Delete", { ctrlKey: false }).defaultPrevented).toBe(
+    true,
+  );
+  expect(actions.deleteSheet).toHaveBeenCalledOnce();
+
+  view.rerender({ canDeleteSheet: true, sheetCommandsDisabled: true });
+  expect(dispatchShortcut("Delete", { ctrlKey: false }).defaultPrevented).toBe(
+    true,
+  );
+  expect(actions.deleteSheet).toHaveBeenCalledOnce();
 });
 
 test("leaves contextual Ctrl+E to the active photo owner", () => {
