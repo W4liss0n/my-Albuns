@@ -138,6 +138,54 @@ export function assertReopenedHostExport({
   return true;
 }
 
+export function assertPhysicalAlbumProjectCoreEvents(
+  records,
+  { hostProcessId, intents },
+) {
+  if (
+    !Number.isInteger(hostProcessId) ||
+    !Array.isArray(intents) ||
+    intents.length === 0
+  ) {
+    throw new Error(
+      "The physical Album ProjectCore observation requires one Host and at least one intent",
+    );
+  }
+  const normalized = intents.map((intent) => {
+    const matches = records.filter(
+      (record) =>
+        record.event === "project_intent_applied" &&
+        record.intent === intent &&
+        Number(record.process_id) === hostProcessId,
+    );
+    if (matches.length !== 1) {
+      throw new Error(
+        `The physical Album ProjectCore observation expected ${intent} for Host ${hostProcessId} exactly once and observed ${matches.length}`,
+      );
+    }
+    const [record] = matches;
+    return {
+      event: record.event,
+      intent: record.intent,
+      processId: Number(record.process_id),
+      revision: Number(record.revision),
+    };
+  });
+  if (
+    records.length !== intents.length ||
+    normalized.some((record) => !Number.isInteger(record.revision)) ||
+    normalized.some(
+      (record, index) =>
+        index > 0 && record.revision !== normalized[index - 1].revision + 1,
+    )
+  ) {
+    throw new Error(
+      `The physical Album ProjectCore events were not causal and consecutive: ${JSON.stringify(normalized)}`,
+    );
+  }
+  return normalized;
+}
+
 export function assertEmptyCacheExport(observation) {
   const {
     previewArtifactCountBeforePurge,

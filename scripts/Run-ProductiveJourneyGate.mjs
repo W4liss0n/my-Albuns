@@ -26,6 +26,7 @@ import {
   assertCausalProjectHandoff,
   assertCorrelatedJourneyTerminals,
   assertDistinguishableSheetExport,
+  assertPhysicalAlbumProjectCoreEvents,
   assertReopenedHostExport,
   eventCount,
 } from "./ProductiveJourneyObservations.mjs";
@@ -2637,31 +2638,13 @@ try {
       );
     }
   }
-  const projectCoreEvents = [
-    addSheetEvent,
-    reorderSheetEvent,
-    deleteSheetEvent,
-  ].map((record) => ({
-    event: record.event,
-    intent: record.intent,
-    processId: Number(record.process_id),
-    revision: Number(record.revision),
-  }));
-  if (
-    projectCoreEvents.some(
-      (record, index) =>
-        record.event !== "project_intent_applied" ||
-        record.intent !== structuralIntentKinds[index] ||
-        record.processId !== secondHost.processId ||
-        !Number.isInteger(record.revision),
-    ) ||
-    projectCoreEvents[1].revision !== projectCoreEvents[0].revision + 1 ||
-    projectCoreEvents[2].revision !== projectCoreEvents[1].revision + 1
-  ) {
-    throw new Error(
-      `The physical Album ProjectCore events were not causal and consecutive: ${JSON.stringify(projectCoreEvents)}`,
-    );
-  }
+  const projectCoreEvents = assertPhysicalAlbumProjectCoreEvents(
+    [addSheetEvent, reorderSheetEvent, deleteSheetEvent],
+    {
+      hostProcessId: secondHost.processId,
+      intents: structuralIntentKinds,
+    },
+  );
   const physicalAlbumStructure = {
     reorderSurface: "grid",
     dragTransport: "w3c-pointer-actions",

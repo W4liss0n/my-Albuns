@@ -20,6 +20,7 @@ import {
   assertCausalProjectHandoff,
   assertCorrelatedJourneyTerminals,
   assertDistinguishableSheetExport,
+  assertPhysicalAlbumProjectCoreEvents,
   assertReopenedHostExport,
 } from "./ProductiveJourneyObservations.mjs";
 
@@ -118,6 +119,101 @@ test("keeps the physical Album structure proof in the productive WebView2 contra
   assert.match(wrapper, /\$physicalAlbumStructure\.afterDelete\.count -ne 3/);
   assert.match(wrapper, /physical-album-structure-ui-project-core/);
   assert.match(wrapper, /physicalAlbumStructure = \$gate\.physicalAlbumStructure/);
+});
+
+test("correlates the physical Album ProjectCore events to one Host in causal order", () => {
+  const input = [
+    {
+      event: "project_intent_applied",
+      intent: "add_sheet",
+      process_id: 203,
+      revision: 9,
+    },
+    {
+      event: "project_intent_applied",
+      intent: "reorder_sheet",
+      process_id: 203,
+      revision: 10,
+    },
+    {
+      event: "project_intent_applied",
+      intent: "delete_sheet",
+      process_id: 203,
+      revision: 11,
+    },
+  ];
+
+  assert.deepEqual(
+    assertPhysicalAlbumProjectCoreEvents(input, {
+      hostProcessId: 203,
+      intents: ["add_sheet", "reorder_sheet", "delete_sheet"],
+    }),
+    [
+      {
+        event: "project_intent_applied",
+        intent: "add_sheet",
+        processId: 203,
+        revision: 9,
+      },
+      {
+        event: "project_intent_applied",
+        intent: "reorder_sheet",
+        processId: 203,
+        revision: 10,
+      },
+      {
+        event: "project_intent_applied",
+        intent: "delete_sheet",
+        processId: 203,
+        revision: 11,
+      },
+    ],
+  );
+
+  assert.throws(
+    () =>
+      assertPhysicalAlbumProjectCoreEvents(
+        input.map(({ process_id: _processId, ...record }) => record),
+        {
+          hostProcessId: 203,
+          intents: ["add_sheet", "reorder_sheet", "delete_sheet"],
+        },
+      ),
+    /Host 203/,
+  );
+  assert.throws(
+    () =>
+      assertPhysicalAlbumProjectCoreEvents(
+        [input[0], { ...input[1], revision: 12 }, input[2]],
+        {
+          hostProcessId: 203,
+          intents: ["add_sheet", "reorder_sheet", "delete_sheet"],
+        },
+      ),
+    /causal and consecutive/,
+  );
+});
+
+test("emits Project intent outcomes with the Desktop Host process id", () => {
+  const commands = readFileSync(
+    path.join(
+      path.dirname(fileURLToPath(import.meta.url)),
+      "..",
+      "src-tauri",
+      "src",
+      "project_commands.rs",
+    ),
+    "utf8",
+  );
+
+  assert.match(
+    commands,
+    /tracing::warn!\([\s\S]{0,400}?process_id\s*=\s*process_id[\s\S]{0,400}?event\s*=\s*"project_intent_rejected"/,
+  );
+  assert.match(
+    commands,
+    /tracing::info!\([\s\S]{0,400}?process_id\s*=\s*process_id[\s\S]{0,400}?event\s*=\s*"project_intent_applied"/,
+  );
 });
 
 function withJunctionFixture(configure, assertion) {
