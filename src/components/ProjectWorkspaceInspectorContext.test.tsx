@@ -54,6 +54,7 @@ const projectCorePort: ProjectCorePort = {
   applyWithOutcome: async () => ({
     projection: representativeProjection,
     affectedFrameId: null,
+    affectedSheetId: null,
   }),
   importPhoto: async () => ({
     kind: "cancelled",

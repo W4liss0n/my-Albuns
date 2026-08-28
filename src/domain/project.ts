@@ -40,6 +40,7 @@ export type { ProjectedOverlayContent } from "./generated/ProjectedOverlayConten
 export type { ProjectedVisualDefaults } from "./generated/ProjectedVisualDefaults";
 export type { RectUm } from "./generated/RectUm";
 export type { SheetRole } from "./generated/SheetRole";
+export type { SheetInsertionPosition } from "./generated/SheetInsertionPosition";
 export type { SheetSnapshot } from "./generated/SheetSnapshot";
 export type { SizeUm } from "./generated/SizeUm";
 export type { VectorUm } from "./generated/VectorUm";

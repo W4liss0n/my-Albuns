@@ -42,12 +42,14 @@ import type {
 import { useEditorView } from "../state/editorView";
 import {
   createEmptyProjection,
+  createThreeSheetProjection,
   createTwoSheetProjection,
   representativeProjection,
 } from "../test/projectFixtures";
 import type {
   AlbumCanvasMode,
   CanvasMetrics,
+  CanvasSheetReorder,
   CanvasTechnicalGuides,
   CanvasPhotoDropPoint,
   PhotoTransformDelta,
@@ -66,6 +68,7 @@ const canvasHarness = vi.hoisted(() => ({
     continuousCanvasLayout: ContinuousCanvasLayout;
     mediaPreviewUrls?: Readonly<Record<string, string>>;
     technicalGuides?: CanvasTechnicalGuides;
+    sheetReorder?: CanvasSheetReorder;
     onMediaDemandChange?(demand: MediaPreviewDemand): void;
     onCanvasMetricsChange?(metrics: CanvasMetrics): void;
     onCenteredSheetChange?(sheetId: string): void;
@@ -80,6 +83,10 @@ const canvasHarness = vi.hoisted(() => ({
       point: CanvasPhotoDropPoint,
     ): Promise<boolean>;
     onPhotoDragCancel?(): void;
+    onOpenSheetContextMenu?(
+      sheetId: string,
+      position: { x: number; y: number },
+    ): void;
     onTransformPreview?(
       preview: PhotoTransformPreview | null,
     ): void;
@@ -183,6 +190,16 @@ function deferredProjection() {
   let resolve!: (value: EditorProjection) => void;
   let reject!: (reason: unknown) => void;
   const promise = new Promise<EditorProjection>((resolver, rejecter) => {
+    resolve = resolver;
+    reject = rejecter;
+  });
+  return { promise, reject, resolve };
+}
+
+function deferredValue<Value>() {
+  let resolve!: (value: Value) => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<Value>((resolver, rejecter) => {
     resolve = resolver;
     reject = rejecter;
   });
@@ -317,6 +334,7 @@ function projectCorePortWithApply(
     applyWithOutcome: async (intent) => ({
       projection: await apply(intent),
       affectedFrameId: "frame-001",
+      affectedSheetId: null,
     }),
     importPhoto: async () => ({ kind: "cancelled", projection }),
     resolvePhotoDropTarget: async () => ({ kind: "invalid" }),
@@ -539,7 +557,9 @@ test("presents the canonical desktop menus and marks unfinished commands", () =>
   expect(
     screen.getByRole("menuitem", { name: "Trazer para frente" }),
   ).toBeDisabled();
-  expect(getApplicationCommand("Lâmina", "Adicionar depois")).toBeDisabled();
+  const addSheetAfter = getApplicationCommand("Lâmina", "Adicionar depois");
+  expect(addSheetAfter).toBeEnabled();
+  expect(addSheetAfter).not.toHaveAttribute("data-placeholder-feature");
   expect(getApplicationCommand("Exibir", "Painel de imagens")).toBeEnabled();
   expect(getApplicationCommand("Exibir", "Painel de imagens")).toHaveAttribute(
     "aria-checked",
@@ -547,6 +567,318 @@ test("presents the canonical desktop menus and marks unfinished commands", () =>
   );
   expect(getApplicationCommand("Ferramentas", "Configurações…")).toBeDisabled();
   expect(getApplicationCommand("Ajuda", "Manual do MyAlbuns")).toBeDisabled();
+});
+
+test("routes implicit menu and explicit context actions to their intended Sheets", async () => {
+  const physicalProjection = createThreeSheetProjection();
+  const port = projectCorePortWithApply(async () => physicalProjection);
+  const applyWithOutcome = vi.fn(async () => ({
+    projection: physicalProjection,
+    affectedFrameId: null,
+    affectedSheetId: null,
+  }));
+  port.applyWithOutcome = applyWithOutcome;
+
+  render(
+    <ProjectWorkspace
+      exportPipelinePort={exportPipelinePort}
+      projection={physicalProjection}
+      projectCorePort={port}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  act(() => canvasHarness.props?.onCenteredSheetChange?.("sheet-002"));
+  fireEvent.click(getApplicationCommand("Lâmina", "Adicionar depois"));
+  await waitFor(() =>
+    expect(applyWithOutcome).toHaveBeenCalledWith({
+      kind: "addSheet",
+      anchorSheetId: "sheet-002",
+      position: "after",
+    }),
+  );
+
+  act(() =>
+    canvasHarness.props?.onOpenSheetContextMenu?.("sheet-003", {
+      x: 240,
+      y: 180,
+    }),
+  );
+  const contextMenu = screen.getByRole("menu", {
+    name: "Ações da Lâmina 03",
+  });
+  expect(contextMenu).toHaveStyle({ left: "240px", top: "180px" });
+  fireEvent.click(
+    within(contextMenu).getByRole("menuitem", { name: "Excluir" }),
+  );
+
+  await waitFor(() =>
+    expect(applyWithOutcome).toHaveBeenLastCalledWith({
+      kind: "deleteSheet",
+      sheetId: "sheet-003",
+    }),
+  );
+  expect(
+    screen.queryByRole("menu", { name: "Ações da Lâmina 03" }),
+  ).not.toBeInTheDocument();
+});
+
+test("commits one valid Grade reorder and keeps structural controls inert in Sheet Edit Mode", async () => {
+  const physicalProjection = createThreeSheetProjection();
+  const port = projectCorePortWithApply(async () => physicalProjection);
+  const applyWithOutcome = vi.fn(async () => ({
+    projection: physicalProjection,
+    affectedFrameId: null,
+    affectedSheetId: "sheet-001",
+  }));
+  port.applyWithOutcome = applyWithOutcome;
+  const view = render(
+    <ProjectWorkspace
+      exportPipelinePort={exportPipelinePort}
+      projection={physicalProjection}
+      projectCorePort={port}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  const slots = Array.from(
+    view.container.querySelectorAll<HTMLElement>(".sheet-grid-slot"),
+  );
+  const dataTransfer = {
+    effectAllowed: "none",
+    setData: vi.fn(),
+  };
+  fireEvent.dragStart(slots[0], { dataTransfer });
+  fireEvent.dragEnter(slots[1]);
+  expect(screen.getByTestId("sheet-reorder-grid")).toHaveAttribute(
+    "data-reorder-state",
+    "preview",
+  );
+  fireEvent.drop(screen.getByTestId("sheet-reorder-grid"));
+
+  await waitFor(() =>
+    expect(applyWithOutcome).toHaveBeenCalledWith({
+      kind: "reorderSheet",
+      sheetId: "sheet-001",
+      targetIndex: 1,
+    }),
+  );
+  expect(applyWithOutcome).toHaveBeenCalledOnce();
+
+  act(() => canvasHarness.props?.onEditSheet?.("sheet-001"));
+  expect(getApplicationCommand("Lâmina", "Adicionar depois")).toBeDisabled();
+  expect(getApplicationCommand("Lâmina", "Excluir")).toBeDisabled();
+  for (const slot of view.container.querySelectorAll(".sheet-grid-slot")) {
+    expect(slot).toHaveAttribute("draggable", "false");
+  }
+  act(() =>
+    canvasHarness.props?.onOpenSheetContextMenu?.("sheet-002", {
+      x: 40,
+      y: 50,
+    }),
+  );
+  expect(
+    screen.queryByRole("menu", { name: "Ações da Lâmina 02" }),
+  ).not.toBeInTheDocument();
+});
+
+test("previews a Bar reorder locally while the Grade stays confirmed, then commits once", async () => {
+  const physicalProjection = createThreeSheetProjection();
+  const port = projectCorePortWithApply(async () => physicalProjection);
+  const applyWithOutcome = vi.fn(async () => ({
+    projection: physicalProjection,
+    affectedFrameId: null,
+    affectedSheetId: "sheet-001",
+  }));
+  port.applyWithOutcome = applyWithOutcome;
+  const view = render(
+    <ProjectWorkspace
+      exportPipelinePort={exportPipelinePort}
+      projection={physicalProjection}
+      projectCorePort={port}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  act(() => canvasHarness.props?.sheetReorder?.onPreview("sheet-001", 1));
+
+  expect(canvasHarness.props?.sheetReorder).toMatchObject({
+    status: "preview",
+    representation: {
+      order: ["sheet-002", "sheet-001", "sheet-003"],
+      placeholderIndex: 1,
+      ghost: { sheetId: "sheet-001" },
+    },
+  });
+  expect(
+    Array.from(
+      view.container.querySelectorAll<HTMLElement>(".sheet-grid-slot"),
+      (slot) => slot.dataset.sheetId,
+    ),
+  ).toEqual(["sheet-001", "sheet-002", "sheet-003"]);
+
+  act(() => canvasHarness.props?.sheetReorder?.onDrop());
+  await waitFor(() =>
+    expect(applyWithOutcome).toHaveBeenCalledWith({
+      kind: "reorderSheet",
+      sheetId: "sheet-001",
+      targetIndex: 1,
+    }),
+  );
+  expect(applyWithOutcome).toHaveBeenCalledOnce();
+});
+
+test("keeps a newer canonical reorder session when a queued reorder fails", async () => {
+  const visibleProjection = createThreeSheetProjection();
+  const restoredProjection = structuredClone(visibleProjection);
+  restoredProjection.state.revision += 1;
+  restoredProjection.state.album.sheets.forEach((sheet, index) => {
+    sheet.number = index + 2;
+    sheet.role = index === restoredProjection.state.album.sheets.length - 1
+      ? "final"
+      : "internal";
+  });
+  restoredProjection.composition.sheets.forEach((sheet, index) => {
+    sheet.number = index + 2;
+  });
+  restoredProjection.state.album.sheets.unshift({
+    ...structuredClone(restoredProjection.state.album.sheets[0]),
+    id: "sheet-restored",
+    number: 1,
+    role: "initial",
+    activeSides: "right",
+    pageNumbers: [1],
+    frames: [],
+  });
+  restoredProjection.composition.sheets.unshift({
+    ...structuredClone(restoredProjection.composition.sheets[0]),
+    sheetId: "sheet-restored",
+    number: 1,
+    activeSides: "right",
+    frames: [],
+  });
+
+  const pendingUndo = deferredProjection();
+  const pendingReorder = deferredValue<
+    Awaited<ReturnType<ProjectCorePort["applyWithOutcome"]>>
+  >();
+  const port = projectCorePortWithApply(async () => visibleProjection);
+  port.undo = () => pendingUndo.promise;
+  port.applyWithOutcome = vi.fn(() => pendingReorder.promise);
+  let view!: ReturnType<typeof render>;
+  const renderWorkspace = (currentProjection: EditorProjection) => (
+    <ProjectWorkspace
+      exportPipelinePort={exportPipelinePort}
+      projection={currentProjection}
+      projectCorePort={port}
+      onProjectionChange={(nextProjection) => {
+        view.rerender(renderWorkspace(nextProjection));
+      }}
+    />
+  );
+  view = render(renderWorkspace(visibleProjection));
+
+  fireEvent.click(getApplicationCommand("Editar", "Desfazer"));
+  const initialSlots = Array.from(
+    view.container.querySelectorAll<HTMLElement>(".sheet-grid-slot"),
+  );
+  const dataTransfer = {
+    effectAllowed: "none",
+    setData: vi.fn(),
+  };
+  fireEvent.dragStart(initialSlots[1], { dataTransfer });
+  fireEvent.dragEnter(initialSlots[0]);
+  fireEvent.drop(screen.getByTestId("sheet-reorder-grid"));
+
+  expect(port.applyWithOutcome).not.toHaveBeenCalled();
+  await act(async () => {
+    pendingUndo.resolve(restoredProjection);
+    await pendingUndo.promise;
+  });
+  await waitFor(() => expect(port.applyWithOutcome).toHaveBeenCalledOnce());
+  await waitFor(() =>
+    expect(
+      Array.from(
+        view.container.querySelectorAll<HTMLElement>(".sheet-grid-slot"),
+        (slot) => slot.dataset.sheetId,
+      ),
+    ).toEqual(["sheet-restored", "sheet-001", "sheet-002", "sheet-003"]),
+  );
+  act(() => canvasHarness.props?.sheetReorder?.onPreview("sheet-003", 2));
+  expect(canvasHarness.props?.sheetReorder).toMatchObject({
+    status: "preview",
+    representation: {
+      order: ["sheet-restored", "sheet-001", "sheet-003", "sheet-002"],
+      placeholderIndex: 2,
+      ghost: { sheetId: "sheet-003" },
+    },
+  });
+
+  await act(async () => {
+    pendingReorder.reject(new Error("A ordem mudou antes do commit."));
+    await pendingReorder.promise.catch(() => undefined);
+  });
+
+  await waitFor(() => {
+    expect(
+      Array.from(
+        view.container.querySelectorAll<HTMLElement>(".sheet-grid-slot"),
+        (slot) => slot.dataset.sheetId,
+      ),
+    ).toEqual(["sheet-restored", "sheet-001", "sheet-002", "sheet-003"]);
+    expect(canvasHarness.props?.sheetReorder?.representation.order).toEqual([
+      "sheet-restored",
+      "sheet-001",
+      "sheet-003",
+      "sheet-002",
+    ]);
+    expect(canvasHarness.props?.sheetReorder?.status).toBe("preview");
+  });
+});
+
+test("keeps both Sheet reorder surfaces inert while a commit is pending", async () => {
+  const physicalProjection = createThreeSheetProjection();
+  const pendingReorder = deferredValue<
+    Awaited<ReturnType<ProjectCorePort["applyWithOutcome"]>>
+  >();
+  const port = projectCorePortWithApply(async () => physicalProjection);
+  port.applyWithOutcome = vi.fn(() => pendingReorder.promise);
+  const view = render(
+    <ProjectWorkspace
+      exportPipelinePort={exportPipelinePort}
+      projection={physicalProjection}
+      projectCorePort={port}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  const slots = Array.from(
+    view.container.querySelectorAll<HTMLElement>(".sheet-grid-slot"),
+  );
+  const dataTransfer = {
+    effectAllowed: "none",
+    setData: vi.fn(),
+  };
+  fireEvent.dragStart(slots[0], { dataTransfer });
+  fireEvent.dragEnter(slots[1]);
+  fireEvent.drop(screen.getByTestId("sheet-reorder-grid"));
+
+  await waitFor(() => expect(port.applyWithOutcome).toHaveBeenCalledOnce());
+  expect(canvasHarness.props?.sheetReorder?.status).toBe("committing");
+  for (const slot of view.container.querySelectorAll(".sheet-grid-slot")) {
+    expect(slot).toHaveAttribute("draggable", "false");
+  }
+
+  await act(async () => {
+    pendingReorder.reject(new Error("Falha controlada após observar o commit."));
+    await pendingReorder.promise.catch(() => undefined);
+  });
+  await waitFor(() =>
+    expect(screen.getByTestId("sheet-reorder-grid")).toHaveAttribute(
+      "data-reorder-state",
+      "idle",
+    ),
+  );
 });
 
 test("derives the Canvas technical guides from the canonical document", () => {
@@ -5142,6 +5474,7 @@ test("resolves a mode-free target while dropping a Photo in the current Canvas m
   const applyWithOutcome = vi.fn(async () => ({
     projection,
     affectedFrameId: "frame-001",
+    affectedSheetId: null,
   }));
   port.resolvePhotoDropTarget = resolvePhotoDropTarget;
   port.applyWithOutcome = applyWithOutcome;

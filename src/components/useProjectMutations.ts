@@ -27,6 +27,7 @@ interface ProjectMutationsInput {
   runProjectMutation: ProjectMutationRunner;
   onProjectionChange(projection: EditorProjection): void;
   onAffectedFrame(frameId: string): void;
+  onAffectedSheet(sheetId: string): void;
   onSaveAsBarrierChange?(active: boolean): void;
 }
 
@@ -39,6 +40,7 @@ export function useProjectMutations({
   runProjectMutation,
   onProjectionChange,
   onAffectedFrame,
+  onAffectedSheet,
   onSaveAsBarrierChange,
 }: ProjectMutationsInput) {
   const [message, setMessage] = useState<string | null>(null);
@@ -94,16 +96,20 @@ export function useProjectMutations({
     );
   }
 
-  async function applyPhotoWithStatus(intent: ProjectIntent) {
+  async function applyWithOutcome(intent: ProjectIntent) {
     let affectedFrameId: string | null = null;
+    let affectedSheetId: string | null = null;
     const completed = await runWithErrorFeedback(
       async (port) => {
         const result = await port.applyWithOutcome(intent);
         affectedFrameId = result.affectedFrameId;
+        affectedSheetId = result.affectedSheetId;
         return result.projection;
       },
     );
     if (completed && affectedFrameId) onAffectedFrame(affectedFrameId);
+    if (completed && affectedSheetId) onAffectedSheet(affectedSheetId);
+    return completed;
   }
 
   function saveVisibleRevision() {
@@ -279,7 +285,8 @@ export function useProjectMutations({
     applyAlbumInformation: commitAlbumInformation,
     applyAlbumDesign: (draft: AlbumDesignProjectDraft) =>
       commitProjectSettingsDraft(draft),
-    applyPhotoWithStatus,
+    applyWithOutcome,
+    applyPhotoWithStatus: applyWithOutcome,
     importPhoto: async () => {
       let selectedMediaId: string | null = null;
       const completed = await runWithErrorFeedback(
@@ -291,23 +298,7 @@ export function useProjectMutations({
       );
       return completed ? selectedMediaId : null;
     },
-    dropPhoto: async (intent: ProjectIntent) => {
-      if (saveAsBarrierRef.current) return false;
-      setMessage(null);
-      let affectedFrameId: string | null = null;
-      const outcome = await runProjectMutation.run(async (port) => {
-        const result = await port.applyWithOutcome(intent);
-        affectedFrameId = result.affectedFrameId;
-        return result.projection;
-      });
-      if (outcome.status === "completed") {
-        onProjectionChange(outcome.projection);
-        if (affectedFrameId) onAffectedFrame(affectedFrameId);
-        return true;
-      }
-      if (outcome.status === "failed") setMessage(messageFromError(outcome.error));
-      return false;
-    },
+    dropPhoto: applyWithOutcome,
     applyDpi: async (dpi: number) => {
       await commitInteraction({
         kind: "setDpi",

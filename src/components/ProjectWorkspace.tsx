@@ -15,6 +15,7 @@ import {
   displayUnitLabel,
   formatMicrometers,
 } from "../application/physicalMeasurements";
+import { sheetStructureAvailability } from "../application/sheetStructure";
 import type { ProjectDialogPort } from "../application/projectDialogPort";
 import type { GraphicsDiagnostic } from "../application/graphics";
 import { renderableMediaPreviewUrls } from "../application/mediaPreviews";
@@ -37,6 +38,14 @@ import { useProjectCloseController } from "./useProjectCloseController";
 import { useProjectEditorController } from "./useProjectEditorController";
 import { useProjectOperationFailureDialog } from "./useProjectOperationFailureDialog";
 import { useAlbumInformationApplyController } from "./useAlbumInformationApplyController";
+import { SheetContextMenu } from "./SheetContextMenu";
+import {
+  createSheetReorderSession,
+  reduceSheetReorderSession,
+  sheetReorderRepresentation,
+  type SheetReorderSession,
+  type SheetReorderSurface,
+} from "./sheetReorderSession";
 import type { ProjectMutationRunner } from "./useProjectMutationRunner";
 import { useWorkspacePreferences } from "../state/useWorkspacePreferences";
 import {
@@ -115,6 +124,10 @@ export function ProjectWorkspace({
   const saveAsBarrierRef = useRef(false);
   const [draggedPhotoId, setDraggedPhotoId] = useState<string | null>(null);
   const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
+  const [sheetContextMenu, setSheetContextMenu] = useState<{
+    position: { x: number; y: number };
+    sheetId: string;
+  } | null>(null);
   const [closeMessage, setCloseMessage] = useState<string | null>(null);
   const [presentationUnitOverride, setPresentationUnitOverride] = useState<{
     projectId: string;
@@ -304,6 +317,121 @@ export function ProjectWorkspace({
     projectClose.interactionBlocked ||
     albumInformationApply.active ||
     saveAsBarrierActive;
+  const sheetOrderSignature = projection.state.album.sheets
+    .map((sheet) => sheet.id)
+    .join(",");
+  const authoritativeSheetsRef = useRef(projection.state.album.sheets);
+  authoritativeSheetsRef.current = projection.state.album.sheets;
+  const sheetReorderAttemptRef = useRef(0);
+  const [sheetReorderSession, setSheetReorderSession] =
+    useState<SheetReorderSession>(() =>
+      createSheetReorderSession(projection.state.album.sheets),
+    );
+  const sheetReorderSessionRef = useRef(sheetReorderSession);
+  sheetReorderSessionRef.current = sheetReorderSession;
+  useEffect(() => {
+    sheetReorderAttemptRef.current += 1;
+    const next = createSheetReorderSession(projection.state.album.sheets);
+    sheetReorderSessionRef.current = next;
+    setSheetReorderSession(next);
+  }, [projectId, sheetOrderSignature]);
+  const sheetReorderDisabled =
+    commandsBlocked || controller.structuralCommandsDisabled;
+  useEffect(() => {
+    if (sheetReorderDisabled) setSheetContextMenu(null);
+  }, [sheetReorderDisabled]);
+  const updateSheetReorder = useCallback((session: SheetReorderSession) => {
+    sheetReorderSessionRef.current = session;
+    setSheetReorderSession(session);
+  }, []);
+  const previewSheetReorder = useCallback(
+    (
+      origin: SheetReorderSurface,
+      draggedSheetId: string,
+      targetIndex: number,
+    ) => {
+      if (sheetReorderDisabled) return;
+      const transition = reduceSheetReorderSession(
+        sheetReorderSessionRef.current,
+        projection.state.album.sheets,
+        { type: "preview", origin, draggedSheetId, targetIndex },
+      );
+      updateSheetReorder(transition.session);
+    },
+    [
+      projection.state.album.sheets,
+      sheetReorderDisabled,
+      updateSheetReorder,
+    ],
+  );
+  const dropSheetReorder = useCallback(
+    (surface: SheetReorderSurface) => {
+      if (sheetReorderDisabled) return;
+      const transition = reduceSheetReorderSession(
+        sheetReorderSessionRef.current,
+        projection.state.album.sheets,
+        { type: "drop", surface },
+      );
+      updateSheetReorder(transition.session);
+      if (!transition.effect) return;
+      const attempt = sheetReorderAttemptRef.current + 1;
+      sheetReorderAttemptRef.current = attempt;
+      void controller
+        .reorderSheet(
+          transition.effect.sheetId,
+          transition.effect.targetIndex,
+        )
+        .then((completed) => {
+          if (sheetReorderAttemptRef.current !== attempt) return;
+          if (completed) return;
+          updateSheetReorder(
+            createSheetReorderSession(authoritativeSheetsRef.current),
+          );
+        });
+    },
+    [
+      controller,
+      projection.state.album.sheets,
+      sheetReorderDisabled,
+      updateSheetReorder,
+    ],
+  );
+  const cancelSheetReorder = useCallback(() => {
+    const transition = reduceSheetReorderSession(
+      sheetReorderSessionRef.current,
+      projection.state.album.sheets,
+      { type: "escape" },
+    );
+    updateSheetReorder(transition.session);
+  }, [projection.state.album.sheets, updateSheetReorder]);
+  useEffect(() => {
+    if (
+      sheetReorderSession.status !== "preview" &&
+      sheetReorderSession.status !== "invalid"
+    ) {
+      return;
+    }
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      cancelSheetReorder();
+    };
+    window.addEventListener("keydown", onEscape);
+    return () => window.removeEventListener("keydown", onEscape);
+  }, [cancelSheetReorder, sheetReorderSession.status]);
+
+  const implicitSheetId =
+    canvasMode.kind === "sheet-editing"
+      ? canvasMode.sheetId
+      : projection.state.album.sheets.some(
+            (sheet) => sheet.id === controller.canvasProps.centeredSheetId,
+          )
+        ? controller.canvasProps.centeredSheetId
+        : projection.state.album.sheets[0]?.id ?? null;
+  const implicitSheetAvailability = sheetStructureAvailability(
+    projection.state.album.sheets,
+    implicitSheetId ?? "",
+  );
   useProjectCommandShortcuts({
     canRedo: projection.state.canRedo,
     canUndo: projection.state.canUndo,
@@ -315,16 +443,29 @@ export function ProjectWorkspace({
     undo: controller.undo,
   });
   const applicationMenus = createProjectApplicationMenus({
+    addSheetAfter: () => {
+      void controller.addSheetAfter();
+    },
+    addSheetBefore: () => {
+      void controller.addSheetBefore();
+    },
+    canAddAfter: implicitSheetAvailability.canAddAfter,
+    canAddBefore: implicitSheetAvailability.canAddBefore,
+    canDelete: implicitSheetAvailability.canDelete,
     canExport: controller.canvasProps.centeredSheetId !== null,
     canRedo: projection.state.canRedo,
     canUndo: projection.state.canUndo,
     contextualPanelVisible: workspacePanels.panels.inspector.visible,
     closeProject: () => void projectClose.requestClose(),
+    deleteSheet: () => {
+      void controller.deleteSheet();
+    },
     exportSheet: () => exportControlRef.current?.start(),
     mediaPanelVisible: workspacePanels.panels.media.visible,
     redo: () => void controller.redo(),
     save: () => void controller.save(),
     saveAs: () => void controller.saveAs(),
+    structuralCommandsDisabled: sheetReorderDisabled,
     undo: () => void controller.undo(),
     toggleContextualPanel: () =>
       workspacePanels.setPanelVisibility(
@@ -378,6 +519,19 @@ export function ProjectWorkspace({
             {...controller.canvasProps}
             draggedPhotoId={draggedPhotoId}
             onPhotoDragCancel={() => setDraggedPhotoId(null)}
+            sheetReorder={{
+              disabled: sheetReorderDisabled,
+              representation: sheetReorderRepresentation(
+                sheetReorderSession,
+                "bar",
+              ),
+              status: sheetReorderSession.status,
+              onPreview: (draggedSheetId, targetIndex) =>
+                previewSheetReorder("bar", draggedSheetId, targetIndex),
+              onDrop: () => dropSheetReorder("bar"),
+              onCancel: cancelSheetReorder,
+              onNavigate: controller.navigateToSheet,
+            }}
             mediaPreviewUrls={mediaPreviewUrls}
             technicalGuides={{
               bleedUm: projection.state.document.bleedUm,
@@ -385,6 +539,11 @@ export function ProjectWorkspace({
             }}
             onMediaDemandChange={setCanvasMediaDemand}
             onGraphicsUnavailable={onGraphicsUnavailable}
+            onOpenSheetContextMenu={(sheetId, position) => {
+              if (sheetReorderDisabled) return;
+              controller.navigateToSheet(sheetId);
+              setSheetContextMenu({ position, sheetId });
+            }}
           />
         </section>
 
@@ -431,6 +590,23 @@ export function ProjectWorkspace({
           onPresentationUnitChange={changePresentationUnit}
           onValidateAlbumInformation={projectCorePort.validateAlbumInformation}
           onNavigateToSheet={controller.navigateToSheet}
+          onOpenSheetContextMenu={(sheetId, position) => {
+            if (sheetReorderDisabled) return;
+            controller.navigateToSheet(sheetId);
+            setSheetContextMenu({ position, sheetId });
+          }}
+          sheetReorder={{
+            disabled: sheetReorderDisabled,
+            representation: sheetReorderRepresentation(
+              sheetReorderSession,
+              "grid",
+            ),
+            status: sheetReorderSession.status,
+            onPreview: (draggedSheetId, targetIndex) =>
+              previewSheetReorder("grid", draggedSheetId, targetIndex),
+            onDrop: () => dropSheetReorder("grid"),
+            onCancel: cancelSheetReorder,
+          }}
           sectionState={{
             kind: "controlled",
             values: workspacePreferences.preferences.inspectorSections,
@@ -490,6 +666,31 @@ export function ProjectWorkspace({
           }}
         />}
       </div>
+
+      {sheetContextMenu ? (
+        <SheetContextMenu
+          availability={sheetStructureAvailability(
+            projection.state.album.sheets,
+            sheetContextMenu.sheetId,
+          )}
+          position={sheetContextMenu.position}
+          sheetNumber={
+            projection.state.album.sheets.find(
+              (sheet) => sheet.id === sheetContextMenu.sheetId,
+            )?.number ?? 0
+          }
+          onAddAfter={() => {
+            void controller.addSheetAfter(sheetContextMenu.sheetId);
+          }}
+          onAddBefore={() => {
+            void controller.addSheetBefore(sheetContextMenu.sheetId);
+          }}
+          onDelete={() => {
+            void controller.deleteSheet(sheetContextMenu.sheetId);
+          }}
+          onDismiss={() => setSheetContextMenu(null)}
+        />
+      ) : null}
 
     </div>
   );

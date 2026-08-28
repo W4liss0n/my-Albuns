@@ -12,6 +12,7 @@ use crate::model::{
     MediaId, MediaKind, PHOTO_PAN_MAX, PHOTO_PAN_MIN, PHOTO_ZOOM_MAX, PHOTO_ZOOM_MIN,
     PhotoDropTarget, PhotoPlacementMode, ProjectedBackground, ProjectedBackgroundContent,
     ProjectedFrameBorder, ProjectedOverlay, ProjectedOverlayContent, ProjectedVisualDefaults,
+    SheetInsertionPosition,
 };
 
 pub(crate) const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
@@ -468,6 +469,70 @@ impl ProjectDocument {
             .find(|media| media.id == media_id)
             .ok_or(())?;
         media.path = path;
+        validate_project_state(&candidate)?;
+        Ok(candidate)
+    }
+
+    pub(crate) fn with_added_sheet(
+        &self,
+        anchor_sheet_id: Uuid,
+        position: SheetInsertionPosition,
+    ) -> Result<(Self, Uuid), ()> {
+        let mut candidate = self.clone();
+        let anchor_index = candidate
+            .sheets
+            .iter()
+            .position(|sheet| sheet.id == anchor_sheet_id)
+            .ok_or(())?;
+        let insertion_index = match position {
+            SheetInsertionPosition::Before => anchor_index,
+            SheetInsertionPosition::After => anchor_index + 1,
+        };
+        let sheet_id = Uuid::new_v4();
+        candidate.sheets.insert(
+            insertion_index,
+            ProjectSheet::new(sheet_id, ActiveSides::Both),
+        );
+        validate_project_state(&candidate)?;
+        Ok((candidate, sheet_id))
+    }
+
+    pub(crate) fn with_deleted_sheet(&self, sheet_id: Uuid) -> Result<(Self, Uuid), ()> {
+        let mut candidate = self.clone();
+        if candidate.sheets.len() <= 2 {
+            return Err(());
+        }
+        let deleted_index = candidate
+            .sheets
+            .iter()
+            .position(|sheet| sheet.id == sheet_id)
+            .ok_or(())?;
+        candidate.sheets.remove(deleted_index);
+        let neighbor_index = deleted_index.min(candidate.sheets.len() - 1);
+        let neighbor_id = candidate.sheets[neighbor_index].id;
+        validate_project_state(&candidate)?;
+        Ok((candidate, neighbor_id))
+    }
+
+    pub(crate) fn with_reordered_sheet(
+        &self,
+        sheet_id: Uuid,
+        target_index: usize,
+    ) -> Result<Self, ()> {
+        if target_index >= self.sheets.len() {
+            return Err(());
+        }
+        let mut candidate = self.clone();
+        let source_index = candidate
+            .sheets
+            .iter()
+            .position(|sheet| sheet.id == sheet_id)
+            .ok_or(())?;
+        if source_index == target_index {
+            return Err(());
+        }
+        let sheet = candidate.sheets.remove(source_index);
+        candidate.sheets.insert(target_index, sheet);
         validate_project_state(&candidate)?;
         Ok(candidate)
     }

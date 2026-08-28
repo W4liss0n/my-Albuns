@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { ProjectCorePort } from "../application/projectPorts";
 import type { EditorProjection } from "../domain/project";
@@ -40,11 +40,39 @@ export function useProjectEditorController({
         : { kind: "normal" },
     [navigation.editingSheetId],
   );
+  const structuralCommandsDisabled =
+    interactionBlocked || canvasMode.kind === "sheet-editing";
+  const [pendingAffectedSheetId, setPendingAffectedSheetId] = useState<
+    string | null
+  >(null);
+
+  useEffect(() => {
+    setPendingAffectedSheetId(null);
+  }, [projection.state.projectId]);
+
+  useEffect(() => {
+    if (
+      !pendingAffectedSheetId ||
+      !projection.composition.sheets.some(
+        (sheet) => sheet.sheetId === pendingAffectedSheetId,
+      )
+    ) {
+      return;
+    }
+    navigation.navigateToSheet(pendingAffectedSheetId);
+    setPendingAffectedSheetId(null);
+  }, [
+    navigation.navigateToSheet,
+    pendingAffectedSheetId,
+    projection.composition.sheets,
+  ]);
+
   const mutations = useProjectMutations({
     projection,
     runProjectMutation,
     onProjectionChange,
     onAffectedFrame: navigation.selectFrame,
+    onAffectedSheet: setPendingAffectedSheetId,
     onSaveAsBarrierChange,
   });
   const selectedFrame = useMemo(
@@ -156,6 +184,38 @@ export function useProjectEditorController({
     onCanvasMetricsChange: navigation.handleCanvasMetricsChange,
   };
 
+  const addSheetBefore = (sheetId = navigation.implicitSheetId) => {
+    if (structuralCommandsDisabled || !sheetId) return Promise.resolve(false);
+    return mutations.applyWithOutcome({
+      kind: "addSheet",
+      anchorSheetId: sheetId,
+      position: "before",
+    });
+  };
+
+  const addSheetAfter = (sheetId = navigation.implicitSheetId) => {
+    if (structuralCommandsDisabled || !sheetId) return Promise.resolve(false);
+    return mutations.applyWithOutcome({
+      kind: "addSheet",
+      anchorSheetId: sheetId,
+      position: "after",
+    });
+  };
+
+  const deleteSheet = (sheetId = navigation.implicitSheetId) => {
+    if (structuralCommandsDisabled || !sheetId) return Promise.resolve(false);
+    return mutations.applyWithOutcome({ kind: "deleteSheet", sheetId });
+  };
+
+  const reorderSheet = (sheetId: string, targetIndex: number) => {
+    if (structuralCommandsDisabled) return Promise.resolve(false);
+    return mutations.applyWithOutcome({
+      kind: "reorderSheet",
+      sheetId,
+      targetIndex,
+    });
+  };
+
   return {
     message: mutations.message,
     selectedFrame,
@@ -164,6 +224,7 @@ export function useProjectEditorController({
     displayedPhotoPanX: photoGestures.displayedPhotoPanX,
     zoomCommitting: photoGestures.zoomCommitting,
     sheetCount: projection.state.album.sheets.length,
+    structuralCommandsDisabled,
     canvasProps,
     navigateToSheet: navigation.navigateToSheet,
     beginZoomGesture: photoGestures.beginZoomGesture,
@@ -174,6 +235,10 @@ export function useProjectEditorController({
     applyDpi: mutations.applyDpi,
     relinkMedia: mutations.relinkMedia,
     importPhoto: mutations.importPhoto,
+    addSheetBefore,
+    addSheetAfter,
+    deleteSheet,
+    reorderSheet,
     save: mutations.save,
     saveAs: mutations.saveAs,
     undo: mutations.undo,

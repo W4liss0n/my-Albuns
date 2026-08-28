@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 
 import {
   PROJECT_COMMAND_CATALOG,
@@ -54,16 +54,23 @@ test("keeps displayed Project command shortcuts and accepted aliases in one cata
 
 test("feeds the canonical shortcuts into the Project application menu", () => {
   const groups = createProjectApplicationMenus({
+    addSheetAfter: () => undefined,
+    addSheetBefore: () => undefined,
+    canAddAfter: true,
+    canAddBefore: true,
+    canDelete: true,
     canExport: true,
     canRedo: true,
     canUndo: true,
     contextualPanelVisible: true,
     closeProject: () => undefined,
+    deleteSheet: () => undefined,
     exportSheet: () => undefined,
     mediaPanelVisible: true,
     redo: () => undefined,
     save: () => undefined,
     saveAs: () => undefined,
+    structuralCommandsDisabled: false,
     undo: () => undefined,
     toggleContextualPanel: () => undefined,
     toggleMediaPanel: () => undefined,
@@ -177,6 +184,132 @@ test("represents Select all availability per owning context", () => {
   });
 });
 
+test("owns the available Sheet structure commands without claiming later owners", () => {
+  expect(projectCommandBinding("add-before", "sheet")).toEqual({
+    availability: "implemented",
+    context: "sheet",
+  });
+  expect(projectCommandBinding("add-after", "sheet")).toEqual({
+    availability: "implemented",
+    context: "sheet",
+  });
+  expect(projectCommandBinding("delete-sheet", "sheet")).toEqual({
+    availability: "implemented",
+    context: "sheet",
+  });
+  expect(projectCommandBinding("duplicate-sheet", "sheet")).toMatchObject({
+    availability: "placeholder",
+  });
+  expect(projectCommandBinding("convert-edge", "sheet")).toMatchObject({
+    availability: "placeholder",
+  });
+});
+
+test("projects each Sheet structure command with its own availability and owner", () => {
+  const addSheetBefore = vi.fn();
+  const addSheetAfter = vi.fn();
+  const deleteSheet = vi.fn();
+  const groups = createProjectApplicationMenus({
+    addSheetAfter,
+    addSheetBefore,
+    canAddAfter: true,
+    canAddBefore: false,
+    canDelete: true,
+    canExport: true,
+    canRedo: true,
+    canUndo: true,
+    contextualPanelVisible: true,
+    closeProject: () => undefined,
+    deleteSheet,
+    exportSheet: () => undefined,
+    mediaPanelVisible: true,
+    redo: () => undefined,
+    save: () => undefined,
+    saveAs: () => undefined,
+    structuralCommandsDisabled: false,
+    toggleContextualPanel: () => undefined,
+    toggleMediaPanel: () => undefined,
+    undo: () => undefined,
+  });
+  const sheetCommands = groups.find(({ id }) => id === "sheet")?.items;
+  const command = (id: string) =>
+    sheetCommands?.find((item) => item.type === "command" && item.id === id);
+
+  expect(command("add-before")).toMatchObject({
+    availability: "implemented",
+    disabled: true,
+  });
+  expect(command("add-after")).toMatchObject({
+    availability: "implemented",
+    disabled: false,
+  });
+  expect(command("delete-sheet")).toMatchObject({
+    availability: "implemented",
+    disabled: false,
+  });
+  expect(command("duplicate-sheet")).toMatchObject({
+    availability: "placeholder",
+  });
+  expect(command("convert-edge")).toMatchObject({
+    availability: "placeholder",
+  });
+
+  const addAfterCommand = command("add-after");
+  const deleteCommand = command("delete-sheet");
+  if (
+    addAfterCommand?.type === "command" &&
+    addAfterCommand.availability === "implemented"
+  ) {
+    addAfterCommand.onSelect();
+  }
+  if (
+    deleteCommand?.type === "command" &&
+    deleteCommand.availability === "implemented"
+  ) {
+    deleteCommand.onSelect();
+  }
+  expect(addSheetBefore).not.toHaveBeenCalled();
+  expect(addSheetAfter).toHaveBeenCalledOnce();
+  expect(deleteSheet).toHaveBeenCalledOnce();
+});
+
+test("disables Sheet structure commands during editing without disabling global commands", () => {
+  const groups = createProjectApplicationMenus({
+    addSheetAfter: () => undefined,
+    addSheetBefore: () => undefined,
+    canAddAfter: true,
+    canAddBefore: true,
+    canDelete: true,
+    canExport: true,
+    canRedo: true,
+    canUndo: true,
+    contextualPanelVisible: true,
+    closeProject: () => undefined,
+    deleteSheet: () => undefined,
+    exportSheet: () => undefined,
+    mediaPanelVisible: true,
+    redo: () => undefined,
+    save: () => undefined,
+    saveAs: () => undefined,
+    structuralCommandsDisabled: true,
+    toggleContextualPanel: () => undefined,
+    toggleMediaPanel: () => undefined,
+    undo: () => undefined,
+  });
+  const command = (groupId: string, commandId: string) =>
+    groups
+      .find(({ id }) => id === groupId)
+      ?.items.find(
+        (item) => item.type === "command" && item.id === commandId,
+      );
+
+  expect(command("sheet", "add-before")).toMatchObject({ disabled: true });
+  expect(command("sheet", "add-after")).toMatchObject({ disabled: true });
+  expect(command("sheet", "delete-sheet")).toMatchObject({ disabled: true });
+  expect(command("edit", "undo")).toMatchObject({ disabled: false });
+  expect(command("file", "save")).not.toMatchObject({ disabled: true });
+});
+
 test("keeps both Project panel visibility commands canonical and implemented", () => {
   expect(projectCommandBinding("media-panel", "project-window")).toEqual({
     availability: "implemented",
@@ -195,16 +328,23 @@ test("projects every application-menu command from its canonical descriptor", ()
     ),
   );
   const groups = createProjectApplicationMenus({
+    addSheetAfter: () => undefined,
+    addSheetBefore: () => undefined,
+    canAddAfter: true,
+    canAddBefore: true,
+    canDelete: true,
     canExport: true,
     canRedo: true,
     canUndo: true,
     contextualPanelVisible: true,
     closeProject: () => undefined,
+    deleteSheet: () => undefined,
     exportSheet: () => undefined,
     mediaPanelVisible: true,
     redo: () => undefined,
     save: () => undefined,
     saveAs: () => undefined,
+    structuralCommandsDisabled: false,
     undo: () => undefined,
     toggleContextualPanel: () => undefined,
     toggleMediaPanel: () => undefined,

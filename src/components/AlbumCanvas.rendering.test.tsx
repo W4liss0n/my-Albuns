@@ -1440,3 +1440,143 @@ test("reconciles only the composed sheet that changed", async () => {
   expect(reconciledSheets[1]).not.toBe(originalSheets[1]);
   expect(reconciledSheets[2]).toBe(originalSheets[2]);
 });
+
+test("opens the structural context menu for the Sheet under the pointer", async () => {
+  const onOpenSheetContextMenu = vi.fn();
+  const view = renderCanvas({ onOpenSheetContextMenu });
+  await finishPixiInitialization();
+
+  const host = view.container.querySelector(".canvas-host") as HTMLDivElement;
+  const canvas = view.container.querySelector("canvas") as HTMLCanvasElement;
+  vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
+    bottom: 500,
+    height: 500,
+    left: 0,
+    right: 1_000,
+    top: 0,
+    width: 1_000,
+    x: 0,
+    y: 0,
+    toJSON: () => ({}),
+  });
+
+  fireEvent.contextMenu(host, { clientX: 600, clientY: 250 });
+
+  expect(onOpenSheetContextMenu).toHaveBeenCalledWith("sheet-001", {
+    x: 600,
+    y: 250,
+  });
+});
+
+test("opens the structural context menu from the inactive side of a single Page Sheet", async () => {
+  const onOpenSheetContextMenu = vi.fn();
+  const view = renderCanvas({
+    compositionPlan: createSinglePageComposition("right"),
+    onOpenSheetContextMenu,
+    technicalGuides: { bleedUm: 3_000, safetyUm: 3_000 },
+  });
+  await finishPixiInitialization();
+
+  const host = view.container.querySelector(".canvas-host") as HTMLDivElement;
+  const canvas = view.container.querySelector("canvas") as HTMLCanvasElement;
+  vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
+    bottom: 500,
+    height: 500,
+    left: 0,
+    right: 1_000,
+    top: 0,
+    width: 1_000,
+    x: 0,
+    y: 0,
+    toJSON: () => ({}),
+  });
+
+  fireEvent.contextMenu(host, { clientX: 220, clientY: 250 });
+
+  expect(onOpenSheetContextMenu).toHaveBeenCalledWith("sheet-001", {
+    x: 220,
+    y: 250,
+  });
+});
+
+test("does not expose the structural context menu through masked Sangria", async () => {
+  const onOpenSheetContextMenu = vi.fn();
+  const view = renderCanvas({
+    onOpenSheetContextMenu,
+    technicalGuides: { bleedUm: 3_000, safetyUm: 3_000 },
+  });
+  await finishPixiInitialization();
+
+  const host = view.container.querySelector(".canvas-host") as HTMLDivElement;
+  const canvas = view.container.querySelector("canvas") as HTMLCanvasElement;
+  vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
+    bottom: 500,
+    height: 500,
+    left: 0,
+    right: 1_000,
+    top: 0,
+    width: 1_000,
+    x: 0,
+    y: 0,
+    toJSON: () => ({}),
+  });
+
+  fireEvent.contextMenu(host, { clientX: 132, clientY: 250 });
+
+  expect(onOpenSheetContextMenu).not.toHaveBeenCalled();
+});
+
+test("mounts the productive Sheet Bar seam for navigation, context, and reorder", async () => {
+  const onCancel = vi.fn();
+  const onDrop = vi.fn();
+  const onNavigate = vi.fn();
+  const onOpenSheetContextMenu = vi.fn();
+  const onPreview = vi.fn();
+  const view = renderCanvas({
+    compositionPlan: threeSheetComposition,
+    onOpenSheetContextMenu,
+    sheetReorder: {
+      disabled: false,
+      onCancel,
+      onDrop,
+      onNavigate,
+      onPreview,
+      representation: {
+        ghost: null,
+        order: ["sheet-001", "sheet-002", "sheet-003"],
+        placeholderIndex: null,
+      },
+      status: "idle",
+    },
+  });
+  await finishPixiInitialization();
+
+  const first = screen.getByRole("button", {
+    name: "Reordenar Lâmina 01 pela Barra",
+  });
+  const second = screen.getByRole("button", {
+    name: "Reordenar Lâmina 02 pela Barra",
+  });
+  const dataTransfer = {
+    dropEffect: "none",
+    effectAllowed: "none",
+    setData: vi.fn(),
+  };
+
+  fireEvent.click(second);
+  expect(onNavigate).toHaveBeenCalledWith("sheet-002");
+  fireEvent.contextMenu(second, { clientX: 220, clientY: 36 });
+  expect(onOpenSheetContextMenu).toHaveBeenCalledWith("sheet-002", {
+    x: 220,
+    y: 36,
+  });
+
+  fireEvent.dragStart(first, { dataTransfer });
+  fireEvent.dragEnter(second, { dataTransfer });
+  expect(onPreview).toHaveBeenLastCalledWith("sheet-001", 1);
+  fireEvent.drop(
+    view.getByTestId("sheet-reorder-bar-drop-zone"),
+    { dataTransfer },
+  );
+  expect(onDrop).toHaveBeenCalledOnce();
+});

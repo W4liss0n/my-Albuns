@@ -210,27 +210,39 @@ export class AlbumCanvasScene {
     this.input?.onTransformPreview(null);
   }
 
+  resolveSheetAtPoint(clientX: number, clientY: number): string | null {
+    const worldPoint = this.resolveWorldPoint(clientX, clientY);
+    if (!worldPoint) return null;
+    for (const [sheetId, node] of this.sheetNodes) {
+      const localX = worldPoint.x - node.container.position.x;
+      const localY = worldPoint.y - node.container.position.y;
+      const { x, y, width, height } = node.viewBounds;
+      if (
+        localX >= x &&
+        localY >= y &&
+        localX < x + width &&
+        localY < y + height
+      ) {
+        return sheetId;
+      }
+    }
+    return null;
+  }
+
   resolvePhotoDropPoint(
     clientX: number,
     clientY: number,
   ): { sheetId: string; xUm: number; yUm: number } | null {
-    if (!this.input || this.canvasScale <= 0) return null;
-    const bounds = this.app.canvas.getBoundingClientRect();
-    if (bounds.width <= 0 || bounds.height <= 0) return null;
-    const canvasX =
-      (clientX - bounds.left) * (this.app.screen.width / bounds.width);
-    const canvasY =
-      (clientY - bounds.top) * (this.app.screen.height / bounds.height);
-    const worldX = (canvasX - this.world.position.x) / this.canvasScale;
-    const worldY = (canvasY - this.world.position.y) / this.canvasScale;
+    const worldPoint = this.resolveWorldPoint(clientX, clientY);
+    if (!worldPoint || !this.input) return null;
     for (const [sheetId, node] of this.sheetNodes) {
       const sheet = this.input.composition.sheets.find(
         (candidate) => candidate.sheetId === sheetId,
       );
       if (!sheet) continue;
       const localX =
-        worldX - node.container.position.x - node.activeOffsetXPx;
-      const localY = worldY - node.container.position.y;
+        worldPoint.x - node.container.position.x - node.activeOffsetXPx;
+      const localY = worldPoint.y - node.container.position.y;
       const width = sheet.widthUm * MICROMETER_TO_CANVAS_PIXEL;
       const height = sheet.heightUm * MICROMETER_TO_CANVAS_PIXEL;
       if (localX < 0 || localY < 0 || localX >= width || localY >= height) {
@@ -243,6 +255,23 @@ export class AlbumCanvasScene {
       };
     }
     return null;
+  }
+
+  private resolveWorldPoint(
+    clientX: number,
+    clientY: number,
+  ): { x: number; y: number } | null {
+    if (!this.input || this.canvasScale <= 0) return null;
+    const bounds = this.app.canvas.getBoundingClientRect();
+    if (bounds.width <= 0 || bounds.height <= 0) return null;
+    const canvasX =
+      (clientX - bounds.left) * (this.app.screen.width / bounds.width);
+    const canvasY =
+      (clientY - bounds.top) * (this.app.screen.height / bounds.height);
+    return {
+      x: (canvasX - this.world.position.x) / this.canvasScale,
+      y: (canvasY - this.world.position.y) / this.canvasScale,
+    };
   }
 
   private resetProjectScene() {

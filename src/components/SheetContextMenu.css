@@ -1,0 +1,35 @@
+.sheet-context-menu {
+  position: fixed;
+  z-index: 50;
+  display: grid;
+  min-width: 220px;
+  padding: var(--ui-space-1) 0;
+}
+
+.sheet-context-menu button {
+  min-height: var(--ui-compact-control-height);
+  padding: 0 var(--ui-space-3);
+  border: 0;
+  color: var(--ui-text-secondary);
+  background: transparent;
+  text-align: left;
+}
+
+.sheet-context-menu button:hover:not(:disabled),
+.sheet-context-menu button:focus-visible:not(:disabled) {
+  color: var(--ui-text);
+  background: var(--ui-surface-muted);
+  outline: 0;
+}
+
+.sheet-context-menu button:disabled {
+  color: var(--ui-text-disabled);
+  cursor: default;
+  opacity: 0.72;
+}
+
+.sheet-context-menu__separator {
+  height: 1px;
+  margin: var(--ui-space-1) 0;
+  background: var(--ui-border);
+}

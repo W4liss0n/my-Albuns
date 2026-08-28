@@ -11,32 +11,46 @@ import type {
 } from "./ApplicationMenuBar";
 
 interface ProjectApplicationMenuOptions {
+  addSheetAfter(): void;
+  addSheetBefore(): void;
+  canAddAfter: boolean;
+  canAddBefore: boolean;
+  canDelete: boolean;
   canExport: boolean;
   canRedo: boolean;
   canUndo: boolean;
   contextualPanelVisible: boolean;
   closeProject(): void;
+  deleteSheet(): void;
   exportSheet(): void;
   mediaPanelVisible: boolean;
   redo(): void;
   save(): void;
   saveAs(): void;
+  structuralCommandsDisabled: boolean;
   undo(): void;
   toggleContextualPanel(): void;
   toggleMediaPanel(): void;
 }
 
 export function createProjectApplicationMenus({
+  addSheetAfter,
+  addSheetBefore,
+  canAddAfter,
+  canAddBefore,
+  canDelete,
   canExport,
   canRedo,
   canUndo,
   contextualPanelVisible,
   closeProject,
+  deleteSheet,
   exportSheet,
   mediaPanelVisible,
   redo,
   save,
   saveAs,
+  structuralCommandsDisabled,
   undo,
   toggleContextualPanel,
   toggleMediaPanel,
@@ -87,10 +101,25 @@ export function createProjectApplicationMenus({
       id: "sheet",
       label: "Lâmina",
       items: [
-        placeholder("add-before", "sheet"),
-        placeholder("add-after", "sheet"),
+        implemented(
+          "add-before",
+          "sheet",
+          addSheetBefore,
+          structuralCommandsDisabled || !canAddBefore,
+        ),
+        implemented(
+          "add-after",
+          "sheet",
+          addSheetAfter,
+          structuralCommandsDisabled || !canAddAfter,
+        ),
         placeholder("duplicate-sheet", "sheet"),
-        placeholder("delete-sheet", "sheet"),
+        implemented(
+          "delete-sheet",
+          "sheet",
+          deleteSheet,
+          structuralCommandsDisabled || !canDelete,
+        ),
         separator("sheet-edge-separator"),
         placeholder("convert-edge", "sheet"),
       ],

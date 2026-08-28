@@ -2,5 +2,6 @@
 import type { AlbumInformation } from "./AlbumInformation";
 import type { PhotoPlacementMode } from "./PhotoPlacementMode";
 import type { ProjectedVisualDefaults } from "./ProjectedVisualDefaults";
+import type { SheetInsertionPosition } from "./SheetInsertionPosition";
 
-export type ProjectIntent = { "kind": "setAlbumInformation", information: AlbumInformation, } | { "kind": "setVisualDefaults", visualDefaults: ProjectedVisualDefaults, } | { "kind": "setDpi", dpi: number, } | { "kind": "transformPhoto", frameId: string, deltaPanX: number, deltaPanY: number, deltaZoom: number, } | { "kind": "addPhoto", sheetId: string, mediaId: string, mode: PhotoPlacementMode, } | { "kind": "dropPhoto", sheetId: string, mediaId: string, xUm: number, yUm: number, mode: PhotoPlacementMode, };
+export type ProjectIntent = { "kind": "setAlbumInformation", information: AlbumInformation, } | { "kind": "setVisualDefaults", visualDefaults: ProjectedVisualDefaults, } | { "kind": "setDpi", dpi: number, } | { "kind": "addSheet", anchorSheetId: string, position: SheetInsertionPosition, } | { "kind": "deleteSheet", sheetId: string, } | { "kind": "reorderSheet", sheetId: string, targetIndex: number, } | { "kind": "transformPhoto", frameId: string, deltaPanX: number, deltaPanY: number, deltaZoom: number, } | { "kind": "addPhoto", sheetId: string, mediaId: string, mode: PhotoPlacementMode, } | { "kind": "dropPhoto", sheetId: string, mediaId: string, xUm: number, yUm: number, mode: PhotoPlacementMode, };

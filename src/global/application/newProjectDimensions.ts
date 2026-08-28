@@ -53,7 +53,7 @@ export function createDefaultDimensionsDraft(): NewProjectDimensionsDraft {
     firstSheet: "double",
     lastSheet: "double",
     bleed: createPhysicalFieldDraft(3_000, displayUnit),
-    safety: createPhysicalFieldDraft(5_000, displayUnit),
+    safety: createPhysicalFieldDraft(3_000, displayUnit),
   };
 }
 

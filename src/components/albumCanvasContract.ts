@@ -6,6 +6,10 @@ import type { GraphicsDiagnostic } from "../application/graphics";
 import type { MediaPreviewDemand } from "../application/projectPorts";
 import type { ViewportState } from "../state/viewport";
 import type { ContinuousCanvasLayout } from "./canvasGeometry";
+import type {
+  SheetReorderRepresentation,
+  SheetReorderStatus,
+} from "./sheetReorderSession";
 
 export interface PhotoZoomPreview {
   frameId: string;
@@ -42,6 +46,16 @@ export interface SheetBarMetadata {
   layoutLocked: boolean;
 }
 
+export interface CanvasSheetReorder {
+  disabled: boolean;
+  representation: SheetReorderRepresentation;
+  status: SheetReorderStatus;
+  onPreview(draggedSheetId: string, targetIndex: number): void;
+  onDrop(): void;
+  onCancel(): void;
+  onNavigate(sheetId: string): void;
+}
+
 export type AlbumCanvasMode =
   | { kind: "normal" }
   | { kind: "sheet-editing"; sheetId: string };
@@ -64,6 +78,7 @@ export interface AlbumCanvasProps {
   centeredSheetId: string | null;
   viewport: ViewportState;
   draggedPhotoId?: string | null;
+  sheetReorder?: CanvasSheetReorder;
   photoDropHighlight?: PhotoDropTarget | null;
   photoZoomPreview?: PhotoZoomPreview | null;
   onSelectFrame(frameId: string | null): void;
@@ -82,6 +97,10 @@ export interface AlbumCanvasProps {
     point: CanvasPhotoDropPoint,
   ): Promise<boolean>;
   onPhotoDragCancel?(): void;
+  onOpenSheetContextMenu?(
+    sheetId: string,
+    position: { x: number; y: number },
+  ): void;
   onCanvasMetricsChange?(metrics: CanvasMetrics): void;
   onMediaDemandChange?(demand: MediaPreviewDemand): void;
   onGraphicsUnavailable?(diagnostic: GraphicsDiagnostic): void;

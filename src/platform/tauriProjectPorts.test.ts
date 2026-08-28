@@ -311,6 +311,7 @@ test("maps the Project and media ports to the desktop commands", async () => {
     .mockResolvedValueOnce({
       projection: representativeProjection,
       affectedFrameId: "frame-001",
+      affectedSheetId: null,
     });
   await tauriProjectCorePort.load("project-load-1");
   await tauriProjectCorePort.validateAlbumInformation(information);
@@ -443,6 +444,7 @@ test("maps Photo import, target resolution, and affected Frame outcomes", async 
   const mutationOutcome = {
     projection: representativeProjection,
     affectedFrameId: "frame-001",
+    affectedSheetId: null,
   };
   const importOutcome = {
     kind: "imported" as const,

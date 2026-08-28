@@ -207,3 +207,29 @@ export function createTwoSheetProjection(): EditorProjection {
     mediaUsage: representativeProjection.mediaUsage,
   };
 }
+
+export function createThreeSheetProjection(): EditorProjection {
+  const projection = structuredClone(createTwoSheetProjection());
+  const secondSheet = projection.state.album.sheets[1];
+  const secondComposition = projection.composition.sheets[1];
+  if (!secondSheet || !secondComposition) return projection;
+
+  secondSheet.role = "internal";
+  const finalSheet = {
+    ...structuredClone(secondSheet),
+    id: "sheet-003",
+    number: 3,
+    role: "final" as const,
+    pageNumbers: [5, 6],
+    frames: [],
+  };
+  const finalComposition = {
+    ...structuredClone(secondComposition),
+    sheetId: "sheet-003",
+    number: 3,
+    frames: [],
+  };
+  projection.state.album.sheets.push(finalSheet);
+  projection.composition.sheets.push(finalComposition);
+  return projection;
+}

@@ -11,6 +11,7 @@ import {
   type AlbumCanvasMode,
   type AlbumCanvasProps,
   type CanvasMetrics,
+  type CanvasSheetReorder,
   type CanvasTechnicalGuides,
   type PhotoTransformDelta,
   type PhotoTransformPreview,
@@ -400,6 +401,7 @@ export function renderCanvas({
   selectedFrameId = null,
   mediaPreviewUrls,
   technicalGuides,
+  sheetReorder,
   onCanvasMetricsChange = vi.fn<(metrics: CanvasMetrics) => void>(),
   onEditSheet = vi.fn<(sheetId: string) => void>(),
   onFocusSheet = vi.fn<(sheetId: string) => void>(),
@@ -415,6 +417,7 @@ export function renderCanvas({
   onResolvePhotoDropTarget,
   onDropPhoto,
   onPhotoDragCancel,
+  onOpenSheetContextMenu,
   onMediaDemandChange,
   onGraphicsUnavailable,
   canvasGraphicsDiagnosticProbe,
@@ -427,6 +430,7 @@ export function renderCanvas({
   selectedFrameId?: string | null;
   mediaPreviewUrls?: Readonly<Record<string, string>>;
   technicalGuides?: CanvasTechnicalGuides;
+  sheetReorder?: CanvasSheetReorder;
   onCanvasMetricsChange?: (metrics: CanvasMetrics) => void;
   onEditSheet?: (sheetId: string) => void;
   onFocusSheet?: (sheetId: string) => void;
@@ -448,6 +452,10 @@ export function renderCanvas({
     point: { sheetId: string; xUm: number; yUm: number },
   ) => Promise<boolean>;
   onPhotoDragCancel?: () => void;
+  onOpenSheetContextMenu?: (
+    sheetId: string,
+    position: { x: number; y: number },
+  ) => void;
   onMediaDemandChange?: (demand: MediaPreviewDemand) => void;
   onGraphicsUnavailable?: (diagnostic: GraphicsDiagnostic) => void;
   canvasGraphicsDiagnosticProbe?: CanvasGraphicsDiagnosticProbe;
@@ -465,6 +473,7 @@ export function renderCanvas({
         sheetBarMetadata={sheetBarMetadata}
         mediaPreviewUrls={mediaPreviewUrls}
         technicalGuides={technicalGuides}
+        sheetReorder={sheetReorder}
         continuousCanvasLayout={
           mode.kind === "normal"
             ? createNormalCanvasLayout(
@@ -488,6 +497,7 @@ export function renderCanvas({
         onResolvePhotoDropTarget={onResolvePhotoDropTarget}
         onDropPhoto={onDropPhoto}
         onPhotoDragCancel={onPhotoDragCancel}
+        onOpenSheetContextMenu={onOpenSheetContextMenu}
         onCanvasMetricsChange={onCanvasMetricsChange}
         onMediaDemandChange={onMediaDemandChange}
         onGraphicsUnavailable={onGraphicsUnavailable}
