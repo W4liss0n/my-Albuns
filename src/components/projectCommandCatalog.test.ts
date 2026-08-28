@@ -58,12 +58,14 @@ test("feeds the canonical shortcuts into the Project application menu", () => {
     addSheetBefore: () => undefined,
     canAddAfter: true,
     canAddBefore: true,
+    canConvertEdge: true,
     canDelete: true,
     canExport: true,
     canRedo: true,
     canUndo: true,
     contextualPanelVisible: true,
     closeProject: () => undefined,
+    convertEdge: () => undefined,
     deleteSheet: () => undefined,
     exportSheet: () => undefined,
     mediaPanelVisible: true,
@@ -201,7 +203,7 @@ test("owns the available Sheet structure commands without claiming later owners"
     availability: "placeholder",
   });
   expect(projectCommandBinding("convert-edge", "sheet")).toMatchObject({
-    availability: "placeholder",
+    availability: "implemented",
   });
 });
 
@@ -209,17 +211,20 @@ test("projects each Sheet structure command with its own availability and owner"
   const addSheetBefore = vi.fn();
   const addSheetAfter = vi.fn();
   const deleteSheet = vi.fn();
+  const convertEdge = vi.fn();
   const groups = createProjectApplicationMenus({
     addSheetAfter,
     addSheetBefore,
     canAddAfter: true,
     canAddBefore: false,
+    canConvertEdge: true,
     canDelete: true,
     canExport: true,
     canRedo: true,
     canUndo: true,
     contextualPanelVisible: true,
     closeProject: () => undefined,
+    convertEdge,
     deleteSheet,
     exportSheet: () => undefined,
     mediaPanelVisible: true,
@@ -251,11 +256,13 @@ test("projects each Sheet structure command with its own availability and owner"
     availability: "placeholder",
   });
   expect(command("convert-edge")).toMatchObject({
-    availability: "placeholder",
+    availability: "implemented",
+    disabled: false,
   });
 
   const addAfterCommand = command("add-after");
   const deleteCommand = command("delete-sheet");
+  const convertCommand = command("convert-edge");
   if (
     addAfterCommand?.type === "command" &&
     addAfterCommand.availability === "implemented"
@@ -268,9 +275,16 @@ test("projects each Sheet structure command with its own availability and owner"
   ) {
     deleteCommand.onSelect();
   }
+  if (
+    convertCommand?.type === "command" &&
+    convertCommand.availability === "implemented"
+  ) {
+    convertCommand.onSelect();
+  }
   expect(addSheetBefore).not.toHaveBeenCalled();
   expect(addSheetAfter).toHaveBeenCalledOnce();
   expect(deleteSheet).toHaveBeenCalledOnce();
+  expect(convertEdge).toHaveBeenCalledOnce();
 });
 
 test("disables Sheet structure commands during editing without disabling global commands", () => {
@@ -279,12 +293,14 @@ test("disables Sheet structure commands during editing without disabling global 
     addSheetBefore: () => undefined,
     canAddAfter: true,
     canAddBefore: true,
+    canConvertEdge: true,
     canDelete: true,
     canExport: true,
     canRedo: true,
     canUndo: true,
     contextualPanelVisible: true,
     closeProject: () => undefined,
+    convertEdge: () => undefined,
     deleteSheet: () => undefined,
     exportSheet: () => undefined,
     mediaPanelVisible: true,
@@ -332,12 +348,14 @@ test("projects every application-menu command from its canonical descriptor", ()
     addSheetBefore: () => undefined,
     canAddAfter: true,
     canAddBefore: true,
+    canConvertEdge: true,
     canDelete: true,
     canExport: true,
     canRedo: true,
     canUndo: true,
     contextualPanelVisible: true,
     closeProject: () => undefined,
+    convertEdge: () => undefined,
     deleteSheet: () => undefined,
     exportSheet: () => undefined,
     mediaPanelVisible: true,

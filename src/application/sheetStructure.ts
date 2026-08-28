@@ -3,6 +3,7 @@ import type { SheetSnapshot } from "../domain/project";
 export interface SheetStructureAvailability {
   canAddAfter: boolean;
   canAddBefore: boolean;
+  canConvertEdge: boolean;
   canDelete: boolean;
 }
 
@@ -23,6 +24,7 @@ export function sheetStructureAvailability(
     return {
       canAddAfter: false,
       canAddBefore: false,
+      canConvertEdge: false,
       canDelete: false,
     };
   }
@@ -31,6 +33,8 @@ export function sheetStructureAvailability(
     canAddBefore: index > 0 || sheet.activeSides === "both",
     canAddAfter:
       index < sheets.length - 1 || sheet.activeSides === "both",
+    canConvertEdge:
+      (index === 0 || index === sheets.length - 1) && sheet.frames.length === 0,
     canDelete: sheets.length > 2,
   };
 }

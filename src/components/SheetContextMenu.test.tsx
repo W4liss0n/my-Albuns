@@ -4,6 +4,36 @@ import { describe, expect, test, vi } from "vitest";
 import { SheetContextMenu } from "./SheetContextMenu";
 
 describe("SheetContextMenu", () => {
+  test("converts an eligible explicit edge target", () => {
+    const convertEdge = vi.fn();
+    const dismiss = vi.fn();
+    render(
+      <SheetContextMenu
+        availability={{
+          canAddAfter: true,
+          canAddBefore: true,
+          canConvertEdge: true,
+          canDelete: true,
+        }}
+        position={{ x: 20, y: 30 }}
+        sheetNumber={1}
+        onAddAfter={vi.fn()}
+        onAddBefore={vi.fn()}
+        onConvertEdge={convertEdge}
+        onDelete={vi.fn()}
+        onDismiss={dismiss}
+      />,
+    );
+
+    const command = screen.getByRole("menuitem", {
+      name: "Converter extremidade",
+    });
+    expect(command).toBeEnabled();
+    fireEvent.click(command);
+    expect(convertEdge).toHaveBeenCalledOnce();
+    expect(dismiss).toHaveBeenCalledOnce();
+  });
+
   test("projects the explicit target and the same structural actions", () => {
     const addBefore = vi.fn();
     const addAfter = vi.fn();
@@ -14,12 +44,14 @@ describe("SheetContextMenu", () => {
         availability={{
           canAddAfter: true,
           canAddBefore: false,
+          canConvertEdge: false,
           canDelete: true,
         }}
         position={{ x: 140, y: 220 }}
         sheetNumber={4}
         onAddAfter={addAfter}
         onAddBefore={addBefore}
+        onConvertEdge={vi.fn()}
         onDelete={deleteSheet}
         onDismiss={dismiss}
       />,
@@ -57,12 +89,14 @@ describe("SheetContextMenu", () => {
         availability={{
           canAddAfter: true,
           canAddBefore: true,
+          canConvertEdge: false,
           canDelete: false,
         }}
         position={{ x: 0, y: 0 }}
         sheetNumber={1}
         onAddAfter={vi.fn()}
         onAddBefore={vi.fn()}
+        onConvertEdge={vi.fn()}
         onDelete={deleteSheet}
         onDismiss={dismiss}
       />,
@@ -74,12 +108,14 @@ describe("SheetContextMenu", () => {
         availability={{
           canAddAfter: true,
           canAddBefore: true,
+          canConvertEdge: false,
           canDelete: true,
         }}
         position={{ x: 0, y: 0 }}
         sheetNumber={1}
         onAddAfter={vi.fn()}
         onAddBefore={vi.fn()}
+        onConvertEdge={vi.fn()}
         onDelete={deleteSheet}
         onDismiss={dismiss}
       />,
@@ -96,12 +132,14 @@ describe("SheetContextMenu", () => {
         availability={{
           canAddAfter: true,
           canAddBefore: true,
+          canConvertEdge: false,
           canDelete: true,
         }}
         position={{ x: 4, y: 8 }}
         sheetNumber={2}
         onAddAfter={vi.fn()}
         onAddBefore={vi.fn()}
+        onConvertEdge={vi.fn()}
         onDelete={deleteSheet}
         onDismiss={dismiss}
       />,

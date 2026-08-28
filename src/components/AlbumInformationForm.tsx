@@ -148,6 +148,7 @@ export function AlbumInformationForm({
   const candidate = local.information;
   const baselineInformation = toCandidate(baseline).information;
   const candidateKey = candidate ? JSON.stringify(candidate) : "";
+  const validationKey = `${revision}:${candidateKey}`;
   const projectDraft =
     candidate && baselineInformation
       ? createAlbumInformationProjectDraft(
@@ -171,7 +172,7 @@ export function AlbumInformationForm({
       .then((result) => {
         if (!current) return;
         setValidated({
-          key: candidateKey,
+          key: validationKey,
           errors: presentConfigurationValidationErrors(result.errors, {
             displayUnit: candidate.displayUnit,
             dpi: candidate.dpi,
@@ -186,9 +187,9 @@ export function AlbumInformationForm({
     return () => {
       current = false;
     };
-  }, [candidateKey, dirty, onValidate]);
+  }, [dirty, onValidate, validationKey]);
 
-  const validationCurrent = validated?.key === candidateKey;
+  const validationCurrent = validated?.key === validationKey;
   const errors = mergeErrors(
     local.errors,
     validationCurrent ? validated.errors : {},
@@ -196,6 +197,8 @@ export function AlbumInformationForm({
   const validationTooltip = useFieldValidationTooltip(
     `${formId}-validation-summary`,
     [
+      { field: "firstSheet", messages: errors.firstSheet },
+      { field: "lastSheet", messages: errors.lastSheet },
       { field: "dpi", messages: errors.dpi },
       { field: "sheetWidth", messages: errors.sheetWidth },
       { field: "sheetHeight", messages: errors.sheetHeight },
@@ -336,6 +339,12 @@ export function AlbumInformationForm({
     return measurementChanged(key) ? () => resetMeasurement(key) : undefined;
   }
 
+  function endSheetResetAction(key: "firstSheet" | "lastSheet") {
+    return draft[key] === baseline[key]
+      ? undefined
+      : () => setField(key, baseline[key]);
+  }
+
   function changeUnit(unit: DocumentSnapshot["displayUnit"]) {
     setDraftSession((session) => {
       const current = session.current;
@@ -379,6 +388,15 @@ export function AlbumInformationForm({
     : undefined;
   const pageDimensionValid =
     pageWidth !== undefined && pageWidth > 0 && pageWidth % 2 === 0;
+  // PLACEHOLDER UI: #31 owns proportional transformation of existing content.
+  const dimensionChangeRequiresSafeTransformation = sheetStates.some(
+    (sheet) => sheet.frames.length > 0,
+  );
+  // PLACEHOLDER UI: #32 owns reorganization of composed edge content.
+  const firstSheetConversionRequiresCompleteFlow =
+    (sheetStates[0]?.frames.length ?? 0) > 0;
+  const lastSheetConversionRequiresCompleteFlow =
+    (sheetStates[sheetStates.length - 1]?.frames.length ?? 0) > 0;
 
   return (
     <form
@@ -394,13 +412,25 @@ export function AlbumInformationForm({
         <h3>Estrutura</h3>
         <div className="inspector-readout-grid">
           <SelectField
+            disabled={firstSheetConversionRequiresCompleteFlow}
+            error={firstError(errors.firstSheet)}
+            field="firstSheet"
             label="Primeira Lâmina"
+            onReset={endSheetResetAction("firstSheet")}
+            placeholderFeature="convert-composed-edge"
+            validationTooltip={validationTooltip}
             value={draft.firstSheet}
             options={END_SHEET_OPTIONS}
             onChange={(value) => setField("firstSheet", value as EndSheetFormat)}
           />
           <SelectField
+            disabled={lastSheetConversionRequiresCompleteFlow}
+            error={firstError(errors.lastSheet)}
+            field="lastSheet"
             label="Última Lâmina"
+            onReset={endSheetResetAction("lastSheet")}
+            placeholderFeature="convert-composed-edge"
+            validationTooltip={validationTooltip}
             value={draft.lastSheet}
             options={END_SHEET_OPTIONS}
             onChange={(value) => setField("lastSheet", value as EndSheetFormat)}
@@ -412,7 +442,9 @@ export function AlbumInformationForm({
         <h3>Documento</h3>
         <div className="document-compact-controls">
           <SelectField
+            field="displayUnit"
             label="Unidade"
+            validationTooltip={validationTooltip}
             value={draft.displayUnit}
             options={UNIT_OPTIONS}
             onChange={(value) =>
@@ -438,20 +470,24 @@ export function AlbumInformationForm({
           <legend>Dimensão da Lâmina</legend>
           <div className="inspector-readout-grid">
             <MeasurementField
+              disabled={dimensionChangeRequiresSafeTransformation}
               error={firstError(errors.sheetWidth)}
               field="sheetWidth"
               label="Largura"
               onReset={measurementResetAction("sheetWidth")}
+              placeholderFeature="safe-sheet-dimension-change"
               unit={draft.displayUnit}
               validationTooltip={validationTooltip}
               value={draft.sheetWidth.text}
               onChange={(value) => setMeasurement("sheetWidth", value)}
             />
             <MeasurementField
+              disabled={dimensionChangeRequiresSafeTransformation}
               error={firstError(errors.sheetHeight)}
               field="sheetHeight"
               label="Altura"
               onReset={measurementResetAction("sheetHeight")}
+              placeholderFeature="safe-sheet-dimension-change"
               unit={draft.displayUnit}
               validationTooltip={validationTooltip}
               value={draft.sheetHeight.text}
@@ -807,32 +843,64 @@ function firstError(errors: readonly string[] | undefined) {
 }
 
 function SelectField({
+  disabled = false,
+  error,
+  field,
   label,
+  onReset,
   value,
   options,
+  placeholderFeature,
+  validationTooltip,
   onChange,
 }: {
+  disabled?: boolean;
+  error?: string;
+  field: string;
   label: string;
+  onReset?: () => void;
   value: string;
   options: readonly { value: string; label: string }[];
+  placeholderFeature?: string;
+  validationTooltip: FieldValidationTooltipModel;
   onChange(value: string): void;
 }) {
+  const inputId = `album-information-${field}`;
   return (
-    <label className="album-information-field">
-      <span>{label}</span>
-      <select
-        aria-label={label}
-        className="ui-field-control"
-        value={value}
-        onChange={(event) => onChange(event.currentTarget.value)}
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
+    <div
+      className="album-information-field"
+      data-placeholder-feature={disabled ? placeholderFeature : undefined}
+      title={
+        disabled
+          ? "Disponível após a conversão completa de extremidades"
+          : undefined
+      }
+    >
+      <label htmlFor={inputId}>{label}</label>
+      <span className="album-entry-control">
+        <select
+          aria-label={label}
+          className="ui-field-control"
+          disabled={disabled}
+          id={inputId}
+          value={value}
+          {...fieldValidationTooltipAttributes(
+            field,
+            error,
+            validationTooltip,
+          )}
+          onChange={(event) => onChange(event.currentTarget.value)}
+        >
+          {options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        {onReset ? <FieldResetButton label={label} onReset={onReset} /> : null}
+      </span>
+      <FieldValidationAutoTooltip field={field} tooltip={validationTooltip} />
+    </div>
   );
 }
 
@@ -885,19 +953,23 @@ function TextField({
 }
 
 function MeasurementField({
+  disabled = false,
   error,
   field,
   label,
   onReset,
+  placeholderFeature,
   unit,
   validationTooltip,
   value,
   onChange,
 }: {
+  disabled?: boolean;
   error?: string;
   field: string;
   label: string;
   onReset?: () => void;
+  placeholderFeature?: string;
   unit: DocumentSnapshot["displayUnit"];
   validationTooltip: FieldValidationTooltipModel;
   value: string;
@@ -905,12 +977,21 @@ function MeasurementField({
 }) {
   const inputId = `album-information-${field}`;
   return (
-    <div className="album-information-field">
+    <div
+      className="album-information-field"
+      data-placeholder-feature={disabled ? placeholderFeature : undefined}
+      title={
+        disabled
+          ? "Disponível após a mudança dimensional segura"
+          : undefined
+      }
+    >
       <label htmlFor={inputId}>{label}</label>
       <span className="album-entry-control album-measurement-control">
         <TextInput
           aria-label={label}
           className="ui-field-control"
+          disabled={disabled}
           id={inputId}
           inputMode="decimal"
           type="text"

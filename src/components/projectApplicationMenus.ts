@@ -15,12 +15,14 @@ interface ProjectApplicationMenuOptions {
   addSheetBefore(): void;
   canAddAfter: boolean;
   canAddBefore: boolean;
+  canConvertEdge: boolean;
   canDelete: boolean;
   canExport: boolean;
   canRedo: boolean;
   canUndo: boolean;
   contextualPanelVisible: boolean;
   closeProject(): void;
+  convertEdge(): void;
   deleteSheet(): void;
   exportSheet(): void;
   mediaPanelVisible: boolean;
@@ -38,12 +40,14 @@ export function createProjectApplicationMenus({
   addSheetBefore,
   canAddAfter,
   canAddBefore,
+  canConvertEdge,
   canDelete,
   canExport,
   canRedo,
   canUndo,
   contextualPanelVisible,
   closeProject,
+  convertEdge,
   deleteSheet,
   exportSheet,
   mediaPanelVisible,
@@ -121,7 +125,12 @@ export function createProjectApplicationMenus({
           structuralCommandsDisabled || !canDelete,
         ),
         separator("sheet-edge-separator"),
-        placeholder("convert-edge", "sheet"),
+        implemented(
+          "convert-edge",
+          "sheet",
+          convertEdge,
+          structuralCommandsDisabled || !canConvertEdge,
+        ),
       ],
     },
     {

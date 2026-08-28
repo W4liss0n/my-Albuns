@@ -207,6 +207,11 @@ export function useProjectEditorController({
     return mutations.applyWithOutcome({ kind: "deleteSheet", sheetId });
   };
 
+  const convertEdge = (sheetId = navigation.implicitSheetId) => {
+    if (structuralCommandsDisabled || !sheetId) return Promise.resolve(false);
+    return mutations.applyWithOutcome({ kind: "convertEdgeSheet", sheetId });
+  };
+
   const reorderSheet = (sheetId: string, targetIndex: number) => {
     if (structuralCommandsDisabled) return Promise.resolve(false);
     return mutations.applyWithOutcome({
@@ -237,6 +242,7 @@ export function useProjectEditorController({
     importPhoto: mutations.importPhoto,
     addSheetBefore,
     addSheetAfter,
+    convertEdge,
     deleteSheet,
     reorderSheet,
     save: mutations.save,

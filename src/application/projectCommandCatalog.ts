@@ -310,8 +310,7 @@ const DEFINITIONS = [
     description: "Converte a configuração da Lâmina de extremidade.",
     kind: "domain",
     contexts: ["sheet"],
-    availability: "placeholder",
-    placeholderFeature: "convert-edge-sheet",
+    availability: "implemented",
     shortcuts: [],
   }),
   command({

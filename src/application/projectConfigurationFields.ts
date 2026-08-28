@@ -6,6 +6,8 @@ import {
 } from "./physicalMeasurements";
 
 export type ProjectConfigurationFieldName =
+  | "firstSheet"
+  | "lastSheet"
   | "sheetWidth"
   | "sheetHeight"
   | "bleed"
@@ -74,6 +76,21 @@ const validationPresentation: Record<
     field: "sheetWidth",
     message:
       "Mantenha a proporção atual da Lâmina para preservar a composição.",
+  },
+  sheetDimensionsRequireContentTransformation: {
+    field: "sheetWidth",
+    message:
+      "A composição existente exige o fluxo de mudança dimensional segura.",
+  },
+  firstSheetConversionRequiresContentReorganization: {
+    field: "firstSheet",
+    message:
+      "A primeira Lâmina contém composição e exige o fluxo completo de conversão.",
+  },
+  lastSheetConversionRequiresContentReorganization: {
+    field: "lastSheet",
+    message:
+      "A última Lâmina contém composição e exige o fluxo completo de conversão.",
   },
   dpiOutOfRange: {
     field: "dpi",

@@ -19,6 +19,7 @@ interface SheetContextMenuProps {
   sheetNumber: number;
   onAddAfter(): void;
   onAddBefore(): void;
+  onConvertEdge(): void;
   onDelete(): void;
   onDismiss(): void;
 }
@@ -29,6 +30,7 @@ export function SheetContextMenu({
   sheetNumber,
   onAddAfter,
   onAddBefore,
+  onConvertEdge,
   onDelete,
   onDismiss,
 }: SheetContextMenuProps) {
@@ -125,10 +127,15 @@ export function SheetContextMenu({
       </button>
       <span className="sheet-context-menu__separator" role="separator" />
       <button
-        disabled
+        disabled={!availability.canConvertEdge}
         role="menuitem"
-        title="Disponível após a conversão completa de extremidades"
+        title={
+          availability.canConvertEdge
+            ? undefined
+            : "Disponível somente para uma extremidade vazia"
+        }
         type="button"
+        onClick={() => invoke(onConvertEdge)}
       >
         {sheetCommandLabels.convertEdge}
       </button>

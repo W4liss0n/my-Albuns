@@ -514,6 +514,29 @@ impl ProjectDocument {
         Ok((candidate, neighbor_id))
     }
 
+    pub(crate) fn with_converted_edge_sheet(&self, sheet_id: Uuid) -> Result<Self, ()> {
+        let mut candidate = self.clone();
+        let sheet_index = candidate
+            .sheets
+            .iter()
+            .position(|sheet| sheet.id == sheet_id)
+            .ok_or(())?;
+        let last_index = candidate.sheets.len() - 1;
+        let sheet = &mut candidate.sheets[sheet_index];
+        if !sheet.frames.is_empty() {
+            return Err(());
+        }
+        sheet.active_sides = match (sheet_index, sheet.active_sides) {
+            (0, ActiveSides::Both) => ActiveSides::Right,
+            (0, ActiveSides::Right) => ActiveSides::Both,
+            (index, ActiveSides::Both) if index == last_index => ActiveSides::Left,
+            (index, ActiveSides::Left) if index == last_index => ActiveSides::Both,
+            _ => return Err(()),
+        };
+        validate_project_state(&candidate)?;
+        Ok(candidate)
+    }
+
     pub(crate) fn with_reordered_sheet(
         &self,
         sheet_id: Uuid,
@@ -571,6 +594,29 @@ impl ProjectDocument {
             )
         {
             errors.push(ProjectConfigurationValidationError::SheetDimensionsNotProportional);
+        }
+        if dimensions_are_valid
+            && dimensions_changed
+            && self.sheets.iter().any(|sheet| !sheet.frames.is_empty())
+        {
+            errors.push(
+                ProjectConfigurationValidationError::SheetDimensionsRequireContentTransformation,
+            );
+        }
+        if information.first_sheet.active_sides(true) != self.sheets[0].active_sides
+            && !self.sheets[0].frames.is_empty()
+        {
+            errors.push(
+                ProjectConfigurationValidationError::FirstSheetConversionRequiresContentReorganization,
+            );
+        }
+        let last_index = self.sheets.len() - 1;
+        if information.last_sheet.active_sides(false) != self.sheets[last_index].active_sides
+            && !self.sheets[last_index].frames.is_empty()
+        {
+            errors.push(
+                ProjectConfigurationValidationError::LastSheetConversionRequiresContentReorganization,
+            );
         }
         let impact = errors
             .is_empty()
@@ -1180,6 +1226,9 @@ pub enum ProjectConfigurationValidationError {
     SheetHeightAboveSafeInteger,
     SheetHeightRasterOutOfRange,
     SheetDimensionsNotProportional,
+    SheetDimensionsRequireContentTransformation,
+    FirstSheetConversionRequiresContentReorganization,
+    LastSheetConversionRequiresContentReorganization,
     DpiOutOfRange,
     SheetCountTooSmall,
     BleedNegative,

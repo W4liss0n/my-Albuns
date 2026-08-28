@@ -793,6 +793,9 @@ pub enum ProjectIntent {
     DeleteSheet {
         sheet_id: String,
     },
+    ConvertEdgeSheet {
+        sheet_id: String,
+    },
     ReorderSheet {
         sheet_id: String,
         target_index: usize,
@@ -845,6 +848,8 @@ pub enum CoreError {
     InvalidSheetInsertion,
     #[error("O Álbum precisa manter ao menos duas Lâminas")]
     MinimumSheetCount,
+    #[error("A extremidade não pode ser convertida sem reorganizar seu conteúdo")]
+    InvalidEdgeConversion,
     #[error("A Lâmina não pode ser movida para essa posição")]
     InvalidSheetReorder,
     #[error("Foto não encontrada no Projeto: {0}")]

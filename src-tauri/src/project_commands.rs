@@ -120,6 +120,7 @@ pub(crate) fn apply_project_intent(
         ProjectIntent::SetDpi { .. } => "set_dpi",
         ProjectIntent::AddSheet { .. } => "add_sheet",
         ProjectIntent::DeleteSheet { .. } => "delete_sheet",
+        ProjectIntent::ConvertEdgeSheet { .. } => "convert_edge_sheet",
         ProjectIntent::ReorderSheet { .. } => "reorder_sheet",
         ProjectIntent::TransformPhoto { .. } => "transform_photo",
         ProjectIntent::AddPhoto { .. } => "add_photo",

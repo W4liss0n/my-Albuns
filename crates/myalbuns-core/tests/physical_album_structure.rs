@@ -1,10 +1,11 @@
 use std::fs;
 
 use myalbuns_core::{
-    CoreError, CreateAuthorization, CreateProjectRequest, DisplayUnit, EndSheetFormat, ImportPhoto,
-    InitialProject, InitialProjectConfiguration, OpenProjectRequest, PhotoPlacementMode,
-    PhotoSourceMetadata, ProjectCore, ProjectIntent, ProjectLocation, ProjectedActiveSides,
-    SaveProjectOutcome, SheetInsertionPosition, SheetRole,
+    AlbumInformation, CoreError, CreateAuthorization, CreateProjectRequest, DisplayUnit,
+    EndSheetFormat, ImportPhoto, InitialProject, InitialProjectConfiguration, OpenProjectRequest,
+    PhotoPlacementMode, PhotoSourceMetadata,
+    ProjectConfigurationValidationError as ValidationError, ProjectCore, ProjectIntent,
+    ProjectLocation, ProjectedActiveSides, SaveProjectOutcome, SheetInsertionPosition, SheetRole,
 };
 use myalbuns_paths::OperationPathContext;
 
@@ -41,6 +42,109 @@ fn create_project(
         CreateAuthorization::CreateOnly,
     ))
     .expect("the physical Album is created through ProjectCore")
+}
+
+#[test]
+fn converting_empty_edges_is_atomic_persistent_and_reversible() {
+    let root = tempfile::tempdir().expect("temporary edge conversion root");
+    let project_path = root.path().join("Converter extremidade.myalbuns");
+    let core = ProjectCore::new()
+        .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"));
+    let mut project = create_project(&core, &project_path, 3);
+    let initial = project.projection();
+    let first_id = initial.state.album.sheets[0].id.clone();
+    let last_id = initial
+        .state
+        .album
+        .sheets
+        .last()
+        .expect("the physical Album has a final Sheet")
+        .id
+        .clone();
+
+    let converted = project
+        .apply_with_outcome(ProjectIntent::ConvertEdgeSheet {
+            sheet_id: first_id.clone(),
+        })
+        .expect("an empty initial single Page expands safely");
+    assert_eq!(
+        converted.affected_sheet_id.as_deref(),
+        Some(first_id.as_str())
+    );
+    assert_eq!(converted.projection.state.revision, 1);
+    assert_eq!(
+        converted.projection.state.album.sheets[0].active_sides,
+        ProjectedActiveSides::Both
+    );
+
+    let undone = project.undo().expect("Undo restores the single Page");
+    assert_eq!(undone.state.revision, 0);
+    assert_eq!(
+        undone.state.album.sheets[0].active_sides,
+        ProjectedActiveSides::Right
+    );
+    let redone = project.redo().expect("Redo restores the double Sheet");
+    assert_eq!(redone.state.revision, 1);
+    assert_eq!(
+        redone.state.album.sheets[0].active_sides,
+        ProjectedActiveSides::Both
+    );
+
+    let restored_first = project
+        .apply_with_outcome(ProjectIntent::ConvertEdgeSheet { sheet_id: first_id })
+        .expect("the empty initial double Sheet contracts safely");
+    assert_eq!(restored_first.projection.state.revision, 2);
+    assert_eq!(
+        restored_first.projection.state.album.sheets[0].active_sides,
+        ProjectedActiveSides::Right
+    );
+    let converted_last = project
+        .apply_with_outcome(ProjectIntent::ConvertEdgeSheet {
+            sheet_id: last_id.clone(),
+        })
+        .expect("the empty final single Page expands safely");
+    assert_eq!(
+        converted_last.affected_sheet_id.as_deref(),
+        Some(last_id.as_str())
+    );
+    assert_eq!(converted_last.projection.state.revision, 3);
+    assert_eq!(
+        converted_last
+            .projection
+            .state
+            .album
+            .sheets
+            .last()
+            .expect("the converted Album keeps its final Sheet")
+            .active_sides,
+        ProjectedActiveSides::Both
+    );
+    assert_eq!(
+        project
+            .save(3)
+            .expect("the conversions are saved explicitly"),
+        SaveProjectOutcome::Saved { revision: 3 }
+    );
+    drop(project);
+
+    let reopened = core
+        .open_editable(OpenProjectRequest::new(project_location(&project_path)))
+        .expect("the converted edge reopens");
+    assert_eq!(
+        reopened.projection().state.album.sheets[0].active_sides,
+        ProjectedActiveSides::Right
+    );
+    assert_eq!(
+        reopened
+            .projection()
+            .state
+            .album
+            .sheets
+            .last()
+            .expect("the reopened Album keeps its final Sheet")
+            .active_sides,
+        ProjectedActiveSides::Both
+    );
 }
 
 #[test]
@@ -426,6 +530,158 @@ fn deleting_and_undoing_a_composed_sheet_never_removes_its_media_catalog_entry()
     assert_eq!(restored_sheet.frames.len(), 1);
     assert_eq!(restored.state.album.media.len(), 1);
     assert_eq!(restored.media_usage[0].count, 1);
+}
+
+#[test]
+fn composed_album_requires_the_safe_dimension_change_owner() {
+    let root = tempfile::tempdir().expect("temporary composed Album root");
+    let project_path = root.path().join("Dimensão composta.myalbuns");
+    let photo_path = root.path().join("Foto dimensional.jpg");
+    fs::write(&photo_path, b"trusted external JPEG fixture").expect("the linked original exists");
+    let core = ProjectCore::new()
+        .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"));
+    let mut project = create_project(&core, &project_path, 3);
+    let imported = project
+        .import_photo(ImportPhoto::new(
+            photo_path,
+            PhotoSourceMetadata::new(
+                1_200,
+                800,
+                ["#B83225".into(), "#477998".into(), "#F4EBD9".into()],
+            )
+            .expect("the observed JPEG metadata is valid"),
+        ))
+        .expect("the linked Photo enters the Album catalog");
+    let middle_id = imported.projection.state.album.sheets[1].id.clone();
+    project
+        .apply(ProjectIntent::AddPhoto {
+            sheet_id: middle_id,
+            media_id: imported.media_id,
+            mode: PhotoPlacementMode::Normal,
+        })
+        .expect("the Album has composed geometry");
+
+    let information = AlbumInformation {
+        display_unit: DisplayUnit::Mm,
+        sheet_width_um: 1_200_000,
+        sheet_height_um: 600_000,
+        dpi: 300,
+        bleed_um: 3_000,
+        safety_um: 3_000,
+        first_sheet: EndSheetFormat::SinglePage,
+        last_sheet: EndSheetFormat::SinglePage,
+    };
+    let validation = project.validate_album_information(&information);
+
+    assert_eq!(
+        validation.errors,
+        [ValidationError::SheetDimensionsRequireContentTransformation]
+    );
+    assert_eq!(validation.impact, None);
+}
+
+#[test]
+fn composed_edge_requires_the_complete_conversion_owner() {
+    let root = tempfile::tempdir().expect("temporary composed edge root");
+    let project_path = root.path().join("Extremidade composta.myalbuns");
+    let photo_path = root.path().join("Foto da extremidade.jpg");
+    fs::write(&photo_path, b"trusted external JPEG fixture").expect("the linked original exists");
+    let core = ProjectCore::new()
+        .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"));
+    let mut project = create_project(&core, &project_path, 3);
+    let imported = project
+        .import_photo(ImportPhoto::new(
+            photo_path,
+            PhotoSourceMetadata::new(
+                1_200,
+                800,
+                ["#B83225".into(), "#477998".into(), "#F4EBD9".into()],
+            )
+            .expect("the observed JPEG metadata is valid"),
+        ))
+        .expect("the linked Photo enters the Album catalog");
+    let first_id = imported.projection.state.album.sheets[0].id.clone();
+    project
+        .apply(ProjectIntent::AddPhoto {
+            sheet_id: first_id,
+            media_id: imported.media_id,
+            mode: PhotoPlacementMode::Normal,
+        })
+        .expect("the initial single Page has composed geometry");
+
+    let information = AlbumInformation {
+        display_unit: DisplayUnit::Mm,
+        sheet_width_um: 600_000,
+        sheet_height_um: 300_000,
+        dpi: 300,
+        bleed_um: 3_000,
+        safety_um: 3_000,
+        first_sheet: EndSheetFormat::Double,
+        last_sheet: EndSheetFormat::SinglePage,
+    };
+    let validation = project.validate_album_information(&information);
+
+    assert_eq!(
+        validation.errors,
+        [ValidationError::FirstSheetConversionRequiresContentReorganization]
+    );
+    assert_eq!(validation.impact, None);
+}
+
+#[test]
+fn composed_final_edge_requires_the_complete_conversion_owner() {
+    let root = tempfile::tempdir().expect("temporary composed final edge root");
+    let project_path = root.path().join("Extremidade final composta.myalbuns");
+    let photo_path = root.path().join("Foto da extremidade final.jpg");
+    fs::write(&photo_path, b"trusted external JPEG fixture").expect("the linked original exists");
+    let core = ProjectCore::new()
+        .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"));
+    let mut project = create_project(&core, &project_path, 3);
+    let imported = project
+        .import_photo(ImportPhoto::new(
+            photo_path,
+            PhotoSourceMetadata::new(
+                1_200,
+                800,
+                ["#B83225".into(), "#477998".into(), "#F4EBD9".into()],
+            )
+            .expect("the observed JPEG metadata is valid"),
+        ))
+        .expect("the linked Photo enters the Album catalog");
+    let last_id = imported
+        .projection
+        .state
+        .album
+        .sheets
+        .last()
+        .expect("the Album has a final Sheet")
+        .id
+        .clone();
+    project
+        .apply(ProjectIntent::AddPhoto {
+            sheet_id: last_id,
+            media_id: imported.media_id,
+            mode: PhotoPlacementMode::Normal,
+        })
+        .expect("the final single Page has composed geometry");
+
+    let information = AlbumInformation {
+        display_unit: DisplayUnit::Mm,
+        sheet_width_um: 600_000,
+        sheet_height_um: 300_000,
+        dpi: 300,
+        bleed_um: 3_000,
+        safety_um: 3_000,
+        first_sheet: EndSheetFormat::SinglePage,
+        last_sheet: EndSheetFormat::Double,
+    };
+    let validation = project.validate_album_information(&information);
+
+    assert_eq!(
+        validation.errors,
+        [ValidationError::LastSheetConversionRequiresContentReorganization]
+    );
+    assert_eq!(validation.impact, None);
 }
 
 #[test]

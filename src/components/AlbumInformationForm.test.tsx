@@ -22,15 +22,20 @@ const validImpact = {
   pageWidthPx: 3_543,
   heightPx: 3_543,
 };
+const emptySheetStates = representativeProjection.state.album.sheets.map(
+  (sheet) => ({ ...sheet, frames: [] }),
+);
 
 function renderForm({
   onApply = vi.fn(),
   onValidate = vi.fn(async () => ({ errors: [], impact: validImpact })),
+  sheetStates = emptySheetStates,
 }: {
   onApply?: ComponentProps<typeof AlbumInformationForm>["onApply"];
   onValidate?: (
     information: AlbumInformation,
   ) => Promise<AlbumInformationValidation>;
+  sheetStates?: typeof representativeProjection.state.album.sheets;
 } = {}) {
   const onPresentationUnitChange = vi.fn();
   function Harness() {
@@ -41,7 +46,7 @@ function renderForm({
           document={representativeProjection.state.document}
           formId="album-information-test"
           revision={representativeProjection.state.revision}
-          sheetStates={representativeProjection.state.album.sheets}
+          sheetStates={sheetStates}
           onApply={onApply}
           onPresentationUnitChange={onPresentationUnitChange}
           onReadyChange={setReady}
@@ -99,6 +104,33 @@ function ProjectionHarness({
     </>
   );
 }
+
+test("marks composed dimension changes as owned by the safe transformation flow", () => {
+  renderForm({ sheetStates: representativeProjection.state.album.sheets });
+
+  const dimensions = screen.getByRole("group", { name: "Dimensão da Lâmina" });
+  for (const label of ["Largura", "Altura"]) {
+    const input = within(dimensions).getByRole("textbox", { name: label });
+    expect(input).toBeDisabled();
+    expect(input.closest(".album-information-field")).toHaveAttribute(
+      "data-placeholder-feature",
+      "safe-sheet-dimension-change",
+    );
+  }
+});
+
+test("marks composed edge conversions as owned by the complete conversion flow", () => {
+  renderForm({ sheetStates: representativeProjection.state.album.sheets });
+
+  for (const label of ["Primeira Lâmina", "Última Lâmina"]) {
+    const select = screen.getByRole("combobox", { name: label });
+    expect(select).toBeDisabled();
+    expect(select.closest(".album-information-field")).toHaveAttribute(
+      "data-placeholder-feature",
+      "convert-composed-edge",
+    );
+  }
+});
 
 test("edits every Album information field and submits one complete candidate", async () => {
   const onApply = vi.fn();
@@ -441,6 +473,123 @@ test("preserves an unapplied draft across a semantically equivalent projection",
 
   expect(screen.getByRole("textbox", { name: "DPI" })).toHaveValue("600");
   expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled();
+});
+
+test("revalidates a pending dimension draft when composed geometry arrives", async () => {
+  let composed = false;
+  const onValidate = vi.fn(
+    async (): Promise<AlbumInformationValidation> =>
+      composed
+        ? {
+            errors: ["sheetDimensionsRequireContentTransformation"],
+            impact: null,
+          }
+        : { errors: [], impact: validImpact },
+  );
+  const onPresentationUnitChange =
+    vi.fn<(unit: DisplayUnit | null) => void>();
+  const view = render(
+    <ProjectionHarness
+      document={representativeProjection.state.document}
+      onPresentationUnitChange={onPresentationUnitChange}
+      onValidate={onValidate}
+      sheetStates={emptySheetStates}
+    />,
+  );
+
+  fireEvent.change(screen.getByRole("textbox", { name: "Largura" }), {
+    target: { value: "700" },
+  });
+  fireEvent.change(screen.getByRole("textbox", { name: "Altura" }), {
+    target: { value: "350" },
+  });
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
+  );
+  const validationsBeforeComposition = onValidate.mock.calls.length;
+
+  composed = true;
+  view.rerender(
+    <ProjectionHarness
+      document={representativeProjection.state.document}
+      onPresentationUnitChange={onPresentationUnitChange}
+      onValidate={onValidate}
+      revision={representativeProjection.state.revision + 1}
+      sheetStates={representativeProjection.state.album.sheets}
+    />,
+  );
+
+  expect(screen.getByRole("button", { name: "Aplicar" })).toBeDisabled();
+  await waitFor(() =>
+    expect(onValidate.mock.calls.length).toBeGreaterThan(
+      validationsBeforeComposition,
+    ),
+  );
+  expect(screen.getByRole("button", { name: "Aplicar" })).toBeDisabled();
+
+  fireEvent.click(screen.getByRole("button", { name: "Restaurar Largura" }));
+  fireEvent.click(screen.getByRole("button", { name: "Restaurar Altura" }));
+  expect(screen.getByRole("textbox", { name: "Largura" })).toHaveValue("600");
+  expect(screen.getByRole("textbox", { name: "Altura" })).toHaveValue("300");
+});
+
+test("lets a pending edge conversion be restored when edge content arrives", async () => {
+  let composed = false;
+  const onValidate = vi.fn(
+    async (): Promise<AlbumInformationValidation> =>
+      composed
+        ? {
+            errors: ["firstSheetConversionRequiresContentReorganization"],
+            impact: null,
+          }
+        : { errors: [], impact: validImpact },
+  );
+  const onPresentationUnitChange =
+    vi.fn<(unit: DisplayUnit | null) => void>();
+  const view = render(
+    <ProjectionHarness
+      document={representativeProjection.state.document}
+      onPresentationUnitChange={onPresentationUnitChange}
+      onValidate={onValidate}
+      sheetStates={emptySheetStates}
+    />,
+  );
+
+  fireEvent.change(screen.getByRole("combobox", { name: "Primeira Lâmina" }), {
+    target: { value: "singlePage" },
+  });
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
+  );
+  const validationsBeforeComposition = onValidate.mock.calls.length;
+
+  composed = true;
+  view.rerender(
+    <ProjectionHarness
+      document={representativeProjection.state.document}
+      onPresentationUnitChange={onPresentationUnitChange}
+      onValidate={onValidate}
+      revision={representativeProjection.state.revision + 1}
+      sheetStates={representativeProjection.state.album.sheets}
+    />,
+  );
+
+  expect(screen.getByRole("button", { name: "Aplicar" })).toBeDisabled();
+  await waitFor(() =>
+    expect(onValidate.mock.calls.length).toBeGreaterThan(
+      validationsBeforeComposition,
+    ),
+  );
+  expect(
+    screen.getByRole("combobox", { name: "Primeira Lâmina" }),
+  ).toBeDisabled();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Restaurar Primeira Lâmina" }),
+  );
+  expect(
+    screen.getByRole("combobox", { name: "Primeira Lâmina" }),
+  ).toHaveValue("double");
+  expect(screen.getByRole("button", { name: "Aplicar" })).toBeDisabled();
 });
 
 test("resets the draft when authoritative Album information really changes", async () => {

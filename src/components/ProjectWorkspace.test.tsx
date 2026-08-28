@@ -623,6 +623,60 @@ test("routes implicit menu and explicit context actions to their intended Sheets
   ).not.toBeInTheDocument();
 });
 
+test("routes implicit and explicit empty-edge conversions to their intended Sheet", async () => {
+  const physicalProjection = createThreeSheetProjection();
+  const port = projectCorePortWithApply(async () => physicalProjection);
+  const applyWithOutcome = vi.fn(async () => ({
+    projection: physicalProjection,
+    affectedFrameId: null,
+    affectedSheetId: "sheet-003",
+  }));
+  port.applyWithOutcome = applyWithOutcome;
+
+  render(
+    <ProjectWorkspace
+      exportPipelinePort={exportPipelinePort}
+      projection={physicalProjection}
+      projectCorePort={port}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  act(() => canvasHarness.props?.onCenteredSheetChange?.("sheet-003"));
+  const implicitCommand = getApplicationCommand(
+    "Lâmina",
+    "Converter extremidade",
+  );
+  expect(implicitCommand).toBeEnabled();
+  fireEvent.click(implicitCommand);
+  await waitFor(() =>
+    expect(applyWithOutcome).toHaveBeenCalledWith({
+      kind: "convertEdgeSheet",
+      sheetId: "sheet-003",
+    }),
+  );
+
+  act(() =>
+    canvasHarness.props?.onOpenSheetContextMenu?.("sheet-003", {
+      x: 240,
+      y: 180,
+    }),
+  );
+  const contextMenu = screen.getByRole("menu", {
+    name: "Ações da Lâmina 03",
+  });
+  const explicitCommand = within(contextMenu).getByRole("menuitem", {
+    name: "Converter extremidade",
+  });
+  expect(explicitCommand).toBeEnabled();
+  fireEvent.click(explicitCommand);
+  await waitFor(() => expect(applyWithOutcome).toHaveBeenCalledTimes(2));
+  expect(applyWithOutcome).toHaveBeenLastCalledWith({
+    kind: "convertEdgeSheet",
+    sheetId: "sheet-003",
+  });
+});
+
 test("commits one valid Grade reorder and keeps structural controls inert in Sheet Edit Mode", async () => {
   const physicalProjection = createThreeSheetProjection();
   const port = projectCorePortWithApply(async () => physicalProjection);
@@ -668,6 +722,9 @@ test("commits one valid Grade reorder and keeps structural controls inert in She
   act(() => canvasHarness.props?.onEditSheet?.("sheet-001"));
   expect(getApplicationCommand("Lâmina", "Adicionar depois")).toBeDisabled();
   expect(getApplicationCommand("Lâmina", "Excluir")).toBeDisabled();
+  expect(
+    getApplicationCommand("Lâmina", "Converter extremidade"),
+  ).toBeDisabled();
   for (const slot of view.container.querySelectorAll(".sheet-grid-slot")) {
     expect(slot).toHaveAttribute("draggable", "false");
   }
@@ -3235,7 +3292,9 @@ test("preserves the Album Information draft when Album Design is applied", async
   );
 
   expect(information.getByLabelText("DPI")).toHaveValue("600");
-  expect(information.getByRole("button", { name: "Aplicar" })).toBeEnabled();
+  await waitFor(() =>
+    expect(information.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
+  );
 });
 
 test("preserves the Album Design draft when Album Information is applied", async () => {

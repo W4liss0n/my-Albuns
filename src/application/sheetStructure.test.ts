@@ -35,21 +35,55 @@ describe("physical Album structure projection", () => {
     expect(sheetStructureAvailability(physicalAlbum, "initial")).toEqual({
       canAddAfter: true,
       canAddBefore: false,
+      canConvertEdge: true,
       canDelete: true,
     });
     expect(sheetStructureAvailability(physicalAlbum, "third")).toEqual({
       canAddAfter: true,
       canAddBefore: true,
+      canConvertEdge: false,
       canDelete: true,
     });
     expect(sheetStructureAvailability(physicalAlbum, "final")).toEqual({
       canAddAfter: false,
       canAddBefore: true,
+      canConvertEdge: true,
       canDelete: true,
     });
     expect(
       sheetStructureAvailability(physicalAlbum.slice(0, 2), "initial"),
     ).toMatchObject({ canDelete: false });
+  });
+
+  test("offers edge conversion only for empty eligible targets", () => {
+    expect(sheetStructureAvailability(physicalAlbum, "initial")).toMatchObject({
+      canConvertEdge: true,
+    });
+    expect(sheetStructureAvailability(physicalAlbum, "third")).toMatchObject({
+      canConvertEdge: false,
+    });
+    expect(sheetStructureAvailability(physicalAlbum, "final")).toMatchObject({
+      canConvertEdge: true,
+    });
+    expect(
+      sheetStructureAvailability(
+        [
+          {
+            ...physicalAlbum[0],
+            frames: [
+              {
+                id: "frame-on-edge",
+                rect: { x: 0, y: 0, width: 10_000, height: 10_000 },
+                zIndex: 0,
+                photo: null,
+              },
+            ],
+          },
+          ...physicalAlbum.slice(1),
+        ],
+        "initial",
+      ),
+    ).toMatchObject({ canConvertEdge: false });
   });
 
   test("previews a valid final order without mutating the opposite surface", () => {

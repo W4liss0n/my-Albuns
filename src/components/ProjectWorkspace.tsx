@@ -451,12 +451,16 @@ export function ProjectWorkspace({
     },
     canAddAfter: implicitSheetAvailability.canAddAfter,
     canAddBefore: implicitSheetAvailability.canAddBefore,
+    canConvertEdge: implicitSheetAvailability.canConvertEdge,
     canDelete: implicitSheetAvailability.canDelete,
     canExport: controller.canvasProps.centeredSheetId !== null,
     canRedo: projection.state.canRedo,
     canUndo: projection.state.canUndo,
     contextualPanelVisible: workspacePanels.panels.inspector.visible,
     closeProject: () => void projectClose.requestClose(),
+    convertEdge: () => {
+      void controller.convertEdge();
+    },
     deleteSheet: () => {
       void controller.deleteSheet();
     },
@@ -684,6 +688,9 @@ export function ProjectWorkspace({
           }}
           onAddBefore={() => {
             void controller.addSheetBefore(sheetContextMenu.sheetId);
+          }}
+          onConvertEdge={() => {
+            void controller.convertEdge(sheetContextMenu.sheetId);
           }}
           onDelete={() => {
             void controller.deleteSheet(sheetContextMenu.sheetId);

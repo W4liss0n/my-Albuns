@@ -130,6 +130,18 @@ impl PersistentProjectSession {
                 outcome.affected_sheet_id = Some(neighbor_id);
                 Ok(next)
             }
+            ProjectIntent::ConvertEdgeSheet { sheet_id } => {
+                let parsed = parse_uuid(&sheet_id)
+                    .map_err(|()| CoreError::SheetNotFound(sheet_id.clone()))?;
+                if !project.sheets().iter().any(|sheet| sheet.id() == parsed) {
+                    return Err(CoreError::SheetNotFound(sheet_id));
+                }
+                let next = project
+                    .with_converted_edge_sheet(parsed)
+                    .map_err(|()| CoreError::InvalidEdgeConversion)?;
+                outcome.affected_sheet_id = Some(parsed);
+                Ok(next)
+            }
             ProjectIntent::ReorderSheet {
                 sheet_id,
                 target_index,
