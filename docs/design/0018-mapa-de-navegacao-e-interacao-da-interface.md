@@ -180,7 +180,7 @@ renderizada e uma revisão explícita posterior decide `accepted`, `rejected` ou
 | entrada/saída do Modo de edição | `canvas-sheet-editing`, `canvas-sheet-editing-exit` |
 | Zoom por teclado, roda, reset e teto | `editor-zoom-keyboard-in`, `editor-zoom-keyboard-out`, `editor-zoom-wheel`, `editor-zoom-reset`, `editor-zoom-cap` |
 | reordenação pela Barra | `sheet-reorder-bar-preview`, `sheet-reorder-bar-commit`, `sheet-reorder-cancelled` |
-| reordenação pela Grade | `sheet-reorder-grid-preview`, `sheet-reorder-grid-commit`, `sheet-reorder-invalid-drop` |
+| reordenação pela Grade | `sheet-reorder-grid-preview`, `sheet-reorder-grid-commit`, `sheet-reorder-invalid-target-preview`, `sheet-reorder-invalid-drop` |
 | seleção múltipla e mistos | `frame-multi-selection-mixed`, `frame-multi-selection-absolute-edit` |
 | mover, redimensionar e travar | `frame-manipulation-move`, `frame-manipulation-resize`, `frame-layout-locked` |
 

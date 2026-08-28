@@ -93,6 +93,33 @@ test("locates the New Project flow through stable accessible names", () => {
   assert.doesNotMatch(runner, /localStateStartedEmpty/);
 });
 
+test("keeps the physical Album structure proof in the productive WebView2 contract", () => {
+  const scripts = path.dirname(fileURLToPath(import.meta.url));
+  const runner = readFileSync(
+    path.join(scripts, "Run-ProductiveJourneyGate.mjs"),
+    "utf8",
+  );
+  const wrapper = readFileSync(
+    path.join(scripts, "Test-ProductiveJourney.ps1"),
+    "utf8",
+  );
+
+  assert.match(runner, /physicalAlbumStructure:\s*\{/);
+  assert.match(runner, /projectCoreEvents/);
+  assert.match(runner, /"Lâmina",\s*"Adicionar depois"/);
+  assert.match(runner, /"Lâmina",\s*"Excluir"/);
+  assert.match(runner, /\.sheet-grid-slot\[data-sheet-id=/);
+  assert.match(
+    runner,
+    /"add_sheet",\s*"reorder_sheet",\s*"delete_sheet"/,
+  );
+  assert.match(wrapper, /\$physicalAlbumStructure\.afterAdd\.count -ne 4/);
+  assert.match(wrapper, /\$physicalAlbumStructure\.afterReorder\.count -ne 4/);
+  assert.match(wrapper, /\$physicalAlbumStructure\.afterDelete\.count -ne 3/);
+  assert.match(wrapper, /physical-album-structure-ui-project-core/);
+  assert.match(wrapper, /physicalAlbumStructure = \$gate\.physicalAlbumStructure/);
+});
+
 function withJunctionFixture(configure, assertion) {
   const root = mkdtempSync(path.join(os.tmpdir(), "myalbuns-cache-guard-"));
   const scratch = path.join(root, "scratch");

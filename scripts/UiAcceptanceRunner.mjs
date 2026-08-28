@@ -22,6 +22,68 @@ function elementReference(elementId) {
   return { [webdriverElementKey]: elementId };
 }
 
+const activeSheetReorderSelector = [
+  '[data-reorder-surface][data-reorder-state="preview"]',
+  '[data-reorder-surface][data-reorder-state="invalid"]',
+].join(",");
+
+async function cancelHtmlDragAndDropWithEscape({
+  execute,
+  locateSelector,
+  request,
+  sessionId,
+}) {
+  let cancellationError;
+  try {
+    const bodyId = await locateSelector("body");
+    try {
+      await request(
+        "POST",
+        `/session/${sessionId}/element/${encodeURIComponent(bodyId)}/value`,
+        { text: webdriverKeys.Escape, value: [webdriverKeys.Escape] },
+      );
+    } catch {
+      // A public-state check below decides whether the deterministic fallback is needed.
+    }
+
+    let reorderRemainsActive = await execute(
+      "return Boolean(document.querySelector(arguments[0]));",
+      [activeSheetReorderSelector],
+    );
+    if (reorderRemainsActive) {
+      await execute(`
+        const target = document.activeElement ?? document.body;
+        target.dispatchEvent(new KeyboardEvent("keydown", {
+          key: "Escape",
+          bubbles: true,
+          cancelable: true,
+        }));
+        target.dispatchEvent(new KeyboardEvent("keyup", {
+          key: "Escape",
+          bubbles: true,
+          cancelable: true,
+        }));
+      `);
+      reorderRemainsActive = await execute(
+        "return Boolean(document.querySelector(arguments[0]));",
+        [activeSheetReorderSelector],
+      );
+    }
+    if (reorderRemainsActive) {
+      throw new Error("Escape did not cancel the active HTML drag-and-drop gesture");
+    }
+  } catch (error) {
+    cancellationError = error;
+  }
+
+  try {
+    await request("DELETE", `/session/${sessionId}/actions`);
+  } catch (error) {
+    cancellationError ??= error;
+  }
+  if (cancellationError) throw cancellationError;
+}
+
 export function requiresBrowserZoomInvariant(actions) {
   return actions.some(
     (action) =>
@@ -258,32 +320,78 @@ export async function performUiAcceptanceAction({
     const dropTargetId = action.dropTargetSelector
       ? await locateSelector(action.dropTargetSelector)
       : null;
-    const pointerActions = [
-      {
-        type: "pointerMove",
-        duration: 0,
-        origin: elementReference(elementId),
-        x: 0,
-        y: 0,
-      },
-      { type: "pointerDown", button: 0 },
-      {
-        type: "pointerMove",
-        duration: 220,
-        origin: elementReference(targetId),
-        x: 0,
-        y: 0,
-      },
-    ];
+    const sourceElement = elementReference(elementId);
+    const targetElement = elementReference(targetId);
+    const htmlDragAndDrop = action.gesture === "html-dnd";
+    if (htmlDragAndDrop) {
+      const draggable = await request(
+        "GET",
+        `/session/${sessionId}/element/${encodedElementId}/attribute/draggable`,
+      );
+      if (draggable !== "true") {
+        throw new Error(`HTML drag source is not draggable: ${action.selector}`);
+      }
+      await execute(
+        "arguments[0].scrollIntoView({ block: 'center', inline: 'nearest' });",
+        [sourceElement],
+      );
+    }
+    const pointerActions = htmlDragAndDrop
+      ? [
+          {
+            type: "pointerMove",
+            duration: 0,
+            origin: sourceElement,
+            x: 0,
+            y: 0,
+          },
+          { type: "pointerDown", button: 0 },
+          { type: "pause", duration: 200 },
+          {
+            type: "pointerMove",
+            duration: 200,
+            origin: sourceElement,
+            x: 10,
+            y: 10,
+          },
+          {
+            type: "pointerMove",
+            duration: 600,
+            origin: targetElement,
+            x: 0,
+            y: 0,
+          },
+          { type: "pause", duration: 250 },
+        ]
+      : [
+          {
+            type: "pointerMove",
+            duration: 0,
+            origin: sourceElement,
+            x: 0,
+            y: 0,
+          },
+          { type: "pointerDown", button: 0 },
+          {
+            type: "pointerMove",
+            duration: 220,
+            origin: targetElement,
+            x: 0,
+            y: 0,
+          },
+        ];
     if (action.phase === "drop") {
       if (dropTargetId) {
         pointerActions.push({
           type: "pointerMove",
-          duration: 220,
+          duration: htmlDragAndDrop ? 600 : 220,
           origin: elementReference(dropTargetId),
           x: 0,
           y: 0,
         });
+        if (htmlDragAndDrop) {
+          pointerActions.push({ type: "pause", duration: 250 });
+        }
       }
       pointerActions.push({ type: "pointerUp", button: 0 });
     }
@@ -297,6 +405,17 @@ export async function performUiAcceptanceAction({
         },
       ],
     });
+    if (action.phase === "escape") {
+      if (!htmlDragAndDrop) {
+        throw new Error("Escape termination requires an HTML drag-and-drop gesture");
+      }
+      await cancelHtmlDragAndDropWithEscape({
+        execute,
+        locateSelector,
+        request,
+        sessionId,
+      });
+    }
     return;
   }
 

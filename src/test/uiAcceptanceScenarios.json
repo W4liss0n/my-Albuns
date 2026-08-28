@@ -507,7 +507,7 @@
       "viewport": { "width": 1440, "height": 900 },
       "readySelector": ".sheet-grid .sheet-tile",
       "actions": [
-        { "type": "hover", "selector": ".sheet-grid > .sheet-tile:nth-child(3)" }
+        { "type": "hover", "selector": ".sheet-grid > .sheet-grid-slot:nth-child(3) > .sheet-tile" }
       ]
     },
     {
@@ -521,9 +521,9 @@
         "reason": "A referência visual vigente antecede a seleção integrada à numeração da Grade de Lâminas definida nas decisões aceitas posteriores."
       },
       "viewport": { "width": 1440, "height": 900 },
-      "readySelector": ".sheet-grid > .sheet-tile:nth-child(3)[aria-current=\"true\"]",
+      "readySelector": ".sheet-grid > .sheet-grid-slot:nth-child(3) > .sheet-tile[aria-current=\"true\"]",
       "actions": [
-        { "type": "click", "selector": ".sheet-grid > .sheet-tile:nth-child(3)" }
+        { "type": "click", "selector": ".sheet-grid > .sheet-grid-slot:nth-child(3) > .sheet-tile" }
       ]
     },
     {
@@ -760,114 +760,133 @@
     {
       "id": "sheet-reorder-bar-preview",
       "title": "Reordenação — prévia pela Barra da Lâmina",
-      "implementationPath": "/ui-architecture-prototype.html?view=editor&mode=normal",
+      "implementationPath": "/workspace-preview.html?structure=physical",
       "comparison": {
         "kind": "implementation-only",
         "surface": "sheet-reordering",
-        "implementationCaptureSelector": ".ui-architecture-prototype",
-        "reason": "A referência visual vigente não representa os estados intermediários de reordenação aceitos posteriormente."
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A referência visual vigente não representa os estados intermediários de reordenação agora integrados à Janela produtiva."
       },
-      "viewport": { "width": 1440, "height": 900 },
-      "readySelector": "[data-editor-mode=\"normal\"] [data-reorder-surface=\"bar\"][data-reorder-state=\"preview\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"][data-preview-order=\"sheet-001,sheet-004,sheet-002,sheet-003,sheet-005\"]:has([data-testid=\"reorder-placeholder\"]):has([data-testid=\"reorder-ghost\"])",
+      "viewport": { "width": 1440, "height": 600 },
+      "readySelector": ".app-shell:has([data-reorder-surface=\"bar\"][data-reorder-state=\"preview\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"][data-preview-order=\"sheet-001,sheet-003,sheet-002,sheet-004,sheet-005\"]):has([data-reorder-surface=\"bar\"] [data-testid=\"reorder-placeholder\"]):has([data-reorder-surface=\"bar\"] [data-testid=\"reorder-ghost\"]):has([data-reorder-surface=\"grid\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"])",
       "actions": [
-        { "type": "drag", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-004\"]", "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "phase": "preview" }
+        { "type": "click", "selector": ".sheet-grid-slot[data-sheet-id=\"sheet-003\"] .sheet-tile" },
+        { "type": "drag", "gesture": "html-dnd", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-003\"]", "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "phase": "preview" }
       ]
     },
     {
       "id": "sheet-reorder-bar-commit",
       "title": "Reordenação — commit pela Barra da Lâmina",
-      "implementationPath": "/ui-architecture-prototype.html?view=editor&mode=normal",
+      "implementationPath": "/workspace-preview.html?structure=physical",
       "comparison": {
         "kind": "implementation-only",
         "surface": "sheet-reordering",
-        "implementationCaptureSelector": ".ui-architecture-prototype",
-        "reason": "A referência visual vigente não representa o commit sincronizado de reordenação aceito posteriormente."
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A referência visual vigente não representa o commit sincronizado agora integrado à Janela produtiva."
       },
-      "viewport": { "width": 1440, "height": 900 },
-      "readySelector": "[data-editor-mode=\"normal\"]:has([data-reorder-surface=\"bar\"][data-reorder-state=\"committed\"][data-sheet-order=\"sheet-001,sheet-004,sheet-002,sheet-003,sheet-005\"]):has([data-reorder-surface=\"grid\"][data-sheet-order=\"sheet-001,sheet-004,sheet-002,sheet-003,sheet-005\"])",
+      "viewport": { "width": 1440, "height": 600 },
+      "readySelector": ".app-shell:has([data-reorder-surface=\"bar\"][data-reorder-state=\"idle\"][data-sheet-order=\"sheet-001,sheet-003,sheet-002,sheet-004,sheet-005\"]):has([data-reorder-surface=\"grid\"][data-sheet-order=\"sheet-001,sheet-003,sheet-002,sheet-004,sheet-005\"])",
       "actions": [
-        { "type": "drag", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-004\"]", "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "phase": "drop" }
+        { "type": "click", "selector": ".sheet-grid-slot[data-sheet-id=\"sheet-003\"] .sheet-tile" },
+        { "type": "drag", "gesture": "html-dnd", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-003\"]", "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "phase": "drop" }
       ]
     },
     {
       "id": "sheet-reorder-grid-preview",
       "title": "Reordenação — prévia pela Grade de Lâminas",
-      "implementationPath": "/ui-architecture-prototype.html?view=editor&mode=normal",
+      "implementationPath": "/workspace-preview.html?structure=physical",
       "comparison": {
         "kind": "implementation-only",
         "surface": "sheet-reordering",
-        "implementationCaptureSelector": ".ui-architecture-prototype",
-        "reason": "A referência visual vigente não representa os estados intermediários de reordenação aceitos posteriormente."
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A referência visual vigente não representa os estados intermediários agora integrados à Grade produtiva."
       },
-      "viewport": { "width": 1440, "height": 900 },
-      "readySelector": "[data-editor-mode=\"normal\"] [data-reorder-surface=\"grid\"][data-reorder-state=\"preview\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"][data-preview-order=\"sheet-001,sheet-004,sheet-002,sheet-003,sheet-005\"]:has([data-testid=\"reorder-placeholder\"]):has([data-testid=\"reorder-ghost\"])",
+      "viewport": { "width": 1440, "height": 600 },
+      "readySelector": ".app-shell:has([data-reorder-surface=\"grid\"][data-reorder-state=\"preview\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"]):has([data-reorder-surface=\"grid\"] > .sheet-grid-slot:nth-child(2)[data-sheet-id=\"sheet-003\"]):has([data-reorder-surface=\"grid\"] [data-testid=\"reorder-placeholder\"]):has([data-reorder-surface=\"grid\"] [data-testid=\"reorder-ghost\"]):has([data-reorder-surface=\"bar\"][data-preview-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"])",
       "actions": [
-        { "type": "drag", "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-004\"]", "targetSelector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"]", "phase": "preview" }
+        { "type": "drag", "gesture": "html-dnd", "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-003\"]", "targetSelector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"]", "phase": "preview" }
       ]
     },
     {
       "id": "sheet-reorder-grid-commit",
       "title": "Reordenação — commit pela Grade de Lâminas",
-      "implementationPath": "/ui-architecture-prototype.html?view=editor&mode=normal",
+      "implementationPath": "/workspace-preview.html?structure=physical",
       "comparison": {
         "kind": "implementation-only",
         "surface": "sheet-reordering",
-        "implementationCaptureSelector": ".ui-architecture-prototype",
-        "reason": "A referência visual vigente não representa o commit sincronizado de reordenação aceito posteriormente."
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A referência visual vigente não representa o commit sincronizado agora integrado à Grade produtiva."
       },
-      "viewport": { "width": 1440, "height": 900 },
-      "readySelector": "[data-editor-mode=\"normal\"]:has([data-reorder-surface=\"grid\"][data-reorder-state=\"committed\"][data-sheet-order=\"sheet-001,sheet-004,sheet-002,sheet-003,sheet-005\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001,sheet-004,sheet-002,sheet-003,sheet-005\"])",
+      "viewport": { "width": 1440, "height": 600 },
+      "readySelector": ".app-shell:has([data-reorder-surface=\"grid\"][data-reorder-state=\"idle\"][data-sheet-order=\"sheet-001,sheet-003,sheet-002,sheet-004,sheet-005\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001,sheet-003,sheet-002,sheet-004,sheet-005\"])",
       "actions": [
-        { "type": "drag", "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-004\"]", "targetSelector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"]", "phase": "drop" }
+        { "type": "drag", "gesture": "html-dnd", "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-003\"]", "targetSelector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"]", "phase": "drop" }
       ]
     },
     {
       "id": "sheet-reorder-cancelled",
       "title": "Reordenação — cancelamento por Esc",
-      "implementationPath": "/ui-architecture-prototype.html?view=editor&mode=normal",
+      "implementationPath": "/workspace-preview.html?structure=physical",
       "comparison": {
         "kind": "implementation-only",
         "surface": "sheet-reordering",
-        "implementationCaptureSelector": ".ui-architecture-prototype",
-        "reason": "A referência visual vigente não representa o cancelamento de reordenação aceito posteriormente."
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A referência visual vigente não representa o cancelamento de reordenação agora integrado à Janela produtiva."
       },
-      "viewport": { "width": 1440, "height": 900 },
-      "readySelector": "[data-editor-mode=\"normal\"]:has([data-reorder-surface=\"bar\"][data-reorder-state=\"cancelled\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"])",
+      "viewport": { "width": 1440, "height": 600 },
+      "readySelector": ".app-shell:has([data-reorder-surface=\"bar\"][data-reorder-state=\"cancelled\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"][data-preview-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"]):has([data-reorder-surface=\"grid\"][data-reorder-state=\"cancelled\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"] > .sheet-grid-slot:nth-child(1)[data-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"grid\"] > .sheet-grid-slot:nth-child(2)[data-sheet-id=\"sheet-002\"]):has([data-reorder-surface=\"grid\"] > .sheet-grid-slot:nth-child(3)[data-sheet-id=\"sheet-003\"]):has([data-reorder-surface=\"grid\"] > .sheet-grid-slot:nth-child(4)[data-sheet-id=\"sheet-004\"]):has([data-reorder-surface=\"grid\"] > .sheet-grid-slot:nth-child(5)[data-sheet-id=\"sheet-005\"]):not(:has([data-reorder-surface=\"bar\"] [data-testid=\"reorder-placeholder\"])):not(:has([data-reorder-surface=\"bar\"] [data-testid=\"reorder-ghost\"])):not(:has([data-reorder-surface=\"grid\"] [data-testid=\"reorder-placeholder\"])):not(:has([data-reorder-surface=\"grid\"] [data-testid=\"reorder-ghost\"]))",
       "actions": [
-        { "type": "drag", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-004\"]", "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "phase": "preview" },
-        { "type": "key", "key": "Escape" }
+        { "type": "click", "selector": ".sheet-grid-slot[data-sheet-id=\"sheet-003\"] .sheet-tile" },
+        { "type": "drag", "gesture": "html-dnd", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-003\"]", "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "phase": "escape" }
       ]
     },
     {
       "id": "sheet-reorder-cross-surface-cancelled",
       "title": "Reordenação — cancelamento ao soltar na representação oposta",
-      "implementationPath": "/ui-architecture-prototype.html?view=editor&mode=normal",
+      "implementationPath": "/workspace-preview.html?structure=physical",
       "comparison": {
         "kind": "implementation-only",
         "surface": "sheet-reordering",
-        "implementationCaptureSelector": ".ui-architecture-prototype",
-        "reason": "A referência visual vigente não representa o cancelamento de uma prévia ao soltar fora da superfície originadora."
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A referência visual vigente não representa o cancelamento de uma prévia produtiva ao soltar fora da superfície originadora."
       },
-      "viewport": { "width": 1440, "height": 900 },
-      "readySelector": "[data-editor-mode=\"normal\"]:has([data-reorder-surface=\"bar\"][data-reorder-state=\"cancelled\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"]):has([data-reorder-surface=\"grid\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"])",
+      "viewport": { "width": 1440, "height": 600 },
+      "readySelector": ".app-shell:has([data-reorder-surface=\"bar\"][data-reorder-state=\"cancelled\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"]):has([data-reorder-surface=\"grid\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"])",
       "actions": [
-        { "type": "drag", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-004\"]", "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "dropTargetSelector": "[data-reorder-surface=\"grid\"]", "phase": "drop" }
+        { "type": "click", "selector": ".sheet-grid-slot[data-sheet-id=\"sheet-003\"] .sheet-tile" },
+        { "type": "drag", "gesture": "html-dnd", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-003\"]", "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "dropTargetSelector": "[data-reorder-surface=\"grid\"]", "phase": "drop" }
       ]
     },
     {
       "id": "sheet-reorder-invalid-drop",
       "title": "Reordenação — drop inválido de Página única",
-      "implementationPath": "/ui-architecture-prototype.html?view=editor&mode=normal",
+      "implementationPath": "/workspace-preview.html?structure=physical",
       "comparison": {
         "kind": "implementation-only",
         "surface": "sheet-reordering",
-        "implementationCaptureSelector": ".ui-architecture-prototype",
-        "reason": "A referência visual vigente não representa o bloqueio de posições que interiorizariam uma Página única."
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A referência visual vigente não representa a rejeição produtiva de posições que interiorizariam uma Página única."
       },
-      "viewport": { "width": 1440, "height": 900 },
-      "readySelector": "[data-editor-mode=\"normal\"]:has([data-reorder-surface=\"grid\"][data-reorder-state=\"invalid\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"])",
+      "viewport": { "width": 1440, "height": 600 },
+      "readySelector": ".app-shell:has([data-reorder-surface=\"grid\"][data-reorder-state=\"cancelled\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"] > .sheet-grid-slot:nth-child(1)[data-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"grid\"] > .sheet-grid-slot:nth-child(2)[data-sheet-id=\"sheet-002\"]):has([data-reorder-surface=\"grid\"] > .sheet-grid-slot:nth-child(3)[data-sheet-id=\"sheet-003\"]):has([data-reorder-surface=\"grid\"] > .sheet-grid-slot:nth-child(4)[data-sheet-id=\"sheet-004\"]):has([data-reorder-surface=\"grid\"] > .sheet-grid-slot:nth-child(5)[data-sheet-id=\"sheet-005\"]):has([data-reorder-surface=\"bar\"][data-reorder-state=\"cancelled\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"][data-preview-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"]):not(:has([data-reorder-surface=\"grid\"] [data-testid=\"reorder-placeholder\"])):not(:has([data-reorder-surface=\"grid\"] [data-testid=\"reorder-ghost\"])):not(:has([data-reorder-surface=\"bar\"] [data-testid=\"reorder-placeholder\"])):not(:has([data-reorder-surface=\"bar\"] [data-testid=\"reorder-ghost\"]))",
       "actions": [
-        { "type": "drag", "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-001\"]", "targetSelector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-003\"]", "phase": "drop" }
+        { "type": "drag", "gesture": "html-dnd", "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-003\"]", "targetSelector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-001\"]", "phase": "drop" }
+      ]
+    },
+    {
+      "id": "sheet-reorder-invalid-target-preview",
+      "title": "Reordenação — prévia de alvo inválido para Página única",
+      "implementationPath": "/workspace-preview.html?structure=physical",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-reordering",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A referência visual vigente não representa a indicação produtiva de uma posição que interiorizaria uma Página única."
+      },
+      "viewport": { "width": 1440, "height": 600 },
+      "readySelector": ".app-shell:has([data-reorder-surface=\"grid\"][data-reorder-state=\"invalid\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"] > .sheet-grid-slot:nth-child(3)[data-sheet-id=\"sheet-003\"][data-reorder-ghost=\"true\"]):has([data-reorder-surface=\"grid\"] [data-testid=\"reorder-ghost\"]):has([data-reorder-surface=\"grid\"] [data-reorder-invalid-indicator]):not(:has([data-reorder-surface=\"grid\"] [data-testid=\"reorder-placeholder\"])):has([data-reorder-surface=\"bar\"][data-reorder-state=\"invalid\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"][data-preview-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"]):not(:has([data-reorder-surface=\"bar\"] [data-testid=\"reorder-placeholder\"])):not(:has([data-reorder-surface=\"bar\"] [data-testid=\"reorder-ghost\"]))",
+      "actions": [
+        { "type": "drag", "gesture": "html-dnd", "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-003\"]", "targetSelector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-001\"]", "phase": "preview" }
       ]
     },
     {
