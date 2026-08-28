@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "gate": "productive-end-to-end-journey",
-  "collectedAtUtc": "2026-08-28T20:45:31.1326713Z",
-  "gitCommit": "2cca54d0b937ede1828258c827fa4d7a0107b41f",
+  "collectedAtUtc": "2026-08-28T21:58:32.5329531Z",
+  "gitCommit": "bfccdd3cf63d62a5b37dfc7a59c46ac2fe7d3799",
   "sourceInputsDirty": false,
   "platform": {
     "operatingSystem": "Microsoft Windows NT 10.0.26200.0",
@@ -101,7 +101,7 @@
     "cancelledExportBeforePipeline": true,
     "createAuthorization": "createOnly",
     "exportedSheetNumber": 2,
-    "selectedSheetId": "21ad0ba4-d4f7-4c71-bb22-eaea29daafd8",
+    "selectedSheetId": "53f202e9-d25a-4f71-bf23-b3aca95879cc",
     "selectedSheetActiveSides": "both",
     "firstSheetDimensions": {
       "width": 720,
@@ -122,43 +122,43 @@
     "physicalAlbumStructure": {
       "reorderSurface": "grid",
       "dragTransport": "w3c-pointer-actions",
-      "addedSheetId": "98003fff-148d-4627-acda-d8f95629f53c",
+      "addedSheetId": "dd9a2e2d-71b1-4ed6-a9fc-fcb4548697d7",
       "before": {
         "count": 3,
-        "focusedSheetId": "21ad0ba4-d4f7-4c71-bb22-eaea29daafd8",
+        "focusedSheetId": "53f202e9-d25a-4f71-bf23-b3aca95879cc",
         "order": [
-          "dafb1ce6-a96d-4b0b-885a-cec323bbb089",
-          "21ad0ba4-d4f7-4c71-bb22-eaea29daafd8",
-          "468d5158-17f4-488e-8e3c-ce6f0b1a50dd"
+          "1a358128-1c88-471c-bb89-624eb92e761b",
+          "53f202e9-d25a-4f71-bf23-b3aca95879cc",
+          "5d5759cb-03bc-4de4-b263-7cf6748874cc"
         ]
       },
       "afterAdd": {
         "count": 4,
-        "focusedSheetId": "98003fff-148d-4627-acda-d8f95629f53c",
+        "focusedSheetId": "dd9a2e2d-71b1-4ed6-a9fc-fcb4548697d7",
         "order": [
-          "dafb1ce6-a96d-4b0b-885a-cec323bbb089",
-          "21ad0ba4-d4f7-4c71-bb22-eaea29daafd8",
-          "98003fff-148d-4627-acda-d8f95629f53c",
-          "468d5158-17f4-488e-8e3c-ce6f0b1a50dd"
+          "1a358128-1c88-471c-bb89-624eb92e761b",
+          "53f202e9-d25a-4f71-bf23-b3aca95879cc",
+          "dd9a2e2d-71b1-4ed6-a9fc-fcb4548697d7",
+          "5d5759cb-03bc-4de4-b263-7cf6748874cc"
         ]
       },
       "afterReorder": {
         "count": 4,
-        "focusedSheetId": "98003fff-148d-4627-acda-d8f95629f53c",
+        "focusedSheetId": "dd9a2e2d-71b1-4ed6-a9fc-fcb4548697d7",
         "order": [
-          "dafb1ce6-a96d-4b0b-885a-cec323bbb089",
-          "98003fff-148d-4627-acda-d8f95629f53c",
-          "21ad0ba4-d4f7-4c71-bb22-eaea29daafd8",
-          "468d5158-17f4-488e-8e3c-ce6f0b1a50dd"
+          "1a358128-1c88-471c-bb89-624eb92e761b",
+          "dd9a2e2d-71b1-4ed6-a9fc-fcb4548697d7",
+          "53f202e9-d25a-4f71-bf23-b3aca95879cc",
+          "5d5759cb-03bc-4de4-b263-7cf6748874cc"
         ]
       },
       "afterDelete": {
         "count": 3,
-        "focusedSheetId": "21ad0ba4-d4f7-4c71-bb22-eaea29daafd8",
+        "focusedSheetId": "53f202e9-d25a-4f71-bf23-b3aca95879cc",
         "order": [
-          "dafb1ce6-a96d-4b0b-885a-cec323bbb089",
-          "21ad0ba4-d4f7-4c71-bb22-eaea29daafd8",
-          "468d5158-17f4-488e-8e3c-ce6f0b1a50dd"
+          "1a358128-1c88-471c-bb89-624eb92e761b",
+          "53f202e9-d25a-4f71-bf23-b3aca95879cc",
+          "5d5759cb-03bc-4de4-b263-7cf6748874cc"
         ]
       },
       "restoredOriginalOrder": true,
@@ -166,19 +166,19 @@
         {
           "event": "project_intent_applied",
           "intent": "add_sheet",
-          "processId": 37316,
+          "processId": 21160,
           "revision": 9
         },
         {
           "event": "project_intent_applied",
           "intent": "reorder_sheet",
-          "processId": 37316,
+          "processId": 21160,
           "revision": 10
         },
         {
           "event": "project_intent_applied",
           "intent": "delete_sheet",
-          "processId": 37316,
+          "processId": 21160,
           "revision": 11
         }
       ]
@@ -203,15 +203,15 @@
       "postRecoveryActionsCheckpointed": true,
       "checkpointPreservedByCancelledSaveAs": true,
       "checkpointFinishedBySuccessfulSaveAs": true,
-      "crashedHostProcessId": 28992,
-      "recoveredHostProcessId": 37316,
+      "crashedHostProcessId": 4260,
+      "recoveredHostProcessId": 21160,
       "lockReleasedToDistinctHost": true
     },
     "saveAs": {
       "cancelledBeforeCore": true,
       "createAuthorization": "createOnly",
-      "originalProjectId": "f5dd1de5-5efe-41ed-9828-e8ca8671583c",
-      "copiedProjectId": "58735f64-5f34-4927-b3ca-481392ac8a58",
+      "originalProjectId": "702e0add-cdd5-4314-b8ae-8bafe25badc4",
+      "copiedProjectId": "ef6baf51-c8b0-48a6-b362-6e89e14b8f30",
       "savedAsRevision": 6,
       "contentPreserved": true,
       "originalByteIdentical": true,
@@ -228,7 +228,7 @@
       "localAuthorityTransitioned": true,
       "webviewNamespaceTransitioned": true,
       "nativeTitleUpdated": true,
-      "observedNativeTitle": "Jornada produtiva - Cópia — C:\\Users\\Usuario\\.codex\\worktrees\\a73e\\my-Albuns\\.scratch\\j8-46144-1e5b17\\Jornada produtiva - Cópia.myalbuns",
+      "observedNativeTitle": "Jornada produtiva - Cópia — C:\\Users\\Usuario\\.codex\\worktrees\\a73e\\my-Albuns\\.scratch\\j8-29032-d74271\\Jornada produtiva - Cópia.myalbuns",
       "replacementWebviewReady": true,
       "globalInspectorPreferencePreserved": true,
       "projectLocalSelectionReset": true
@@ -267,16 +267,16 @@
       }
     },
     "processIds": {
-      "firstGlobal": 37356,
-      "firstHost": 12896,
-      "global": 34796,
-      "crashedHost": 28992,
-      "recoveryGlobal": 53388,
-      "host": 37316,
-      "simultaneousOriginalGlobal": 42020,
-      "simultaneousOriginalHost": 25852,
-      "imaging": 40552,
-      "missingOriginalImaging": 51008
+      "firstGlobal": 26208,
+      "firstHost": 30864,
+      "global": 25368,
+      "crashedHost": 4260,
+      "recoveryGlobal": 8748,
+      "host": 21160,
+      "simultaneousOriginalGlobal": 6612,
+      "simultaneousOriginalHost": 30400,
+      "imaging": 23716,
+      "missingOriginalImaging": 2920
     },
     "correlations": {
       "bootstraps": 4,
@@ -296,10 +296,10 @@
     "canvasPhotoSample": {
       "x": 506,
       "y": 443,
-      "red": 112,
+      "red": 123,
       "green": 136,
-      "blue": 128,
-      "jpegMaxChannelDelta": 15,
+      "blue": 127,
+      "jpegMaxChannelDelta": 17,
       "tolerance": 32
     },
     "cleanupCompleted": true
