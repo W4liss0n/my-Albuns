@@ -55,9 +55,9 @@ describe("sheet reorder session", () => {
       targetIndex: 1,
     });
     expect(sheetReorderRepresentation(committed.session, "bar")).toEqual({
-      order: confirmedOrder,
-      placeholderIndex: null,
-      ghost: null,
+      order: ["initial", "fourth", "second", "third", "final"],
+      placeholderIndex: 1,
+      ghost: { sheetId: "fourth" },
     });
 
     const duplicateDrop = reduceSheetReorderSession(
@@ -109,6 +109,39 @@ describe("sheet reorder session", () => {
       placeholderIndex: null,
       ghost: null,
     });
+  });
+
+  test("starts a valid drag with an origin placeholder and cancels an unchanged drop", () => {
+    const started = reduceSheetReorderSession(
+      createSheetReorderSession(physicalAlbum),
+      physicalAlbum,
+      {
+        type: "preview",
+        origin: "grid",
+        draggedSheetId: "third",
+        targetIndex: 2,
+      },
+    );
+
+    expect(started.effect).toBeNull();
+    expect(started.session).toMatchObject({
+      status: "preview",
+      confirmedOrder,
+      origin: "grid",
+      draggedSheetId: "third",
+      targetIndex: 2,
+      previewOrder: confirmedOrder,
+      placeholderIndex: 2,
+      ghost: { sheetId: "third" },
+    });
+
+    const dropped = reduceSheetReorderSession(
+      started.session,
+      physicalAlbum,
+      { type: "drop", surface: "grid" },
+    );
+    expect(dropped.effect).toBeNull();
+    expect(dropped.session.status).toBe("cancelled");
   });
 
   test("cancels a preview on Escape or a drop in the opposite surface", () => {

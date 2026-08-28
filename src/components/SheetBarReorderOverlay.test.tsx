@@ -23,8 +23,8 @@ test("aligns enabled reorder handles with the scaled Sheet Bar slots", () => {
   const second = screen.getByRole("button", {
     name: "Reordenar Lâmina 02 pela Barra",
   });
-  expect(first).toHaveStyle({ left: "25px", top: "28px", width: "100px" });
-  expect(second).toHaveStyle({ left: "171px", top: "28px", width: "100px" });
+  expect(first).toHaveStyle({ left: "88px", top: "28px", width: "37px" });
+  expect(second).toHaveStyle({ left: "234px", top: "28px", width: "37px" });
   expect(first).toHaveAttribute("draggable", "true");
 
   rerender(<SheetBarReorderOverlay {...props()} disabled />);
@@ -34,6 +34,37 @@ test("aligns enabled reorder handles with the scaled Sheet Bar slots", () => {
     <SheetBarReorderOverlay {...props({ status: "committing" })} />,
   );
   expect(first).toHaveAttribute("draggable", "false");
+});
+
+test("keeps reserved swap and layout hit regions outside the Bar reorder handle", () => {
+  const onNavigate = vi.fn();
+  const onPreview = vi.fn();
+  render(
+    <SheetBarReorderOverlay
+      {...props({ onNavigate, onPreview })}
+    />,
+  );
+  const first = screen.getByRole("button", {
+    name: "Reordenar Lâmina 01 pela Barra",
+  });
+  const reservedSurface = screen.getByTestId(
+    "sheet-reorder-bar-drop-zone",
+  );
+
+  expect(first).toHaveStyle({ left: "88px", width: "37px" });
+  fireEvent.dragStart(reservedSurface, {
+    dataTransfer: { effectAllowed: "none", setData: vi.fn() },
+  });
+  fireEvent.click(reservedSurface);
+  expect(onPreview).not.toHaveBeenCalled();
+  expect(onNavigate).not.toHaveBeenCalled();
+
+  fireEvent.dragStart(first, {
+    dataTransfer: { effectAllowed: "none", setData: vi.fn() },
+  });
+  fireEvent.click(first);
+  expect(onPreview).toHaveBeenCalledWith("sheet-1", 0);
+  expect(onNavigate).toHaveBeenCalledWith("sheet-1");
 });
 
 test("moves neighboring handles and renders only the declared preview markers", () => {
@@ -60,13 +91,20 @@ test("moves neighboring handles and renders only the declared preview markers", 
   const dragged = screen.getByRole("button", {
     name: "Reordenar Lâmina 02 pela Barra",
   });
-  expect(movedNeighbor).toHaveStyle({ left: "171px" });
+  expect(movedNeighbor).toHaveStyle({ left: "234px" });
   expect(movedNeighbor).toHaveAttribute("data-reorder-shift", "true");
-  expect(dragged).toHaveStyle({ left: "25px" });
+  expect(dragged).toHaveStyle({ left: "88px" });
   expect(dragged).toHaveAttribute("data-reorder-ghost", "true");
 
   expect(screen.getByTestId("reorder-placeholder")).toHaveStyle({
+    height: "50px",
     left: "171px",
+    top: "28px",
+    width: "100px",
+  });
+  expect(screen.getByTestId("reorder-ghost")).toHaveStyle({
+    height: "50px",
+    left: "25px",
     top: "28px",
     width: "100px",
   });
@@ -88,6 +126,36 @@ test("moves neighboring handles and renders only the declared preview markers", 
     "Posição inválida: Páginas únicas permanecem nas extremidades.",
   );
   expect(screen.queryByTestId("reorder-placeholder")).not.toBeInTheDocument();
+});
+
+test("matches full-size markers to the bleed-cropped visible Sheet bounds", () => {
+  render(
+    <SheetBarReorderOverlay
+      {...props({
+        bleedUm: 3_000,
+        representation: {
+          ghost: { sheetId: "sheet-2" },
+          order: ["sheet-2", "sheet-1"],
+          placeholderIndex: 1,
+        },
+        status: "preview",
+      })}
+    />,
+  );
+
+  expect(
+    screen.getByRole("button", {
+      name: "Reordenar Lâmina 01 pela Barra",
+    }),
+  ).toHaveStyle({ top: "29.5px" });
+  expect(screen.getByTestId("reorder-placeholder")).toHaveStyle({
+    height: "47px",
+    top: "29.5px",
+  });
+  expect(screen.getByTestId("reorder-ghost")).toHaveStyle({
+    height: "47px",
+    top: "29.5px",
+  });
 });
 
 test("routes native drag, drop, end, and context gestures through the Bar seam", () => {
@@ -153,6 +221,20 @@ test("anchors a visible custom native drag image to the pointer", () => {
     const first = screen.getByRole("button", {
       name: "Reordenar Lâmina 01 pela Barra",
     });
+    const overlay = screen.getByRole("group", {
+      name: "Reordenação pela Barra da Lâmina",
+    });
+    vi.spyOn(overlay, "getBoundingClientRect").mockReturnValue({
+      bottom: 560,
+      height: 500,
+      left: 10,
+      right: 650,
+      top: 60,
+      width: 640,
+      x: 10,
+      y: 60,
+      toJSON: () => ({}),
+    });
     vi.spyOn(first, "getBoundingClientRect").mockReturnValue({
       bottom: 68,
       height: 40,
@@ -164,17 +246,7 @@ test("anchors a visible custom native drag image to the pointer", () => {
       y: 28,
       toJSON: () => ({}),
     });
-    const setDragImage = vi.fn(
-      (element: HTMLElement, offsetX: number, offsetY: number) => {
-        expect(document.body).toContainElement(element);
-        expect(element).toHaveClass(
-          "sheet-bar-reorder-overlay__native-drag-image",
-        );
-        expect(element).toHaveTextContent("L01");
-        expect(element).toHaveStyle({ height: "40px", width: "100px" });
-        expect([offsetX, offsetY]).toEqual([50, 20]);
-      },
-    );
+    const setDragImage = vi.fn();
     const dataTransfer = {
       dropEffect: "none",
       effectAllowed: "none",
@@ -182,10 +254,26 @@ test("anchors a visible custom native drag image to the pointer", () => {
       setDragImage,
     };
 
-    dragStartAt(first, 70, 48, dataTransfer);
+    dragStartAt(first, 70, 108, dataTransfer);
 
     expect(setDragImage).toHaveBeenCalledOnce();
-    const dragImage = setDragImage.mock.calls[0][0];
+    const [dragImage, offsetX, offsetY] = setDragImage.mock.calls[0] as [
+      HTMLElement,
+      number,
+      number,
+    ];
+    expect(document.body).toContainElement(dragImage);
+    expect(dragImage).toHaveClass(
+      "sheet-bar-reorder-overlay__native-drag-image",
+    );
+    expect(dragImage).toHaveTextContent("L01");
+    expect(dragImage).toHaveStyle({
+      height: "50px",
+      left: "35px",
+      top: "88px",
+      width: "100px",
+    });
+    expect([offsetX, offsetY]).toEqual([35, 20]);
     vi.runOnlyPendingTimers();
     expect(document.body).not.toContainElement(dragImage);
   } finally {

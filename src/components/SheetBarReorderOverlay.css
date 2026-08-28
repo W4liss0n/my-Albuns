@@ -28,6 +28,13 @@
   right: 0;
   left: 0;
   background: transparent;
+  pointer-events: none;
+}
+
+.sheet-bar-reorder-overlay[data-reorder-state="preview"]
+  .sheet-bar-reorder-overlay__drop-zone,
+.sheet-bar-reorder-overlay[data-reorder-state="invalid"]
+  .sheet-bar-reorder-overlay__drop-zone {
   pointer-events: auto;
 }
 

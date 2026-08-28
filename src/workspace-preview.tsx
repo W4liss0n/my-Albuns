@@ -194,7 +194,10 @@ function createPreviewProjection(
   structureMode: string | null,
 ): EditorProjection {
   const preview = structuredClone(createTwoSheetProjection());
-  if (structureMode === "physical") configurePhysicalPreview(preview);
+  if (structureMode === "physical") configurePhysicalPreview(preview, 5);
+  if (structureMode === "minimum-single-edges") {
+    configurePhysicalPreview(preview, 2);
+  }
   if (decorativeMode === "unavailable") {
     preview.state.album.media.push({
       id: unavailableDecorativeId,
@@ -248,10 +251,16 @@ function createPreviewProjection(
   return preview;
 }
 
-function configurePhysicalPreview(preview: EditorProjection) {
+function configurePhysicalPreview(
+  preview: EditorProjection,
+  sheetCount: number,
+) {
   const sheetWidthUm = preview.state.document.sheetWidthUm;
   const sheetHeightUm = preview.state.document.sheetHeightUm;
-  const ids = ["sheet-001", "sheet-002", "sheet-003", "sheet-004", "sheet-005"];
+  const ids = Array.from(
+    { length: sheetCount },
+    (_, index) => `sheet-${String(index + 1).padStart(3, "0")}`,
+  );
   let nextPageNumber = 1;
   preview.state.album.sheets = ids.map((id, index) => {
     const activeSides =

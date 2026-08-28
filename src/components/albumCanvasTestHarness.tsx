@@ -65,6 +65,7 @@ const pixiLifecycle = vi.hoisted(() => ({
     };
   }>,
   resizeCallbacks: [] as ResizeObserverCallback[],
+  tickerCallbacks: [] as Array<(ticker: { deltaMS: number }) => void>,
   resolveInitializations: [] as Array<() => void>,
   assetLoads: [] as string[],
   assetUnloads: [] as string[],
@@ -317,7 +318,14 @@ vi.mock("pixi.js", () => {
     screen = { width: 1_200, height: 500 };
     stage = new Container();
     ticker = {
+      add: (callback: (ticker: { deltaMS: number }) => void) => {
+        pixiLifecycle.tickerCallbacks.push(callback);
+      },
       addOnce: (callback: () => void) => callback(),
+      remove: (callback: (ticker: { deltaMS: number }) => void) => {
+        const index = pixiLifecycle.tickerCallbacks.indexOf(callback);
+        if (index >= 0) pixiLifecycle.tickerCallbacks.splice(index, 1);
+      },
     };
 
     constructor() {
@@ -554,12 +562,22 @@ export function displayWithLabel(label: string) {
   return display;
 }
 
+export async function advancePixiTicker(deltaMS: number) {
+  await act(async () => {
+    for (const callback of [...pixiLifecycle.tickerCallbacks]) {
+      callback({ deltaMS });
+    }
+    await Promise.resolve();
+  });
+}
+
 export function setupAlbumCanvasTestHarness() {
   beforeEach(() => {
     pixiLifecycle.displays.length = 0;
     pixiLifecycle.initOptions.length = 0;
     pixiLifecycle.instances.length = 0;
     pixiLifecycle.resizeCallbacks.length = 0;
+    pixiLifecycle.tickerCallbacks.length = 0;
     pixiLifecycle.resolveInitializations.length = 0;
     pixiLifecycle.assetLoads.length = 0;
     pixiLifecycle.assetUnloads.length = 0;

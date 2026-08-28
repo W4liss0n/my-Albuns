@@ -186,6 +186,30 @@ export async function performUiAcceptanceAction({
       : await locateSelector(action.selector);
   const encodedElementId = encodeURIComponent(elementId);
 
+  if (action.type === "context-click") {
+    await request("POST", `/session/${sessionId}/actions`, {
+      actions: [
+        {
+          type: "pointer",
+          id: "acceptance-pointer",
+          parameters: { pointerType: "mouse" },
+          actions: [
+            {
+              type: "pointerMove",
+              duration: 0,
+              origin: elementReference(elementId),
+              x: 0,
+              y: 0,
+            },
+            { type: "pointerDown", button: 2 },
+            { type: "pointerUp", button: 2 },
+          ],
+        },
+      ],
+    });
+    return;
+  }
+
   if (action.type === "click" || action.type === "click-text") {
     if (action.modifiers?.includes("Control")) {
       await request("POST", `/session/${sessionId}/actions`, {

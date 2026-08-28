@@ -102,7 +102,12 @@ export function reduceSheetReorderSession(
       event.draggedSheetId,
       event.targetIndex,
     );
-    const valid = plan.valid && plan.changed;
+    const originPreview =
+      plan.sourceIndex >= 0 && plan.sourceIndex === event.targetIndex;
+    const valid = originPreview || (plan.valid && plan.changed);
+    const previewOrder = originPreview
+      ? confirmedSheetOrder(sheets)
+      : plan.order;
 
     return {
       effect: null,
@@ -112,7 +117,7 @@ export function reduceSheetReorderSession(
         origin: event.origin,
         draggedSheetId: event.draggedSheetId,
         targetIndex: event.targetIndex,
-        previewOrder: valid ? plan.order : null,
+        previewOrder: valid ? previewOrder : null,
         placeholderIndex: valid ? plan.targetIndex : null,
         ghost: { sheetId: event.draggedSheetId },
       },
@@ -160,9 +165,6 @@ export function reduceSheetReorderSession(
       ...session,
       status: "committing",
       confirmedOrder: confirmedSheetOrder(sheets),
-      previewOrder: null,
-      placeholderIndex: null,
-      ghost: null,
     },
   };
 }
@@ -174,7 +176,10 @@ export function sheetReorderRepresentation(
   if (surface !== session.origin) {
     return confirmedRepresentation(session.confirmedOrder);
   }
-  if (session.status === "preview" && session.previewOrder !== null) {
+  if (
+    (session.status === "preview" || session.status === "committing") &&
+    session.previewOrder !== null
+  ) {
     return {
       order: session.previewOrder,
       placeholderIndex: session.placeholderIndex,

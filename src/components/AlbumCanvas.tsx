@@ -548,6 +548,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
         )}
         {props.mode.kind === "normal" && props.sheetReorder ? (
           <SheetBarReorderOverlay
+            bleedUm={props.technicalGuides?.bleedUm}
             disabled={props.sheetReorder.disabled}
             layout={props.continuousCanvasLayout}
             metrics={canvasMetrics}

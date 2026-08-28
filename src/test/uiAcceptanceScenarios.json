@@ -358,6 +358,38 @@
       ]
     },
     {
+      "id": "sheet-structure-application-menu",
+      "title": "Estrutura física — menu Lâmina no mínimo",
+      "implementationPath": "/workspace-preview.html?structure=minimum-single-edges",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-structure-commands",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A referência visual vigente não representa os comandos estruturais nem as restrições físicas aceitas posteriormente."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": ".app-shell:has(#application-menu-sheet button[aria-label=\"Adicionar antes\"]:disabled):has(#application-menu-sheet button[aria-label=\"Excluir\"]:disabled)",
+      "actions": [
+        { "type": "click", "selector": "[aria-controls=\"application-menu-sheet\"]" }
+      ]
+    },
+    {
+      "id": "sheet-structure-context-menu",
+      "title": "Estrutura física — menu contextual da Página única inicial",
+      "implementationPath": "/workspace-preview.html?structure=minimum-single-edges",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-structure-commands",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A referência visual vigente não representa o menu contextual estrutural nem as restrições físicas aceitas posteriormente."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": ".app-shell:has([role=\"menu\"][aria-label=\"Ações da Lâmina 01\"]):has([role=\"menu\"][aria-label=\"Ações da Lâmina 01\"] button:nth-of-type(1):disabled):has([role=\"menu\"][aria-label=\"Ações da Lâmina 01\"] button:nth-of-type(4):disabled)",
+      "actions": [
+        { "type": "context-click", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-001\"]" }
+      ]
+    },
+    {
       "id": "project-workspace-panels-persisted",
       "title": "Janela do Projeto — tamanhos de painéis persistidos",
       "implementationPath": "/workspace-preview.html?layout=persisted",

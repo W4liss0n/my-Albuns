@@ -135,10 +135,10 @@ export function validateUiAcceptanceManifest(manifest) {
         const actionLocation = `${location}.${groupName}[${actionIndex}]`;
         invariant(action && typeof action === "object", `${actionLocation} must be an object`);
         invariant(
-          ["click", "click-text", "drag", "focus", "hover", "input", "key", "wheel"].includes(action.type),
+          ["click", "click-text", "context-click", "drag", "focus", "hover", "input", "key", "wheel"].includes(action.type),
           `${actionLocation}.type is not supported`,
         );
-        if (["click", "drag", "focus", "hover", "input", "wheel"].includes(action.type)) {
+        if (["click", "context-click", "drag", "focus", "hover", "input", "wheel"].includes(action.type)) {
           invariant(typeof action.selector === "string" && action.selector.trim(), `${actionLocation}.selector is required`);
         }
         if (action.type === "click-text") {

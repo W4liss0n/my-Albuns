@@ -10,6 +10,7 @@ import {
 } from "./albumCanvasTestFixtures";
 import { createContinuousCanvasLayout } from "./canvasGeometry";
 import {
+  advancePixiTicker,
   AlbumCanvas,
   displayWithLabel,
   displayWithHandler,
@@ -1579,4 +1580,120 @@ test("mounts the productive Sheet Bar seam for navigation, context, and reorder"
     { dataTransfer },
   );
   expect(onDrop).toHaveBeenCalledOnce();
+});
+
+test("slides intermediate Pixi Sheets while the dragged Sheet yields to the placeholder", async () => {
+  const canvasProps = {
+    projectId: "project-spike-001",
+    mode: { kind: "normal" } as const,
+    composition: threeSheetComposition,
+    continuousCanvasLayout: createContinuousCanvasLayout(
+      threeSheetComposition.sheets,
+    ),
+    sheetBarMetadata: [],
+    selectedFrameId: null,
+    focusedSheetId: "sheet-001",
+    centeredSheetId: "sheet-001",
+    viewport: { offsetX: 42 },
+    onSelectFrame: vi.fn(),
+    onEditSheet: vi.fn(),
+    onFocusSheet: vi.fn(),
+    onCenteredSheetChange: vi.fn(),
+    onViewportChange: vi.fn(),
+    onTransformPreview: vi.fn(),
+    onTransformCommit: vi.fn(async () => true),
+  };
+  const reorderCallbacks = {
+    disabled: false,
+    onCancel: vi.fn(),
+    onDrop: vi.fn(),
+    onNavigate: vi.fn(),
+    onPreview: vi.fn(),
+  };
+  const view = render(
+    <AlbumCanvas
+      {...canvasProps}
+      sheetReorder={{
+        ...reorderCallbacks,
+        representation: {
+          ghost: null,
+          order: ["sheet-001", "sheet-002", "sheet-003"],
+          placeholderIndex: null,
+        },
+        status: "idle",
+      }}
+    />,
+  );
+  await finishPixiInitialization();
+
+  const first = displayWithLabel("canvas-sheet-sheet-001");
+  const second = displayWithLabel("canvas-sheet-sheet-002");
+  const third = displayWithLabel("canvas-sheet-sheet-003");
+  const initialPositions = [
+    first.position.x,
+    second.position.x,
+    third.position.x,
+  ];
+
+  view.rerender(
+    <AlbumCanvas
+      {...canvasProps}
+      sheetReorder={{
+        ...reorderCallbacks,
+        representation: {
+          ghost: { sheetId: "sheet-003" },
+          order: ["sheet-001", "sheet-003", "sheet-002"],
+          placeholderIndex: 1,
+        },
+        status: "preview",
+      }}
+    />,
+  );
+
+  expect(first.position.x).toBe(initialPositions[0]);
+  expect(second.position.x).toBe(initialPositions[1]);
+  expect(third.visible).toBe(false);
+
+  await advancePixiTicker(70);
+  expect(second.position.x).toBeGreaterThan(initialPositions[1]);
+  expect(second.position.x).toBeLessThan(initialPositions[2]);
+
+  await advancePixiTicker(70);
+  expect(second.position.x).toBe(initialPositions[2]);
+
+  view.rerender(
+    <AlbumCanvas
+      {...canvasProps}
+      sheetReorder={{
+        ...reorderCallbacks,
+        representation: {
+          ghost: { sheetId: "sheet-003" },
+          order: ["sheet-001", "sheet-003", "sheet-002"],
+          placeholderIndex: 1,
+        },
+        status: "committing",
+      }}
+    />,
+  );
+  await advancePixiTicker(70);
+  expect(second.position.x).toBe(initialPositions[2]);
+  expect(third.visible).toBe(false);
+
+  view.rerender(
+    <AlbumCanvas
+      {...canvasProps}
+      sheetReorder={{
+        ...reorderCallbacks,
+        representation: {
+          ghost: null,
+          order: ["sheet-001", "sheet-002", "sheet-003"],
+          placeholderIndex: null,
+        },
+        status: "cancelled",
+      }}
+    />,
+  );
+  expect(third.visible).toBe(true);
+  await advancePixiTicker(140);
+  expect(second.position.x).toBe(initialPositions[1]);
 });

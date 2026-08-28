@@ -78,3 +78,60 @@ export function planSheetReorder(
     valid,
   };
 }
+
+/**
+ * Keeps a queued drag's semantic destination when an earlier mutation changes
+ * the Sheet count. The captured neighbors define the user's destination; the
+ * numeric index is recalculated only when the queued command actually runs.
+ */
+export function materializeSheetReorderTarget(
+  capturedSheets: readonly SheetSnapshot[],
+  latestSheets: readonly SheetSnapshot[],
+  sheetId: string,
+  targetIndex: number,
+): number | null {
+  const capturedPlan = planSheetReorder(
+    capturedSheets,
+    sheetId,
+    targetIndex,
+  );
+  if (!capturedPlan.valid || !capturedPlan.changed) return null;
+  if (!latestSheets.some((sheet) => sheet.id === sheetId)) return null;
+
+  const destinationIndex = capturedPlan.order.indexOf(sheetId);
+  const predecessorId = capturedPlan.order[destinationIndex - 1] ?? null;
+  const successorId = capturedPlan.order[destinationIndex + 1] ?? null;
+  const remainingOrder = latestSheets
+    .map((sheet) => sheet.id)
+    .filter((candidateId) => candidateId !== sheetId);
+  const predecessorIndex = predecessorId
+    ? remainingOrder.indexOf(predecessorId)
+    : -1;
+  const successorIndex = successorId
+    ? remainingOrder.indexOf(successorId)
+    : -1;
+
+  let materializedTarget: number | null = null;
+  if (predecessorIndex >= 0 && successorIndex >= 0) {
+    if (predecessorIndex >= successorIndex) return null;
+    materializedTarget = successorIndex;
+  } else if (successorIndex >= 0) {
+    materializedTarget = successorIndex;
+  } else if (predecessorIndex >= 0) {
+    materializedTarget = predecessorIndex + 1;
+  } else if (destinationIndex === 0) {
+    materializedTarget = 0;
+  } else if (destinationIndex === capturedPlan.order.length - 1) {
+    materializedTarget = remainingOrder.length;
+  }
+  if (materializedTarget === null) return null;
+
+  const latestPlan = planSheetReorder(
+    latestSheets,
+    sheetId,
+    materializedTarget,
+  );
+  return latestPlan.valid && latestPlan.changed
+    ? materializedTarget
+    : null;
+}

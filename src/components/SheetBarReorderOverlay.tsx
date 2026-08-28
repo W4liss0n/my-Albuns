@@ -11,8 +11,10 @@ import type { ViewportState } from "../state/viewport";
 import type { CanvasMetrics } from "./albumCanvasContract";
 import {
   CANVAS_VERTICAL_MARGIN_PX,
+  createCanvasSheetPresentation,
   type ContinuousCanvasLayout,
 } from "./canvasGeometry";
+import { createCanvasSheetViewGeometry } from "./canvasSheetViewGeometry";
 import {
   SHEET_REORDER_INVALID_MESSAGE,
   sheetReorderAutoScrollVelocity,
@@ -26,6 +28,7 @@ export interface SheetBarReorderOverlayProps {
   readonly sheets: readonly ComposedSheet[];
   readonly layout: ContinuousCanvasLayout;
   readonly metrics: CanvasMetrics | null;
+  readonly bleedUm?: number;
   readonly viewport: ViewportState;
   readonly representation: SheetReorderRepresentation;
   readonly status: SheetReorderStatus;
@@ -66,6 +69,19 @@ export function SheetBarReorderOverlay(
     ? props.representation.order.indexOf(ghostSheetId)
     : -1;
   const ghostEntry = ghostIndex >= 0 ? entries[ghostIndex] ?? null : null;
+  const firstSheetBounds =
+    scale === null || !props.sheets[0]
+      ? null
+      : visibleSheetBounds(
+          props.sheets[0],
+          scale,
+          props.bleedUm,
+        );
+  const placeholderBounds =
+    scale === null || !ghostSheet
+      ? null
+      : visibleSheetBounds(ghostSheet, scale, props.bleedUm);
+  const ghostBounds = placeholderBounds;
   const draggedSheetIdRef = useRef<string | null>(null);
   const nativeDragImageCleanupRef = useRef<(() => void) | null>(null);
 
@@ -101,18 +117,31 @@ export function SheetBarReorderOverlay(
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/plain", sheetId);
     event.dataTransfer.setData("application/x-myalbuns-sheet", sheetId);
-    setNativeDragImage(event, sheetById.get(sheetId));
+    setNativeDragImage(
+      event,
+      sheetById.get(sheetId),
+      entries[targetIndex],
+    );
     props.onPreview(sheetId, targetIndex);
   }
 
   function setNativeDragImage(
     event: ReactDragEvent<HTMLButtonElement>,
     sheet: ComposedSheet | undefined,
+    entry: (typeof entries)[number] | undefined,
   ) {
     nativeDragImageCleanupRef.current?.();
-    if (!sheet) return;
+    if (!sheet || !entry || scale === null) return;
 
-    const bounds = event.currentTarget.getBoundingClientRect();
+    const bounds = visibleSheetBounds(sheet, scale, props.bleedUm);
+    const overlayBounds = event.currentTarget
+      .closest<HTMLDivElement>(".sheet-bar-reorder-overlay")
+      ?.getBoundingClientRect();
+    const left =
+      (overlayBounds?.left ?? 0) +
+      entry.left * scale +
+      props.viewport.offsetX;
+    const top = (overlayBounds?.top ?? 0) + bounds.top;
     const source = event.currentTarget;
     const dragImage = document.createElement("span");
     dragImage.className =
@@ -120,18 +149,18 @@ export function SheetBarReorderOverlay(
     dragImage.textContent = `L${String(sheet.number).padStart(2, "0")}`;
     Object.assign(dragImage.style, {
       height: `${bounds.height}px`,
-      left: `${bounds.left}px`,
-      top: `${bounds.top}px`,
-      width: `${bounds.width}px`,
+      left: `${left}px`,
+      top: `${top}px`,
+      width: `${entry.width * scale}px`,
     });
     document.body.append(dragImage);
 
     const offsetX = dragImageOffset(
-      event.clientX - bounds.left,
-      bounds.width,
+      event.clientX - left,
+      entry.width * scale,
     );
     const offsetY = dragImageOffset(
-      event.clientY - bounds.top,
+      event.clientY - top,
       bounds.height,
     );
 
@@ -251,18 +280,18 @@ export function SheetBarReorderOverlay(
         data-testid="sheet-reorder-bar-drop-zone"
         style={{
           height: `${SHEET_VISUAL_STYLE.sheetBar.heightPx}px`,
-          top: `${CANVAS_VERTICAL_MARGIN_PX}px`,
+          top: `${firstSheetBounds?.top ?? CANVAS_VERTICAL_MARGIN_PX}px`,
         }}
       />
-      {placeholderEntry && scale !== null ? (
+      {placeholderEntry && placeholderBounds && scale !== null ? (
         <span
           aria-hidden="true"
           className="sheet-bar-reorder-overlay__placeholder"
           data-testid="reorder-placeholder"
           style={{
-            height: `${SHEET_VISUAL_STYLE.sheetBar.heightPx}px`,
+            height: `${placeholderBounds.height}px`,
             left: `${placeholderEntry.left * scale + props.viewport.offsetX}px`,
-            top: `${CANVAS_VERTICAL_MARGIN_PX}px`,
+            top: `${placeholderBounds.top}px`,
             width: `${placeholderEntry.width * scale}px`,
           }}
         />
@@ -272,11 +301,26 @@ export function SheetBarReorderOverlay(
         const entry = entries[index];
         if (!sheet || !entry || scale === null) return [];
 
+        const fullWidth = entry.width * scale;
+        const sheetBounds = visibleSheetBounds(
+          sheet,
+          scale,
+          props.bleedUm,
+        );
+        const freeRegionStart = Math.min(
+          fullWidth,
+          Math.max(
+            SHEET_VISUAL_STYLE.sheetBar.swapActionCenterPx +
+              SHEET_VISUAL_STYLE.sheetBar.actionSizePx / 2,
+            fullWidth / 2 +
+              SHEET_VISUAL_STYLE.sheetBar.actionSizePx / 2,
+          ),
+        );
         const style = {
           height: `${SHEET_VISUAL_STYLE.sheetBar.heightPx}px`,
-          left: `${entry.left * scale + props.viewport.offsetX}px`,
-          top: `${CANVAS_VERTICAL_MARGIN_PX}px`,
-          width: `${entry.width * scale}px`,
+          left: `${entry.left * scale + props.viewport.offsetX + freeRegionStart}px`,
+          top: `${sheetBounds.top}px`,
+          width: `${Math.max(0, fullWidth - freeRegionStart)}px`,
         } satisfies CSSProperties;
         return [
           <button
@@ -311,16 +355,16 @@ export function SheetBarReorderOverlay(
           </button>,
         ];
       })}
-      {ghostSheet && ghostEntry && scale !== null ? (
+      {ghostSheet && ghostEntry && ghostBounds && scale !== null ? (
         <span
           aria-hidden="true"
           className="sheet-bar-reorder-overlay__ghost"
           data-sheet-id={ghostSheet.sheetId}
           data-testid="reorder-ghost"
           style={{
-            height: `${SHEET_VISUAL_STYLE.sheetBar.heightPx}px`,
+            height: `${ghostBounds.height}px`,
             left: `${ghostEntry.left * scale + props.viewport.offsetX}px`,
-            top: `${CANVAS_VERTICAL_MARGIN_PX}px`,
+            top: `${ghostBounds.top}px`,
             width: `${ghostEntry.width * scale}px`,
           }}
         >
@@ -343,4 +387,21 @@ export function SheetBarReorderOverlay(
 function dragImageOffset(pointerOffset: number, extent: number): number {
   if (!Number.isFinite(pointerOffset) || !Number.isFinite(extent)) return 0;
   return Math.round(Math.min(Math.max(pointerOffset, 0), Math.max(extent, 0)));
+}
+
+function visibleSheetBounds(
+  sheet: ComposedSheet,
+  scale: number,
+  bleedUm: number | undefined,
+) {
+  const geometry = createCanvasSheetViewGeometry(
+    sheet,
+    createCanvasSheetPresentation(sheet),
+    bleedUm,
+    true,
+  ).visibleOuterBounds;
+  return {
+    height: geometry.height * scale,
+    top: CANVAS_VERTICAL_MARGIN_PX + geometry.y * scale,
+  };
 }

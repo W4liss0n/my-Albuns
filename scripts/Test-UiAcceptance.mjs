@@ -284,6 +284,51 @@ test("the manifest covers critical integrated workspace, panel, menu, and graphi
   }
 });
 
+test("the manifest captures rendered structural command surfaces at the physical minimum", () => {
+  const scenariosById = new Map(
+    manifest.scenarios.map((scenario) => [scenario.id, scenario]),
+  );
+  const applicationMenu = scenariosById.get("sheet-structure-application-menu");
+  const contextMenu = scenariosById.get("sheet-structure-context-menu");
+
+  for (const scenario of [applicationMenu, contextMenu]) {
+    assert.ok(scenario, "the structural command surface is missing");
+    assert.equal(
+      scenario.implementationPath,
+      "/workspace-preview.html?structure=minimum-single-edges",
+    );
+    assert.equal(scenario.comparison.kind, "implementation-only");
+    assert.equal(scenario.comparison.surface, "sheet-structure-commands");
+    assert.equal(
+      scenario.comparison.implementationCaptureSelector,
+      ".app-shell",
+    );
+    assert.match(scenario.comparison.reason, /referência visual vigente/i);
+    assert.match(scenario.readySelector, /disabled/u);
+  }
+
+  assert.deepEqual(applicationMenu.actions, [
+    {
+      type: "click",
+      selector: '[aria-controls="application-menu-sheet"]',
+    },
+  ]);
+  assert.match(applicationMenu.readySelector, /application-menu-sheet/u);
+  assert.match(applicationMenu.readySelector, /Adicionar antes/u);
+  assert.match(applicationMenu.readySelector, /Excluir/u);
+
+  assert.deepEqual(contextMenu.actions, [
+    {
+      type: "context-click",
+      selector:
+        '[data-reorder-surface="bar"] [data-sheet-id="sheet-001"]',
+    },
+  ]);
+  assert.match(contextMenu.readySelector, /Ações da Lâmina 01/u);
+  assert.match(contextMenu.readySelector, /nth-of-type\(1\)/u);
+  assert.match(contextMenu.readySelector, /nth-of-type\(4\)/u);
+});
+
 test("the manifest captures the rendered Canvas scrollbar at idle, hover, and focus", () => {
   const scenariosById = new Map(
     manifest.scenarios.map((scenario) => [scenario.id, scenario]),
@@ -369,7 +414,7 @@ test("the manifest preserves Program 05 proofs and promotes Sheet reordering to 
     "sheet-reorder-invalid-target-preview",
   ]);
 
-  assert.equal(manifest.scenarios.length, 41 + Object.keys(expectedScenarios).length);
+  assert.equal(manifest.scenarios.length, 43 + Object.keys(expectedScenarios).length);
   for (const [id, actionTypes] of Object.entries(expectedScenarios)) {
     const scenario = scenariosById.get(id);
     assert.ok(scenario, `${id} is missing`);
@@ -515,10 +560,11 @@ test("the manifest preserves Program 05 proofs and promotes Sheet reordering to 
   assert.match(invalidTargetPreview.readySelector, /data-preview-order=/u);
 });
 
-test("manifest schema 3 accepts real modifier, wheel, and drag actions", () => {
+test("manifest schema 3 accepts real context click, modifier, wheel, and drag actions", () => {
   const interactive = structuredClone(manifest);
   interactive.schemaVersion = 3;
   interactive.scenarios[0].actions = [
+    { type: "context-click", selector: "#sheet" },
     { type: "key", key: "Plus", modifiers: ["Control"] },
     { type: "click", selector: "#frame", modifiers: ["Control"] },
     {
@@ -547,14 +593,14 @@ test("manifest schema 3 accepts real modifier, wheel, and drag actions", () => {
   assert.equal(validateUiAcceptanceManifest(interactive), interactive);
 
   const unknownModifier = structuredClone(interactive);
-  unknownModifier.scenarios[0].actions[0].modifiers = ["Alt"];
+  unknownModifier.scenarios[0].actions[1].modifiers = ["Alt"];
   assert.throws(
     () => validateUiAcceptanceManifest(unknownModifier),
     /modifier.*not supported/u,
   );
 
   const duplicateModifier = structuredClone(interactive);
-  duplicateModifier.scenarios[0].actions[0].modifiers = [
+  duplicateModifier.scenarios[0].actions[1].modifiers = [
     "Control",
     "Control",
   ];
@@ -564,35 +610,35 @@ test("manifest schema 3 accepts real modifier, wheel, and drag actions", () => {
   );
 
   const zeroWheel = structuredClone(interactive);
-  zeroWheel.scenarios[0].actions[2].deltaY = 0;
+  zeroWheel.scenarios[0].actions[3].deltaY = 0;
   assert.throws(
     () => validateUiAcceptanceManifest(zeroWheel),
     /deltaY.*non-zero integer/u,
   );
 
   const invalidDrag = structuredClone(interactive);
-  invalidDrag.scenarios[0].actions[3].phase = "hover";
+  invalidDrag.scenarios[0].actions[4].phase = "hover";
   assert.throws(
     () => validateUiAcceptanceManifest(invalidDrag),
     /phase.*preview, drop, or escape/u,
   );
 
   const invalidDropTarget = structuredClone(interactive);
-  invalidDropTarget.scenarios[0].actions[3].dropTargetSelector = "";
+  invalidDropTarget.scenarios[0].actions[4].dropTargetSelector = "";
   assert.throws(
     () => validateUiAcceptanceManifest(invalidDropTarget),
     /dropTargetSelector.*non-empty string/u,
   );
 
   const invalidGesture = structuredClone(interactive);
-  invalidGesture.scenarios[0].actions[3].gesture = "native";
+  invalidGesture.scenarios[0].actions[4].gesture = "native";
   assert.throws(
     () => validateUiAcceptanceManifest(invalidGesture),
     /gesture.*html-dnd/u,
   );
 
   const escapeWithoutHtmlDragAndDrop = structuredClone(interactive);
-  delete escapeWithoutHtmlDragAndDrop.scenarios[0].actions[4].gesture;
+  delete escapeWithoutHtmlDragAndDrop.scenarios[0].actions[5].gesture;
   assert.throws(
     () => validateUiAcceptanceManifest(escapeWithoutHtmlDragAndDrop),
     /phase escape.*html-dnd/u,
@@ -700,6 +746,54 @@ test("runner executes focus, hover, keyboard and input actions through WebDriver
       method: "POST",
       endpoint: "/session/session-1/element/element%3A%23target/value",
       body: { text: "600.0001" },
+    },
+  ]);
+});
+
+test("runner emits a real W3C secondary-button click for context menus", async () => {
+  const { performUiAcceptanceAction } = await import(
+    "./UiAcceptanceRunner.mjs"
+  );
+  const requests = [];
+
+  await performUiAcceptanceAction({
+    action: { type: "context-click", selector: "#sheet" },
+    execute: async () => true,
+    locateSelector: async (selector) => `element:${selector}`,
+    locateText: async (text) => `text:${text}`,
+    request: async (method, endpoint, body) => {
+      requests.push({ body, endpoint, method });
+      return null;
+    },
+    sessionId: "session-context-click",
+  });
+
+  assert.deepEqual(requests, [
+    {
+      method: "POST",
+      endpoint: "/session/session-context-click/actions",
+      body: {
+        actions: [
+          {
+            type: "pointer",
+            id: "acceptance-pointer",
+            parameters: { pointerType: "mouse" },
+            actions: [
+              {
+                type: "pointerMove",
+                duration: 0,
+                origin: {
+                  "element-6066-11e4-a52e-4f735466cecf": "element:#sheet",
+                },
+                x: 0,
+                y: 0,
+              },
+              { type: "pointerDown", button: 2 },
+              { type: "pointerUp", button: 2 },
+            ],
+          },
+        ],
+      },
     },
   ]);
 });

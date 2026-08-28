@@ -10,6 +10,7 @@ import {
   type AlbumInformationProjectDraft,
   type ProjectSettingsDraft,
 } from "../application/projectSettingsDraft";
+import { materializeSheetReorderTarget } from "../application/sheetStructure";
 import {
   albumInformationReviewEquals,
   albumInformationReviewHasChanges,
@@ -97,16 +98,37 @@ export function useProjectMutations({
   }
 
   async function applyWithOutcome(intent: ProjectIntent) {
+    const capturedProjection = projection;
     let affectedFrameId: string | null = null;
     let affectedSheetId: string | null = null;
+    let reorderCancelled = false;
     const completed = await runWithErrorFeedback(
-      async (port) => {
-        const result = await port.applyWithOutcome(intent);
+      async (port, latestProjection) => {
+        const effectiveProjection = latestProjection ?? capturedProjection;
+        let materializedIntent = intent;
+        if (intent.kind === "reorderSheet") {
+          const materializedTarget = materializeSheetReorderTarget(
+            capturedProjection.state.album.sheets,
+            effectiveProjection.state.album.sheets,
+            intent.sheetId,
+            intent.targetIndex,
+          );
+          if (materializedTarget === null) {
+            reorderCancelled = true;
+            return effectiveProjection;
+          }
+          materializedIntent = {
+            ...intent,
+            targetIndex: materializedTarget,
+          };
+        }
+        const result = await port.applyWithOutcome(materializedIntent);
         affectedFrameId = result.affectedFrameId;
         affectedSheetId = result.affectedSheetId;
         return result.projection;
       },
     );
+    if (reorderCancelled) return false;
     if (completed && affectedFrameId) onAffectedFrame(affectedFrameId);
     if (completed && affectedSheetId) onAffectedSheet(affectedSheetId);
     return completed;

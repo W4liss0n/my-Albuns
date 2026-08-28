@@ -4,7 +4,10 @@ import { expect, test, vi } from "vitest";
 import type { ProjectCorePort } from "../application/projectPorts";
 import { createAlbumDesignProjectDraft } from "../application/projectSettingsDraft";
 import type { EditorProjection } from "../domain/project";
-import { representativeProjection } from "../test/projectFixtures";
+import {
+  createThreeSheetProjection,
+  representativeProjection,
+} from "../test/projectFixtures";
 import {
   useProjectMutationRunner,
   type ProjectMutationRunner,
@@ -111,6 +114,121 @@ test("applies a structural intent with outcome, returns its status, and forwards
   expect(applyWithOutcome).toHaveBeenCalledWith(intent);
   expect(onProjectionChange).toHaveBeenCalledWith(updatedProjection);
   expect(onAffectedSheet).toHaveBeenCalledWith("sheet-001");
+});
+
+test("materializes a queued reorder beside its intended Sheet after History restores an earlier Sheet", async () => {
+  const capturedProjection = createThreeSheetProjection();
+  const afterUndo = structuredClone(capturedProjection);
+  const restoredSheet = {
+    ...structuredClone(afterUndo.state.album.sheets[1]),
+    id: "sheet-restored",
+    number: 2,
+  };
+  const restoredComposition = {
+    ...structuredClone(afterUndo.composition.sheets[1]),
+    sheetId: "sheet-restored",
+    number: 2,
+  };
+  afterUndo.state.revision += 1;
+  afterUndo.state.album.sheets.splice(1, 0, restoredSheet);
+  afterUndo.composition.sheets.splice(1, 0, restoredComposition);
+
+  const pendingUndo = deferredProjection();
+  const undo = vi.fn<ProjectCorePort["undo"]>(() => pendingUndo.promise);
+  const port = projectSessionPort(
+    async () => afterUndo,
+    undo,
+  );
+  const applyWithOutcome = vi
+    .spyOn(port, "applyWithOutcome")
+    .mockResolvedValue({
+      projection: afterUndo,
+      affectedFrameId: null,
+      affectedSheetId: "sheet-003",
+    });
+  const view = renderHook(() => {
+    const runner = useProjectMutationRunner(
+      capturedProjection.state.projectId,
+      port,
+    );
+    return useProjectMutations({
+      projection: capturedProjection,
+      runProjectMutation: runner,
+      onProjectionChange: () => undefined,
+      onAffectedFrame: () => undefined,
+      onAffectedSheet: () => undefined,
+    });
+  });
+
+  act(() => view.result.current.undo());
+  await waitFor(() => expect(undo).toHaveBeenCalledOnce());
+  let completed = false;
+  await act(async () => {
+    const completion = view.result.current.applyWithOutcome({
+      kind: "reorderSheet",
+      sheetId: "sheet-003",
+      targetIndex: 1,
+    });
+    pendingUndo.resolve(afterUndo);
+    completed = await completion;
+  });
+
+  expect(completed).toBe(true);
+  expect(applyWithOutcome).toHaveBeenCalledWith({
+    kind: "reorderSheet",
+    sheetId: "sheet-003",
+    targetIndex: 2,
+  });
+});
+
+test("keeps a queued reorder valid when the preceding History command fails", async () => {
+  const capturedProjection = createThreeSheetProjection();
+  const pendingUndo = deferredProjection();
+  const undo = vi.fn<ProjectCorePort["undo"]>(() => pendingUndo.promise);
+  const port = projectSessionPort(
+    async () => capturedProjection,
+    undo,
+  );
+  const applyWithOutcome = vi
+    .spyOn(port, "applyWithOutcome")
+    .mockResolvedValue({
+      projection: capturedProjection,
+      affectedFrameId: null,
+      affectedSheetId: "sheet-003",
+    });
+  const view = renderHook(() => {
+    const runner = useProjectMutationRunner(
+      capturedProjection.state.projectId,
+      port,
+    );
+    return useProjectMutations({
+      projection: capturedProjection,
+      runProjectMutation: runner,
+      onProjectionChange: () => undefined,
+      onAffectedFrame: () => undefined,
+      onAffectedSheet: () => undefined,
+    });
+  });
+
+  act(() => view.result.current.undo());
+  await waitFor(() => expect(undo).toHaveBeenCalledOnce());
+  let completed = false;
+  await act(async () => {
+    const completion = view.result.current.applyWithOutcome({
+      kind: "reorderSheet",
+      sheetId: "sheet-003",
+      targetIndex: 1,
+    });
+    pendingUndo.reject(new Error("History failed"));
+    completed = await completion;
+  });
+
+  expect(completed).toBe(true);
+  expect(applyWithOutcome).toHaveBeenCalledWith({
+    kind: "reorderSheet",
+    sheetId: "sheet-003",
+    targetIndex: 1,
+  });
 });
 
 test("preserves Redo when preceding History already materialized the Album Design target", async () => {
