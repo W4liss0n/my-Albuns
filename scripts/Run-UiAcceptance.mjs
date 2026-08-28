@@ -25,9 +25,12 @@ import {
   webdriverElementId,
 } from "./UiAcceptance.mjs";
 import {
+  assertBrowserZoomUnchanged,
+  captureBrowserZoomState,
   captureUiAcceptanceScreenshot,
   neutralizeUiAcceptancePointer,
   performUiAcceptanceAction,
+  requiresBrowserZoomInvariant,
 } from "./UiAcceptanceRunner.mjs";
 
 const [workspaceArgument, outputArgument, edgeArgument, driverArgument] =
@@ -422,46 +425,69 @@ async function navigateAndCapture({
   label,
 }) {
   await setExactViewport(request, sessionId, scenario.viewport);
-  const targetUrl = `${frontendOrigin}${servedPath}`;
-  await request("POST", `/session/${sessionId}/url`, {
-    url: targetUrl,
-  });
-  await waitForNavigation(request, sessionId, targetUrl, label);
-  await settleDocument(request, sessionId);
-  await neutralizeUiAcceptancePointer({
-    request,
-    sessionId,
-    viewport: scenario.viewport,
-  });
-  await settleDocument(request, sessionId);
-  const locateSelector = (selector) =>
-    waitForElement(request, sessionId, selector, `${label} action`);
-  const locateText = (text) =>
-    waitForButtonText(request, sessionId, text, `${label} action`);
-  for (const action of actions) {
-    await performUiAcceptanceAction({
-      action,
-      execute: (script, args) => execute(request, sessionId, script, args),
-      locateSelector,
-      locateText,
+  try {
+    const targetUrl = `${frontendOrigin}${servedPath}`;
+    await request("POST", `/session/${sessionId}/url`, {
+      url: targetUrl,
+    });
+    await waitForNavigation(request, sessionId, targetUrl, label);
+    await settleDocument(request, sessionId);
+    await neutralizeUiAcceptancePointer({
+      request,
+      sessionId,
+      viewport: scenario.viewport,
+    });
+    await settleDocument(request, sessionId);
+    const guardBrowserZoom = requiresBrowserZoomInvariant(actions);
+    const browserZoomBefore = guardBrowserZoom
+      ? await captureBrowserZoomState({
+          execute: (script) => execute(request, sessionId, script),
+        })
+      : null;
+    const locateSelector = (selector) =>
+      waitForElement(request, sessionId, selector, `${label} action`);
+    const locateText = (text) =>
+      waitForButtonText(request, sessionId, text, `${label} action`);
+    for (const action of actions) {
+      await performUiAcceptanceAction({
+        action,
+        execute: (script, args) => execute(request, sessionId, script, args),
+        locateSelector,
+        locateText,
+        request,
+        sessionId,
+      });
+      await settleDocument(request, sessionId);
+    }
+    await waitForElement(request, sessionId, readySelector, label);
+    await settleDocument(request, sessionId);
+    if (browserZoomBefore) {
+      const browserZoomAfter = await captureBrowserZoomState({
+        execute: (script) => execute(request, sessionId, script),
+      });
+      assertBrowserZoomUnchanged({
+        after: browserZoomAfter,
+        before: browserZoomBefore,
+        label,
+      });
+    }
+    const screenshot = await captureUiAcceptanceScreenshot({
+      captureSelector,
+      locateSelector: (selector) =>
+        waitForElement(request, sessionId, selector, `${label} capture`),
       request,
       sessionId,
     });
-    await settleDocument(request, sessionId);
+    if (typeof screenshot !== "string" || !screenshot) {
+      throw new Error(`${label} returned no screenshot`);
+    }
+    writeFileSync(screenshotPath, Buffer.from(screenshot, "base64"));
+    return {
+      browserZoomStatus: guardBrowserZoom ? "unchanged" : undefined,
+    };
+  } finally {
+    await request("DELETE", `/session/${sessionId}/actions`);
   }
-  await waitForElement(request, sessionId, readySelector, label);
-  await settleDocument(request, sessionId);
-  const screenshot = await captureUiAcceptanceScreenshot({
-    captureSelector,
-    locateSelector: (selector) =>
-      waitForElement(request, sessionId, selector, `${label} capture`),
-    request,
-    sessionId,
-  });
-  if (typeof screenshot !== "string" || !screenshot) {
-    throw new Error(`${label} returned no screenshot`);
-  }
-  writeFileSync(screenshotPath, Buffer.from(screenshot, "base64"));
 }
 
 const managedProcesses = [];
@@ -559,7 +585,7 @@ try {
         : {}),
     };
     try {
-      await navigateAndCapture({
+      const implementationCapture = await navigateAndCapture({
         request,
         sessionId,
         scenario,
@@ -571,6 +597,9 @@ try {
         screenshotPath: implementationPath,
         label: `${scenario.id} implementation`,
       });
+      if (implementationCapture.browserZoomStatus) {
+        result.browserZoomStatus = implementationCapture.browserZoomStatus;
+      }
       if (paired) {
         await navigateAndCapture({
           request,

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "scenarios": [
     {
       "id": "welcome",
@@ -642,6 +642,319 @@
       "actions": [
         { "type": "focus", "selector": "[data-canvas-mode=\"sheet-editing\"] canvas" },
         { "type": "key", "key": "Escape" }
+      ]
+    },
+    {
+      "id": "ui-architecture-map",
+      "title": "Mapa canônico — superfícies, nomes e ownership",
+      "implementationPath": "/ui-architecture-prototype.html",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "ui-architecture-map",
+        "implementationCaptureSelector": ".ui-architecture-prototype",
+        "reason": "A referência visual vigente distribui as superfícies por arquivos e antecede o mapa canônico navegável que reconcilia nomes, transições e ownership posteriores."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": ".ui-architecture-prototype[data-prototype-surface=\"map\"]:has([data-surface-id=\"global.settings\"])",
+      "actions": []
+    },
+    {
+      "id": "editor-zoom-keyboard-in",
+      "title": "Modo de edição — ampliar pelo teclado",
+      "implementationPath": "/ui-architecture-prototype.html?view=editor",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-editing-viewport",
+        "implementationCaptureSelector": ".ui-architecture-prototype",
+        "reason": "A referência visual vigente não representa a ViewportTransform transitória nem os gestos de Zoom aceitos posteriormente para o Modo de edição."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "[aria-label=\"Canvas do protótipo\"][data-last-zoom-input=\"keyboard-in\"][data-zoom-state=\"raised\"][data-zoom-anchor=\"center\"]",
+      "actions": [
+        { "type": "focus", "selector": "[aria-label=\"Canvas do protótipo\"]" },
+        { "type": "key", "key": "Plus", "modifiers": ["Control"] }
+      ]
+    },
+    {
+      "id": "editor-zoom-keyboard-out",
+      "title": "Modo de edição — reduzir pelo teclado",
+      "implementationPath": "/ui-architecture-prototype.html?view=editor",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-editing-viewport",
+        "implementationCaptureSelector": ".ui-architecture-prototype",
+        "reason": "A referência visual vigente não representa a ViewportTransform transitória nem os gestos de Zoom aceitos posteriormente para o Modo de edição."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "[aria-label=\"Canvas do protótipo\"][data-last-zoom-input=\"keyboard-out\"][data-zoom-state=\"raised\"][data-zoom-anchor=\"center\"]",
+      "actions": [
+        { "type": "focus", "selector": "[aria-label=\"Canvas do protótipo\"]" },
+        { "type": "key", "key": "Plus", "modifiers": ["Control"] },
+        { "type": "key", "key": "Plus", "modifiers": ["Control"] },
+        { "type": "key", "key": "Minus", "modifiers": ["Control"] }
+      ]
+    },
+    {
+      "id": "editor-zoom-wheel",
+      "title": "Modo de edição — Zoom ancorado pelo cursor",
+      "implementationPath": "/ui-architecture-prototype.html?view=editor",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-editing-viewport",
+        "implementationCaptureSelector": ".ui-architecture-prototype",
+        "reason": "A referência visual vigente não representa a ViewportTransform transitória nem a âncora sob o cursor aceita posteriormente."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "[aria-label=\"Canvas do protótipo\"][data-last-zoom-input=\"wheel-in\"][data-zoom-state=\"raised\"][data-zoom-anchor=\"cursor\"]:not([data-zoom-origin-x=\"50\"]):not([data-zoom-origin-y=\"50\"])",
+      "actions": [
+        { "type": "wheel", "selector": "[data-frame-gesture-target=\"resize\"]", "deltaY": -120, "modifiers": ["Control"] }
+      ]
+    },
+    {
+      "id": "editor-zoom-reset",
+      "title": "Modo de edição — retornar a Ajustar Lâmina",
+      "implementationPath": "/ui-architecture-prototype.html?view=editor",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-editing-viewport",
+        "implementationCaptureSelector": ".ui-architecture-prototype",
+        "reason": "A referência visual vigente não representa a ViewportTransform transitória nem o reset aceito posteriormente para o Modo de edição."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "[aria-label=\"Canvas do protótipo\"][data-last-zoom-input=\"reset\"][data-zoom-state=\"fit\"][data-zoom-anchor=\"center\"]",
+      "actions": [
+        { "type": "focus", "selector": "[aria-label=\"Canvas do protótipo\"]" },
+        { "type": "key", "key": "Plus", "modifiers": ["Control"] },
+        { "type": "key", "key": "Plus", "modifiers": ["Control"] },
+        { "type": "key", "key": "Digit0", "modifiers": ["Control"] }
+      ]
+    },
+    {
+      "id": "editor-zoom-cap",
+      "title": "Modo de edição — teto calibrado do Zoom",
+      "implementationPath": "/ui-architecture-prototype.html?view=editor",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-editing-viewport",
+        "implementationCaptureSelector": ".ui-architecture-prototype",
+        "reason": "A referência visual vigente não representa o teto calibrado posteriormente para a ViewportTransform do Modo de edição."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "[aria-label=\"Canvas do protótipo\"][data-last-zoom-input=\"keyboard-in\"][data-zoom-level=\"4\"][data-zoom-state=\"cap\"]",
+      "actions": [
+        { "type": "focus", "selector": "[aria-label=\"Canvas do protótipo\"]" },
+        { "type": "key", "key": "Plus", "modifiers": ["Control"] },
+        { "type": "key", "key": "Plus", "modifiers": ["Control"] },
+        { "type": "key", "key": "Plus", "modifiers": ["Control"] },
+        { "type": "key", "key": "Plus", "modifiers": ["Control"] },
+        { "type": "key", "key": "Plus", "modifiers": ["Control"] },
+        { "type": "key", "key": "Plus", "modifiers": ["Control"] },
+        { "type": "key", "key": "Plus", "modifiers": ["Control"] },
+        { "type": "key", "key": "Plus", "modifiers": ["Control"] },
+        { "type": "key", "key": "Plus", "modifiers": ["Control"] },
+        { "type": "key", "key": "Plus", "modifiers": ["Control"] },
+        { "type": "key", "key": "Plus", "modifiers": ["Control"] },
+        { "type": "key", "key": "Plus", "modifiers": ["Control"] }
+      ]
+    },
+    {
+      "id": "sheet-reorder-bar-preview",
+      "title": "Reordenação — prévia pela Barra da Lâmina",
+      "implementationPath": "/ui-architecture-prototype.html?view=editor&mode=normal",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-reordering",
+        "implementationCaptureSelector": ".ui-architecture-prototype",
+        "reason": "A referência visual vigente não representa os estados intermediários de reordenação aceitos posteriormente."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "[data-editor-mode=\"normal\"] [data-reorder-surface=\"bar\"][data-reorder-state=\"preview\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"][data-preview-order=\"sheet-001,sheet-004,sheet-002,sheet-003,sheet-005\"]:has([data-testid=\"reorder-placeholder\"]):has([data-testid=\"reorder-ghost\"])",
+      "actions": [
+        { "type": "drag", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-004\"]", "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "phase": "preview" }
+      ]
+    },
+    {
+      "id": "sheet-reorder-bar-commit",
+      "title": "Reordenação — commit pela Barra da Lâmina",
+      "implementationPath": "/ui-architecture-prototype.html?view=editor&mode=normal",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-reordering",
+        "implementationCaptureSelector": ".ui-architecture-prototype",
+        "reason": "A referência visual vigente não representa o commit sincronizado de reordenação aceito posteriormente."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "[data-editor-mode=\"normal\"]:has([data-reorder-surface=\"bar\"][data-reorder-state=\"committed\"][data-sheet-order=\"sheet-001,sheet-004,sheet-002,sheet-003,sheet-005\"]):has([data-reorder-surface=\"grid\"][data-sheet-order=\"sheet-001,sheet-004,sheet-002,sheet-003,sheet-005\"])",
+      "actions": [
+        { "type": "drag", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-004\"]", "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "phase": "drop" }
+      ]
+    },
+    {
+      "id": "sheet-reorder-grid-preview",
+      "title": "Reordenação — prévia pela Grade de Lâminas",
+      "implementationPath": "/ui-architecture-prototype.html?view=editor&mode=normal",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-reordering",
+        "implementationCaptureSelector": ".ui-architecture-prototype",
+        "reason": "A referência visual vigente não representa os estados intermediários de reordenação aceitos posteriormente."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "[data-editor-mode=\"normal\"] [data-reorder-surface=\"grid\"][data-reorder-state=\"preview\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"][data-preview-order=\"sheet-001,sheet-004,sheet-002,sheet-003,sheet-005\"]:has([data-testid=\"reorder-placeholder\"]):has([data-testid=\"reorder-ghost\"])",
+      "actions": [
+        { "type": "drag", "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-004\"]", "targetSelector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"]", "phase": "preview" }
+      ]
+    },
+    {
+      "id": "sheet-reorder-grid-commit",
+      "title": "Reordenação — commit pela Grade de Lâminas",
+      "implementationPath": "/ui-architecture-prototype.html?view=editor&mode=normal",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-reordering",
+        "implementationCaptureSelector": ".ui-architecture-prototype",
+        "reason": "A referência visual vigente não representa o commit sincronizado de reordenação aceito posteriormente."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "[data-editor-mode=\"normal\"]:has([data-reorder-surface=\"grid\"][data-reorder-state=\"committed\"][data-sheet-order=\"sheet-001,sheet-004,sheet-002,sheet-003,sheet-005\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001,sheet-004,sheet-002,sheet-003,sheet-005\"])",
+      "actions": [
+        { "type": "drag", "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-004\"]", "targetSelector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"]", "phase": "drop" }
+      ]
+    },
+    {
+      "id": "sheet-reorder-cancelled",
+      "title": "Reordenação — cancelamento por Esc",
+      "implementationPath": "/ui-architecture-prototype.html?view=editor&mode=normal",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-reordering",
+        "implementationCaptureSelector": ".ui-architecture-prototype",
+        "reason": "A referência visual vigente não representa o cancelamento de reordenação aceito posteriormente."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "[data-editor-mode=\"normal\"]:has([data-reorder-surface=\"bar\"][data-reorder-state=\"cancelled\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"])",
+      "actions": [
+        { "type": "drag", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-004\"]", "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "phase": "preview" },
+        { "type": "key", "key": "Escape" }
+      ]
+    },
+    {
+      "id": "sheet-reorder-cross-surface-cancelled",
+      "title": "Reordenação — cancelamento ao soltar na representação oposta",
+      "implementationPath": "/ui-architecture-prototype.html?view=editor&mode=normal",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-reordering",
+        "implementationCaptureSelector": ".ui-architecture-prototype",
+        "reason": "A referência visual vigente não representa o cancelamento de uma prévia ao soltar fora da superfície originadora."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "[data-editor-mode=\"normal\"]:has([data-reorder-surface=\"bar\"][data-reorder-state=\"cancelled\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"]):has([data-reorder-surface=\"grid\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"])",
+      "actions": [
+        { "type": "drag", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-004\"]", "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "dropTargetSelector": "[data-reorder-surface=\"grid\"]", "phase": "drop" }
+      ]
+    },
+    {
+      "id": "sheet-reorder-invalid-drop",
+      "title": "Reordenação — drop inválido de Página única",
+      "implementationPath": "/ui-architecture-prototype.html?view=editor&mode=normal",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-reordering",
+        "implementationCaptureSelector": ".ui-architecture-prototype",
+        "reason": "A referência visual vigente não representa o bloqueio de posições que interiorizariam uma Página única."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "[data-editor-mode=\"normal\"]:has([data-reorder-surface=\"grid\"][data-reorder-state=\"invalid\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"])",
+      "actions": [
+        { "type": "drag", "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-001\"]", "targetSelector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-003\"]", "phase": "drop" }
+      ]
+    },
+    {
+      "id": "frame-multi-selection-mixed",
+      "title": "Frames — seleção múltipla e valores mistos",
+      "implementationPath": "/ui-architecture-prototype.html?view=editor",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-selection-inspector",
+        "implementationCaptureSelector": ".ui-architecture-prototype",
+        "reason": "A referência visual vigente não representa a seleção múltipla nem a projeção de valores divergentes aceitas posteriormente."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "[aria-label=\"Inspector de Frames\"][data-selection-count=\"2\"]:has([data-mixed-value=\"numeric\"]):has([data-mixed-value=\"color\"]):has([aria-checked=\"mixed\"])",
+      "actions": [
+        { "type": "click", "selector": "[data-frame-id=\"frame-001\"]" },
+        { "type": "click", "selector": "[data-frame-id=\"frame-002\"]", "modifiers": ["Control"] }
+      ]
+    },
+    {
+      "id": "frame-multi-selection-absolute-edit",
+      "title": "Frames — primeira edição absoluta da seleção",
+      "implementationPath": "/ui-architecture-prototype.html?view=editor",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-selection-inspector",
+        "implementationCaptureSelector": ".ui-architecture-prototype",
+        "reason": "A referência visual vigente não representa a aplicação absoluta de um valor a uma Seleção de Frames aceita posteriormente."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "[data-history-count=\"1\"]:has([data-frame-id=\"frame-001\"][data-opacity=\"80\"]):has([data-frame-id=\"frame-002\"][data-opacity=\"80\"])",
+      "actions": [
+        { "type": "click", "selector": "[data-frame-id=\"frame-001\"]" },
+        { "type": "click", "selector": "[data-frame-id=\"frame-002\"]", "modifiers": ["Control"] },
+        { "type": "input", "selector": "[aria-label=\"Opacidade dos Frames\"]", "value": "80" }
+      ]
+    },
+    {
+      "id": "frame-manipulation-move",
+      "title": "Frames — movimento no Modo de edição",
+      "implementationPath": "/ui-architecture-prototype.html?view=editor",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-manipulation",
+        "implementationCaptureSelector": ".ui-architecture-prototype",
+        "reason": "A referência visual vigente não representa a manipulação geométrica direta de Frames aceita posteriormente."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "[data-history-count=\"1\"]:has([data-frame-id=\"frame-001\"][data-x=\"16\"][data-y=\"18\"])",
+      "actions": [
+        { "type": "click", "selector": "[data-frame-id=\"frame-001\"]" },
+        { "type": "drag", "selector": "[data-frame-id=\"frame-001\"]", "targetSelector": "[data-frame-gesture-target=\"move\"]", "phase": "drop" }
+      ]
+    },
+    {
+      "id": "frame-manipulation-resize",
+      "title": "Frames — redimensionamento por alça",
+      "implementationPath": "/ui-architecture-prototype.html?view=editor",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-manipulation",
+        "implementationCaptureSelector": ".ui-architecture-prototype",
+        "reason": "A referência visual vigente não representa as oito alças nem o redimensionamento direto de Frames aceitos posteriormente."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "[data-history-count=\"1\"]:has([data-frame-id=\"frame-001\"][data-width=\"38\"][data-height=\"42\"])",
+      "actions": [
+        { "type": "click", "selector": "[data-frame-id=\"frame-001\"]" },
+        { "type": "drag", "selector": "[data-resize-handle=\"se\"]", "targetSelector": "[data-frame-gesture-target=\"resize\"]", "phase": "drop" }
+      ]
+    },
+    {
+      "id": "frame-layout-locked",
+      "title": "Frames — contraste de Layout travado",
+      "implementationPath": "/ui-architecture-prototype.html?view=editor",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-manipulation",
+        "implementationCaptureSelector": ".ui-architecture-prototype",
+        "reason": "A referência visual vigente não representa a seleção preservada sem alças e o bloqueio geométrico de Layout travado aceitos posteriormente."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "[data-layout-locked=\"true\"][data-history-count=\"0\"]:has([data-layout-lock-feedback][data-blocked=\"true\"]):has([data-frame-id=\"frame-001\"][aria-pressed=\"true\"]):not(:has([data-resize-handle]))",
+      "actions": [
+        { "type": "click", "selector": "[data-frame-id=\"frame-001\"]" },
+        { "type": "click", "selector": "button[aria-label=\"Layout travado\"]" },
+        { "type": "drag", "selector": "[data-frame-id=\"frame-001\"]", "targetSelector": "[data-frame-gesture-target=\"move\"]", "phase": "drop" }
       ]
     }
   ]

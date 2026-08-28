@@ -12,7 +12,11 @@ const supportedKeys = new Set([
   "Escape",
   "Space",
   "Tab",
+  "Digit0",
+  "Minus",
+  "Plus",
 ]);
+const supportedModifiers = new Set(["Control"]);
 
 function invariant(condition, message) {
   if (!condition) throw new Error(`Invalid UI acceptance manifest: ${message}`);
@@ -27,7 +31,7 @@ function validateServedPath(value, label) {
 
 export function validateUiAcceptanceManifest(manifest) {
   invariant(manifest && typeof manifest === "object", "the document must be an object");
-  invariant(manifest.schemaVersion === 2, "schemaVersion must be 2");
+  invariant(manifest.schemaVersion === 3, "schemaVersion must be 3");
   invariant(Array.isArray(manifest.scenarios) && manifest.scenarios.length > 0, "scenarios must be a non-empty array");
 
   const ids = new Set();
@@ -131,10 +135,10 @@ export function validateUiAcceptanceManifest(manifest) {
         const actionLocation = `${location}.${groupName}[${actionIndex}]`;
         invariant(action && typeof action === "object", `${actionLocation} must be an object`);
         invariant(
-          ["click", "click-text", "focus", "hover", "input", "key"].includes(action.type),
+          ["click", "click-text", "drag", "focus", "hover", "input", "key", "wheel"].includes(action.type),
           `${actionLocation}.type is not supported`,
         );
-        if (["click", "focus", "hover", "input"].includes(action.type)) {
+        if (["click", "drag", "focus", "hover", "input", "wheel"].includes(action.type)) {
           invariant(typeof action.selector === "string" && action.selector.trim(), `${actionLocation}.selector is required`);
         }
         if (action.type === "click-text") {
@@ -146,6 +150,61 @@ export function validateUiAcceptanceManifest(manifest) {
         if (action.type === "key") {
           invariant(supportedKeys.has(action.key), `${actionLocation}.key is not supported`);
           invariant(action.selector === undefined, `${actionLocation}.selector is not valid for key actions`);
+        }
+        const modifiers = action.modifiers;
+        invariant(
+          modifiers === undefined || Array.isArray(modifiers),
+          `${actionLocation}.modifiers must be an array when present`,
+        );
+        if (modifiers !== undefined) {
+          invariant(
+            ["click", "key", "wheel"].includes(action.type),
+            `${actionLocation}.modifiers are not valid for ${action.type}`,
+          );
+          const seenModifiers = new Set();
+          for (const modifier of modifiers) {
+            invariant(
+              supportedModifiers.has(modifier),
+              `${actionLocation}.modifier ${modifier} is not supported`,
+            );
+            invariant(
+              !seenModifiers.has(modifier),
+              `${actionLocation}.modifier ${modifier} duplicates an earlier modifier`,
+            );
+            seenModifiers.add(modifier);
+          }
+        }
+        if (action.type === "wheel") {
+          invariant(
+            Number.isInteger(action.deltaY) && action.deltaY !== 0,
+            `${actionLocation}.deltaY must be a non-zero integer`,
+          );
+          invariant(
+            action.deltaX === undefined || Number.isInteger(action.deltaX),
+            `${actionLocation}.deltaX must be an integer when present`,
+          );
+        }
+        if (action.type === "drag") {
+          invariant(
+            typeof action.targetSelector === "string" &&
+              action.targetSelector.trim(),
+            `${actionLocation}.targetSelector is required`,
+          );
+          invariant(
+            action.phase === "preview" || action.phase === "drop",
+            `${actionLocation}.phase must be preview or drop`,
+          );
+          if (action.dropTargetSelector !== undefined) {
+            invariant(
+              typeof action.dropTargetSelector === "string" &&
+                action.dropTargetSelector.trim(),
+              `${actionLocation}.dropTargetSelector must be a non-empty string`,
+            );
+            invariant(
+              action.phase === "drop",
+              `${actionLocation}.dropTargetSelector is valid only for drop`,
+            );
+          }
         }
       }
     }

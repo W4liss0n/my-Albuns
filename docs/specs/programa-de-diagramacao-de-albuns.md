@@ -535,6 +535,10 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 
 ### Estrutura da interface
 
+O [mapa canônico de navegação e interação](../design/0018-mapa-de-navegacao-e-interacao-da-interface.md)
+reúne os IDs estáveis, nomes atuais, transições, ownership e cenários de
+validação das superfícies descritas nesta seção.
+
 - Todo diálogo do aplicativo abre como uma janela nativa separada e pertencente à janela que o solicitou. Fora da abertura de um Projeto existente, a proprietária permanece visível ao fundo, bloqueada para interação enquanto o diálogo estiver aberto, e recupera interação e foco quando ele termina.
 - A largura de cada tipo de diálogo permanece estável, enquanto a altura acompanha seu conteúdo renderizado e é recalculada quando o estado muda; o ajuste recentraliza a janela e respeita a área útil do monitor.
 - `Abrir Projeto`, inclusive por `Projetos recentes`, é a única transição que retira a superfície de origem antes de mostrar o progresso. Se a abertura falhar, a superfície reaparece atrás do diálogo de falha; `Novo Projeto`, confirmações, avisos e demais progressos não usam essa exceção.
@@ -594,7 +598,7 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - O Zoom de edição é alterado por `Ctrl` + `+`, `Ctrl` + `−` e `Ctrl` + roda do mouse; `Ctrl` + `0` retorna para `Ajustar Lâmina`. Não há slider, botões ou percentual permanente.
 - `Ctrl` + roda ancora no ponto sob o cursor; `Ctrl` + `+` e `Ctrl` + `−` ancoram no centro visível do Canvas.
 - Acima do ajuste inicial, `Espaço` + arraste com o botão esquerdo ou arraste com o botão do meio fazem Pan do Canvas, com cursor de mão e sem modificar conteúdo.
-- `Ajustar Lâmina` é o limite mínimo do Zoom; o limite máximo é calibrado no protótipo conforme nitidez e responsividade.
+- `Ajustar Lâmina` é o limite mínimo do Zoom; `4× Ajustar Lâmina` é o teto calibrado, e toda tentativa de ultrapassar qualquer limite é contida por clamp.
 - No Modo de edição, gestos diretos selecionam um ou vários Frames e permitem suas operações geométricas; os atalhos diretos de Pan e Zoom da Foto não atuam nesse modo.
 - Nesse modo, o Painel de imagens assume uma altura compacta sem desaparecer. Ao sair, o Canvas contínuo centraliza a Lâmina que estava sendo editada e restaura a altura normal do Painel.
 - As mídias do Painel de imagens formam uma grade iniciada no canto superior esquerdo, preenchida por colunas e novas linhas conforme a largura disponível. Quando necessário, a região rola verticalmente e nunca se transforma em uma faixa horizontal contínua.
@@ -800,7 +804,7 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - A criação manual de um Frame placeholder ocorre somente no Modo de edição da Lâmina por `Editar > Adicionar Frame` ou pelo menu de contexto da área vazia do Canvas.
 - O comando cria imediatamente um único Frame centralizado, selecionado e com dimensões proporcionais à superfície ativa, sem modo de desenho nem ferramenta persistente.
 - Em Lâmina dupla, o Frame usa a Lâmina inteira como referência e pode atravessar a divisão; em Página única, usa somente a Página ativa.
-- A proporção inicial exata é calibrada no protótipo e nunca representa um tamanho físico fixo. A criação é uma única ação de Undo/Redo e fica indisponível em Layout travado.
+- A geometria inicial usa proporção `3:2` e largura de `40%` da superfície ativa, reduzida somente quando a altura disponível exigir; nunca representa um tamanho físico fixo. A criação é uma única ação de Undo/Redo e fica indisponível em Layout travado.
 - Fora do Modo de edição, inserir uma Foto em área livre cria um Frame e aplica o primeiro Layout compatível quando a organização está destravada.
 - Inserir uma Foto sobre um placeholder preenche o Frame existente sem mudar sua geometria.
 - Arrastar uma Foto sobre qualquer Frame usa somente esse alvo: preenche um placeholder ou substitui a Foto existente, preservando geometria e estilo.

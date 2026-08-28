@@ -330,6 +330,174 @@ test("manifest validation rejects incomplete implementation and reference action
   assert.throws(() => validateUiAcceptanceManifest(missingText), /text is required/);
 });
 
+test("the manifest proves every Program 05 closeout interaction through the isolated prototype", () => {
+  const expectedScenarios = {
+    "ui-architecture-map": [],
+    "editor-zoom-keyboard-in": ["focus", "key"],
+    "editor-zoom-keyboard-out": ["focus", "key", "key", "key"],
+    "editor-zoom-wheel": ["wheel"],
+    "editor-zoom-reset": ["focus", "key", "key", "key"],
+    "editor-zoom-cap": [
+      "focus",
+      ...Array.from({ length: 12 }, () => "key"),
+    ],
+    "sheet-reorder-bar-preview": ["drag"],
+    "sheet-reorder-bar-commit": ["drag"],
+    "sheet-reorder-grid-preview": ["drag"],
+    "sheet-reorder-grid-commit": ["drag"],
+    "sheet-reorder-cancelled": ["drag", "key"],
+    "sheet-reorder-cross-surface-cancelled": ["drag"],
+    "sheet-reorder-invalid-drop": ["drag"],
+    "frame-multi-selection-mixed": ["click", "click"],
+    "frame-multi-selection-absolute-edit": ["click", "click", "input"],
+    "frame-manipulation-move": ["click", "drag"],
+    "frame-manipulation-resize": ["click", "drag"],
+    "frame-layout-locked": ["click", "click", "drag"],
+  };
+  const scenariosById = new Map(
+    manifest.scenarios.map((scenario) => [scenario.id, scenario]),
+  );
+
+  assert.equal(manifest.scenarios.length, 41 + Object.keys(expectedScenarios).length);
+  for (const [id, actionTypes] of Object.entries(expectedScenarios)) {
+    const scenario = scenariosById.get(id);
+    assert.ok(scenario, `${id} is missing`);
+    assert.equal(
+      scenario.implementationPath.startsWith("/ui-architecture-prototype.html"),
+      true,
+      `${id} must use the isolated prototype`,
+    );
+    assert.equal(scenario.comparison.kind, "implementation-only");
+    assert.match(scenario.comparison.reason, /referência visual vigente/i);
+    assert.equal(
+      scenario.comparison.implementationCaptureSelector,
+      ".ui-architecture-prototype",
+    );
+    assert.deepEqual(
+      scenario.actions.map((action) => action.type),
+      actionTypes,
+      `${id} exercises the wrong gesture sequence`,
+    );
+    assert.match(scenario.readySelector, /data-/u);
+  }
+
+  const keyboardZoom = scenariosById.get("editor-zoom-keyboard-in");
+  assert.deepEqual(keyboardZoom.actions.at(-1), {
+    type: "key",
+    key: "Plus",
+    modifiers: ["Control"],
+  });
+  const wheelZoom = scenariosById.get("editor-zoom-wheel");
+  assert.deepEqual(wheelZoom.actions[0], {
+    type: "wheel",
+    selector: '[data-frame-gesture-target="resize"]',
+    deltaY: -120,
+    modifiers: ["Control"],
+  });
+  const mixedSelection = scenariosById.get("frame-multi-selection-mixed");
+  assert.deepEqual(mixedSelection.actions[1].modifiers, ["Control"]);
+  for (const id of [
+    "sheet-reorder-bar-preview",
+    "sheet-reorder-grid-preview",
+  ]) {
+    assert.equal(scenariosById.get(id).actions[0].phase, "preview");
+  }
+  for (const id of [
+    "sheet-reorder-bar-commit",
+    "sheet-reorder-grid-commit",
+    "sheet-reorder-cross-surface-cancelled",
+    "sheet-reorder-invalid-drop",
+    "frame-manipulation-move",
+    "frame-manipulation-resize",
+    "frame-layout-locked",
+  ]) {
+    assert.equal(scenariosById.get(id).actions.at(-1).phase, "drop");
+  }
+  for (const id of [
+    "sheet-reorder-bar-preview",
+    "sheet-reorder-bar-commit",
+    "sheet-reorder-grid-preview",
+    "sheet-reorder-grid-commit",
+    "sheet-reorder-cancelled",
+    "sheet-reorder-cross-surface-cancelled",
+    "sheet-reorder-invalid-drop",
+  ]) {
+    assert.match(scenariosById.get(id).implementationPath, /mode=normal/u);
+    assert.match(scenariosById.get(id).readySelector, /data-editor-mode/u);
+  }
+  for (const id of [
+    "sheet-reorder-bar-preview",
+    "sheet-reorder-grid-preview",
+  ]) {
+    assert.match(
+      scenariosById.get(id).readySelector,
+      /^\[data-editor-mode="normal"\] \[data-reorder-surface=/u,
+    );
+  }
+});
+
+test("manifest schema 3 accepts real modifier, wheel, and drag actions", () => {
+  const interactive = structuredClone(manifest);
+  interactive.schemaVersion = 3;
+  interactive.scenarios[0].actions = [
+    { type: "key", key: "Plus", modifiers: ["Control"] },
+    { type: "click", selector: "#frame", modifiers: ["Control"] },
+    {
+      type: "wheel",
+      selector: "#canvas",
+      deltaY: -120,
+      modifiers: ["Control"],
+    },
+    {
+      type: "drag",
+      selector: "#source",
+      targetSelector: "#target",
+      dropTargetSelector: "#opposite-surface",
+      phase: "drop",
+    },
+  ];
+
+  assert.equal(validateUiAcceptanceManifest(interactive), interactive);
+
+  const unknownModifier = structuredClone(interactive);
+  unknownModifier.scenarios[0].actions[0].modifiers = ["Alt"];
+  assert.throws(
+    () => validateUiAcceptanceManifest(unknownModifier),
+    /modifier.*not supported/u,
+  );
+
+  const duplicateModifier = structuredClone(interactive);
+  duplicateModifier.scenarios[0].actions[0].modifiers = [
+    "Control",
+    "Control",
+  ];
+  assert.throws(
+    () => validateUiAcceptanceManifest(duplicateModifier),
+    /modifier.*duplicates/u,
+  );
+
+  const zeroWheel = structuredClone(interactive);
+  zeroWheel.scenarios[0].actions[2].deltaY = 0;
+  assert.throws(
+    () => validateUiAcceptanceManifest(zeroWheel),
+    /deltaY.*non-zero integer/u,
+  );
+
+  const invalidDrag = structuredClone(interactive);
+  invalidDrag.scenarios[0].actions[3].phase = "hover";
+  assert.throws(
+    () => validateUiAcceptanceManifest(invalidDrag),
+    /phase.*preview or drop/u,
+  );
+
+  const invalidDropTarget = structuredClone(interactive);
+  invalidDropTarget.scenarios[0].actions[3].dropTargetSelector = "";
+  assert.throws(
+    () => validateUiAcceptanceManifest(invalidDropTarget),
+    /dropTargetSelector.*non-empty string/u,
+  );
+});
+
 test("runner executes focus, hover, keyboard and input actions through WebDriver", async () => {
   const { performUiAcceptanceAction } = await import("./UiAcceptanceRunner.mjs");
   const requests = [];
@@ -426,6 +594,166 @@ test("runner executes focus, hover, keyboard and input actions through WebDriver
   ]);
 });
 
+test("runner emits W3C actions for Ctrl gestures, wheel, and preview or committed drag", async () => {
+  const {
+    assertBrowserZoomUnchanged,
+    performUiAcceptanceAction,
+    requiresBrowserZoomInvariant,
+  } = await import("./UiAcceptanceRunner.mjs");
+  const requests = [];
+  const common = {
+    execute: async () => true,
+    locateSelector: async (selector) => `element:${selector}`,
+    locateText: async (text) => `text:${text}`,
+    request: async (method, endpoint, body) => {
+      requests.push({ body, endpoint, method });
+      return null;
+    },
+    sessionId: "session-gestures",
+  };
+
+  await performUiAcceptanceAction({
+    ...common,
+    action: { type: "key", key: "Plus", modifiers: ["Control"] },
+  });
+  assert.deepEqual(requests.at(-1).body.actions[0].actions, [
+    { type: "keyDown", value: "\uE009" },
+    { type: "keyDown", value: "\uE025" },
+    { type: "keyUp", value: "\uE025" },
+    { type: "keyUp", value: "\uE009" },
+  ]);
+
+  await performUiAcceptanceAction({
+    ...common,
+    action: { type: "click", selector: "#frame", modifiers: ["Control"] },
+  });
+  const ctrlClick = requests.at(-1).body.actions;
+  assert.deepEqual(ctrlClick[0].actions, [
+    { type: "keyDown", value: "\uE009" },
+    { type: "pause", duration: 0 },
+    { type: "pause", duration: 0 },
+    { type: "pause", duration: 0 },
+    { type: "keyUp", value: "\uE009" },
+  ]);
+  assert.equal(ctrlClick[1].type, "pointer");
+  assert.deepEqual(
+    ctrlClick[1].actions.map((action) => action.type),
+    ["pause", "pointerMove", "pointerDown", "pointerUp", "pause"],
+  );
+
+  await performUiAcceptanceAction({
+    ...common,
+    action: {
+      type: "wheel",
+      selector: "#canvas",
+      deltaY: -120,
+      modifiers: ["Control"],
+    },
+  });
+  const ctrlWheel = requests.at(-1).body.actions;
+  assert.equal(ctrlWheel[1].type, "wheel");
+  assert.deepEqual(ctrlWheel[1].actions[1], {
+    type: "scroll",
+    duration: 0,
+    origin: {
+      "element-6066-11e4-a52e-4f735466cecf": "element:#canvas",
+    },
+    x: 0,
+    y: 0,
+    deltaX: 0,
+    deltaY: -120,
+  });
+  assert.equal(
+    requiresBrowserZoomInvariant([
+      {
+        type: "wheel",
+        selector: "#canvas",
+        deltaY: -120,
+        modifiers: ["Control"],
+      },
+    ]),
+    true,
+  );
+  assert.equal(
+    requiresBrowserZoomInvariant([
+      { type: "wheel", selector: "#canvas", deltaY: -120 },
+      { type: "key", key: "Plus", modifiers: ["Control"] },
+    ]),
+    false,
+  );
+  const browserZoom = {
+    devicePixelRatio: 1,
+    innerHeight: 900,
+    innerWidth: 1440,
+    visualViewportScale: 1,
+  };
+  assert.doesNotThrow(() =>
+    assertBrowserZoomUnchanged({
+      after: { ...browserZoom },
+      before: browserZoom,
+      label: "editor-zoom-wheel implementation",
+    }),
+  );
+  assert.throws(
+    () =>
+      assertBrowserZoomUnchanged({
+        after: {
+          ...browserZoom,
+          devicePixelRatio: 1.25,
+          innerWidth: 1152,
+        },
+        before: browserZoom,
+        label: "editor-zoom-wheel implementation",
+      }),
+    /editor-zoom-wheel implementation changed browser zoom.*devicePixelRatio.*innerWidth/u,
+  );
+
+  await performUiAcceptanceAction({
+    ...common,
+    action: {
+      type: "drag",
+      selector: "#source",
+      targetSelector: "#target",
+      phase: "preview",
+    },
+  });
+  assert.deepEqual(
+    requests.at(-1).body.actions[0].actions.map((action) => action.type),
+    ["pointerMove", "pointerDown", "pointerMove"],
+  );
+
+  await performUiAcceptanceAction({
+    ...common,
+    action: {
+      type: "drag",
+      selector: "#source",
+      targetSelector: "#target",
+      dropTargetSelector: "#opposite-surface",
+      phase: "drop",
+    },
+  });
+  assert.deepEqual(
+    requests.at(-1).body.actions[0].actions.map((action) => action.type),
+    [
+      "pointerMove",
+      "pointerDown",
+      "pointerMove",
+      "pointerMove",
+      "pointerUp",
+    ],
+  );
+  assert.deepEqual(requests.at(-1).body.actions[0].actions.at(-2), {
+    type: "pointerMove",
+    duration: 220,
+    origin: {
+      "element-6066-11e4-a52e-4f735466cecf":
+        "element:#opposite-surface",
+    },
+    x: 0,
+    y: 0,
+  });
+});
+
 test("runner neutralizes pointer state before each captured surface", async () => {
   const { neutralizeUiAcceptancePointer } = await import(
     "./UiAcceptanceRunner.mjs"
@@ -468,6 +796,50 @@ test("runner neutralizes pointer state before each captured surface", async () =
       },
     },
   ]);
+});
+
+function assertRunnerReleasesHeldActions(runner, checkoutLineEndings) {
+  const normalizedRunner = runner.replaceAll("\r\n", "\n");
+  const captureFunction = normalizedRunner.indexOf(
+    "async function navigateAndCapture",
+  );
+  const screenshot = normalizedRunner.indexOf(
+    "const screenshot = await captureUiAcceptanceScreenshot",
+    captureFunction,
+  );
+  const release = normalizedRunner.indexOf(
+    "await request(\"DELETE\", `/session/${sessionId}/actions`);",
+    screenshot,
+  );
+  const nextFunction = normalizedRunner.indexOf("\n}\n", screenshot);
+
+  assert.ok(
+    release > screenshot,
+    `${checkoutLineEndings}: held actions must be released after capture`,
+  );
+  assert.ok(
+    release < nextFunction,
+    `${checkoutLineEndings}: held actions must be released inside navigateAndCapture`,
+  );
+  assert.match(
+    normalizedRunner.slice(captureFunction, nextFunction),
+    /finally[\s\S]*DELETE/u,
+    `${checkoutLineEndings}: capture cleanup must also run after an action or screenshot failure`,
+  );
+}
+
+test("runner releases held pointer and modifier state for LF and CRLF checkouts", () => {
+  const runner = readFileSync(
+    path.join(workspace, "scripts", "Run-UiAcceptance.mjs"),
+    "utf8",
+  );
+  const lfRunner = runner.replaceAll("\r\n", "\n");
+
+  assertRunnerReleasesHeldActions(lfRunner, "LF checkout");
+  assertRunnerReleasesHeldActions(
+    lfRunner.replaceAll("\n", "\r\n"),
+    "CRLF checkout",
+  );
 });
 
 test("runner captures the declared surface instead of the whole viewport", async () => {
