@@ -10,7 +10,10 @@ import {
   type AlbumInformationProjectDraft,
   type ProjectSettingsDraft,
 } from "../application/projectSettingsDraft";
-import { materializeSheetReorderTarget } from "../application/sheetStructure";
+import {
+  isSheetStructureIntent,
+  materializeSheetStructureIntent,
+} from "../application/sheetStructure";
 import {
   albumInformationReviewEquals,
   albumInformationReviewHasChanges,
@@ -101,26 +104,25 @@ export function useProjectMutations({
     const capturedProjection = projection;
     let affectedFrameId: string | null = null;
     let affectedSheetId: string | null = null;
-    let reorderCancelled = false;
+    let structuralIntentCancelled = false;
     const completed = await runWithErrorFeedback(
       async (port, latestProjection) => {
         const effectiveProjection = latestProjection ?? capturedProjection;
         let materializedIntent = intent;
-        if (intent.kind === "reorderSheet") {
-          const materializedTarget = materializeSheetReorderTarget(
+        if (
+          isSheetStructureIntent(intent) &&
+          (latestProjection !== null || intent.kind === "reorderSheet")
+        ) {
+          const materializedStructure = materializeSheetStructureIntent(
             capturedProjection.state.album.sheets,
             effectiveProjection.state.album.sheets,
-            intent.sheetId,
-            intent.targetIndex,
+            intent,
           );
-          if (materializedTarget === null) {
-            reorderCancelled = true;
+          if (materializedStructure === null) {
+            structuralIntentCancelled = true;
             return effectiveProjection;
           }
-          materializedIntent = {
-            ...intent,
-            targetIndex: materializedTarget,
-          };
+          materializedIntent = materializedStructure;
         }
         const result = await port.applyWithOutcome(materializedIntent);
         affectedFrameId = result.affectedFrameId;
@@ -128,7 +130,7 @@ export function useProjectMutations({
         return result.projection;
       },
     );
-    if (reorderCancelled) return false;
+    if (structuralIntentCancelled) return false;
     if (completed && affectedFrameId) onAffectedFrame(affectedFrameId);
     if (completed && affectedSheetId) onAffectedSheet(affectedSheetId);
     return completed;

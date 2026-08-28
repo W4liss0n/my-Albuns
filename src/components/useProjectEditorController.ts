@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ProjectCorePort } from "../application/projectPorts";
-import type { EditorProjection, ProjectIntent } from "../domain/project";
+import type { SheetStructureIntent } from "../application/sheetStructure";
+import type { EditorProjection } from "../domain/project";
 import type {
   AlbumCanvasMode,
   AlbumCanvasProps,
@@ -20,13 +21,6 @@ interface ProjectEditorControllerInput {
   onProjectionChange(projection: EditorProjection): void;
   onSaveAsBarrierChange?(active: boolean): void;
 }
-
-type StructuralProjectIntent = Extract<
-  ProjectIntent,
-  {
-    kind: "addSheet" | "convertEdgeSheet" | "deleteSheet" | "reorderSheet";
-  }
->;
 
 export function useProjectEditorController({
   interactionBlocked = false,
@@ -198,7 +192,7 @@ export function useProjectEditorController({
     onCanvasMetricsChange: navigation.handleCanvasMetricsChange,
   };
 
-  async function applyStructuralIntent(intent: StructuralProjectIntent) {
+  async function applyStructuralIntent(intent: SheetStructureIntent) {
     if (structuralCommandsDisabled || structuralMutationPendingRef.current) {
       return false;
     }
