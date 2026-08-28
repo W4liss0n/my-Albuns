@@ -59,7 +59,7 @@ test("exposes every canonical surface as a navigable, stable map node", () => {
 });
 
 test("applies only Ctrl zoom gestures between Ajustar Lâmina and the calibrated 4× cap", () => {
-  render(<UiArchitecturePrototype initialView="editor" />);
+  const { unmount } = render(<UiArchitecturePrototype initialView="editor" />);
 
   const canvas = screen.getByRole("region", { name: "Canvas do protótipo" });
   const sheet = screen.getByTestId("prototype-editing-sheet");
@@ -87,12 +87,16 @@ test("applies only Ctrl zoom gestures between Ajustar Lâmina and the calibrated
       y: 50,
     }),
   });
-  fireEvent.wheel(canvas, {
+  const ctrlWheel = new WheelEvent("wheel", {
+    bubbles: true,
+    cancelable: true,
     clientX: 700,
     clientY: 150,
     ctrlKey: true,
     deltaY: -120,
   });
+  expect(fireEvent(canvas, ctrlWheel)).toBe(false);
+  expect(ctrlWheel.defaultPrevented).toBe(true);
   expect(canvas).toHaveAttribute("data-zoom-level", "1.25");
   expect(canvas).toHaveAttribute("data-last-zoom-input", "wheel-in");
   expect(canvas).toHaveAttribute("data-zoom-anchor", "cursor");
@@ -122,6 +126,16 @@ test("applies only Ctrl zoom gestures between Ajustar Lâmina and the calibrated
   expect(canvas).toHaveAttribute("data-zoom-offset-y", "0");
   expect(screen.queryByText(/\d+%/u)).not.toBeInTheDocument();
   expect(screen.queryByText(/Ctrl\+/u)).not.toBeInTheDocument();
+
+  unmount();
+  const detachedCtrlWheel = new WheelEvent("wheel", {
+    bubbles: true,
+    cancelable: true,
+    ctrlKey: true,
+    deltaY: -120,
+  });
+  expect(canvas.dispatchEvent(detachedCtrlWheel)).toBe(true);
+  expect(detachedCtrlWheel.defaultPrevented).toBe(false);
 });
 
 test("previews, cancels, and commits one synchronized reorder from the Barra", () => {

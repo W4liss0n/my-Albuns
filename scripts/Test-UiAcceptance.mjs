@@ -595,7 +595,11 @@ test("runner executes focus, hover, keyboard and input actions through WebDriver
 });
 
 test("runner emits W3C actions for Ctrl gestures, wheel, and preview or committed drag", async () => {
-  const { performUiAcceptanceAction } = await import("./UiAcceptanceRunner.mjs");
+  const {
+    assertBrowserZoomUnchanged,
+    performUiAcceptanceAction,
+    requiresBrowserZoomInvariant,
+  } = await import("./UiAcceptanceRunner.mjs");
   const requests = [];
   const common = {
     execute: async () => true,
@@ -659,6 +663,50 @@ test("runner emits W3C actions for Ctrl gestures, wheel, and preview or committe
     deltaX: 0,
     deltaY: -120,
   });
+  assert.equal(
+    requiresBrowserZoomInvariant([
+      {
+        type: "wheel",
+        selector: "#canvas",
+        deltaY: -120,
+        modifiers: ["Control"],
+      },
+    ]),
+    true,
+  );
+  assert.equal(
+    requiresBrowserZoomInvariant([
+      { type: "wheel", selector: "#canvas", deltaY: -120 },
+      { type: "key", key: "Plus", modifiers: ["Control"] },
+    ]),
+    false,
+  );
+  const browserZoom = {
+    devicePixelRatio: 1,
+    innerHeight: 900,
+    innerWidth: 1440,
+    visualViewportScale: 1,
+  };
+  assert.doesNotThrow(() =>
+    assertBrowserZoomUnchanged({
+      after: { ...browserZoom },
+      before: browserZoom,
+      label: "editor-zoom-wheel implementation",
+    }),
+  );
+  assert.throws(
+    () =>
+      assertBrowserZoomUnchanged({
+        after: {
+          ...browserZoom,
+          devicePixelRatio: 1.25,
+          innerWidth: 1152,
+        },
+        before: browserZoom,
+        label: "editor-zoom-wheel implementation",
+      }),
+    /editor-zoom-wheel implementation changed browser zoom.*devicePixelRatio.*innerWidth/u,
+  );
 
   await performUiAcceptanceAction({
     ...common,

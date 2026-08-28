@@ -25,9 +25,12 @@ import {
   webdriverElementId,
 } from "./UiAcceptance.mjs";
 import {
+  assertBrowserZoomUnchanged,
+  captureBrowserZoomState,
   captureUiAcceptanceScreenshot,
   neutralizeUiAcceptancePointer,
   performUiAcceptanceAction,
+  requiresBrowserZoomInvariant,
 } from "./UiAcceptanceRunner.mjs";
 
 const [workspaceArgument, outputArgument, edgeArgument, driverArgument] =
@@ -435,6 +438,12 @@ async function navigateAndCapture({
       viewport: scenario.viewport,
     });
     await settleDocument(request, sessionId);
+    const guardBrowserZoom = requiresBrowserZoomInvariant(actions);
+    const browserZoomBefore = guardBrowserZoom
+      ? await captureBrowserZoomState({
+          execute: (script) => execute(request, sessionId, script),
+        })
+      : null;
     const locateSelector = (selector) =>
       waitForElement(request, sessionId, selector, `${label} action`);
     const locateText = (text) =>
@@ -452,6 +461,16 @@ async function navigateAndCapture({
     }
     await waitForElement(request, sessionId, readySelector, label);
     await settleDocument(request, sessionId);
+    if (browserZoomBefore) {
+      const browserZoomAfter = await captureBrowserZoomState({
+        execute: (script) => execute(request, sessionId, script),
+      });
+      assertBrowserZoomUnchanged({
+        after: browserZoomAfter,
+        before: browserZoomBefore,
+        label,
+      });
+    }
     const screenshot = await captureUiAcceptanceScreenshot({
       captureSelector,
       locateSelector: (selector) =>
@@ -463,6 +482,9 @@ async function navigateAndCapture({
       throw new Error(`${label} returned no screenshot`);
     }
     writeFileSync(screenshotPath, Buffer.from(screenshot, "base64"));
+    return {
+      browserZoomStatus: guardBrowserZoom ? "unchanged" : undefined,
+    };
   } finally {
     await request("DELETE", `/session/${sessionId}/actions`);
   }
@@ -563,7 +585,7 @@ try {
         : {}),
     };
     try {
-      await navigateAndCapture({
+      const implementationCapture = await navigateAndCapture({
         request,
         sessionId,
         scenario,
@@ -575,6 +597,9 @@ try {
         screenshotPath: implementationPath,
         label: `${scenario.id} implementation`,
       });
+      if (implementationCapture.browserZoomStatus) {
+        result.browserZoomStatus = implementationCapture.browserZoomStatus;
+      }
       if (paired) {
         await navigateAndCapture({
           request,

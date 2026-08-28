@@ -22,6 +22,39 @@ function elementReference(elementId) {
   return { [webdriverElementKey]: elementId };
 }
 
+export function requiresBrowserZoomInvariant(actions) {
+  return actions.some(
+    (action) =>
+      action.type === "wheel" && action.modifiers?.includes("Control"),
+  );
+}
+
+export async function captureBrowserZoomState({ execute }) {
+  return execute(`
+    return {
+      devicePixelRatio: window.devicePixelRatio,
+      innerHeight: window.innerHeight,
+      innerWidth: window.innerWidth,
+      visualViewportScale: window.visualViewport?.scale ?? null,
+    };
+  `);
+}
+
+export function assertBrowserZoomUnchanged({ after, before, label }) {
+  const measuredProperties = [
+    "devicePixelRatio",
+    "innerHeight",
+    "innerWidth",
+    "visualViewportScale",
+  ];
+  const changes = measuredProperties
+    .filter((property) => !Object.is(before[property], after[property]))
+    .map((property) => `${property}: ${before[property]} -> ${after[property]}`);
+  if (changes.length > 0) {
+    throw new Error(`${label} changed browser zoom (${changes.join(", ")})`);
+  }
+}
+
 export async function neutralizeUiAcceptancePointer({
   request,
   sessionId,

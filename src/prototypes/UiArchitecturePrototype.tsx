@@ -1,9 +1,10 @@
 import {
+  useCallback,
   useEffect,
+  useRef,
   useState,
   type KeyboardEvent,
   type PointerEvent as ReactPointerEvent,
-  type WheelEvent,
 } from "react";
 
 export type UiArchitecturePrototypeView = "editor" | "map";
@@ -399,27 +400,31 @@ export function UiArchitecturePrototype({
   const [frameGesture, setFrameGesture] = useState<FrameGesture | null>(null);
   const [layoutLocked, setLayoutLocked] = useState(false);
   const [layoutLockFeedback, setLayoutLockFeedback] = useState(false);
+  const canvasRef = useRef<HTMLElement>(null);
 
-  const changeZoom = (
-    delta: number,
-    input: ZoomInput,
-    anchor: "center" | "cursor",
-    anchorPoint = { x: 0, y: 0 },
-  ) => {
-    setViewport((current) => {
-      const nextZoom = clampZoom(current.zoom + delta);
-      const ratio = nextZoom / current.zoom;
-      const point = anchor === "cursor" ? anchorPoint : { x: 0, y: 0 };
-      return {
-        offsetX: point.x - ratio * (point.x - current.offsetX),
-        offsetY: point.y - ratio * (point.y - current.offsetY),
-        zoom: nextZoom,
-      };
-    });
-    setLastZoomInput(input);
-    setZoomAnchor(anchor);
-    if (anchor === "center") setZoomOrigin({ x: 50, y: 50 });
-  };
+  const changeZoom = useCallback(
+    (
+      delta: number,
+      input: ZoomInput,
+      anchor: "center" | "cursor",
+      anchorPoint = { x: 0, y: 0 },
+    ) => {
+      setViewport((current) => {
+        const nextZoom = clampZoom(current.zoom + delta);
+        const ratio = nextZoom / current.zoom;
+        const point = anchor === "cursor" ? anchorPoint : { x: 0, y: 0 };
+        return {
+          offsetX: point.x - ratio * (point.x - current.offsetX),
+          offsetY: point.y - ratio * (point.y - current.offsetY),
+          zoom: nextZoom,
+        };
+      });
+      setLastZoomInput(input);
+      setZoomAnchor(anchor);
+      if (anchor === "center") setZoomOrigin({ x: 50, y: 50 });
+    },
+    [],
+  );
 
   const handleCanvasKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (!event.ctrlKey) return;
@@ -438,10 +443,12 @@ export function UiArchitecturePrototype({
     }
   };
 
-  const handleCanvasWheel = (event: WheelEvent<HTMLElement>) => {
+  const handleCanvasWheel = useCallback((event: globalThis.WheelEvent) => {
     if (!event.ctrlKey || event.deltaY === 0) return;
     event.preventDefault();
-    const bounds = event.currentTarget.getBoundingClientRect();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const bounds = canvas.getBoundingClientRect();
     let anchorPoint = { x: 0, y: 0 };
     if (bounds.width > 0 && bounds.height > 0) {
       anchorPoint = {
@@ -465,7 +472,15 @@ export function UiArchitecturePrototype({
       "cursor",
       anchorPoint,
     );
-  };
+  }, [changeZoom]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || editorMode !== "edit" || view !== "editor") return;
+
+    canvas.addEventListener("wheel", handleCanvasWheel, { passive: false });
+    return () => canvas.removeEventListener("wheel", handleCanvasWheel);
+  }, [editorMode, handleCanvasWheel, view]);
 
   const changeEditorMode = (nextMode: UiArchitecturePrototypeEditorMode) => {
     setEditorMode(nextMode);
@@ -850,7 +865,7 @@ export function UiArchitecturePrototype({
               zoom === fitZoom ? "fit" : zoom === maximumZoom ? "cap" : "raised"
             }
             onKeyDown={editorMode === "edit" ? handleCanvasKeyDown : undefined}
-            onWheel={editorMode === "edit" ? handleCanvasWheel : undefined}
+            ref={canvasRef}
             tabIndex={0}
           >
             <div
