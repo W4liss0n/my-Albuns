@@ -750,31 +750,47 @@ test("runner neutralizes pointer state before each captured surface", async () =
   ]);
 });
 
-test("runner releases held pointer and modifier state immediately after each capture", () => {
+function assertRunnerReleasesHeldActions(runner, checkoutLineEndings) {
+  const normalizedRunner = runner.replaceAll("\r\n", "\n");
+  const captureFunction = normalizedRunner.indexOf(
+    "async function navigateAndCapture",
+  );
+  const screenshot = normalizedRunner.indexOf(
+    "const screenshot = await captureUiAcceptanceScreenshot",
+    captureFunction,
+  );
+  const release = normalizedRunner.indexOf(
+    "await request(\"DELETE\", `/session/${sessionId}/actions`);",
+    screenshot,
+  );
+  const nextFunction = normalizedRunner.indexOf("\n}\n", screenshot);
+
+  assert.ok(
+    release > screenshot,
+    `${checkoutLineEndings}: held actions must be released after capture`,
+  );
+  assert.ok(
+    release < nextFunction,
+    `${checkoutLineEndings}: held actions must be released inside navigateAndCapture`,
+  );
+  assert.match(
+    normalizedRunner.slice(captureFunction, nextFunction),
+    /finally[\s\S]*DELETE/u,
+    `${checkoutLineEndings}: capture cleanup must also run after an action or screenshot failure`,
+  );
+}
+
+test("runner releases held pointer and modifier state for LF and CRLF checkouts", () => {
   const runner = readFileSync(
     path.join(workspace, "scripts", "Run-UiAcceptance.mjs"),
     "utf8",
   );
-  const captureFunction = runner.indexOf("async function navigateAndCapture");
-  const screenshot = runner.indexOf(
-    "const screenshot = await captureUiAcceptanceScreenshot",
-    captureFunction,
-  );
-  const release = runner.indexOf(
-    "await request(\"DELETE\", `/session/${sessionId}/actions`);",
-    screenshot,
-  );
-  const nextFunction = runner.indexOf("\n}\n", screenshot);
+  const lfRunner = runner.replaceAll("\r\n", "\n");
 
-  assert.ok(release > screenshot, "held actions must be released after capture");
-  assert.ok(
-    release < nextFunction,
-    "held actions must be released inside navigateAndCapture",
-  );
-  assert.match(
-    runner.slice(captureFunction, nextFunction),
-    /finally[\s\S]*DELETE/u,
-    "capture cleanup must also run after an action or screenshot failure",
+  assertRunnerReleasesHeldActions(lfRunner, "LF checkout");
+  assertRunnerReleasesHeldActions(
+    lfRunner.replaceAll("\n", "\r\n"),
+    "CRLF checkout",
   );
 });
 
