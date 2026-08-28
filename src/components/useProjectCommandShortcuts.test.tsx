@@ -5,10 +5,14 @@ import { useProjectCommandShortcuts } from "./useProjectCommandShortcuts";
 
 function handlers() {
   return {
+    canDeleteSheet: true,
     closeProject: vi.fn(),
+    deleteSheet: vi.fn(),
     redo: vi.fn(),
     save: vi.fn(),
     saveAs: vi.fn(),
+    sheetShortcutActive: true,
+    sheetCommandsDisabled: false,
     undo: vi.fn(),
   };
 }
@@ -76,6 +80,100 @@ test("dispatches Save as distinctly from Save", () => {
   expect(event.defaultPrevented).toBe(true);
   expect(actions.save).not.toHaveBeenCalled();
   expect(actions.saveAs).toHaveBeenCalledOnce();
+});
+
+test("dispatches Delete only for an available Sheet outside text entry and Edit Mode", () => {
+  const actions = handlers();
+  const view = renderHook(
+    ({ canDeleteSheet, sheetCommandsDisabled }) =>
+      useProjectCommandShortcuts({
+        ...actions,
+        canDeleteSheet,
+        canRedo: true,
+        canUndo: true,
+        disabled: false,
+        sheetCommandsDisabled,
+      }),
+    {
+      initialProps: {
+        canDeleteSheet: true,
+        sheetCommandsDisabled: false,
+      },
+    },
+  );
+
+  expect(dispatchShortcut("Delete", { ctrlKey: false }).defaultPrevented).toBe(
+    true,
+  );
+  expect(actions.deleteSheet).toHaveBeenCalledOnce();
+
+  const input = document.createElement("input");
+  document.body.append(input);
+  try {
+    expect(
+      dispatchShortcut("Delete", { ctrlKey: false }, input).defaultPrevented,
+    ).toBe(false);
+    expect(actions.deleteSheet).toHaveBeenCalledOnce();
+  } finally {
+    input.remove();
+  }
+
+  view.rerender({ canDeleteSheet: false, sheetCommandsDisabled: false });
+  expect(dispatchShortcut("Delete", { ctrlKey: false }).defaultPrevented).toBe(
+    true,
+  );
+  expect(actions.deleteSheet).toHaveBeenCalledOnce();
+
+  view.rerender({ canDeleteSheet: true, sheetCommandsDisabled: true });
+  expect(dispatchShortcut("Delete", { ctrlKey: false }).defaultPrevented).toBe(
+    true,
+  );
+  expect(actions.deleteSheet).toHaveBeenCalledOnce();
+});
+
+test("leaves Delete to the Media Panel while a media item owns keyboard focus", () => {
+  const actions = handlers();
+  renderHook(() =>
+    useProjectCommandShortcuts({
+      ...actions,
+      canRedo: true,
+      canUndo: true,
+      disabled: false,
+    }),
+  );
+  const mediaPanel = document.createElement("section");
+  mediaPanel.dataset.projectCommandContext = "media-panel";
+  const media = document.createElement("button");
+  mediaPanel.append(media);
+  document.body.append(mediaPanel);
+
+  try {
+    media.focus();
+    const event = dispatchShortcut("Delete", { ctrlKey: false }, media);
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(actions.deleteSheet).not.toHaveBeenCalled();
+  } finally {
+    mediaPanel.remove();
+  }
+});
+
+test("leaves Delete to the selected Frame when the Sheet context is inactive", () => {
+  const actions = handlers();
+  renderHook(() =>
+    useProjectCommandShortcuts({
+      ...actions,
+      canRedo: true,
+      canUndo: true,
+      disabled: false,
+      sheetShortcutActive: false,
+    }),
+  );
+
+  const event = dispatchShortcut("Delete", { ctrlKey: false });
+
+  expect(event.defaultPrevented).toBe(false);
+  expect(actions.deleteSheet).not.toHaveBeenCalled();
 });
 
 test("leaves contextual Ctrl+E to the active photo owner", () => {

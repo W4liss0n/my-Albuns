@@ -623,6 +623,128 @@ test("routes implicit menu and explicit context actions to their intended Sheets
   ).not.toBeInTheDocument();
 });
 
+test("routes Delete to the centered Sheet and guards text entry, Edit Mode, and the minimum", async () => {
+  const physicalProjection = createThreeSheetProjection();
+  const port = projectCorePortWithApply(async () => physicalProjection);
+  const applyWithOutcome = vi.fn(async () => ({
+    projection: physicalProjection,
+    affectedFrameId: null,
+    affectedSheetId: null,
+  }));
+  port.applyWithOutcome = applyWithOutcome;
+  const view = render(
+    <ProjectWorkspace
+      exportPipelinePort={exportPipelinePort}
+      projection={physicalProjection}
+      projectCorePort={port}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  act(() => canvasHarness.props?.onCenteredSheetChange?.("sheet-002"));
+  fireEvent.keyDown(window, { key: "Delete" });
+  await waitFor(() =>
+    expect(applyWithOutcome).toHaveBeenCalledWith({
+      kind: "deleteSheet",
+      sheetId: "sheet-002",
+    }),
+  );
+
+  const media = screen.getByRole("button", { name: /Campo\.jpg/ });
+  media.focus();
+  fireEvent.keyDown(media, { key: "Delete" });
+  expect(applyWithOutcome).toHaveBeenCalledOnce();
+
+  act(() => useEditorView.getState().selectFrame("frame-001"));
+  fireEvent.keyDown(window, { key: "Delete" });
+  expect(applyWithOutcome).toHaveBeenCalledOnce();
+  act(() => useEditorView.getState().selectFrame(null));
+
+  const input = document.createElement("input");
+  document.body.append(input);
+  try {
+    fireEvent.keyDown(input, { key: "Delete" });
+    expect(applyWithOutcome).toHaveBeenCalledOnce();
+  } finally {
+    input.remove();
+  }
+
+  act(() => canvasHarness.props?.onEditSheet?.("sheet-002"));
+  fireEvent.keyDown(window, { key: "Delete" });
+  expect(applyWithOutcome).toHaveBeenCalledOnce();
+  view.unmount();
+
+  const minimumProjection = createTwoSheetProjection();
+  const minimumPort = projectCorePortWithApply(async () => minimumProjection);
+  const minimumApply = vi.fn(async () => ({
+    projection: minimumProjection,
+    affectedFrameId: null,
+    affectedSheetId: null,
+  }));
+  minimumPort.applyWithOutcome = minimumApply;
+  render(
+    <ProjectWorkspace
+      exportPipelinePort={exportPipelinePort}
+      projection={minimumProjection}
+      projectCorePort={minimumPort}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  fireEvent.keyDown(window, { key: "Delete" });
+  expect(minimumApply).not.toHaveBeenCalled();
+});
+
+test.each(["completed", "failed"] as const)(
+  "blocks adjacent structural commands while a predecessor is pending and then %s",
+  async (predecessorOutcome) => {
+    const physicalProjection = createThreeSheetProjection();
+    const pendingDelete = deferredValue<
+      Awaited<ReturnType<ProjectCorePort["applyWithOutcome"]>>
+    >();
+    const port = projectCorePortWithApply(async () => physicalProjection);
+    port.applyWithOutcome = vi.fn(() => pendingDelete.promise);
+    render(
+      <ProjectWorkspace
+        exportPipelinePort={exportPipelinePort}
+        projection={physicalProjection}
+        projectCorePort={port}
+        onProjectionChange={() => undefined}
+      />,
+    );
+
+    fireEvent.click(getApplicationCommand("Lâmina", "Excluir"));
+    await waitFor(() => expect(port.applyWithOutcome).toHaveBeenCalledOnce());
+
+    const adjacentCommand = getApplicationCommand(
+      "Lâmina",
+      "Adicionar depois",
+    );
+    expect(adjacentCommand).toBeDisabled();
+    fireEvent.click(adjacentCommand);
+
+    await act(async () => {
+      if (predecessorOutcome === "completed") {
+        pendingDelete.resolve({
+          projection: physicalProjection,
+          affectedFrameId: null,
+          affectedSheetId: null,
+        });
+      } else {
+        pendingDelete.reject(new Error("Falha estrutural controlada."));
+      }
+      await pendingDelete.promise.catch(() => undefined);
+    });
+
+    await waitFor(() => expect(port.applyWithOutcome).toHaveBeenCalledOnce());
+    await waitFor(() =>
+      expect(
+        getApplicationCommand("Lâmina", "Adicionar depois"),
+      ).toBeEnabled(),
+    );
+  },
+);
+
 test("routes implicit and explicit empty-edge conversions to their intended Sheet", async () => {
   const physicalProjection = createThreeSheetProjection();
   const port = projectCorePortWithApply(async () => physicalProjection);
@@ -785,7 +907,7 @@ test("previews a Bar reorder locally while the Grade stays confirmed, then commi
   expect(applyWithOutcome).toHaveBeenCalledOnce();
 });
 
-test("keeps a newer canonical reorder session when a queued reorder fails", async () => {
+test("blocks a newer reorder while a queued reorder is pending and restores the canonical session on failure", async () => {
   const visibleProjection = createThreeSheetProjection();
   const restoredProjection = structuredClone(visibleProjection);
   restoredProjection.state.revision += 1;
@@ -863,13 +985,16 @@ test("keeps a newer canonical reorder session when a queued reorder fails", asyn
   );
   act(() => canvasHarness.props?.sheetReorder?.onPreview("sheet-003", 2));
   expect(canvasHarness.props?.sheetReorder).toMatchObject({
-    status: "preview",
+    disabled: true,
+    status: "idle",
     representation: {
-      order: ["sheet-restored", "sheet-001", "sheet-003", "sheet-002"],
-      placeholderIndex: 2,
-      ghost: { sheetId: "sheet-003" },
+      order: ["sheet-restored", "sheet-001", "sheet-002", "sheet-003"],
+      placeholderIndex: null,
+      ghost: null,
     },
   });
+  act(() => canvasHarness.props?.sheetReorder?.onDrop());
+  expect(port.applyWithOutcome).toHaveBeenCalledOnce();
 
   await act(async () => {
     pendingReorder.reject(new Error("A ordem mudou antes do commit."));
@@ -886,10 +1011,11 @@ test("keeps a newer canonical reorder session when a queued reorder fails", asyn
     expect(canvasHarness.props?.sheetReorder?.representation.order).toEqual([
       "sheet-restored",
       "sheet-001",
-      "sheet-003",
       "sheet-002",
+      "sheet-003",
     ]);
-    expect(canvasHarness.props?.sheetReorder?.status).toBe("preview");
+    expect(canvasHarness.props?.sheetReorder?.status).toBe("idle");
+    expect(canvasHarness.props?.sheetReorder?.disabled).toBe(false);
   });
 });
 
@@ -937,6 +1063,75 @@ test("keeps both Sheet reorder surfaces inert while a commit is pending", async 
     ),
   );
 });
+
+test.each(["bar", "grid"] as const)(
+  "cancels and blocks the %s reorder preview while another structural commit is pending",
+  async (surface) => {
+    const physicalProjection = createThreeSheetProjection();
+    const pendingConversion = deferredValue<
+      Awaited<ReturnType<ProjectCorePort["applyWithOutcome"]>>
+    >();
+    const port = projectCorePortWithApply(async () => physicalProjection);
+    port.applyWithOutcome = vi.fn(() => pendingConversion.promise);
+    const view = render(
+      <ProjectWorkspace
+        exportPipelinePort={exportPipelinePort}
+        projection={physicalProjection}
+        projectCorePort={port}
+        onProjectionChange={() => undefined}
+      />,
+    );
+
+    act(() => canvasHarness.props?.onCenteredSheetChange?.("sheet-003"));
+    const slots = Array.from(
+      view.container.querySelectorAll<HTMLElement>(".sheet-grid-slot"),
+    );
+    const dataTransfer = {
+      effectAllowed: "none",
+      setData: vi.fn(),
+    };
+    if (surface === "bar") {
+      act(() => canvasHarness.props?.sheetReorder?.onPreview("sheet-001", 1));
+    } else {
+      fireEvent.dragStart(slots[0], { dataTransfer });
+      fireEvent.dragEnter(slots[1]);
+    }
+    expect(canvasHarness.props?.sheetReorder?.status).toBe("preview");
+
+    fireEvent.click(
+      getApplicationCommand("Lâmina", "Converter extremidade"),
+    );
+    await waitFor(() => expect(port.applyWithOutcome).toHaveBeenCalledOnce());
+
+    expect(canvasHarness.props?.sheetReorder?.disabled).toBe(true);
+    expect(canvasHarness.props?.sheetReorder?.status).toBe("idle");
+    expect(screen.getByTestId("sheet-reorder-grid")).toHaveAttribute(
+      "data-reorder-state",
+      "idle",
+    );
+    for (const slot of slots) {
+      expect(slot).toHaveAttribute("draggable", "false");
+    }
+
+    if (surface === "bar") {
+      act(() => canvasHarness.props?.sheetReorder?.onPreview("sheet-001", 1));
+      act(() => canvasHarness.props?.sheetReorder?.onDrop());
+    } else {
+      fireEvent.dragStart(slots[0], { dataTransfer });
+      fireEvent.dragEnter(slots[1]);
+      fireEvent.drop(screen.getByTestId("sheet-reorder-grid"));
+    }
+    expect(canvasHarness.props?.sheetReorder?.status).toBe("idle");
+    expect(port.applyWithOutcome).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      pendingConversion.reject(
+        new Error("Falha estrutural controlada após observar a trava."),
+      );
+      await pendingConversion.promise.catch(() => undefined);
+    });
+  },
+);
 
 test("derives the Canvas technical guides from the canonical document", () => {
   render(

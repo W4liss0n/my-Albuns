@@ -380,6 +380,7 @@ export function MediaPanel({
     <section
       id="media-panel"
       className="media-panel"
+      data-project-command-context="media-panel"
       aria-label="Painel de imagens"
       onKeyDown={selectAllVisibleMedia}
     >

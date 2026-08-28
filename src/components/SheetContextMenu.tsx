@@ -1,4 +1,10 @@
-import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 
 import { projectCommandDescriptor } from "../application/projectCommandCatalog";
 import type { SheetStructureAvailability } from "../application/sheetStructure";
@@ -12,6 +18,8 @@ const sheetCommandLabels = {
   deleteSheet: projectCommandDescriptor("delete-sheet").label,
   duplicateSheet: projectCommandDescriptor("duplicate-sheet").label,
 } as const;
+
+const VIEWPORT_MARGIN_PX = 8;
 
 interface SheetContextMenuProps {
   availability: SheetStructureAvailability;
@@ -35,6 +43,34 @@ export function SheetContextMenu({
   onDismiss,
 }: SheetContextMenuProps) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const [visiblePosition, setVisiblePosition] = useState(position);
+
+  useLayoutEffect(() => {
+    const keepInsideViewport = () => {
+      const root = rootRef.current;
+      if (!root) return;
+      const bounds = root.getBoundingClientRect();
+      const maximumX = Math.max(
+        VIEWPORT_MARGIN_PX,
+        window.innerWidth - bounds.width - VIEWPORT_MARGIN_PX,
+      );
+      const maximumY = Math.max(
+        VIEWPORT_MARGIN_PX,
+        window.innerHeight - bounds.height - VIEWPORT_MARGIN_PX,
+      );
+      const next = {
+        x: Math.min(Math.max(position.x, VIEWPORT_MARGIN_PX), maximumX),
+        y: Math.min(Math.max(position.y, VIEWPORT_MARGIN_PX), maximumY),
+      };
+      setVisiblePosition((current) =>
+        current.x === next.x && current.y === next.y ? current : next,
+      );
+    };
+
+    keepInsideViewport();
+    window.addEventListener("resize", keepInsideViewport);
+    return () => window.removeEventListener("resize", keepInsideViewport);
+  }, [position.x, position.y]);
 
   useDismissableSurface({
     enabled: true,
@@ -88,7 +124,7 @@ export function SheetContextMenu({
       aria-label={`Ações da Lâmina ${String(sheetNumber).padStart(2, "0")}`}
       className="ui-floating-surface sheet-context-menu"
       role="menu"
-      style={{ left: position.x, top: position.y }}
+      style={{ left: visiblePosition.x, top: visiblePosition.y }}
       tabIndex={-1}
       onContextMenu={(event) => event.preventDefault()}
       onKeyDown={handleKeyDown}
