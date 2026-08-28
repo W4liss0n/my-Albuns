@@ -339,20 +339,33 @@ export function ProjectWorkspace({
     commandsBlocked || controller.structuralCommandsDisabled;
   const structuralCommandsBlocked =
     sheetReorderDisabled || controller.structuralMutationPending;
-  useEffect(() => {
-    if (structuralCommandsBlocked) setSheetContextMenu(null);
-  }, [structuralCommandsBlocked]);
   const updateSheetReorder = useCallback((session: SheetReorderSession) => {
     sheetReorderSessionRef.current = session;
     setSheetReorderSession(session);
   }, []);
+  useEffect(() => {
+    if (!structuralCommandsBlocked) return;
+    setSheetContextMenu(null);
+    if (
+      sheetReorderSessionRef.current.status === "preview" ||
+      sheetReorderSessionRef.current.status === "invalid"
+    ) {
+      updateSheetReorder(
+        createSheetReorderSession(projection.state.album.sheets),
+      );
+    }
+  }, [
+    projection.state.album.sheets,
+    structuralCommandsBlocked,
+    updateSheetReorder,
+  ]);
   const previewSheetReorder = useCallback(
     (
       origin: SheetReorderSurface,
       draggedSheetId: string,
       targetIndex: number,
     ) => {
-      if (sheetReorderDisabled) return;
+      if (structuralCommandsBlocked) return;
       const transition = reduceSheetReorderSession(
         sheetReorderSessionRef.current,
         projection.state.album.sheets,
@@ -362,13 +375,18 @@ export function ProjectWorkspace({
     },
     [
       projection.state.album.sheets,
-      sheetReorderDisabled,
+      structuralCommandsBlocked,
       updateSheetReorder,
     ],
   );
   const dropSheetReorder = useCallback(
     (surface: SheetReorderSurface) => {
-      if (structuralCommandsBlocked) return;
+      if (structuralCommandsBlocked) {
+        updateSheetReorder(
+          createSheetReorderSession(projection.state.album.sheets),
+        );
+        return;
+      }
       const transition = reduceSheetReorderSession(
         sheetReorderSessionRef.current,
         projection.state.album.sheets,
@@ -446,6 +464,7 @@ export function ProjectWorkspace({
     redo: controller.redo,
     save: controller.save,
     saveAs: controller.saveAs,
+    sheetShortcutActive: controller.selectedFrame === null,
     sheetCommandsDisabled: structuralCommandsBlocked,
     undo: controller.undo,
   });
@@ -531,7 +550,7 @@ export function ProjectWorkspace({
             draggedPhotoId={draggedPhotoId}
             onPhotoDragCancel={() => setDraggedPhotoId(null)}
             sheetReorder={{
-              disabled: sheetReorderDisabled,
+              disabled: structuralCommandsBlocked,
               representation: sheetReorderRepresentation(
                 sheetReorderSession,
                 "bar",
@@ -607,7 +626,7 @@ export function ProjectWorkspace({
             setSheetContextMenu({ position, sheetId });
           }}
           sheetReorder={{
-            disabled: sheetReorderDisabled,
+            disabled: structuralCommandsBlocked,
             representation: sheetReorderRepresentation(
               sheetReorderSession,
               "grid",

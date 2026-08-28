@@ -11,6 +11,7 @@ function handlers() {
     redo: vi.fn(),
     save: vi.fn(),
     saveAs: vi.fn(),
+    sheetShortcutActive: true,
     sheetCommandsDisabled: false,
     undo: vi.fn(),
   };
@@ -128,6 +129,51 @@ test("dispatches Delete only for an available Sheet outside text entry and Edit 
     true,
   );
   expect(actions.deleteSheet).toHaveBeenCalledOnce();
+});
+
+test("leaves Delete to the Media Panel while a media item owns keyboard focus", () => {
+  const actions = handlers();
+  renderHook(() =>
+    useProjectCommandShortcuts({
+      ...actions,
+      canRedo: true,
+      canUndo: true,
+      disabled: false,
+    }),
+  );
+  const mediaPanel = document.createElement("section");
+  mediaPanel.dataset.projectCommandContext = "media-panel";
+  const media = document.createElement("button");
+  mediaPanel.append(media);
+  document.body.append(mediaPanel);
+
+  try {
+    media.focus();
+    const event = dispatchShortcut("Delete", { ctrlKey: false }, media);
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(actions.deleteSheet).not.toHaveBeenCalled();
+  } finally {
+    mediaPanel.remove();
+  }
+});
+
+test("leaves Delete to the selected Frame when the Sheet context is inactive", () => {
+  const actions = handlers();
+  renderHook(() =>
+    useProjectCommandShortcuts({
+      ...actions,
+      canRedo: true,
+      canUndo: true,
+      disabled: false,
+      sheetShortcutActive: false,
+    }),
+  );
+
+  const event = dispatchShortcut("Delete", { ctrlKey: false });
+
+  expect(event.defaultPrevented).toBe(false);
+  expect(actions.deleteSheet).not.toHaveBeenCalled();
 });
 
 test("leaves contextual Ctrl+E to the active photo owner", () => {

@@ -3,6 +3,19 @@ import { useEffect } from "react";
 import { matchProjectCommandShortcut } from "../application/projectCommandCatalog";
 import { isTextEntryTarget } from "./isTextEntryTarget";
 
+const PROJECT_COMMAND_CONTEXT_ATTRIBUTE = "data-project-command-context";
+
+function targetAllowsSheetCommandShortcut(target: EventTarget | null) {
+  if (!(target instanceof Element)) return true;
+  const owner = target.closest<HTMLElement>(
+    `[${PROJECT_COMMAND_CONTEXT_ATTRIBUTE}]`,
+  );
+  return (
+    owner === null ||
+    owner.dataset.projectCommandContext === "sheet"
+  );
+}
+
 interface ProjectCommandShortcutHandlers {
   canDeleteSheet: boolean;
   canRedo: boolean;
@@ -13,6 +26,7 @@ interface ProjectCommandShortcutHandlers {
   redo(): void;
   save(): void;
   saveAs(): void;
+  sheetShortcutActive: boolean;
   sheetCommandsDisabled: boolean;
   undo(): void;
 }
@@ -27,6 +41,7 @@ export function useProjectCommandShortcuts({
   redo,
   save,
   saveAs,
+  sheetShortcutActive,
   sheetCommandsDisabled,
   undo,
 }: ProjectCommandShortcutHandlers) {
@@ -35,7 +50,9 @@ export function useProjectCommandShortcuts({
       if (event.defaultPrevented) return;
       const command =
         matchProjectCommandShortcut(event, "project-window") ??
-        matchProjectCommandShortcut(event, "sheet");
+        (sheetShortcutActive && targetAllowsSheetCommandShortcut(event.target)
+          ? matchProjectCommandShortcut(event, "sheet")
+          : null);
       if (command === null) return;
       if (
         (command === "undo" ||
@@ -91,6 +108,7 @@ export function useProjectCommandShortcuts({
     redo,
     save,
     saveAs,
+    sheetShortcutActive,
     sheetCommandsDisabled,
     undo,
   ]);
