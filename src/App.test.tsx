@@ -110,6 +110,7 @@ const projectCorePort: ProjectCorePort = {
   applyWithOutcome: async () => ({
     projection,
     affectedFrameId: null,
+    affectedSheetId: null,
   }),
   importPhoto: async () => ({ kind: "cancelled", projection }),
   resolvePhotoDropTarget: async () => ({ kind: "invalid" }),
@@ -632,6 +633,7 @@ test("synchronizes a no-cache reopen while Monitor startup remains pending witho
   const applyWithOutcome = vi.fn(async () => ({
     projection: representativeProjection,
     affectedFrameId: null,
+    affectedSheetId: null,
   }));
   const undo = vi.fn(async () => representativeProjection);
   const redo = vi.fn(async () => representativeProjection);

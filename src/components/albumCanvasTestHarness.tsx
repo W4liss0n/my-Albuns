@@ -11,6 +11,7 @@ import {
   type AlbumCanvasMode,
   type AlbumCanvasProps,
   type CanvasMetrics,
+  type CanvasSheetReorder,
   type CanvasTechnicalGuides,
   type PhotoTransformDelta,
   type PhotoTransformPreview,
@@ -64,6 +65,7 @@ const pixiLifecycle = vi.hoisted(() => ({
     };
   }>,
   resizeCallbacks: [] as ResizeObserverCallback[],
+  tickerCallbacks: [] as Array<(ticker: { deltaMS: number }) => void>,
   resolveInitializations: [] as Array<() => void>,
   assetLoads: [] as string[],
   assetUnloads: [] as string[],
@@ -316,7 +318,14 @@ vi.mock("pixi.js", () => {
     screen = { width: 1_200, height: 500 };
     stage = new Container();
     ticker = {
+      add: (callback: (ticker: { deltaMS: number }) => void) => {
+        pixiLifecycle.tickerCallbacks.push(callback);
+      },
       addOnce: (callback: () => void) => callback(),
+      remove: (callback: (ticker: { deltaMS: number }) => void) => {
+        const index = pixiLifecycle.tickerCallbacks.indexOf(callback);
+        if (index >= 0) pixiLifecycle.tickerCallbacks.splice(index, 1);
+      },
     };
 
     constructor() {
@@ -400,6 +409,7 @@ export function renderCanvas({
   selectedFrameId = null,
   mediaPreviewUrls,
   technicalGuides,
+  sheetReorder,
   onCanvasMetricsChange = vi.fn<(metrics: CanvasMetrics) => void>(),
   onEditSheet = vi.fn<(sheetId: string) => void>(),
   onFocusSheet = vi.fn<(sheetId: string) => void>(),
@@ -415,6 +425,7 @@ export function renderCanvas({
   onResolvePhotoDropTarget,
   onDropPhoto,
   onPhotoDragCancel,
+  onOpenSheetContextMenu,
   onMediaDemandChange,
   onGraphicsUnavailable,
   canvasGraphicsDiagnosticProbe,
@@ -427,6 +438,7 @@ export function renderCanvas({
   selectedFrameId?: string | null;
   mediaPreviewUrls?: Readonly<Record<string, string>>;
   technicalGuides?: CanvasTechnicalGuides;
+  sheetReorder?: CanvasSheetReorder;
   onCanvasMetricsChange?: (metrics: CanvasMetrics) => void;
   onEditSheet?: (sheetId: string) => void;
   onFocusSheet?: (sheetId: string) => void;
@@ -448,6 +460,10 @@ export function renderCanvas({
     point: { sheetId: string; xUm: number; yUm: number },
   ) => Promise<boolean>;
   onPhotoDragCancel?: () => void;
+  onOpenSheetContextMenu?: (
+    sheetId: string,
+    position: { x: number; y: number },
+  ) => void;
   onMediaDemandChange?: (demand: MediaPreviewDemand) => void;
   onGraphicsUnavailable?: (diagnostic: GraphicsDiagnostic) => void;
   canvasGraphicsDiagnosticProbe?: CanvasGraphicsDiagnosticProbe;
@@ -465,6 +481,7 @@ export function renderCanvas({
         sheetBarMetadata={sheetBarMetadata}
         mediaPreviewUrls={mediaPreviewUrls}
         technicalGuides={technicalGuides}
+        sheetReorder={sheetReorder}
         continuousCanvasLayout={
           mode.kind === "normal"
             ? createNormalCanvasLayout(
@@ -488,6 +505,7 @@ export function renderCanvas({
         onResolvePhotoDropTarget={onResolvePhotoDropTarget}
         onDropPhoto={onDropPhoto}
         onPhotoDragCancel={onPhotoDragCancel}
+        onOpenSheetContextMenu={onOpenSheetContextMenu}
         onCanvasMetricsChange={onCanvasMetricsChange}
         onMediaDemandChange={onMediaDemandChange}
         onGraphicsUnavailable={onGraphicsUnavailable}
@@ -544,12 +562,22 @@ export function displayWithLabel(label: string) {
   return display;
 }
 
+export async function advancePixiTicker(deltaMS: number) {
+  await act(async () => {
+    for (const callback of [...pixiLifecycle.tickerCallbacks]) {
+      callback({ deltaMS });
+    }
+    await Promise.resolve();
+  });
+}
+
 export function setupAlbumCanvasTestHarness() {
   beforeEach(() => {
     pixiLifecycle.displays.length = 0;
     pixiLifecycle.initOptions.length = 0;
     pixiLifecycle.instances.length = 0;
     pixiLifecycle.resizeCallbacks.length = 0;
+    pixiLifecycle.tickerCallbacks.length = 0;
     pixiLifecycle.resolveInitializations.length = 0;
     pixiLifecycle.assetLoads.length = 0;
     pixiLifecycle.assetUnloads.length = 0;

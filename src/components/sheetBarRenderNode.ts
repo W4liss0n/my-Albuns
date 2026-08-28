@@ -89,7 +89,7 @@ export function createSheetBarRenderNode(
       fill: "#ffffff",
       fontSize: 15,
     }),
-    x: 22,
+    x: style.swapActionCenterPx,
     y: style.heightPx / 2,
   });
   const layoutPlaceholder = createSheetBarAction({
@@ -196,7 +196,8 @@ export function applySheetBarScale(
   for (const element of node.horizontallyFixedElements) {
     element.scale.x = 1 / safeScale;
   }
-  node.swapPlaceholder.position.x = 22 / safeScale;
+  node.swapPlaceholder.position.x =
+    SHEET_VISUAL_STYLE.sheetBar.swapActionCenterPx / safeScale;
   node.sheetNumber.position.x = node.width - 11 / safeScale;
 }
 

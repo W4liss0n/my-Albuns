@@ -1,8 +1,11 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
+  type DragEvent as ReactDragEvent,
+  type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
 import { Button } from "react-aria-components";
@@ -37,6 +40,12 @@ import {
   type SheetDesignScope,
 } from "./SheetDesignInspector";
 import { inactiveSideCssGradient } from "./sheetVisualStyle";
+import {
+  SHEET_REORDER_INVALID_MESSAGE,
+  sheetReorderAutoScrollVelocity,
+  type SheetReorderRepresentation,
+  type SheetReorderStatus,
+} from "./sheetReorderSession";
 import "./InspectorPanel.css";
 
 const PHOTO_ZOOM_KEYS = new Set([
@@ -101,6 +110,18 @@ export interface InspectorPanelProps {
   ): Promise<AlbumInformationValidation>;
   onPresentationUnitChange(unit: DisplayUnit | null): void;
   onNavigateToSheet(sheetId: string): void;
+  onOpenSheetContextMenu?(
+    sheetId: string,
+    position: { x: number; y: number },
+  ): void;
+  sheetReorder?: {
+    disabled: boolean;
+    representation: SheetReorderRepresentation;
+    status: SheetReorderStatus;
+    onPreview(draggedSheetId: string, targetIndex: number): void;
+    onDrop(): void;
+    onCancel(): void;
+  };
   sectionState: InspectorSectionState;
 }
 
@@ -127,6 +148,8 @@ export function InspectorPanel({
   onPresentationUnitChange,
   onValidateAlbumInformation,
   onNavigateToSheet,
+  onOpenSheetContextMenu,
+  sheetReorder,
   sectionState,
 }: InspectorPanelProps) {
   const mediaPreviewUrls = useMemo(
@@ -139,9 +162,155 @@ export function InspectorPanel({
     sheetId: string;
     scope: SheetDesignScope;
   } | null>(null);
+  const draggedSheetIdRef = useRef<string | null>(null);
+  const gridAutoScrollRef = useRef<{
+    frameId: number | null;
+    lastTimestamp: number | null;
+    velocity: number;
+    viewport: HTMLElement | null;
+  }>({
+    frameId: null,
+    lastTimestamp: null,
+    velocity: 0,
+    viewport: null,
+  });
   const sheetStateById = new Map(
     sheetStates.map((sheet) => [sheet.id, sheet] as const),
   );
+  const composedSheetById = new Map(
+    sheets.map((sheet) => [sheet.sheetId, sheet] as const),
+  );
+  const sheetReorderEnabled =
+    sheetReorder !== undefined &&
+    !sheetReorder.disabled &&
+    sheetReorder.status !== "committing";
+  const orderedSheets = sheetReorder
+    ? sheetReorder.representation.order.flatMap((sheetId) => {
+        const sheet = composedSheetById.get(sheetId);
+        return sheet ? [sheet] : [];
+      })
+    : sheets;
+
+  function stopGridAutoScroll() {
+    const state = gridAutoScrollRef.current;
+    if (state.frameId !== null) {
+      window.cancelAnimationFrame(state.frameId);
+    }
+    state.frameId = null;
+    state.lastTimestamp = null;
+    state.velocity = 0;
+    state.viewport = null;
+  }
+
+  function advanceGridAutoScroll(timestamp: number) {
+    const state = gridAutoScrollRef.current;
+    state.frameId = null;
+    if (!state.viewport || state.velocity === 0) {
+      state.lastTimestamp = null;
+      return;
+    }
+
+    const previousTimestamp = state.lastTimestamp;
+    state.lastTimestamp = timestamp;
+    if (previousTimestamp !== null) {
+      const elapsedMs = Math.min(
+        50,
+        Math.max(0, timestamp - previousTimestamp),
+      );
+      state.viewport.scrollTop += (state.velocity * elapsedMs) / 1_000;
+    }
+    state.frameId = window.requestAnimationFrame(advanceGridAutoScroll);
+  }
+
+  function updateGridAutoScroll(
+    viewport: HTMLElement,
+    velocity: number,
+  ) {
+    if (velocity === 0) {
+      stopGridAutoScroll();
+      return;
+    }
+    const state = gridAutoScrollRef.current;
+    if (state.viewport !== viewport) state.lastTimestamp = null;
+    state.viewport = viewport;
+    state.velocity = velocity;
+    if (state.frameId === null) {
+      state.frameId = window.requestAnimationFrame(advanceGridAutoScroll);
+    }
+  }
+
+  useEffect(() => () => stopGridAutoScroll(), []);
+
+  useEffect(() => {
+    const cancelGridReorderOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || !draggedSheetIdRef.current) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      stopGridAutoScroll();
+      draggedSheetIdRef.current = null;
+      sheetReorder?.onCancel();
+    };
+    window.addEventListener("keydown", cancelGridReorderOnEscape, true);
+    return () =>
+      window.removeEventListener("keydown", cancelGridReorderOnEscape, true);
+  }, [sheetReorder]);
+
+  function beginGridReorder(
+    event: ReactDragEvent<HTMLDivElement>,
+    sheetId: string,
+    targetIndex: number,
+  ) {
+    if (!sheetReorder || !sheetReorderEnabled) {
+      event.preventDefault();
+      return;
+    }
+    draggedSheetIdRef.current = sheetId;
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", sheetId);
+    sheetReorder.onPreview(sheetId, targetIndex);
+  }
+
+  function previewGridReorder(
+    event: ReactDragEvent<HTMLDivElement>,
+    targetIndex: number,
+  ) {
+    const draggedSheetId = draggedSheetIdRef.current;
+    if (!sheetReorder || !sheetReorderEnabled || !draggedSheetId) return;
+    event.preventDefault();
+    sheetReorder.onPreview(draggedSheetId, targetIndex);
+  }
+
+  function autoScrollGrid(event: ReactDragEvent<HTMLDivElement>) {
+    if (
+      !sheetReorder ||
+      !sheetReorderEnabled ||
+      !draggedSheetIdRef.current
+    ) {
+      return;
+    }
+    event.preventDefault();
+    const viewport = event.currentTarget.closest<HTMLElement>(
+      ".inspector-scroll",
+    );
+    if (!viewport) return;
+    const bounds = viewport.getBoundingClientRect();
+    const velocity = sheetReorderAutoScrollVelocity({
+      axis: "vertical",
+      pointerPosition: event.clientY,
+      viewportStart: bounds.top,
+      viewportEnd: bounds.bottom,
+    });
+    updateGridAutoScroll(viewport, velocity);
+  }
+
+  function openGridContextMenu(
+    event: ReactMouseEvent<HTMLDivElement>,
+    sheetId: string,
+  ) {
+    if (!onOpenSheetContextMenu) return;
+    event.preventDefault();
+    onOpenSheetContextMenu(sheetId, { x: event.clientX, y: event.clientY });
+  }
   const editingSheet =
     context.kind === "sheet"
       ? context.sheet
@@ -337,9 +506,20 @@ export function InspectorPanel({
               ) : (
                 <div
                   className="sheet-grid"
-                  data-placeholder-feature="reorder-sheets-from-grid"
+                  data-reorder-state={sheetReorder?.status ?? "idle"}
+                  data-reorder-surface="grid"
+                  data-sheet-order={sheets.map((sheet) => sheet.sheetId).join(",")}
+                  data-testid="sheet-reorder-grid"
+                  onDragOver={autoScrollGrid}
+                  onDrop={(event) => {
+                    stopGridAutoScroll();
+                    if (!sheetReorder || !sheetReorderEnabled) return;
+                    event.preventDefault();
+                    draggedSheetIdRef.current = null;
+                    sheetReorder.onDrop();
+                  }}
                 >
-                  {sheets.map((sheet) => {
+                  {orderedSheets.map((sheet, index) => {
                     const number = String(sheet.number).padStart(2, "0");
                     const pageMetadata = formatSheetPageMetadata(
                       sheetStateById.get(sheet.sheetId),
@@ -358,11 +538,43 @@ export function InspectorPanel({
                               inactiveSideCssGradient(sheet.activeSides),
                           }),
                     } as CSSProperties;
+                    const reorderGhost =
+                      sheetReorder?.representation.ghost?.sheetId ===
+                      sheet.sheetId;
                     return (
+                      <div
+                        className="sheet-grid-slot"
+                        data-reorder-ghost={reorderGhost || undefined}
+                        data-sheet-id={sheet.sheetId}
+                        draggable={sheetReorderEnabled}
+                        key={sheet.sheetId}
+                        onContextMenu={(event) =>
+                          openGridContextMenu(event, sheet.sheetId)
+                        }
+                        onDragEnd={() => {
+                          if (!draggedSheetIdRef.current) return;
+                          stopGridAutoScroll();
+                          draggedSheetIdRef.current = null;
+                          sheetReorder?.onCancel();
+                        }}
+                        onDragEnter={(event) =>
+                          previewGridReorder(event, index)
+                        }
+                        onDragStart={(event) =>
+                          beginGridReorder(event, sheet.sheetId, index)
+                        }
+                      >
+                        {sheetReorder?.representation.placeholderIndex ===
+                        index ? (
+                          <span
+                            aria-hidden="true"
+                            className="sheet-reorder-placeholder"
+                            data-testid="reorder-placeholder"
+                          />
+                        ) : null}
                       <Button
                         aria-current={active ? "true" : undefined}
                         aria-label={`Ir para Lâmina ${number}, ${accessiblePageLabel}`}
-                        key={sheet.sheetId}
                         className={active ? "sheet-tile active" : "sheet-tile"}
                         data-active-sides={sheet.activeSides}
                         style={tileStyle}
@@ -380,8 +592,30 @@ export function InspectorPanel({
                           {visualPageLabel}
                         </span>
                       </Button>
+                      </div>
                     );
                   })}
+                  {sheetReorder?.representation.ghost ? (
+                    <span
+                      aria-hidden="true"
+                      className="sheet-reorder-ghost"
+                      data-testid="reorder-ghost"
+                    >
+                      {sheetStateById.get(
+                        sheetReorder.representation.ghost.sheetId,
+                      )?.number ?? ""}
+                    </span>
+                  ) : null}
+                  {sheetReorder?.status === "invalid" &&
+                  sheetReorder.representation.ghost ? (
+                    <span
+                      className="sheet-grid__reorder-invalid"
+                      data-reorder-invalid-indicator
+                      role="status"
+                    >
+                      {SHEET_REORDER_INVALID_MESSAGE}
+                    </span>
+                  ) : null}
                 </div>
               )}
             </InspectorSection>

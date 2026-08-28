@@ -4,6 +4,12 @@ use crate::{
 };
 use uuid::Uuid;
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) struct ProjectIntentOutcome {
+    pub(crate) affected_frame_id: Option<Uuid>,
+    pub(crate) affected_sheet_id: Option<Uuid>,
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct PersistentProjectSession {
     current: ProjectRevision,
@@ -79,8 +85,11 @@ impl PersistentProjectSession {
         !self.redo.is_empty()
     }
 
-    pub(crate) fn apply(&mut self, intent: ProjectIntent) -> Result<Option<Uuid>, CoreError> {
-        let mut affected_frame_id = None;
+    pub(crate) fn apply(
+        &mut self,
+        intent: ProjectIntent,
+    ) -> Result<ProjectIntentOutcome, CoreError> {
+        let mut outcome = ProjectIntentOutcome::default();
         self.commit_edit(|project| match intent {
             ProjectIntent::SetAlbumInformation { information } => project
                 .with_album_information(information)
@@ -91,6 +100,63 @@ impl PersistentProjectSession {
             ProjectIntent::SetDpi { dpi } => project
                 .with_dpi(dpi)
                 .map_err(|()| CoreError::InvalidDpi(dpi)),
+            ProjectIntent::AddSheet {
+                anchor_sheet_id,
+                position,
+            } => {
+                let parsed = parse_uuid(&anchor_sheet_id)
+                    .map_err(|()| CoreError::SheetNotFound(anchor_sheet_id.clone()))?;
+                if !project.sheets().iter().any(|sheet| sheet.id() == parsed) {
+                    return Err(CoreError::SheetNotFound(anchor_sheet_id));
+                }
+                let (next, sheet_id) = project
+                    .with_added_sheet(parsed, position)
+                    .map_err(|()| CoreError::InvalidSheetInsertion)?;
+                outcome.affected_sheet_id = Some(sheet_id);
+                Ok(next)
+            }
+            ProjectIntent::DeleteSheet { sheet_id } => {
+                let parsed = parse_uuid(&sheet_id)
+                    .map_err(|()| CoreError::SheetNotFound(sheet_id.clone()))?;
+                if !project.sheets().iter().any(|sheet| sheet.id() == parsed) {
+                    return Err(CoreError::SheetNotFound(sheet_id));
+                }
+                if project.sheets().len() <= 2 {
+                    return Err(CoreError::MinimumSheetCount);
+                }
+                let (next, neighbor_id) = project.with_deleted_sheet(parsed).map_err(|()| {
+                    CoreError::InvalidProject("a Lâmina não pode ser excluída".into())
+                })?;
+                outcome.affected_sheet_id = Some(neighbor_id);
+                Ok(next)
+            }
+            ProjectIntent::ConvertEdgeSheet { sheet_id } => {
+                let parsed = parse_uuid(&sheet_id)
+                    .map_err(|()| CoreError::SheetNotFound(sheet_id.clone()))?;
+                if !project.sheets().iter().any(|sheet| sheet.id() == parsed) {
+                    return Err(CoreError::SheetNotFound(sheet_id));
+                }
+                let next = project
+                    .with_converted_edge_sheet(parsed)
+                    .map_err(|()| CoreError::InvalidEdgeConversion)?;
+                outcome.affected_sheet_id = Some(parsed);
+                Ok(next)
+            }
+            ProjectIntent::ReorderSheet {
+                sheet_id,
+                target_index,
+            } => {
+                let parsed = parse_uuid(&sheet_id)
+                    .map_err(|()| CoreError::SheetNotFound(sheet_id.clone()))?;
+                if !project.sheets().iter().any(|sheet| sheet.id() == parsed) {
+                    return Err(CoreError::SheetNotFound(sheet_id));
+                }
+                let next = project
+                    .with_reordered_sheet(parsed, target_index)
+                    .map_err(|()| CoreError::InvalidSheetReorder)?;
+                outcome.affected_sheet_id = Some(parsed);
+                Ok(next)
+            }
             ProjectIntent::TransformPhoto {
                 frame_id,
                 delta_pan_x,
@@ -102,7 +168,7 @@ impl PersistentProjectSession {
                 let next = project
                     .with_transformed_photo(parsed, delta_pan_x, delta_pan_y, delta_zoom)
                     .map_err(|()| CoreError::FrameNotFound(frame_id))?;
-                affected_frame_id = Some(parsed);
+                outcome.affected_frame_id = Some(parsed);
                 Ok(next)
             }
             ProjectIntent::AddPhoto {
@@ -119,7 +185,7 @@ impl PersistentProjectSession {
                             "não foi possível adicionar a Foto à Lâmina".into(),
                         )
                     })?;
-                affected_frame_id = Some(frame_id);
+                outcome.affected_frame_id = Some(frame_id);
                 Ok(next)
             }
             ProjectIntent::DropPhoto {
@@ -136,11 +202,11 @@ impl PersistentProjectSession {
                     .map_err(|()| {
                         CoreError::InvalidProject("o alvo da Foto não é válido".into())
                     })?;
-                affected_frame_id = Some(frame_id);
+                outcome.affected_frame_id = Some(frame_id);
                 Ok(next)
             }
         })?;
-        Ok(affected_frame_id)
+        Ok(outcome)
     }
 
     pub(crate) fn import_photo(

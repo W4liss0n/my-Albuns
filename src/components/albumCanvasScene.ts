@@ -1,4 +1,9 @@
-import { Application, Container, Rectangle } from "pixi.js";
+import {
+  Application,
+  Container,
+  Rectangle,
+  type Ticker,
+} from "pixi.js";
 
 import type { ComposedSheet } from "../domain/project";
 import type {
@@ -31,6 +36,18 @@ import { ViewportTexturePool } from "./viewportTexturePool";
 
 const PRELOAD_MARGIN = 1;
 const VIEWPORT_PRELOAD_PX = 700;
+const SHEET_REORDER_TRANSITION_MS = 140;
+
+interface SheetPositionAnimation {
+  readonly fromX: number;
+  readonly toX: number;
+  elapsedMs: number;
+}
+
+interface BarSheetReorderPreview {
+  readonly draggedSheetId: string;
+  readonly sheets: readonly ComposedSheet[];
+}
 
 export class AlbumCanvasScene {
   private readonly world = new Container();
@@ -44,6 +61,13 @@ export class AlbumCanvasScene {
   private lastCanvasMetrics: CanvasMetrics | null = null;
   private lastMediaDemandSignature: string | null = null;
   private pendingViewportOffsetX: number | null = null;
+  private sheetReorderPreviewActive = false;
+  private sheetReorderPlaceholderSheetId: string | null = null;
+  private sheetPositionTickerAttached = false;
+  private readonly sheetPositionAnimations = new Map<
+    string,
+    SheetPositionAnimation
+  >();
   private readonly previewTextures: ViewportTexturePool;
   private readonly photoInteractions: PhotoInteractionSession;
 
@@ -103,20 +127,32 @@ export class AlbumCanvasScene {
     this.modeSignature = modeSignature;
     this.input = input;
     const modePolicy = albumCanvasModePolicy(input.mode);
-    const sheets = sheetsForCanvasMode(
+    const confirmedSheets = sheetsForCanvasMode(
       input.composition.sheets,
       modePolicy,
     );
+    const reorderPreview = resolveBarSheetReorderPreview(
+      input,
+      confirmedSheets,
+    );
+    const shouldAnimateSheetPositions =
+      reorderPreview !== null || this.sheetReorderPreviewActive;
+    this.sheetReorderPreviewActive = reorderPreview !== null;
+    this.sheetReorderPlaceholderSheetId =
+      reorderPreview?.draggedSheetId ?? null;
+    const sheets = reorderPreview?.sheets ?? confirmedSheets;
     const firstSheet = sheets[0];
     if (!firstSheet) {
       this.clearMaterializedSheets();
       this.previewTextures.sync([]);
       return;
     }
-    const layout =
-      modePolicy.enablesContinuousNavigation
-        ? input.continuousCanvasLayout
-        : createContinuousCanvasLayout(sheets);
+    const navigationLayout = input.continuousCanvasLayout;
+    const layout = !modePolicy.enablesContinuousNavigation
+      ? createContinuousCanvasLayout(sheets)
+      : reorderPreview
+        ? createReorderedCanvasLayout(input, sheets)
+        : navigationLayout;
 
     const sheetHeight = firstSheet.heightUm * MICROMETER_TO_CANVAS_PIXEL;
     const scale = continuousCanvasScale(
@@ -126,7 +162,7 @@ export class AlbumCanvasScene {
     this.canvasScale = scale;
     const transitionOffsetX =
       returnedToContinuousCanvas && input.centeredSheetId
-        ? layout.centeredOffset(
+        ? navigationLayout.centeredOffset(
             input.centeredSheetId,
             scale,
             this.app.screen.width,
@@ -146,7 +182,7 @@ export class AlbumCanvasScene {
       input.viewport.offsetX;
     const boundedOffsetX =
       modePolicy.enablesContinuousNavigation
-        ? layout.clampOffset(
+        ? navigationLayout.clampOffset(
             requestedOffsetX,
             scale,
             this.app.screen.width,
@@ -167,7 +203,11 @@ export class AlbumCanvasScene {
     }
 
     if (modePolicy.enablesContinuousNavigation) {
-      this.synchronizeCenteredSheet(layout, boundedOffsetX, scale);
+      this.synchronizeCenteredSheet(
+        navigationLayout,
+        boundedOffsetX,
+        scale,
+      );
     }
     this.reportCanvasMetrics(scale);
     this.world.position.set(
@@ -187,6 +227,7 @@ export class AlbumCanvasScene {
       layout,
       boundedOffsetX,
       scale,
+      shouldAnimateSheetPositions,
     );
     this.updateDecorations();
     this.photoInteractions.applyExternalPreview();
@@ -210,27 +251,39 @@ export class AlbumCanvasScene {
     this.input?.onTransformPreview(null);
   }
 
+  resolveSheetAtPoint(clientX: number, clientY: number): string | null {
+    const worldPoint = this.resolveWorldPoint(clientX, clientY);
+    if (!worldPoint) return null;
+    for (const [sheetId, node] of this.sheetNodes) {
+      const localX = worldPoint.x - node.container.position.x;
+      const localY = worldPoint.y - node.container.position.y;
+      const { x, y, width, height } = node.viewBounds;
+      if (
+        localX >= x &&
+        localY >= y &&
+        localX < x + width &&
+        localY < y + height
+      ) {
+        return sheetId;
+      }
+    }
+    return null;
+  }
+
   resolvePhotoDropPoint(
     clientX: number,
     clientY: number,
   ): { sheetId: string; xUm: number; yUm: number } | null {
-    if (!this.input || this.canvasScale <= 0) return null;
-    const bounds = this.app.canvas.getBoundingClientRect();
-    if (bounds.width <= 0 || bounds.height <= 0) return null;
-    const canvasX =
-      (clientX - bounds.left) * (this.app.screen.width / bounds.width);
-    const canvasY =
-      (clientY - bounds.top) * (this.app.screen.height / bounds.height);
-    const worldX = (canvasX - this.world.position.x) / this.canvasScale;
-    const worldY = (canvasY - this.world.position.y) / this.canvasScale;
+    const worldPoint = this.resolveWorldPoint(clientX, clientY);
+    if (!worldPoint || !this.input) return null;
     for (const [sheetId, node] of this.sheetNodes) {
       const sheet = this.input.composition.sheets.find(
         (candidate) => candidate.sheetId === sheetId,
       );
       if (!sheet) continue;
       const localX =
-        worldX - node.container.position.x - node.activeOffsetXPx;
-      const localY = worldY - node.container.position.y;
+        worldPoint.x - node.container.position.x - node.activeOffsetXPx;
+      const localY = worldPoint.y - node.container.position.y;
       const width = sheet.widthUm * MICROMETER_TO_CANVAS_PIXEL;
       const height = sheet.heightUm * MICROMETER_TO_CANVAS_PIXEL;
       if (localX < 0 || localY < 0 || localX >= width || localY >= height) {
@@ -245,6 +298,23 @@ export class AlbumCanvasScene {
     return null;
   }
 
+  private resolveWorldPoint(
+    clientX: number,
+    clientY: number,
+  ): { x: number; y: number } | null {
+    if (!this.input || this.canvasScale <= 0) return null;
+    const bounds = this.app.canvas.getBoundingClientRect();
+    if (bounds.width <= 0 || bounds.height <= 0) return null;
+    const canvasX =
+      (clientX - bounds.left) * (this.app.screen.width / bounds.width);
+    const canvasY =
+      (clientY - bounds.top) * (this.app.screen.height / bounds.height);
+    return {
+      x: (canvasX - this.world.position.x) / this.canvasScale,
+      y: (canvasY - this.world.position.y) / this.canvasScale,
+    };
+  }
+
   private resetProjectScene() {
     this.resetTransientInteractions();
     this.clearMaterializedSheets();
@@ -257,6 +327,9 @@ export class AlbumCanvasScene {
 
   private resetTransientInteractions() {
     this.photoInteractions.reset();
+    this.sheetReorderPreviewActive = false;
+    this.sheetReorderPlaceholderSheetId = null;
+    this.stopSheetPositionAnimations();
   }
 
   private synchronizeCenteredSheet(
@@ -297,6 +370,7 @@ export class AlbumCanvasScene {
     layout: ContinuousCanvasLayout,
     boundedOffsetX: number,
     scale: number,
+    animateSheetPositions: boolean,
   ) {
     if (!this.input) return;
     const entries = layout.entriesAtScale(scale);
@@ -392,6 +466,7 @@ export class AlbumCanvasScene {
       const sheet = sheets[index];
       const signature = signatures.get(sheet.sheetId) ?? "";
       let node = this.sheetNodes.get(sheet.sheetId);
+      const created = !node;
       if (!node) {
         node = this.createSheetNode(
           sheet,
@@ -406,11 +481,85 @@ export class AlbumCanvasScene {
       for (const selection of node.frameSelections.values()) {
         applyFrameSelectionScale(selection, scale);
       }
-      node.container.position.set(
+      this.moveSheetNode(
+        sheet.sheetId,
+        node,
         entries[index].left - node.viewBounds.x,
-        0,
+        created ? false : animateSheetPositions,
       );
     }
+  }
+
+  private moveSheetNode(
+    sheetId: string,
+    node: SheetRenderNode,
+    targetX: number,
+    animate: boolean,
+  ) {
+    node.container.position.y = 0;
+    const currentAnimation = this.sheetPositionAnimations.get(sheetId);
+    if (!animate) {
+      if (currentAnimation?.toX === targetX) return;
+      this.sheetPositionAnimations.delete(sheetId);
+      node.container.position.x = targetX;
+      this.detachSheetPositionTickerIfIdle();
+      return;
+    }
+    if (currentAnimation?.toX === targetX) return;
+    if (Math.abs(node.container.position.x - targetX) < 0.0001) {
+      this.sheetPositionAnimations.delete(sheetId);
+      this.detachSheetPositionTickerIfIdle();
+      return;
+    }
+    this.sheetPositionAnimations.set(sheetId, {
+      fromX: node.container.position.x,
+      toX: targetX,
+      elapsedMs: 0,
+    });
+    if (!this.sheetPositionTickerAttached) {
+      this.sheetPositionTickerAttached = true;
+      this.app.ticker.add(this.advanceSheetPositionAnimations);
+    }
+  }
+
+  private readonly advanceSheetPositionAnimations = (ticker: Ticker) => {
+    for (const [sheetId, animation] of this.sheetPositionAnimations) {
+      const node = this.sheetNodes.get(sheetId);
+      if (!node) {
+        this.sheetPositionAnimations.delete(sheetId);
+        continue;
+      }
+      animation.elapsedMs = Math.min(
+        SHEET_REORDER_TRANSITION_MS,
+        animation.elapsedMs + Math.max(0, ticker.deltaMS),
+      );
+      const progress = animation.elapsedMs / SHEET_REORDER_TRANSITION_MS;
+      const easedProgress = 1 - (1 - progress) ** 3;
+      node.container.position.x =
+        animation.fromX +
+        (animation.toX - animation.fromX) * easedProgress;
+      if (progress >= 1) {
+        node.container.position.x = animation.toX;
+        this.sheetPositionAnimations.delete(sheetId);
+      }
+    }
+    this.detachSheetPositionTickerIfIdle();
+  };
+
+  private detachSheetPositionTickerIfIdle() {
+    if (
+      !this.sheetPositionTickerAttached ||
+      this.sheetPositionAnimations.size > 0
+    ) {
+      return;
+    }
+    this.app.ticker.remove(this.advanceSheetPositionAnimations);
+    this.sheetPositionTickerAttached = false;
+  }
+
+  private stopSheetPositionAnimations() {
+    this.sheetPositionAnimations.clear();
+    this.detachSheetPositionTickerIfIdle();
   }
 
   private reportMediaDemand(
@@ -439,6 +588,8 @@ export class AlbumCanvasScene {
   }
 
   private removeSheetNode(sheetId: string, node: SheetRenderNode) {
+    this.sheetPositionAnimations.delete(sheetId);
+    this.detachSheetPositionTickerIfIdle();
     this.world.removeChild(node.container);
     for (const photoNode of node.photoNodes) {
       this.photoNodes.delete(photoNode.frameId);
@@ -505,6 +656,8 @@ export class AlbumCanvasScene {
   private updateDecorations() {
     if (!this.input) return;
     for (const [sheetId, node] of this.sheetNodes) {
+      node.container.visible =
+        sheetId !== this.sheetReorderPlaceholderSheetId;
       node.focusOutline.visible = sheetId === this.input.focusedSheetId;
       node.sheetDropOutline.visible =
         this.input.photoDropHighlight?.kind === "sheet" &&
@@ -543,6 +696,54 @@ export class AlbumCanvasScene {
     });
     this.synchronizeCenteredSheet(layout, nextOffset, this.canvasScale);
   };
+}
+
+function resolveBarSheetReorderPreview(
+  input: AlbumCanvasProps,
+  confirmedSheets: readonly ComposedSheet[],
+): BarSheetReorderPreview | null {
+  const reorder = input.sheetReorder;
+  if (
+    input.mode.kind !== "normal" ||
+    (reorder?.status !== "preview" && reorder?.status !== "committing") ||
+    reorder.representation.ghost === null ||
+    reorder.representation.placeholderIndex === null ||
+    reorder.representation.order.length !== confirmedSheets.length
+  ) {
+    return null;
+  }
+  const sheetsById = new Map(
+    confirmedSheets.map((sheet) => [sheet.sheetId, sheet]),
+  );
+  const reorderedSheets: ComposedSheet[] = [];
+  const seenSheetIds = new Set<string>();
+  for (const sheetId of reorder.representation.order) {
+    const sheet = sheetsById.get(sheetId);
+    if (!sheet || seenSheetIds.has(sheetId)) return null;
+    seenSheetIds.add(sheetId);
+    reorderedSheets.push(sheet);
+  }
+  if (!sheetsById.has(reorder.representation.ghost.sheetId)) return null;
+  return {
+    draggedSheetId: reorder.representation.ghost.sheetId,
+    sheets: reorderedSheets,
+  };
+}
+
+function createReorderedCanvasLayout(
+  input: AlbumCanvasProps,
+  reorderedSheets: readonly ComposedSheet[],
+) {
+  const confirmedWidths = new Map(
+    input.continuousCanvasLayout
+      .entriesAtScale(1)
+      .map((entry) => [entry.sheetId, entry.width]),
+  );
+  return createContinuousCanvasLayout(
+    reorderedSheets,
+    (sheet, presentation) =>
+      confirmedWidths.get(sheet.sheetId) ?? presentation.visualWidthPx,
+  );
 }
 
 function mediaIdsForSheets(sheets: readonly ComposedSheet[]) {

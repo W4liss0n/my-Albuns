@@ -218,7 +218,7 @@ pub struct FrameSnapshot {
     pub photo: Option<PhotoSnapshot>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub enum SheetRole {
     Initial,
@@ -638,6 +638,7 @@ pub enum PhotoPlacementMode {
 pub struct ProjectMutationOutcome {
     pub projection: EditorProjection,
     pub affected_frame_id: Option<String>,
+    pub affected_sheet_id: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -761,6 +762,13 @@ impl RenderSnapshot {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum SheetInsertionPosition {
+    Before,
+    After,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(
     tag = "kind",
@@ -777,6 +785,20 @@ pub enum ProjectIntent {
     },
     SetDpi {
         dpi: u32,
+    },
+    AddSheet {
+        anchor_sheet_id: String,
+        position: SheetInsertionPosition,
+    },
+    DeleteSheet {
+        sheet_id: String,
+    },
+    ConvertEdgeSheet {
+        sheet_id: String,
+    },
+    ReorderSheet {
+        sheet_id: String,
+        target_index: usize,
     },
     TransformPhoto {
         frame_id: String,
@@ -822,6 +844,14 @@ pub enum CoreError {
     FrameHasNoPhoto(String),
     #[error("Lâmina não encontrada: {0}")]
     SheetNotFound(String),
+    #[error("A nova Lâmina não pode ser inserida nessa posição")]
+    InvalidSheetInsertion,
+    #[error("O Álbum precisa manter ao menos duas Lâminas")]
+    MinimumSheetCount,
+    #[error("A extremidade não pode ser convertida sem reorganizar seu conteúdo")]
+    InvalidEdgeConversion,
+    #[error("A Lâmina não pode ser movida para essa posição")]
+    InvalidSheetReorder,
     #[error("Foto não encontrada no Projeto: {0}")]
     MediaNotFound(String),
     #[error("A Lâmina não possui Frame placeholder: {0}")]

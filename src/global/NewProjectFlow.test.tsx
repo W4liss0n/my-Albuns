@@ -254,7 +254,7 @@ test("validates and creates with the complete neutral configuration", async () =
   expect(screen.getByRole("textbox", { name: "Sangria" })).toHaveValue("3");
   expect(
     screen.getByRole("textbox", { name: "Área de segurança" }),
-  ).toHaveValue("5");
+  ).toHaveValue("3");
   expect(
     screen.queryByText(
       "Lâmina 600 × 300 mm · Página 300 × 300 mm · 300 DPI",
@@ -288,7 +288,7 @@ test("validates and creates with the complete neutral configuration", async () =
       sheetHeightUm: 300_000,
       dpi: 300,
       bleedUm: 3_000,
-      safetyUm: 5_000,
+      safetyUm: 3_000,
     },
     structure: {
       sheetCount: 18,
@@ -1327,7 +1327,7 @@ test("converts periodic display values without changing physical values and keep
   );
   expect(
     screen.getByRole("textbox", { name: "Área de segurança" }),
-  ).toHaveValue("0.197");
+  ).toHaveValue("0.118");
   expect(width.closest(".new-project-input-shell")).toHaveTextContent("pol");
   expect(width.closest(".new-project-input-shell")).not.toHaveTextContent(
     "in",
@@ -1371,7 +1371,7 @@ test("converts periodic display values without changing physical values and keep
       sheetHeightUm: 254_000,
       dpi: 600,
       bleedUm: 0,
-      safetyUm: 5_000,
+      safetyUm: 3_000,
     },
     structure: {
       sheetCount: 4,

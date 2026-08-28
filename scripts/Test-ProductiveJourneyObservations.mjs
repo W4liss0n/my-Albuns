@@ -20,6 +20,7 @@ import {
   assertCausalProjectHandoff,
   assertCorrelatedJourneyTerminals,
   assertDistinguishableSheetExport,
+  assertPhysicalAlbumProjectCoreEvents,
   assertReopenedHostExport,
 } from "./ProductiveJourneyObservations.mjs";
 
@@ -91,6 +92,128 @@ test("locates the New Project flow through stable accessible names", () => {
   assert.doesNotMatch(runner, /\.media-card\[data-media-id\]/);
   assert.doesNotMatch(runner, /\/window\/handles|DEBUG-project-dialog-targets/);
   assert.doesNotMatch(runner, /localStateStartedEmpty/);
+});
+
+test("keeps the physical Album structure proof in the productive WebView2 contract", () => {
+  const scripts = path.dirname(fileURLToPath(import.meta.url));
+  const runner = readFileSync(
+    path.join(scripts, "Run-ProductiveJourneyGate.mjs"),
+    "utf8",
+  );
+  const wrapper = readFileSync(
+    path.join(scripts, "Test-ProductiveJourney.ps1"),
+    "utf8",
+  );
+
+  assert.match(runner, /physicalAlbumStructure:\s*\{/);
+  assert.match(runner, /projectCoreEvents/);
+  assert.match(runner, /"Lâmina",\s*"Adicionar depois"/);
+  assert.match(runner, /"Lâmina",\s*"Excluir"/);
+  assert.match(runner, /\.sheet-grid-slot\[data-sheet-id=/);
+  assert.match(
+    runner,
+    /"add_sheet",\s*"reorder_sheet",\s*"delete_sheet"/,
+  );
+  assert.match(wrapper, /\$physicalAlbumStructure\.afterAdd\.count -ne 4/);
+  assert.match(wrapper, /\$physicalAlbumStructure\.afterReorder\.count -ne 4/);
+  assert.match(wrapper, /\$physicalAlbumStructure\.afterDelete\.count -ne 3/);
+  assert.match(wrapper, /physical-album-structure-ui-project-core/);
+  assert.match(wrapper, /physicalAlbumStructure = \$gate\.physicalAlbumStructure/);
+});
+
+test("correlates the physical Album ProjectCore events to one Host in causal order", () => {
+  const input = [
+    {
+      event: "project_intent_applied",
+      intent: "add_sheet",
+      process_id: 203,
+      revision: 9,
+    },
+    {
+      event: "project_intent_applied",
+      intent: "reorder_sheet",
+      process_id: 203,
+      revision: 10,
+    },
+    {
+      event: "project_intent_applied",
+      intent: "delete_sheet",
+      process_id: 203,
+      revision: 11,
+    },
+  ];
+
+  assert.deepEqual(
+    assertPhysicalAlbumProjectCoreEvents(input, {
+      hostProcessId: 203,
+      intents: ["add_sheet", "reorder_sheet", "delete_sheet"],
+    }),
+    [
+      {
+        event: "project_intent_applied",
+        intent: "add_sheet",
+        processId: 203,
+        revision: 9,
+      },
+      {
+        event: "project_intent_applied",
+        intent: "reorder_sheet",
+        processId: 203,
+        revision: 10,
+      },
+      {
+        event: "project_intent_applied",
+        intent: "delete_sheet",
+        processId: 203,
+        revision: 11,
+      },
+    ],
+  );
+
+  assert.throws(
+    () =>
+      assertPhysicalAlbumProjectCoreEvents(
+        input.map(({ process_id: _processId, ...record }) => record),
+        {
+          hostProcessId: 203,
+          intents: ["add_sheet", "reorder_sheet", "delete_sheet"],
+        },
+      ),
+    /Host 203/,
+  );
+  assert.throws(
+    () =>
+      assertPhysicalAlbumProjectCoreEvents(
+        [input[0], { ...input[1], revision: 12 }, input[2]],
+        {
+          hostProcessId: 203,
+          intents: ["add_sheet", "reorder_sheet", "delete_sheet"],
+        },
+      ),
+    /causal and consecutive/,
+  );
+});
+
+test("emits Project intent outcomes with the Desktop Host process id", () => {
+  const commands = readFileSync(
+    path.join(
+      path.dirname(fileURLToPath(import.meta.url)),
+      "..",
+      "src-tauri",
+      "src",
+      "project_commands.rs",
+    ),
+    "utf8",
+  );
+
+  assert.match(
+    commands,
+    /tracing::warn!\([\s\S]{0,400}?process_id\s*=\s*process_id[\s\S]{0,400}?event\s*=\s*"project_intent_rejected"/,
+  );
+  assert.match(
+    commands,
+    /tracing::info!\([\s\S]{0,400}?process_id\s*=\s*process_id[\s\S]{0,400}?event\s*=\s*"project_intent_applied"/,
+  );
 });
 
 function withJunctionFixture(configure, assertion) {

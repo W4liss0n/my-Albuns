@@ -4,6 +4,7 @@ import {
   useRef,
   useState,
   type DragEvent,
+  type MouseEvent as ReactMouseEvent,
 } from "react";
 import { Layers3 } from "lucide-react";
 import { Application } from "pixi.js";
@@ -22,6 +23,7 @@ import type {
   CanvasMetrics,
 } from "./albumCanvasContract";
 import { CanvasHorizontalScrollbar } from "./CanvasHorizontalScrollbar";
+import { SheetBarReorderOverlay } from "./SheetBarReorderOverlay";
 import {
   useCanvasGraphicsDiagnosticProbe,
 } from "./canvasGraphicsDiagnosticProbeContext";
@@ -38,6 +40,7 @@ export type {
   AlbumCanvasProps,
   CanvasPhotoDropPoint,
   CanvasMetrics,
+  CanvasSheetReorder,
   CanvasTechnicalGuides,
   PhotoTransformDelta,
   PhotoTransformPreview,
@@ -60,6 +63,8 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
   const [canvasMetrics, setCanvasMetrics] = useState<CanvasMetrics | null>(
     null,
   );
+  const [sheetAutoScrollVelocity, setSheetAutoScrollVelocity] =
+    useState(0);
   const handleCanvasMetricsChange = useCallback((metrics: CanvasMetrics) => {
     setCanvasMetrics((current) =>
       current &&
@@ -89,6 +94,39 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
   const [, setPreviewTextureRevision] = useState(0);
   const hasSheets = props.composition.sheets.length > 0;
   const dragRequestRef = useRef(0);
+
+  useEffect(() => {
+    if (sheetAutoScrollVelocity === 0 || !canvasMetrics) return;
+    let frame = 0;
+    let previousTimestamp = performance.now();
+    const advance = (timestamp: number) => {
+      const elapsedSeconds =
+        Math.min(50, Math.max(0, timestamp - previousTimestamp)) / 1_000;
+      previousTimestamp = timestamp;
+      const latest = latestPropsRef.current;
+      const offsetX = latest.continuousCanvasLayout.clampOffset(
+        latest.viewport.offsetX - sheetAutoScrollVelocity * elapsedSeconds,
+        canvasMetrics.scale,
+        canvasMetrics.width,
+      );
+      if (offsetX !== latest.viewport.offsetX) {
+        latest.onViewportChange({ ...latest.viewport, offsetX });
+      }
+      frame = requestAnimationFrame(advance);
+    };
+    frame = requestAnimationFrame(advance);
+    return () => cancelAnimationFrame(frame);
+  }, [canvasMetrics, sheetAutoScrollVelocity]);
+
+  useEffect(() => {
+    if (
+      props.mode.kind === "sheet-editing" ||
+      !props.sheetReorder ||
+      props.sheetReorder.disabled
+    ) {
+      setSheetAutoScrollVelocity(0);
+    }
+  }, [props.mode.kind, props.sheetReorder]);
 
   useEffect(() => {
     if (!props.draggedPhotoId) {
@@ -444,6 +482,20 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
     void props.onDropPhoto(mediaId, point);
   }
 
+  function handleSheetContextMenu(event: ReactMouseEvent<HTMLDivElement>) {
+    event.preventDefault();
+    if (props.mode.kind !== "normal") return;
+    const sheetId = sceneRef.current?.resolveSheetAtPoint(
+      event.clientX,
+      event.clientY,
+    );
+    if (!sheetId) return;
+    props.onOpenSheetContextMenu?.(sheetId, {
+      x: event.clientX,
+      y: event.clientY,
+    });
+  }
+
   if (!hasSheets) {
     return (
       <EmptyState
@@ -463,6 +515,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
         onDragLeave={handlePhotoDragLeave}
         onDragOver={handlePhotoDragOver}
         onDrop={handlePhotoDrop}
+        onContextMenu={handleSheetContextMenu}
       >
         <div
           aria-label="Ações da Barra da Lâmina"
@@ -493,6 +546,26 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
             O editor gráfico está indisponível.
           </span>
         )}
+        {props.mode.kind === "normal" && props.sheetReorder ? (
+          <SheetBarReorderOverlay
+            bleedUm={props.technicalGuides?.bleedUm}
+            disabled={props.sheetReorder.disabled}
+            layout={props.continuousCanvasLayout}
+            metrics={canvasMetrics}
+            onAutoScrollVelocity={setSheetAutoScrollVelocity}
+            onCancel={props.sheetReorder.onCancel}
+            onContextMenu={(sheetId, position) =>
+              props.onOpenSheetContextMenu?.(sheetId, position)
+            }
+            onDrop={props.sheetReorder.onDrop}
+            onNavigate={props.sheetReorder.onNavigate}
+            onPreview={props.sheetReorder.onPreview}
+            representation={props.sheetReorder.representation}
+            sheets={props.composition.sheets}
+            status={props.sheetReorder.status}
+            viewport={props.viewport}
+          />
+        ) : null}
       </div>
       <CanvasHorizontalScrollbar
         centeredSheetId={props.centeredSheetId}

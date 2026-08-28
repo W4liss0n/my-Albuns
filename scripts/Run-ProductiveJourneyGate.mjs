@@ -26,6 +26,7 @@ import {
   assertCausalProjectHandoff,
   assertCorrelatedJourneyTerminals,
   assertDistinguishableSheetExport,
+  assertPhysicalAlbumProjectCoreEvents,
   assertReopenedHostExport,
   eventCount,
 } from "./ProductiveJourneyObservations.mjs";
@@ -709,6 +710,121 @@ async function elementAttribute(driver, elementId, attribute) {
   );
 }
 
+async function observeSheetGrid(driver, label) {
+  const grid = await findElement(
+    driver,
+    "css selector",
+    ".sheet-grid",
+    label,
+  );
+  return driver.request(
+    "POST",
+    `/session/${driver.sessionId}/execute/sync`,
+    {
+      script: `
+        const grid = arguments[0];
+        const slots = Array.from(
+          grid.querySelectorAll(":scope > .sheet-grid-slot"),
+        );
+        const focused = slots.find((slot) =>
+          slot.querySelector("button.active"),
+        );
+        return {
+          count: slots.length,
+          focusedSheetId: focused?.dataset.sheetId ?? null,
+          order: slots.map((slot) => slot.dataset.sheetId ?? ""),
+        };
+      `,
+      args: [{ "element-6066-11e4-a52e-4f735466cecf": grid }],
+    },
+  );
+}
+
+async function waitForSheetGrid(driver, label, predicate) {
+  return waitFor(
+    label,
+    async () => {
+      const observation = await observeSheetGrid(driver, label);
+      return predicate(observation) ? observation : false;
+    },
+    timeoutMilliseconds,
+  );
+}
+
+async function dragSheetInGrid(
+  driver,
+  sourceSheetId,
+  targetSheetId,
+  label,
+) {
+  const source = await findElement(
+    driver,
+    "css selector",
+    `.sheet-grid-slot[data-sheet-id='${sourceSheetId}']`,
+    `${label} source`,
+  );
+  const target = await findElement(
+    driver,
+    "css selector",
+    `.sheet-grid-slot[data-sheet-id='${targetSheetId}']`,
+    `${label} target`,
+  );
+  if ((await elementAttribute(driver, source, "draggable")) !== "true") {
+    throw new Error(`${label} source is not publicly draggable`);
+  }
+  const endpoint = `/session/${driver.sessionId}`;
+  const sourceElement = {
+    "element-6066-11e4-a52e-4f735466cecf": source,
+  };
+  const targetElement = {
+    "element-6066-11e4-a52e-4f735466cecf": target,
+  };
+  await driver.request("POST", `${endpoint}/execute/sync`, {
+    script: "arguments[0].scrollIntoView({ block: 'center', inline: 'nearest' });",
+    args: [sourceElement],
+  });
+  try {
+    await driver.request("POST", `${endpoint}/actions`, {
+      actions: [
+        {
+          type: "pointer",
+          id: "physical-album-structure-mouse",
+          parameters: { pointerType: "mouse" },
+          actions: [
+            {
+              type: "pointerMove",
+              duration: 0,
+              origin: sourceElement,
+              x: 0,
+              y: 0,
+            },
+            { type: "pointerDown", button: 0 },
+            { type: "pause", duration: 200 },
+            {
+              type: "pointerMove",
+              duration: 200,
+              origin: sourceElement,
+              x: 10,
+              y: 10,
+            },
+            {
+              type: "pointerMove",
+              duration: 600,
+              origin: targetElement,
+              x: 0,
+              y: 0,
+            },
+            { type: "pause", duration: 250 },
+            { type: "pointerUp", button: 0 },
+          ],
+        },
+      ],
+    });
+  } finally {
+    await driver.request("DELETE", `${endpoint}/actions`).catch(() => undefined);
+  }
+}
+
 async function waitFor(label, predicate, timeout = 30_000) {
   const deadline = Date.now() + timeout;
   let observation;
@@ -841,6 +957,26 @@ function logText() {
 
 function recordsFor(event) {
   return logRecords().filter((record) => record.event === event);
+}
+
+function projectIntentRecords(processId, intent) {
+  return recordsFor("project_intent_applied").filter(
+    (record) =>
+      Number(record.process_id) === processId && record.intent === intent,
+  );
+}
+
+async function waitForProjectIntent(processId, intent, expectedCount, label) {
+  return waitFor(
+    label,
+    () => {
+      const records = projectIntentRecords(processId, intent);
+      return records.length >= expectedCount
+        ? records[expectedCount - 1]
+        : false;
+    },
+    timeoutMilliseconds,
+  );
 }
 
 function exportProcessorAttempts() {
@@ -1081,7 +1217,7 @@ try {
   await click(
     hostDriver,
     "css selector",
-    ".sheet-grid > button:nth-child(2)",
+    ".sheet-grid > .sheet-grid-slot:nth-child(2) > button",
     "second sheet",
   );
   const activeSheetNumber = Number(
@@ -1090,7 +1226,7 @@ try {
       await findElement(
         hostDriver,
         "css selector",
-        ".sheet-grid > button.active > span",
+        ".sheet-grid > .sheet-grid-slot > button.active > span",
         "active sheet number",
       ),
     ),
@@ -1314,7 +1450,7 @@ try {
   await click(
     hostDriver,
     "css selector",
-    ".sheet-grid > button:nth-child(2)",
+    ".sheet-grid > .sheet-grid-slot:nth-child(2) > button",
     "reopened second sheet",
   );
   const reopenedActiveSheetNumber = Number(
@@ -1323,7 +1459,7 @@ try {
       await findElement(
         hostDriver,
         "css selector",
-        ".sheet-grid > button.active > span",
+        ".sheet-grid > .sheet-grid-slot > button.active > span",
         "reopened active sheet number",
       ),
     ),
@@ -1855,7 +1991,7 @@ try {
       await findElement(
         hostDriver,
         "css selector",
-        ".sheet-grid > button.active > span",
+        ".sheet-grid > .sheet-grid-slot > button.active > span",
         "fresh Save As active sheet number",
       ),
     ),
@@ -1867,7 +2003,7 @@ try {
   await click(
     hostDriver,
     "css selector",
-    ".sheet-grid > button:nth-child(2)",
+    ".sheet-grid > .sheet-grid-slot:nth-child(2) > button",
     "Save As second sheet",
   );
   await waitFor(
@@ -1879,7 +2015,7 @@ try {
           await findElement(
             hostDriver,
             "css selector",
-            ".sheet-grid > button.active > span",
+            ".sheet-grid > .sheet-grid-slot > button.active > span",
             "Save As selected sheet number",
           ),
         ),
@@ -2390,6 +2526,137 @@ try {
     throw new Error("The restored proof Original differs from the imported bytes");
   }
 
+  await ensureInspectorSectionExpanded(
+    hostDriver,
+    "Grade de Lâminas",
+    "physical Album structure Grade",
+  );
+  const physicalAlbumBefore = await waitForSheetGrid(
+    hostDriver,
+    "physical Album structure baseline",
+    (observation) =>
+      observation.count === 3 &&
+      observation.order.length === 3 &&
+      observation.order[1] === observation.focusedSheetId,
+  );
+  const structuralIntentKinds = [
+    "add_sheet",
+    "reorder_sheet",
+    "delete_sheet",
+  ];
+  const structuralIntentCountsBefore = Object.fromEntries(
+    structuralIntentKinds.map((intent) => [
+      intent,
+      projectIntentRecords(secondHost.processId, intent).length,
+    ]),
+  );
+
+  await selectApplicationMenuCommand(
+    hostDriver,
+    "Lâmina",
+    "Adicionar depois",
+    "Add Sheet after the focused Sheet",
+  );
+  const addSheetEvent = await waitForProjectIntent(
+    secondHost.processId,
+    "add_sheet",
+    structuralIntentCountsBefore.add_sheet + 1,
+    "ProjectCore Add Sheet event",
+  );
+  const physicalAlbumAfterAdd = await waitForSheetGrid(
+    hostDriver,
+    "four-Sheet Album after Add",
+    (observation) =>
+      observation.count === 4 &&
+      observation.order.length === 4 &&
+      observation.focusedSheetId !== null &&
+      !physicalAlbumBefore.order.includes(observation.focusedSheetId) &&
+      observation.order[0] === physicalAlbumBefore.order[0] &&
+      observation.order[1] === physicalAlbumBefore.order[1] &&
+      observation.order[2] === observation.focusedSheetId &&
+      observation.order[3] === physicalAlbumBefore.order[2],
+  );
+  const addedSheetId = physicalAlbumAfterAdd.focusedSheetId;
+
+  await dragSheetInGrid(
+    hostDriver,
+    addedSheetId,
+    physicalAlbumBefore.focusedSheetId,
+    "Reorder added Sheet through the Grade",
+  );
+  const reorderSheetEvent = await waitForProjectIntent(
+    secondHost.processId,
+    "reorder_sheet",
+    structuralIntentCountsBefore.reorder_sheet + 1,
+    "ProjectCore Reorder Sheet event",
+  );
+  const expectedReorderedSheetIds = [
+    physicalAlbumBefore.order[0],
+    addedSheetId,
+    physicalAlbumBefore.order[1],
+    physicalAlbumBefore.order[2],
+  ];
+  const physicalAlbumAfterReorder = await waitForSheetGrid(
+    hostDriver,
+    "four-Sheet Album after Grade reorder",
+    (observation) =>
+      observation.count === 4 &&
+      observation.focusedSheetId === addedSheetId &&
+      observation.order.join(",") === expectedReorderedSheetIds.join(","),
+  );
+
+  await selectApplicationMenuCommand(
+    hostDriver,
+    "Lâmina",
+    "Excluir",
+    "Delete reordered Sheet",
+  );
+  const deleteSheetEvent = await waitForProjectIntent(
+    secondHost.processId,
+    "delete_sheet",
+    structuralIntentCountsBefore.delete_sheet + 1,
+    "ProjectCore Delete Sheet event",
+  );
+  const physicalAlbumAfterDelete = await waitForSheetGrid(
+    hostDriver,
+    "original three-Sheet Album after Delete",
+    (observation) =>
+      observation.count === 3 &&
+      observation.focusedSheetId === physicalAlbumBefore.focusedSheetId &&
+      observation.order.join(",") === physicalAlbumBefore.order.join(","),
+  );
+
+  for (const intent of structuralIntentKinds) {
+    const expectedCount = structuralIntentCountsBefore[intent] + 1;
+    const observedCount = projectIntentRecords(
+      secondHost.processId,
+      intent,
+    ).length;
+    if (observedCount !== expectedCount) {
+      throw new Error(
+        `The physical Album structure journey expected one ${intent} event and observed ${observedCount - structuralIntentCountsBefore[intent]}`,
+      );
+    }
+  }
+  const projectCoreEvents = assertPhysicalAlbumProjectCoreEvents(
+    [addSheetEvent, reorderSheetEvent, deleteSheetEvent],
+    {
+      hostProcessId: secondHost.processId,
+      intents: structuralIntentKinds,
+    },
+  );
+  const physicalAlbumStructure = {
+    reorderSurface: "grid",
+    dragTransport: "w3c-pointer-actions",
+    addedSheetId,
+    before: physicalAlbumBefore,
+    afterAdd: physicalAlbumAfterAdd,
+    afterReorder: physicalAlbumAfterReorder,
+    afterDelete: physicalAlbumAfterDelete,
+    restoredOriginalOrder: true,
+    projectCoreEvents,
+  };
+
   await selectApplicationMenuCommandUntilLogEvent(
     hostDriver,
     "Arquivo",
@@ -2524,6 +2791,9 @@ try {
       photoFrameCount: savedFrames.length,
       persistedPhotoLinkOnly,
       reimportedExistingPhotoWithoutRevision,
+      physicalAlbumStructure: {
+        ...physicalAlbumStructure,
+      },
       sessionRecovery: {
         schemaVersion: recoveryCheckpoint.schemaVersion,
         baseSavedRevision: recoveryCheckpoint.baseRevision.revision,

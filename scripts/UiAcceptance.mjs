@@ -135,10 +135,10 @@ export function validateUiAcceptanceManifest(manifest) {
         const actionLocation = `${location}.${groupName}[${actionIndex}]`;
         invariant(action && typeof action === "object", `${actionLocation} must be an object`);
         invariant(
-          ["click", "click-text", "drag", "focus", "hover", "input", "key", "wheel"].includes(action.type),
+          ["click", "click-text", "context-click", "drag", "focus", "hover", "input", "key", "wheel"].includes(action.type),
           `${actionLocation}.type is not supported`,
         );
-        if (["click", "drag", "focus", "hover", "input", "wheel"].includes(action.type)) {
+        if (["click", "context-click", "drag", "focus", "hover", "input", "wheel"].includes(action.type)) {
           invariant(typeof action.selector === "string" && action.selector.trim(), `${actionLocation}.selector is required`);
         }
         if (action.type === "click-text") {
@@ -186,14 +186,26 @@ export function validateUiAcceptanceManifest(manifest) {
         }
         if (action.type === "drag") {
           invariant(
+            action.gesture === undefined || action.gesture === "html-dnd",
+            `${actionLocation}.gesture must be html-dnd when present`,
+          );
+          invariant(
             typeof action.targetSelector === "string" &&
               action.targetSelector.trim(),
             `${actionLocation}.targetSelector is required`,
           );
           invariant(
-            action.phase === "preview" || action.phase === "drop",
-            `${actionLocation}.phase must be preview or drop`,
+            action.phase === "preview" ||
+              action.phase === "drop" ||
+              action.phase === "escape",
+            `${actionLocation}.phase must be preview, drop, or escape`,
           );
+          if (action.phase === "escape") {
+            invariant(
+              action.gesture === "html-dnd",
+              `${actionLocation}.phase escape requires gesture html-dnd`,
+            );
+          }
           if (action.dropTargetSelector !== undefined) {
             invariant(
               typeof action.dropTargetSelector === "string" &&

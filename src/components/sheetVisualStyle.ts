@@ -40,6 +40,7 @@ export const SHEET_VISUAL_STYLE = {
     action: "#403b35",
     actionHover: "#2c2924",
     actionSizePx: 26,
+    swapActionCenterPx: 22,
     actionHoverOpacity: 1,
     sheetHoverOpacity: 0.55,
     directHoverOpacity: 1,

@@ -10,6 +10,7 @@ import {
 } from "./albumCanvasTestFixtures";
 import { createContinuousCanvasLayout } from "./canvasGeometry";
 import {
+  advancePixiTicker,
   AlbumCanvas,
   displayWithLabel,
   displayWithHandler,
@@ -1439,4 +1440,260 @@ test("reconciles only the composed sheet that changed", async () => {
   expect(reconciledSheets[0]).toBe(originalSheets[0]);
   expect(reconciledSheets[1]).not.toBe(originalSheets[1]);
   expect(reconciledSheets[2]).toBe(originalSheets[2]);
+});
+
+test("opens the structural context menu for the Sheet under the pointer", async () => {
+  const onOpenSheetContextMenu = vi.fn();
+  const view = renderCanvas({ onOpenSheetContextMenu });
+  await finishPixiInitialization();
+
+  const host = view.container.querySelector(".canvas-host") as HTMLDivElement;
+  const canvas = view.container.querySelector("canvas") as HTMLCanvasElement;
+  vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
+    bottom: 500,
+    height: 500,
+    left: 0,
+    right: 1_000,
+    top: 0,
+    width: 1_000,
+    x: 0,
+    y: 0,
+    toJSON: () => ({}),
+  });
+
+  fireEvent.contextMenu(host, { clientX: 600, clientY: 250 });
+
+  expect(onOpenSheetContextMenu).toHaveBeenCalledWith("sheet-001", {
+    x: 600,
+    y: 250,
+  });
+});
+
+test("opens the structural context menu from the inactive side of a single Page Sheet", async () => {
+  const onOpenSheetContextMenu = vi.fn();
+  const view = renderCanvas({
+    compositionPlan: createSinglePageComposition("right"),
+    onOpenSheetContextMenu,
+    technicalGuides: { bleedUm: 3_000, safetyUm: 3_000 },
+  });
+  await finishPixiInitialization();
+
+  const host = view.container.querySelector(".canvas-host") as HTMLDivElement;
+  const canvas = view.container.querySelector("canvas") as HTMLCanvasElement;
+  vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
+    bottom: 500,
+    height: 500,
+    left: 0,
+    right: 1_000,
+    top: 0,
+    width: 1_000,
+    x: 0,
+    y: 0,
+    toJSON: () => ({}),
+  });
+
+  fireEvent.contextMenu(host, { clientX: 220, clientY: 250 });
+
+  expect(onOpenSheetContextMenu).toHaveBeenCalledWith("sheet-001", {
+    x: 220,
+    y: 250,
+  });
+});
+
+test("does not expose the structural context menu through masked Sangria", async () => {
+  const onOpenSheetContextMenu = vi.fn();
+  const view = renderCanvas({
+    onOpenSheetContextMenu,
+    technicalGuides: { bleedUm: 3_000, safetyUm: 3_000 },
+  });
+  await finishPixiInitialization();
+
+  const host = view.container.querySelector(".canvas-host") as HTMLDivElement;
+  const canvas = view.container.querySelector("canvas") as HTMLCanvasElement;
+  vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
+    bottom: 500,
+    height: 500,
+    left: 0,
+    right: 1_000,
+    top: 0,
+    width: 1_000,
+    x: 0,
+    y: 0,
+    toJSON: () => ({}),
+  });
+
+  fireEvent.contextMenu(host, { clientX: 132, clientY: 250 });
+
+  expect(onOpenSheetContextMenu).not.toHaveBeenCalled();
+});
+
+test("mounts the productive Sheet Bar seam for navigation, context, and reorder", async () => {
+  const onCancel = vi.fn();
+  const onDrop = vi.fn();
+  const onNavigate = vi.fn();
+  const onOpenSheetContextMenu = vi.fn();
+  const onPreview = vi.fn();
+  const view = renderCanvas({
+    compositionPlan: threeSheetComposition,
+    onOpenSheetContextMenu,
+    sheetReorder: {
+      disabled: false,
+      onCancel,
+      onDrop,
+      onNavigate,
+      onPreview,
+      representation: {
+        ghost: null,
+        order: ["sheet-001", "sheet-002", "sheet-003"],
+        placeholderIndex: null,
+      },
+      status: "idle",
+    },
+  });
+  await finishPixiInitialization();
+
+  const first = screen.getByRole("button", {
+    name: "Reordenar Lâmina 01 pela Barra",
+  });
+  const second = screen.getByRole("button", {
+    name: "Reordenar Lâmina 02 pela Barra",
+  });
+  const dataTransfer = {
+    dropEffect: "none",
+    effectAllowed: "none",
+    setData: vi.fn(),
+  };
+
+  fireEvent.click(second);
+  expect(onNavigate).toHaveBeenCalledWith("sheet-002");
+  fireEvent.contextMenu(second, { clientX: 220, clientY: 36 });
+  expect(onOpenSheetContextMenu).toHaveBeenCalledWith("sheet-002", {
+    x: 220,
+    y: 36,
+  });
+
+  fireEvent.dragStart(first, { dataTransfer });
+  fireEvent.dragEnter(second, { dataTransfer });
+  expect(onPreview).toHaveBeenLastCalledWith("sheet-001", 1);
+  fireEvent.drop(
+    view.getByTestId("sheet-reorder-bar-drop-zone"),
+    { dataTransfer },
+  );
+  expect(onDrop).toHaveBeenCalledOnce();
+});
+
+test("slides intermediate Pixi Sheets while the dragged Sheet yields to the placeholder", async () => {
+  const canvasProps = {
+    projectId: "project-spike-001",
+    mode: { kind: "normal" } as const,
+    composition: threeSheetComposition,
+    continuousCanvasLayout: createContinuousCanvasLayout(
+      threeSheetComposition.sheets,
+    ),
+    sheetBarMetadata: [],
+    selectedFrameId: null,
+    focusedSheetId: "sheet-001",
+    centeredSheetId: "sheet-001",
+    viewport: { offsetX: 42 },
+    onSelectFrame: vi.fn(),
+    onEditSheet: vi.fn(),
+    onFocusSheet: vi.fn(),
+    onCenteredSheetChange: vi.fn(),
+    onViewportChange: vi.fn(),
+    onTransformPreview: vi.fn(),
+    onTransformCommit: vi.fn(async () => true),
+  };
+  const reorderCallbacks = {
+    disabled: false,
+    onCancel: vi.fn(),
+    onDrop: vi.fn(),
+    onNavigate: vi.fn(),
+    onPreview: vi.fn(),
+  };
+  const view = render(
+    <AlbumCanvas
+      {...canvasProps}
+      sheetReorder={{
+        ...reorderCallbacks,
+        representation: {
+          ghost: null,
+          order: ["sheet-001", "sheet-002", "sheet-003"],
+          placeholderIndex: null,
+        },
+        status: "idle",
+      }}
+    />,
+  );
+  await finishPixiInitialization();
+
+  const first = displayWithLabel("canvas-sheet-sheet-001");
+  const second = displayWithLabel("canvas-sheet-sheet-002");
+  const third = displayWithLabel("canvas-sheet-sheet-003");
+  const initialPositions = [
+    first.position.x,
+    second.position.x,
+    third.position.x,
+  ];
+
+  view.rerender(
+    <AlbumCanvas
+      {...canvasProps}
+      sheetReorder={{
+        ...reorderCallbacks,
+        representation: {
+          ghost: { sheetId: "sheet-003" },
+          order: ["sheet-001", "sheet-003", "sheet-002"],
+          placeholderIndex: 1,
+        },
+        status: "preview",
+      }}
+    />,
+  );
+
+  expect(first.position.x).toBe(initialPositions[0]);
+  expect(second.position.x).toBe(initialPositions[1]);
+  expect(third.visible).toBe(false);
+
+  await advancePixiTicker(70);
+  expect(second.position.x).toBeGreaterThan(initialPositions[1]);
+  expect(second.position.x).toBeLessThan(initialPositions[2]);
+
+  await advancePixiTicker(70);
+  expect(second.position.x).toBe(initialPositions[2]);
+
+  view.rerender(
+    <AlbumCanvas
+      {...canvasProps}
+      sheetReorder={{
+        ...reorderCallbacks,
+        representation: {
+          ghost: { sheetId: "sheet-003" },
+          order: ["sheet-001", "sheet-003", "sheet-002"],
+          placeholderIndex: 1,
+        },
+        status: "committing",
+      }}
+    />,
+  );
+  await advancePixiTicker(70);
+  expect(second.position.x).toBe(initialPositions[2]);
+  expect(third.visible).toBe(false);
+
+  view.rerender(
+    <AlbumCanvas
+      {...canvasProps}
+      sheetReorder={{
+        ...reorderCallbacks,
+        representation: {
+          ghost: null,
+          order: ["sheet-001", "sheet-002", "sheet-003"],
+          placeholderIndex: null,
+        },
+        status: "cancelled",
+      }}
+    />,
+  );
+  expect(third.visible).toBe(true);
+  await advancePixiTicker(140);
+  expect(second.position.x).toBe(initialPositions[1]);
 });

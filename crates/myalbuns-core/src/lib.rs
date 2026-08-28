@@ -17,8 +17,8 @@ pub use model::{
     PhotoPlacementMode, PhotoPlacementPlan, PhotoSnapshot, PhotoSourceMetadata, ProjectIntent,
     ProjectMutationOutcome, ProjectedActiveSides, ProjectedBackground, ProjectedBackgroundContent,
     ProjectedDisplayUnit, ProjectedFrameBorder, ProjectedOverlay, ProjectedOverlayContent,
-    ProjectedVisualDefaults, RectUm, RelinkMedia, RenderSnapshot, RenderSnapshotRef, SheetRole,
-    SheetSnapshot, SizeUm, VectorUm,
+    ProjectedVisualDefaults, RectUm, RelinkMedia, RenderSnapshot, RenderSnapshotRef,
+    SheetInsertionPosition, SheetRole, SheetSnapshot, SizeUm, VectorUm,
 };
 pub use persistent_project::{
     CreateAuthorization, CreateProjectError, CreateProjectRequest, EditableProject,

@@ -118,14 +118,20 @@ pub(crate) fn apply_project_intent(
         ProjectIntent::SetAlbumInformation { .. } => "set_album_information",
         ProjectIntent::SetVisualDefaults { .. } => "set_visual_defaults",
         ProjectIntent::SetDpi { .. } => "set_dpi",
+        ProjectIntent::AddSheet { .. } => "add_sheet",
+        ProjectIntent::DeleteSheet { .. } => "delete_sheet",
+        ProjectIntent::ConvertEdgeSheet { .. } => "convert_edge_sheet",
+        ProjectIntent::ReorderSheet { .. } => "reorder_sheet",
         ProjectIntent::TransformPhoto { .. } => "transform_photo",
         ProjectIntent::AddPhoto { .. } => "add_photo",
         ProjectIntent::DropPhoto { .. } => "drop_photo",
     };
+    let process_id = std::process::id();
     let outcome = state.apply_with_outcome(intent).inspect_err(|_| {
         tracing::warn!(
             target: "myalbuns.desktop",
             process_role = ProcessRole::DesktopHost.as_str(),
+            process_id = process_id,
             window_label = window.label(),
             intent = intent_kind,
             event = "project_intent_rejected",
@@ -134,6 +140,7 @@ pub(crate) fn apply_project_intent(
     tracing::info!(
         target: "myalbuns.desktop",
         process_role = ProcessRole::DesktopHost.as_str(),
+        process_id = process_id,
         window_label = window.label(),
         project_id = safe_log_identifier(&outcome.projection.state.project_id),
         revision = outcome.projection.state.revision,

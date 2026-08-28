@@ -12,6 +12,7 @@ use crate::model::{
     MediaId, MediaKind, PHOTO_PAN_MAX, PHOTO_PAN_MIN, PHOTO_ZOOM_MAX, PHOTO_ZOOM_MIN,
     PhotoDropTarget, PhotoPlacementMode, ProjectedBackground, ProjectedBackgroundContent,
     ProjectedFrameBorder, ProjectedOverlay, ProjectedOverlayContent, ProjectedVisualDefaults,
+    SheetInsertionPosition,
 };
 
 pub(crate) const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
@@ -472,6 +473,93 @@ impl ProjectDocument {
         Ok(candidate)
     }
 
+    pub(crate) fn with_added_sheet(
+        &self,
+        anchor_sheet_id: Uuid,
+        position: SheetInsertionPosition,
+    ) -> Result<(Self, Uuid), ()> {
+        let mut candidate = self.clone();
+        let anchor_index = candidate
+            .sheets
+            .iter()
+            .position(|sheet| sheet.id == anchor_sheet_id)
+            .ok_or(())?;
+        let insertion_index = match position {
+            SheetInsertionPosition::Before => anchor_index,
+            SheetInsertionPosition::After => anchor_index + 1,
+        };
+        let sheet_id = Uuid::new_v4();
+        candidate.sheets.insert(
+            insertion_index,
+            ProjectSheet::new(sheet_id, ActiveSides::Both),
+        );
+        validate_project_state(&candidate)?;
+        Ok((candidate, sheet_id))
+    }
+
+    pub(crate) fn with_deleted_sheet(&self, sheet_id: Uuid) -> Result<(Self, Uuid), ()> {
+        let mut candidate = self.clone();
+        if candidate.sheets.len() <= 2 {
+            return Err(());
+        }
+        let deleted_index = candidate
+            .sheets
+            .iter()
+            .position(|sheet| sheet.id == sheet_id)
+            .ok_or(())?;
+        candidate.sheets.remove(deleted_index);
+        let neighbor_index = deleted_index.min(candidate.sheets.len() - 1);
+        let neighbor_id = candidate.sheets[neighbor_index].id;
+        validate_project_state(&candidate)?;
+        Ok((candidate, neighbor_id))
+    }
+
+    pub(crate) fn with_converted_edge_sheet(&self, sheet_id: Uuid) -> Result<Self, ()> {
+        let mut candidate = self.clone();
+        let sheet_index = candidate
+            .sheets
+            .iter()
+            .position(|sheet| sheet.id == sheet_id)
+            .ok_or(())?;
+        let last_index = candidate.sheets.len() - 1;
+        let sheet = &mut candidate.sheets[sheet_index];
+        if !sheet.frames.is_empty() {
+            return Err(());
+        }
+        sheet.active_sides = match (sheet_index, sheet.active_sides) {
+            (0, ActiveSides::Both) => ActiveSides::Right,
+            (0, ActiveSides::Right) => ActiveSides::Both,
+            (index, ActiveSides::Both) if index == last_index => ActiveSides::Left,
+            (index, ActiveSides::Left) if index == last_index => ActiveSides::Both,
+            _ => return Err(()),
+        };
+        validate_project_state(&candidate)?;
+        Ok(candidate)
+    }
+
+    pub(crate) fn with_reordered_sheet(
+        &self,
+        sheet_id: Uuid,
+        target_index: usize,
+    ) -> Result<Self, ()> {
+        if target_index >= self.sheets.len() {
+            return Err(());
+        }
+        let mut candidate = self.clone();
+        let source_index = candidate
+            .sheets
+            .iter()
+            .position(|sheet| sheet.id == sheet_id)
+            .ok_or(())?;
+        if source_index == target_index {
+            return Err(());
+        }
+        let sheet = candidate.sheets.remove(source_index);
+        candidate.sheets.insert(target_index, sheet);
+        validate_project_state(&candidate)?;
+        Ok(candidate)
+    }
+
     pub(crate) fn validate_album_information(
         &self,
         information: &AlbumInformation,
@@ -506,6 +594,29 @@ impl ProjectDocument {
             )
         {
             errors.push(ProjectConfigurationValidationError::SheetDimensionsNotProportional);
+        }
+        if dimensions_are_valid
+            && dimensions_changed
+            && self.sheets.iter().any(|sheet| !sheet.frames.is_empty())
+        {
+            errors.push(
+                ProjectConfigurationValidationError::SheetDimensionsRequireContentTransformation,
+            );
+        }
+        if information.first_sheet.active_sides(true) != self.sheets[0].active_sides
+            && !self.sheets[0].frames.is_empty()
+        {
+            errors.push(
+                ProjectConfigurationValidationError::FirstSheetConversionRequiresContentReorganization,
+            );
+        }
+        let last_index = self.sheets.len() - 1;
+        if information.last_sheet.active_sides(false) != self.sheets[last_index].active_sides
+            && !self.sheets[last_index].frames.is_empty()
+        {
+            errors.push(
+                ProjectConfigurationValidationError::LastSheetConversionRequiresContentReorganization,
+            );
         }
         let impact = errors
             .is_empty()
@@ -1115,6 +1226,9 @@ pub enum ProjectConfigurationValidationError {
     SheetHeightAboveSafeInteger,
     SheetHeightRasterOutOfRange,
     SheetDimensionsNotProportional,
+    SheetDimensionsRequireContentTransformation,
+    FirstSheetConversionRequiresContentReorganization,
+    LastSheetConversionRequiresContentReorganization,
     DpiOutOfRange,
     SheetCountTooSmall,
     BleedNegative,

@@ -273,8 +273,7 @@ const DEFINITIONS = [
     description: "Adiciona uma Lâmina antes da Lâmina ativa.",
     kind: "domain",
     contexts: ["sheet"],
-    availability: "placeholder",
-    placeholderFeature: "add-sheet-before",
+    availability: "implemented",
     shortcuts: [],
   }),
   command({
@@ -283,8 +282,7 @@ const DEFINITIONS = [
     description: "Adiciona uma Lâmina depois da Lâmina ativa.",
     kind: "domain",
     contexts: ["sheet"],
-    availability: "placeholder",
-    placeholderFeature: "add-sheet-after",
+    availability: "implemented",
     shortcuts: [],
   }),
   command({
@@ -303,8 +301,7 @@ const DEFINITIONS = [
     description: "Exclui a Lâmina ativa.",
     kind: "domain",
     contexts: ["sheet"],
-    availability: "placeholder",
-    placeholderFeature: "delete-sheet",
+    availability: "implemented",
     shortcuts: [shortcut("delete", "Delete")],
   }),
   command({
@@ -313,8 +310,7 @@ const DEFINITIONS = [
     description: "Converte a configuração da Lâmina de extremidade.",
     kind: "domain",
     contexts: ["sheet"],
-    availability: "placeholder",
-    placeholderFeature: "convert-edge-sheet",
+    availability: "implemented",
     shortcuts: [],
   }),
   command({

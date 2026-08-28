@@ -50,6 +50,18 @@ export function CanvasHorizontalScrollbar({
     Math.max(24, idealThumbWidth),
   );
   const thumbLeft = scrollProgress * (trackWidth - thumbWidth);
+  const entries = layout.entriesAtScale(metrics?.scale ?? 1);
+  const centeredIndex = entries.findIndex(
+    (entry) => entry.sheetId === centeredSheetId,
+  );
+  const navigationEnabled =
+    mode.kind === "normal" && metrics !== null && centeredIndex >= 0;
+  const previousSheetId = navigationEnabled
+    ? entries[centeredIndex - 1]?.sheetId ?? null
+    : null;
+  const nextSheetId = navigationEnabled
+    ? entries[centeredIndex + 1]?.sheetId ?? null
+    : null;
 
   useLayoutEffect(() => {
     const scrollbar = scrollbarRef.current;
@@ -82,8 +94,29 @@ export function CanvasHorizontalScrollbar({
     }
   };
 
+  const centerAdjacentSheet = (sheetId: string | null) => {
+    if (!sheetId || !metrics || mode.kind !== "normal") return;
+    const offsetX = layout.centeredOffset(
+      sheetId,
+      metrics.scale,
+      metrics.width,
+    );
+    if (offsetX === null) return;
+    onViewportChange({ ...viewport, offsetX });
+    onCenteredSheetChange(sheetId);
+  };
+
   return (
     <div className="canvas-horizontal-scrollbar-shell">
+      <button
+        aria-label="Lâmina anterior"
+        className="canvas-sheet-navigation canvas-sheet-navigation--previous"
+        disabled={previousSheetId === null}
+        type="button"
+        onClick={() => centerAdjacentSheet(previousSheetId)}
+      >
+        <span aria-hidden="true">‹</span>
+      </button>
       <div
         aria-disabled={!bounds}
         aria-label="Navegação horizontal das Lâminas"
@@ -114,6 +147,15 @@ export function CanvasHorizontalScrollbar({
           />
         ) : null}
       </div>
+      <button
+        aria-label="Próxima Lâmina"
+        className="canvas-sheet-navigation canvas-sheet-navigation--next"
+        disabled={nextSheetId === null}
+        type="button"
+        onClick={() => centerAdjacentSheet(nextSheetId)}
+      >
+        <span aria-hidden="true">›</span>
+      </button>
     </div>
   );
 }

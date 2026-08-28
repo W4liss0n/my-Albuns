@@ -228,6 +228,53 @@ try {
     ) {
         $contractViolations += 'saveAs'
     }
+    $physicalAlbumStructure = $gate.physicalAlbumStructure
+    $physicalBeforeOrder = @($physicalAlbumStructure.before.order)
+    $physicalAfterAddOrder = @($physicalAlbumStructure.afterAdd.order)
+    $physicalAfterReorderOrder = @($physicalAlbumStructure.afterReorder.order)
+    $physicalAfterDeleteOrder = @($physicalAlbumStructure.afterDelete.order)
+    $physicalProjectCoreEvents = @($physicalAlbumStructure.projectCoreEvents)
+    if (
+        $physicalAlbumStructure.reorderSurface -cne 'grid' -or
+        $physicalAlbumStructure.dragTransport -cne 'w3c-pointer-actions' -or
+        $physicalAlbumStructure.addedSheetId -notmatch '^[0-9a-f-]{36}$' -or
+        $physicalAlbumStructure.before.count -ne 3 -or
+        $physicalBeforeOrder.Count -ne 3 -or
+        $physicalAlbumStructure.before.focusedSheetId -cne $physicalBeforeOrder[1] -or
+        $physicalAlbumStructure.afterAdd.count -ne 4 -or
+        $physicalAfterAddOrder.Count -ne 4 -or
+        $physicalAlbumStructure.afterAdd.focusedSheetId -cne $physicalAlbumStructure.addedSheetId -or
+        $physicalAfterAddOrder[0] -cne $physicalBeforeOrder[0] -or
+        $physicalAfterAddOrder[1] -cne $physicalBeforeOrder[1] -or
+        $physicalAfterAddOrder[2] -cne $physicalAlbumStructure.addedSheetId -or
+        $physicalAfterAddOrder[3] -cne $physicalBeforeOrder[2] -or
+        $physicalAlbumStructure.afterReorder.count -ne 4 -or
+        $physicalAfterReorderOrder.Count -ne 4 -or
+        $physicalAlbumStructure.afterReorder.focusedSheetId -cne $physicalAlbumStructure.addedSheetId -or
+        $physicalAfterReorderOrder[0] -cne $physicalBeforeOrder[0] -or
+        $physicalAfterReorderOrder[1] -cne $physicalAlbumStructure.addedSheetId -or
+        $physicalAfterReorderOrder[2] -cne $physicalBeforeOrder[1] -or
+        $physicalAfterReorderOrder[3] -cne $physicalBeforeOrder[2] -or
+        $physicalAlbumStructure.afterDelete.count -ne 3 -or
+        $physicalAfterDeleteOrder.Count -ne 3 -or
+        $physicalAlbumStructure.afterDelete.focusedSheetId -cne $physicalAlbumStructure.before.focusedSheetId -or
+        ($physicalAfterDeleteOrder -join ',') -cne ($physicalBeforeOrder -join ',') -or
+        -not $physicalAlbumStructure.restoredOriginalOrder -or
+        $physicalProjectCoreEvents.Count -ne 3 -or
+        $physicalProjectCoreEvents[0].event -cne 'project_intent_applied' -or
+        $physicalProjectCoreEvents[0].intent -cne 'add_sheet' -or
+        $physicalProjectCoreEvents[1].event -cne 'project_intent_applied' -or
+        $physicalProjectCoreEvents[1].intent -cne 'reorder_sheet' -or
+        $physicalProjectCoreEvents[2].event -cne 'project_intent_applied' -or
+        $physicalProjectCoreEvents[2].intent -cne 'delete_sheet' -or
+        $physicalProjectCoreEvents[0].processId -ne $gate.processIds.host -or
+        $physicalProjectCoreEvents[1].processId -ne $gate.processIds.host -or
+        $physicalProjectCoreEvents[2].processId -ne $gate.processIds.host -or
+        [int64] $physicalProjectCoreEvents[1].revision -ne ([int64] $physicalProjectCoreEvents[0].revision + 1) -or
+        [int64] $physicalProjectCoreEvents[2].revision -ne ([int64] $physicalProjectCoreEvents[1].revision + 1)
+    ) {
+        $contractViolations += 'physicalAlbumStructure'
+    }
     if (
         -not $gate.originalUnchanged -or
         -not $gate.missingOriginalBlocked -or
@@ -449,6 +496,7 @@ try {
             [ordered]@{ name = 'real-application-empty-cache-original-read'; passed = $true },
             [ordered]@{ name = 'missing-original-actionable-failure'; passed = $true },
             [ordered]@{ name = 'saved-project-unchanged-by-export'; passed = $true },
+            [ordered]@{ name = 'physical-album-structure-ui-project-core'; passed = $true },
             [ordered]@{ name = 'independent-host-reopen-empty-history'; passed = $true },
             [ordered]@{ name = 'correlated-process-terminals-cleanup'; passed = $true }
         )
@@ -469,6 +517,7 @@ try {
             photoFrameCount = [int] $gate.photoFrameCount
             persistedPhotoLinkOnly = [bool] $gate.persistedPhotoLinkOnly
             reimportedExistingPhotoWithoutRevision = [bool] $gate.reimportedExistingPhotoWithoutRevision
+            physicalAlbumStructure = $gate.physicalAlbumStructure
             sessionRecovery = $gate.sessionRecovery
             saveAs = $gate.saveAs
             originalUnchanged = [bool] $gate.originalUnchanged

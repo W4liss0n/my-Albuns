@@ -25,6 +25,33 @@ test("presents shared Project configuration validation by field", () => {
   );
 });
 
+test("presents deferred content transformations on their owning fields", () => {
+  expect(
+    presentConfigurationValidationErrors(
+      [
+        "sheetDimensionsRequireContentTransformation",
+        "firstSheetConversionRequiresContentReorganization",
+        "lastSheetConversionRequiresContentReorganization",
+      ],
+      {
+        displayUnit: "mm",
+        dpi: 300,
+        sheetWidthPresentation: "openSheet",
+      },
+    ),
+  ).toEqual({
+    sheetWidth: [
+      "A composição existente exige o fluxo de mudança dimensional segura.",
+    ],
+    firstSheet: [
+      "A primeira Lâmina contém composição e exige o fluxo completo de conversão.",
+    ],
+    lastSheet: [
+      "A última Lâmina contém composição e exige o fluxo completo de conversão.",
+    ],
+  });
+});
+
 test("presents raster ranges in the selected physical Unit and current DPI", () => {
   expect(
     presentConfigurationValidationErrors(

@@ -505,13 +505,17 @@ impl EditableProject {
         if !self.session_valid {
             return Err(CoreError::EditableSessionInvalidated);
         }
-        let affected_frame_id = self
-            .session
-            .apply(intent)?
+        let intent_outcome = self.session.apply(intent)?;
+        let affected_frame_id = intent_outcome
+            .affected_frame_id
             .map(|frame_id| frame_id.hyphenated().to_string());
+        let affected_sheet_id = intent_outcome
+            .affected_sheet_id
+            .map(|sheet_id| sheet_id.hyphenated().to_string());
         Ok(ProjectMutationOutcome {
             projection: self.projection(),
             affected_frame_id,
+            affected_sheet_id,
         })
     }
 
