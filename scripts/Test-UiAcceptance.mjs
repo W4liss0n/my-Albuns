@@ -17,6 +17,81 @@ const workspace = path.resolve(scriptsDirectory, "..");
 const manifestPath = path.join(workspace, "src", "test", "uiAcceptanceScenarios.json");
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 
+test("captured pointer gestures have one neutral W3C policy", async () => {
+  const {
+    buildCapturedPointerGestureActions,
+    measureVisiblePointerGeometryScript,
+    scrollIntoPointerViewportScript,
+  } = await import("./WebDriverPointerGestures.mjs");
+
+  assert.match(scrollIntoPointerViewportScript, /scrollIntoView/u);
+  assert.match(measureVisiblePointerGeometryScript, /getBoundingClientRect/u);
+  assert.match(measureVisiblePointerGeometryScript, /window\.innerWidth/u);
+  assert.deepEqual(
+    buildCapturedPointerGestureActions({
+      phase: "preview",
+      source: { x: 100, y: 200 },
+      target: { x: 300, y: 220 },
+    }),
+    [
+      {
+        type: "pointerMove",
+        duration: 0,
+        origin: "viewport",
+        x: 100,
+        y: 200,
+      },
+      { type: "pointerDown", button: 0 },
+      { type: "pause", duration: 80 },
+      {
+        type: "pointerMove",
+        duration: 120,
+        origin: "viewport",
+        x: 110,
+        y: 201,
+      },
+      {
+        type: "pointerMove",
+        duration: 450,
+        origin: "viewport",
+        x: 300,
+        y: 220,
+      },
+      { type: "pause", duration: 100 },
+    ],
+  );
+
+  const dropActions = buildCapturedPointerGestureActions({
+    dropTarget: { x: 400, y: 240 },
+    phase: "drop",
+    source: { x: 100, y: 200 },
+    target: { x: 300, y: 220 },
+  });
+  assert.deepEqual(
+    dropActions.slice(-3),
+    [
+      {
+        type: "pointerMove",
+        duration: 450,
+        origin: "viewport",
+        x: 400,
+        y: 240,
+      },
+      { type: "pause", duration: 100 },
+      { type: "pointerUp", button: 0 },
+    ],
+  );
+
+  for (const runnerName of [
+    "Run-ProductiveJourneyGate.mjs",
+    "UiAcceptanceRunner.mjs",
+  ]) {
+    const runner = readFileSync(path.join(scriptsDirectory, runnerName), "utf8");
+    assert.match(runner, /from "\.\/WebDriverPointerGestures\.mjs"/u);
+    assert.doesNotMatch(runner, /const visibleCenter =/u);
+  }
+});
+
 test("the canonical UI acceptance manifest is valid and points to served files", () => {
   validateUiAcceptanceManifest(manifest);
   for (const scenario of manifest.scenarios) {
