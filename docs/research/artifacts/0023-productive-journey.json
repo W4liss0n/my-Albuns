@@ -1,8 +1,8 @@
 {
     "schemaVersion":  1,
     "gate":  "productive-end-to-end-journey",
-    "collectedAtUtc":  "2026-08-29T00:25:32.4796173Z",
-    "gitCommit":  "14da817083aa79fef6960da75fb1676ca53ea471",
+    "collectedAtUtc":  "2026-08-29T15:27:23.0359867Z",
+    "gitCommit":  "1949905e3a76037aebe59ddaa0b60218d9b64b11",
     "sourceInputsDirty":  false,
     "platform":  {
                      "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
@@ -15,169 +15,169 @@
                        "name":  "cancel-before-project-core",
                        "passed":  true,
                        "proofLayer":  "windows-webview2",
-                       "evidence":  "productive-runner observations and retained raw artifacts"
+                       "evidence":  "productive-runner observations (raw artifacts not retained)"
                    },
                    {
                        "name":  "create-only-causal-handoff",
                        "passed":  true,
                        "proofLayer":  "windows-webview2",
-                       "evidence":  "productive-runner observations and retained raw artifacts"
+                       "evidence":  "productive-runner observations (raw artifacts not retained)"
                    },
                    {
                        "name":  "project-core-save-history",
                        "passed":  true,
                        "proofLayer":  "windows-webview2",
-                       "evidence":  "productive-runner observations and retained raw artifacts"
+                       "evidence":  "productive-runner observations (raw artifacts not retained)"
                    },
                    {
                        "name":  "crash-recovery-distinct-host",
                        "passed":  true,
                        "proofLayer":  "windows-webview2",
-                       "evidence":  "productive-runner observations and retained raw artifacts"
+                       "evidence":  "productive-runner observations (raw artifacts not retained)"
                    },
                    {
                        "name":  "interrupted-gesture-keeps-previous-checkpoint",
                        "passed":  true,
                        "proofLayer":  "windows-webview2",
-                       "evidence":  "productive-runner observations and retained raw artifacts"
+                       "evidence":  "productive-runner observations (raw artifacts not retained)"
                    },
                    {
                        "name":  "recovered-project-unsaved-empty-history",
                        "passed":  true,
                        "proofLayer":  "windows-webview2",
-                       "evidence":  "productive-runner observations and retained raw artifacts"
+                       "evidence":  "productive-runner observations (raw artifacts not retained)"
                    },
                    {
                        "name":  "native-save-as-cancel-before-core",
                        "passed":  true,
                        "proofLayer":  "windows-webview2",
-                       "evidence":  "productive-runner observations and retained raw artifacts"
+                       "evidence":  "productive-runner observations (raw artifacts not retained)"
                    },
                    {
                        "name":  "save-as-copy-content-and-history",
                        "passed":  true,
                        "proofLayer":  "windows-webview2",
-                       "evidence":  "productive-runner observations and retained raw artifacts"
+                       "evidence":  "productive-runner observations (raw artifacts not retained)"
                    },
                    {
                        "name":  "save-as-webview-cache-recovery-transition",
                        "passed":  true,
                        "proofLayer":  "windows-webview2",
-                       "evidence":  "productive-runner observations and retained raw artifacts"
+                       "evidence":  "productive-runner observations (raw artifacts not retained)"
                    },
                    {
                        "name":  "simultaneous-original-copy-isolated-saves",
                        "passed":  true,
                        "proofLayer":  "windows-webview2",
-                       "evidence":  "productive-runner observations and retained raw artifacts"
+                       "evidence":  "productive-runner observations (raw artifacts not retained)"
                    },
                    {
                        "name":  "native-jpeg-import-reselect-external-link-only",
                        "passed":  true,
                        "proofLayer":  "windows-webview2",
-                       "evidence":  "productive-runner observations and retained raw artifacts"
+                       "evidence":  "productive-runner observations (raw artifacts not retained)"
                    },
                    {
                        "name":  "double-click-frame-selection-canvas",
                        "passed":  true,
                        "proofLayer":  "windows-webview2",
-                       "evidence":  "productive-runner observations and retained raw artifacts"
+                       "evidence":  "productive-runner observations (raw artifacts not retained)"
                    },
                    {
                        "name":  "cancel-before-export-pipeline",
                        "passed":  true,
                        "proofLayer":  "windows-webview2",
-                       "evidence":  "productive-runner observations and retained raw artifacts"
+                       "evidence":  "productive-runner observations (raw artifacts not retained)"
                    },
                    {
                        "name":  "distinguishable-sheet-two-jpeg-export",
                        "passed":  true,
                        "proofLayer":  "windows-webview2",
-                       "evidence":  "productive-runner observations and retained raw artifacts"
+                       "evidence":  "productive-runner observations (raw artifacts not retained)"
                    },
                    {
                        "name":  "canvas-jpeg-photo-fidelity",
                        "passed":  true,
                        "proofLayer":  "windows-webview2",
-                       "evidence":  "productive-runner observations and retained raw artifacts"
+                       "evidence":  "productive-runner observations (raw artifacts not retained)"
                    },
                    {
                        "name":  "real-application-empty-cache-original-read",
                        "passed":  true,
                        "proofLayer":  "windows-webview2",
-                       "evidence":  "productive-runner observations and retained raw artifacts"
+                       "evidence":  "productive-runner observations (raw artifacts not retained)"
                    },
                    {
                        "name":  "missing-original-actionable-failure",
                        "passed":  true,
                        "proofLayer":  "windows-webview2",
-                       "evidence":  "productive-runner observations and retained raw artifacts"
+                       "evidence":  "productive-runner observations (raw artifacts not retained)"
                    },
                    {
                        "name":  "saved-project-unchanged-by-export",
                        "passed":  true,
                        "proofLayer":  "windows-webview2",
-                       "evidence":  "productive-runner observations and retained raw artifacts"
+                       "evidence":  "productive-runner observations (raw artifacts not retained)"
                    },
                    {
                        "name":  "physical-album-structure-ui-project-core",
                        "passed":  true,
                        "proofLayer":  "windows-webview2",
-                       "evidence":  "productive-runner observations and retained raw artifacts"
+                       "evidence":  "productive-runner observations (raw artifacts not retained)"
                    },
                    {
                        "name":  "independent-host-reopen-empty-history",
                        "passed":  true,
                        "proofLayer":  "windows-webview2",
-                       "evidence":  "productive-runner observations and retained raw artifacts"
+                       "evidence":  "productive-runner observations (raw artifacts not retained)"
                    },
                    {
                        "name":  "correlated-process-terminals-cleanup",
                        "passed":  true,
                        "proofLayer":  "windows-webview2",
-                       "evidence":  "productive-runner observations and retained raw artifacts"
+                       "evidence":  "productive-runner observations (raw artifacts not retained)"
                    },
                    {
                        "name":  "public-project-core-journey",
                        "passed":  true,
                        "proofLayer":  "rust-public-api",
-                       "evidence":  "public-project-core-journey.log"
+                       "evidence":  "gate stdout (ephemeral; use -ArtifactDirectory to retain)"
                    },
                    {
                        "name":  "queued-history-structural-authority",
                        "passed":  true,
                        "proofLayer":  "public-workspace-vitest",
-                       "evidence":  "frontend-structure-tests.log"
+                       "evidence":  "gate stdout (ephemeral; use -ArtifactDirectory to retain)"
                    },
                    {
                        "name":  "pending-structure-cancels-reorder-preview-drop",
                        "passed":  true,
                        "proofLayer":  "public-workspace-vitest",
-                       "evidence":  "frontend-structure-tests.log"
+                       "evidence":  "gate stdout (ephemeral; use -ArtifactDirectory to retain)"
                    },
                    {
                        "name":  "delete-shortcut-context",
                        "passed":  true,
                        "proofLayer":  "public-workspace-vitest",
-                       "evidence":  "frontend-structure-tests.log"
+                       "evidence":  "gate stdout (ephemeral; use -ArtifactDirectory to retain)"
                    },
                    {
                        "name":  "context-menu-viewport-clamp",
                        "passed":  true,
                        "proofLayer":  "public-workspace-vitest",
-                       "evidence":  "frontend-structure-tests.log"
+                       "evidence":  "gate stdout (ephemeral; use -ArtifactDirectory to retain)"
                    },
                    {
                        "name":  "sheet-reorder-bar-grid",
                        "passed":  true,
                        "proofLayer":  "public-workspace-vitest",
-                       "evidence":  "frontend-structure-tests.log"
+                       "evidence":  "gate stdout (ephemeral; use -ArtifactDirectory to retain)"
                    },
                    {
                        "name":  "sheet-reorder-autoscroll-policy",
                        "passed":  true,
                        "proofLayer":  "public-workspace-vitest",
-                       "evidence":  "frontend-structure-tests.log"
+                       "evidence":  "gate stdout (ephemeral; use -ArtifactDirectory to retain)"
                    }
                ],
     "coverageLimits":  [
@@ -205,7 +205,7 @@
                      "cancelledExportBeforePipeline":  true,
                      "createAuthorization":  "createOnly",
                      "exportedSheetNumber":  2,
-                     "selectedSheetId":  "f94eea00-439c-4aa7-9967-b1b479d2346b",
+                     "selectedSheetId":  "df313c49-0089-47df-a2b7-5ee0da8f51ee",
                      "selectedSheetActiveSides":  "both",
                      "firstSheetDimensions":  {
                                                   "width":  720,
@@ -226,43 +226,43 @@
                      "physicalAlbumStructure":  {
                                                     "reorderSurface":  "grid",
                                                     "dragTransport":  "w3c-pointer-actions",
-                                                    "addedSheetId":  "a89f2238-47fa-4b4f-8e9d-f04a8e4e34b3",
+                                                    "addedSheetId":  "f9a0eb24-6568-47e0-93e4-d4f7eb6e39b2",
                                                     "before":  {
                                                                    "count":  3,
-                                                                   "focusedSheetId":  "f94eea00-439c-4aa7-9967-b1b479d2346b",
+                                                                   "focusedSheetId":  "df313c49-0089-47df-a2b7-5ee0da8f51ee",
                                                                    "order":  [
-                                                                                 "f1268c2f-e2e8-436b-94c2-c33d1eb155ea",
-                                                                                 "f94eea00-439c-4aa7-9967-b1b479d2346b",
-                                                                                 "5a93593e-2c09-455d-8c2e-0fd49c0fbdf3"
+                                                                                 "3e31ec59-e9a6-47ab-b1da-7ba8495fc896",
+                                                                                 "df313c49-0089-47df-a2b7-5ee0da8f51ee",
+                                                                                 "501dfb94-e9f0-433a-8644-a4ca717933d4"
                                                                              ]
                                                                },
                                                     "afterAdd":  {
                                                                      "count":  4,
-                                                                     "focusedSheetId":  "a89f2238-47fa-4b4f-8e9d-f04a8e4e34b3",
+                                                                     "focusedSheetId":  "f9a0eb24-6568-47e0-93e4-d4f7eb6e39b2",
                                                                      "order":  [
-                                                                                   "f1268c2f-e2e8-436b-94c2-c33d1eb155ea",
-                                                                                   "f94eea00-439c-4aa7-9967-b1b479d2346b",
-                                                                                   "a89f2238-47fa-4b4f-8e9d-f04a8e4e34b3",
-                                                                                   "5a93593e-2c09-455d-8c2e-0fd49c0fbdf3"
+                                                                                   "3e31ec59-e9a6-47ab-b1da-7ba8495fc896",
+                                                                                   "df313c49-0089-47df-a2b7-5ee0da8f51ee",
+                                                                                   "f9a0eb24-6568-47e0-93e4-d4f7eb6e39b2",
+                                                                                   "501dfb94-e9f0-433a-8644-a4ca717933d4"
                                                                                ]
                                                                  },
                                                     "afterReorder":  {
                                                                          "count":  4,
-                                                                         "focusedSheetId":  "a89f2238-47fa-4b4f-8e9d-f04a8e4e34b3",
+                                                                         "focusedSheetId":  "f9a0eb24-6568-47e0-93e4-d4f7eb6e39b2",
                                                                          "order":  [
-                                                                                       "f1268c2f-e2e8-436b-94c2-c33d1eb155ea",
-                                                                                       "a89f2238-47fa-4b4f-8e9d-f04a8e4e34b3",
-                                                                                       "f94eea00-439c-4aa7-9967-b1b479d2346b",
-                                                                                       "5a93593e-2c09-455d-8c2e-0fd49c0fbdf3"
+                                                                                       "3e31ec59-e9a6-47ab-b1da-7ba8495fc896",
+                                                                                       "f9a0eb24-6568-47e0-93e4-d4f7eb6e39b2",
+                                                                                       "df313c49-0089-47df-a2b7-5ee0da8f51ee",
+                                                                                       "501dfb94-e9f0-433a-8644-a4ca717933d4"
                                                                                    ]
                                                                      },
                                                     "afterDelete":  {
                                                                         "count":  3,
-                                                                        "focusedSheetId":  "f94eea00-439c-4aa7-9967-b1b479d2346b",
+                                                                        "focusedSheetId":  "df313c49-0089-47df-a2b7-5ee0da8f51ee",
                                                                         "order":  [
-                                                                                      "f1268c2f-e2e8-436b-94c2-c33d1eb155ea",
-                                                                                      "f94eea00-439c-4aa7-9967-b1b479d2346b",
-                                                                                      "5a93593e-2c09-455d-8c2e-0fd49c0fbdf3"
+                                                                                      "3e31ec59-e9a6-47ab-b1da-7ba8495fc896",
+                                                                                      "df313c49-0089-47df-a2b7-5ee0da8f51ee",
+                                                                                      "501dfb94-e9f0-433a-8644-a4ca717933d4"
                                                                                   ]
                                                                     },
                                                     "restoredOriginalOrder":  true,
@@ -270,19 +270,19 @@
                                                                               {
                                                                                   "event":  "project_intent_applied",
                                                                                   "intent":  "add_sheet",
-                                                                                  "processId":  32580,
+                                                                                  "processId":  36188,
                                                                                   "revision":  9
                                                                               },
                                                                               {
                                                                                   "event":  "project_intent_applied",
                                                                                   "intent":  "reorder_sheet",
-                                                                                  "processId":  32580,
+                                                                                  "processId":  36188,
                                                                                   "revision":  10
                                                                               },
                                                                               {
                                                                                   "event":  "project_intent_applied",
                                                                                   "intent":  "delete_sheet",
-                                                                                  "processId":  32580,
+                                                                                  "processId":  36188,
                                                                                   "revision":  11
                                                                               }
                                                                           ]
@@ -293,10 +293,33 @@
                                              "creativeRevision":  4,
                                              "recoveredDpi":  360,
                                              "promptChoices":  [
-                                                                   "Reabrir e recuperar",
+                                                                   "Agora não",
                                                                    "Abrir última versão salva",
-                                                                   "Agora não"
+                                                                   "Reabrir e recuperar"
                                                                ],
+                                             "presentation":  {
+                                                                  "ariaModal":  "true",
+                                                                  "backdropColor":  "rgba(35, 32, 27, 0.38)",
+                                                                  "backdropPosition":  "absolute",
+                                                                  "choices":  [
+                                                                                  "Agora não",
+                                                                                  "Abrir última versão salva",
+                                                                                  "Reabrir e recuperar"
+                                                                              ],
+                                                                  "dialogCount":  1,
+                                                                  "fullPageRecoveryCount":  0,
+                                                                  "initialFocus":  "Reabrir e recuperar",
+                                                                  "modalLayerCount":  1,
+                                                                  "modalOwner":  "project",
+                                                                  "ownerAriaHidden":  "true",
+                                                                  "ownerInert":  true,
+                                                                  "ownerSurfaceCount":  1,
+                                                                  "title":  "Recuperar trabalho não salvo?",
+                                                                  "url":  "http://tauri.localhost/",
+                                                                  "recoveredOwnerUrl":  "http://tauri.localhost/",
+                                                                  "routePreserved":  true,
+                                                                  "stableProjectOwner":  true
+                                                              },
                                              "opaqueProjectKey":  true,
                                              "completedActionCheckpointed":  true,
                                              "midGesturePreservedPreviousCheckpoint":  true,
@@ -307,15 +330,15 @@
                                              "postRecoveryActionsCheckpointed":  true,
                                              "checkpointPreservedByCancelledSaveAs":  true,
                                              "checkpointFinishedBySuccessfulSaveAs":  true,
-                                             "crashedHostProcessId":  26100,
-                                             "recoveredHostProcessId":  32580,
+                                             "crashedHostProcessId":  36600,
+                                             "recoveredHostProcessId":  36188,
                                              "lockReleasedToDistinctHost":  true
                                          },
                      "saveAs":  {
                                     "cancelledBeforeCore":  true,
                                     "createAuthorization":  "createOnly",
-                                    "originalProjectId":  "8359c00e-ff39-44f1-bb37-ec5c6528f322",
-                                    "copiedProjectId":  "1809deff-4082-4b62-8a81-aa110f78ea6a",
+                                    "originalProjectId":  "08c1e656-abfc-402c-bd26-efb97ac63503",
+                                    "copiedProjectId":  "f16be109-f7f7-4629-a903-aa0fa1608ac6",
                                     "savedAsRevision":  6,
                                     "contentPreserved":  true,
                                     "originalByteIdentical":  true,
@@ -332,7 +355,7 @@
                                     "localAuthorityTransitioned":  true,
                                     "webviewNamespaceTransitioned":  true,
                                     "nativeTitleUpdated":  true,
-                                    "observedNativeTitle":  "Jornada produtiva - Cópia — C:\\Users\\Usuario\\.codex\\worktrees\\4195\\my-Albuns\\.scratch\\j8-7784-e9bbb5\\Jornada produtiva - Cópia.myalbuns",
+                                    "observedNativeTitle":  "Jornada produtiva - Cópia — C:\\Users\\Usuario\\.codex\\worktrees\\c8d2\\my-Albuns\\.scratch\\j8-12652-81ec79\\Jornada produtiva - Cópia.myalbuns",
                                     "replacementWebviewReady":  true,
                                     "globalInspectorPreferencePreserved":  true,
                                     "projectLocalSelectionReset":  true
@@ -371,16 +394,16 @@
                                                   }
                               },
                      "processIds":  {
-                                        "firstGlobal":  12300,
-                                        "firstHost":  28644,
-                                        "global":  33236,
-                                        "crashedHost":  26100,
-                                        "recoveryGlobal":  25300,
-                                        "host":  32580,
-                                        "simultaneousOriginalGlobal":  31044,
-                                        "simultaneousOriginalHost":  11324,
-                                        "imaging":  17360,
-                                        "missingOriginalImaging":  32656
+                                        "firstGlobal":  17892,
+                                        "firstHost":  26632,
+                                        "global":  32360,
+                                        "crashedHost":  36600,
+                                        "recoveryGlobal":  33256,
+                                        "host":  36188,
+                                        "simultaneousOriginalGlobal":  2860,
+                                        "simultaneousOriginalHost":  10020,
+                                        "imaging":  27808,
+                                        "missingOriginalImaging":  13908
                                     },
                      "correlations":  {
                                           "bootstraps":  4,
@@ -395,23 +418,18 @@
                                             "hostReady":  4,
                                             "imagingStopped":  2
                                         },
-                     "canvasNonWhiteSamples":  1270,
+                     "canvasNonWhiteSamples":  1271,
                      "canvasSampleCount":  1271,
                      "canvasPhotoSample":  {
-                                               "x":  506,
-                                               "y":  443,
+                                               "x":  508,
+                                               "y":  447,
                                                "red":  112,
                                                "green":  136,
                                                "blue":  128,
                                                "jpegMaxChannelDelta":  15,
                                                "tolerance":  32
                                            },
-                     "retainedArtifacts":  {
-                                               "directory":  ".scratch/productive-journey-evidence/14da81758b0-20260828T2129",
-                                               "manifest":  "artifact-manifest.json",
-                                               "manifestSha256":  "4ae35608f7acace79933c871bb09019759a1837c81da3d668db129e3967c4829",
-                                               "fileCount":  10
-                                           },
+                     "retainedArtifacts":  null,
                      "cleanupCompleted":  true
                  }
 }
