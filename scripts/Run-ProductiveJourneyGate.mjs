@@ -797,6 +797,53 @@ async function dragSheetInGrid(
     script: "arguments[0].scrollIntoView({ block: 'center', inline: 'nearest' });",
     args: [sourceElement],
   });
+  await driver.request("POST", `${endpoint}/execute/sync`, {
+    script: "arguments[0].scrollIntoView({ block: 'center', inline: 'nearest' });",
+    args: [targetElement],
+  });
+  const geometry = await driver.request(
+    "POST",
+    `${endpoint}/execute/sync`,
+    {
+      script: `
+        const visibleCenter = (element, label) => {
+          const bounds = element.getBoundingClientRect();
+          const left = Math.max(0, bounds.left);
+          const right = Math.min(window.innerWidth, bounds.right);
+          const top = Math.max(0, bounds.top);
+          const bottom = Math.min(window.innerHeight, bounds.bottom);
+          if (right <= left || bottom <= top) {
+            throw new Error(label + " is outside the pointer viewport");
+          }
+          return {
+            x: Math.round((left + right) / 2),
+            y: Math.round((top + bottom) / 2),
+          };
+        };
+        const source = visibleCenter(arguments[0], "reorder source");
+        const target = visibleCenter(arguments[1], "reorder target");
+        const deltaX = target.x - source.x;
+        const deltaY = target.y - source.y;
+        const distance = Math.hypot(deltaX, deltaY);
+        return {
+          enabled: arguments[0].dataset.reorderEnabled === "true",
+          source,
+          target,
+          threshold:
+            distance === 0
+              ? { x: source.x + 10, y: source.y }
+              : {
+                  x: Math.round(source.x + (deltaX / distance) * 10),
+                  y: Math.round(source.y + (deltaY / distance) * 10),
+                },
+        };
+      `,
+      args: [sourceElement, targetElement],
+    },
+  );
+  if (!geometry.enabled) {
+    throw new Error(`${label} source was not ready for pointer reordering`);
+  }
   try {
     await driver.request("POST", `${endpoint}/actions`, {
       actions: [
@@ -808,25 +855,25 @@ async function dragSheetInGrid(
             {
               type: "pointerMove",
               duration: 0,
-              origin: sourceElement,
-              x: 0,
-              y: 0,
+              origin: "viewport",
+              x: geometry.source.x,
+              y: geometry.source.y,
             },
             { type: "pointerDown", button: 0 },
             { type: "pause", duration: 80 },
             {
               type: "pointerMove",
               duration: 120,
-              origin: sourceElement,
-              x: 10,
-              y: 0,
+              origin: "viewport",
+              x: geometry.threshold.x,
+              y: geometry.threshold.y,
             },
             {
               type: "pointerMove",
               duration: 450,
-              origin: targetElement,
-              x: 0,
-              y: 0,
+              origin: "viewport",
+              x: geometry.target.x,
+              y: geometry.target.y,
             },
             { type: "pause", duration: 100 },
             { type: "pointerUp", button: 0 },
