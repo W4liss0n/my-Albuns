@@ -24,6 +24,7 @@ import type {
   ProjectDialogPort,
   ProjectDialogSession,
 } from "../application/projectDialogPort";
+import type { SheetStructureIntent } from "../application/sheetStructure";
 import {
   ProjectCloseError,
   SaveProjectError,
@@ -741,6 +742,139 @@ test.each(["completed", "failed"] as const)(
       expect(
         getApplicationCommand("Lâmina", "Adicionar depois"),
       ).toBeEnabled(),
+    );
+  },
+);
+
+type QueuedStructuralIntent = Exclude<
+  SheetStructureIntent,
+  { kind: "reorderSheet" }
+>;
+
+const queuedHistoryStructuralCases = (["undo", "redo"] as const).flatMap(
+  (historyOperation) =>
+    (["completed", "failed"] as const).flatMap((historyOutcome) =>
+      [
+        {
+          commandName: "Adicionar depois",
+          intent: {
+            kind: "addSheet",
+            anchorSheetId: "sheet-003",
+            position: "after",
+          } satisfies QueuedStructuralIntent,
+          operationName: "add",
+        },
+        {
+          commandName: "Excluir",
+          intent: {
+            kind: "deleteSheet",
+            sheetId: "sheet-003",
+          } satisfies QueuedStructuralIntent,
+          operationName: "delete",
+        },
+        {
+          commandName: "Converter extremidade",
+          intent: {
+            kind: "convertEdgeSheet",
+            sheetId: "sheet-003",
+          } satisfies QueuedStructuralIntent,
+          operationName: "convert",
+        },
+      ].map((structural) => ({
+        historyOperation,
+        historyOutcome,
+        ...structural,
+      })),
+    ),
+);
+
+test.each(queuedHistoryStructuralCases)(
+  "keeps the latest projection authoritative for delayed $historyOperation $historyOutcome followed by $operationName",
+  async ({ commandName, historyOperation, historyOutcome, intent }) => {
+    const beforeHistory = createThreeSheetProjection();
+    beforeHistory.state.canUndo = historyOperation === "undo";
+    beforeHistory.state.canRedo = historyOperation === "redo";
+    const afterHistory = createTwoSheetProjection();
+    afterHistory.state.revision = beforeHistory.state.revision + 1;
+    afterHistory.state.canUndo = historyOperation === "redo";
+    afterHistory.state.canRedo = historyOperation === "undo";
+    const pendingHistory = deferredProjection();
+    let authoritativeProjection = beforeHistory;
+    const port = projectCorePortWithApply(async () => authoritativeProjection);
+    const history = vi.fn(() => pendingHistory.promise);
+    port[historyOperation] = history;
+    const applyWithOutcome = vi.fn<ProjectCorePort["applyWithOutcome"]>(
+      async (queuedIntent) => {
+        const sheetId =
+          queuedIntent.kind === "addSheet"
+            ? queuedIntent.anchorSheetId
+            : queuedIntent.kind === "deleteSheet" ||
+                queuedIntent.kind === "convertEdgeSheet"
+              ? queuedIntent.sheetId
+              : null;
+        if (
+          sheetId &&
+          !authoritativeProjection.state.album.sheets.some(
+            (sheet) => sheet.id === sheetId,
+          )
+        ) {
+          throw new Error(`Lâmina não encontrada: ${sheetId}`);
+        }
+        return {
+          projection: authoritativeProjection,
+          affectedFrameId: null,
+          affectedSheetId: sheetId,
+        };
+      },
+    );
+    port.applyWithOutcome = applyWithOutcome;
+    const dialog = projectDialogHarness();
+    const onProjectionChange = vi.fn();
+
+    render(
+      <ProjectWorkspace
+        exportPipelinePort={exportPipelinePort}
+        projection={beforeHistory}
+        projectCorePort={port}
+        projectDialogPort={dialog.port}
+        onProjectionChange={onProjectionChange}
+      />,
+    );
+
+    act(() => canvasHarness.props?.onCenteredSheetChange?.("sheet-003"));
+    fireEvent.keyDown(window, {
+      ctrlKey: true,
+      key: historyOperation === "undo" ? "z" : "y",
+    });
+    await waitFor(() => expect(history).toHaveBeenCalledOnce());
+    fireEvent.click(getApplicationCommand("Lâmina", commandName));
+    expect(applyWithOutcome).not.toHaveBeenCalled();
+
+    await act(async () => {
+      if (historyOutcome === "completed") {
+        authoritativeProjection = afterHistory;
+        pendingHistory.resolve(afterHistory);
+      } else {
+        pendingHistory.reject(
+          new Error(`${historyOperation} indisponível para este teste.`),
+        );
+      }
+      await pendingHistory.promise.catch(() => undefined);
+    });
+
+    await waitFor(() =>
+      expect(onProjectionChange).toHaveBeenCalledTimes(
+        historyOutcome === "completed" ? 2 : 1,
+      ),
+    );
+    if (historyOutcome === "completed") {
+      expect(applyWithOutcome).not.toHaveBeenCalled();
+    } else {
+      expect(applyWithOutcome).toHaveBeenCalledOnce();
+      expect(applyWithOutcome).toHaveBeenCalledWith(intent);
+    }
+    expect(dialog.present).not.toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "projectOperationFailure" }),
     );
   },
 );

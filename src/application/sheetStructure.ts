@@ -1,4 +1,14 @@
-import type { SheetSnapshot } from "../domain/project";
+import type {
+  ProjectIntent,
+  SheetSnapshot,
+} from "../domain/project";
+
+export type SheetStructureIntent = Extract<
+  ProjectIntent,
+  {
+    kind: "addSheet" | "convertEdgeSheet" | "deleteSheet" | "reorderSheet";
+  }
+>;
 
 export interface SheetStructureAvailability {
   canAddAfter: boolean;
@@ -81,6 +91,54 @@ export function planSheetReorder(
     targetIndex,
     valid,
   };
+}
+
+export function isSheetStructureIntent(
+  intent: ProjectIntent,
+): intent is SheetStructureIntent {
+  return (
+    intent.kind === "addSheet" ||
+    intent.kind === "convertEdgeSheet" ||
+    intent.kind === "deleteSheet" ||
+    intent.kind === "reorderSheet"
+  );
+}
+
+/**
+ * Revalidates a queued structural command against the authoritative Sheet
+ * sequence. Sheet identity is never inferred from number or position: if the
+ * original target disappeared, the command no longer has a valid materialized
+ * form and is cancelled.
+ */
+export function materializeSheetStructureIntent(
+  capturedSheets: readonly SheetSnapshot[],
+  latestSheets: readonly SheetSnapshot[],
+  intent: SheetStructureIntent,
+): SheetStructureIntent | null {
+  if (intent.kind === "reorderSheet") {
+    const targetIndex = materializeSheetReorderTarget(
+      capturedSheets,
+      latestSheets,
+      intent.sheetId,
+      intent.targetIndex,
+    );
+    return targetIndex === null ? null : { ...intent, targetIndex };
+  }
+
+  const sheetId =
+    intent.kind === "addSheet" ? intent.anchorSheetId : intent.sheetId;
+  const availability = sheetStructureAvailability(latestSheets, sheetId);
+  if (intent.kind === "addSheet") {
+    const available =
+      intent.position === "before"
+        ? availability.canAddBefore
+        : availability.canAddAfter;
+    return available ? intent : null;
+  }
+  if (intent.kind === "deleteSheet") {
+    return availability.canDelete ? intent : null;
+  }
+  return availability.canConvertEdge ? intent : null;
 }
 
 /**

@@ -3,7 +3,7 @@ status: current
 document: technical-research
 ticket: 8-esqueleto-ponta-a-ponta
 date: 2026-08-14
-updated: 2026-08-14
+updated: 2026-08-28
 ---
 
 # Jornada produtiva ponta a ponta
@@ -50,6 +50,23 @@ O runner também lê o source público da WebView e falha se nele aparecer algum
 caminho nativo da rodada. A captura do elemento Canvas precisa conter amostras
 não brancas antes de a prova ser aceita.
 
+O mesmo gate conserva a distinção entre camadas de prova. Antes da aplicação
+real, ele executa pela fronteira pública do `ProjectWorkspace` a matriz de
+Desfazer/Refazer atrasado seguida por Adicionar, Excluir ou Converter, nos
+terminais de sucesso e falha. Essa camada também cobre cancelamento integral do
+preview/drop durante mutação estrutural, escopo contextual de `Delete`, menu
+contido na viewport, reordenação por Barra e Grade e política progressiva de
+auto-scroll. Esses checks não são renomeados como WebView2: cada entrada do
+recibo declara `proofLayer`.
+
+O recibo também registra limites negativos de cobertura. A corrida determinista
+de Histórico não recebe um hook temporal exclusivo de teste no produto; a
+distância progressiva do auto-scroll não é tratada como propriedade de uma
+captura estática; e a aceitação visual do menu não alega mostrar simultaneamente
+as quatro geometrias de canto. As três propriedades continuam comprovadas por
+testes públicos deterministas, mas não são atribuídas à camada visual ou à
+rodada Windows além do que ela realmente observa.
+
 ## Reprodutibilidade
 
 O wrapper captura `HEAD` e a árvore inteira antes e depois da execução, exclui
@@ -58,12 +75,16 @@ captura. Portanto, `sourceInputsDirty=false` atribui a rodada ao commit indicado
 em `gitCommit`; mudança concorrente de `HEAD`, arquivo rastreado ou não
 rastreado fecha o gate.
 
-A rodada canônica registrada em
-`docs/research/artifacts/0023-productive-journey.json` executou 8/8 checks sobre
-o input limpo `8cb8dc3380911e18b3f9ec0e1f50458df10afeb3`, com
-`sourceInputsDirty=false`. O artefato foi publicado no commit posterior
-`ea0acf6fe78b3aeebb5cbaad62bcfcb551abe66c`, que altera somente o JSON de
-evidência. A captura contém 1.271 de 1.271 amostras não brancas, os três PIDs
-distintos, Lâmina 02 dupla contra a primeira de página única, amostra RGB
-`31/64/95` com delta máximo 1 em relação ao Background salvo e
-`cleanupCompleted=true`.
+Uma rodada canônica pode ainda receber `-ArtifactDirectory` com um filho direto
+e inédito de `.scratch/productive-journey-evidence/`. Nesse modo, o gate retém,
+sem versioná-los, a captura do Canvas, o JPEG exportado, a mídia original, os
+Projetos salvos, os logs dos testes públicos e os logs JSONL correlacionados dos
+processos. `artifact-manifest.json` fixa tamanho e SHA-256 de cada arquivo; o
+recibo versionado fixa o SHA-256 desse manifesto. O scratch efêmero da execução
+continua removido e o diretório de retenção nunca é sobrescrito.
+
+O estado canônico fica no próprio
+`docs/research/artifacts/0023-productive-journey.json`. `gitCommit`,
+`sourceInputsDirty`, `proofLayer`, `coverageLimits`, hashes, versões de Windows,
+WebView2 e driver e `cleanupCompleted` são a autoridade para atribuir cada
+rodada ao snapshot e para limitar as conclusões permitidas.
