@@ -45,6 +45,7 @@ O fixed point que originou esta consolidação é
 | `native.project-name-location` | [Nome e local](0003-criacao-de-projeto.md) | diálogo nativo pertencente à Boas-vindas | #13 | abre somente após `Criar Projeto` |
 | `project.normal` | [Janela do Projeto — Modo normal](0001-estrutura-da-janela-do-projeto.md) | Janela do Projeto | #9 | integrada em cortes incrementais |
 | `project.edit` | [Janela do Projeto — Modo de edição](0001-estrutura-da-janela-do-projeto.md) | Janela do Projeto | #20 e #22 | contrato aceito e protótipo verificável |
+| `project.recovery` | [Recuperação de sessão](../specs/programa-de-diagramacao-de-albuns.md#identidade-sessão-e-persistência) | host e Janela do Projeto da sessão | #15 | diálogo modal pertencente; nunca rota principal ou owner global |
 | `project.export` | [Exportação](0004-exportacao-normal.md) | Janela do Projeto originadora | #35 | contrato aceito; resultados pertencem à tentativa |
 | `global.batch-export` | [Exportação em lote](0006-configuracao-da-exportacao-em-lote.md) | processo global exclusivo | #39 | desabilitada até integração |
 | `project.batch-generation` | [Geração em lote](0008-configuracao-da-geracao-em-lote.md) | Janela do Projeto originadora | #36 | acessível somente pelo Projeto |
@@ -65,6 +66,7 @@ flowchart LR
   P[global.new-project.personalization<br/>Personalização]
   N[native.project-name-location<br/>Nome e local]
   PN[project.normal<br/>Modo normal]
+  RC[project.recovery<br/>Recuperação]
   PE[project.edit<br/>Modo de edição]
   EX[project.export<br/>Exportação]
   BE[global.batch-export<br/>Exportação em lote]
@@ -80,6 +82,9 @@ flowchart LR
   N -->|cancelar| P
   W -->|Abrir / Recente| PG
   PG -->|abertura concluída| PN
+  PG -->|checkpoint disponível| RC
+  RC -->|recuperar ou abrir salva| PN
+  RC -->|Agora não| PG
   PG -->|falha de abertura| W
   PN <-->|duplo clique ou Enter / Esc| PE
   PN --> EX
@@ -106,6 +111,9 @@ para essas superfícies não criam um owner global compartilhado.
 | Configurações | `Continuar` | Personalização | preserva os valores válidos | `Voltar` retorna a Configurações |
 | Personalização | `Criar Projeto` | Nome e local | abre diálogo nativo pertencente | cancelar preserva o formulário e não cria arquivo |
 | Boas-vindas ou Windows | abrir Projeto | Progresso de abertura | a origem é retirada apenas nessa operação | falha restaura a origem atrás do diálogo pertencente |
+| Progresso de abertura | checkpoint disponível | Recuperação | exatamente um modal na Janela do Projeto owner; a superfície e a rota normais permanecem sob o backdrop | `Esc` ou `Agora não` preserva o checkpoint; fechar/falhar limpa o handoff sem duplicar Host |
+| Recuperação | `Reabrir e recuperar` | Modo normal | cria uma sessão não salva no mesmo Host, uma única vez | falha mantém terminal explícito e não abre segunda sessão |
+| Recuperação | `Abrir última versão salva` | confirmação no mesmo modal e Modo normal | só descarta o checkpoint após confirmação e sucesso | cancelar retorna à decisão; falha não descarta por aproximação |
 | Modo normal | duplo clique na Lâmina ou `Enter` | Modo de edição | isola a Lâmina, fecha/suspende Barra e Layouts e inicia em `Ajustar Lâmina` | `Esc` descarta `ViewportTransform`, restaura painéis e centraliza a Lâmina |
 | Modo normal | arrastar pela Barra ou Grade | prévia local de reordenação | somente a superfície originadora mostra placeholder, ghost e deslocamento | `Esc` ou drop inválido restaura; drop válido comita uma ação e sincroniza a outra superfície |
 | Modo normal | `Exportar` | Exportação | pertence à Janela do Projeto | cancelar/fechar retorna ao mesmo Projeto |
@@ -118,10 +126,15 @@ para essas superfícies não criam um owner global compartilhado.
 ### Modo normal
 
 - O Canvas contínuo mantém todas as Lâminas interativas e sem Zoom manual.
+- As teclas físicas `←` e `→` centralizam a Lâmina física anterior e seguinte pelo catálogo público de comandos. Não existem botões permanentes de anterior/próxima nos cantos; controles editáveis, diálogos, menus, Modo de edição e gestos com semântica própria conservam ownership do teclado.
+- A roda navega horizontalmente sobre toda a superfície e Barra da Lâmina, sem zona morta assimétrica; um controle só a retém quando possui semântica específica de wheel.
+- Abrir ou dispensar o menu contextual não navega, seleciona ou centraliza. O alvo clicado permanece explícito para seus comandos, independentemente da Lâmina centralizada.
 - Barra da Lâmina e Grade navegam e iniciam a mesma operação de reordenação.
 - Clique sem vencer o limiar de arraste centraliza a Lâmina; somente depois do
   limiar surgem placeholder, ghost e deslocamento intermediário. Soltar fora da
-  superfície originadora ou receber `pointercancel` cancela sem commit.
+  superfície originadora ou receber `pointercancel` cancela sem commit. Barra e
+  Grade usam eventos de ponteiro e captura real; o ghost acompanha o ponteiro e
+  o auto-scroll continua atualizando destinos nas respectivas bordas.
 - A ordem confirmada não muda durante a prévia. A representação oposta não
   anima e só sincroniza no drop válido.
 - Reordenação e demais comandos estruturais pertencem ao owner #9.
@@ -179,9 +192,14 @@ renderizada e uma revisão explícita posterior decide `accepted`, `rejected` ou
 | mapa e nomes atuais | `ui-architecture-map` |
 | entrada/saída do Modo de edição | `canvas-sheet-editing`, `canvas-sheet-editing-exit` |
 | Zoom por teclado, roda, reset e teto | `editor-zoom-keyboard-in`, `editor-zoom-keyboard-out`, `editor-zoom-wheel`, `editor-zoom-reset`, `editor-zoom-cap` |
-| comandos de estrutura física | `sheet-structure-application-menu`, `sheet-structure-context-menu` |
+| comandos de estrutura física e alvo contextual explícito | `sheet-structure-application-menu`, `sheet-structure-context-menu`, `canvas-context-menu-surface-preserves-viewport` |
+| navegação física sem botões permanentes | `canvas-keyboard-next-sheet`, `canvas-keyboard-previous-sheet` |
+| roda sobre a Barra inteira | `canvas-wheel-sheet-bar-forward`, `canvas-wheel-sheet-bar-backward` |
 | reordenação pela Barra | `sheet-reorder-bar-preview`, `sheet-reorder-bar-commit`, `sheet-reorder-cancelled` |
 | reordenação pela Grade | `sheet-reorder-grid-preview`, `sheet-reorder-grid-commit`, `sheet-reorder-invalid-target-preview`, `sheet-reorder-invalid-drop` |
+| seleção semântica de texto | `project-text-selection-policy`, `new-project-operational-failure-dialog` |
+| Recuperação modal pertencente | `project-recovery-modal` |
+| splitters finos e alvo interativo | `project-splitters-normal-100`, `project-splitter-horizontal-hover-125`, `project-splitter-vertical-focus-150`, `project-splitters-resized` |
 | seleção múltipla e mistos | `frame-multi-selection-mixed`, `frame-multi-selection-absolute-edit` |
 | mover, redimensionar e travar | `frame-manipulation-move`, `frame-manipulation-resize`, `frame-layout-locked` |
 

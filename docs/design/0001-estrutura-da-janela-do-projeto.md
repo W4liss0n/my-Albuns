@@ -62,6 +62,8 @@ A única política de substituição pertence ao fluxo `Abrir Projeto`: depois q
 
 Não existe um navegador lateral independente de Lâminas. A visão contínua fica no Canvas, e a Grade de Lâminas do Painel contextual oferece a visão geral e o acesso rápido.
 
+O chrome estrutural da Janela — menus, títulos, abas, cabeçalhos, labels, unidades, badges, toolbars, Barra da Lâmina, Grade, Painel de imagens, estados vazios e textos auxiliares — não permite seleção nativa de texto. Campos editáveis preservam seleção, caret e cópia, e conteúdo estático legitimamente copiável usa uma marca semântica explícita; a política não é aplicada indiscriminadamente a toda a árvore.
+
 ## Menu superior
 
 A Janela usa uma barra de menus desktop convencional. Os grupos inicialmente previstos são:
@@ -79,7 +81,7 @@ No Modo de edição, `Editar` oferece `Copiar` e `Colar` para Frames, com os ata
 
 O menu `Lâmina` contém `Adicionar antes`, `Adicionar depois`, `Duplicar Lâmina`, `Excluir` e `Converter extremidade`. Esses comandos usam a Lâmina mais centralizada no Canvas como alvo implícito.
 
-Os mesmos comandos aparecem no menu de contexto da superfície e da Barra de cada Lâmina, usando a Lâmina clicada como alvo explícito. `Converter extremidade` fica disponível somente quando o alvo é uma extremidade e a conversão produz uma estrutura válida.
+Os mesmos comandos aparecem no menu de contexto da superfície e da Barra de cada Lâmina, usando a Lâmina clicada como alvo explícito. Abrir, fechar, cancelar com `Esc` ou dispensar esse menu não seleciona, navega, centraliza nem altera a Transformação da visualização; seus comandos continuam independentes da Lâmina centralizada. `Converter extremidade` fica disponível somente quando o alvo é uma extremidade e a conversão produz uma estrutura válida. Uma regra própria de centralização só acontece depois do sucesso de um comando estrutural que a defina.
 
 No Modo de edição, o menu `Lâmina` continua visível, mas `Adicionar antes`, `Adicionar depois`, `Duplicar Lâmina`, `Excluir` e `Converter extremidade` ficam desabilitados. Barra e Grade não oferecem reordenação nesse modo; o usuário retorna ao Canvas contínuo com `Esc` antes de alterar a sequência.
 
@@ -97,7 +99,7 @@ Depois da exclusão, papéis e Numeração são recalculados. O Canvas centraliz
 
 ### Reordenação das Lâminas no Canvas
 
-Pressionar uma área livre da Barra da Lâmina e mover além do limiar padrão de arraste inicia a reordenação. Os botões da Barra continuam reservados às próprias ações e não iniciam o gesto.
+Pressionar uma área livre da Barra da Lâmina e mover além do limiar padrão de arraste inicia a reordenação por eventos de ponteiro e captura o ponteiro durante o gesto. Movimento abaixo do limiar continua sendo clique; os botões da Barra permanecem reservados às próprias ações e não iniciam o gesto.
 
 Durante o arraste:
 
@@ -110,7 +112,7 @@ Durante o arraste:
 
 Quando o fantasma entra na zona próxima à borda esquerda ou direita do Canvas, a visualização rola horizontalmente na direção correspondente. A velocidade cresce progressivamente conforme o ponteiro se aproxima da borda, e o espaço reservado continua acompanhando as posições reveladas pela rolagem.
 
-O comportamento representa inserção na posição do espaço reservado, não troca direta com a Lâmina sob o ponteiro. Nenhuma ordem do Projeto é alterada durante a prévia. Soltar confirma a posição atual como uma única ação de Undo/Redo; `Esc` ou uma soltura inválida devolve imediatamente todos os itens à ordem original.
+O comportamento representa inserção na posição do espaço reservado, não troca direta com a Lâmina sob o ponteiro. Nenhuma ordem do Projeto é alterada durante a prévia. Soltar confirma a posição atual como uma única ação de Undo/Redo; `Esc`, `pointercancel` ou uma soltura inválida devolve imediatamente todos os itens à ordem original e encerra a captura.
 
 Se o gesto começou no Canvas, somente o Canvas anima a prévia e a Grade conserva a ordem confirmada. Se começou na Grade, somente ela anima e o Canvas permanece estável. A representação oposta é sincronizada de uma vez após a soltura válida e não muda em um cancelamento.
 
@@ -138,7 +140,7 @@ Comandos rotineiros e serializados, como `Salvar`, `Desfazer`, `Refazer` e alter
 - Um arraste completo cria uma única ação de Undo/Redo ao soltar. Passos consecutivos de `Alt` + roda são agrupados em uma ação quando a sequência de rolagem termina.
 - Selecionar um Frame ou Foto em qualquer Lâmina troca a seleção para aquele elemento e atualiza o contexto à direita.
 - Clicar em uma área vazia remove a seleção do elemento e retorna ao contexto geral do Álbum, sem desativar nenhuma Lâmina.
-- Clicar na Grade de Lâminas, usar as setas de navegação ou executar qualquer comando `Ir para Lâmina` posiciona o centro visual da Lâmina de destino no centro horizontal da área útil do Canvas, mas não torna as demais inativas. Arrastar uma miniatura da Grade inicia a reordenação estrutural descrita para a Barra.
+- Clicar na Grade de Lâminas, usar as teclas físicas `←` e `→` ou executar qualquer comando `Ir para Lâmina` posiciona o centro visual da Lâmina de destino no centro horizontal da área útil do Canvas, mas não torna as demais inativas. `←` e `→` percorrem respectivamente a Lâmina física anterior e seguinte no Modo normal e são encaminhadas pelo catálogo público de comandos; não existem botões permanentes de Lâmina anterior/próxima nos cantos do Canvas. Campos editáveis, diálogos, menus, Modo de edição e interações que possuem semântica própria conservam ownership dessas teclas. Arrastar uma miniatura da Grade inicia a reordenação estrutural descrita para a Barra.
 - Apenas percorrer o Canvas por rolagem não troca o conteúdo do Painel contextual.
 - A Lâmina cujo centro visual está mais próximo do centro horizontal da área visível é a `Lâmina centralizada no Canvas`.
 - Essa referência é recalculada durante a navegação e permanece independente da Lâmina ou do Frame em foco. Ela não cria uma seleção exclusiva; apenas fornece o destino para comandos que não receberam um alvo pelo ponteiro, inclusive o duplo clique em uma mídia no Painel de imagens.
@@ -151,7 +153,7 @@ Comandos rotineiros e serializados, como `Salvar`, `Desfazer`, `Refazer` e alter
 - Sangria e Área de segurança são projetadas diretamente das medidas canônicas do Documento. No Modo normal do Canvas, uma máscara transitória recorta a composição nos limites da Área de corte, sem pintar uma faixa no espaço oculto nem desenhar guias técnicas. No Modo de edição da Lâmina, a superfície ativa inteira permanece visível e as medidas aparecem como guias tracejadas vermelha e azul; valor zero desativa somente a guia correspondente. Em uma Página única, a borda voltada ao lado inativo não recebe máscara nem guia. Máscara e guias permanecem abaixo da Barra da Lâmina e fora da Exportação.
 - No Modo normal do Canvas, superfície, sombras, contorno de foco, hover, área de interação e Barra da Lâmina usam uma única geometria de apresentação derivada dos limites visíveis depois da máscara. A separação horizontal de `46 px` é medida entre esses limites, sem conservar espaço invisível para a Sangria. Em uma Lâmina de página única, essa geometria une a Área de corte da Página ativa ao Lado inativo preservado. No Modo de edição da Lâmina, a geometria de apresentação volta a usar a superfície completa. O contorno de foco reutiliza a linha técnica azul de `1 px` da Seleção de Frames, centralizada nessa geometria e sem ampliá-la; o contorno externo permanece exclusivo da seleção de escopo na Personalização do diálogo `Novo Projeto`.
 - O modo normal não possui rolagem vertical; a navegação entre Lâminas é exclusivamente horizontal.
-- Uma barra de rolagem horizontal permanece visível imediatamente abaixo da área renderizada. Sua faixa usa o mesmo neutro dos divisores vizinhos e seu indicador é mais claro, integrando a navegação à estrutura sem competir com o Canvas. Seu intervalo usa os mesmos limites lógicos da roda: a extremidade inicial representa a primeira Lâmina centralizada, a final representa a última e qualquer mudança por barra, roda ou comando atualiza a mesma Transformação da visualização. A barra não pertence ao Projeto, ao Histórico, ao Salvamento ou à Exportação.
+- Uma barra de rolagem horizontal permanece visível imediatamente abaixo da área renderizada. Sua faixa usa o mesmo neutro dos divisores vizinhos e seu indicador é mais claro, integrando a navegação à estrutura sem competir com o Canvas. Seu intervalo usa os mesmos limites lógicos da roda: a extremidade inicial representa a primeira Lâmina centralizada, a final representa a última e qualquer mudança por barra, roda ou comando atualiza a mesma Transformação da visualização. A roda continua navegando horizontalmente sobre toda a superfície e toda a Barra da Lâmina, inclusive seus lados esquerdo e direito, exceto quando o alvo possui ownership específico da roda. A barra não pertence ao Projeto, ao Histórico, ao Salvamento ou à Exportação.
 - A navegação horizontal é limitada nas extremidades: o centro da primeira e o centro da última Lâmina podem alcançar o centro visível do Canvas, mas nunca ultrapassá-lo em direção à borda oposta.
 - Redimensionar a Janela ou mover o splitter entre Canvas e Painel de imagens sincroniza primeiro a superfície do renderizador com a nova área útil e então recalcula a escala automática, mantendo a Lâmina inteira visível sem criar estado de Zoom.
 
@@ -306,7 +308,7 @@ Quando o Zoom ultrapassa `Ajustar Lâmina`, `Espaço` + arraste com o botão esq
 ## Painel de imagens
 
 - Ocupa a região inferior da coluna de trabalho e termina antes do Painel contextual.
-- Um splitter horizontal entre Canvas e Painel de imagens permite alterar sua altura.
+- Um splitter horizontal entre Canvas e Painel de imagens permite alterar sua altura. Ele ocupa somente uma linha visual discreta de `1 px`; uma área de hit-test invisível de `12 px`, centralizada sobre essa linha e sobreposta ao layout, preserva mouse e pen sem retirar espaço útil. Hover realça a linha discretamente, foco por teclado permanece claramente visível e cursor, ARIA, teclas e arraste conservam o contrato de redimensionamento.
 - `Exibir > Painel de imagens` recolhe ou restaura completamente a região; quando recolhida, o Canvas usa a altura disponível.
 - Mantém as abas já definidas `Fotos` e `Decorativos`.
 - `Importar` abre um menu com `Arquivos...` e `Pasta...`. `Arquivos...` usa o seletor do Windows com seleção múltipla; `Pasta...` importa somente imagens diretamente contidas na pasta escolhida, sem visitar subpastas.
@@ -387,7 +389,7 @@ Esses estados são preferências da interface reutilizadas entre Projetos e sess
 
 A área de rolagem do Painel reserva permanentemente a largura potencial da barra vertical. Expandir ou recolher seções não desloca horizontalmente títulos, controles ou previews quando a barra aparece ou desaparece.
 
-Um splitter vertical separa o Painel contextual da coluna formada conjuntamente por Canvas e Painel de imagens. Arrastá-lo altera a largura do Painel contextual sem permitir que ele cubra ou se sobreponha às duas regiões.
+Um splitter vertical separa o Painel contextual da coluna formada conjuntamente por Canvas e Painel de imagens. Assim como o horizontal, usa linha visual de `1 px` e alvo interativo invisível de `12 px` sobreposto, sem criar gap no layout; hover, foco, cursor, ARIA, teclado e arraste permanecem operáveis. Arrastá-lo altera a largura do Painel contextual sem permitir que ele cubra ou se sobreponha às duas regiões.
 
 `Exibir > Painel contextual` oculta ou restaura completamente a região. Quando ocultada, Canvas e Painel de imagens usam toda a largura disponível. Largura e visibilidade são preferências da interface lembradas entre sessões; não alteram o Projeto nem participam de Undo/Redo.
 

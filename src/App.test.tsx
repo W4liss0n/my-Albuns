@@ -263,6 +263,7 @@ function App({
 }
 
 test("offers exactly the three Recovery choices before reading editor state", async () => {
+  const ownerLocation = window.location.href;
   const load = vi.fn(async () => projection);
   const recoveryStatus = vi.fn(async () => ({ kind: "available" }) as const);
   const recoveredProjection: EditorProjection = {
@@ -298,13 +299,29 @@ test("offers exactly the three Recovery choices before reading editor state", as
     />,
   );
 
+  const dialog = await screen.findByRole("dialog", {
+    name: "Recuperar trabalho não salvo?",
+  });
+  expect(screen.getAllByRole("dialog")).toHaveLength(1);
+  expect(dialog).toHaveAttribute("aria-modal", "true");
+  const titleId = dialog.getAttribute("aria-labelledby");
+  expect(titleId).toBeTruthy();
+  expect(document.getElementById(titleId!)).toHaveTextContent(
+    "Recuperar trabalho não salvo?",
+  );
   expect(
-    await screen.findByRole("heading", { name: "Recuperar trabalho não salvo?" }),
+    document.querySelector("[data-project-owner-surface]"),
   ).toBeInTheDocument();
-  expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual([
-    "Reabrir e recuperar",
-    "Abrir última versão salva",
+  expect(window.location.href).toBe(ownerLocation);
+  expect(
+    screen.getByRole("button", { name: "Reabrir e recuperar" }),
+  ).toHaveFocus();
+  expect(
+    screen.getAllByRole("button").map((button) => button.textContent),
+  ).toEqual([
     "Agora não",
+    "Abrir última versão salva",
+    "Reabrir e recuperar",
   ]);
   expect(load).not.toHaveBeenCalled();
   await waitFor(() => expect(confirmUiReady).toHaveBeenCalledOnce());
@@ -322,6 +339,7 @@ test("offers exactly the three Recovery choices before reading editor state", as
 });
 
 test("requires a separate confirmation before discarding Recovery for the saved version", async () => {
+  const ownerLocation = window.location.href;
   const load = vi.fn(async () => projection);
   const resolveRecovery = vi.fn(async () => ({
     kind: "openedLastSaved" as const,
@@ -344,14 +362,20 @@ test("requires a separate confirmation before discarding Recovery for the saved 
     />,
   );
 
+  const ownerSurface = document.querySelector("[data-project-owner-surface]");
   fireEvent.click(
     await screen.findByRole("button", { name: "Abrir última versão salva" }),
   );
   expect(resolveRecovery).not.toHaveBeenCalled();
-  expect(
-    screen.getByRole("heading", { name: "Descartar o trabalho recuperável?" }),
-  ).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Voltar" }));
+  const discardDialog = screen.getByRole("dialog", {
+    name: "Descartar o trabalho recuperável?",
+  });
+  expect(screen.getAllByRole("dialog")).toHaveLength(1);
+  expect(document.querySelector("[data-project-owner-surface]")).toBe(
+    ownerSurface,
+  );
+  expect(window.location.href).toBe(ownerLocation);
+  fireEvent.keyDown(discardDialog, { key: "Escape" });
   expect(
     screen.getByRole("button", { name: "Abrir última versão salva" }),
   ).toBeInTheDocument();

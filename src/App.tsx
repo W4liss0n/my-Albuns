@@ -30,6 +30,8 @@ import {
   type CanvasGraphicsDiagnosticProbe,
 } from "./components/canvasGraphicsDiagnosticProbeContext";
 import { ProjectWorkspace } from "./components/ProjectWorkspace";
+import { ProjectRecoveryDialog } from "./components/ProjectRecoveryDialog";
+import { ProjectRecoveryOwnerShell } from "./components/ProjectRecoveryOwnerShell";
 import { useProjectMutationRunner } from "./components/useProjectMutationRunner";
 import { useProjectOperationFailureDialog } from "./components/useProjectOperationFailureDialog";
 import { BrandWordmark, InlineNotice } from "./ui";
@@ -558,7 +560,7 @@ function App({
 
   if (loadError) {
     return (
-      <main className="startup-surface">
+      <main className="startup-surface ui-chrome-selection-scope">
         <section className="startup-card" role="alert">
           <BrandWordmark compact />
           <p className="eyebrow">MyAlbuns</p>
@@ -571,109 +573,48 @@ function App({
 
   if (recoveryStartup === "deferred") {
     return (
-      <main className="startup-surface" aria-busy="true">
-        <section className="startup-card">
-          <BrandWordmark compact />
-          <span className="loading-mark" aria-hidden="true" />
-          <p>Fechando o Projeto…</p>
-        </section>
-      </main>
+      <ProjectRecoveryOwnerShell
+        modal={false}
+        status="Fechando o Projeto…"
+      />
     );
   }
 
-  if (recoveryStartup === "confirmDiscard") {
+  if (
+    recoveryStartup === "available" ||
+    recoveryStartup === "confirmDiscard" ||
+    recoveryStartup === "resolving"
+  ) {
     return (
-      <main className="startup-surface">
-        <section className="startup-card">
-          <BrandWordmark compact />
-          <p className="eyebrow">Recuperação de sessão</p>
-          <h1>Descartar o trabalho recuperável?</h1>
-          <p>
-            A última versão salva será aberta e o trabalho recuperável será
-            removido definitivamente.
-          </p>
-          {recoveryError && (
-            <InlineNotice tone="error">{recoveryError}</InlineNotice>
-          )}
-          <div className="recovery-actions">
-            <button
-              className="recovery-primary"
-              type="button"
-              onClick={() =>
-                void resolveRecovery("discardCheckpointAndOpenLastSaved")
-              }
-            >
-              Descartar recuperação e abrir
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setRecoveryError(null);
-                setRecoveryStartup("available");
-              }}
-            >
-              Voltar
-            </button>
-          </div>
-        </section>
-      </main>
-    );
-  }
-
-  if (recoveryStartup === "available" || recoveryStartup === "resolving") {
-    const busy = recoveryStartup === "resolving";
-    return (
-      <main className="startup-surface">
-        <section className="startup-card">
-          <BrandWordmark compact />
-          <p className="eyebrow">Recuperação de sessão</p>
-          <h1>Recuperar trabalho não salvo?</h1>
-          <p>
-            O MyAlbuns encontrou trabalho concluído depois da última versão
-            salva deste Projeto.
-          </p>
-          {recoveryError && (
-            <InlineNotice tone="error">{recoveryError}</InlineNotice>
-          )}
-          <div className="recovery-actions">
-            <button
-              className="recovery-primary"
-              disabled={busy}
-              type="button"
-              onClick={() => void resolveRecovery("reopenAndRecover")}
-            >
-              Reabrir e recuperar
-            </button>
-            <button
-              disabled={busy}
-              type="button"
-              onClick={() => setRecoveryStartup("confirmDiscard")}
-            >
-              Abrir última versão salva
-            </button>
-            <button
-              disabled={busy}
-              type="button"
-              onClick={() => void resolveRecovery("nowNot")}
-            >
-              Agora não
-            </button>
-          </div>
-          {busy && <p aria-live="polite">Concluindo…</p>}
-        </section>
-      </main>
+      <ProjectRecoveryOwnerShell modal status="Recuperação de sessão">
+        <ProjectRecoveryDialog
+          error={recoveryError}
+          onBack={() => {
+            setRecoveryError(null);
+            setRecoveryStartup("available");
+          }}
+          onDefer={() => void resolveRecovery("nowNot")}
+          onDiscard={() =>
+            void resolveRecovery("discardCheckpointAndOpenLastSaved")
+          }
+          onRecover={() => void resolveRecovery("reopenAndRecover")}
+          onRequestDiscard={() => setRecoveryStartup("confirmDiscard")}
+          state={recoveryStartup}
+        />
+      </ProjectRecoveryOwnerShell>
     );
   }
 
   if (!projection) {
     return (
-      <main className="startup-surface" aria-busy="true">
-        <section className="startup-card">
-          <BrandWordmark compact />
-          <span className="loading-mark" aria-hidden="true" />
-          <p>Preparando o editor…</p>
-        </section>
-      </main>
+      <ProjectRecoveryOwnerShell
+        modal={false}
+        status={
+          recoveryStartup === "checking"
+            ? "Verificando Recuperação…"
+            : "Preparando o editor…"
+        }
+      />
     );
   }
 
@@ -729,7 +670,7 @@ function ProjectGraphicsFailure({
   diagnostic: Extract<GraphicsDiagnostic, { supported: false }>;
 }) {
   return (
-    <main className="startup-surface">
+    <main className="startup-surface ui-chrome-selection-scope">
       <section className="startup-card" role="alert">
         <BrandWordmark compact />
         <p className="eyebrow">Editor indisponível</p>

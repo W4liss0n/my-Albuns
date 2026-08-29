@@ -54,12 +54,25 @@ test("locates the New Project flow through stable accessible names", () => {
   assert.match(runner, /projectDialogDebugPort/);
   assert.match(
     runner,
+    /productive Grade click did not activate Sheet 2/,
+  );
+  assert.match(
+    runner,
     /startAttachedWebDriver\(\s*driver\.projectDialogDebugPort/,
   );
   assert.match(runner, /Aplicar alterações no Álbum\?/);
   assert.match(runner, /selectApplicationMenuCommand/);
   assert.match(runner, /clickElementWhenInteractable/);
   assert.match(runner, /withProjectDialog/);
+  assert.match(runner, /function accessibleProjectDialogXpath/);
+  assert.match(
+    runner,
+    /@aria-labelledby = \/\/\*\[normalize-space\(\)=\$\{title\}\]\/@id/,
+  );
+  assert.doesNotMatch(
+    runner,
+    /@role='dialog' and @aria-label=/,
+  );
   assert.match(runner, /openPhotoImportDialog/);
   assert.match(runner, /globalInspectorPreferencePreserved/);
   assert.match(runner, /projectLocalSelectionReset/);
