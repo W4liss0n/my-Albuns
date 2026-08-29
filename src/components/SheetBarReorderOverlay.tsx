@@ -4,15 +4,22 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 
-import type { ComposedSheet } from "../domain/project";
+import type {
+  ComposedSheet,
+  ProjectedFrameBorder,
+} from "../domain/project";
 import type { ViewportState } from "../state/viewport";
-import type { CanvasMetrics } from "./albumCanvasContract";
+import type {
+  CanvasMetrics,
+  SheetBarMetadata,
+} from "./albumCanvasContract";
 import {
   CANVAS_VERTICAL_MARGIN_PX,
   createCanvasSheetPresentation,
   type ContinuousCanvasLayout,
 } from "./canvasGeometry";
 import { createCanvasSheetViewGeometry } from "./canvasSheetViewGeometry";
+import { SheetPreviewShell } from "./SheetPreview";
 import {
   SHEET_REORDER_INVALID_MESSAGE,
   sheetReorderAutoScrollVelocity,
@@ -31,6 +38,10 @@ export interface SheetBarReorderOverlayProps {
   readonly layout: ContinuousCanvasLayout;
   readonly metrics: CanvasMetrics | null;
   readonly bleedUm?: number;
+  readonly focusedSheetId?: string | null;
+  readonly frameBorder?: ProjectedFrameBorder;
+  readonly mediaPreviewUrls?: Readonly<Record<string, string>>;
+  readonly sheetBarMetadata?: readonly SheetBarMetadata[];
   readonly viewport: ViewportState;
   readonly representation: SheetReorderRepresentation;
   readonly status: SheetReorderStatus;
@@ -59,6 +70,12 @@ export function SheetBarReorderOverlay(
   );
   const confirmedIndexById = new Map(
     props.sheets.map((sheet, index) => [sheet.sheetId, index] as const),
+  );
+  const sheetBarMetadataById = new Map(
+    (props.sheetBarMetadata ?? []).map((metadata) => [
+      metadata.sheetId,
+      metadata,
+    ]),
   );
   const reorderEnabled = !props.disabled && props.status !== "committing";
   const placeholderEntry =
@@ -111,6 +128,9 @@ export function SheetBarReorderOverlay(
       ? null
       : visibleSheetBounds(ghostSheet, scale, props.bleedUm);
   const ghostBounds = placeholderBounds;
+  const ghostPageNumbers = ghostSheet
+    ? sheetBarMetadataById.get(ghostSheet.sheetId)?.pageNumbers ?? []
+    : [];
 
   function reportAutoScroll(position: SheetReorderPointerPosition) {
     const bounds = overlayRef.current?.getBoundingClientRect();
@@ -189,20 +209,11 @@ export function SheetBarReorderOverlay(
           scale,
           props.bleedUm,
         );
-        const freeRegionStart = Math.min(
-          fullWidth,
-          Math.max(
-            SHEET_VISUAL_STYLE.sheetBar.swapActionCenterPx +
-              SHEET_VISUAL_STYLE.sheetBar.actionSizePx / 2,
-            fullWidth / 2 +
-              SHEET_VISUAL_STYLE.sheetBar.actionSizePx / 2,
-          ),
-        );
         const style = {
           height: `${SHEET_VISUAL_STYLE.sheetBar.heightPx}px`,
-          left: `${entry.left * scale + props.viewport.offsetX + freeRegionStart}px`,
+          left: `${entry.left * scale + props.viewport.offsetX}px`,
           top: `${sheetBounds.top}px`,
-          width: `${Math.max(0, fullWidth - freeRegionStart)}px`,
+          width: `${fullWidth}px`,
         } satisfies CSSProperties;
         return [
           <button
@@ -239,12 +250,8 @@ export function SheetBarReorderOverlay(
                   event.clientX -
                   (overlayBounds?.left ?? 0) -
                   fullLeft,
-                offsetY:
-                  event.clientY -
-                  (overlayBounds?.top ?? 0) -
-                  sheetBounds.top,
                 overlayLeft: overlayBounds?.left ?? 0,
-                overlayTop: overlayBounds?.top ?? 0,
+                top: sheetBounds.top,
                 width: fullWidth,
               };
               pointerReorder.begin(
@@ -269,6 +276,10 @@ export function SheetBarReorderOverlay(
         <span
           aria-hidden="true"
           className="sheet-bar-reorder-overlay__ghost"
+          data-active-sides={ghostSheet.activeSides}
+          data-origin-selected={
+            ghostSheet.sheetId === props.focusedSheetId || undefined
+          }
           data-pointer-x={pointerReorder.pointer?.clientX}
           data-pointer-y={pointerReorder.pointer?.clientY}
           data-sheet-id={ghostSheet.sheetId}
@@ -284,7 +295,42 @@ export function SheetBarReorderOverlay(
             },
           )}
         >
-          {String(ghostSheet.number).padStart(2, "0")}
+          <SheetPreviewShell
+            className="sheet-bar-reorder-overlay__ghost-visual"
+            frameBorder={props.frameBorder}
+            mediaPreviewUrls={props.mediaPreviewUrls}
+            sheet={ghostSheet}
+          >
+            <span
+              className="sheet-bar-reorder-overlay__ghost-bar"
+              data-active-sides={ghostSheet.activeSides}
+              style={{
+                background: SHEET_VISUAL_STYLE.sheetBar.surface,
+                borderBottomColor:
+                  SHEET_VISUAL_STYLE.sheetBar.separator,
+                color: SHEET_VISUAL_STYLE.sheetBar.text,
+                height: `${SHEET_VISUAL_STYLE.sheetBar.heightPx}px`,
+              }}
+            >
+              {ghostSheet.activeSides === "both" ? (
+                <>
+                  <span data-page-side="left">
+                    {ghostPageNumbers[0]}
+                  </span>
+                  <span data-page-side="right">
+                    {ghostPageNumbers[1]}
+                  </span>
+                </>
+              ) : (
+                <span data-page-side={ghostSheet.activeSides}>
+                  {ghostPageNumbers[0]}
+                </span>
+              )}
+              <span className="sheet-bar-reorder-overlay__ghost-number">
+                L{String(ghostSheet.number).padStart(2, "0")}
+              </span>
+            </span>
+          </SheetPreviewShell>
         </span>
       ) : null}
       {props.status === "invalid" && props.representation.ghost ? (
@@ -303,9 +349,8 @@ export function SheetBarReorderOverlay(
 interface GhostAnchor {
   readonly height: number;
   readonly offsetX: number;
-  readonly offsetY: number;
   readonly overlayLeft: number;
-  readonly overlayTop: number;
+  readonly top: number;
   readonly width: number;
 }
 
@@ -325,7 +370,7 @@ function ghostStyle(
   return {
     height: `${anchor.height}px`,
     left: `${pointer.clientX - anchor.overlayLeft - anchor.offsetX}px`,
-    top: `${pointer.clientY - anchor.overlayTop - anchor.offsetY}px`,
+    top: `${anchor.top}px`,
     width: `${anchor.width}px`,
   };
 }

@@ -1024,12 +1024,12 @@
         "reason": "A referência visual vigente não representa os estados intermediários de reordenação agora integrados à Janela produtiva."
       },
       "viewport": { "width": 1440, "height": 600 },
-      "readySelector": ".app-shell:has([data-reorder-surface=\"bar\"][data-reorder-state=\"preview\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"][data-preview-order=\"sheet-001,sheet-003,sheet-002,sheet-004,sheet-005\"]):has([data-reorder-surface=\"bar\"] [data-testid=\"reorder-placeholder\"]):has([data-reorder-surface=\"bar\"] [data-testid=\"reorder-ghost\"]):has([data-reorder-surface=\"grid\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"])",
+      "readySelector": ".app-shell:has([data-reorder-surface=\"bar\"][data-reorder-state=\"preview\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"][data-preview-order=\"sheet-001,sheet-003,sheet-002,sheet-004,sheet-005\"]):has([data-reorder-surface=\"bar\"] [data-testid=\"reorder-placeholder\"]):has([data-reorder-surface=\"bar\"] [data-testid=\"reorder-ghost\"][data-active-sides=\"both\"] .sheet-preview):has([data-reorder-surface=\"grid\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"])",
       "actions": [
         { "type": "focus", "selector": ".canvas-host canvas" },
         { "type": "key", "key": "ArrowRight" },
         { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-003\"]" },
-        { "type": "drag", "gesture": "pointer", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-003\"]", "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "phase": "preview" }
+        { "type": "drag", "gesture": "pointer", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-003\"]", "sourceXRatio": 0.25, "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "phase": "preview" }
       ]
     },
     {
@@ -1048,7 +1048,7 @@
         { "type": "focus", "selector": ".canvas-host canvas" },
         { "type": "key", "key": "ArrowRight" },
         { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-003\"]" },
-        { "type": "drag", "gesture": "pointer", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-003\"]", "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "phase": "drop" }
+        { "type": "drag", "gesture": "pointer", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-003\"]", "sourceXRatio": 0.75, "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "phase": "drop" }
       ]
     },
     {
@@ -1062,7 +1062,7 @@
         "reason": "A referência visual vigente não representa os estados intermediários agora integrados à Grade produtiva."
       },
       "viewport": { "width": 1440, "height": 600 },
-      "readySelector": ".app-shell:has([data-reorder-surface=\"grid\"][data-reorder-state=\"preview\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"]):has([data-reorder-surface=\"grid\"] > .sheet-grid-slot:nth-child(2)[data-sheet-id=\"sheet-003\"]):has([data-reorder-surface=\"grid\"] [data-testid=\"reorder-placeholder\"]):has([data-reorder-surface=\"grid\"] [data-testid=\"reorder-ghost\"]):has([data-reorder-surface=\"bar\"][data-preview-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"])",
+      "readySelector": ".app-shell:has([data-reorder-surface=\"grid\"][data-reorder-state=\"preview\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"]):has([data-reorder-surface=\"grid\"] > .sheet-grid-slot:nth-child(2)[data-sheet-id=\"sheet-003\"]):has([data-reorder-surface=\"grid\"] [data-testid=\"reorder-placeholder\"]):has([data-reorder-surface=\"grid\"] [data-testid=\"reorder-ghost\"][data-active-sides=\"both\"] .sheet-preview):has([data-reorder-surface=\"bar\"][data-preview-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"])",
       "actions": [
         { "type": "drag", "gesture": "pointer", "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-003\"]", "targetSelector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"]", "phase": "preview" }
       ]

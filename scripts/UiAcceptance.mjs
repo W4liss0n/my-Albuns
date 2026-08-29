@@ -206,6 +206,18 @@ export function validateUiAcceptanceManifest(manifest) {
               action.phase === "escape",
             `${actionLocation}.phase must be preview, drop, or escape`,
           );
+          if (action.sourceXRatio !== undefined) {
+            invariant(
+              Number.isFinite(action.sourceXRatio) &&
+                action.sourceXRatio > 0 &&
+                action.sourceXRatio < 1,
+              `${actionLocation}.sourceXRatio must be between 0 and 1`,
+            );
+            invariant(
+              action.gesture === "pointer",
+              `${actionLocation}.sourceXRatio requires gesture pointer`,
+            );
+          }
           if (action.phase === "escape") {
             invariant(
               action.gesture === "pointer",
