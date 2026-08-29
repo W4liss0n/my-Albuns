@@ -1796,7 +1796,7 @@ test("does not expose the structural context menu through masked Sangria", async
   expect(onOpenSheetContextMenu).not.toHaveBeenCalled();
 });
 
-test("mounts the productive Sheet Bar seam for navigation, context, and reorder", async () => {
+test("mounts the productive Sheet Bar seam for navigation, edit, context, and reorder", async () => {
   const onCancel = vi.fn();
   const onDrop = vi.fn();
   const onNavigate = vi.fn();
@@ -1844,6 +1844,18 @@ test("mounts the productive Sheet Bar seam for navigation, context, and reorder"
 
   fireEvent.click(second);
   expect(onNavigate).toHaveBeenCalledWith("sheet-002");
+  const firstWidth = Number.parseFloat(first.style.width);
+  const secondWidth = Number.parseFloat(second.style.width);
+  fireEvent.doubleClick(first, {
+    clientX: Number.parseFloat(first.style.left) + firstWidth * 0.25,
+    clientY: 36,
+  });
+  fireEvent.doubleClick(second, {
+    clientX: Number.parseFloat(second.style.left) + secondWidth * 0.75,
+    clientY: 36,
+  });
+  expect(view.onEditSheet).toHaveBeenNthCalledWith(1, "sheet-001");
+  expect(view.onEditSheet).toHaveBeenNthCalledWith(2, "sheet-002");
   fireEvent.contextMenu(second, { clientX: 220, clientY: 36 });
   expect(onOpenSheetContextMenu).toHaveBeenCalledWith("sheet-002", {
     x: 220,

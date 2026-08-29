@@ -16,10 +16,18 @@ import {
 } from "./sheetVisualStyle";
 import "./SheetPreview.css";
 
+export interface SheetPreviewViewport {
+  readonly xUm: number;
+  readonly yUm: number;
+  readonly widthUm: number;
+  readonly heightUm: number;
+}
+
 interface SheetPreviewProps {
   sheet: ComposedSheet;
   frameBorder?: ProjectedFrameBorder;
   mediaPreviewUrls?: Readonly<Record<string, string>>;
+  viewport?: SheetPreviewViewport;
 }
 
 interface SheetPreviewShellProps extends SheetPreviewProps {
@@ -42,12 +50,22 @@ function sheetPreviewShellStyle(
       };
 }
 
+function sheetPreviewViewBox(
+  sheet: ComposedSheet,
+  viewport: SheetPreviewViewport | undefined,
+) {
+  return viewport
+    ? `${viewport.xUm} ${viewport.yUm} ${viewport.widthUm} ${viewport.heightUm}`
+    : `0 0 ${sheet.widthUm} ${sheet.heightUm}`;
+}
+
 export function SheetPreviewShell({
   children,
   className,
   frameBorder,
   mediaPreviewUrls,
   sheet,
+  viewport,
 }: SheetPreviewShellProps) {
   return (
     <span
@@ -63,6 +81,7 @@ export function SheetPreviewShell({
         frameBorder={frameBorder}
         mediaPreviewUrls={mediaPreviewUrls}
         sheet={sheet}
+        viewport={viewport}
       />
       {children}
     </span>
@@ -73,6 +92,7 @@ export function SheetPreview({
   sheet,
   frameBorder = { kind: "none" },
   mediaPreviewUrls = {},
+  viewport,
 }: SheetPreviewProps) {
   const instanceId = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   const label = `Prévia da Lâmina ${String(sheet.number).padStart(2, "0")}`;
@@ -87,7 +107,7 @@ export function SheetPreview({
       focusable="false"
       preserveAspectRatio="xMidYMid meet"
       role="img"
-      viewBox={`0 0 ${sheet.widthUm} ${sheet.heightUm}`}
+      viewBox={sheetPreviewViewBox(sheet, viewport)}
       xmlns="http://www.w3.org/2000/svg"
     >
       <title>{label}</title>
