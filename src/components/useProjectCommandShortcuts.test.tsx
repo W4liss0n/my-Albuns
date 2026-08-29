@@ -105,7 +105,13 @@ test("leaves horizontal arrows to editable and keyboard-owning surfaces", () => 
   contentEditable.setAttribute("contenteditable", "true");
   const contentEditableChild = document.createElement("span");
   contentEditable.append(contentEditableChild);
-  const ownedSurfaces = ["dialog", "menu", "menubar", "listbox"].map(
+  const ownedSurfaces = [
+    "dialog",
+    "menu",
+    "menubar",
+    "listbox",
+    "scrollbar",
+  ].map(
     (role) => {
       const owner = document.createElement("div");
       owner.setAttribute("role", role);

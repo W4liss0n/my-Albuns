@@ -783,6 +783,28 @@ test("opens and dismisses an explicit Sheet context menu without navigating the 
     screen.queryByRole("menu", { name: "Ações da Lâmina 03" }),
   ).not.toBeInTheDocument();
   expect(useEditorView.getState()).toMatchObject(before);
+
+  act(() =>
+    canvasHarness.props?.onOpenSheetContextMenu?.("sheet-003", {
+      x: 240,
+      y: 180,
+    }),
+  );
+  const dismissLayer = document.querySelector(
+    ".sheet-context-menu__dismiss-layer",
+  );
+  expect(dismissLayer).toBeInstanceOf(HTMLElement);
+  fireEvent.pointerDown(dismissLayer!, { button: 0, pointerId: 31 });
+  fireEvent.pointerUp(dismissLayer!, { button: 0, pointerId: 31 });
+  expect(
+    screen.getByRole("menu", { name: "Ações da Lâmina 03" }),
+  ).toBeInTheDocument();
+  expect(useEditorView.getState()).toMatchObject(before);
+  fireEvent.click(dismissLayer!);
+  expect(
+    screen.queryByRole("menu", { name: "Ações da Lâmina 03" }),
+  ).not.toBeInTheDocument();
+  expect(useEditorView.getState()).toMatchObject(before);
 });
 
 test("routes Delete to the centered Sheet and guards text entry, Edit Mode, and the minimum", async () => {

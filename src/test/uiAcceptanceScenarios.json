@@ -458,6 +458,46 @@
       ]
     },
     {
+      "id": "sheet-context-menu-outside-bar-click-preserves-navigation",
+      "title": "Menu contextual — clique externo na Barra não navega",
+      "implementationPath": "/workspace-preview.html?structure=physical",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-context-menu-dismissal-ownership",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A referência visual vigente não representa o ownership do gesto externo ao menu contextual aceito posteriormente."
+      },
+      "viewport": { "width": 1440, "height": 600 },
+      "readySelector": ".app-shell:has(.canvas-host[data-centered-sheet-id=\"sheet-002\"]):not(:has([role=\"menu\"][aria-label^=\"Ações da Lâmina\"]))",
+      "actions": [
+        { "type": "context-click", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]" },
+        { "type": "assert", "selector": "[role=\"menu\"][aria-label=\"Ações da Lâmina 02\"]" },
+        { "type": "pointer-click", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-001\"]" },
+        { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-002\"]" }
+      ]
+    },
+    {
+      "id": "sheet-context-menu-outside-grid-click-preserves-navigation",
+      "title": "Menu contextual — clique externo na Grade não navega",
+      "implementationPath": "/workspace-preview.html?structure=physical",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-context-menu-dismissal-ownership",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A referência visual vigente não representa o ownership do gesto externo ao menu contextual aceito posteriormente."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": ".app-shell:has(.canvas-host[data-centered-sheet-id=\"sheet-001\"]):not(:has([role=\"menu\"][aria-label^=\"Ações da Lâmina\"]))",
+      "actions": [
+        { "type": "wheel", "selector": ".inspector", "deltaY": 1100 },
+        { "type": "assert", "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"]" },
+        { "type": "context-click", "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"]" },
+        { "type": "assert", "selector": "[role=\"menu\"][aria-label=\"Ações da Lâmina 02\"]" },
+        { "type": "pointer-click", "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-001\"]" },
+        { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-001\"]" }
+      ]
+    },
+    {
       "id": "canvas-keyboard-previous-sheet",
       "title": "Canvas — tecla ← centraliza a Lâmina física anterior",
       "implementationPath": "/workspace-preview.html?structure=physical",

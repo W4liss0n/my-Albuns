@@ -245,7 +245,8 @@ export async function performUiAcceptanceAction({
 
   if (action.type === "assert") return;
 
-  if (action.type === "context-click") {
+  if (action.type === "context-click" || action.type === "pointer-click") {
+    const button = action.type === "context-click" ? 2 : 0;
     await request("POST", `/session/${sessionId}/actions`, {
       actions: [
         {
@@ -260,8 +261,8 @@ export async function performUiAcceptanceAction({
               x: 0,
               y: 0,
             },
-            { type: "pointerDown", button: 2 },
-            { type: "pointerUp", button: 2 },
+            { type: "pointerDown", button },
+            { type: "pointerUp", button },
           ],
         },
       ],

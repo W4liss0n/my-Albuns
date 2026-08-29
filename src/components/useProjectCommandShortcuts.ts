@@ -21,7 +21,7 @@ function targetOwnsHorizontalNavigation(target: EventTarget | null) {
   return (
     target instanceof Element &&
     target.closest(
-      '[role="dialog"], [role="menu"], [role="menubar"], [role="listbox"]',
+      '[role="dialog"], [role="menu"], [role="menubar"], [role="listbox"], [role="scrollbar"]',
     ) !== null
   );
 }
