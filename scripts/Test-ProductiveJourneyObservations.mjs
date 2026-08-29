@@ -24,6 +24,19 @@ import {
   assertReopenedHostExport,
 } from "./ProductiveJourneyObservations.mjs";
 
+test("productive journey uses the neutral captured-pointer gesture policy", () => {
+  const runner = readFileSync(
+    path.join(
+      path.dirname(fileURLToPath(import.meta.url)),
+      "Run-ProductiveJourneyGate.mjs",
+    ),
+    "utf8",
+  );
+
+  assert.match(runner, /from "\.\/WebDriverPointerGestures\.mjs"/u);
+  assert.doesNotMatch(runner, /const visibleCenter =/u);
+});
+
 test("locates the New Project flow through stable accessible names", () => {
   const runner = readFileSync(
     path.join(

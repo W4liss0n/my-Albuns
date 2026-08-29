@@ -2,6 +2,11 @@ import {
   webdriverElementId,
   webdriverElementKey,
 } from "./UiAcceptance.mjs";
+import {
+  buildCapturedPointerGestureActions,
+  measureVisiblePointerGeometryScript,
+  scrollIntoPointerViewportScript,
+} from "./WebDriverPointerGestures.mjs";
 
 const webdriverKeys = Object.freeze({
   ArrowDown: "\uE015",
@@ -36,17 +41,6 @@ const cdpArrowKeys = Object.freeze({
 
 function elementReference(elementId) {
   return { [webdriverElementKey]: elementId };
-}
-
-function pointerThresholdPoint(source, target) {
-  const deltaX = target.x - source.x;
-  const deltaY = target.y - source.y;
-  const distance = Math.hypot(deltaX, deltaY);
-  if (distance === 0) return { x: source.x + 10, y: source.y };
-  return {
-    x: Math.round(source.x + (deltaX / distance) * 10),
-    y: Math.round(source.y + (deltaY / distance) * 10),
-  };
 }
 
 const activeSheetReorderSelector = [
@@ -491,41 +485,19 @@ export async function performUiAcceptanceAction({
     const capturedPointerGesture = action.gesture === "pointer";
     if (capturedPointerGesture) {
       await execute(
-        "arguments[0].scrollIntoView({ block: 'center', inline: 'nearest' });",
+        scrollIntoPointerViewportScript,
         [sourceElement],
       );
       if (dropTargetId) {
         await execute(
-          "arguments[0].scrollIntoView({ block: 'center', inline: 'nearest' });",
+          scrollIntoPointerViewportScript,
           [elementReference(dropTargetId)],
         );
       }
     }
     const gestureGeometry = capturedPointerGesture
       ? await execute(
-          `
-            const visibleCenter = (element, label) => {
-              const bounds = element.getBoundingClientRect();
-              const left = Math.max(0, bounds.left);
-              const right = Math.min(window.innerWidth, bounds.right);
-              const top = Math.max(0, bounds.top);
-              const bottom = Math.min(window.innerHeight, bounds.bottom);
-              if (right <= left || bottom <= top) {
-                throw new Error(label + " is outside the pointer viewport");
-              }
-              return {
-                x: Math.round((left + right) / 2),
-                y: Math.round((top + bottom) / 2),
-              };
-            };
-            return {
-              source: visibleCenter(arguments[0], "drag source"),
-              target: visibleCenter(arguments[1], "drag target"),
-              dropTarget: arguments[2]
-                ? visibleCenter(arguments[2], "drop target")
-                : null,
-            };
-          `,
+          measureVisiblePointerGeometryScript,
           [
             sourceElement,
             targetElement,
@@ -533,36 +505,11 @@ export async function performUiAcceptanceAction({
           ],
         )
       : null;
-    const thresholdPoint = gestureGeometry
-      ? pointerThresholdPoint(gestureGeometry.source, gestureGeometry.target)
-      : null;
     const pointerActions = capturedPointerGesture
-      ? [
-          {
-            type: "pointerMove",
-            duration: 0,
-            origin: "viewport",
-            x: gestureGeometry.source.x,
-            y: gestureGeometry.source.y,
-          },
-          { type: "pointerDown", button: 0 },
-          { type: "pause", duration: 80 },
-          {
-            type: "pointerMove",
-            duration: 120,
-            origin: "viewport",
-            x: thresholdPoint.x,
-            y: thresholdPoint.y,
-          },
-          {
-            type: "pointerMove",
-            duration: 450,
-            origin: "viewport",
-            x: gestureGeometry.target.x,
-            y: gestureGeometry.target.y,
-          },
-          { type: "pause", duration: 100 },
-        ]
+      ? buildCapturedPointerGestureActions({
+          ...gestureGeometry,
+          phase: action.phase,
+        })
       : [
           {
             type: "pointerMove",
@@ -580,18 +527,15 @@ export async function performUiAcceptanceAction({
             y: 0,
           },
         ];
-    if (action.phase === "drop") {
+    if (action.phase === "drop" && !capturedPointerGesture) {
       if (dropTargetId) {
         pointerActions.push({
           type: "pointerMove",
-          duration: capturedPointerGesture ? 450 : 220,
-          origin: capturedPointerGesture ? "viewport" : elementReference(dropTargetId),
-          x: capturedPointerGesture ? gestureGeometry.dropTarget.x : 0,
-          y: capturedPointerGesture ? gestureGeometry.dropTarget.y : 0,
+          duration: 220,
+          origin: elementReference(dropTargetId),
+          x: 0,
+          y: 0,
         });
-        if (capturedPointerGesture) {
-          pointerActions.push({ type: "pause", duration: 100 });
-        }
       }
       pointerActions.push({ type: "pointerUp", button: 0 });
     }
