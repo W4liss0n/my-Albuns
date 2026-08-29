@@ -9,6 +9,7 @@ src-tauri/binaries/*.exe
 .scratch/topology-spike-target/
 .scratch/topology-corpus/
 .scratch/ui-acceptance/
+.scratch/productive-journey-evidence/
 benchmark-data/albums/*
 !benchmark-data/albums/README.md
 *.log

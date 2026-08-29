@@ -1,4 +1,7 @@
-param([string] $OutputPath)
+param(
+    [string] $OutputPath,
+    [string] $ArtifactDirectory
+)
 
 $ErrorActionPreference = 'Stop'
 
@@ -40,6 +43,28 @@ if (-not $runnerMutexHeld) {
 
 $scratchRoot = Join-Path $workspaceRoot '.scratch'
 New-Item -ItemType Directory -Force -Path $scratchRoot | Out-Null
+$artifactRoot = [System.IO.Path]::GetFullPath(
+    (Join-Path $scratchRoot 'productive-journey-evidence')
+)
+$retainedArtifactDirectory = $null
+if (-not [string]::IsNullOrWhiteSpace($ArtifactDirectory)) {
+    if (-not [System.IO.Path]::IsPathRooted($ArtifactDirectory)) {
+        $ArtifactDirectory = Join-Path $workspaceRoot $ArtifactDirectory
+    }
+    $retainedArtifactDirectory = [System.IO.Path]::GetFullPath(
+        $ArtifactDirectory
+    )
+    if (-not [string]::Equals(
+            [System.IO.Path]::GetDirectoryName($retainedArtifactDirectory),
+            $artifactRoot,
+            [System.StringComparison]::OrdinalIgnoreCase
+        )) {
+        throw 'Retained productive-journey evidence must be one direct child of .scratch/productive-journey-evidence.'
+    }
+    if (Test-Path -LiteralPath $retainedArtifactDirectory) {
+        throw "The retained productive-journey evidence directory already exists: $retainedArtifactDirectory"
+    }
+}
 $runRoot = Join-Path `
     $scratchRoot `
     "j8-$PID-$([guid]::NewGuid().ToString('N').Substring(0, 6))"
@@ -60,6 +85,9 @@ $gate = $null
 $driver = $null
 $sampleCount = 0
 $nonWhiteCount = 0
+$retainedArtifactEvidence = $null
+$frontendStructureTestLog = Join-Path $runRoot 'frontend-structure-tests.log'
+$publicProjectCoreTestLog = Join-Path $runRoot 'public-project-core-journey.log'
 
 function Get-ExactExecutableProcesses([string] $ExecutablePath) {
     $expected = [System.IO.Path]::GetFullPath($ExecutablePath)
@@ -90,23 +118,141 @@ function Get-Sha256([string] $Path) {
     }
 }
 
+function Get-ContainedRelativePath(
+    [string] $ParentPath,
+    [string] $ChildPath
+) {
+    $parent = [System.IO.Path]::GetFullPath($ParentPath)
+    $child = [System.IO.Path]::GetFullPath($ChildPath)
+    $parentPrefix = $parent.TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar
+    ) + [System.IO.Path]::DirectorySeparatorChar
+    if (-not $child.StartsWith(
+            $parentPrefix,
+            [System.StringComparison]::OrdinalIgnoreCase
+        )) {
+        throw "A relative evidence path escaped its parent: $child"
+    }
+    return $child.Substring($parentPrefix.Length)
+}
+
+function Copy-RetainedArtifact(
+    [string] $SourcePath,
+    [string] $RelativePath
+) {
+    $source = [System.IO.Path]::GetFullPath($SourcePath)
+    $runPrefix = $runRoot.TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar
+    ) + [System.IO.Path]::DirectorySeparatorChar
+    if (-not $source.StartsWith(
+            $runPrefix,
+            [System.StringComparison]::OrdinalIgnoreCase
+        )) {
+        throw "A retained artifact escaped the productive-journey run root: $source"
+    }
+    if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
+        throw "A retained productive-journey artifact is missing: $source"
+    }
+
+    $destination = [System.IO.Path]::GetFullPath(
+        (Join-Path $retainedArtifactDirectory $RelativePath)
+    )
+    $artifactPrefix = $retainedArtifactDirectory.TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar
+    ) + [System.IO.Path]::DirectorySeparatorChar
+    if (-not $destination.StartsWith(
+            $artifactPrefix,
+            [System.StringComparison]::OrdinalIgnoreCase
+        )) {
+        throw "A retained artifact destination escaped its evidence directory: $destination"
+    }
+    New-Item -ItemType Directory -Force -Path (
+        [System.IO.Path]::GetDirectoryName($destination)
+    ) | Out-Null
+    Copy-Item -LiteralPath $source -Destination $destination
+
+    return [ordered]@{
+        path = $RelativePath.Replace('\', '/')
+        byteCount = [int64] (Get-Item -LiteralPath $destination).Length
+        sha256 = (Get-Sha256 $destination).ToLowerInvariant()
+    }
+}
+
 try {
     New-Item -ItemType Directory -Force -Path $runRoot | Out-Null
     $node = (Get-Command node.exe -ErrorAction Stop).Source
+    $npm = (Get-Command npm.cmd -ErrorAction Stop).Source
+    $frontendStructureTestFiles = @(
+        (Join-Path $workspaceRoot 'src\components\ProjectWorkspace.test.tsx'),
+        (Join-Path $workspaceRoot 'src\components\SheetContextMenu.test.tsx'),
+        (Join-Path $workspaceRoot 'src\components\useProjectCommandShortcuts.test.tsx'),
+        (Join-Path $workspaceRoot 'src\components\sheetReorderSession.test.ts'),
+        (Join-Path $workspaceRoot 'src\components\SheetBarReorderOverlay.test.tsx'),
+        (Join-Path $workspaceRoot 'src\components\InspectorPanelStructure.test.tsx')
+    )
+    $priorErrorActionPreference = $ErrorActionPreference
+    try {
+        # Windows PowerShell surfaces redirected native stderr as non-terminating
+        # ErrorRecord values. Preserve those values in the log without letting
+        # npm's informational stderr bypass the native exit-code contract.
+        $ErrorActionPreference = 'Continue'
+        $frontendStructureTestOutput = @(
+            & $npm test -- @frontendStructureTestFiles --reporter=verbose 2>&1
+        )
+        $frontendStructureTestExitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $priorErrorActionPreference
+    }
+    $frontendStructureTestText = @(
+        $frontendStructureTestOutput | ForEach-Object { $_.ToString() }
+    ) -join [System.Environment]::NewLine
+    [System.IO.File]::WriteAllText(
+        $frontendStructureTestLog,
+        $frontendStructureTestText + [System.Environment]::NewLine,
+        [System.Text.UTF8Encoding]::new($false)
+    )
+    Write-Output $frontendStructureTestText
+    if ($frontendStructureTestExitCode -ne 0) {
+        throw "The public workspace structure tests failed with exit code $frontendStructureTestExitCode."
+    }
     & $node --test `
         (Join-Path $PSScriptRoot 'Test-ProductiveJourneyObservations.mjs') `
         (Join-Path $PSScriptRoot 'Test-GateWebDriver.mjs')
     if ($LASTEXITCODE -ne 0) {
         throw "The productive journey observation tests failed with exit code $LASTEXITCODE."
     }
-    & $script:CargoExecutable `
-        test `
-        -p myalbuns-core `
-        --test productive_project_core_journey `
-        -- `
-        --exact
-    if ($LASTEXITCODE -ne 0) {
-        throw "The public ProjectCore journey failed with exit code $LASTEXITCODE."
+    $priorErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $publicProjectCoreTestOutput = @(
+            & $script:CargoExecutable `
+                test `
+                -p myalbuns-core `
+                --test productive_project_core_journey `
+                -- `
+                --exact `
+                2>&1
+        )
+        $publicProjectCoreTestExitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $priorErrorActionPreference
+    }
+    $publicProjectCoreTestText = @(
+        $publicProjectCoreTestOutput | ForEach-Object { $_.ToString() }
+    ) -join [System.Environment]::NewLine
+    [System.IO.File]::WriteAllText(
+        $publicProjectCoreTestLog,
+        $publicProjectCoreTestText + [System.Environment]::NewLine,
+        [System.Text.UTF8Encoding]::new($false)
+    )
+    Write-Output $publicProjectCoreTestText
+    if ($publicProjectCoreTestExitCode -ne 0) {
+        throw "The public ProjectCore journey failed with exit code $publicProjectCoreTestExitCode."
     }
 
     & (Join-Path $PSScriptRoot 'Prepare-Sidecar.ps1') -Profile debug
@@ -456,6 +602,89 @@ try {
     }
     Wait-GatePathProcessesExit -Path $runRoot
 
+    if ($null -ne $retainedArtifactDirectory) {
+        New-Item -ItemType Directory -Force -Path $artifactRoot | Out-Null
+        New-Item -ItemType Directory -Path $retainedArtifactDirectory |
+            Out-Null
+        $retainedFiles = @(
+            Copy-RetainedArtifact `
+                -SourcePath $gate.screenshotPath `
+                -RelativePath 'project-canvas.png'
+            Copy-RetainedArtifact `
+                -SourcePath $jpegPath `
+                -RelativePath 'Jornada produtiva_002.jpg'
+            Copy-RetainedArtifact `
+                -SourcePath $photoPath `
+                -RelativePath 'Foto da jornada.jpg'
+            Copy-RetainedArtifact `
+                -SourcePath $frontendStructureTestLog `
+                -RelativePath 'frontend-structure-tests.log'
+            Copy-RetainedArtifact `
+                -SourcePath $publicProjectCoreTestLog `
+                -RelativePath 'public-project-core-journey.log'
+        )
+        $processDataRoot = Join-Path $runRoot 'process-data'
+        if (-not (Test-Path -LiteralPath $processDataRoot -PathType Container)) {
+            throw 'The productive journey did not retain its correlated process-data directory.'
+        }
+        $processLogs = @(
+            Get-ChildItem `
+                -LiteralPath $processDataRoot `
+                -Recurse `
+                -File `
+                -Filter '*.jsonl'
+        )
+        if ($processLogs.Count -eq 0) {
+            throw 'The productive journey did not emit correlated process logs.'
+        }
+        foreach ($processLog in $processLogs) {
+            $relativeLogPath = Get-ContainedRelativePath `
+                -ParentPath $runRoot `
+                -ChildPath $processLog.FullName
+            $retainedFiles += Copy-RetainedArtifact `
+                -SourcePath $processLog.FullName `
+                -RelativePath $relativeLogPath
+        }
+        foreach ($projectFile in @(
+                Get-ChildItem -LiteralPath $runRoot -Recurse -File |
+                    Where-Object {
+                        $_.Extension -in @('.myalbum', '.myalbuns')
+                    }
+            )) {
+            $relativeProjectPath = Get-ContainedRelativePath `
+                -ParentPath $runRoot `
+                -ChildPath $projectFile.FullName
+            $retainedFiles += Copy-RetainedArtifact `
+                -SourcePath $projectFile.FullName `
+                -RelativePath $relativeProjectPath
+        }
+        $artifactManifest = [ordered]@{
+            schemaVersion = 1
+            gate = 'productive-end-to-end-journey'
+            gitCommit = $sourceBefore.gitCommit
+            collectedAtUtc = [DateTime]::UtcNow.ToString('o')
+            files = $retainedFiles
+        }
+        $artifactManifestPath = Join-Path `
+            $retainedArtifactDirectory `
+            'artifact-manifest.json'
+        [System.IO.File]::WriteAllText(
+            $artifactManifestPath,
+            ($artifactManifest | ConvertTo-Json -Depth 6) +
+                [System.Environment]::NewLine,
+            [System.Text.UTF8Encoding]::new($false)
+        )
+        $retainedArtifactEvidence = [ordered]@{
+            directory = (Get-ContainedRelativePath `
+                    -ParentPath $workspaceRoot `
+                    -ChildPath $retainedArtifactDirectory
+                ).Replace('\', '/')
+            manifest = 'artifact-manifest.json'
+            manifestSha256 = (Get-Sha256 $artifactManifestPath).ToLowerInvariant()
+            fileCount = $retainedFiles.Count
+        }
+    }
+
     Remove-GateScratchDirectory -Path $runRoot -AllowedParent $scratchRoot
     $runRootCleaned = $true
     $sourceAfter = Get-GateSourceSnapshot `
@@ -464,6 +693,80 @@ try {
     $sourceInputsDirty = Test-GateSourceSnapshotsDirty `
         -Before $sourceBefore `
         -After $sourceAfter
+
+    $windowsWebView2CheckNames = @(
+        'cancel-before-project-core',
+        'create-only-causal-handoff',
+        'project-core-save-history',
+        'crash-recovery-distinct-host',
+        'interrupted-gesture-keeps-previous-checkpoint',
+        'recovered-project-unsaved-empty-history',
+        'native-save-as-cancel-before-core',
+        'save-as-copy-content-and-history',
+        'save-as-webview-cache-recovery-transition',
+        'simultaneous-original-copy-isolated-saves',
+        'native-jpeg-import-reselect-external-link-only',
+        'double-click-frame-selection-canvas',
+        'cancel-before-export-pipeline',
+        'distinguishable-sheet-two-jpeg-export',
+        'canvas-jpeg-photo-fidelity',
+        'real-application-empty-cache-original-read',
+        'missing-original-actionable-failure',
+        'saved-project-unchanged-by-export',
+        'physical-album-structure-ui-project-core',
+        'independent-host-reopen-empty-history',
+        'correlated-process-terminals-cleanup'
+    )
+    $frontendWorkspaceCheckNames = @(
+        'queued-history-structural-authority',
+        'pending-structure-cancels-reorder-preview-drop',
+        'delete-shortcut-context',
+        'context-menu-viewport-clamp',
+        'sheet-reorder-bar-grid',
+        'sheet-reorder-autoscroll-policy'
+    )
+    $retainedFrontendLog = if ($null -ne $retainedArtifactEvidence) {
+        'frontend-structure-tests.log'
+    }
+    else {
+        'gate stdout (ephemeral; use -ArtifactDirectory to retain)'
+    }
+    $retainedProjectCoreLog = if ($null -ne $retainedArtifactEvidence) {
+        'public-project-core-journey.log'
+    }
+    else {
+        'gate stdout (ephemeral; use -ArtifactDirectory to retain)'
+    }
+    $windowsWebView2Evidence = if ($null -ne $retainedArtifactEvidence) {
+        'productive-runner observations and retained raw artifacts'
+    }
+    else {
+        'productive-runner observations (raw artifacts not retained)'
+    }
+    $checks = @(
+        foreach ($checkName in $windowsWebView2CheckNames) {
+            [ordered]@{
+                name = $checkName
+                passed = $true
+                proofLayer = 'windows-webview2'
+                evidence = $windowsWebView2Evidence
+            }
+        }
+        [ordered]@{
+            name = 'public-project-core-journey'
+            passed = $true
+            proofLayer = 'rust-public-api'
+            evidence = $retainedProjectCoreLog
+        }
+        foreach ($checkName in $frontendWorkspaceCheckNames) {
+            [ordered]@{
+                name = $checkName
+                passed = $true
+                proofLayer = 'public-workspace-vitest'
+                evidence = $retainedFrontendLog
+            }
+        }
+    )
 
     $report = [ordered]@{
         schemaVersion = 1
@@ -477,28 +780,26 @@ try {
             nativeDriverVersion = $driver.nativeDriverVersion
             webView2RuntimeVersion = $driver.webView2RuntimeVersion
         }
-        checks = @(
-            [ordered]@{ name = 'cancel-before-project-core'; passed = $true },
-            [ordered]@{ name = 'create-only-causal-handoff'; passed = $true },
-            [ordered]@{ name = 'project-core-save-history'; passed = $true },
-            [ordered]@{ name = 'crash-recovery-distinct-host'; passed = $true },
-            [ordered]@{ name = 'interrupted-gesture-keeps-previous-checkpoint'; passed = $true },
-            [ordered]@{ name = 'recovered-project-unsaved-empty-history'; passed = $true },
-            [ordered]@{ name = 'native-save-as-cancel-before-core'; passed = $true },
-            [ordered]@{ name = 'save-as-copy-content-and-history'; passed = $true },
-            [ordered]@{ name = 'save-as-webview-cache-recovery-transition'; passed = $true },
-            [ordered]@{ name = 'simultaneous-original-copy-isolated-saves'; passed = $true },
-            [ordered]@{ name = 'native-jpeg-import-reselect-external-link-only'; passed = $true },
-            [ordered]@{ name = 'double-click-frame-selection-canvas'; passed = $true },
-            [ordered]@{ name = 'cancel-before-export-pipeline'; passed = $true },
-            [ordered]@{ name = 'distinguishable-sheet-two-jpeg-export'; passed = $true },
-            [ordered]@{ name = 'canvas-jpeg-photo-fidelity'; passed = $true },
-            [ordered]@{ name = 'real-application-empty-cache-original-read'; passed = $true },
-            [ordered]@{ name = 'missing-original-actionable-failure'; passed = $true },
-            [ordered]@{ name = 'saved-project-unchanged-by-export'; passed = $true },
-            [ordered]@{ name = 'physical-album-structure-ui-project-core'; passed = $true },
-            [ordered]@{ name = 'independent-host-reopen-empty-history'; passed = $true },
-            [ordered]@{ name = 'correlated-process-terminals-cleanup'; passed = $true }
+        checks = $checks
+        coverageLimits = @(
+            [ordered]@{
+                property = 'queued-history-structural-authority-in-windows-webview2'
+                status = 'not-claimed'
+                provenBy = 'public-workspace-vitest'
+                reason = 'Deterministic delayed History completion is exercised at the public ProjectWorkspace boundary without a product-only timing hook.'
+            },
+            [ordered]@{
+                property = 'sheet-reorder-autoscroll-visual-distance'
+                status = 'not-claimed'
+                provenBy = 'public-workspace-vitest'
+                reason = 'Progressive frame scheduling, edge distance and stop terminals are deterministic component behavior, not a stable screenshot property.'
+            },
+            [ordered]@{
+                property = 'context-menu-all-corners-static-visual'
+                status = 'not-claimed'
+                provenBy = 'public-workspace-vitest'
+                reason = 'All four viewport clamp geometries are asserted from the public floating-menu component; the visual suite demonstrates the current menu but does not claim every corner.'
+            }
         )
         evidence = [ordered]@{
             cancelledCreationBeforeCore = [bool] $gate.cancelledCreationBeforeCore
@@ -549,6 +850,7 @@ try {
                 jpegMaxChannelDelta = $canvasJpegMaxChannelDelta
                 tolerance = $photoTolerance
             }
+            retainedArtifacts = $retainedArtifactEvidence
             cleanupCompleted = $true
         }
     }
