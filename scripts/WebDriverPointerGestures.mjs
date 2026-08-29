@@ -2,7 +2,7 @@ export const scrollIntoPointerViewportScript =
   "arguments[0].scrollIntoView({ block: 'center', inline: 'nearest' });";
 
 export const measureVisiblePointerGeometryScript = `
-  const visibleCenter = (element, label) => {
+  const visiblePoint = (element, label, xRatio = null) => {
     const bounds = element.getBoundingClientRect();
     const left = Math.max(0, bounds.left);
     const right = Math.min(window.innerWidth, bounds.right);
@@ -11,16 +11,25 @@ export const measureVisiblePointerGeometryScript = `
     if (right <= left || bottom <= top) {
       throw new Error(label + " is outside the pointer viewport");
     }
+    const requestedX = xRatio === null
+      ? (left + right) / 2
+      : bounds.left + bounds.width * xRatio;
+    if (requestedX < left || requestedX > right) {
+      throw new Error(label + " sourceXRatio is outside the pointer viewport");
+    }
     return {
-      x: Math.round((left + right) / 2),
+      x: Math.round(requestedX),
       y: Math.round((top + bottom) / 2),
     };
   };
+  const sourceXRatio = typeof arguments[3] === "number"
+    ? arguments[3]
+    : null;
   return {
-    source: visibleCenter(arguments[0], "drag source"),
-    target: visibleCenter(arguments[1], "drag target"),
+    source: visiblePoint(arguments[0], "drag source", sourceXRatio),
+    target: visiblePoint(arguments[1], "drag target"),
     dropTarget: arguments[2]
-      ? visibleCenter(arguments[2], "drop target")
+      ? visiblePoint(arguments[2], "drop target")
       : null,
   };
 `;

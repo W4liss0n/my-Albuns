@@ -502,6 +502,7 @@ export async function performUiAcceptanceAction({
             sourceElement,
             targetElement,
             dropTargetId ? elementReference(dropTargetId) : null,
+            action.sourceXRatio ?? null,
           ],
         )
       : null;

@@ -27,6 +27,7 @@ test("captured pointer gestures have one neutral W3C policy", async () => {
   assert.match(scrollIntoPointerViewportScript, /scrollIntoView/u);
   assert.match(measureVisiblePointerGeometryScript, /getBoundingClientRect/u);
   assert.match(measureVisiblePointerGeometryScript, /window\.innerWidth/u);
+  assert.match(measureVisiblePointerGeometryScript, /sourceXRatio/u);
   assert.deepEqual(
     buildCapturedPointerGestureActions({
       phase: "preview",
@@ -545,6 +546,17 @@ test("the manifest preserves Program 05 proofs and promotes Sheet reordering to 
       .actions.find((action) => action.type === "drag");
     assert.equal(drag.gesture, "pointer", `${id} must use pointer capture`);
   }
+  assert.deepEqual(
+    [
+      "sheet-reorder-bar-preview",
+      "sheet-reorder-bar-commit",
+    ].map((id) =>
+      scenariosById
+        .get(id)
+        .actions.find((action) => action.type === "drag").sourceXRatio,
+    ),
+    [0.25, 0.75],
+  );
   for (const id of [
     "sheet-reorder-bar-preview",
     "sheet-reorder-grid-preview",
@@ -590,6 +602,14 @@ test("the manifest preserves Program 05 proofs and promotes Sheet reordering to 
   ]) {
     assert.match(scenariosById.get(id).readySelector, /^\.app-shell:has/u);
   }
+  assert.match(
+    scenariosById.get("sheet-reorder-bar-preview").readySelector,
+    /reorder-ghost.*data-active-sides.*sheet-preview/u,
+  );
+  assert.match(
+    scenariosById.get("sheet-reorder-grid-preview").readySelector,
+    /reorder-ghost.*data-active-sides.*sheet-preview/u,
+  );
 
   const cancelled = scenariosById.get("sheet-reorder-cancelled");
   assert.match(cancelled.readySelector, /data-reorder-state="cancelled"/u);
@@ -740,6 +760,7 @@ test("manifest schema 3 accepts real context click, hit-tested click, modifier, 
       type: "drag",
       gesture: "pointer",
       selector: "#source",
+      sourceXRatio: 0.25,
       targetSelector: "#target",
       dropTargetSelector: "#opposite-surface",
       phase: "drop",
@@ -799,6 +820,20 @@ test("manifest schema 3 accepts real context click, hit-tested click, modifier, 
   assert.throws(
     () => validateUiAcceptanceManifest(invalidGesture),
     /gesture.*pointer/u,
+  );
+
+  const invalidSourceRatio = structuredClone(interactive);
+  invalidSourceRatio.scenarios[0].actions[5].sourceXRatio = 1;
+  assert.throws(
+    () => validateUiAcceptanceManifest(invalidSourceRatio),
+    /sourceXRatio.*between 0 and 1/u,
+  );
+
+  const ratioWithoutPointerCapture = structuredClone(interactive);
+  delete ratioWithoutPointerCapture.scenarios[0].actions[5].gesture;
+  assert.throws(
+    () => validateUiAcceptanceManifest(ratioWithoutPointerCapture),
+    /sourceXRatio.*gesture pointer/u,
   );
 
   const escapeWithoutPointerCapture = structuredClone(interactive);
@@ -1216,6 +1251,7 @@ test("runner initiates declared pointer capture through the proven WebDriver seq
       type: "drag",
       gesture: "pointer",
       selector: "#source",
+      sourceXRatio: 0.25,
       targetSelector: "#target",
       phase: "preview",
     },
@@ -1246,6 +1282,7 @@ test("runner initiates declared pointer capture through the proven WebDriver seq
     },
   ]);
   assert.match(executions[1].script, /getBoundingClientRect/u);
+  assert.equal(executions[1].args[3], 0.25);
   assert.deepEqual(
     requests.at(-1).body.actions[0].actions,
     [

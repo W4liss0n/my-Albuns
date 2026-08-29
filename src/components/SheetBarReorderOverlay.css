@@ -64,14 +64,54 @@
 
 .sheet-bar-reorder-overlay__ghost {
   z-index: 3;
-  display: grid;
+  overflow: hidden;
   border: 1px solid var(--ui-accent);
-  place-items: center;
-  color: var(--ui-accent-text);
   background: var(--ui-surface-raised);
   box-shadow: var(--ui-shadow-menu);
+}
+
+.sheet-bar-reorder-overlay__ghost[data-origin-selected="true"] {
+  box-shadow:
+    0 0 0 2px var(--ui-accent),
+    var(--ui-shadow-menu);
+}
+
+.sheet-bar-reorder-overlay__ghost-visual {
+  width: 100%;
+  height: 100%;
+}
+
+.sheet-bar-reorder-overlay__ghost-bar {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  right: 0;
+  left: 0;
+  display: grid;
+  box-sizing: border-box;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  border-bottom: 1px solid;
   font-family: var(--ui-font-mono);
   font-size: var(--ui-font-size-caption);
+  line-height: 1;
+}
+
+.sheet-bar-reorder-overlay__ghost-bar > [data-page-side] {
+  text-align: center;
+}
+
+.sheet-bar-reorder-overlay__ghost-bar > [data-page-side="left"] {
+  grid-column: 1;
+}
+
+.sheet-bar-reorder-overlay__ghost-bar > [data-page-side="right"] {
+  grid-column: 2;
+}
+
+.sheet-bar-reorder-overlay__ghost-number {
+  position: absolute;
+  right: 11px;
 }
 
 .sheet-bar-reorder-overlay__invalid {

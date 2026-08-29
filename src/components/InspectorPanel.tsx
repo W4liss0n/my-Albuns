@@ -33,12 +33,11 @@ import { renderableMediaPreviewUrls } from "../application/mediaPreviews";
 import { ActionButton, AppIcon, EmptyState } from "../ui";
 import { AlbumDesignForm } from "./AlbumDesignForm";
 import { AlbumInformationForm } from "./AlbumInformationForm";
-import { SheetPreview } from "./SheetPreview";
+import { SheetPreviewShell } from "./SheetPreview";
 import {
   SheetDesignInspector,
   type SheetDesignScope,
 } from "./SheetDesignInspector";
-import { inactiveSideCssGradient } from "./sheetVisualStyle";
 import {
   SHEET_REORDER_INVALID_MESSAGE,
   sheetReorderAutoScrollVelocity,
@@ -281,6 +280,15 @@ export function InspectorPanel({
     pointerReorder.pointer?.sourceId ??
     sheetReorder?.representation.ghost?.sheetId ??
     null;
+  const reorderGhostSheet = reorderGhostSheetId
+    ? composedSheetById.get(reorderGhostSheetId)
+    : undefined;
+  const reorderGhostSheetState = reorderGhostSheetId
+    ? sheetStateById.get(reorderGhostSheetId)
+    : undefined;
+  const reorderGhostPageMetadata = formatSheetPageMetadata(
+    reorderGhostSheetState,
+  );
 
   function openGridContextMenu(
     event: ReactMouseEvent<HTMLDivElement>,
@@ -507,12 +515,6 @@ export function InspectorPanel({
                     const active = sheet.sheetId === focusedSheetId;
                     const tileStyle = {
                       aspectRatio: `${document.sheetWidthUm} / ${document.sheetHeightUm}`,
-                      ...(sheet.activeSides === "both"
-                        ? {}
-                        : {
-                            "--sheet-inactive-side-gradient":
-                              inactiveSideCssGradient(sheet.activeSides),
-                          }),
                     } as CSSProperties;
                     const reorderGhost =
                       reorderGhostSheetId === sheet.sheetId;
@@ -572,25 +574,30 @@ export function InspectorPanel({
                         style={tileStyle}
                         onPress={() => onNavigateToSheet(sheet.sheetId)}
                       >
-                        <SheetPreview
+                        <SheetPreviewShell
                           frameBorder={frameBorder}
                           sheet={sheet}
                           mediaPreviewUrls={mediaPreviewUrls}
-                        />
-                        <span aria-hidden="true" className="sheet-tile__number">
-                          {number}
-                        </span>
-                        <span aria-hidden="true" className="sheet-tile__pages">
-                          {visualPageLabel}
-                        </span>
+                        >
+                          <span aria-hidden="true" className="sheet-tile__number">
+                            {number}
+                          </span>
+                          <span aria-hidden="true" className="sheet-tile__pages">
+                            {visualPageLabel}
+                          </span>
+                        </SheetPreviewShell>
                       </Button>
                       </div>
                     );
                   })}
-                  {reorderGhostSheetId ? (
+                  {reorderGhostSheetId && reorderGhostSheet ? (
                     <span
                       aria-hidden="true"
                       className="sheet-reorder-ghost"
+                      data-active-sides={reorderGhostSheet.activeSides}
+                      data-origin-selected={
+                        reorderGhostSheetId === focusedSheetId || undefined
+                      }
                       data-pointer-x={pointerReorder.pointer?.clientX}
                       data-pointer-y={pointerReorder.pointer?.clientY}
                       data-sheet-id={reorderGhostSheetId}
@@ -600,9 +607,24 @@ export function InspectorPanel({
                         gridGhostAnchorRef.current,
                       )}
                     >
-                      {sheetStateById.get(
-                        reorderGhostSheetId,
-                      )?.number ?? ""}
+                      <SheetPreviewShell
+                        frameBorder={frameBorder}
+                        mediaPreviewUrls={mediaPreviewUrls}
+                        sheet={reorderGhostSheet}
+                      >
+                        <span className="sheet-tile__number">
+                          {String(
+                            reorderGhostSheetState?.number ??
+                              reorderGhostSheet.number,
+                          ).padStart(2, "0")}
+                        </span>
+                        <span className="sheet-tile__pages">
+                          {reorderGhostPageMetadata?.visualLabel ??
+                            `Lâmina ${String(
+                              reorderGhostSheet.number,
+                            ).padStart(2, "0")}`}
+                        </span>
+                      </SheetPreviewShell>
                     </span>
                   ) : null}
                   {sheetReorder?.status === "invalid" &&

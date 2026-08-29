@@ -20,8 +20,8 @@ test("aligns enabled pointer handles with the scaled Sheet Bar slots", () => {
   const first = barHandle(1);
   const second = barHandle(2);
 
-  expect(first).toHaveStyle({ left: "88px", top: "28px", width: "37px" });
-  expect(second).toHaveStyle({ left: "234px", top: "28px", width: "37px" });
+  expect(first).toHaveStyle({ left: "25px", top: "28px", width: "100px" });
+  expect(second).toHaveStyle({ left: "171px", top: "28px", width: "100px" });
   expect(first).not.toHaveAttribute("draggable");
   expect(overlay).toHaveAttribute("aria-disabled", "false");
 
@@ -39,7 +39,36 @@ test("aligns enabled pointer handles with the scaled Sheet Bar slots", () => {
   expect(overlay).toHaveAttribute("aria-disabled", "true");
 });
 
-test("keeps reserved swap and layout hit regions outside the reorder handle", () => {
+test.each([
+  ["left page", 50],
+  ["right page", 100],
+] as const)(
+  "starts pointer reordering from the %s of the visible Sheet Bar",
+  (_side, startX) => {
+    const onCancel = vi.fn();
+    const onPreview = vi.fn();
+    const view = render(
+      <SheetBarReorderOverlay
+        {...props({ onCancel, onPreview })}
+      />,
+    );
+    setOverlayBounds();
+    const surface = barSurface();
+    const handle = barHandle(1);
+    pointerCapture(surface);
+
+    expectPointerCoordinateInsideHandle(handle, startX, 40);
+    pointerDown(handle, 70 + startX, startX, 40);
+    pointerMove(surface, 70 + startX, 240, 40);
+
+    expect(onPreview).toHaveBeenLastCalledWith("sheet-1", 1);
+    fireEvent.pointerCancel(surface, { pointerId: 70 + startX });
+    expect(onCancel).toHaveBeenCalledOnce();
+    view.unmount();
+  },
+);
+
+test("ignores pointer gestures outside every rendered Sheet Bar handle", () => {
   const onNavigate = vi.fn();
   const onPreview = vi.fn();
   render(
@@ -80,9 +109,9 @@ test("moves neighboring handles and renders only the declared preview markers", 
     />,
   );
 
-  expect(barHandle(1)).toHaveStyle({ left: "234px" });
+  expect(barHandle(1)).toHaveStyle({ left: "171px" });
   expect(barHandle(1)).toHaveAttribute("data-reorder-shift", "true");
-  expect(barHandle(2)).toHaveStyle({ left: "88px" });
+  expect(barHandle(2)).toHaveStyle({ left: "25px" });
   expect(barHandle(2)).toHaveAttribute("data-reorder-ghost", "true");
   expect(screen.getByTestId("reorder-placeholder")).toHaveStyle({
     height: "50px",
@@ -113,6 +142,110 @@ test("moves neighboring handles and renders only the declared preview markers", 
     "Posição inválida: Páginas únicas permanecem nas extremidades.",
   );
   expect(screen.queryByTestId("reorder-placeholder")).not.toBeInTheDocument();
+});
+
+test("renders the exact double and single-page Sheet visual inside the Bar ghost", () => {
+  const doubleSheet = {
+    ...sheet("sheet-double", 3),
+    base: {
+      rgb: "#F2E4C8",
+      drawRect: { x: 0, y: 0, width: 200_000, height: 100_000 },
+    },
+    backgrounds: [
+      {
+        kind: "color" as const,
+        rgb: "#C9D8EC",
+        drawRect: { x: 0, y: 0, width: 200_000, height: 100_000 },
+      },
+    ],
+  } satisfies ComposedSheet;
+  const singleSheet = {
+    ...sheet("sheet-single", 4),
+    activeSides: "right" as const,
+    widthUm: 100_000,
+    base: {
+      rgb: "#E8D7CE",
+      drawRect: { x: 0, y: 0, width: 100_000, height: 100_000 },
+    },
+  } satisfies ComposedSheet;
+  const visualSheets = [doubleSheet, singleSheet];
+  const visualLayout = createContinuousCanvasLayout(visualSheets);
+  const visualMetadata = [
+    {
+      layoutLocked: false,
+      pageNumbers: [5, 6],
+      sheetId: doubleSheet.sheetId,
+    },
+    {
+      layoutLocked: false,
+      pageNumbers: [7],
+      sheetId: singleSheet.sheetId,
+    },
+  ];
+  const view = render(
+    <SheetBarReorderOverlay
+      {...props({
+        focusedSheetId: doubleSheet.sheetId,
+        layout: visualLayout,
+        representation: {
+          ghost: { sheetId: doubleSheet.sheetId },
+          order: visualSheets.map((item) => item.sheetId),
+          placeholderIndex: 1,
+        },
+        sheetBarMetadata: visualMetadata,
+        sheets: visualSheets,
+        status: "preview",
+      })}
+    />,
+  );
+
+  let ghost = screen.getByTestId("reorder-ghost");
+  let preview = ghost.querySelector(".sheet-preview");
+  expect(ghost).toHaveAttribute("data-active-sides", "both");
+  expect(ghost).toHaveAttribute("data-origin-selected", "true");
+  expect(preview).not.toBeNull();
+  expect(preview).toHaveAttribute("viewBox", "0 0 200000 100000");
+  expect(
+    preview?.querySelector('[data-preview-background-color="#C9D8EC"]'),
+  ).not.toBeNull();
+  expect(preview?.querySelector("line")).not.toBeNull();
+  expect(ghost.querySelector('[data-page-side="left"]')).toHaveTextContent(
+    "5",
+  );
+  expect(ghost.querySelector('[data-page-side="right"]')).toHaveTextContent(
+    "6",
+  );
+
+  view.rerender(
+    <SheetBarReorderOverlay
+      {...props({
+        focusedSheetId: doubleSheet.sheetId,
+        layout: visualLayout,
+        representation: {
+          ghost: { sheetId: singleSheet.sheetId },
+          order: visualSheets.map((item) => item.sheetId),
+          placeholderIndex: 0,
+        },
+        sheetBarMetadata: visualMetadata,
+        sheets: visualSheets,
+        status: "preview",
+      })}
+    />,
+  );
+  ghost = screen.getByTestId("reorder-ghost");
+  preview = ghost.querySelector(".sheet-preview");
+  expect(ghost).toHaveAttribute("data-active-sides", "right");
+  expect(ghost).not.toHaveAttribute("data-origin-selected");
+  expect(preview).toHaveAttribute("viewBox", "0 0 100000 100000");
+  expect(preview?.querySelector("line")).toBeNull();
+  expect(ghost.querySelector('[data-page-side="right"]')).toHaveTextContent(
+    "7",
+  );
+  expect(
+    ghost
+      .querySelector<HTMLElement>(".sheet-preview-shell")
+      ?.style.getPropertyValue("--sheet-inactive-side-gradient"),
+  ).toContain("linear-gradient");
 });
 
 test("matches full-size markers to the bleed-cropped visible Sheet bounds", () => {
@@ -189,7 +322,16 @@ test("captures the pointer after press, crosses the threshold, and follows it in
     "data-pointer-x",
     "240",
   );
-  pointerUp(surface, 17, 240, 40);
+  pointerMove(surface, 17, 260, 90);
+  expect(screen.getByTestId("reorder-ghost")).toHaveStyle({
+    left: "185px",
+    top: "28px",
+  });
+  expect(screen.getByTestId("reorder-ghost")).toHaveAttribute(
+    "data-pointer-y",
+    "90",
+  );
+  pointerUp(surface, 17, 260, 90);
   expect(capture.release).toHaveBeenCalledWith(17);
   expect(onDrop).toHaveBeenCalledOnce();
   fireEvent.click(first);
@@ -358,6 +500,21 @@ function barSurface(): HTMLElement {
   return screen.getByRole("group", {
     name: "Reordenação pela Barra da Lâmina",
   });
+}
+
+function expectPointerCoordinateInsideHandle(
+  handle: HTMLElement,
+  clientX: number,
+  clientY: number,
+) {
+  const left = Number.parseFloat(handle.style.left);
+  const top = Number.parseFloat(handle.style.top);
+  const width = Number.parseFloat(handle.style.width);
+  const height = Number.parseFloat(handle.style.height);
+  expect(clientX).toBeGreaterThanOrEqual(left);
+  expect(clientX).toBeLessThanOrEqual(left + width);
+  expect(clientY).toBeGreaterThanOrEqual(top);
+  expect(clientY).toBeLessThanOrEqual(top + height);
 }
 
 function pointerCapture(element: HTMLElement) {

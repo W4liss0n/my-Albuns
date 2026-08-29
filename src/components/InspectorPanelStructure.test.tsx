@@ -55,6 +55,17 @@ test("captures pointer reorder in the Grade and follows it in both directions", 
     "data-pointer-y",
     "160",
   );
+  expect(screen.getByTestId("reorder-ghost")).toHaveAttribute(
+    "data-active-sides",
+    projection.composition.sheets[0].activeSides,
+  );
+  expect(screen.getByTestId("reorder-ghost")).toHaveAttribute(
+    "data-origin-selected",
+    "true",
+  );
+  expect(
+    screen.getByTestId("reorder-ghost").querySelector(".sheet-preview"),
+  ).not.toBeNull();
   pointerUp(grid, 23, 50, 160);
   expect(gridCapture.release).toHaveBeenCalledWith(23);
   expect(onDrop).toHaveBeenCalledOnce();
@@ -67,6 +78,57 @@ test("captures pointer reorder in the Grade and follows it in both directions", 
   pointerUp(grid, 24, 50, 50);
   expect(gridCapture.release).toHaveBeenCalledWith(24);
   expect(onDrop).toHaveBeenCalledTimes(2);
+});
+
+test("keeps the exact single-page source representation in the Grade ghost", () => {
+  const firstSheet = projection.composition.sheets[0];
+  const singlePageSheet = {
+    ...firstSheet,
+    activeSides: "right" as const,
+    widthUm: firstSheet.widthUm / 2,
+  };
+  const panelProps = props();
+  render(
+    <InspectorPanel
+      {...panelProps}
+      sheets={[singlePageSheet, projection.composition.sheets[1]]}
+      sheetStates={[
+        {
+          ...projection.state.album.sheets[0],
+          pageNumbers: [1],
+          role: "initial",
+        },
+        projection.state.album.sheets[1],
+      ]}
+      sheetReorder={{
+        disabled: false,
+        onCancel: vi.fn(),
+        onDrop: vi.fn(),
+        onPreview: vi.fn(),
+        representation: {
+          ghost: { sheetId: singlePageSheet.sheetId },
+          order: sheetIds(),
+          placeholderIndex: 1,
+        },
+        status: "preview",
+      }}
+    />,
+  );
+
+  const sourcePreview = sheetButton(1).querySelector(".sheet-preview");
+  const ghost = screen.getByTestId("reorder-ghost");
+  const ghostShell = ghost.querySelector<HTMLElement>(
+    ".sheet-preview-shell",
+  );
+  const ghostPreview = ghost.querySelector(".sheet-preview");
+  expect(ghost).toHaveAttribute("data-active-sides", "right");
+  expect(ghostPreview).toHaveAttribute(
+    "viewBox",
+    sourcePreview?.getAttribute("viewBox"),
+  );
+  expect(
+    ghostShell?.style.getPropertyValue("--sheet-inactive-side-gradient"),
+  ).toContain("linear-gradient");
 });
 
 test("keeps a below-threshold Grade press as an ordinary navigation click", () => {

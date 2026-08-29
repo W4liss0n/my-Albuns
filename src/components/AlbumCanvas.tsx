@@ -562,7 +562,10 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
           <SheetBarReorderOverlay
             bleedUm={props.technicalGuides?.bleedUm}
             disabled={props.sheetReorder.disabled}
+            focusedSheetId={props.focusedSheetId}
+            frameBorder={props.composition.frameBorder}
             layout={props.continuousCanvasLayout}
+            mediaPreviewUrls={props.mediaPreviewUrls}
             metrics={canvasMetrics}
             onAutoScrollVelocity={setSheetAutoScrollVelocity}
             onCancel={props.sheetReorder.onCancel}
@@ -573,6 +576,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
             onNavigate={props.sheetReorder.onNavigate}
             onPreview={props.sheetReorder.onPreview}
             representation={props.sheetReorder.representation}
+            sheetBarMetadata={props.sheetBarMetadata}
             sheets={props.composition.sheets}
             status={props.sheetReorder.status}
             viewport={props.viewport}

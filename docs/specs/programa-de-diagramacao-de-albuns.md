@@ -133,7 +133,7 @@ A saída final será uma Exportação JPEG, PNG ou PDF, `Por lâmina` ou `Por p�
 1. Como pessoa diagramadora, quero que Lâminas internas sejam sempre duplas, para manter ambos os lados ativos no interior do Álbum.
 1. Como pessoa diagramadora, quero que o lado inativo não contenha Página, conteúdo ou interação própria de Página, mesmo quando o Canvas contínuo o apresente como uma metade visual desativada que participa do hover, foco e ações da Lâmina, para não confundi-lo com uma página vazia sem quebrar a unidade visual da Lâmina.
 1. Como pessoa diagramadora, quero reordenar Lâminas e atualizar seus papéis pela posição, para reorganizar a sequência do Álbum.
-1. Como pessoa diagramadora, quero arrastar uma Lâmina por sua Barra usando um espaço reservado móvel e um fantasma visual, para compreender a posição resultante antes de confirmar.
+1. Como pessoa diagramadora, quero arrastar uma Lâmina por qualquer área livre de sua Barra, em ambas as metades, usando um espaço reservado móvel e um fantasma visual fiel à origem, para compreender a posição resultante antes de confirmar.
 1. Como pessoa diagramadora, quero adicionar antes/depois, duplicar, excluir ou converter uma extremidade pelo menu `Lâmina`, para editar a estrutura usando a Lâmina centralizada.
 1. Como pessoa diagramadora, quero os mesmos comandos no menu de contexto, para atuar explicitamente sobre a Lâmina clicada.
 1. Como pessoa diagramadora, quero que uma Lâmina adicionada nasça dupla, vazia e herdando o design atual do Álbum, para receber uma base previsível sem composição artificial.
@@ -681,8 +681,8 @@ validação das superfícies descritas nesta seção.
 - Uma Lâmina possui lados esquerdo e direito; somente lados ativos representam Páginas. Um lado inativo não contém conteúdo nem permite interação própria de Página, embora sua representação possa integrar hover, foco e ações da Lâmina.
 - As Lâminas inicial e final podem ser duplas ou de página única. Na inicial simples, somente o lado direito fica ativo; na final simples, somente o esquerdo.
 - Uma Página única permanece presa à extremidade correspondente. Reordenações não podem deslocá-la indiretamente para outra posição.
-- Pressionar uma área não interativa da Barra e ultrapassar o limiar de arraste inicia a reordenação; os controles da Barra não iniciam o gesto.
-- A origem mantém um espaço reservado do mesmo tamanho e um fantasma da Lâmina acompanha o ponteiro.
+- Pressionar qualquer área livre da geometria visual completa da Barra, inclusive as metades esquerda e direita e o lado visualmente inativo de uma Página única, e ultrapassar o limiar de arraste inicia a reordenação. Somente controles interativos com gesto próprio ficam fora dessa superfície; rótulos e placeholders sem ação não criam zonas mortas.
+- A origem mantém um espaço reservado do mesmo tamanho e um fantasma visual fiel à representação de origem: mesma forma de Lâmina dupla ou Página única, proporção, Páginas, composição disponível e estado de seleção pertinente, na escala da superfície originadora. Na Barra, o fantasma acompanha somente a coordenada horizontal e mantém a vertical ancorada à faixa original; na Grade, acompanha os dois eixos para alcançar todas as células.
 - Ao alcançar outra posição válida, o espaço reservado se desloca até ela e as Lâminas intermediárias avançam uma posição em direção à origem. Trata-se de inserção, não de troca direta.
 - Aproximar o fantasma de uma borda lateral inicia rolagem horizontal automática na direção correspondente; a velocidade aumenta com a proximidade da borda e o espaço reservado continua sendo atualizado.
 - Durante a prévia, a ordem do Projeto permanece intacta. Soltar em posição válida confirma uma única ação de Undo/Redo; `Esc` ou soltura inválida restaura a ordem original.

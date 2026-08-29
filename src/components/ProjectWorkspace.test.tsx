@@ -5130,6 +5130,9 @@ test("shows Page numbers instead of cover and final aliases", () => {
   const tiles = Array.from(
     view.container.querySelectorAll<HTMLElement>(".sheet-tile"),
   );
+  const tilePreviews = tiles.map((tile) =>
+    tile.querySelector<HTMLElement>(".sheet-preview-shell"),
+  );
   expect(
     tiles.map(
       (tile) => tile.querySelector(".sheet-tile__pages")?.textContent,
@@ -5142,12 +5145,16 @@ test("shows Page numbers instead of cover and final aliases", () => {
     "Ir para Lâmina 02, Lâmina final, Página 2",
   );
   expect(
-    tiles[0].style.getPropertyValue("--sheet-inactive-side-gradient"),
+    tilePreviews[0]?.style.getPropertyValue(
+      "--sheet-inactive-side-gradient",
+    ),
   ).toBe(
     "linear-gradient(to right, #faf9f6 0%, #ebe3d8 58%, #cec2b2 100%)",
   );
   expect(
-    tiles[1].style.getPropertyValue("--sheet-inactive-side-gradient"),
+    tilePreviews[1]?.style.getPropertyValue(
+      "--sheet-inactive-side-gradient",
+    ),
   ).toBe(
     "linear-gradient(to left, #faf9f6 0%, #ebe3d8 58%, #cec2b2 100%)",
   );

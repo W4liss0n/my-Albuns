@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useId, type CSSProperties, type ReactNode } from "react";
 
 import type {
   ComposedBackground,
@@ -10,6 +10,7 @@ import type {
 import { CANVAS_MICROMETERS_PER_PIXEL } from "./canvasGeometry";
 import {
   frameOutlineStyle,
+  inactiveSideCssGradient,
   photoPaletteIndexForStripe,
   SHEET_VISUAL_STYLE,
 } from "./sheetVisualStyle";
@@ -19,6 +20,53 @@ interface SheetPreviewProps {
   sheet: ComposedSheet;
   frameBorder?: ProjectedFrameBorder;
   mediaPreviewUrls?: Readonly<Record<string, string>>;
+}
+
+interface SheetPreviewShellProps extends SheetPreviewProps {
+  children?: ReactNode;
+  className?: string;
+}
+
+type SheetPreviewShellStyle = CSSProperties & {
+  "--sheet-inactive-side-gradient"?: string;
+};
+
+function sheetPreviewShellStyle(
+  activeSides: ComposedSheet["activeSides"],
+): SheetPreviewShellStyle {
+  return activeSides === "both"
+    ? {}
+    : {
+        "--sheet-inactive-side-gradient":
+          inactiveSideCssGradient(activeSides),
+      };
+}
+
+export function SheetPreviewShell({
+  children,
+  className,
+  frameBorder,
+  mediaPreviewUrls,
+  sheet,
+}: SheetPreviewShellProps) {
+  return (
+    <span
+      className={
+        className
+          ? `sheet-preview-shell ${className}`
+          : "sheet-preview-shell"
+      }
+      data-active-sides={sheet.activeSides}
+      style={sheetPreviewShellStyle(sheet.activeSides)}
+    >
+      <SheetPreview
+        frameBorder={frameBorder}
+        mediaPreviewUrls={mediaPreviewUrls}
+        sheet={sheet}
+      />
+      {children}
+    </span>
+  );
 }
 
 export function SheetPreview({
