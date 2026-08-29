@@ -1,8 +1,8 @@
 {
     "schemaVersion":  1,
     "gate":  "productive-end-to-end-journey",
-    "collectedAtUtc":  "2026-08-29T15:27:23.0359867Z",
-    "gitCommit":  "1949905e3a76037aebe59ddaa0b60218d9b64b11",
+    "collectedAtUtc":  "2026-08-29T16:46:11.1705379Z",
+    "gitCommit":  "3ac5fbb06840e648928b4171f7f5b26cc1eb11ca",
     "sourceInputsDirty":  false,
     "platform":  {
                      "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
@@ -205,7 +205,7 @@
                      "cancelledExportBeforePipeline":  true,
                      "createAuthorization":  "createOnly",
                      "exportedSheetNumber":  2,
-                     "selectedSheetId":  "df313c49-0089-47df-a2b7-5ee0da8f51ee",
+                     "selectedSheetId":  "ad90d76e-c75a-4dfd-8681-ddf30654435b",
                      "selectedSheetActiveSides":  "both",
                      "firstSheetDimensions":  {
                                                   "width":  720,
@@ -226,43 +226,43 @@
                      "physicalAlbumStructure":  {
                                                     "reorderSurface":  "grid",
                                                     "dragTransport":  "w3c-pointer-actions",
-                                                    "addedSheetId":  "f9a0eb24-6568-47e0-93e4-d4f7eb6e39b2",
+                                                    "addedSheetId":  "0b6e0e50-ce21-4b8b-8cf6-5c644f7a9345",
                                                     "before":  {
                                                                    "count":  3,
-                                                                   "focusedSheetId":  "df313c49-0089-47df-a2b7-5ee0da8f51ee",
+                                                                   "focusedSheetId":  "ad90d76e-c75a-4dfd-8681-ddf30654435b",
                                                                    "order":  [
-                                                                                 "3e31ec59-e9a6-47ab-b1da-7ba8495fc896",
-                                                                                 "df313c49-0089-47df-a2b7-5ee0da8f51ee",
-                                                                                 "501dfb94-e9f0-433a-8644-a4ca717933d4"
+                                                                                 "32690062-9ed6-47b3-8fee-07f65b1a9d31",
+                                                                                 "ad90d76e-c75a-4dfd-8681-ddf30654435b",
+                                                                                 "62d6bb63-2ff3-44c5-92c5-5bae8ce69aa2"
                                                                              ]
                                                                },
                                                     "afterAdd":  {
                                                                      "count":  4,
-                                                                     "focusedSheetId":  "f9a0eb24-6568-47e0-93e4-d4f7eb6e39b2",
+                                                                     "focusedSheetId":  "0b6e0e50-ce21-4b8b-8cf6-5c644f7a9345",
                                                                      "order":  [
-                                                                                   "3e31ec59-e9a6-47ab-b1da-7ba8495fc896",
-                                                                                   "df313c49-0089-47df-a2b7-5ee0da8f51ee",
-                                                                                   "f9a0eb24-6568-47e0-93e4-d4f7eb6e39b2",
-                                                                                   "501dfb94-e9f0-433a-8644-a4ca717933d4"
+                                                                                   "32690062-9ed6-47b3-8fee-07f65b1a9d31",
+                                                                                   "ad90d76e-c75a-4dfd-8681-ddf30654435b",
+                                                                                   "0b6e0e50-ce21-4b8b-8cf6-5c644f7a9345",
+                                                                                   "62d6bb63-2ff3-44c5-92c5-5bae8ce69aa2"
                                                                                ]
                                                                  },
                                                     "afterReorder":  {
                                                                          "count":  4,
-                                                                         "focusedSheetId":  "f9a0eb24-6568-47e0-93e4-d4f7eb6e39b2",
+                                                                         "focusedSheetId":  "0b6e0e50-ce21-4b8b-8cf6-5c644f7a9345",
                                                                          "order":  [
-                                                                                       "3e31ec59-e9a6-47ab-b1da-7ba8495fc896",
-                                                                                       "f9a0eb24-6568-47e0-93e4-d4f7eb6e39b2",
-                                                                                       "df313c49-0089-47df-a2b7-5ee0da8f51ee",
-                                                                                       "501dfb94-e9f0-433a-8644-a4ca717933d4"
+                                                                                       "32690062-9ed6-47b3-8fee-07f65b1a9d31",
+                                                                                       "0b6e0e50-ce21-4b8b-8cf6-5c644f7a9345",
+                                                                                       "ad90d76e-c75a-4dfd-8681-ddf30654435b",
+                                                                                       "62d6bb63-2ff3-44c5-92c5-5bae8ce69aa2"
                                                                                    ]
                                                                      },
                                                     "afterDelete":  {
                                                                         "count":  3,
-                                                                        "focusedSheetId":  "df313c49-0089-47df-a2b7-5ee0da8f51ee",
+                                                                        "focusedSheetId":  "ad90d76e-c75a-4dfd-8681-ddf30654435b",
                                                                         "order":  [
-                                                                                      "3e31ec59-e9a6-47ab-b1da-7ba8495fc896",
-                                                                                      "df313c49-0089-47df-a2b7-5ee0da8f51ee",
-                                                                                      "501dfb94-e9f0-433a-8644-a4ca717933d4"
+                                                                                      "32690062-9ed6-47b3-8fee-07f65b1a9d31",
+                                                                                      "ad90d76e-c75a-4dfd-8681-ddf30654435b",
+                                                                                      "62d6bb63-2ff3-44c5-92c5-5bae8ce69aa2"
                                                                                   ]
                                                                     },
                                                     "restoredOriginalOrder":  true,
@@ -270,19 +270,19 @@
                                                                               {
                                                                                   "event":  "project_intent_applied",
                                                                                   "intent":  "add_sheet",
-                                                                                  "processId":  36188,
+                                                                                  "processId":  33112,
                                                                                   "revision":  9
                                                                               },
                                                                               {
                                                                                   "event":  "project_intent_applied",
                                                                                   "intent":  "reorder_sheet",
-                                                                                  "processId":  36188,
+                                                                                  "processId":  33112,
                                                                                   "revision":  10
                                                                               },
                                                                               {
                                                                                   "event":  "project_intent_applied",
                                                                                   "intent":  "delete_sheet",
-                                                                                  "processId":  36188,
+                                                                                  "processId":  33112,
                                                                                   "revision":  11
                                                                               }
                                                                           ]
@@ -330,15 +330,15 @@
                                              "postRecoveryActionsCheckpointed":  true,
                                              "checkpointPreservedByCancelledSaveAs":  true,
                                              "checkpointFinishedBySuccessfulSaveAs":  true,
-                                             "crashedHostProcessId":  36600,
-                                             "recoveredHostProcessId":  36188,
+                                             "crashedHostProcessId":  25440,
+                                             "recoveredHostProcessId":  33112,
                                              "lockReleasedToDistinctHost":  true
                                          },
                      "saveAs":  {
                                     "cancelledBeforeCore":  true,
                                     "createAuthorization":  "createOnly",
-                                    "originalProjectId":  "08c1e656-abfc-402c-bd26-efb97ac63503",
-                                    "copiedProjectId":  "f16be109-f7f7-4629-a903-aa0fa1608ac6",
+                                    "originalProjectId":  "c3d3f751-4715-4778-b7e0-53b39e9590ab",
+                                    "copiedProjectId":  "6ca2de2e-9801-4b76-b352-cb347d4ee25e",
                                     "savedAsRevision":  6,
                                     "contentPreserved":  true,
                                     "originalByteIdentical":  true,
@@ -355,7 +355,7 @@
                                     "localAuthorityTransitioned":  true,
                                     "webviewNamespaceTransitioned":  true,
                                     "nativeTitleUpdated":  true,
-                                    "observedNativeTitle":  "Jornada produtiva - Cópia — C:\\Users\\Usuario\\.codex\\worktrees\\c8d2\\my-Albuns\\.scratch\\j8-12652-81ec79\\Jornada produtiva - Cópia.myalbuns",
+                                    "observedNativeTitle":  "Jornada produtiva - Cópia — C:\\Users\\Usuario\\.codex\\worktrees\\c8d2\\my-Albuns\\.scratch\\j8-34732-9a9441\\Jornada produtiva - Cópia.myalbuns",
                                     "replacementWebviewReady":  true,
                                     "globalInspectorPreferencePreserved":  true,
                                     "projectLocalSelectionReset":  true
@@ -394,16 +394,16 @@
                                                   }
                               },
                      "processIds":  {
-                                        "firstGlobal":  17892,
-                                        "firstHost":  26632,
-                                        "global":  32360,
-                                        "crashedHost":  36600,
-                                        "recoveryGlobal":  33256,
-                                        "host":  36188,
-                                        "simultaneousOriginalGlobal":  2860,
-                                        "simultaneousOriginalHost":  10020,
-                                        "imaging":  27808,
-                                        "missingOriginalImaging":  13908
+                                        "firstGlobal":  27896,
+                                        "firstHost":  29380,
+                                        "global":  11452,
+                                        "crashedHost":  25440,
+                                        "recoveryGlobal":  32604,
+                                        "host":  33112,
+                                        "simultaneousOriginalGlobal":  6520,
+                                        "simultaneousOriginalHost":  15396,
+                                        "imaging":  23072,
+                                        "missingOriginalImaging":  2280
                                     },
                      "correlations":  {
                                           "bootstraps":  4,
