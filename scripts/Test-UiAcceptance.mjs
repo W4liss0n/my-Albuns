@@ -421,7 +421,7 @@ test("the manifest preserves Program 05 proofs and promotes Sheet reordering to 
     "sheet-reorder-invalid-target-preview",
   ]);
 
-  assert.equal(manifest.scenarios.length, 54 + Object.keys(expectedScenarios).length);
+  assert.equal(manifest.scenarios.length, 56 + Object.keys(expectedScenarios).length);
   for (const [id, actionTypes] of Object.entries(expectedScenarios)) {
     const scenario = scenariosById.get(id);
     assert.ok(scenario, `${id} is missing`);
@@ -577,6 +577,8 @@ test("the manifest exercises this UI correction batch in the real renderer", () 
     "canvas-keyboard-next-sheet",
     "canvas-keyboard-previous-sheet",
     "canvas-context-menu-surface-preserves-viewport",
+    "sheet-context-menu-outside-bar-click-preserves-navigation",
+    "sheet-context-menu-outside-grid-click-preserves-navigation",
     "canvas-wheel-sheet-bar-forward",
     "canvas-wheel-sheet-bar-backward",
     "project-splitters-normal-100",
@@ -645,11 +647,12 @@ test("the manifest exercises this UI correction batch in the real renderer", () 
   );
 });
 
-test("manifest schema 3 accepts real context click, modifier, wheel, and drag actions", () => {
+test("manifest schema 3 accepts real context click, hit-tested click, modifier, wheel, and drag actions", () => {
   const interactive = structuredClone(manifest);
   interactive.schemaVersion = 3;
   interactive.scenarios[0].actions = [
     { type: "context-click", selector: "#sheet" },
+    { type: "pointer-click", selector: "#sheet" },
     { type: "key", key: "Plus", modifiers: ["Control"] },
     { type: "click", selector: "#frame", modifiers: ["Control"] },
     {
@@ -679,14 +682,14 @@ test("manifest schema 3 accepts real context click, modifier, wheel, and drag ac
   assert.equal(validateUiAcceptanceManifest(interactive), interactive);
 
   const unknownModifier = structuredClone(interactive);
-  unknownModifier.scenarios[0].actions[1].modifiers = ["Alt"];
+  unknownModifier.scenarios[0].actions[2].modifiers = ["Alt"];
   assert.throws(
     () => validateUiAcceptanceManifest(unknownModifier),
     /modifier.*not supported/u,
   );
 
   const duplicateModifier = structuredClone(interactive);
-  duplicateModifier.scenarios[0].actions[1].modifiers = [
+  duplicateModifier.scenarios[0].actions[2].modifiers = [
     "Control",
     "Control",
   ];
@@ -696,42 +699,42 @@ test("manifest schema 3 accepts real context click, modifier, wheel, and drag ac
   );
 
   const zeroWheel = structuredClone(interactive);
-  zeroWheel.scenarios[0].actions[3].deltaY = 0;
+  zeroWheel.scenarios[0].actions[4].deltaY = 0;
   assert.throws(
     () => validateUiAcceptanceManifest(zeroWheel),
     /deltaY.*non-zero integer/u,
   );
 
   const invalidDrag = structuredClone(interactive);
-  invalidDrag.scenarios[0].actions[4].phase = "hover";
+  invalidDrag.scenarios[0].actions[5].phase = "hover";
   assert.throws(
     () => validateUiAcceptanceManifest(invalidDrag),
     /phase.*preview, drop, or escape/u,
   );
 
   const invalidDropTarget = structuredClone(interactive);
-  invalidDropTarget.scenarios[0].actions[4].dropTargetSelector = "";
+  invalidDropTarget.scenarios[0].actions[5].dropTargetSelector = "";
   assert.throws(
     () => validateUiAcceptanceManifest(invalidDropTarget),
     /dropTargetSelector.*non-empty string/u,
   );
 
   const invalidGesture = structuredClone(interactive);
-  invalidGesture.scenarios[0].actions[4].gesture = "native";
+  invalidGesture.scenarios[0].actions[5].gesture = "native";
   assert.throws(
     () => validateUiAcceptanceManifest(invalidGesture),
     /gesture.*pointer/u,
   );
 
   const escapeWithoutPointerCapture = structuredClone(interactive);
-  delete escapeWithoutPointerCapture.scenarios[0].actions[5].gesture;
+  delete escapeWithoutPointerCapture.scenarios[0].actions[6].gesture;
   assert.throws(
     () => validateUiAcceptanceManifest(escapeWithoutPointerCapture),
     /phase escape.*pointer/u,
   );
 
   const invalidSelectionExpectation = structuredClone(interactive);
-  invalidSelectionExpectation.scenarios[0].actions[6].expect = "native";
+  invalidSelectionExpectation.scenarios[0].actions[7].expect = "native";
   assert.throws(
     () => validateUiAcceptanceManifest(invalidSelectionExpectation),
     /expect must be control, none, or text/u,
@@ -881,7 +884,7 @@ test("runner executes focus, hover, keyboard and input actions through WebDriver
   ]);
 });
 
-test("runner emits a real W3C secondary-button click for context menus", async () => {
+test("runner emits real W3C secondary-button and hit-tested primary clicks", async () => {
   const { performUiAcceptanceAction } = await import(
     "./UiAcceptanceRunner.mjs"
   );
@@ -889,6 +892,18 @@ test("runner emits a real W3C secondary-button click for context menus", async (
 
   await performUiAcceptanceAction({
     action: { type: "context-click", selector: "#sheet" },
+    execute: async () => true,
+    locateSelector: async (selector) => `element:${selector}`,
+    locateText: async (text) => `text:${text}`,
+    request: async (method, endpoint, body) => {
+      requests.push({ body, endpoint, method });
+      return null;
+    },
+    sessionId: "session-context-click",
+  });
+
+  await performUiAcceptanceAction({
+    action: { type: "pointer-click", selector: "#underlay" },
     execute: async () => true,
     locateSelector: async (selector) => `element:${selector}`,
     locateText: async (text) => `text:${text}`,
@@ -921,6 +936,32 @@ test("runner emits a real W3C secondary-button click for context menus", async (
               },
               { type: "pointerDown", button: 2 },
               { type: "pointerUp", button: 2 },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      method: "POST",
+      endpoint: "/session/session-context-click/actions",
+      body: {
+        actions: [
+          {
+            type: "pointer",
+            id: "acceptance-pointer",
+            parameters: { pointerType: "mouse" },
+            actions: [
+              {
+                type: "pointerMove",
+                duration: 0,
+                origin: {
+                  "element-6066-11e4-a52e-4f735466cecf": "element:#underlay",
+                },
+                x: 0,
+                y: 0,
+              },
+              { type: "pointerDown", button: 0 },
+              { type: "pointerUp", button: 0 },
             ],
           },
         ],
