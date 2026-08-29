@@ -573,6 +573,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
               props.onOpenSheetContextMenu?.(sheetId, position)
             }
             onDrop={props.sheetReorder.onDrop}
+            onEditSheet={props.onEditSheet}
             onNavigate={props.sheetReorder.onNavigate}
             onPreview={props.sheetReorder.onPreview}
             representation={props.sheetReorder.representation}

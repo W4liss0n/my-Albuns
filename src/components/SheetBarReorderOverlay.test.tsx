@@ -4,6 +4,7 @@ import { expect, test, vi } from "vitest";
 
 import type { ComposedSheet } from "../domain/project";
 import { createContinuousCanvasLayout } from "./canvasGeometry";
+import { createNormalCanvasLayout } from "./canvasSheetViewGeometry";
 import { SheetBarReorderOverlay } from "./SheetBarReorderOverlay";
 
 const sheets = [sheet("sheet-1", 1), sheet("sheet-2", 2)];
@@ -272,15 +273,56 @@ test("matches full-size markers to the bleed-cropped visible Sheet bounds", () =
     height: "47px",
     top: "29.5px",
   });
+  expect(
+    screen.getByTestId("reorder-ghost").querySelector(".sheet-preview"),
+  ).toHaveAttribute("viewBox", "3000 3000 194000 94000");
 });
 
-test("keeps click and context-menu gestures distinct from reorder", () => {
+test.each([
+  ["left", "3000 3000 97000 94000"],
+  ["right", "0 3000 97000 94000"],
+] as const)(
+  "preserves the side-specific Sangria crop for a %s single Page ghost",
+  (activeSides, expectedViewBox) => {
+    const singleSheet = {
+      ...sheet(`sheet-${activeSides}`, 1),
+      activeSides,
+      widthUm: 100_000,
+      base: {
+        rgb: "#FFFFFF",
+        drawRect: { x: 0, y: 0, width: 100_000, height: 100_000 },
+      },
+    } satisfies ComposedSheet;
+    render(
+      <SheetBarReorderOverlay
+        {...props({
+          bleedUm: 3_000,
+          layout: createNormalCanvasLayout([singleSheet], 3_000),
+          representation: {
+            ghost: { sheetId: singleSheet.sheetId },
+            order: [singleSheet.sheetId],
+            placeholderIndex: 0,
+          },
+          sheets: [singleSheet],
+          status: "preview",
+        })}
+      />,
+    );
+
+    expect(
+      screen.getByTestId("reorder-ghost").querySelector(".sheet-preview"),
+    ).toHaveAttribute("viewBox", expectedViewBox);
+  },
+);
+
+test("keeps navigation, edit, and context gestures distinct from reorder", () => {
   const onContextMenu = vi.fn();
+  const onEditSheet = vi.fn();
   const onNavigate = vi.fn();
   const onPreview = vi.fn();
   render(
     <SheetBarReorderOverlay
-      {...props({ onContextMenu, onNavigate, onPreview })}
+      {...props({ onContextMenu, onEditSheet, onNavigate, onPreview })}
     />,
   );
 
@@ -288,6 +330,10 @@ test("keeps click and context-menu gestures distinct from reorder", () => {
   expect(onContextMenu).toHaveBeenCalledWith("sheet-2", { x: 80, y: 120 });
   fireEvent.click(barHandle(2));
   expect(onNavigate).toHaveBeenCalledWith("sheet-2");
+  fireEvent.doubleClick(barHandle(2), { clientX: 220, clientY: 40 });
+  expect(onEditSheet).toHaveBeenCalledWith("sheet-2");
+  fireEvent.doubleClick(barSurface(), { clientX: 150, clientY: 40 });
+  expect(onEditSheet).toHaveBeenCalledOnce();
   expect(onPreview).not.toHaveBeenCalled();
 });
 
@@ -608,6 +654,7 @@ function props(
     onCancel: vi.fn(),
     onContextMenu: vi.fn(),
     onDrop: vi.fn(),
+    onEditSheet: vi.fn(),
     onNavigate: vi.fn(),
     onPreview: vi.fn(),
     representation: {
