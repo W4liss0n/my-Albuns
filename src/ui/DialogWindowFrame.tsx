@@ -1,28 +1,34 @@
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 
-interface DialogWindowFrameProps {
+type DialogWindowFrameProps = {
   actions?: ReactNode;
   children: ReactNode;
-  layout: "message" | "progress";
   title: string;
-}
+} & (
+  | { layout: "message"; titleId: string }
+  | { layout: "progress"; titleId?: never }
+);
 
 export function DialogWindowFrame({
   actions,
   children,
   layout,
   title,
+  titleId,
 }: DialogWindowFrameProps) {
+  const generatedTitleId = useId();
+  const accessibleTitleId = titleId ?? generatedTitleId;
+
   return (
     <section
-      aria-label={title}
+      aria-labelledby={accessibleTitleId}
       aria-modal="true"
       className={`ui-dialog-window ui-dialog-window--${layout}`}
       role="dialog"
     >
       {layout !== "message" ? (
         <header className="ui-dialog-window__header">
-          <h2>{title}</h2>
+          <h2 id={accessibleTitleId}>{title}</h2>
         </header>
       ) : null}
       <div className="ui-dialog-window__body">{children}</div>

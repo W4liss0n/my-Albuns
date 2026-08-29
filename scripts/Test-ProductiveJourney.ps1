@@ -296,9 +296,9 @@ try {
     }
     $gate = $gateOutput | Select-Object -Last 1 | ConvertFrom-Json
     $expectedRecoveryChoices = @(
-        'Reabrir e recuperar',
+        "Agora n$([char]0x00E3)o",
         "Abrir $([char]0x00FA)ltima vers$([char]0x00E3)o salva",
-        "Agora n$([char]0x00E3)o"
+        'Reabrir e recuperar'
     )
     $contractViolations = @()
     if (
@@ -342,7 +342,19 @@ try {
         -not $gate.sessionRecovery.postRecoveryActionsCheckpointed -or
         -not $gate.sessionRecovery.checkpointPreservedByCancelledSaveAs -or
         -not $gate.sessionRecovery.checkpointFinishedBySuccessfulSaveAs -or
-        -not $gate.sessionRecovery.lockReleasedToDistinctHost
+        -not $gate.sessionRecovery.lockReleasedToDistinctHost -or
+        $gate.sessionRecovery.presentation.dialogCount -ne 1 -or
+        $gate.sessionRecovery.presentation.modalLayerCount -ne 1 -or
+        $gate.sessionRecovery.presentation.ownerSurfaceCount -ne 1 -or
+        $gate.sessionRecovery.presentation.fullPageRecoveryCount -ne 0 -or
+        $gate.sessionRecovery.presentation.ariaModal -cne 'true' -or
+        $gate.sessionRecovery.presentation.modalOwner -cne 'project' -or
+        $gate.sessionRecovery.presentation.ownerAriaHidden -cne 'true' -or
+        -not $gate.sessionRecovery.presentation.ownerInert -or
+        $gate.sessionRecovery.presentation.title -cne "Recuperar trabalho n$([char]0x00E3)o salvo?" -or
+        $gate.sessionRecovery.presentation.initialFocus -cne 'Reabrir e recuperar' -or
+        -not $gate.sessionRecovery.presentation.routePreserved -or
+        -not $gate.sessionRecovery.presentation.stableProjectOwner
     ) {
         $contractViolations += 'sessionRecovery'
     }

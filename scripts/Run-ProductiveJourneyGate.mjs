@@ -494,6 +494,20 @@ async function withProjectDialog(driver, label, operation) {
   }
 }
 
+function xpathLiteral(value) {
+  if (!value.includes("'")) return `'${value}'`;
+  if (!value.includes('"')) return `"${value}"`;
+  return `concat(${value
+    .split("'")
+    .map((part) => `'${part}'`)
+    .join(`, "'", `)})`;
+}
+
+function accessibleProjectDialogXpath(dialogLabel) {
+  const title = xpathLiteral(dialogLabel);
+  return `//*[@role='dialog' and @aria-modal='true' and @aria-labelledby = //*[normalize-space()=${title}]/@id]`;
+}
+
 async function clickProjectDialogAction(
   driver,
   dialogLabel,
@@ -504,7 +518,7 @@ async function clickProjectDialogAction(
     clickWhenEnabled(
       dialogDriver,
       "xpath",
-      `//*[@role='dialog' and @aria-label='${dialogLabel}']//button[normalize-space()='${actionLabel}']`,
+      `${accessibleProjectDialogXpath(dialogLabel)}//button[normalize-space()=${xpathLiteral(actionLabel)}]`,
       label,
     ),
   );
@@ -769,8 +783,8 @@ async function dragSheetInGrid(
     `.sheet-grid-slot[data-sheet-id='${targetSheetId}']`,
     `${label} target`,
   );
-  if ((await elementAttribute(driver, source, "draggable")) !== "true") {
-    throw new Error(`${label} source is not publicly draggable`);
+  if ((await elementAttribute(driver, source, "draggable")) === "true") {
+    throw new Error(`${label} unexpectedly fell back to native HTML drag-and-drop`);
   }
   const endpoint = `/session/${driver.sessionId}`;
   const sourceElement = {
@@ -799,22 +813,22 @@ async function dragSheetInGrid(
               y: 0,
             },
             { type: "pointerDown", button: 0 },
-            { type: "pause", duration: 200 },
+            { type: "pause", duration: 80 },
             {
               type: "pointerMove",
-              duration: 200,
+              duration: 120,
               origin: sourceElement,
               x: 10,
-              y: 10,
+              y: 0,
             },
             {
               type: "pointerMove",
-              duration: 600,
+              duration: 450,
               origin: targetElement,
               x: 0,
               y: 0,
             },
-            { type: "pause", duration: 250 },
+            { type: "pause", duration: 100 },
             { type: "pointerUp", button: 0 },
           ],
         },
@@ -1231,8 +1245,10 @@ try {
       ),
     ),
   );
-  if (!Number.isInteger(activeSheetNumber)) {
-    throw new Error("The productive UI exposed no active sheet number");
+  if (activeSheetNumber !== 2) {
+    throw new Error(
+      `The productive Grade click did not activate Sheet 2 (observed ${activeSheetNumber})`,
+    );
   }
   await replaceAlbumInformationDpi(hostDriver, "300", "DPI input");
   await applyAlbumInformation(hostDriver, "Apply Album information action");
@@ -1653,24 +1669,65 @@ try {
     "recovery Project Host",
     recoveryProjectDialogDebugPort,
   );
-  const recoveryChoices = await hostDriver.request(
+  const recoveryPresentation = await hostDriver.request(
     "POST",
     `/session/${hostDriver.sessionId}/execute/sync`,
     {
-      script: `return Array.from(document.querySelectorAll('.recovery-actions button')).map((button) => button.textContent.trim());`,
+      script: `
+        const dialog = document.querySelector('[role="dialog"]');
+        const layer = document.querySelector('.ui-modal-dialog-layer');
+        const owner = document.querySelector('[data-project-owner-surface]');
+        const title = dialog?.getAttribute('aria-labelledby');
+        return {
+          ariaModal: dialog?.getAttribute('aria-modal') ?? null,
+          backdropColor: layer ? getComputedStyle(layer).backgroundColor : null,
+          backdropPosition: layer ? getComputedStyle(layer).position : null,
+          choices: Array.from(dialog?.querySelectorAll('button') ?? [])
+            .map((button) => button.textContent.trim()),
+          dialogCount: document.querySelectorAll('[role="dialog"]').length,
+          fullPageRecoveryCount: document.querySelectorAll('.startup-surface .recovery-actions').length,
+          initialFocus: document.activeElement?.textContent?.trim() ?? null,
+          modalLayerCount: document.querySelectorAll('.ui-modal-dialog-layer').length,
+          modalOwner: layer?.getAttribute('data-modal-owner') ?? null,
+          ownerAriaHidden: owner?.getAttribute('aria-hidden') ?? null,
+          ownerInert: Boolean(owner?.inert),
+          ownerSurfaceCount: document.querySelectorAll('[data-project-owner-surface]').length,
+          title: title ? document.getElementById(title)?.textContent?.trim() ?? null : null,
+          url: window.location.href,
+        };
+      `,
       args: [],
     },
   );
+  const recoveryChoices = recoveryPresentation.choices;
   if (
     JSON.stringify(recoveryChoices) !==
     JSON.stringify([
-      "Reabrir e recuperar",
-      "Abrir última versão salva",
       "Agora não",
+      "Abrir última versão salva",
+      "Reabrir e recuperar",
     ])
   ) {
     throw new Error(
       `The recovery prompt exposed unexpected choices: ${JSON.stringify(recoveryChoices)}`,
+    );
+  }
+  if (
+    recoveryPresentation.dialogCount !== 1 ||
+    recoveryPresentation.modalLayerCount !== 1 ||
+    recoveryPresentation.ownerSurfaceCount !== 1 ||
+    recoveryPresentation.fullPageRecoveryCount !== 0 ||
+    recoveryPresentation.ariaModal !== "true" ||
+    recoveryPresentation.modalOwner !== "project" ||
+    recoveryPresentation.ownerAriaHidden !== "true" ||
+    !recoveryPresentation.ownerInert ||
+    recoveryPresentation.title !== "Recuperar trabalho não salvo?" ||
+    recoveryPresentation.initialFocus !== "Reabrir e recuperar" ||
+    recoveryPresentation.backdropPosition !== "absolute" ||
+    recoveryPresentation.backdropColor === "rgba(0, 0, 0, 0)"
+  ) {
+    throw new Error(
+      `Recovery was not one accessible modal inside the stable Project owner: ${JSON.stringify(recoveryPresentation)}`,
     );
   }
   await click(
@@ -1685,6 +1742,16 @@ try {
     ".app-shell",
     "recovered Project UI",
   );
+  const recoveredOwnerUrl = await hostDriver.request(
+    "POST",
+    `/session/${hostDriver.sessionId}/execute/sync`,
+    { script: "return window.location.href;", args: [] },
+  );
+  if (recoveredOwnerUrl !== recoveryPresentation.url) {
+    throw new Error(
+      `Recovery replaced the Project route: ${recoveryPresentation.url} -> ${recoveredOwnerUrl}`,
+    );
+  }
   const recoveredDpi = await findAlbumInformationDpi(hostDriver, "recovered DPI");
   if ((await elementAttribute(hostDriver, recoveredDpi, "value")) !== "360") {
     throw new Error("The recovered Project did not restore the checkpoint state");
@@ -2489,14 +2556,14 @@ try {
         const failureDialog = await findElement(
           dialogDriver,
           "xpath",
-          "//*[@role='dialog' and @aria-label='Exportação não concluída']",
+          accessibleProjectDialogXpath("Exportação não concluída"),
           "actionable missing-Original message",
         );
         const text = await elementText(dialogDriver, failureDialog);
         await clickWhenEnabled(
           dialogDriver,
           "xpath",
-          "//*[@role='dialog' and @aria-label='Exportação não concluída']//button[normalize-space()='Fechar']",
+          `${accessibleProjectDialogXpath("Exportação não concluída")}//button[normalize-space()=${xpathLiteral("Fechar")}]`,
           "close missing-Original feedback",
         );
         return text;
@@ -2800,6 +2867,14 @@ try {
         creativeRevision: recoveryCheckpoint.creativeState.revision,
         recoveredDpi: recoveryCheckpoint.creativeState.project.document.dpi,
         promptChoices: recoveryChoices,
+        presentation: {
+          ...recoveryPresentation,
+          recoveredOwnerUrl,
+          routePreserved: recoveredOwnerUrl === recoveryPresentation.url,
+          stableProjectOwner:
+            recoveryGlobal.processId !== secondHost.processId &&
+            recoveryPresentation.modalOwner === "project",
+        },
         opaqueProjectKey:
           path.basename(recoveryCheckpointPath) === `${originalNamespace}.json` &&
           !path.basename(recoveryCheckpointPath).includes(originalProjectId),

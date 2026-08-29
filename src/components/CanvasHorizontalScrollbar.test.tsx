@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 
 import type { ContinuousCanvasLayout } from "./canvasGeometry";
@@ -41,9 +41,7 @@ describe("CanvasHorizontalScrollbar", () => {
     });
   });
 
-  test("centers the previous and next physical Sheet through explicit controls", () => {
-    const onCenteredSheetChange = vi.fn();
-    const onViewportChange = vi.fn();
+  test("does not render permanent previous or next Sheet controls", () => {
     render(
       <CanvasHorizontalScrollbar
         centeredSheetId="sheet-2"
@@ -51,34 +49,16 @@ describe("CanvasHorizontalScrollbar", () => {
         metrics={{ scale: 1, width: 600 }}
         mode={{ kind: "normal" }}
         viewport={{ offsetX: 0 }}
-        onCenteredSheetChange={onCenteredSheetChange}
-        onViewportChange={onViewportChange}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "Lâmina anterior" }));
-    expect(onViewportChange).toHaveBeenLastCalledWith({ offsetX: 600 });
-    expect(onCenteredSheetChange).toHaveBeenLastCalledWith("sheet-1");
-
-    fireEvent.click(screen.getByRole("button", { name: "Próxima Lâmina" }));
-    expect(onViewportChange).toHaveBeenLastCalledWith({ offsetX: -600 });
-    expect(onCenteredSheetChange).toHaveBeenLastCalledWith("sheet-3");
-  });
-
-  test("blocks structural navigation controls in Edit Mode", () => {
-    render(
-      <CanvasHorizontalScrollbar
-        centeredSheetId="sheet-2"
-        layout={layout}
-        metrics={{ scale: 1, width: 600 }}
-        mode={{ kind: "sheet-editing", sheetId: "sheet-2" }}
-        viewport={{ offsetX: 0 }}
         onCenteredSheetChange={vi.fn()}
         onViewportChange={vi.fn()}
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Lâmina anterior" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Próxima Lâmina" })).toBeDisabled();
+    expect(
+      screen.queryByRole("button", { name: "Lâmina anterior" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Próxima Lâmina" }),
+    ).not.toBeInTheDocument();
   });
 });

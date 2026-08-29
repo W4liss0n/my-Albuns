@@ -25,7 +25,9 @@ export function InlineNotice({
         .join(" ")}
     >
       {title ? <h2>{title}</h2> : null}
-      <div>{children}</div>
+      <div className={tone === "error" ? "ui-copyable-text" : undefined}>
+        {children}
+      </div>
     </section>
   );
 }

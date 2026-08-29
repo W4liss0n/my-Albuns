@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useId, type ReactNode, type Ref } from "react";
 import { CircleAlert, CircleHelp } from "lucide-react";
 
 import { ActionButton } from "./ActionButton";
@@ -12,6 +12,7 @@ type ConfirmationTone = "danger" | "neutral" | "question";
 interface ConfirmationDialogProps {
   cancelAction: DialogAction;
   children?: ReactNode;
+  confirmButtonRef?: Ref<HTMLButtonElement>;
   confirmAction: DialogAction;
   description: ReactNode;
   leadingAction?: DialogAction;
@@ -22,6 +23,7 @@ interface ConfirmationDialogProps {
 export function ConfirmationDialog({
   cancelAction,
   children,
+  confirmButtonRef,
   confirmAction,
   description,
   leadingAction,
@@ -29,6 +31,7 @@ export function ConfirmationDialog({
   tone = "question",
 }: ConfirmationDialogProps) {
   const icon = tone === "question" ? CircleHelp : CircleAlert;
+  const titleId = useId();
 
   return (
     <DialogWindowFrame
@@ -57,6 +60,7 @@ export function ConfirmationDialog({
             }
             disabled={confirmAction.disabled}
             onClick={confirmAction.onClick}
+            ref={confirmButtonRef}
             variant={tone === "danger" ? "secondary" : "primary"}
           >
             {confirmAction.label}
@@ -65,6 +69,7 @@ export function ConfirmationDialog({
       }
       layout="message"
       title={title}
+      titleId={titleId}
     >
       <div className="ui-standard-message" data-tone={tone}>
         {tone !== "neutral" ? (
@@ -77,7 +82,9 @@ export function ConfirmationDialog({
           </span>
         ) : null}
         <div className="ui-standard-message__content">
-          <h2 className="ui-standard-message__title">{title}</h2>
+          <h2 className="ui-standard-message__title" id={titleId}>
+            {title}
+          </h2>
           <div className="ui-standard-message__description">
             {description}
           </div>

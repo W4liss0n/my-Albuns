@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { CircleCheck, CircleX } from "lucide-react";
 
 import { ActionButton } from "./ActionButton";
@@ -26,6 +26,7 @@ export function MessageDialog({
   tone,
 }: MessageDialogProps) {
   const icon = tone === "error" ? CircleX : CircleCheck;
+  const titleId = useId();
   const actions =
     primaryAction || secondaryAction ? (
       <>
@@ -50,7 +51,12 @@ export function MessageDialog({
     ) : undefined;
 
   return (
-    <DialogWindowFrame actions={actions} layout="message" title={title}>
+    <DialogWindowFrame
+      actions={actions}
+      layout="message"
+      title={title}
+      titleId={titleId}
+    >
       <div
         aria-live={tone === "error" ? "assertive" : "polite"}
         className="ui-standard-message"
@@ -65,12 +71,22 @@ export function MessageDialog({
           <AppIcon icon={icon} size={14} />
         </span>
         <div className="ui-standard-message__content">
-          <h2 className="ui-standard-message__title">{title}</h2>
-          <div className="ui-standard-message__description">
+          <h2 className="ui-standard-message__title" id={titleId}>
+            {title}
+          </h2>
+          <div
+            className={
+              tone === "error"
+                ? "ui-standard-message__description ui-copyable-text"
+                : "ui-standard-message__description"
+            }
+          >
             {description}
           </div>
           {detail ? (
-            <div className="ui-standard-message__detail">{detail}</div>
+            <div className="ui-standard-message__detail ui-copyable-text">
+              {detail}
+            </div>
           ) : null}
         </div>
       </div>

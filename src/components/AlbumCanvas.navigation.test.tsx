@@ -26,6 +26,7 @@ test("does not zoom the continuous Canvas outside sheet-editing mode", async () 
 
   pixiLifecycle.instances[0].canvas.dispatchEvent(
     new WheelEvent("wheel", {
+      bubbles: true,
       cancelable: true,
       ctrlKey: true,
       deltaY: -120,
@@ -54,6 +55,7 @@ test("keeps edge sheets centered and tracks the centered sheet while scrolling",
 
   app.canvas.dispatchEvent(
     new WheelEvent("wheel", {
+      bubbles: true,
       cancelable: true,
       deltaY: 10_000,
     }),
@@ -69,6 +71,7 @@ test("keeps edge sheets centered and tracks the centered sheet while scrolling",
 
   app.canvas.dispatchEvent(
     new WheelEvent("wheel", {
+      bubbles: true,
       cancelable: true,
       deltaY: -10_000,
     }),
@@ -80,6 +83,62 @@ test("keeps edge sheets centered and tracks the centered sheet while scrolling",
     ]?.[0].offsetX;
   expect(firstOffset + entries[0].center * scale).toBeCloseTo(600, 4);
   expect(onCenteredSheetChange).not.toHaveBeenCalled();
+});
+
+test("keeps horizontal wheel navigation alive across the left, center, and right Sheet Bar regions", async () => {
+  const onViewportChange = vi.fn();
+  renderCanvas({
+    compositionPlan: threeSheetComposition,
+    onViewportChange,
+    sheetReorder: {
+      disabled: false,
+      onCancel: vi.fn(),
+      onDrop: vi.fn(),
+      onNavigate: vi.fn(),
+      onPreview: vi.fn(),
+      representation: {
+        ghost: null,
+        order: threeSheetComposition.sheets.map((sheet) => sheet.sheetId),
+        placeholderIndex: null,
+      },
+      status: "idle",
+    },
+  });
+  await finishPixiInitialization();
+
+  const pixiBackedBarTarget = pixiLifecycle.instances[0].canvas;
+  const rightBarTarget = screen.getByRole("button", {
+    name: "Reordenar Lâmina 01 pela Barra",
+  });
+  // The left/page and central/action regions belong to the Pixi canvas. The
+  // free right region is the productive DOM reorder overlay that exposed the
+  // original propagation asymmetry.
+  const targets = [
+    { name: "left", target: pixiBackedBarTarget, clientX: 160 },
+    { name: "center", target: pixiBackedBarTarget, clientX: 300 },
+    { name: "right", target: rightBarTarget, clientX: 440 },
+  ];
+
+  for (const { name, target, clientX } of targets) {
+    for (const deltaY of [-120, 120]) {
+      onViewportChange.mockClear();
+      target.dispatchEvent(
+        new WheelEvent("wheel", {
+          bubbles: true,
+          cancelable: true,
+          clientX,
+          deltaY,
+        }),
+      );
+
+      expect(
+        onViewportChange,
+        `${name} Bar region with deltaY ${deltaY}`,
+      ).toHaveBeenCalledOnce();
+      const nextOffset = onViewportChange.mock.calls[0]?.[0].offsetX;
+      expect(Math.sign(nextOffset - 42)).toBe(-Math.sign(deltaY));
+    }
+  }
 });
 
 test("resizes the Pixi renderer before fitting a taller Canvas", async () => {
@@ -247,6 +306,7 @@ test("isolates the target sheet and suppresses continuous navigation in Sheet Ed
 
   pixiLifecycle.instances[0].canvas.dispatchEvent(
     new WheelEvent("wheel", {
+      bubbles: true,
       cancelable: true,
       deltaY: 600,
     }),

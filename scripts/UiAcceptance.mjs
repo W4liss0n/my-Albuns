@@ -135,10 +135,10 @@ export function validateUiAcceptanceManifest(manifest) {
         const actionLocation = `${location}.${groupName}[${actionIndex}]`;
         invariant(action && typeof action === "object", `${actionLocation} must be an object`);
         invariant(
-          ["click", "click-text", "context-click", "drag", "focus", "hover", "input", "key", "wheel"].includes(action.type),
+          ["assert", "click", "click-text", "context-click", "drag", "focus", "hover", "input", "key", "selection-drag", "wheel"].includes(action.type),
           `${actionLocation}.type is not supported`,
         );
-        if (["click", "context-click", "drag", "focus", "hover", "input", "wheel"].includes(action.type)) {
+        if (["assert", "click", "context-click", "drag", "focus", "hover", "input", "selection-drag", "wheel"].includes(action.type)) {
           invariant(typeof action.selector === "string" && action.selector.trim(), `${actionLocation}.selector is required`);
         }
         if (action.type === "click-text") {
@@ -184,10 +184,16 @@ export function validateUiAcceptanceManifest(manifest) {
             `${actionLocation}.deltaX must be an integer when present`,
           );
         }
+        if (action.type === "selection-drag") {
+          invariant(
+            ["control", "none", "text"].includes(action.expect),
+            `${actionLocation}.expect must be control, none, or text`,
+          );
+        }
         if (action.type === "drag") {
           invariant(
-            action.gesture === undefined || action.gesture === "html-dnd",
-            `${actionLocation}.gesture must be html-dnd when present`,
+            action.gesture === undefined || action.gesture === "pointer",
+            `${actionLocation}.gesture must be pointer when present`,
           );
           invariant(
             typeof action.targetSelector === "string" &&
@@ -202,8 +208,8 @@ export function validateUiAcceptanceManifest(manifest) {
           );
           if (action.phase === "escape") {
             invariant(
-              action.gesture === "html-dnd",
-              `${actionLocation}.phase escape requires gesture html-dnd`,
+              action.gesture === "pointer",
+              `${actionLocation}.phase escape requires gesture pointer`,
             );
           }
           if (action.dropTargetSelector !== undefined) {

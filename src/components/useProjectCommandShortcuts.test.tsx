@@ -8,11 +8,14 @@ function handlers() {
     canDeleteSheet: true,
     closeProject: vi.fn(),
     deleteSheet: vi.fn(),
+    navigateToNextSheet: vi.fn(),
+    navigateToPreviousSheet: vi.fn(),
     redo: vi.fn(),
     save: vi.fn(),
     saveAs: vi.fn(),
     sheetShortcutActive: true,
     sheetCommandsDisabled: false,
+    sheetNavigationActive: true,
     undo: vi.fn(),
   };
 }
@@ -62,6 +65,95 @@ test("dispatches the implemented Project command for every accepted shortcut", (
   expect(actions.undo).toHaveBeenCalledOnce();
   expect(actions.redo).toHaveBeenCalledTimes(2);
   expect(actions.closeProject).toHaveBeenCalledOnce();
+});
+
+test("routes physical horizontal arrows through the Sheet command seam", () => {
+  const actions = handlers();
+  renderHook(() =>
+    useProjectCommandShortcuts({
+      ...actions,
+      canRedo: true,
+      canUndo: true,
+      disabled: false,
+    }),
+  );
+
+  expect(
+    dispatchShortcut("ArrowLeft", { ctrlKey: false }).defaultPrevented,
+  ).toBe(true);
+  expect(
+    dispatchShortcut("ArrowRight", { ctrlKey: false }).defaultPrevented,
+  ).toBe(true);
+  expect(actions.navigateToPreviousSheet).toHaveBeenCalledOnce();
+  expect(actions.navigateToNextSheet).toHaveBeenCalledOnce();
+});
+
+test("leaves horizontal arrows to editable and keyboard-owning surfaces", () => {
+  const actions = handlers();
+  const view = renderHook(
+    ({ sheetNavigationActive }) =>
+      useProjectCommandShortcuts({
+        ...actions,
+        canRedo: true,
+        canUndo: true,
+        disabled: false,
+        sheetNavigationActive,
+      }),
+    { initialProps: { sheetNavigationActive: true } },
+  );
+  const contentEditable = document.createElement("div");
+  contentEditable.setAttribute("contenteditable", "true");
+  const contentEditableChild = document.createElement("span");
+  contentEditable.append(contentEditableChild);
+  const ownedSurfaces = ["dialog", "menu", "menubar", "listbox"].map(
+    (role) => {
+      const owner = document.createElement("div");
+      owner.setAttribute("role", role);
+      const target = document.createElement("button");
+      owner.append(target);
+      return { owner, target };
+    },
+  );
+  const targets = [
+    document.createElement("input"),
+    document.createElement("textarea"),
+    document.createElement("select"),
+    contentEditable,
+    contentEditableChild,
+    ...ownedSurfaces.map(({ target }) => target),
+  ];
+  targets.slice(0, 5).forEach((target) => {
+    if (!target.isConnected) document.body.append(target);
+  });
+  ownedSurfaces.forEach(({ owner }) => document.body.append(owner));
+
+  try {
+    for (const target of targets) {
+      expect(
+        dispatchShortcut("ArrowLeft", { ctrlKey: false }, target)
+          .defaultPrevented,
+        target.outerHTML,
+      ).toBe(false);
+      expect(
+        dispatchShortcut("ArrowRight", { ctrlKey: false }, target)
+          .defaultPrevented,
+        target.outerHTML,
+      ).toBe(false);
+    }
+
+    view.rerender({ sheetNavigationActive: false });
+    expect(
+      dispatchShortcut("ArrowLeft", { ctrlKey: false }).defaultPrevented,
+    ).toBe(false);
+    expect(
+      dispatchShortcut("ArrowRight", { ctrlKey: false }).defaultPrevented,
+    ).toBe(false);
+    expect(actions.navigateToPreviousSheet).not.toHaveBeenCalled();
+    expect(actions.navigateToNextSheet).not.toHaveBeenCalled();
+  } finally {
+    targets.slice(0, 5).forEach((target) => target.remove());
+    ownedSurfaces.forEach(({ owner }) => owner.remove());
+  }
 });
 
 test("dispatches Save as distinctly from Save", () => {

@@ -37,7 +37,9 @@
       },
       "viewport": { "width": 520, "height": 320 },
       "readySelector": ".ui-standard-message[role=\"alert\"]",
-      "actions": []
+      "actions": [
+        { "type": "selection-drag", "selector": ".ui-standard-message__description.ui-copyable-text", "expect": "text" }
+      ]
     },
     {
       "id": "album-information-confirmation-single-change",
@@ -284,6 +286,37 @@
       "actions": []
     },
     {
+      "id": "project-text-selection-policy",
+      "title": "Janela do Projeto — seleção somente em conteúdo pertinente",
+      "implementationPath": "/workspace-preview.html",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "project-text-selection-policy",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A referência visual vigente não explicita a política semântica que bloqueia seleção no chrome e preserva caret e seleção nos campos editáveis."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": ".app-shell.ui-chrome-selection-scope:has(input[aria-label=\"DPI\"])",
+      "actions": [
+        { "type": "selection-drag", "selector": ".album-information-form h3", "expect": "none" },
+        { "type": "selection-drag", "selector": "input[aria-label=\"DPI\"]", "expect": "control" }
+      ]
+    },
+    {
+      "id": "project-recovery-modal",
+      "title": "Recuperação de sessão — diálogo no owner do Projeto",
+      "implementationPath": "/workspace-preview.html?recovery=available",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "project-recovery-modal",
+        "implementationCaptureSelector": ".project-recovery-owner",
+        "reason": "A referência visual vigente antecede o diálogo de Recuperação pertencente à única Janela do Projeto definido pelos contratos multiprocesso aceitos posteriormente."
+      },
+      "viewport": { "width": 1280, "height": 720 },
+      "readySelector": ".project-recovery-owner:has([data-project-owner-surface][aria-hidden=\"true\"]):has(.ui-modal-dialog-layer[data-modal-owner=\"project\"] [role=\"dialog\"][aria-modal=\"true\"])",
+      "actions": []
+    },
+    {
       "id": "project-workspace-sheet-context",
       "title": "Janela do Projeto — contexto Lâmina",
       "implementationPath": "/workspace-preview.html",
@@ -384,9 +417,97 @@
         "reason": "A referência visual vigente não representa o menu contextual estrutural nem as restrições físicas aceitas posteriormente."
       },
       "viewport": { "width": 1440, "height": 900 },
-      "readySelector": ".app-shell:has([role=\"menu\"][aria-label=\"Ações da Lâmina 01\"]):has([role=\"menu\"][aria-label=\"Ações da Lâmina 01\"] button:nth-of-type(1):disabled):has([role=\"menu\"][aria-label=\"Ações da Lâmina 01\"] button:nth-of-type(4):disabled)",
+      "readySelector": ".app-shell:has(.canvas-host[data-centered-sheet-id=\"sheet-001\"][data-viewport-offset-x=\"0\"]):has([role=\"menu\"][aria-label=\"Ações da Lâmina 01\"] button:nth-of-type(1):disabled):has([role=\"menu\"][aria-label=\"Ações da Lâmina 01\"] button:nth-of-type(4):disabled)",
       "actions": [
         { "type": "context-click", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-001\"]" }
+      ]
+    },
+    {
+      "id": "canvas-keyboard-next-sheet",
+      "title": "Canvas — tecla → centraliza a Lâmina física seguinte",
+      "implementationPath": "/workspace-preview.html?structure=physical",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "continuous-canvas-keyboard-navigation",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A referência visual vigente não representa o comando público de navegação pelas teclas físicas ←/→ aceito posteriormente."
+      },
+      "viewport": { "width": 1440, "height": 600 },
+      "readySelector": ".app-shell:has(.canvas-host[data-centered-sheet-id=\"sheet-003\"]):not(:has(.canvas-sheet-navigation))",
+      "actions": [
+        { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-002\"]" },
+        { "type": "focus", "selector": ".canvas-host canvas" },
+        { "type": "key", "key": "ArrowRight" }
+      ]
+    },
+    {
+      "id": "canvas-context-menu-surface-preserves-viewport",
+      "title": "Canvas — menu contextual da superfície preserva a Lâmina centralizada",
+      "implementationPath": "/workspace-preview.html?structure=physical",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-context-menu-targeting",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A referência visual vigente não representa o menu contextual estrutural nem a separação posterior entre seu alvo explícito e a Lâmina centralizada."
+      },
+      "viewport": { "width": 1440, "height": 600 },
+      "readySelector": ".app-shell:has(.canvas-host[data-centered-sheet-id=\"sheet-002\"]):has([role=\"menu\"][aria-label=\"Ações da Lâmina 02\"])",
+      "actions": [
+        { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-002\"]" },
+        { "type": "context-click", "selector": ".canvas-host canvas" }
+      ]
+    },
+    {
+      "id": "canvas-keyboard-previous-sheet",
+      "title": "Canvas — tecla ← centraliza a Lâmina física anterior",
+      "implementationPath": "/workspace-preview.html?structure=physical",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "continuous-canvas-keyboard-navigation",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A referência visual vigente não representa o comando público de navegação pelas teclas físicas ←/→ aceito posteriormente."
+      },
+      "viewport": { "width": 1440, "height": 600 },
+      "readySelector": ".app-shell:has(.canvas-host[data-centered-sheet-id=\"sheet-001\"]):not(:has(.canvas-sheet-navigation))",
+      "actions": [
+        { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-002\"]" },
+        { "type": "focus", "selector": ".canvas-host canvas" },
+        { "type": "key", "key": "ArrowLeft" }
+      ]
+    },
+    {
+      "id": "canvas-wheel-sheet-bar-forward",
+      "title": "Canvas — roda avança sobre a metade direita da Barra",
+      "implementationPath": "/workspace-preview.html?structure=physical",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "continuous-canvas-wheel-hit-testing",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A referência visual vigente não registra o hit-testing produtivo da roda sobre toda a Barra da Lâmina."
+      },
+      "viewport": { "width": 1440, "height": 600 },
+      "readySelector": ".app-shell:has(.canvas-host:not([data-centered-sheet-id=\"sheet-001\"]))",
+      "actions": [
+        { "type": "wheel", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-001\"]", "deltaY": 1200 }
+      ]
+    },
+    {
+      "id": "canvas-wheel-sheet-bar-backward",
+      "title": "Canvas — roda retorna sobre a metade direita da Barra",
+      "implementationPath": "/workspace-preview.html?structure=physical",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "continuous-canvas-wheel-hit-testing",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A referência visual vigente não registra o hit-testing produtivo da roda sobre toda a Barra da Lâmina."
+      },
+      "viewport": { "width": 1440, "height": 600 },
+      "readySelector": ".app-shell:has(.canvas-host:not([data-centered-sheet-id=\"sheet-003\"]))",
+      "actions": [
+        { "type": "focus", "selector": ".canvas-host canvas" },
+        { "type": "key", "key": "ArrowRight" },
+        { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-003\"]" },
+        { "type": "wheel", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-003\"]", "deltaY": -1200 }
       ]
     },
     {
@@ -402,6 +523,69 @@
       "viewport": { "width": 1440, "height": 900 },
       "readySelector": ".workspace-grid[style*=\"--inspector-width: 420px\"][style*=\"--media-panel-height: 140px\"]",
       "actions": []
+    },
+    {
+      "id": "project-splitters-normal-100",
+      "title": "Splitters do Projeto — linhas finas a 100%",
+      "implementationPath": "/workspace-preview.html?scale=1",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "project-workspace-splitters",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A referência visual vigente usa faixas antigas; os splitters produtivos agora separam uma linha visual fina de seu alvo interativo sobreposto."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "html[data-preview-scale=\"1\"] .workspace-grid:has(.inspector-splitter):has(.media-splitter)",
+      "actions": []
+    },
+    {
+      "id": "project-splitter-horizontal-hover-125",
+      "title": "Splitter horizontal — hover a 125%",
+      "implementationPath": "/workspace-preview.html?scale=1.25",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "project-workspace-splitters",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A referência visual vigente não representa a linha fina com alvo invisível e realce de hover na escala exercitada."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "html[data-preview-scale=\"1.25\"] .workspace-grid:has(.media-splitter)",
+      "actions": [
+        { "type": "hover", "selector": ".media-splitter" }
+      ]
+    },
+    {
+      "id": "project-splitter-vertical-focus-150",
+      "title": "Splitter vertical — foco a 150%",
+      "implementationPath": "/workspace-preview.html?scale=1.5",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "project-workspace-splitters",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A referência visual vigente não representa a linha fina com alvo invisível e foco por teclado na escala exercitada."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "html[data-preview-scale=\"1.5\"] .inspector-splitter:focus",
+      "actions": [
+        { "type": "focus", "selector": ".inspector-splitter" }
+      ]
+    },
+    {
+      "id": "project-splitters-resized",
+      "title": "Splitters do Projeto — após redimensionar os dois eixos",
+      "implementationPath": "/workspace-preview.html?scale=1",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "project-workspace-splitters",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A referência visual vigente não representa os tracks finos após o resize funcional e persistido dos dois Painéis."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": ".workspace-grid[style*=\"--inspector-width: 480px\"][style*=\"--media-panel-height: 360px\"]",
+      "actions": [
+        { "type": "drag", "selector": ".inspector-splitter", "targetSelector": ".canvas-section", "phase": "drop" },
+        { "type": "drag", "selector": ".media-splitter", "targetSelector": ".canvas-section", "phase": "drop" }
+      ]
     },
     {
       "id": "project-workspace-panels-collapsed",
@@ -802,8 +986,10 @@
       "viewport": { "width": 1440, "height": 600 },
       "readySelector": ".app-shell:has([data-reorder-surface=\"bar\"][data-reorder-state=\"preview\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"][data-preview-order=\"sheet-001,sheet-003,sheet-002,sheet-004,sheet-005\"]):has([data-reorder-surface=\"bar\"] [data-testid=\"reorder-placeholder\"]):has([data-reorder-surface=\"bar\"] [data-testid=\"reorder-ghost\"]):has([data-reorder-surface=\"grid\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"])",
       "actions": [
-        { "type": "click", "selector": ".sheet-grid-slot[data-sheet-id=\"sheet-003\"] .sheet-tile" },
-        { "type": "drag", "gesture": "html-dnd", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-003\"]", "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "phase": "preview" }
+        { "type": "focus", "selector": ".canvas-host canvas" },
+        { "type": "key", "key": "ArrowRight" },
+        { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-003\"]" },
+        { "type": "drag", "gesture": "pointer", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-003\"]", "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "phase": "preview" }
       ]
     },
     {
@@ -819,8 +1005,10 @@
       "viewport": { "width": 1440, "height": 600 },
       "readySelector": ".app-shell:has([data-reorder-surface=\"bar\"][data-reorder-state=\"idle\"][data-sheet-order=\"sheet-001,sheet-003,sheet-002,sheet-004,sheet-005\"]):has([data-reorder-surface=\"grid\"][data-sheet-order=\"sheet-001,sheet-003,sheet-002,sheet-004,sheet-005\"])",
       "actions": [
-        { "type": "click", "selector": ".sheet-grid-slot[data-sheet-id=\"sheet-003\"] .sheet-tile" },
-        { "type": "drag", "gesture": "html-dnd", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-003\"]", "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "phase": "drop" }
+        { "type": "focus", "selector": ".canvas-host canvas" },
+        { "type": "key", "key": "ArrowRight" },
+        { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-003\"]" },
+        { "type": "drag", "gesture": "pointer", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-003\"]", "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "phase": "drop" }
       ]
     },
     {
@@ -836,7 +1024,7 @@
       "viewport": { "width": 1440, "height": 600 },
       "readySelector": ".app-shell:has([data-reorder-surface=\"grid\"][data-reorder-state=\"preview\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"]):has([data-reorder-surface=\"grid\"] > .sheet-grid-slot:nth-child(2)[data-sheet-id=\"sheet-003\"]):has([data-reorder-surface=\"grid\"] [data-testid=\"reorder-placeholder\"]):has([data-reorder-surface=\"grid\"] [data-testid=\"reorder-ghost\"]):has([data-reorder-surface=\"bar\"][data-preview-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"])",
       "actions": [
-        { "type": "drag", "gesture": "html-dnd", "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-003\"]", "targetSelector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"]", "phase": "preview" }
+        { "type": "drag", "gesture": "pointer", "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-003\"]", "targetSelector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"]", "phase": "preview" }
       ]
     },
     {
@@ -852,7 +1040,7 @@
       "viewport": { "width": 1440, "height": 600 },
       "readySelector": ".app-shell:has([data-reorder-surface=\"grid\"][data-reorder-state=\"idle\"][data-sheet-order=\"sheet-001,sheet-003,sheet-002,sheet-004,sheet-005\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001,sheet-003,sheet-002,sheet-004,sheet-005\"])",
       "actions": [
-        { "type": "drag", "gesture": "html-dnd", "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-003\"]", "targetSelector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"]", "phase": "drop" }
+        { "type": "drag", "gesture": "pointer", "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-003\"]", "targetSelector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"]", "phase": "drop" }
       ]
     },
     {
@@ -868,8 +1056,10 @@
       "viewport": { "width": 1440, "height": 600 },
       "readySelector": ".app-shell:has([data-reorder-surface=\"bar\"][data-reorder-state=\"cancelled\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"][data-preview-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"]):has([data-reorder-surface=\"grid\"][data-reorder-state=\"cancelled\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"] > .sheet-grid-slot:nth-child(1)[data-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"grid\"] > .sheet-grid-slot:nth-child(2)[data-sheet-id=\"sheet-002\"]):has([data-reorder-surface=\"grid\"] > .sheet-grid-slot:nth-child(3)[data-sheet-id=\"sheet-003\"]):has([data-reorder-surface=\"grid\"] > .sheet-grid-slot:nth-child(4)[data-sheet-id=\"sheet-004\"]):has([data-reorder-surface=\"grid\"] > .sheet-grid-slot:nth-child(5)[data-sheet-id=\"sheet-005\"]):not(:has([data-reorder-surface=\"bar\"] [data-testid=\"reorder-placeholder\"])):not(:has([data-reorder-surface=\"bar\"] [data-testid=\"reorder-ghost\"])):not(:has([data-reorder-surface=\"grid\"] [data-testid=\"reorder-placeholder\"])):not(:has([data-reorder-surface=\"grid\"] [data-testid=\"reorder-ghost\"]))",
       "actions": [
-        { "type": "click", "selector": ".sheet-grid-slot[data-sheet-id=\"sheet-003\"] .sheet-tile" },
-        { "type": "drag", "gesture": "html-dnd", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-003\"]", "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "phase": "escape" }
+        { "type": "focus", "selector": ".canvas-host canvas" },
+        { "type": "key", "key": "ArrowRight" },
+        { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-003\"]" },
+        { "type": "drag", "gesture": "pointer", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-003\"]", "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "phase": "escape" }
       ]
     },
     {
@@ -885,8 +1075,10 @@
       "viewport": { "width": 1440, "height": 600 },
       "readySelector": ".app-shell:has([data-reorder-surface=\"bar\"][data-reorder-state=\"cancelled\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"]):has([data-reorder-surface=\"grid\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"])",
       "actions": [
-        { "type": "click", "selector": ".sheet-grid-slot[data-sheet-id=\"sheet-003\"] .sheet-tile" },
-        { "type": "drag", "gesture": "html-dnd", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-003\"]", "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "dropTargetSelector": "[data-reorder-surface=\"grid\"]", "phase": "drop" }
+        { "type": "focus", "selector": ".canvas-host canvas" },
+        { "type": "key", "key": "ArrowRight" },
+        { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-003\"]" },
+        { "type": "drag", "gesture": "pointer", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-003\"]", "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "dropTargetSelector": "[data-reorder-surface=\"grid\"]", "phase": "drop" }
       ]
     },
     {
@@ -902,7 +1094,7 @@
       "viewport": { "width": 1440, "height": 600 },
       "readySelector": ".app-shell:has([data-reorder-surface=\"grid\"][data-reorder-state=\"cancelled\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"] > .sheet-grid-slot:nth-child(1)[data-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"grid\"] > .sheet-grid-slot:nth-child(2)[data-sheet-id=\"sheet-002\"]):has([data-reorder-surface=\"grid\"] > .sheet-grid-slot:nth-child(3)[data-sheet-id=\"sheet-003\"]):has([data-reorder-surface=\"grid\"] > .sheet-grid-slot:nth-child(4)[data-sheet-id=\"sheet-004\"]):has([data-reorder-surface=\"grid\"] > .sheet-grid-slot:nth-child(5)[data-sheet-id=\"sheet-005\"]):has([data-reorder-surface=\"bar\"][data-reorder-state=\"cancelled\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"][data-preview-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"]):not(:has([data-reorder-surface=\"grid\"] [data-testid=\"reorder-placeholder\"])):not(:has([data-reorder-surface=\"grid\"] [data-testid=\"reorder-ghost\"])):not(:has([data-reorder-surface=\"bar\"] [data-testid=\"reorder-placeholder\"])):not(:has([data-reorder-surface=\"bar\"] [data-testid=\"reorder-ghost\"]))",
       "actions": [
-        { "type": "drag", "gesture": "html-dnd", "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-003\"]", "targetSelector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-001\"]", "phase": "drop" }
+        { "type": "drag", "gesture": "pointer", "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-003\"]", "targetSelector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-001\"]", "phase": "drop" }
       ]
     },
     {
@@ -918,7 +1110,7 @@
       "viewport": { "width": 1440, "height": 600 },
       "readySelector": ".app-shell:has([data-reorder-surface=\"grid\"][data-reorder-state=\"invalid\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"] > .sheet-grid-slot:nth-child(3)[data-sheet-id=\"sheet-003\"][data-reorder-ghost=\"true\"]):has([data-reorder-surface=\"grid\"] [data-testid=\"reorder-ghost\"]):has([data-reorder-surface=\"grid\"] [data-reorder-invalid-indicator]):not(:has([data-reorder-surface=\"grid\"] [data-testid=\"reorder-placeholder\"])):has([data-reorder-surface=\"bar\"][data-reorder-state=\"invalid\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"][data-preview-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"]):not(:has([data-reorder-surface=\"bar\"] [data-testid=\"reorder-placeholder\"])):not(:has([data-reorder-surface=\"bar\"] [data-testid=\"reorder-ghost\"]))",
       "actions": [
-        { "type": "drag", "gesture": "html-dnd", "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-003\"]", "targetSelector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-001\"]", "phase": "preview" }
+        { "type": "drag", "gesture": "pointer", "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-003\"]", "targetSelector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-001\"]", "phase": "preview" }
       ]
     },
     {

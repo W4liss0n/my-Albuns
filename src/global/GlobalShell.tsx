@@ -254,7 +254,7 @@ export function GlobalShell({
 
   if (surface === "newProject") {
     return (
-      <div className="global-shell global-shell--new-project">
+      <div className="global-shell global-shell--new-project ui-chrome-selection-scope">
         <ApplicationHeader context="Novo Projeto" />
         <NewProjectFlow
           onCancel={cancelCreation}
@@ -279,7 +279,7 @@ export function GlobalShell({
   }
 
   return (
-    <div className="global-shell">
+    <div className="global-shell ui-chrome-selection-scope">
       <ApplicationHeader status="diagramação de Álbuns" />
 
         <main className="global-recent-projects">

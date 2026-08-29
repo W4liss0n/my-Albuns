@@ -100,9 +100,6 @@ export class AlbumCanvasScene {
     this.app.stage.on("pointerup", this.photoInteractions.finishPan);
     this.app.stage.on("pointerupoutside", this.photoInteractions.finishPan);
     this.app.stage.on("pointercancel", this.photoInteractions.cancelPan);
-    this.app.canvas.addEventListener("wheel", this.handleCanvasWheel, {
-      passive: false,
-    });
   }
 
   update(input: AlbumCanvasProps, hostHeight: number) {
@@ -240,7 +237,6 @@ export class AlbumCanvasScene {
 
   destroy() {
     this.resetTransientInteractions();
-    this.app.canvas.removeEventListener("wheel", this.handleCanvasWheel);
     this.app.stage.removeAllListeners();
     this.clearMaterializedSheets();
     this.previewTextures.destroy();
@@ -673,8 +669,9 @@ export class AlbumCanvasScene {
     }
   }
 
-  private readonly handleCanvasWheel = (event: WheelEvent) => {
+  readonly handleCanvasWheel = (event: WheelEvent) => {
     if (
+      event.defaultPrevented ||
       !this.input ||
       !albumCanvasModePolicy(this.input.mode).enablesContinuousNavigation ||
       event.altKey

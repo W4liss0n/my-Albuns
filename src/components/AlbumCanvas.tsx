@@ -96,6 +96,16 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
   const dragRequestRef = useRef(0);
 
   useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    const handleWheel = (event: WheelEvent) => {
+      sceneRef.current?.handleCanvasWheel(event);
+    };
+    host.addEventListener("wheel", handleWheel, { passive: false });
+    return () => host.removeEventListener("wheel", handleWheel);
+  }, []);
+
+  useEffect(() => {
     if (sheetAutoScrollVelocity === 0 || !canvasMetrics) return;
     let frame = 0;
     let previousTimestamp = performance.now();
@@ -511,6 +521,8 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
     <div className="canvas-shell">
       <div
         className="canvas-host"
+        data-centered-sheet-id={props.centeredSheetId ?? undefined}
+        data-viewport-offset-x={props.viewport.offsetX}
         ref={hostRef}
         onDragLeave={handlePhotoDragLeave}
         onDragOver={handlePhotoDragOver}

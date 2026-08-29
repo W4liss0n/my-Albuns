@@ -426,11 +426,12 @@ async function navigateAndCapture({
 }) {
   await setExactViewport(request, sessionId, scenario.viewport);
   try {
-    const targetUrl = `${frontendOrigin}${servedPath}`;
+    const targetUrl = new URL(servedPath, frontendOrigin);
+    targetUrl.searchParams.set("ui-acceptance-scenario", label);
     await request("POST", `/session/${sessionId}/url`, {
-      url: targetUrl,
+      url: targetUrl.href,
     });
-    await waitForNavigation(request, sessionId, targetUrl, label);
+    await waitForNavigation(request, sessionId, targetUrl.href, label);
     await settleDocument(request, sessionId);
     await neutralizeUiAcceptancePointer({
       request,

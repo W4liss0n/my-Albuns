@@ -417,13 +417,23 @@ export function ProjectWorkspace({
     ],
   );
   const cancelSheetReorder = useCallback(() => {
+    if (structuralCommandsBlocked) {
+      updateSheetReorder(
+        createSheetReorderSession(projection.state.album.sheets),
+      );
+      return;
+    }
     const transition = reduceSheetReorderSession(
       sheetReorderSessionRef.current,
       projection.state.album.sheets,
       { type: "escape" },
     );
     updateSheetReorder(transition.session);
-  }, [projection.state.album.sheets, updateSheetReorder]);
+  }, [
+    projection.state.album.sheets,
+    structuralCommandsBlocked,
+    updateSheetReorder,
+  ]);
   useEffect(() => {
     if (
       sheetReorderSession.status !== "preview" &&
@@ -452,6 +462,24 @@ export function ProjectWorkspace({
     projection.state.album.sheets,
     implicitSheetId ?? "",
   );
+  const sheetReorderGestureActive =
+    sheetReorderSession.status === "preview" ||
+    sheetReorderSession.status === "invalid";
+  const sheetNavigationActive =
+    canvasMode.kind === "normal" &&
+    controller.selectedFrame === null &&
+    draggedPhotoId === null &&
+    sheetContextMenu === null &&
+    !commandsBlocked &&
+    !structuralCommandsBlocked &&
+    !sheetReorderGestureActive;
+  const openSheetContextMenu = useCallback(
+    (sheetId: string, position: { x: number; y: number }) => {
+      if (structuralCommandsBlocked) return;
+      setSheetContextMenu({ position, sheetId });
+    },
+    [structuralCommandsBlocked],
+  );
   useProjectCommandShortcuts({
     canDeleteSheet: implicitSheetAvailability.canDelete,
     canRedo: projection.state.canRedo,
@@ -461,11 +489,15 @@ export function ProjectWorkspace({
       void controller.deleteSheet();
     },
     disabled: commandsBlocked,
+    navigateToNextSheet: () => controller.navigateToAdjacentSheet("next"),
+    navigateToPreviousSheet: () =>
+      controller.navigateToAdjacentSheet("previous"),
     redo: controller.redo,
     save: controller.save,
     saveAs: controller.saveAs,
     sheetShortcutActive: controller.selectedFrame === null,
     sheetCommandsDisabled: structuralCommandsBlocked,
+    sheetNavigationActive,
     undo: controller.undo,
   });
   const applicationMenus = createProjectApplicationMenus({
@@ -510,7 +542,7 @@ export function ProjectWorkspace({
   });
 
   return (
-    <div className="app-shell">
+    <div className="app-shell ui-chrome-selection-scope">
       <ApplicationHeader
         context={projection.state.projectName}
         metadata={projectMetadata}
@@ -569,11 +601,7 @@ export function ProjectWorkspace({
             }}
             onMediaDemandChange={setCanvasMediaDemand}
             onGraphicsUnavailable={onGraphicsUnavailable}
-            onOpenSheetContextMenu={(sheetId, position) => {
-              if (structuralCommandsBlocked) return;
-              controller.navigateToSheet(sheetId);
-              setSheetContextMenu({ position, sheetId });
-            }}
+            onOpenSheetContextMenu={openSheetContextMenu}
           />
         </section>
 
@@ -620,11 +648,7 @@ export function ProjectWorkspace({
           onPresentationUnitChange={changePresentationUnit}
           onValidateAlbumInformation={projectCorePort.validateAlbumInformation}
           onNavigateToSheet={controller.navigateToSheet}
-          onOpenSheetContextMenu={(sheetId, position) => {
-            if (structuralCommandsBlocked) return;
-            controller.navigateToSheet(sheetId);
-            setSheetContextMenu({ position, sheetId });
-          }}
+          onOpenSheetContextMenu={openSheetContextMenu}
           sheetReorder={{
             disabled: structuralCommandsBlocked,
             representation: sheetReorderRepresentation(

@@ -60,6 +60,7 @@
   --ui-commandbar-height: var(--ui-control-height);
   --ui-toolbar-height: 34px;
   --ui-compact-control-height: 28px;
+  --ui-splitter-visual-size: 1px;
   --ui-control-padding-inline: 15px;
   --ui-footer-padding: 11px 14px;
   --ui-content-gutter: 16px;

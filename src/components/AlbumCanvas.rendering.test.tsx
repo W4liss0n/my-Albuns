@@ -511,15 +511,53 @@ test("enters sheet editing by a double click on either surface or Frame", async 
   await finishPixiInitialization();
   const sheet = displayWithHandler("pointertap");
 
-  sheet.emit("pointertap", { target: sheet, detail: 2 });
+  sheet.emit("pointertap", { button: 0, target: sheet, detail: 2 });
   expect(onEditSheet).toHaveBeenCalledWith("sheet-001");
 
   displayWithLabel("canvas-frame-frame-001").emit("pointertap", {
+    button: 0,
     detail: 2,
     stopPropagation: vi.fn(),
   });
   expect(onEditSheet).toHaveBeenCalledTimes(2);
   expect(onEditSheet).toHaveBeenLastCalledWith("sheet-001");
+});
+
+test("leaves right-button taps on the Pixi surface, Frame, and Sheet Bar to the contextual owner", async () => {
+  const onEditSheet = vi.fn();
+  const onFocusSheet = vi.fn();
+  const onSelectFrame = vi.fn();
+  renderCanvas({
+    compositionPlan: interactiveComposition,
+    onEditSheet,
+    onFocusSheet,
+    onSelectFrame,
+  });
+  await finishPixiInitialization();
+
+  const sheet = displayWithLabel("canvas-sheet-sheet-001");
+  const frame = displayWithLabel("canvas-frame-frame-001");
+  const sheetBar = displayWithLabel("sheet-bar-sheet-001");
+  sheet.emit("pointertap", {
+    button: 2,
+    detail: 1,
+    target: sheet,
+  });
+  frame.emit("pointertap", {
+    altKey: false,
+    button: 2,
+    detail: 1,
+    stopPropagation: vi.fn(),
+  });
+  sheetBar.emit("pointertap", {
+    button: 2,
+    detail: 1,
+    target: sheetBar,
+  });
+
+  expect(onFocusSheet).not.toHaveBeenCalled();
+  expect(onSelectFrame).not.toHaveBeenCalled();
+  expect(onEditSheet).not.toHaveBeenCalled();
 });
 
 test("editing mode materializes only its isolated sheet", async () => {
@@ -800,10 +838,10 @@ test("enters Sheet Edit Mode on the second pointer tap of a Sheet", async () => 
   await finishPixiInitialization();
 
   const sheet = displayWithLabel("canvas-sheet-sheet-001");
-  sheet.emit("pointertap", { detail: 1, target: sheet });
+  sheet.emit("pointertap", { button: 0, detail: 1, target: sheet });
   expect(onEditSheet).not.toHaveBeenCalled();
 
-  sheet.emit("pointertap", { detail: 2, target: sheet });
+  sheet.emit("pointertap", { button: 0, detail: 2, target: sheet });
   expect(onEditSheet).toHaveBeenCalledWith("sheet-001");
 });
 
@@ -890,7 +928,7 @@ test.each([
     expect(sheetBar).toMatchObject({
       hitArea: { height: 40, width: 600, x: 0, y: 0 },
     });
-    sheetBar.emit("pointertap", { target: sheetBar });
+    sheetBar.emit("pointertap", { button: 0, target: sheetBar });
     expect(onFocusSheet).toHaveBeenCalledWith("sheet-001");
     expect(displayWithLabel("sheet-center-line-sheet-001")).toMatchObject({
       pathCommands: [
@@ -1558,11 +1596,20 @@ test("mounts the productive Sheet Bar seam for navigation, context, and reorder"
   const second = screen.getByRole("button", {
     name: "Reordenar Lâmina 02 pela Barra",
   });
-  const dataTransfer = {
-    dropEffect: "none",
-    effectAllowed: "none",
-    setData: vi.fn(),
-  };
+  const overlay = view.getByRole("group", {
+    name: "Reordenação pela Barra da Lâmina",
+  });
+  vi.spyOn(overlay, "getBoundingClientRect").mockReturnValue({
+    left: 0,
+    right: 10_000,
+    top: 0,
+    bottom: 600,
+    width: 10_000,
+    height: 600,
+    x: 0,
+    y: 0,
+    toJSON: () => ({}),
+  });
 
   fireEvent.click(second);
   expect(onNavigate).toHaveBeenCalledWith("sheet-002");
@@ -1572,13 +1619,32 @@ test("mounts the productive Sheet Bar seam for navigation, context, and reorder"
     y: 36,
   });
 
-  fireEvent.dragStart(first, { dataTransfer });
-  fireEvent.dragEnter(second, { dataTransfer });
+  const firstX = Number.parseFloat(first.style.left) + 8;
+  const secondX = Number.parseFloat(second.style.left) + 8;
+  fireEvent.pointerDown(first, {
+    button: 0,
+    buttons: 1,
+    clientX: firstX,
+    clientY: 32,
+    pointerId: 31,
+    pointerType: "mouse",
+  });
+  fireEvent.pointerMove(first, {
+    buttons: 1,
+    clientX: secondX,
+    clientY: 32,
+    pointerId: 31,
+    pointerType: "mouse",
+  });
   expect(onPreview).toHaveBeenLastCalledWith("sheet-001", 1);
-  fireEvent.drop(
-    view.getByTestId("sheet-reorder-bar-drop-zone"),
-    { dataTransfer },
-  );
+  fireEvent.pointerUp(first, {
+    button: 0,
+    buttons: 0,
+    clientX: secondX,
+    clientY: 32,
+    pointerId: 31,
+    pointerType: "mouse",
+  });
   expect(onDrop).toHaveBeenCalledOnce();
 });
 
