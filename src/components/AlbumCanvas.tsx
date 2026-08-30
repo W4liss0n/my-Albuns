@@ -574,7 +574,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
             }
             onDrop={props.sheetReorder.onDrop}
             onEditSheet={props.onEditSheet}
-            onNavigate={props.sheetReorder.onNavigate}
+            onSelect={props.sheetReorder.onSelect}
             onPreview={props.sheetReorder.onPreview}
             representation={props.sheetReorder.representation}
             sheetBarMetadata={props.sheetBarMetadata}

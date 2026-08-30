@@ -67,6 +67,9 @@ const canvasHarness = vi.hoisted(() => ({
   props: null as null | {
     mode: AlbumCanvasMode;
     continuousCanvasLayout: ContinuousCanvasLayout;
+    focusedSheetId: string | null;
+    centeredSheetId: string | null;
+    viewport: { offsetX: number };
     mediaPreviewUrls?: Readonly<Record<string, string>>;
     technicalGuides?: CanvasTechnicalGuides;
     sheetReorder?: CanvasSheetReorder;
@@ -805,6 +808,45 @@ test("opens and dismisses an explicit Sheet context menu without navigating the 
     screen.queryByRole("menu", { name: "Ações da Lâmina 03" }),
   ).not.toBeInTheDocument();
   expect(useEditorView.getState()).toMatchObject(before);
+});
+
+test("selects a Sheet through the Bar seam without navigating the Canvas", () => {
+  const physicalProjection = createThreeSheetProjection();
+  physicalProjection.state.album.sheets[0]!.activeSides = "right";
+  physicalProjection.state.album.sheets[0]!.pageNumbers = [1];
+  physicalProjection.composition.sheets[0]!.activeSides = "right";
+  render(
+    <ProjectWorkspace
+      exportPipelinePort={exportPipelinePort}
+      projection={physicalProjection}
+      projectCorePort={projectCorePortWithApply(async () => physicalProjection)}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  act(() => {
+    canvasHarness.props?.onCanvasMetricsChange?.({
+      width: 1_000,
+      scale: 0.5,
+    });
+  });
+  fireEvent.click(
+    screen.getByRole("button", { name: /Ir para Lâmina 02/u }),
+  );
+  const before = {
+    centeredSheetId: canvasHarness.props?.centeredSheetId,
+    offsetX: canvasHarness.props?.viewport.offsetX,
+  };
+  expect(before).toMatchObject({ centeredSheetId: "sheet-002" });
+  expect(before.offsetX).not.toBe(0);
+
+  for (const sheetId of ["sheet-001", "sheet-003", "sheet-003"]) {
+    act(() => canvasHarness.props?.sheetReorder?.onSelect(sheetId));
+
+    expect(canvasHarness.props?.focusedSheetId).toBe(sheetId);
+    expect(canvasHarness.props?.centeredSheetId).toBe(before.centeredSheetId);
+    expect(canvasHarness.props?.viewport.offsetX).toBe(before.offsetX);
+  }
 });
 
 test("routes Delete to the centered Sheet and guards text entry, Edit Mode, and the minimum", async () => {

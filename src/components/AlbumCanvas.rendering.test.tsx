@@ -1565,10 +1565,10 @@ test("does not expose the structural context menu through masked Sangria", async
   expect(onOpenSheetContextMenu).not.toHaveBeenCalled();
 });
 
-test("mounts the productive Sheet Bar seam for navigation, edit, context, and reorder", async () => {
+test("mounts the productive Sheet Bar seam for selection, edit, context, and reorder", async () => {
   const onCancel = vi.fn();
   const onDrop = vi.fn();
-  const onNavigate = vi.fn();
+  const onSelect = vi.fn();
   const onOpenSheetContextMenu = vi.fn();
   const onPreview = vi.fn();
   const view = renderCanvas({
@@ -1578,7 +1578,7 @@ test("mounts the productive Sheet Bar seam for navigation, edit, context, and re
       disabled: false,
       onCancel,
       onDrop,
-      onNavigate,
+      onSelect,
       onPreview,
       representation: {
         ghost: null,
@@ -1612,7 +1612,7 @@ test("mounts the productive Sheet Bar seam for navigation, edit, context, and re
   });
 
   fireEvent.click(second);
-  expect(onNavigate).toHaveBeenCalledWith("sheet-002");
+  expect(onSelect).toHaveBeenCalledWith("sheet-002");
   const firstWidth = Number.parseFloat(first.style.width);
   const secondWidth = Number.parseFloat(second.style.width);
   fireEvent.doubleClick(first, {
@@ -1685,7 +1685,7 @@ test("slides intermediate Pixi Sheets while the dragged Sheet yields to the plac
     disabled: false,
     onCancel: vi.fn(),
     onDrop: vi.fn(),
-    onNavigate: vi.fn(),
+    onSelect: vi.fn(),
     onPreview: vi.fn(),
   };
   const view = render(

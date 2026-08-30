@@ -54,7 +54,7 @@ export interface SheetBarReorderOverlayProps {
   readonly onDrop: () => void;
   readonly onCancel: () => void;
   readonly onEditSheet: (sheetId: string) => void;
-  readonly onNavigate: (sheetId: string) => void;
+  readonly onSelect: (sheetId: string) => void;
   readonly onContextMenu: (
     sheetId: string,
     position: { x: number; y: number },
@@ -99,7 +99,7 @@ export function SheetBarReorderOverlay(
   const ghostAnchorRef = useRef<GhostAnchor | null>(null);
   const pointerReorder = useSheetPointerReorder({
     enabled: reorderEnabled,
-    onActivate: props.onNavigate,
+    onActivate: props.onSelect,
     onCancel: props.onCancel,
     onDrop: props.onDrop,
     onFinish: () => props.onAutoScrollVelocity(0),
@@ -262,7 +262,7 @@ export function SheetBarReorderOverlay(
                 event.stopPropagation();
                 return;
               }
-              props.onNavigate(sheet.sheetId);
+              props.onSelect(sheet.sheetId);
             }}
             onPointerDown={(event) => {
               const overlayBounds =
