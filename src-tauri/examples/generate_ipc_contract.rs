@@ -6,8 +6,8 @@ use myalbuns_desktop_lib::ipc_contract::{
     ExportCommandError, ExportEvent, ExportResult, FrontendLogEvent, ImportPhotoResult,
     LinkedMediaChanged, MediaPanelSettings, MediaPanelTabSettings, MediaPreferenceKind,
     MediaPreview, MediaPreviewCommandError, MediaPreviewDemand, MediaPreviewState,
-    MediaSortDirection, MediaThumbnailSizes, MediaUsageFilter, ProjectCloseChoice,
-    ProjectCloseRequestOutcome, ProjectCloseResolution, ProjectDialogAction,
+    MediaSortDirection, MediaThumbnailSizes, MediaUsageFilter, OpeningExternalCopyDecision,
+    ProjectCloseChoice, ProjectCloseRequestOutcome, ProjectCloseResolution, ProjectDialogAction,
     ProjectDialogActionEvent, ProjectDialogPresentation, ProjectDialogState,
     ProjectRecoveryDecision, SaveAsProjectCommandError, SaveAsProjectOutcome, SaveAsProjectResult,
     SaveProjectCommandError, SaveProjectOutcome, SaveProjectResult, SettingsPreferenceChange,
@@ -81,6 +81,8 @@ fn main() {
         .expect("Project close resolution bindings should be generated");
     ProjectRecoveryDecision::export_all(&config)
         .expect("Project Recovery decision bindings should be generated");
+    OpeningExternalCopyDecision::export_all(&config)
+        .expect("opening external-copy decision bindings should be generated");
     SaveProjectCommandError::export_all(&config)
         .expect("Save Project error bindings should be generated");
     SaveProjectOutcome::export_all(&config)

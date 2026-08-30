@@ -330,6 +330,29 @@
       ]
     },
     {
+      "id": "external-copy-opening-dialog",
+      "title": "Cópia externa — decisão no diálogo do fluxo de abertura",
+      "implementationPath": "/dialog.html?kind=external-copy&attemptId=acceptance-preview",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "external-copy-opening-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "A referência visual vigente antecede a transição da janela externa de progresso para a decisão de Cópia externa no mesmo owner e Host correlacionado."
+      },
+      "viewport": { "width": 440, "height": 320 },
+      "readySelector": ".ui-owned-window-shell:has([data-opening-owner-transition] .external-copy-decision-dialog-scope [role=\"dialog\"][aria-modal=\"true\"]):not(:has(.ui-modal-dialog-layer))",
+      "actions": [
+        {
+          "type": "assert-single-line",
+          "selector": ".external-copy-decision-dialog-scope .ui-dialog-window__footer button:nth-of-type(1)"
+        },
+        {
+          "type": "assert-single-line",
+          "selector": ".external-copy-decision-dialog-scope .ui-dialog-window__footer button:nth-of-type(2)"
+        }
+      ]
+    },
+    {
       "id": "project-workspace-sheet-context",
       "title": "Janela do Projeto — contexto Lâmina",
       "implementationPath": "/workspace-preview.html",
@@ -678,16 +701,16 @@
     },
     {
       "id": "project-graphics-failure",
-      "title": "Janela do Projeto — falha gráfica inicial",
-      "implementationPath": "/workspace-preview.html?graphics=unsupported",
+      "title": "Janela do Projeto — falha gráfica tardia em diálogo pertencente",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22graphicsFailure%22%2C%22reason%22%3A%22O%20contexto%20WebGL2%20foi%20perdido%20e%20n%C3%A3o%20p%C3%B4de%20ser%20restaurado.%22%7D",
       "comparison": {
         "kind": "implementation-only",
-        "surface": "project-graphics-failure",
-        "implementationCaptureSelector": ".startup-surface",
-        "reason": "A referência visual vigente não representa o bloqueio seguro da Janela do Projeto quando WebGL2 por hardware não é confirmado."
+        "surface": "owned-project-graphics-failure",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "A referência visual vigente não representa o diálogo externo pertencente que bloqueia a Janela do Projeto após uma falha tardia do Canvas WebGL2."
       },
-      "viewport": { "width": 1280, "height": 720 },
-      "readySelector": ".startup-card[role=\"alert\"]",
+      "viewport": { "width": 440, "height": 320 },
+      "readySelector": ".ui-owned-window-shell:has([role=\"dialog\"][aria-modal=\"true\"] button):not(:has(.startup-card))",
       "actions": []
     },
     {

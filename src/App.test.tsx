@@ -18,7 +18,10 @@ import type {
   ProjectCorePort,
   ProjectWindowPort,
 } from "./application/projectPorts";
-import type { ProjectDialogPort } from "./application/projectDialogPort";
+import type {
+  ProjectDialogAction,
+  ProjectDialogPort,
+} from "./application/projectDialogPort";
 import {
   createWorkspacePreferences,
   type WorkspacePreferences,
@@ -209,11 +212,16 @@ type TestAppProps = Omit<
 function projectDialogHarness() {
   const dismiss = vi.fn(async () => undefined);
   const present = vi.fn(async () => undefined);
+  let listener: (action: ProjectDialogAction) => void = () => undefined;
   return {
     dismiss,
+    emit: (action: ProjectDialogAction) => listener(action),
     present,
     port: {
-      acquire: () => ({ dismiss, present }),
+      acquire: (nextListener) => {
+        listener = nextListener;
+        return { dismiss, present };
+      },
     } satisfies ProjectDialogPort,
   };
 }
@@ -322,14 +330,16 @@ test("surfaces the durable Save As terminal when the previous WebView is restore
 test("reports a defensive Project Canvas failure without claiming that no Session exists", async () => {
   const load = vi.fn(async () => projection);
   const prepareMediaPreviews = vi.fn(async () => null);
+  const dialog = projectDialogHarness();
+  const requestClose = vi.fn(async () => ({ kind: "closed" as const }));
   render(
     <App
       workspacePreferencesMode="memory"
       exportPort={exportPort}
       exportPipelinePort={exportPipelinePort}
       projectStartupPort={projectStartupPort}
-      projectDialogPort={projectDialogPort}
-      projectWindowPort={projectWindowPort}
+      projectDialogPort={dialog.port}
+      projectWindowPort={{ ...projectWindowPort, requestClose }}
       mediaPreviewPort={{
         ...mediaPreviewPort,
         prepareMediaPreviews,
@@ -349,20 +359,24 @@ test("reports a defensive Project Canvas failure without claiming that no Sessio
     />,
   );
 
+  await waitFor(() =>
+    expect(dialog.present).toHaveBeenCalledWith({
+      kind: "graphicsFailure",
+      reason: "WebGL2 acelerado por hardware não foi confirmado.",
+    }),
+  );
   expect(
-    await screen.findByRole("heading", {
+    screen.queryByRole("heading", {
       name: "O Canvas não pôde ser iniciado",
     }),
-  ).toBeInTheDocument();
-  expect(
-    screen.getByText("WebGL2 acelerado por hardware não foi confirmado."),
-  ).toBeInTheDocument();
-  expect(
-    screen.getByRole("alert"),
-  ).toBeInTheDocument();
+  ).not.toBeInTheDocument();
 
   expect(load).not.toHaveBeenCalled();
   expect(prepareMediaPreviews).not.toHaveBeenCalled();
+
+  act(() => dialog.emit("closeProjectAfterGraphicsFailure"));
+  await waitFor(() => expect(dialog.dismiss).toHaveBeenCalledOnce());
+  expect(requestClose).toHaveBeenCalledOnce();
 });
 
 test("opens the Project in the real workspace when hardware WebGL2 is available", async () => {
@@ -1509,6 +1523,15 @@ test("keeps one Monitor subscription while demand revisions change", async () =>
 
 test("cancels resident media demand when runtime graphics become unavailable", async () => {
   const prepareMediaPreviews = vi.fn(async () => []);
+  const dialog = projectDialogHarness();
+  let resolveGraphicsDialogPresentation: (() => void) | undefined;
+  dialog.present.mockImplementationOnce(
+    () =>
+      new Promise<undefined>((resolve) => {
+        resolveGraphicsDialogPresentation = () => resolve(undefined);
+      }),
+  );
+  const requestClose = vi.fn(async () => ({ kind: "closed" as const }));
 
   render(
     <App
@@ -1516,8 +1539,8 @@ test("cancels resident media demand when runtime graphics become unavailable", a
       exportPort={exportPort}
       exportPipelinePort={exportPipelinePort}
       projectStartupPort={projectStartupPort}
-      projectDialogPort={projectDialogPort}
-      projectWindowPort={projectWindowPort}
+      projectDialogPort={dialog.port}
+      projectWindowPort={{ ...projectWindowPort, requestClose }}
       mediaPreviewPort={{
         ...mediaPreviewPort,
         prepareMediaPreviews,
@@ -1544,17 +1567,186 @@ test("cancels resident media demand when runtime graphics become unavailable", a
   fireEvent.click(
     screen.getByRole("button", { name: "Simular perda grafica" }),
   );
-  expect(
-    await screen.findByRole("heading", {
-      name: /O Canvas/,
+  await waitFor(() =>
+    expect(dialog.present).toHaveBeenCalledWith({
+      kind: "graphicsFailure",
+      reason: "WebGL2 runtime failure.",
     }),
-  ).toBeInTheDocument();
+  );
+  expect(document.querySelector(".workspace-grid")).toHaveAttribute("inert");
+  expect(document.querySelector(".workspace-grid")).toHaveAttribute(
+    "aria-busy",
+    "true",
+  );
+  expect(
+    screen.getByRole("button", { name: "Exportar Lâmina" }),
+  ).toBeDisabled();
+  expect(screen.getByTestId("album-canvas")).toBeInTheDocument();
+  expect(
+    screen.queryByRole("heading", { name: /O Canvas/ }),
+  ).not.toBeInTheDocument();
   await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledTimes(2));
   expect(prepareMediaPreviews).toHaveBeenNthCalledWith(2, {
     revision: 2,
     visibleMediaIds: [],
     preloadMediaIds: [],
   });
+
+  act(() => resolveGraphicsDialogPresentation?.());
+  act(() => dialog.emit("closeProjectAfterGraphicsFailure"));
+  await waitFor(() => expect(dialog.dismiss).toHaveBeenCalledOnce());
+  expect(requestClose).toHaveBeenCalledOnce();
+});
+
+test("routes a dirty defensive graphics failure through the existing close confirmation", async () => {
+  const sessions: Array<{
+    dismiss: ReturnType<typeof vi.fn>;
+    listener: (action: ProjectDialogAction) => void;
+    present: ReturnType<typeof vi.fn>;
+  }> = [];
+  const dialogPort: ProjectDialogPort = {
+    acquire: (listener) => {
+      const session = {
+        dismiss: vi.fn(async () => undefined),
+        listener,
+        present: vi.fn(async () => undefined),
+      };
+      sessions.push(session);
+      return session;
+    },
+  };
+  const requestClose = vi.fn(async () => ({
+    kind: "confirmationRequired" as const,
+  }));
+  const resolveClose = vi.fn(async () => ({
+    kind: "cancelled" as const,
+    projection,
+  }));
+
+  render(
+    <App
+      workspacePreferencesMode="memory"
+      exportPipelinePort={exportPipelinePort}
+      projectStartupPort={projectStartupPort}
+      projectDialogPort={dialogPort}
+      projectWindowPort={{
+        ...projectWindowPort,
+        requestClose,
+        resolveClose,
+      }}
+      mediaPreviewPort={mediaPreviewPort}
+      projectCorePort={projectCorePort}
+      logger={silentLogger}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      graphicsProbe={() => ({
+        supported: false,
+        code: "webgl2_unavailable",
+        renderer: "indisponível",
+        reason: "WebGL2 acelerado por hardware não foi confirmado.",
+        limits: null,
+      })}
+    />,
+  );
+
+  await waitFor(() => expect(sessions).toHaveLength(1));
+  expect(sessions[0]?.present).toHaveBeenCalledWith({
+    kind: "graphicsFailure",
+    reason: "WebGL2 acelerado por hardware não foi confirmado.",
+  });
+
+  act(() =>
+    sessions[0]?.listener("closeProjectAfterGraphicsFailure"),
+  );
+  await waitFor(() => expect(requestClose).toHaveBeenCalledOnce());
+  await waitFor(() => expect(sessions).toHaveLength(2));
+  expect(sessions[1]?.present).toHaveBeenCalledWith({
+    busy: false,
+    kind: "projectCloseConfirmation",
+  });
+
+  act(() => sessions[1]?.listener("cancelProjectClose"));
+  await waitFor(() => expect(resolveClose).toHaveBeenCalledWith("cancel"));
+  await waitFor(() => expect(sessions[1]?.dismiss).toHaveBeenCalledOnce());
+  await waitFor(() => expect(sessions).toHaveLength(3));
+  expect(sessions[2]?.present).toHaveBeenCalledWith({
+    kind: "graphicsFailure",
+    reason: "WebGL2 acelerado por hardware não foi confirmado.",
+  });
+});
+
+test("does not treat a rejected close confirmation as an explicit graphics-close cancellation", async () => {
+  const sessions: Array<{
+    dismiss: ReturnType<typeof vi.fn>;
+    listener: (action: ProjectDialogAction) => void;
+    present: ReturnType<typeof vi.fn>;
+  }> = [];
+  const dialogPort: ProjectDialogPort = {
+    acquire: (listener) => {
+      const session = {
+        dismiss: vi.fn(async () => undefined),
+        listener,
+        present: vi.fn(async () => {
+          if (sessions.length <= 2) {
+            throw new Error("A janela pertencente não pôde ser apresentada.");
+          }
+        }),
+      };
+      sessions.push(session);
+      return session;
+    },
+  };
+  const requestClose = vi.fn(async () => ({
+    kind: "confirmationRequired" as const,
+  }));
+  const resolveClose = vi.fn(async () => ({
+    kind: "cancelled" as const,
+    projection,
+  }));
+
+  render(
+    <App
+      workspacePreferencesMode="memory"
+      exportPipelinePort={exportPipelinePort}
+      projectStartupPort={projectStartupPort}
+      projectDialogPort={dialogPort}
+      projectWindowPort={{
+        ...projectWindowPort,
+        requestClose,
+        resolveClose,
+      }}
+      mediaPreviewPort={mediaPreviewPort}
+      projectCorePort={projectCorePort}
+      logger={silentLogger}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      graphicsProbe={() => ({
+        supported: false,
+        code: "webgl2_unavailable",
+        renderer: "indisponível",
+        reason: "WebGL2 acelerado por hardware não foi confirmado.",
+        limits: null,
+      })}
+    />,
+  );
+
+  await waitFor(() => expect(resolveClose).toHaveBeenCalledWith("cancel"));
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(sessions[0]?.present).toHaveBeenCalledWith({
+    kind: "graphicsFailure",
+    reason: "WebGL2 acelerado por hardware não foi confirmado.",
+  });
+  expect(sessions[1]?.present).toHaveBeenCalledWith({
+    busy: false,
+    kind: "projectCloseConfirmation",
+  });
+  expect(sessions[2]?.present).toHaveBeenCalledWith({
+    kind: "projectOperationFailure",
+    message: "A janela pertencente não pôde ser apresentada.",
+  });
+  expect(
+    sessions.flatMap((session) => session.present.mock.calls).filter(
+      ([state]) => state.kind === "graphicsFailure",
+    ),
+  ).toHaveLength(1);
 });
 
 test("logs the typed media preview failure code without replacing it with unknown_error", async () => {

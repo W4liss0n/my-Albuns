@@ -46,6 +46,9 @@ pub enum ProjectDialogState {
     ProjectOperationFailure {
         message: String,
     },
+    GraphicsFailure {
+        reason: String,
+    },
     ExportProgress {
         cancel_requested: bool,
         cancellable: bool,
@@ -76,6 +79,7 @@ pub enum ProjectDialogAction {
     CancelProjectClose,
     DiscardAndClose,
     ConfirmAlbumInformation,
+    CloseProjectAfterGraphicsFailure,
     DismissExport,
     DismissProjectCloseFailure,
     DismissProjectOperationFailure,
@@ -115,6 +119,10 @@ mod project_dialog_contract_tests {
             (
                 ProjectDialogAction::ConfirmAlbumInformation,
                 "confirmAlbumInformation",
+            ),
+            (
+                ProjectDialogAction::CloseProjectAfterGraphicsFailure,
+                "closeProjectAfterGraphicsFailure",
             ),
             (ProjectDialogAction::DismissExport, "dismissExport"),
             (
@@ -157,6 +165,9 @@ mod project_dialog_contract_tests {
             ProjectDialogState::ProjectOperationFailure {
                 message: "Falha ao salvar".into(),
             },
+            ProjectDialogState::GraphicsFailure {
+                reason: "O contexto WebGL2 foi perdido.".into(),
+            },
             ProjectDialogState::ExportProgress {
                 cancel_requested: false,
                 cancellable: true,
@@ -180,6 +191,7 @@ mod project_dialog_contract_tests {
             "projectCloseConfirmation",
             "projectCloseFailure",
             "projectOperationFailure",
+            "graphicsFailure",
             "exportProgress",
             "exportFailure",
             "exportSuccess",
@@ -880,6 +892,37 @@ pub enum ProjectRecoveryDecision {
     ReopenAndRecover,
     DiscardCheckpointAndOpenLastSaved,
     NowNot,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum OpeningExternalCopyDecision {
+    SaveCopyAs,
+    Cancel,
+}
+
+#[cfg(test)]
+mod opening_external_copy_contract_tests {
+    use serde_json::json;
+
+    use super::OpeningExternalCopyDecision;
+
+    #[test]
+    fn external_copy_decisions_are_closed_and_stable() {
+        assert_eq!(
+            serde_json::from_value::<OpeningExternalCopyDecision>(json!("saveCopyAs"))
+                .expect("the save-copy decision deserializes"),
+            OpeningExternalCopyDecision::SaveCopyAs
+        );
+        assert_eq!(
+            serde_json::from_value::<OpeningExternalCopyDecision>(json!("cancel"))
+                .expect("the explicit cancellation deserializes"),
+            OpeningExternalCopyDecision::Cancel
+        );
+        assert!(
+            serde_json::from_value::<OpeningExternalCopyDecision>(json!("openReadOnly")).is_err()
+        );
+    }
 }
 
 #[cfg(test)]

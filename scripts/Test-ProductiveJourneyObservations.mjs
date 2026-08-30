@@ -38,11 +38,13 @@ test("productive journey uses the neutral captured-pointer gesture policy", () =
 });
 
 test("locates the New Project flow through stable accessible names", () => {
+  const scripts = path.dirname(fileURLToPath(import.meta.url));
   const runner = readFileSync(
-    path.join(
-      path.dirname(fileURLToPath(import.meta.url)),
-      "Run-ProductiveJourneyGate.mjs",
-    ),
+    path.join(scripts, "Run-ProductiveJourneyGate.mjs"),
+    "utf8",
+  );
+  const wrapper = readFileSync(
+    path.join(scripts, "Test-ProductiveJourney.ps1"),
     "utf8",
   );
 
@@ -133,6 +135,27 @@ test("locates the New Project flow through stable accessible names", () => {
   assert.match(runner, /const actionGeometry =/u);
   assert.match(runner, /action\.lineCount === 1/u);
   assert.match(runner, /recoveryPresentation\.viewportWidth !== 492/u);
+  assert.match(
+    runner,
+    /parsed\.searchParams\.get\("kind"\) === "external-copy"/u,
+  );
+  assert.match(runner, /externalCopyPresentation\.viewportWidth !== 440/u);
+  assert.match(runner, /nativeOwnedWindowState\(externalCopyGlobal\)/u);
+  assert.match(runner, /cancelRestoredGlobalAndCleanedHost/u);
+  assert.match(runner, /\[externalCopyPath\]/u);
+  assert.match(runner, /realPathActivationsCompletedSerially/u);
+  assert.match(runner, /pickerCancellationPreservedAttempt/u);
+  assert.match(runner, /emptyActivationDidNotResurrectGlobal/u);
+  assert.match(runner, /samePendingHostCompletedHandoff/u);
+  assert.match(runner, /selectedExternalCopy\.exactProcess === true/u);
+  assert.match(runner, /new Event\('webglcontextlost'/u);
+  assert.match(runner, /canvas_context_restore_failed/u);
+  assert.match(runner, /graphicsDialogOwnedAndProjectBlocked/u);
+  assert.match(runner, /cancelledCloseRearmedSingleGraphicsDialog/u);
+  assert.match(runner, /workspaceInertBeforeDialogTerminal/u);
+  assert.match(runner, /exportDisabledBeforeDialogTerminal/u);
+  assert.match(wrapper, /externalCopyOpening\.pickerCancellationPreservedAttempt/u);
+  assert.match(wrapper, /graphicsFailure\.dialogOwnedByProject/u);
   assert.doesNotMatch(runner, /DEBUG-project-dialog-targets/);
   assert.doesNotMatch(runner, /localStateStartedEmpty/);
 });

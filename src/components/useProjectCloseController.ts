@@ -52,6 +52,7 @@ export function useProjectCloseController({
   onProjectionChange,
   onError,
 }: ProjectCloseControllerOptions) {
+  const [explicitCancelRevision, setExplicitCancelRevision] = useState(0);
   const [phase, setPhase] = useState<ClosePhase>("idle");
   const phaseRef = useRef<ClosePhase>("idle");
   const requestBlockedRef = useRef(requestBlocked);
@@ -112,7 +113,7 @@ export function useProjectCloseController({
   ]);
 
   const requestClose = useCallback(async () => {
-    if (requestBlockedRef.current || phaseRef.current !== "idle") return;
+    if (requestBlockedRef.current || phaseRef.current !== "idle") return null;
     transition("requesting");
     try {
       const pendingOutcome = await waitForPendingMutations();
@@ -122,7 +123,7 @@ export function useProjectCloseController({
         pendingOutcome?.status === "obsolete"
       ) {
         transition("idle");
-        return;
+        return null;
       }
       const outcome = await projectWindowPort.requestClose();
       if (outcome.kind === "confirmationRequired") {
@@ -130,9 +131,11 @@ export function useProjectCloseController({
       } else {
         transition("terminal");
       }
+      return outcome;
     } catch (error: unknown) {
       transition("idle");
       onError(closeErrorMessage(error));
+      return null;
     }
   }, [
     onError,
@@ -165,6 +168,9 @@ export function useProjectCloseController({
         const resolution = await projectWindowPort.resolveClose(choice);
         if (resolution.kind === "cancelled") {
           onProjectionChange(resolution.projection);
+          if (choice === "cancel") {
+            setExplicitCancelRevision((revision) => revision + 1);
+          }
           transition("idle");
           dismissDialog();
           return;
@@ -293,6 +299,7 @@ export function useProjectCloseController({
   );
 
   return {
+    explicitCancelRevision,
     interactionBlocked: phase !== "idle",
     requestClose,
   };

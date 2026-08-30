@@ -29,8 +29,10 @@ import {
   type CanvasGraphicsDiagnosticProbe,
 } from "./components/canvasGraphicsDiagnosticProbeContext";
 import { ProjectWorkspace } from "./components/ProjectWorkspace";
+import { useProjectCloseController } from "./components/useProjectCloseController";
 import { useProjectMutationRunner } from "./components/useProjectMutationRunner";
 import { useProjectOperationFailureDialog } from "./components/useProjectOperationFailureDialog";
+import { useProjectGraphicsFailureDialog } from "./components/useProjectGraphicsFailureDialog";
 import { BrandWordmark, InlineNotice } from "./ui";
 import "./ui/theme.css";
 import "./ui/ui.css";
@@ -80,6 +82,11 @@ function App({
   const [runtimeGraphicsDiagnostic, setRuntimeGraphicsDiagnostic] =
     useState<GraphicsDiagnostic | null>(null);
   const editorGraphics = runtimeGraphicsDiagnostic ?? graphics;
+  const initialGraphicsFailure = !graphics.supported ? graphics : null;
+  const runtimeGraphicsFailure =
+    runtimeGraphicsDiagnostic && !runtimeGraphicsDiagnostic.supported
+      ? runtimeGraphicsDiagnostic
+      : null;
   const [projection, setProjection] = useState<EditorProjection | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [mediaPreviews, setMediaPreviews] = useState<
@@ -95,6 +102,9 @@ function App({
   const [saveAsStartupFailure, setSaveAsStartupFailure] = useState(() =>
     projectSaveAsStartupFailure(window.location.hash),
   );
+  const [initialGraphicsCloseError, setInitialGraphicsCloseError] = useState<
+    string | null
+  >(null);
   const [preferencesReadyProject, setPreferencesReadyProject] = useState("");
   const [mediaChangeSubscription, setMediaChangeSubscription] =
     useState<MediaPreviewSubscription | null>(null);
@@ -109,9 +119,14 @@ function App({
   }, [logger]);
 
   useProjectOperationFailureDialog({
-    message: saveAsStartupFailure ?? cacheProcessorWarning?.message ?? null,
+    message:
+      initialGraphicsCloseError ??
+      saveAsStartupFailure ??
+      cacheProcessorWarning?.message ??
+      null,
     projectDialogPort,
     onDismiss: () => {
+      setInitialGraphicsCloseError(null);
       const dismissedSaveAsFailure = saveAsStartupFailure !== null;
       setSaveAsStartupFailure(null);
       setCacheProcessorWarning(null);
@@ -467,10 +482,6 @@ function App({
     projectId,
   ]);
 
-  if (!editorGraphics.supported) {
-    return <ProjectGraphicsFailure diagnostic={editorGraphics} />;
-  }
-
   if (loadError) {
     return (
       <main className="startup-surface ui-chrome-selection-scope">
@@ -481,6 +492,18 @@ function App({
           <InlineNotice tone="error">{loadError}</InlineNotice>
         </section>
       </main>
+    );
+  }
+
+  if (initialGraphicsFailure) {
+    return (
+      <InitialProjectGraphicsFailureController
+        diagnostic={initialGraphicsFailure}
+        onCloseError={setInitialGraphicsCloseError}
+        onProjectionChange={setProjection}
+        projectDialogPort={projectDialogPort}
+        projectWindowPort={projectWindowPort}
+      />
     );
   }
 
@@ -513,6 +536,7 @@ function App({
           onRetryUnavailableMedia={retryUnavailableMedia}
           onProjectionChange={setProjection}
           onGraphicsUnavailable={setRuntimeGraphicsDiagnostic}
+          graphicsFailure={runtimeGraphicsFailure}
           onPreferencesReady={handlePreferencesReady}
           workspacePreferences={
             workspacePreferencesPort
@@ -523,6 +547,37 @@ function App({
       </CanvasGraphicsDiagnosticProbeProvider>
     </LoggingProvider>
   );
+}
+
+const noPendingProjectMutations = async () => null;
+
+function InitialProjectGraphicsFailureController({
+  diagnostic,
+  onCloseError,
+  onProjectionChange,
+  projectDialogPort,
+  projectWindowPort,
+}: {
+  diagnostic: Extract<GraphicsDiagnostic, { supported: false }>;
+  onCloseError(message: string): void;
+  onProjectionChange(projection: EditorProjection): void;
+  projectDialogPort: ProjectDialogPort;
+  projectWindowPort: ProjectWindowPort;
+}) {
+  const projectClose = useProjectCloseController({
+    onError: onCloseError,
+    onProjectionChange,
+    projectDialogPort,
+    projectWindowPort,
+    waitForPendingMutations: noPendingProjectMutations,
+  });
+  useProjectGraphicsFailureDialog({
+    closeCancelRevision: projectClose.explicitCancelRevision,
+    diagnostic,
+    onCloseProject: projectClose.requestClose,
+    projectDialogPort,
+  });
+  return null;
 }
 
 function sameMediaDemand(
@@ -539,27 +594,6 @@ function sameStrings(left: readonly string[], right: readonly string[]) {
   return (
     left.length === right.length &&
     left.every((value, index) => value === right[index])
-  );
-}
-
-function ProjectGraphicsFailure({
-  diagnostic,
-}: {
-  diagnostic: Extract<GraphicsDiagnostic, { supported: false }>;
-}) {
-  return (
-    <main className="startup-surface ui-chrome-selection-scope">
-      <section className="startup-card" role="alert">
-        <BrandWordmark compact />
-        <p className="eyebrow">Editor indisponível</p>
-        <h1>O Canvas não pôde ser iniciado</h1>
-        <InlineNotice tone="error">{diagnostic.reason}</InlineNotice>
-        <InlineNotice className="support-note">
-          Feche esta Janela do Projeto e use o Diagnóstico gráfico da
-          Boas-vindas antes de tentar novamente.
-        </InlineNotice>
-      </section>
-    </main>
   );
 }
 

@@ -2,9 +2,14 @@ import React, { useLayoutEffect, useState } from "react";
 import ReactDOM from "react-dom/client";
 
 import type { ProjectRecoveryDecision } from "../application/projectPorts";
+import type { OpeningExternalCopyDecision } from "../global/application/globalProjectPort";
+import { ExternalCopyDecisionDialog } from "../components/ExternalCopyDecisionDialog";
 import { ProjectRecoveryDialog } from "../components/ProjectRecoveryDialog";
 import { installDesktopWebViewPolicy } from "../platform/desktopWebViewPolicy";
-import { resolveOpeningRecovery } from "../platform/tauriOpeningDialogControls";
+import {
+  resolveOpeningExternalCopy,
+  resolveOpeningRecovery,
+} from "../platform/tauriOpeningDialogControls";
 import { dismissOwnedWindow } from "../platform/tauriOwnedDialogControls";
 import { tauriWindowControls } from "../platform/tauriWindowControls";
 import {
@@ -72,7 +77,50 @@ function DialogContent() {
     return <OpeningRecoveryDialog />;
   }
 
+  if (kind === "external-copy") {
+    return <OpeningExternalCopyDialog />;
+  }
+
   return <OpeningProgressDialog />;
+}
+
+function OpeningExternalCopyDialog() {
+  const attemptId = parameter("attemptId", "");
+  const openedFromLoadingOwner =
+    window.sessionStorage.getItem(OPENING_OWNER_MARKER) === "loading";
+  const [resolving, setResolving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const resolve = async (decision: OpeningExternalCopyDecision) => {
+    if (!attemptId || resolving) return;
+    setError(null);
+    setResolving(true);
+    try {
+      await resolveOpeningExternalCopy(attemptId, decision);
+    } catch (reason: unknown) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "Não foi possível concluir a decisão sobre a Cópia externa.",
+      );
+      setResolving(false);
+    }
+  };
+
+  return (
+    <div data-opening-owner-transition={String(openedFromLoadingOwner)}>
+      <ExternalCopyDecisionDialog
+        error={
+          attemptId
+            ? error
+            : "A tentativa de abertura não está mais disponível."
+        }
+        onCancel={() => void resolve("cancel")}
+        onSaveCopyAs={() => void resolve("saveCopyAs")}
+        resolving={resolving}
+      />
+    </div>
+  );
 }
 
 function OpeningProgressDialog() {

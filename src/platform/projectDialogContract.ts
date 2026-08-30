@@ -23,6 +23,7 @@ const projectDialogActionMap = {
   cancelExport: "cancelExport",
   cancelProjectClose: "cancelProjectClose",
   confirmAlbumInformation: "confirmAlbumInformation",
+  closeProjectAfterGraphicsFailure: "closeProjectAfterGraphicsFailure",
   discardAndClose: "discardAndClose",
   dismissExport: "dismissExport",
   dismissProjectCloseFailure: "dismissProjectCloseFailure",
@@ -157,6 +158,10 @@ const stateDecoders: Record<
     typeof value.message === "string"
       ? { kind: "exportSuccess", message: value.message }
       : null,
+  graphicsFailure: (value) =>
+    typeof value.reason === "string"
+      ? { kind: "graphicsFailure", reason: value.reason }
+      : null,
   projectCloseConfirmation: (value) =>
     typeof value.busy === "boolean"
       ? { busy: value.busy, kind: "projectCloseConfirmation" }
@@ -252,6 +257,8 @@ export function toIpcProjectDialogState(
     case "projectOperationFailure":
     case "exportSuccess":
       return { kind: state.kind, message: state.message };
+    case "graphicsFailure":
+      return { kind: state.kind, reason: state.reason };
     case "exportProgress":
       return {
         cancelRequested: state.cancelRequested,
@@ -286,6 +293,8 @@ function fromIpcProjectDialogState(
     case "projectOperationFailure":
     case "exportSuccess":
       return { kind: state.kind, message: state.message };
+    case "graphicsFailure":
+      return { kind: state.kind, reason: state.reason };
     case "exportProgress":
       return {
         cancelRequested: state.cancelRequested,

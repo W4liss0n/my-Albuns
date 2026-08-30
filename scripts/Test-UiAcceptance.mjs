@@ -206,6 +206,7 @@ test("the manifest covers the integrated workspace and every critical Project di
       kind: "projectCloseConfirmation",
     },
     "project-close-failure": { kind: "projectCloseFailure" },
+    "project-graphics-failure": { kind: "graphicsFailure" },
     "export-progress-determinate": {
       cancelRequested: false,
       cancellable: true,
@@ -291,6 +292,7 @@ test("the manifest covers the integrated workspace and every critical Project di
       "exportFailure",
       "exportProgress",
       "exportSuccess",
+      "graphicsFailure",
       "projectCloseConfirmation",
       "projectCloseFailure",
       "projectOperationFailure",
@@ -336,8 +338,8 @@ test("the manifest covers critical integrated workspace, panel, menu, and graphi
       ready: /not\(:has/u,
     },
     "project-graphics-failure": {
-      path: "/workspace-preview.html?graphics=unsupported",
-      ready: /startup-card/u,
+      path: /^\/project-dialog\.html\?state=/u,
+      ready: /ui-owned-window-shell/u,
     },
     "safe-application-shell": {
       path: "/welcome-preview.html?graphics=unsupported",
@@ -348,7 +350,11 @@ test("the manifest covers critical integrated workspace, panel, menu, and graphi
   for (const [id, expected] of Object.entries(expectedStates)) {
     const scenario = scenariosById.get(id);
     assert.ok(scenario, `${id} is missing`);
-    assert.equal(scenario.implementationPath, expected.path);
+    if (expected.path instanceof RegExp) {
+      assert.match(scenario.implementationPath, expected.path);
+    } else {
+      assert.equal(scenario.implementationPath, expected.path);
+    }
     assert.match(scenario.readySelector, expected.ready);
     if (expected.actions) {
       assert.deepEqual(
@@ -497,7 +503,7 @@ test("the manifest preserves Program 05 proofs and promotes Sheet reordering to 
     "sheet-reorder-invalid-target-preview",
   ]);
 
-  assert.equal(manifest.scenarios.length, 57 + Object.keys(expectedScenarios).length);
+  assert.equal(manifest.scenarios.length, 58 + Object.keys(expectedScenarios).length);
   for (const [id, actionTypes] of Object.entries(expectedScenarios)) {
     const scenario = scenariosById.get(id);
     assert.ok(scenario, `${id} is missing`);
@@ -668,6 +674,8 @@ test("the manifest exercises this UI correction batch in the real renderer", () 
   );
   for (const id of [
     "project-recovery-modal",
+    "external-copy-opening-dialog",
+    "project-graphics-failure",
     "project-text-selection-policy",
     "canvas-keyboard-next-sheet",
     "canvas-keyboard-previous-sheet",
@@ -709,6 +717,28 @@ test("the manifest exercises this UI correction batch in the real renderer", () 
       .get("project-recovery-modal")
       .actions.map((action) => action.type),
     ["assert-single-line", "assert-single-line", "assert-single-line"],
+  );
+  assert.match(
+    scenariosById.get("external-copy-opening-dialog").implementationPath,
+    /^\/dialog\.html\?kind=external-copy/u,
+  );
+  assert.deepEqual(
+    scenariosById.get("external-copy-opening-dialog").viewport,
+    { width: 440, height: 320 },
+  );
+  assert.deepEqual(
+    scenariosById
+      .get("external-copy-opening-dialog")
+      .actions.map((action) => action.type),
+    ["assert-single-line", "assert-single-line"],
+  );
+  assert.match(
+    scenariosById.get("project-graphics-failure").implementationPath,
+    /^\/project-dialog\.html\?state=/u,
+  );
+  assert.match(
+    scenariosById.get("project-graphics-failure").readySelector,
+    /aria-modal/u,
   );
   assert.deepEqual(
     scenariosById
