@@ -592,7 +592,7 @@ export function ProjectWorkspace({
                 previewSheetReorder("bar", draggedSheetId, targetIndex),
               onDrop: () => dropSheetReorder("bar"),
               onCancel: cancelSheetReorder,
-              onNavigate: controller.navigateToSheet,
+              onSelect: controller.canvasProps.onFocusSheet,
             }}
             mediaPreviewUrls={mediaPreviewUrls}
             technicalGuides={{

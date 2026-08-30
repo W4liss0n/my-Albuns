@@ -94,7 +94,7 @@ test("keeps horizontal wheel navigation alive across the left, center, and right
       disabled: false,
       onCancel: vi.fn(),
       onDrop: vi.fn(),
-      onNavigate: vi.fn(),
+      onSelect: vi.fn(),
       onPreview: vi.fn(),
       representation: {
         ghost: null,

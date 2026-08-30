@@ -70,10 +70,10 @@ test.each([
 );
 
 test("ignores pointer gestures outside every rendered Sheet Bar handle", () => {
-  const onNavigate = vi.fn();
+  const onSelect = vi.fn();
   const onPreview = vi.fn();
   render(
-    <SheetBarReorderOverlay {...props({ onNavigate, onPreview })} />,
+    <SheetBarReorderOverlay {...props({ onSelect, onPreview })} />,
   );
   const reservedSurface = screen.getByTestId(
     "sheet-reorder-bar-drop-zone",
@@ -86,10 +86,10 @@ test("ignores pointer gestures outside every rendered Sheet Bar handle", () => {
   });
   fireEvent.click(reservedSurface);
   expect(onPreview).not.toHaveBeenCalled();
-  expect(onNavigate).not.toHaveBeenCalled();
+  expect(onSelect).not.toHaveBeenCalled();
 
   fireEvent.click(barHandle(1));
-  expect(onNavigate).toHaveBeenCalledWith("sheet-1");
+  expect(onSelect).toHaveBeenCalledWith("sheet-1");
 });
 
 test("moves neighboring handles and renders only the declared preview markers", () => {
@@ -315,21 +315,21 @@ test.each([
   },
 );
 
-test("keeps navigation, edit, and context gestures distinct from reorder", () => {
+test("keeps selection, edit, and context gestures distinct from reorder", () => {
   const onContextMenu = vi.fn();
   const onEditSheet = vi.fn();
-  const onNavigate = vi.fn();
+  const onSelect = vi.fn();
   const onPreview = vi.fn();
   render(
     <SheetBarReorderOverlay
-      {...props({ onContextMenu, onEditSheet, onNavigate, onPreview })}
+      {...props({ onContextMenu, onEditSheet, onPreview, onSelect })}
     />,
   );
 
   fireEvent.contextMenu(barHandle(2), { clientX: 80, clientY: 120 });
   expect(onContextMenu).toHaveBeenCalledWith("sheet-2", { x: 80, y: 120 });
   fireEvent.click(barHandle(2));
-  expect(onNavigate).toHaveBeenCalledWith("sheet-2");
+  expect(onSelect).toHaveBeenCalledWith("sheet-2");
   fireEvent.doubleClick(barHandle(2), { clientX: 220, clientY: 40 });
   expect(onEditSheet).toHaveBeenCalledWith("sheet-2");
   fireEvent.doubleClick(barSurface(), { clientX: 150, clientY: 40 });
@@ -339,11 +339,11 @@ test("keeps navigation, edit, and context gestures distinct from reorder", () =>
 
 test("captures the pointer after press, crosses the threshold, and follows it in both directions", () => {
   const onDrop = vi.fn();
-  const onNavigate = vi.fn();
+  const onSelect = vi.fn();
   const onPreview = vi.fn();
   render(
     <SheetBarReorderOverlay
-      {...props({ onDrop, onNavigate, onPreview })}
+      {...props({ onDrop, onPreview, onSelect })}
     />,
   );
   setOverlayBounds();
@@ -381,7 +381,7 @@ test("captures the pointer after press, crosses the threshold, and follows it in
   expect(capture.release).toHaveBeenCalledWith(17);
   expect(onDrop).toHaveBeenCalledOnce();
   fireEvent.click(first);
-  expect(onNavigate).not.toHaveBeenCalled();
+  expect(onSelect).not.toHaveBeenCalled();
 
   pointerDown(second, 18, 240, 40);
   pointerMove(surface, 18, 50, 40);
@@ -393,11 +393,11 @@ test("captures the pointer after press, crosses the threshold, and follows it in
 
 test("keeps a below-threshold press as an ordinary Sheet click", () => {
   const onDrop = vi.fn();
-  const onNavigate = vi.fn();
+  const onSelect = vi.fn();
   const onPreview = vi.fn();
   render(
     <SheetBarReorderOverlay
-      {...props({ onDrop, onNavigate, onPreview })}
+      {...props({ onDrop, onPreview, onSelect })}
     />,
   );
   const surface = barSurface();
@@ -406,19 +406,50 @@ test("keeps a below-threshold press as an ordinary Sheet click", () => {
   pointerDown(first, 9, 100, 40);
   pointerMove(surface, 9, 103, 40);
   pointerUp(surface, 9, 103, 40);
-  expect(onNavigate).toHaveBeenCalledWith("sheet-1");
+  expect(onSelect).toHaveBeenCalledWith("sheet-1");
   fireEvent.click(first);
 
-  expect(onNavigate).toHaveBeenCalledOnce();
+  expect(onSelect).toHaveBeenCalledOnce();
   expect(onPreview).not.toHaveBeenCalled();
   expect(onDrop).not.toHaveBeenCalled();
 });
 
+test.each([
+  ["left page", 50],
+  ["right page", 100],
+] as const)(
+  "selects without reordering from a below-threshold press on the %s",
+  (_side, startX) => {
+    const onDrop = vi.fn();
+    const onPreview = vi.fn();
+    const onSelect = vi.fn();
+    render(
+      <SheetBarReorderOverlay
+        {...props({ onDrop, onPreview, onSelect })}
+      />,
+    );
+    setOverlayBounds();
+    const surface = barSurface();
+    const handle = barHandle(1);
+    pointerCapture(surface);
+    expectPointerCoordinateInsideHandle(handle, startX, 40);
+
+    pointerDown(handle, 180 + startX, startX, 40);
+    pointerMove(surface, 180 + startX, startX + 2, 40);
+    pointerUp(surface, 180 + startX, startX + 2, 40);
+
+    expect(onSelect).toHaveBeenCalledOnce();
+    expect(onSelect).toHaveBeenCalledWith("sheet-1");
+    expect(onPreview).not.toHaveBeenCalled();
+    expect(onDrop).not.toHaveBeenCalled();
+  },
+);
+
 test("expires synthetic click suppression before a later deliberate click", () => {
   vi.useFakeTimers();
-  const onNavigate = vi.fn();
+  const onSelect = vi.fn();
   const view = render(
-    <SheetBarReorderOverlay {...props({ onNavigate })} />,
+    <SheetBarReorderOverlay {...props({ onSelect })} />,
   );
   try {
     const surface = barSurface();
@@ -426,11 +457,11 @@ test("expires synthetic click suppression before a later deliberate click", () =
     pointerCapture(surface);
     pointerDown(first, 19, 100, 40);
     pointerUp(surface, 19, 100, 40);
-    expect(onNavigate).toHaveBeenCalledOnce();
+    expect(onSelect).toHaveBeenCalledOnce();
 
     vi.runOnlyPendingTimers();
     fireEvent.click(first);
-    expect(onNavigate).toHaveBeenCalledTimes(2);
+    expect(onSelect).toHaveBeenCalledTimes(2);
   } finally {
     view.unmount();
     vi.useRealTimers();
@@ -655,7 +686,7 @@ function props(
     onContextMenu: vi.fn(),
     onDrop: vi.fn(),
     onEditSheet: vi.fn(),
-    onNavigate: vi.fn(),
+    onSelect: vi.fn(),
     onPreview: vi.fn(),
     representation: {
       ghost: null,

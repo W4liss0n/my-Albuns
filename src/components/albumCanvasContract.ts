@@ -53,7 +53,7 @@ export interface CanvasSheetReorder {
   onPreview(draggedSheetId: string, targetIndex: number): void;
   onDrop(): void;
   onCancel(): void;
-  onNavigate(sheetId: string): void;
+  onSelect(sheetId: string): void;
 }
 
 export type AlbumCanvasMode =
