@@ -239,6 +239,38 @@ export async function performUiAcceptanceAction({
 
   if (action.type === "assert") return;
 
+  if (action.type === "assert-single-line") {
+    const observation = await execute(
+      `
+        const element = arguments[0];
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        const lineTops = [];
+        for (const rect of range.getClientRects()) {
+          if (rect.width <= 0 || rect.height <= 0) continue;
+          if (!lineTops.some((top) => Math.abs(top - rect.top) <= 1)) {
+            lineTops.push(rect.top);
+          }
+        }
+        return {
+          clientWidth: element.clientWidth,
+          lineCount: lineTops.length,
+          scrollWidth: element.scrollWidth,
+        };
+      `,
+      [elementReference(elementId)],
+    );
+    if (
+      observation.lineCount !== 1 ||
+      observation.scrollWidth > observation.clientWidth + 1
+    ) {
+      throw new Error(
+        `Single-line geometry mismatch for ${action.selector}: expected one rendered line without horizontal overflow, observed=${JSON.stringify(observation)}`,
+      );
+    }
+    return;
+  }
+
   if (action.type === "context-click" || action.type === "pointer-click") {
     const button = action.type === "context-click" ? 2 : 0;
     await request("POST", `/session/${sessionId}/actions`, {

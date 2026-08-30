@@ -121,6 +121,12 @@ para essas superfícies não criam um owner global compartilhado.
 | operação | início mensurável | Progresso | pertence e bloqueia somente a proprietária prevista | sucesso fecha; falhas/ignorados seguem para Problemas |
 | Problemas | corrigir/repetir | nova tentativa ou Progresso | usa o mesmo owner da operação | fechar retorna à proprietária |
 
+Ao transicionar de Progresso para Recuperação, a mesma janela externa é
+redimensionada e recentralizada para a largura própria da decisão, sem ampliar
+os demais diálogos. Cada uma das três ações mantém seu rótulo em uma linha; se
+o ambiente realmente restringir a largura, o rodapé as organiza verticalmente
+sem quebrar os rótulos nem alterar ordem, foco ou semântica.
+
 ## Modos e ownership da interação do editor
 
 ### Modo normal

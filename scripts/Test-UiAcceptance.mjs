@@ -706,6 +706,12 @@ test("the manifest exercises this UI correction batch in the real renderer", () 
   );
   assert.deepEqual(
     scenariosById
+      .get("project-recovery-modal")
+      .actions.map((action) => action.type),
+    ["assert-single-line", "assert-single-line", "assert-single-line"],
+  );
+  assert.deepEqual(
+    scenariosById
       .get("sheet-bar-selection-preserves-navigation")
       .actions.map((action) => action.type),
     ["assert", "focus", "key", "assert", "pointer-click", "assert", "assert"],
@@ -802,6 +808,7 @@ test("manifest schema 3 accepts real context click, hit-tested click, modifier, 
       phase: "escape",
     },
     { type: "selection-drag", selector: "#label", expect: "none" },
+    { type: "assert-single-line", selector: "#dialog-action" },
   ];
 
   assert.equal(validateUiAcceptanceManifest(interactive), interactive);
@@ -1386,6 +1393,43 @@ test("runner verifies native selection policy through real pointer motion", asyn
   assert.equal(executionCount, 2);
 });
 
+test("runner rejects a dialog action whose rendered label occupies more than one line", async () => {
+  const { performUiAcceptanceAction } = await import(
+    "./UiAcceptanceRunner.mjs"
+  );
+  const common = {
+    action: {
+      type: "assert-single-line",
+      selector: "#dialog-action",
+    },
+    locateSelector: async (selector) => `element:${selector}`,
+    locateText: async (text) => `text:${text}`,
+    request: async () => null,
+    sessionId: "session-dialog-geometry",
+  };
+
+  await assert.rejects(
+    performUiAcceptanceAction({
+      ...common,
+      execute: async () => ({
+        clientWidth: 112,
+        lineCount: 2,
+        scrollWidth: 112,
+      }),
+    }),
+    /expected one rendered line/u,
+  );
+
+  await performUiAcceptanceAction({
+    ...common,
+    execute: async () => ({
+      clientWidth: 168,
+      lineCount: 1,
+      scrollWidth: 168,
+    }),
+  });
+});
+
 test("runner limits Escape cancellation and its deterministic fallback to captured pointer reordering", async () => {
   const { performUiAcceptanceAction } = await import(
     "./UiAcceptanceRunner.mjs"
@@ -1576,7 +1620,7 @@ test("runner snapshots HEAD and dirty state before and after capture", () => {
   const initialSnapshot = runner.indexOf(
     "const initialSourceInputs = captureSourceInputs();",
   );
-  const captureLoop = runner.indexOf("for (const scenario of manifest.scenarios)");
+  const captureLoop = runner.indexOf("for (const scenario of scenariosToCapture)");
   const finalSnapshot = runner.indexOf(
     "const sourceInputsResult = finalizeUiAcceptanceSourceEvidence(",
   );
@@ -1619,6 +1663,19 @@ test("runner reloads every captured surface with a scenario-isolated URL", () =>
     runner,
     /url: targetUrl\.href/u,
     "WebDriver must receive the isolated URL",
+  );
+  assert.match(runner, /MYALBUNS_UI_DEVICE_SCALE_FACTOR/u);
+  assert.match(runner, /MYALBUNS_UI_SCENARIO_IDS/u);
+  assert.match(runner, /for \(const scenario of scenariosToCapture\)/u);
+  assert.match(
+    runner,
+    /`--force-device-scale-factor=\$\{deviceScaleFactor\}`/u,
+    "the real renderer scale must be selectable without changing scenario geometry",
+  );
+  assert.match(
+    runner,
+    /const MAX_SCALED_VIEWPORT_ROUNDING = 4;[\s\S]*const viewportRoundingTolerance =\s*deviceScaleFactor === 1 \? 0 : MAX_SCALED_VIEWPORT_ROUNDING/u,
+    "scaled viewport setup may admit only bounded browser-chrome rounding",
   );
 });
 
