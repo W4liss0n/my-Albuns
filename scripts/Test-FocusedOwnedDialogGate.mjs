@@ -1,14 +1,61 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { once } from "node:events";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+
+import { waitForProcessInstance } from "./DevLifecycleProcessInstances.mjs";
+import { nativeOwnedWindowState } from "./NativeWindowObservation.mjs";
 
 const scripts = path.dirname(fileURLToPath(import.meta.url));
 const workspace = path.resolve(scripts, "..");
 
 function source(name) {
   return readFileSync(path.join(scripts, name), "utf8");
+}
+
+const hiddenOwnedWindowFixture = String.raw`
+$ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName System.Windows.Forms
+$owner = New-Object System.Windows.Forms.Form
+$owner.Text = 'Headless owner'
+$dialog = New-Object System.Windows.Forms.Form
+$dialog.Text = 'Headless dialog'
+$dialog.Owner = $owner
+[void]$owner.Handle
+[void]$dialog.Handle
+[Console]::Out.WriteLine('READY')
+[Console]::Out.Flush()
+Start-Sleep -Seconds 30
+`;
+
+async function waitForFixtureReady(child) {
+  child.stdout.setEncoding("utf8");
+  child.stderr.setEncoding("utf8");
+  let stdout = "";
+  let stderr = "";
+  child.stderr.on("data", (chunk) => {
+    stderr += chunk;
+  });
+  await new Promise((resolve, reject) => {
+    const timeout = setTimeout(
+      () => reject(new Error(`hidden HWND fixture timed out: ${stderr}`)),
+      10_000,
+    );
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+      if (stdout.includes("READY")) {
+        clearTimeout(timeout);
+        resolve();
+      }
+    });
+    child.once("error", reject);
+    child.once("close", (code) =>
+      reject(new Error(`hidden HWND fixture exited ${code}: ${stderr}`)),
+    );
+  });
 }
 
 test("the focused native gate has an exact closed two-scenario catalog", async () => {
@@ -67,6 +114,39 @@ test("the HWND probe closes over native owner chains from GUI-thread fallbacks",
   assert.match(observer, /GetGUIThreadInfo/u);
   assert.match(observer, /GetAncestor/u);
   assert.match(observer, /ObserveOwnerChain/u);
+});
+
+test("the HWND probe observes an exact process with a hidden owned-window pair", async () => {
+  const child = spawn(
+    "powershell.exe",
+    ["-NoProfile", "-NonInteractive", "-Command", hiddenOwnedWindowFixture],
+    { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] },
+  );
+  try {
+    await waitForFixtureReady(child);
+    const instance = await waitForProcessInstance(
+      child.pid,
+      "hidden owned-window fixture",
+    );
+    const state = nativeOwnedWindowState(instance);
+    const owner = state.windows.find(
+      (window) => window.title === "Headless owner",
+    );
+    const dialog = state.windows.find(
+      (window) => window.title === "Headless dialog",
+    );
+    assert.ok(owner);
+    assert.ok(dialog);
+    assert.equal(dialog.ownerHwnd, owner.hwnd);
+    assert.equal(owner.visible, false);
+    assert.equal(dialog.visible, false);
+    assert.equal(state.dialogCount, 0);
+  } finally {
+    if (child.exitCode === null && child.signalCode === null) child.kill();
+    if (child.exitCode === null && child.signalCode === null) {
+      await once(child, "close");
+    }
+  }
 });
 
 test("a failed visible run retains its exact diagnostics before scratch cleanup", () => {
