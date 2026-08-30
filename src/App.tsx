@@ -16,7 +16,6 @@ import type {
   MediaPreviewDemand,
   MediaPreviewPort,
   ProjectStartupPort,
-  ProjectRecoveryDecision,
   ProjectCorePort,
   ProjectWindowPort,
 } from "./application/projectPorts";
@@ -30,8 +29,6 @@ import {
   type CanvasGraphicsDiagnosticProbe,
 } from "./components/canvasGraphicsDiagnosticProbeContext";
 import { ProjectWorkspace } from "./components/ProjectWorkspace";
-import { ProjectRecoveryDialog } from "./components/ProjectRecoveryDialog";
-import { ProjectRecoveryOwnerShell } from "./components/ProjectRecoveryOwnerShell";
 import { useProjectMutationRunner } from "./components/useProjectMutationRunner";
 import { useProjectOperationFailureDialog } from "./components/useProjectOperationFailureDialog";
 import { BrandWordmark, InlineNotice } from "./ui";
@@ -66,15 +63,6 @@ interface MediaPreviewSubscription {
   port: MediaPreviewPort;
 }
 
-type RecoveryStartupState =
-  | "checking"
-  | "none"
-  | "available"
-  | "confirmDiscard"
-  | "resolving"
-  | "resolved"
-  | "deferred";
-
 function App({
   exportPipelinePort,
   mediaPreviewPort,
@@ -94,9 +82,6 @@ function App({
   const editorGraphics = runtimeGraphicsDiagnostic ?? graphics;
   const [projection, setProjection] = useState<EditorProjection | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [recoveryStartup, setRecoveryStartup] =
-    useState<RecoveryStartupState>("checking");
-  const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const [mediaPreviews, setMediaPreviews] = useState<
     Readonly<Record<string, MediaPreview>>
   >({});
@@ -117,7 +102,6 @@ function App({
     useState<MediaPreviewSubscription | null>(null);
   const mediaDemandSequence = useRef({ projectId: "", revision: 0 });
   const uiReadyProject = useRef("");
-  const recoveryUiReady = useRef(false);
   const loggerRef = useRef(logger);
 
   useEffect(() => {
@@ -143,28 +127,6 @@ function App({
 
   useEffect(() => {
     if (!graphics.supported) return;
-    let active = true;
-    projectStartupPort.recoveryStatus().then(
-      (status) => {
-        if (!active) return;
-        setRecoveryStartup(status.kind === "available" ? "available" : "none");
-      },
-      (error: unknown) => {
-        if (!active) return;
-        setLoadError(
-          error instanceof Error
-            ? error.message
-            : "Não foi possível verificar a Recuperação do Projeto.",
-        );
-      },
-    );
-    return () => {
-      active = false;
-    };
-  }, [graphics.supported, projectStartupPort]);
-
-  useEffect(() => {
-    if (!graphics.supported || recoveryStartup !== "none") return;
     let active = true;
     const operationId = createLogInstanceId("project-load");
     logger.write({
@@ -208,56 +170,7 @@ function App({
     return () => {
       active = false;
     };
-  }, [graphics.supported, logger, projectCorePort, recoveryStartup]);
-
-  useEffect(() => {
-    if (
-      recoveryUiReady.current ||
-      !["available", "confirmDiscard", "resolving"].includes(recoveryStartup)
-    ) {
-      return;
-    }
-    recoveryUiReady.current = true;
-    projectStartupPort.confirmUiReady().catch((error: unknown) => {
-      recoveryUiReady.current = false;
-      logger.write({
-        level: "error",
-        component: "application",
-        event: "project_recovery_ui_ready_failed",
-        reason: logReasonFromError(error),
-      });
-      setLoadError("Não foi possível confirmar a interface de Recuperação.");
-    });
-  }, [logger, projectStartupPort, recoveryStartup]);
-
-  const resolveRecovery = useCallback(
-    async (decision: ProjectRecoveryDecision) => {
-      setRecoveryError(null);
-      setRecoveryStartup("resolving");
-      try {
-        const resolution = await projectStartupPort.resolveRecovery(decision);
-        if (resolution.kind === "deferred") {
-          setRecoveryStartup("deferred");
-          return;
-        }
-        setMediaDemand({ visibleMediaIds: [], preloadMediaIds: [] });
-        setProjection(resolution.projection);
-        setRecoveryStartup("resolved");
-      } catch (error: unknown) {
-        setRecoveryError(
-          error instanceof Error
-            ? error.message
-            : "Não foi possível concluir a escolha de Recuperação.",
-        );
-        setRecoveryStartup(
-          decision === "discardCheckpointAndOpenLastSaved"
-            ? "confirmDiscard"
-            : "available",
-        );
-      }
-    },
-    [projectStartupPort],
-  );
+  }, [graphics.supported, logger, projectCorePort]);
 
   useEffect(() => {
     logger.write({
@@ -571,50 +484,15 @@ function App({
     );
   }
 
-  if (recoveryStartup === "deferred") {
-    return (
-      <ProjectRecoveryOwnerShell
-        modal={false}
-        status="Fechando o Projeto…"
-      />
-    );
-  }
-
-  if (
-    recoveryStartup === "available" ||
-    recoveryStartup === "confirmDiscard" ||
-    recoveryStartup === "resolving"
-  ) {
-    return (
-      <ProjectRecoveryOwnerShell modal status="Recuperação de sessão">
-        <ProjectRecoveryDialog
-          error={recoveryError}
-          onBack={() => {
-            setRecoveryError(null);
-            setRecoveryStartup("available");
-          }}
-          onDefer={() => void resolveRecovery("nowNot")}
-          onDiscard={() =>
-            void resolveRecovery("discardCheckpointAndOpenLastSaved")
-          }
-          onRecover={() => void resolveRecovery("reopenAndRecover")}
-          onRequestDiscard={() => setRecoveryStartup("confirmDiscard")}
-          state={recoveryStartup}
-        />
-      </ProjectRecoveryOwnerShell>
-    );
-  }
-
   if (!projection) {
     return (
-      <ProjectRecoveryOwnerShell
-        modal={false}
-        status={
-          recoveryStartup === "checking"
-            ? "Verificando Recuperação…"
-            : "Preparando o editor…"
-        }
-      />
+      <main className="startup-surface ui-chrome-selection-scope" aria-busy="true">
+        <section className="startup-card">
+          <BrandWordmark compact />
+          <span className="loading-mark" aria-hidden="true" />
+          <p>Preparando o editor…</p>
+        </section>
+      </main>
     );
   }
 

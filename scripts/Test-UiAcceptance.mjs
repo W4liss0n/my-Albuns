@@ -497,7 +497,7 @@ test("the manifest preserves Program 05 proofs and promotes Sheet reordering to 
     "sheet-reorder-invalid-target-preview",
   ]);
 
-  assert.equal(manifest.scenarios.length, 56 + Object.keys(expectedScenarios).length);
+  assert.equal(manifest.scenarios.length, 57 + Object.keys(expectedScenarios).length);
   for (const [id, actionTypes] of Object.entries(expectedScenarios)) {
     const scenario = scenariosById.get(id);
     assert.ok(scenario, `${id} is missing`);
@@ -672,6 +672,7 @@ test("the manifest exercises this UI correction batch in the real renderer", () 
     "canvas-keyboard-next-sheet",
     "canvas-keyboard-previous-sheet",
     "canvas-context-menu-surface-preserves-viewport",
+    "sheet-bar-selection-preserves-navigation",
     "sheet-context-menu-outside-bar-click-preserves-navigation",
     "sheet-context-menu-outside-grid-click-preserves-navigation",
     "canvas-wheel-sheet-bar-forward",
@@ -689,7 +690,35 @@ test("the manifest exercises this UI correction batch in the real renderer", () 
   );
   assert.match(
     scenariosById.get("project-recovery-modal").readySelector,
-    /data-modal-owner/u,
+    /ui-owned-window-shell/u,
+  );
+  assert.match(
+    scenariosById.get("project-recovery-modal").readySelector,
+    /ui-application-header__status/u,
+  );
+  assert.match(
+    scenariosById.get("project-recovery-modal").implementationPath,
+    /^\/dialog\.html\?kind=project-recovery/u,
+  );
+  assert.deepEqual(
+    scenariosById.get("project-recovery-modal").viewport,
+    { width: 492, height: 320 },
+  );
+  assert.deepEqual(
+    scenariosById
+      .get("sheet-bar-selection-preserves-navigation")
+      .actions.map((action) => action.type),
+    ["assert", "focus", "key", "assert", "pointer-click", "assert", "assert"],
+  );
+  assert.equal(
+    scenariosById
+      .get("sheet-bar-selection-preserves-navigation")
+      .actions[2].key,
+    "ArrowRight",
+  );
+  assert.match(
+    scenariosById.get("sheet-bar-selection-preserves-navigation").readySelector,
+    /aria-current/u,
   );
   for (const id of [
     "canvas-keyboard-next-sheet",

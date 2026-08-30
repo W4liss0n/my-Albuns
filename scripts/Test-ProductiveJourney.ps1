@@ -344,17 +344,25 @@ try {
         -not $gate.sessionRecovery.checkpointFinishedBySuccessfulSaveAs -or
         -not $gate.sessionRecovery.lockReleasedToDistinctHost -or
         $gate.sessionRecovery.presentation.dialogCount -ne 1 -or
-        $gate.sessionRecovery.presentation.modalLayerCount -ne 1 -or
-        $gate.sessionRecovery.presentation.ownerSurfaceCount -ne 1 -or
+        $gate.sessionRecovery.presentation.modalLayerCount -ne 0 -or
+        $gate.sessionRecovery.presentation.ownerSurfaceCount -ne 0 -or
+        $gate.sessionRecovery.presentation.ownedShellCount -ne 1 -or
         $gate.sessionRecovery.presentation.fullPageRecoveryCount -ne 0 -or
         $gate.sessionRecovery.presentation.ariaModal -cne 'true' -or
-        $gate.sessionRecovery.presentation.modalOwner -cne 'project' -or
-        $gate.sessionRecovery.presentation.ownerAriaHidden -cne 'true' -or
-        -not $gate.sessionRecovery.presentation.ownerInert -or
+        $gate.sessionRecovery.presentation.owner -cne 'global-opening' -or
         $gate.sessionRecovery.presentation.title -cne "Recuperar trabalho n$([char]0x00E3)o salvo?" -or
         $gate.sessionRecovery.presentation.initialFocus -cne 'Reabrir e recuperar' -or
-        -not $gate.sessionRecovery.presentation.routePreserved -or
-        -not $gate.sessionRecovery.presentation.stableProjectOwner
+        -not $gate.sessionRecovery.presentation.contentFitted -or
+        $gate.sessionRecovery.presentation.viewportWidth -ne 380 -or
+        -not $gate.sessionRecovery.presentation.externalDialog -or
+        -not $gate.sessionRecovery.presentation.openedFromLoadingOwner -or
+        -not $gate.sessionRecovery.presentation.globalRoutePreserved -or
+        $gate.sessionRecovery.presentation.recoveryDialogTargetCount -ne 1 -or
+        $gate.sessionRecovery.presentation.hostWebViewBeforeDecision -or
+        $gate.sessionRecovery.presentation.projectVisibleBeforeDecision -or
+        -not $gate.sessionRecovery.presentation.projectRouteNormal -or
+        -not $gate.sessionRecovery.presentation.sameOpeningWindow -or
+        -not $gate.sessionRecovery.presentation.stableOpeningOwner
     ) {
         $contractViolations += 'sessionRecovery'
     }

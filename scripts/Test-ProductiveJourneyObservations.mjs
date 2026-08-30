@@ -69,6 +69,7 @@ test("locates the New Project flow through stable accessible names", () => {
     runner,
     /productive Grade click did not activate Sheet 2/,
   );
+  assert.match(runner, /button\.active \.sheet-tile__number/);
   assert.match(
     runner,
     /startAttachedWebDriver\(\s*driver\.projectDialogDebugPort/,
@@ -116,7 +117,20 @@ test("locates the New Project flow through stable accessible names", () => {
   );
   assert.doesNotMatch(runner, /Importar JPEG…/);
   assert.doesNotMatch(runner, /\.media-card\[data-media-id\]/);
-  assert.doesNotMatch(runner, /\/window\/handles|DEBUG-project-dialog-targets/);
+  assert.match(runner, /switchToWebDriverWindow\(/);
+  assert.match(
+    runner,
+    /const ownerTargets = await devToolsTargets\(\s*recoveryGlobalDebugPort/,
+  );
+  assert.match(
+    runner,
+    /startAttachedWebDriver\(\s*recoveryGlobalDebugPort/,
+  );
+  assert.match(
+    runner,
+    /parsed\.pathname\.endsWith\("\/dialog\.html"\)[\s\S]*parsed\.searchParams\.get\("kind"\) === "project-recovery"/u,
+  );
+  assert.doesNotMatch(runner, /DEBUG-project-dialog-targets/);
   assert.doesNotMatch(runner, /localStateStartedEmpty/);
 });
 

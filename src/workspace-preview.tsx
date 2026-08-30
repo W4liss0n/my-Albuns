@@ -130,11 +130,6 @@ const projectDialogPort: ProjectDialogPort = {
 };
 
 const projectStartupPort: ProjectStartupPort = {
-  recoveryStatus: async () =>
-    previewParameters.get("recovery") === "available"
-      ? { kind: "available" }
-      : { kind: "none" },
-  resolveRecovery: async () => ({ kind: "deferred" }),
   confirmUiReady: async () => undefined,
 };
 
