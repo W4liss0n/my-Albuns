@@ -100,3 +100,44 @@ test("uses the shared bounded W3C response contract", async () => {
     );
   }
 });
+
+test("serializes a parameterless W3C POST command as an empty JSON object", async () => {
+  const port = await findFreeTcpPort();
+  let observedRequest;
+  const server = http.createServer((request, response) => {
+    const chunks = [];
+    request.on("data", (chunk) => chunks.push(chunk));
+    request.on("end", () => {
+      observedRequest = {
+        body: Buffer.concat(chunks).toString("utf8"),
+        contentType: request.headers["content-type"],
+        method: request.method,
+        url: request.url,
+      };
+      response.setHeader("content-type", "application/json");
+      response.end(JSON.stringify({ value: null }));
+    });
+  });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(port, "127.0.0.1", resolve);
+  });
+
+  try {
+    const request = createWebDriverClient(`http://127.0.0.1:${port}`);
+    await request(
+      "POST",
+      "/session/session-01/element/element-01/click",
+    );
+    assert.deepEqual(observedRequest, {
+      body: "{}",
+      contentType: "application/json",
+      method: "POST",
+      url: "/session/session-01/element/element-01/click",
+    });
+  } finally {
+    await new Promise((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    );
+  }
+});
