@@ -314,7 +314,20 @@
       },
       "viewport": { "width": 492, "height": 320 },
       "readySelector": ".ui-owned-window-shell:has([data-opening-owner-transition] [role=\"dialog\"][aria-modal=\"true\"]):not(:has(.ui-modal-dialog-layer)):not(:has(.ui-application-header__status:not(:empty)))",
-      "actions": []
+      "actions": [
+        {
+          "type": "assert-single-line",
+          "selector": ".project-recovery-dialog-scope .ui-dialog-window__footer button:nth-of-type(1)"
+        },
+        {
+          "type": "assert-single-line",
+          "selector": ".project-recovery-dialog-scope .ui-dialog-window__footer button:nth-of-type(2)"
+        },
+        {
+          "type": "assert-single-line",
+          "selector": ".project-recovery-dialog-scope .ui-dialog-window__footer button:nth-of-type(3)"
+        }
+      ]
     },
     {
       "id": "project-workspace-sheet-context",

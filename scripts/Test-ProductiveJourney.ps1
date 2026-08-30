@@ -300,6 +300,15 @@ try {
         "Abrir $([char]0x00FA)ltima vers$([char]0x00E3)o salva",
         'Reabrir e recuperar'
     )
+    $recoveryActionGeometry = @(
+        $gate.sessionRecovery.presentation.actionGeometry
+    )
+    $invalidRecoveryActionGeometry = @(
+        $recoveryActionGeometry | Where-Object {
+            $_.lineCount -ne 1 -or
+            $_.scrollWidth -gt ($_.clientWidth + 1)
+        }
+    )
     $contractViolations = @()
     if (
         -not $gate.cancelledCreationBeforeCore -or
@@ -353,7 +362,9 @@ try {
         $gate.sessionRecovery.presentation.title -cne "Recuperar trabalho n$([char]0x00E3)o salvo?" -or
         $gate.sessionRecovery.presentation.initialFocus -cne 'Reabrir e recuperar' -or
         -not $gate.sessionRecovery.presentation.contentFitted -or
-        $gate.sessionRecovery.presentation.viewportWidth -ne 380 -or
+        $gate.sessionRecovery.presentation.viewportWidth -ne 492 -or
+        $recoveryActionGeometry.Count -ne 3 -or
+        $invalidRecoveryActionGeometry.Count -ne 0 -or
         -not $gate.sessionRecovery.presentation.externalDialog -or
         -not $gate.sessionRecovery.presentation.openedFromLoadingOwner -or
         -not $gate.sessionRecovery.presentation.globalRoutePreserved -or

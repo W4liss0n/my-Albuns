@@ -23,6 +23,7 @@ use crate::{
 
 const DIALOG_LOAD_TIMEOUT: Duration = Duration::from_secs(5);
 const DIALOG_WIDTH: f64 = 380.0;
+const PROJECT_RECOVERY_DIALOG_WIDTH: f64 = 492.0;
 const OWNED_WINDOW_READY_PARAMETER: &str = "ownedReadyToken";
 pub(crate) const OWNED_WINDOW_TITLEBAR_HEIGHT: f64 = 38.0;
 const OPENING_PROGRESS_LABEL: &str = "dialog-opening-progress";
@@ -228,6 +229,7 @@ impl LaunchProgressDialog {
                 "Recovery is unavailable on this launch dialog",
             ));
         }
+        resize_owned_window_width(&self.window, PROJECT_RECOVERY_DIALOG_WIDTH)?;
         let decision_receiver = project_recovery_decisions()
             .lock()
             .map_err(|_| io::Error::other("the Recovery decision registry is unavailable"))?
@@ -303,6 +305,18 @@ impl LaunchProgressDialog {
         }
         self.closed = true;
     }
+}
+
+fn resize_owned_window_width(window: &WebviewWindow, width: f64) -> io::Result<()> {
+    let scale_factor = window.scale_factor().map_err(io::Error::other)?;
+    let current_size = window
+        .inner_size()
+        .map_err(io::Error::other)?
+        .to_logical::<f64>(scale_factor);
+    window
+        .set_size(tauri::LogicalSize::new(width, current_size.height))
+        .map_err(io::Error::other)?;
+    window.center().map_err(io::Error::other)
 }
 
 impl Drop for LaunchProgressDialog {

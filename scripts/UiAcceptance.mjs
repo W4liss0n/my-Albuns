@@ -135,10 +135,10 @@ export function validateUiAcceptanceManifest(manifest) {
         const actionLocation = `${location}.${groupName}[${actionIndex}]`;
         invariant(action && typeof action === "object", `${actionLocation} must be an object`);
         invariant(
-          ["assert", "click", "click-text", "context-click", "drag", "focus", "hover", "input", "key", "pointer-click", "selection-drag", "wheel"].includes(action.type),
+          ["assert", "assert-single-line", "click", "click-text", "context-click", "drag", "focus", "hover", "input", "key", "pointer-click", "selection-drag", "wheel"].includes(action.type),
           `${actionLocation}.type is not supported`,
         );
-        if (["assert", "click", "context-click", "drag", "focus", "hover", "input", "pointer-click", "selection-drag", "wheel"].includes(action.type)) {
+        if (["assert", "assert-single-line", "click", "context-click", "drag", "focus", "hover", "input", "pointer-click", "selection-drag", "wheel"].includes(action.type)) {
           invariant(typeof action.selector === "string" && action.selector.trim(), `${actionLocation}.selector is required`);
         }
         if (action.type === "click-text") {

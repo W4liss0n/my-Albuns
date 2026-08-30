@@ -1766,7 +1766,29 @@ try {
         const title = dialog?.getAttribute('aria-labelledby');
         const transition = document.querySelector('[data-opening-owner-transition]');
         const shell = document.querySelector('.ui-owned-window-shell');
+        const actionGeometry = Array.from(dialog?.querySelectorAll('button') ?? [])
+          .map((button) => {
+            const range = document.createRange();
+            range.selectNodeContents(button);
+            const lineTops = [];
+            for (const rect of range.getClientRects()) {
+              if (rect.width <= 0 || rect.height <= 0) continue;
+              if (!lineTops.some((top) => Math.abs(top - rect.top) <= 1)) {
+                lineTops.push(rect.top);
+              }
+            }
+            const bounds = button.getBoundingClientRect();
+            return {
+              clientWidth: button.clientWidth,
+              height: bounds.height,
+              label: button.textContent.trim(),
+              lineCount: lineTops.length,
+              scrollWidth: button.scrollWidth,
+              width: bounds.width,
+            };
+          });
         return {
+          actionGeometry,
           ariaModal: dialog?.getAttribute('aria-modal') ?? null,
           choices: Array.from(dialog?.querySelectorAll('button') ?? [])
             .map((button) => button.textContent.trim()),
@@ -1806,6 +1828,10 @@ try {
       `The recovery prompt exposed unexpected choices: ${JSON.stringify(recoveryChoices)}`,
     );
   }
+  const recoveryActionsAreSingleLine = recoveryPresentation.actionGeometry.every(
+    (action) =>
+      action.lineCount === 1 && action.scrollWidth <= action.clientWidth + 1,
+  );
   if (
     recoveryPresentation.dialogCount !== 1 ||
     recoveryPresentation.modalLayerCount !== 0 ||
@@ -1815,8 +1841,9 @@ try {
     recoveryPresentation.ariaModal !== "true" ||
     recoveryPresentation.title !== "Recuperar trabalho não salvo?" ||
     recoveryPresentation.initialFocus !== "Reabrir e recuperar" ||
+    !recoveryActionsAreSingleLine ||
     !recoveryPresentation.contentFitted ||
-    recoveryPresentation.viewportWidth !== 380 ||
+    recoveryPresentation.viewportWidth !== 492 ||
     !recoveryPresentation.externalDialog ||
     !recoveryPresentation.openedFromLoadingOwner ||
     projectWindowTitleBeforeDecision !== "" ||

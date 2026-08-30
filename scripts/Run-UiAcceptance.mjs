@@ -54,8 +54,12 @@ const manifestPath = path.join(
 const screenshotsDirectory = path.join(outputDirectory, "screenshots");
 const frontendPort = 1437;
 const frontendOrigin = `http://127.0.0.1:${frontendPort}`;
+const MAX_SCALED_VIEWPORT_ROUNDING = 4;
 const uiTimeoutMilliseconds = Number(
   process.env.MYALBUNS_UI_ACCEPTANCE_TIMEOUT_MS ?? "60000",
+);
+const deviceScaleFactor = Number(
+  process.env.MYALBUNS_UI_DEVICE_SCALE_FACTOR ?? "1",
 );
 if (
   !Number.isInteger(uiTimeoutMilliseconds) ||
@@ -66,6 +70,17 @@ if (
     "MYALBUNS_UI_ACCEPTANCE_TIMEOUT_MS must be an integer between 5000 and 180000",
   );
 }
+if (
+  !Number.isFinite(deviceScaleFactor) ||
+  deviceScaleFactor < 0.5 ||
+  deviceScaleFactor > 4
+) {
+  throw new Error(
+    "MYALBUNS_UI_DEVICE_SCALE_FACTOR must be a number between 0.5 and 4",
+  );
+}
+const viewportRoundingTolerance =
+  deviceScaleFactor === 1 ? 0 : MAX_SCALED_VIEWPORT_ROUNDING;
 const delay = (milliseconds) =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
 
@@ -82,6 +97,31 @@ mkdirSync(screenshotsDirectory, { recursive: true });
 const manifest = validateUiAcceptanceManifest(
   JSON.parse(readFileSync(manifestPath, "utf8")),
 );
+const requestedScenarioIds = (
+  process.env.MYALBUNS_UI_SCENARIO_IDS ?? ""
+)
+  .split(",")
+  .map((id) => id.trim())
+  .filter(Boolean);
+const requestedScenarioIdSet = new Set(requestedScenarioIds);
+if (requestedScenarioIdSet.size !== requestedScenarioIds.length) {
+  throw new Error("MYALBUNS_UI_SCENARIO_IDS must not contain duplicates");
+}
+const knownScenarioIds = new Set(manifest.scenarios.map((scenario) => scenario.id));
+const unknownScenarioIds = requestedScenarioIds.filter(
+  (id) => !knownScenarioIds.has(id),
+);
+if (unknownScenarioIds.length > 0) {
+  throw new Error(
+    `MYALBUNS_UI_SCENARIO_IDS contains unknown ids: ${unknownScenarioIds.join(", ")}`,
+  );
+}
+const scenariosToCapture =
+  requestedScenarioIds.length === 0
+    ? manifest.scenarios
+    : manifest.scenarios.filter((scenario) =>
+        requestedScenarioIdSet.has(scenario.id),
+      );
 
 function gitOutput(arguments_) {
   try {
@@ -118,11 +158,15 @@ const evidence = {
   },
   captureStatus: "capture-failed",
   reviewStatus: "not-reviewed",
+  scenarioFilter:
+    requestedScenarioIds.length === 0 ? null : requestedScenarioIds,
   browser: {
+    deviceScaleFactor,
     name: "Microsoft Edge",
     version: process.env.MYALBUNS_UI_BROWSER_VERSION ?? "unknown",
     driverVersion: process.env.MYALBUNS_UI_DRIVER_VERSION ?? "unknown",
     mode: "headless-new",
+    viewportRoundingTolerance,
   },
   cleanupCompleted: false,
   scenarios: [],
@@ -361,8 +405,10 @@ async function setExactViewport(request, sessionId, viewport) {
       "return { width: window.innerWidth, height: window.innerHeight };",
     );
     if (
-      measured.width === viewport.width &&
-      measured.height === viewport.height
+      Math.abs(measured.width - viewport.width) <=
+        viewportRoundingTolerance &&
+      Math.abs(measured.height - viewport.height) <=
+        viewportRoundingTolerance
     ) {
       return;
     }
@@ -375,7 +421,7 @@ async function setExactViewport(request, sessionId, viewport) {
     "return { width: window.innerWidth, height: window.innerHeight };",
   );
   throw new Error(
-    `viewport is ${measured.width} × ${measured.height}, expected ${viewport.width} × ${viewport.height}`,
+    `viewport is ${measured.width} × ${measured.height}, expected ${viewport.width} × ${viewport.height} within ${viewportRoundingTolerance} px`,
   );
 }
 
@@ -545,7 +591,7 @@ try {
             "--disable-background-networking",
             "--disable-features=msEdgeFirstRunExperience",
             "--force-color-profile=srgb",
-            "--force-device-scale-factor=1",
+            `--force-device-scale-factor=${deviceScaleFactor}`,
             "--hide-scrollbars",
             "--no-first-run",
           ],
@@ -562,7 +608,7 @@ try {
     script: 30_000,
   });
 
-  for (const scenario of manifest.scenarios) {
+  for (const scenario of scenariosToCapture) {
     console.log(`Capturing ${scenario.id}`);
     const paired = scenario.comparison.kind === "paired";
     const implementationName = `${scenario.id}-implementation.png`;
@@ -625,7 +671,7 @@ try {
 } catch (error) {
   fatalError = error;
   const message = error instanceof Error ? error.stack ?? error.message : String(error);
-  for (const scenario of manifest.scenarios.slice(evidence.scenarios.length)) {
+  for (const scenario of scenariosToCapture.slice(evidence.scenarios.length)) {
     const paired = scenario.comparison.kind === "paired";
     evidence.scenarios.push({
       ...scenario,

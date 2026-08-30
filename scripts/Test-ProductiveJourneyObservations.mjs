@@ -130,6 +130,9 @@ test("locates the New Project flow through stable accessible names", () => {
     runner,
     /parsed\.pathname\.endsWith\("\/dialog\.html"\)[\s\S]*parsed\.searchParams\.get\("kind"\) === "project-recovery"/u,
   );
+  assert.match(runner, /const actionGeometry =/u);
+  assert.match(runner, /action\.lineCount === 1/u);
+  assert.match(runner, /recoveryPresentation\.viewportWidth !== 492/u);
   assert.doesNotMatch(runner, /DEBUG-project-dialog-targets/);
   assert.doesNotMatch(runner, /localStateStartedEmpty/);
 });
@@ -144,6 +147,9 @@ test("keeps the physical Album structure proof in the productive WebView2 contra
     path.join(scripts, "Test-ProductiveJourney.ps1"),
     "utf8",
   );
+
+  assert.match(wrapper, /presentation\.viewportWidth -ne 492/u);
+  assert.match(wrapper, /invalidRecoveryActionGeometry\.Count -ne 0/u);
 
   assert.match(runner, /physicalAlbumStructure:\s*\{/);
   assert.match(runner, /projectCoreEvents/);

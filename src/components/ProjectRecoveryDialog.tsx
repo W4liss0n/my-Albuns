@@ -8,6 +8,8 @@ import {
 
 import { ConfirmationDialog, InlineNotice } from "../ui";
 
+import "./ProjectRecoveryDialog.css";
+
 const FOCUSABLE_SELECTOR = [
   "button:not(:disabled)",
   "[href]",
