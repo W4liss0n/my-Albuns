@@ -1709,6 +1709,20 @@ test("runner reloads every captured surface with a scenario-isolated URL", () =>
   );
 });
 
+test("runner can capture a viewport narrower than the Edge window minimum", () => {
+  const runner = readFileSync(
+    path.join(workspace, "scripts", "Run-UiAcceptance.mjs"),
+    "utf8",
+  );
+
+  assert.match(runner, /Emulation\.clearDeviceMetricsOverride/u);
+  assert.match(runner, /Emulation\.setDeviceMetricsOverride/u);
+  assert.match(
+    runner,
+    /setDeviceMetricsOverride[\s\S]*deviceScaleFactor[\s\S]*mobile:\s*false/u,
+  );
+});
+
 test("runner scrolls an opposite drop surface into the pointer viewport", async () => {
   const { performUiAcceptanceAction } = await import(
     "./UiAcceptanceRunner.mjs"
