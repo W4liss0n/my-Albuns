@@ -28,6 +28,7 @@ export function nativeOwnedWindowState(instance) {
   const observed =
     powershellJson(
       String.raw`
+$ErrorActionPreference = 'Stop'
 $process = Get-CimInstance Win32_Process -Filter "ProcessId = $env:MYALBUNS_GATE_WINDOW_PID" -ErrorAction Stop
 if ($null -eq $process -or $process.CreationDate.ToUniversalTime().ToString('O') -cne $env:MYALBUNS_GATE_WINDOW_CREATED) {
     throw 'The native windows no longer belong to the expected process instance.'
@@ -46,7 +47,7 @@ namespace MyAlbunsGate {
         public long OwnerHwnd { get; set; }
         public bool Visible { get; set; }
         public bool Enabled { get; set; }
-        public string Title { get; set; } = "";
+        public string Title { get; set; }
     }
 
     public static class NativeWindowProbe {
@@ -131,7 +132,8 @@ namespace MyAlbunsGate {
                     pending.Enqueue(rootOwner);
                 }
 
-                GetWindowThreadProcessId(hwnd, out var processId);
+                uint processId;
+                GetWindowThreadProcessId(hwnd, out processId);
                 if (processId != expectedProcessId ||
                     !observedHandles.Add(hwnd.ToInt64())) continue;
                 var text = new StringBuilder(512);
