@@ -362,7 +362,9 @@ try {
         $gate.sessionRecovery.presentation.projectVisibleBeforeDecision -or
         -not $gate.sessionRecovery.presentation.projectRouteNormal -or
         -not $gate.sessionRecovery.presentation.sameOpeningWindow -or
-        -not $gate.sessionRecovery.presentation.stableOpeningOwner
+        -not $gate.sessionRecovery.presentation.stableOpeningOwner -or
+        -not $gate.sessionRecovery.presentation.queuedActivationPreservedOwner -or
+        -not $gate.sessionRecovery.presentation.singleHostDuringQueuedActivation
     ) {
         $contractViolations += 'sessionRecovery'
     }

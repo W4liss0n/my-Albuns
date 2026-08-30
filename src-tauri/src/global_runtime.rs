@@ -83,6 +83,35 @@ impl ScheduledCleanupGate {
     }
 }
 
+#[derive(Clone, Default)]
+struct GlobalProjectLaunchCoordinator {
+    serial: Arc<tokio::sync::Mutex<()>>,
+}
+
+struct GlobalProjectLaunchPermit {
+    _guard: tokio::sync::OwnedMutexGuard<()>,
+}
+
+impl GlobalProjectLaunchCoordinator {
+    async fn enter_interactive(&self) -> GlobalProjectLaunchPermit {
+        self.enter().await
+    }
+
+    async fn enter_activation(&self) -> GlobalProjectLaunchPermit {
+        self.enter().await
+    }
+
+    async fn enter_continuation(&self) -> GlobalProjectLaunchPermit {
+        self.enter().await
+    }
+
+    async fn enter(&self) -> GlobalProjectLaunchPermit {
+        GlobalProjectLaunchPermit {
+            _guard: Arc::clone(&self.serial).lock_owned().await,
+        }
+    }
+}
+
 #[cfg(debug_assertions)]
 const WEBDRIVER_PROJECT_ENV: &str = "MYALBUNS_TAURI_WEBDRIVER_PROJECT";
 #[cfg(debug_assertions)]
@@ -201,7 +230,7 @@ struct GlobalRuntimeState {
     pending_external_copies: PendingExternalCopyCoordinator<PendingExternalCopyProcess>,
     scheduled_cleanup: ScheduledCleanupGate,
     global_activation: Option<Arc<PrimaryGlobalActivation>>,
-    activation_serial: Arc<tokio::sync::Mutex<()>>,
+    project_launches: GlobalProjectLaunchCoordinator,
     exit_requested: Arc<AtomicBool>,
     runtime_exiting: Arc<AtomicBool>,
 }
@@ -224,7 +253,7 @@ impl GlobalRuntimeState {
             pending_external_copies: PendingExternalCopyCoordinator::default(),
             scheduled_cleanup: ScheduledCleanupGate::default(),
             global_activation,
-            activation_serial: Arc::new(tokio::sync::Mutex::new(())),
+            project_launches: GlobalProjectLaunchCoordinator::default(),
             exit_requested: Arc::new(AtomicBool::new(false)),
             runtime_exiting: Arc::new(AtomicBool::new(false)),
         })
@@ -428,6 +457,13 @@ enum ConfirmedProjectLaunch {
     },
 }
 
+#[derive(Clone, Copy)]
+struct ProjectLaunchProgress<'a> {
+    kind: LaunchProgressKind,
+    owner_label: &'a str,
+    restore_owner_on_failure: bool,
+}
+
 #[tauri::command]
 async fn complete_graphics_gate(
     app: AppHandle,
@@ -439,8 +475,9 @@ async fn complete_graphics_gate(
     }
     match state.graphics_gate.complete(report) {
         GraphicsGateCompletion::Ready(projects) if !projects.is_empty() => {
-            let _serial = state.activation_serial.lock().await;
-            let outcome = launch_activation_batch(&app, state.clone(), projects).await;
+            let launch_permit = state.project_launches.enter_activation().await;
+            let outcome =
+                launch_activation_batch(&app, state.clone(), projects, &launch_permit).await;
             match &outcome {
                 ProjectLaunchOutcome::Opened | ProjectLaunchOutcome::Focused => {
                     exit_global_after_handoff(&app)
@@ -474,6 +511,7 @@ async fn open_project(app: AppHandle) -> ProjectLaunchOutcome {
     if let Some(rejection) = state.project_host_gate_rejection() {
         return rejection;
     }
+    let launch_permit = state.project_launches.enter_interactive().await;
     let (sender, receiver) = tokio::sync::oneshot::channel();
     app.dialog()
         .file()
@@ -517,9 +555,12 @@ async fn open_project(app: AppHandle) -> ProjectLaunchOutcome {
         state,
         path,
         ConfirmedLaunch::OpenExisting,
-        LaunchProgressKind::Opening,
-        GLOBAL_WINDOW_LABEL,
-        false,
+        ProjectLaunchProgress {
+            kind: LaunchProgressKind::Opening,
+            owner_label: GLOBAL_WINDOW_LABEL,
+            restore_owner_on_failure: false,
+        },
+        &launch_permit,
     )
     .await;
     if matches!(
@@ -549,8 +590,7 @@ async fn save_external_copy_as(app: AppHandle, window: WebviewWindow) -> Project
     if let Some(rejection) = state.project_host_gate_rejection() {
         return rejection;
     }
-    let activation_serial = Arc::clone(&state.activation_serial);
-    let _serial = activation_serial.lock().await;
+    let _launch_permit = state.project_launches.enter_continuation().await;
     let Some(pending) = state.take_external_copy() else {
         return ProjectLaunchOutcome::Failed {
             error: simple_failure(
@@ -716,6 +756,7 @@ async fn create_project(
     if let Some(rejection) = state.project_host_gate_rejection() {
         return rejection;
     }
+    let launch_permit = state.project_launches.enter_interactive().await;
     let provisional_decoratives = app.state::<ProvisionalDecorativeRegistry>().inner().clone();
     let resolution_registry = provisional_decoratives.clone();
     let configuration = match tauri::async_runtime::spawn_blocking(move || {
@@ -772,9 +813,12 @@ async fn create_project(
             configuration: Box::new(configuration),
             authorization: destination.1,
         },
-        LaunchProgressKind::Creating,
-        GLOBAL_WINDOW_LABEL,
-        true,
+        ProjectLaunchProgress {
+            kind: LaunchProgressKind::Creating,
+            owner_label: GLOBAL_WINDOW_LABEL,
+            restore_owner_on_failure: true,
+        },
+        &launch_permit,
     )
     .await;
     if matches!(
@@ -811,6 +855,7 @@ async fn open_recent_project(app: AppHandle, project_id: String) -> ProjectLaunc
     if let Some(rejection) = state.project_host_gate_rejection() {
         return rejection;
     }
+    let launch_permit = state.project_launches.enter_interactive().await;
     let store = state.recent_projects.clone();
     let lookup_id = project_id.clone();
     let path = match tauri::async_runtime::spawn_blocking(move || store.path_for(&lookup_id)).await
@@ -836,9 +881,12 @@ async fn open_recent_project(app: AppHandle, project_id: String) -> ProjectLaunc
         state,
         path,
         ConfirmedLaunch::OpenExisting,
-        LaunchProgressKind::Opening,
-        GLOBAL_WINDOW_LABEL,
-        false,
+        ProjectLaunchProgress {
+            kind: LaunchProgressKind::Opening,
+            owner_label: GLOBAL_WINDOW_LABEL,
+            restore_owner_on_failure: false,
+        },
+        &launch_permit,
     )
     .await;
     if matches!(
@@ -887,9 +935,8 @@ async fn launch_confirmed_project_with_progress(
     state: GlobalRuntimeState,
     project_path: PathBuf,
     launch: ConfirmedLaunch,
-    progress_kind: LaunchProgressKind,
-    progress_owner_label: &str,
-    restore_owner_on_failure: bool,
+    presentation: ProjectLaunchProgress<'_>,
+    launch_permit: &GlobalProjectLaunchPermit,
 ) -> ProjectLaunchOutcome {
     if let Some(rejection) = state.project_host_gate_rejection() {
         return rejection;
@@ -908,28 +955,25 @@ async fn launch_confirmed_project_with_progress(
         project_path,
         launch,
         root_bindings,
-        progress_kind,
-        progress_owner_label,
-        restore_owner_on_failure,
+        presentation,
+        launch_permit,
     )
     .await
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn launch_confirmed_project_with_bindings_and_progress(
     app: &AppHandle,
     state: GlobalRuntimeState,
     project_path: PathBuf,
     launch: ConfirmedLaunch,
     root_bindings: RootBindingPlan,
-    progress_kind: LaunchProgressKind,
-    progress_owner_label: &str,
-    restore_owner_on_failure: bool,
+    presentation: ProjectLaunchProgress<'_>,
+    _launch_permit: &GlobalProjectLaunchPermit,
 ) -> ProjectLaunchOutcome {
     let mut progress = match native_dialog_window::show_launch_progress(
         app,
-        progress_owner_label,
-        progress_kind,
+        presentation.owner_label,
+        presentation.kind,
         &state.global_webview_data_directory,
     )
     .await
@@ -1034,7 +1078,7 @@ async fn launch_confirmed_project_with_bindings_and_progress(
     if let Some(progress) = progress {
         progress.finish(
             force_owner_restore
-                || restore_owner_on_failure
+                || presentation.restore_owner_on_failure
                     && !matches!(
                         outcome,
                         ProjectLaunchOutcome::Opened | ProjectLaunchOutcome::Focused
@@ -1166,6 +1210,7 @@ async fn launch_activation_batch(
     app: &AppHandle,
     state: GlobalRuntimeState,
     projects: Vec<PathBuf>,
+    launch_permit: &GlobalProjectLaunchPermit,
 ) -> ProjectLaunchOutcome {
     let project_count = projects.len();
     if let Some(rejection) = state.project_host_gate_rejection() {
@@ -1187,9 +1232,12 @@ async fn launch_activation_batch(
             project,
             ConfirmedLaunch::OpenExisting,
             root_bindings.clone(),
-            LaunchProgressKind::Opening,
-            GLOBAL_WINDOW_LABEL,
-            false,
+            ProjectLaunchProgress {
+                kind: LaunchProgressKind::Opening,
+                owner_label: GLOBAL_WINDOW_LABEL,
+                restore_owner_on_failure: false,
+            },
+            launch_permit,
         )
         .await;
         summary.observe(outcome);
@@ -1577,8 +1625,8 @@ async fn listen_for_forwarded_activations(app: AppHandle, state: GlobalRuntimeSt
         } else if let Some(error) = state.scheduled_cleanup_failure().await {
             Some(ProjectLaunchOutcome::Failed { error })
         } else {
-            let _serial = state.activation_serial.lock().await;
-            Some(launch_activation_batch(&app, state.clone(), batch.projects).await)
+            let launch_permit = state.project_launches.enter_activation().await;
+            Some(launch_activation_batch(&app, state.clone(), batch.projects, &launch_permit).await)
         };
         let exit_was_waiting = primary.complete_activation();
 
@@ -1919,6 +1967,43 @@ pub(crate) fn run(direct_projects: Vec<PathBuf>) -> Result<(), Box<dyn std::erro
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn interactive_and_forwarded_openings_share_one_launch_owner() {
+        let coordinator = GlobalProjectLaunchCoordinator::default();
+        let interactive_owner = coordinator.enter_interactive().await;
+        let forwarded_coordinator = coordinator.clone();
+        let (started_sender, started_receiver) = tokio::sync::oneshot::channel();
+        let (entered_sender, mut entered_receiver) = tokio::sync::oneshot::channel();
+        let forwarded = tokio::spawn(async move {
+            started_sender
+                .send(())
+                .expect("the forwarded opening announces its wait");
+            let _forwarded_owner = forwarded_coordinator.enter_activation().await;
+            entered_sender
+                .send(())
+                .expect("the forwarded opening announces ownership");
+        });
+
+        started_receiver
+            .await
+            .expect("the forwarded opening reaches the shared coordinator");
+        assert!(
+            tokio::time::timeout(Duration::from_millis(30), &mut entered_receiver)
+                .await
+                .is_err(),
+            "a forwarded activation cannot replace an interactive Recovery owner"
+        );
+
+        drop(interactive_owner);
+        tokio::time::timeout(Duration::from_secs(1), &mut entered_receiver)
+            .await
+            .expect("the forwarded opening proceeds after the decision terminal")
+            .expect("the forwarded opening acquires ownership");
+        forwarded
+            .await
+            .expect("the forwarded opening joins cleanly");
+    }
 
     #[cfg(windows)]
     #[test]
