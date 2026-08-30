@@ -230,11 +230,14 @@ export function createWebDriverClient(
     body,
     timeoutMilliseconds = defaultTimeoutMilliseconds,
   ) => {
+    const requestBody = body === undefined && method === "POST" ? {} : body;
     const response = await fetch(`${baseUrl}${endpoint}`, {
       method,
       headers:
-        body === undefined ? undefined : { "content-type": "application/json" },
-      body: body === undefined ? undefined : JSON.stringify(body),
+        requestBody === undefined
+          ? undefined
+          : { "content-type": "application/json" },
+      body: requestBody === undefined ? undefined : JSON.stringify(requestBody),
       signal: AbortSignal.timeout(timeoutMilliseconds),
     });
     const text = await response.text();
