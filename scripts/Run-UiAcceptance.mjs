@@ -390,6 +390,10 @@ async function execute(request, sessionId, script, args = []) {
 }
 
 async function setExactViewport(request, sessionId, viewport) {
+  await request("POST", `/session/${sessionId}/ms/cdp/execute`, {
+    cmd: "Emulation.clearDeviceMetricsOverride",
+    params: {},
+  });
   let outerWidth = viewport.width;
   let outerHeight = viewport.height;
   for (let attempt = 0; attempt < 4; attempt += 1) {
@@ -415,11 +419,26 @@ async function setExactViewport(request, sessionId, viewport) {
     outerWidth += viewport.width - measured.width;
     outerHeight += viewport.height - measured.height;
   }
+  await request("POST", `/session/${sessionId}/ms/cdp/execute`, {
+    cmd: "Emulation.setDeviceMetricsOverride",
+    params: {
+      width: viewport.width,
+      height: viewport.height,
+      deviceScaleFactor,
+      mobile: false,
+    },
+  });
   const measured = await execute(
     request,
     sessionId,
     "return { width: window.innerWidth, height: window.innerHeight };",
   );
+  if (
+    Math.abs(measured.width - viewport.width) <= viewportRoundingTolerance &&
+    Math.abs(measured.height - viewport.height) <= viewportRoundingTolerance
+  ) {
+    return;
+  }
   throw new Error(
     `viewport is ${measured.width} × ${measured.height}, expected ${viewport.width} × ${viewport.height} within ${viewportRoundingTolerance} px`,
   );
