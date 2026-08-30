@@ -874,15 +874,7 @@ mod close_contract_tests {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]
-#[serde(tag = "kind", rename_all = "camelCase")]
-#[ts(tag = "kind")]
-pub enum ProjectRecoveryStatus {
-    None,
-    Available,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, TS)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub enum ProjectRecoveryDecision {
     ReopenAndRecover,
@@ -890,38 +882,14 @@ pub enum ProjectRecoveryDecision {
     NowNot,
 }
 
-#[derive(Serialize, TS)]
-#[serde(
-    tag = "kind",
-    rename_all = "camelCase",
-    rename_all_fields = "camelCase"
-)]
-#[ts(tag = "kind")]
-pub enum ProjectRecoveryResolution {
-    Recovered {
-        #[ts(type = "import(\"../../domain/project\").EditorProjection")]
-        projection: Box<EditorProjection>,
-    },
-    OpenedLastSaved {
-        #[ts(type = "import(\"../../domain/project\").EditorProjection")]
-        projection: Box<EditorProjection>,
-    },
-    Deferred,
-}
-
 #[cfg(test)]
 mod recovery_contract_tests {
     use serde_json::json;
 
-    use super::{ProjectRecoveryDecision, ProjectRecoveryResolution, ProjectRecoveryStatus};
+    use super::ProjectRecoveryDecision;
 
     #[test]
-    fn recovery_status_and_decisions_are_closed_and_stable() {
-        assert_eq!(
-            serde_json::to_value(ProjectRecoveryStatus::Available)
-                .expect("the available status serializes"),
-            json!({ "kind": "available" })
-        );
+    fn recovery_decisions_are_closed_and_stable() {
         assert_eq!(
             serde_json::from_value::<ProjectRecoveryDecision>(json!("reopenAndRecover"))
                 .expect("the recover decision deserializes"),
@@ -947,14 +915,10 @@ mod recovery_contract_tests {
             }))
             .is_err()
         );
-    }
-
-    #[test]
-    fn deferred_recovery_has_no_creative_payload() {
         assert_eq!(
-            serde_json::to_value(ProjectRecoveryResolution::Deferred)
-                .expect("the deferred resolution serializes"),
-            json!({ "kind": "deferred" })
+            serde_json::to_value(ProjectRecoveryDecision::NowNot)
+                .expect("the defer decision serializes"),
+            json!("nowNot")
         );
     }
 }

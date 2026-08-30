@@ -146,6 +146,25 @@ async function waitForHttp(url, label, timeout = 30_000) {
   });
 }
 
+async function httpAvailable(url) {
+  try {
+    const response = await fetch(url, { signal: AbortSignal.timeout(500) });
+    await response.arrayBuffer();
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function devToolsTargets(debugPort, label) {
+  await waitForHttp(
+    `http://127.0.0.1:${debugPort}/json/list`,
+    `${label} DevTools targets`,
+  );
+  const response = await fetch(`http://127.0.0.1:${debugPort}/json/list`);
+  return response.json();
+}
+
 async function startAttachedWebDriver(
   debugPort,
   label,
@@ -236,6 +255,25 @@ async function startAttachedWebDriver(
       return output;
     },
   };
+}
+
+async function switchToWebDriverWindow(driver, predicate, label) {
+  const handles = await driver.request(
+    "GET",
+    `/session/${driver.sessionId}/window/handles`,
+  );
+  for (const handle of handles) {
+    await driver.request("POST", `/session/${driver.sessionId}/window`, {
+      handle,
+    });
+    const url = await driver.request(
+      "POST",
+      `/session/${driver.sessionId}/execute/sync`,
+      { script: "return window.location.href;", args: [] },
+    );
+    if (predicate(url)) return { handle, url };
+  }
+  throw new Error(`${label} was not found among ${handles.length} WebViews`);
 }
 
 async function findElement(
@@ -1101,6 +1139,7 @@ let globalDriver;
 let hostDriver;
 let originalDriver;
 let secondGlobalDriver;
+let recoveryDialogDriver;
 let firstHost;
 let secondGlobal;
 let secondHost;
@@ -1240,7 +1279,7 @@ try {
       await findElement(
         hostDriver,
         "css selector",
-        ".sheet-grid > .sheet-grid-slot > button.active > span",
+        ".sheet-grid > .sheet-grid-slot > button.active .sheet-tile__number",
         "active sheet number",
       ),
     ),
@@ -1475,7 +1514,7 @@ try {
       await findElement(
         hostDriver,
         "css selector",
-        ".sheet-grid > .sheet-grid-slot > button.active > span",
+        ".sheet-grid > .sheet-grid-slot > button.active .sheet-tile__number",
         "reopened active sheet number",
       ),
     ),
@@ -1662,38 +1701,93 @@ try {
     [firstHost, crashedHost],
     "recovery Project Host",
   );
-  await waitForExit(recoveryGlobal, "recovery Global handoff");
-  await waitForHostUiReady(secondHost, "recovery choice UI ready");
-  hostDriver = await startAttachedWebDriver(
-    recoveryHostDebugPort,
-    "recovery Project Host",
-    recoveryProjectDialogDebugPort,
+  const projectWindowTitleBeforeDecision = nativeWindowTitle(secondHost);
+  const hostWebViewBeforeDecision = await httpAvailable(
+    `http://127.0.0.1:${recoveryHostDebugPort}/json/version`,
   );
-  const recoveryPresentation = await hostDriver.request(
+  const recoveryTargetSnapshot = await waitFor(
+    "external Recovery dialog target",
+    async () => {
+      const ownerTargets = await devToolsTargets(
+        recoveryGlobalDebugPort,
+        "recovery Global opening owner",
+      );
+      const globalTargets = ownerTargets
+        .filter((target) => target.type === "page")
+        .filter((target) =>
+        target.url.includes("global.html"),
+      );
+      const recoveryTargets = ownerTargets
+        .filter((target) => target.type === "page")
+        .filter((target) => {
+          try {
+            const url = new URL(target.url);
+            return (
+              url.pathname.endsWith("/dialog.html") &&
+              url.searchParams.get("kind") === "project-recovery"
+            );
+          } catch {
+            return false;
+          }
+        });
+      return globalTargets.length >= 1 && recoveryTargets.length === 1
+        ? { globalTargets, recoveryTargets }
+        : undefined;
+    },
+    timeoutMilliseconds,
+  );
+  recoveryDialogDriver = await startAttachedWebDriver(
+    recoveryGlobalDebugPort,
+    "external recovery opening dialog",
+  );
+  await switchToWebDriverWindow(
+    recoveryDialogDriver,
+    (url) => {
+      const parsed = new URL(url);
+      return (
+        parsed.pathname.endsWith("/dialog.html") &&
+        parsed.searchParams.get("kind") === "project-recovery"
+      );
+    },
+    "external Recovery dialog WebView",
+  );
+  await findElement(
+    recoveryDialogDriver,
+    "css selector",
+    ".ui-owned-window-shell [role='dialog']",
+    "external Recovery decision",
+  );
+  const recoveryPresentation = await recoveryDialogDriver.request(
     "POST",
-    `/session/${hostDriver.sessionId}/execute/sync`,
+    `/session/${recoveryDialogDriver.sessionId}/execute/sync`,
     {
       script: `
         const dialog = document.querySelector('[role="dialog"]');
-        const layer = document.querySelector('.ui-modal-dialog-layer');
-        const owner = document.querySelector('[data-project-owner-surface]');
         const title = dialog?.getAttribute('aria-labelledby');
+        const transition = document.querySelector('[data-opening-owner-transition]');
+        const shell = document.querySelector('.ui-owned-window-shell');
         return {
           ariaModal: dialog?.getAttribute('aria-modal') ?? null,
-          backdropColor: layer ? getComputedStyle(layer).backgroundColor : null,
-          backdropPosition: layer ? getComputedStyle(layer).position : null,
           choices: Array.from(dialog?.querySelectorAll('button') ?? [])
             .map((button) => button.textContent.trim()),
+          contentFitted:
+            shell !== null &&
+            Math.abs(document.documentElement.clientHeight - shell.scrollHeight) <= 2,
           dialogCount: document.querySelectorAll('[role="dialog"]').length,
+          externalDialog:
+            window.location.pathname.endsWith('/dialog.html') &&
+            new URLSearchParams(window.location.search).get('kind') === 'project-recovery',
           fullPageRecoveryCount: document.querySelectorAll('.startup-surface .recovery-actions').length,
           initialFocus: document.activeElement?.textContent?.trim() ?? null,
           modalLayerCount: document.querySelectorAll('.ui-modal-dialog-layer').length,
-          modalOwner: layer?.getAttribute('data-modal-owner') ?? null,
-          ownerAriaHidden: owner?.getAttribute('aria-hidden') ?? null,
-          ownerInert: Boolean(owner?.inert),
+          openedFromLoadingOwner:
+            transition?.getAttribute('data-opening-owner-transition') === 'true',
           ownerSurfaceCount: document.querySelectorAll('[data-project-owner-surface]').length,
+          ownedShellCount: document.querySelectorAll('.ui-owned-window-shell').length,
           title: title ? document.getElementById(title)?.textContent?.trim() ?? null : null,
           url: window.location.href,
+          viewportHeight: document.documentElement.clientHeight,
+          viewportWidth: document.documentElement.clientWidth,
         };
       `,
       args: [],
@@ -1714,27 +1808,43 @@ try {
   }
   if (
     recoveryPresentation.dialogCount !== 1 ||
-    recoveryPresentation.modalLayerCount !== 1 ||
-    recoveryPresentation.ownerSurfaceCount !== 1 ||
+    recoveryPresentation.modalLayerCount !== 0 ||
+    recoveryPresentation.ownerSurfaceCount !== 0 ||
+    recoveryPresentation.ownedShellCount !== 1 ||
     recoveryPresentation.fullPageRecoveryCount !== 0 ||
     recoveryPresentation.ariaModal !== "true" ||
-    recoveryPresentation.modalOwner !== "project" ||
-    recoveryPresentation.ownerAriaHidden !== "true" ||
-    !recoveryPresentation.ownerInert ||
     recoveryPresentation.title !== "Recuperar trabalho não salvo?" ||
     recoveryPresentation.initialFocus !== "Reabrir e recuperar" ||
-    recoveryPresentation.backdropPosition !== "absolute" ||
-    recoveryPresentation.backdropColor === "rgba(0, 0, 0, 0)"
+    !recoveryPresentation.contentFitted ||
+    recoveryPresentation.viewportWidth !== 380 ||
+    !recoveryPresentation.externalDialog ||
+    !recoveryPresentation.openedFromLoadingOwner ||
+    projectWindowTitleBeforeDecision !== "" ||
+    hostWebViewBeforeDecision
   ) {
     throw new Error(
-      `Recovery was not one accessible modal inside the stable Project owner: ${JSON.stringify(recoveryPresentation)}`,
+      `Recovery was not one accessible external dialog in the stable opening owner: ${JSON.stringify({
+        ...recoveryPresentation,
+        hostWebViewBeforeDecision,
+        projectWindowTitleBeforeDecision,
+      })}`,
     );
   }
   await click(
-    hostDriver,
+    recoveryDialogDriver,
     "xpath",
     "//button[normalize-space()='Reabrir e recuperar']",
     "Reopen and recover choice",
+  );
+  await waitForExit(recoveryGlobal, "recovery Global handoff");
+  recoveryDialogDriver = await disposeConfirmedWebDriver(
+    recoveryDialogDriver,
+  );
+  await waitForHostUiReady(secondHost, "recovered Project UI ready");
+  hostDriver = await startAttachedWebDriver(
+    recoveryHostDebugPort,
+    "recovery Project Host",
+    recoveryProjectDialogDebugPort,
   );
   await findElement(
     hostDriver,
@@ -1747,11 +1857,8 @@ try {
     `/session/${hostDriver.sessionId}/execute/sync`,
     { script: "return window.location.href;", args: [] },
   );
-  if (recoveredOwnerUrl !== recoveryPresentation.url) {
-    throw new Error(
-      `Recovery replaced the Project route: ${recoveryPresentation.url} -> ${recoveredOwnerUrl}`,
-    );
-  }
+  const projectRouteNormal = !recoveredOwnerUrl.includes("project-recovery");
+
   const recoveredDpi = await findAlbumInformationDpi(hostDriver, "recovered DPI");
   if ((await elementAttribute(hostDriver, recoveredDpi, "value")) !== "360") {
     throw new Error("The recovered Project did not restore the checkpoint state");
@@ -2058,7 +2165,7 @@ try {
       await findElement(
         hostDriver,
         "css selector",
-        ".sheet-grid > .sheet-grid-slot > button.active > span",
+        ".sheet-grid > .sheet-grid-slot > button.active .sheet-tile__number",
         "fresh Save As active sheet number",
       ),
     ),
@@ -2082,7 +2189,7 @@ try {
           await findElement(
             hostDriver,
             "css selector",
-            ".sheet-grid > .sheet-grid-slot > button.active > span",
+            ".sheet-grid > .sheet-grid-slot > button.active .sheet-tile__number",
             "Save As selected sheet number",
           ),
         ),
@@ -2870,10 +2977,19 @@ try {
         presentation: {
           ...recoveryPresentation,
           recoveredOwnerUrl,
-          routePreserved: recoveredOwnerUrl === recoveryPresentation.url,
-          stableProjectOwner:
+          owner: "global-opening",
+          globalRoutePreserved:
+            recoveryTargetSnapshot.globalTargets.length >= 1,
+          recoveryDialogTargetCount:
+            recoveryTargetSnapshot.recoveryTargets.length,
+          hostWebViewBeforeDecision,
+          projectRouteNormal,
+          projectVisibleBeforeDecision:
+            projectWindowTitleBeforeDecision !== "",
+          sameOpeningWindow: recoveryPresentation.openedFromLoadingOwner,
+          stableOpeningOwner:
             recoveryGlobal.processId !== secondHost.processId &&
-            recoveryPresentation.modalOwner === "project",
+            recoveryPresentation.externalDialog,
         },
         opaqueProjectKey:
           path.basename(recoveryCheckpointPath) === `${originalNamespace}.json` &&
@@ -2971,6 +3087,7 @@ try {
     globalDriver,
     hostDriver,
     originalDriver,
+    recoveryDialogDriver,
     secondGlobalDriver,
   ]) {
     if (driver) {

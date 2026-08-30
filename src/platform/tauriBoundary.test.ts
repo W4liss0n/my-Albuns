@@ -22,6 +22,7 @@ const tauriCommandSources = {
   shared: ["./tauriLogger.ts"],
   ownedDialog: ["./tauriWindowControls.ts"],
   messageDialog: ["./tauriOwnedDialogControls.ts"],
+  openingDialog: ["./tauriOpeningDialogControls.ts"],
   project: [
     "./tauriProjectDialogPort.ts",
     "./tauriProjectPorts.ts",
@@ -139,6 +140,7 @@ test("assigns every Tauri command adapter to an explicit surface", () => {
     ...tauriCommandSources.shared,
     ...tauriCommandSources.ownedDialog,
     ...tauriCommandSources.messageDialog,
+    ...tauriCommandSources.openingDialog,
     ...tauriCommandSources.project,
     ...tauriCommandSources.projectDialog,
     ...tauriCommandSources.global,
@@ -237,9 +239,10 @@ test("gives each standard dialog only the abilities exposed by its titlebar", ()
       ...tauriCommandSources.messageDialog,
     ],
   );
-  const progressInvokedCommands = extractInvokedCommands(
-    tauriCommandSources.ownedDialog,
-  );
+  const progressInvokedCommands = extractInvokedCommands([
+    ...tauriCommandSources.ownedDialog,
+    ...tauriCommandSources.openingDialog,
+  ]);
   const {
     capability: messageCapability,
     allowedCommands: messageCommands,

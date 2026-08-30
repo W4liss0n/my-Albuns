@@ -99,7 +99,7 @@ Depois da exclusão, papéis e Numeração são recalculados. O Canvas centraliz
 
 ### Reordenação das Lâminas no Canvas
 
-Pressionar uma área livre da Barra da Lâmina e mover além do limiar padrão de arraste inicia a reordenação por eventos de ponteiro e captura o ponteiro durante o gesto. Movimento abaixo do limiar continua sendo clique; os botões da Barra permanecem reservados às próprias ações e não iniciam o gesto.
+Pressionar uma área livre da Barra da Lâmina e mover além do limiar padrão de arraste inicia a reordenação por eventos de ponteiro e captura o ponteiro durante o gesto. Movimento abaixo do limiar continua sendo clique: ele seleciona/ativa a Lâmina para comandos e feedback visual, mas preserva a Lâmina centralizada e `viewport.offsetX`. Essa regra vale uniformemente nas metades esquerda e direita e no restante da área visual pertinente; os botões da Barra permanecem reservados às próprias ações e não iniciam o gesto. A Grade conserva sua regra própria de clique para centralizar, sem compartilhar esse efeito com a Barra.
 
 Durante o arraste:
 

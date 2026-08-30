@@ -304,16 +304,16 @@
     },
     {
       "id": "project-recovery-modal",
-      "title": "Recuperação de sessão — diálogo no owner do Projeto",
-      "implementationPath": "/workspace-preview.html?recovery=available",
+      "title": "Recuperação de sessão — diálogo externo do fluxo de abertura",
+      "implementationPath": "/dialog.html?kind=project-recovery&attemptId=acceptance-preview",
       "comparison": {
         "kind": "implementation-only",
         "surface": "project-recovery-modal",
-        "implementationCaptureSelector": ".project-recovery-owner",
-        "reason": "A referência visual vigente antecede o diálogo de Recuperação pertencente à única Janela do Projeto definido pelos contratos multiprocesso aceitos posteriormente."
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "A referência visual vigente antecede o diálogo externo de Recuperação pertencente ao fluxo Global de abertura definido pelos contratos multiprocesso aceitos posteriormente."
       },
-      "viewport": { "width": 1280, "height": 720 },
-      "readySelector": ".project-recovery-owner:has([data-project-owner-surface][aria-hidden=\"true\"]):has(.ui-modal-dialog-layer[data-modal-owner=\"project\"] [role=\"dialog\"][aria-modal=\"true\"])",
+      "viewport": { "width": 492, "height": 320 },
+      "readySelector": ".ui-owned-window-shell:has([data-opening-owner-transition] [role=\"dialog\"][aria-modal=\"true\"]):not(:has(.ui-modal-dialog-layer)):not(:has(.ui-application-header__status:not(:empty)))",
       "actions": []
     },
     {
@@ -455,6 +455,28 @@
       "actions": [
         { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-002\"]" },
         { "type": "context-click", "selector": ".canvas-host canvas" }
+      ]
+    },
+    {
+      "id": "sheet-bar-selection-preserves-navigation",
+      "title": "Barra da Lâmina — clique seleciona sem navegar",
+      "implementationPath": "/workspace-preview.html?structure=physical",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-bar-selection-ownership",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A referência visual vigente não representa a separação aceita posteriormente entre seleção pela Barra e navegação explícita do Canvas."
+      },
+      "viewport": { "width": 1440, "height": 600 },
+      "readySelector": ".app-shell:has(.canvas-host[data-centered-sheet-id=\"sheet-003\"][data-viewport-offset-x]:not([data-viewport-offset-x=\"0\"])):has([data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"] .sheet-tile[aria-current=\"true\"])",
+      "actions": [
+        { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-002\"]" },
+        { "type": "focus", "selector": ".canvas-host canvas" },
+        { "type": "key", "key": "ArrowRight" },
+        { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-003\"][data-viewport-offset-x]:not([data-viewport-offset-x=\"0\"])" },
+        { "type": "pointer-click", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]" },
+        { "type": "assert", "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"] .sheet-tile[aria-current=\"true\"]" },
+        { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-003\"][data-viewport-offset-x]:not([data-viewport-offset-x=\"0\"])" }
       ]
     },
     {

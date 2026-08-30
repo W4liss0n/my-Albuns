@@ -16,7 +16,10 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
 #[cfg(windows)]
 use windows::Win32::UI::Input::KeyboardAndMouse::IsWindowEnabled;
 
-use crate::{desktop_webview_policy, global_runtime::GLOBAL_WINDOW_LABEL};
+use crate::{
+    desktop_webview_policy, global_runtime::GLOBAL_WINDOW_LABEL,
+    ipc_contract::ProjectRecoveryDecision,
+};
 
 const DIALOG_LOAD_TIMEOUT: Duration = Duration::from_secs(5);
 const DIALOG_WIDTH: f64 = 380.0;
@@ -26,6 +29,8 @@ const OPENING_PROGRESS_LABEL: &str = "dialog-opening-progress";
 const PROJECT_FAILURE_LABEL: &str = "dialog-project-failure";
 static NEXT_OWNED_WINDOW_READY_TOKEN: AtomicU64 = AtomicU64::new(1);
 static OWNED_WINDOW_READINESS: OnceLock<Mutex<OwnedWindowReadinessRegistry>> = OnceLock::new();
+static PROJECT_RECOVERY_DECISIONS: OnceLock<Mutex<ProjectRecoveryDecisionRegistry>> =
+    OnceLock::new();
 
 #[derive(Default)]
 struct OwnedWindowReadinessRegistry {
@@ -78,12 +83,77 @@ fn cancel_owned_window_readiness(label: &str, token: u64) {
     }
 }
 
+#[derive(Default)]
+struct ProjectRecoveryDecisionRegistry {
+    waiters: HashMap<String, tokio::sync::oneshot::Sender<ProjectRecoveryDecision>>,
+}
+
+impl ProjectRecoveryDecisionRegistry {
+    fn register(
+        &mut self,
+        attempt_id: &str,
+    ) -> io::Result<tokio::sync::oneshot::Receiver<ProjectRecoveryDecision>> {
+        if attempt_id.is_empty() || self.waiters.contains_key(attempt_id) {
+            return Err(io::Error::other(
+                "the Recovery decision attempt is not available",
+            ));
+        }
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        self.waiters.insert(attempt_id.to_owned(), sender);
+        Ok(receiver)
+    }
+
+    fn resolve(
+        &mut self,
+        attempt_id: &str,
+        decision: ProjectRecoveryDecision,
+    ) -> Result<(), String> {
+        let sender = self
+            .waiters
+            .remove(attempt_id)
+            .ok_or_else(|| "the Recovery decision attempt is not current".to_owned())?;
+        sender
+            .send(decision)
+            .map_err(|_| "the Recovery decision owner is unavailable".to_owned())
+    }
+
+    fn cancel(&mut self, attempt_id: &str) {
+        self.waiters.remove(attempt_id);
+    }
+}
+
+fn project_recovery_decisions() -> &'static Mutex<ProjectRecoveryDecisionRegistry> {
+    PROJECT_RECOVERY_DECISIONS
+        .get_or_init(|| Mutex::new(ProjectRecoveryDecisionRegistry::default()))
+}
+
+fn cancel_project_recovery_decision(attempt_id: &str) {
+    if let Ok(mut registry) = project_recovery_decisions().lock() {
+        registry.cancel(attempt_id);
+    }
+}
+
 #[tauri::command]
 pub(crate) fn owned_window_content_ready(window: WebviewWindow, token: u64) -> Result<(), String> {
     owned_window_readiness()
         .lock()
         .map_err(|_| "the owned window readiness registry is unavailable".to_owned())?
         .signal(window.label(), token)
+}
+
+#[tauri::command]
+pub(crate) fn resolve_opening_recovery(
+    window: WebviewWindow,
+    attempt_id: String,
+    decision: ProjectRecoveryDecision,
+) -> Result<(), String> {
+    if window.label() != OPENING_PROGRESS_LABEL {
+        return Err("Recovery belongs only to the owned opening dialog".into());
+    }
+    project_recovery_decisions()
+        .lock()
+        .map_err(|_| "the Recovery decision registry is unavailable".to_owned())?
+        .resolve(&attempt_id, decision)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -142,11 +212,83 @@ pub(crate) struct LaunchProgressDialog {
     closed: bool,
     owner: WebviewWindow,
     owner_presentation: OwnerPresentation,
+    recovery_attempt_id: Option<String>,
     window: WebviewWindow,
 }
 
 impl LaunchProgressDialog {
+    pub(crate) async fn request_recovery_decision(
+        &mut self,
+        attempt_id: &str,
+    ) -> io::Result<ProjectRecoveryDecision> {
+        if self.owner_presentation != OwnerPresentation::Replace
+            || self.recovery_attempt_id.is_some()
+        {
+            return Err(io::Error::other(
+                "Recovery is unavailable on this launch dialog",
+            ));
+        }
+        let decision_receiver = project_recovery_decisions()
+            .lock()
+            .map_err(|_| io::Error::other("the Recovery decision registry is unavailable"))?
+            .register(attempt_id)?;
+        self.recovery_attempt_id = Some(attempt_id.to_owned());
+        let destroyed_attempt_id = attempt_id.to_owned();
+        self.window.on_window_event(move |event| {
+            if matches!(event, WindowEvent::Destroyed) {
+                cancel_project_recovery_decision(&destroyed_attempt_id);
+            }
+        });
+
+        let (ready_token, ready_receiver) = owned_window_readiness()
+            .lock()
+            .map_err(|_| io::Error::other("the owned window readiness registry is unavailable"))?
+            .register(self.window.label());
+        let mut url = self.window.url().map_err(io::Error::other)?;
+        url.set_path("/dialog.html");
+        url.set_query(Some(&format!(
+            "kind=project-recovery&attemptId={}&{OWNED_WINDOW_READY_PARAMETER}={ready_token}",
+            encode_unbounded_component(attempt_id),
+        )));
+        if let Err(error) = self.window.navigate(url) {
+            cancel_owned_window_readiness(self.window.label(), ready_token);
+            cancel_project_recovery_decision(attempt_id);
+            self.recovery_attempt_id = None;
+            return Err(io::Error::other(error));
+        }
+
+        let ready = tokio::time::timeout(DIALOG_LOAD_TIMEOUT, ready_receiver).await;
+        cancel_owned_window_readiness(self.window.label(), ready_token);
+        match ready {
+            Ok(Ok(())) => {}
+            Ok(Err(_)) => {
+                cancel_project_recovery_decision(attempt_id);
+                self.recovery_attempt_id = None;
+                return Err(io::Error::other(
+                    "the Recovery dialog readiness became unavailable",
+                ));
+            }
+            Err(_) => {
+                cancel_project_recovery_decision(attempt_id);
+                self.recovery_attempt_id = None;
+                return Err(io::Error::new(
+                    io::ErrorKind::TimedOut,
+                    "the Recovery dialog did not become ready",
+                ));
+            }
+        }
+
+        let decision = decision_receiver.await.map_err(|_| {
+            io::Error::other("the Recovery dialog closed without a terminal decision")
+        })?;
+        self.recovery_attempt_id = None;
+        Ok(decision)
+    }
+
     pub(crate) fn finish(mut self, restore_owner_window: bool) {
+        if let Some(attempt_id) = self.recovery_attempt_id.take() {
+            cancel_project_recovery_decision(&attempt_id);
+        }
         match self.owner_presentation {
             OwnerPresentation::Replace if restore_owner_window => {
                 let _ = self.window.destroy();
@@ -165,6 +307,9 @@ impl LaunchProgressDialog {
 
 impl Drop for LaunchProgressDialog {
     fn drop(&mut self) {
+        if let Some(attempt_id) = self.recovery_attempt_id.take() {
+            cancel_project_recovery_decision(&attempt_id);
+        }
         if !self.closed {
             match self.owner_presentation {
                 OwnerPresentation::BlockedBehindDialog => {
@@ -183,6 +328,7 @@ pub(crate) async fn show_launch_progress(
     app: &AppHandle,
     owner_label: &str,
     kind: LaunchProgressKind,
+    owner_webview_data_directory: &Path,
 ) -> io::Result<LaunchProgressDialog> {
     let owner = owned_window(app, owner_label)?;
     let window = build_hidden_owned_window(
@@ -194,7 +340,7 @@ pub(crate) async fn show_launch_progress(
             width: DIALOG_WIDTH,
             height: 126.0 + OWNED_WINDOW_TITLEBAR_HEIGHT,
             browser_arguments: None,
-            browser_data_directory: None,
+            browser_data_directory: Some(owner_webview_data_directory),
         },
     )
     .await?;
@@ -208,6 +354,7 @@ pub(crate) async fn show_launch_progress(
         closed: false,
         owner,
         owner_presentation,
+        recovery_attempt_id: None,
         window,
     })
 }
@@ -486,7 +633,14 @@ impl DialogSurface for WebviewWindow {
 
 fn prepare_owner(owner: &impl DialogOwner, presentation: OwnerPresentation) -> io::Result<()> {
     match presentation {
-        OwnerPresentation::Replace => owner.hide_dialog_owner(),
+        OwnerPresentation::Replace => {
+            owner.set_dialog_owner_enabled(false)?;
+            if let Err(error) = owner.hide_dialog_owner() {
+                let _ = owner.set_dialog_owner_enabled(true);
+                return Err(error);
+            }
+            Ok(())
+        }
         OwnerPresentation::BlockedBehindDialog => {
             if !owner.is_dialog_owner_visible()? {
                 owner.show_dialog_owner()?;
@@ -870,11 +1024,60 @@ mod tests {
     }
 
     #[test]
+    fn recovery_decision_registry_accepts_one_terminal_for_the_exact_attempt() {
+        let mut registry = ProjectRecoveryDecisionRegistry::default();
+        let mut decision = registry
+            .register("attempt-17")
+            .expect("the first exact attempt is registered");
+
+        assert!(registry.register("attempt-17").is_err());
+        assert!(
+            registry
+                .resolve("attempt-18", ProjectRecoveryDecision::NowNot)
+                .is_err()
+        );
+        assert_eq!(
+            decision.try_recv(),
+            Err(tokio::sync::oneshot::error::TryRecvError::Empty)
+        );
+
+        registry
+            .resolve("attempt-17", ProjectRecoveryDecision::ReopenAndRecover)
+            .expect("the correlated decision resolves once");
+        assert_eq!(
+            decision.try_recv(),
+            Ok(ProjectRecoveryDecision::ReopenAndRecover)
+        );
+        assert!(
+            registry
+                .resolve("attempt-17", ProjectRecoveryDecision::NowNot)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn cancelling_recovery_closes_the_pending_decision_without_a_fallback_choice() {
+        let mut registry = ProjectRecoveryDecisionRegistry::default();
+        let mut decision = registry
+            .register("attempt-19")
+            .expect("the attempt is registered");
+
+        registry.cancel("attempt-19");
+
+        assert_eq!(
+            decision.try_recv(),
+            Err(tokio::sync::oneshot::error::TryRecvError::Closed)
+        );
+    }
+
+    #[test]
     fn opening_transition_hides_then_restores_the_owner() {
         let owner = RecordingOwner::default();
 
         prepare_owner(&owner, OwnerPresentation::Replace).unwrap();
-        assert_eq!(owner.actions.take(), ["hide"]);
+        assert_eq!(owner.actions.take(), ["enabled:false", "hide"]);
+        assert!(!owner.enabled.get());
+        assert!(!owner.visible.get());
 
         release_owner(&owner, OwnerPresentation::Replace, false);
         assert_eq!(owner.actions.take(), ["enabled:true", "show"]);

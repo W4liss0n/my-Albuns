@@ -19,7 +19,7 @@ function recoveryDialog(
   return { props, view: render(<ProjectRecoveryDialog {...props} />) };
 }
 
-test("owns one accessible modal and traps focus on its three decisions", () => {
+test("renders one accessible external dialog and traps focus on its three decisions", () => {
   const { props } = recoveryDialog();
   const dialog = screen.getByRole("dialog", {
     name: "Recuperar trabalho não salvo?",
@@ -31,10 +31,8 @@ test("owns one accessible modal and traps focus on its three decisions", () => {
 
   expect(screen.getAllByRole("dialog")).toHaveLength(1);
   expect(dialog).toHaveAttribute("aria-modal", "true");
-  expect(dialog.closest(".ui-modal-dialog-layer")).toHaveAttribute(
-    "data-modal-owner",
-    "project",
-  );
+  expect(dialog.closest(".project-recovery-dialog-scope")).toBeInTheDocument();
+  expect(document.querySelector(".ui-modal-dialog-layer")).not.toBeInTheDocument();
   expect(recover).toHaveFocus();
 
   fireEvent.keyDown(recover, { key: "Tab" });
@@ -47,7 +45,7 @@ test("owns one accessible modal and traps focus on its three decisions", () => {
   expect(props.onRecover).not.toHaveBeenCalled();
 });
 
-test("keeps discard confirmation in the same modal owner and cancels it with Escape", () => {
+test("keeps discard confirmation in the same external owner and cancels it with Escape", () => {
   const { props } = recoveryDialog({ state: "confirmDiscard" });
   const dialog = screen.getByRole("dialog", {
     name: "Descartar o trabalho recuperável?",
@@ -57,24 +55,11 @@ test("keeps discard confirmation in the same modal owner and cancels it with Esc
   expect(
     screen.getByRole("button", { name: "Descartar recuperação e abrir" }),
   ).toHaveFocus();
-  fireEvent.pointerDown(document.querySelector(".ui-modal-dialog-layer")!);
-  expect(props.onBack).not.toHaveBeenCalled();
   fireEvent.keyDown(dialog, { key: "Escape" });
   expect(props.onBack).toHaveBeenCalledOnce();
   expect(props.onDiscard).not.toHaveBeenCalled();
 });
 
-test("restores focus after the modal reaches a terminal", () => {
-  const trigger = document.createElement("button");
-  document.body.append(trigger);
-  trigger.focus();
-  const { view } = recoveryDialog();
-
-  expect(trigger).not.toHaveFocus();
-  view.unmount();
-  expect(trigger).toHaveFocus();
-  trigger.remove();
-});
 
 test("does not duplicate a decision while its resolution is in flight", () => {
   const { props } = recoveryDialog({ state: "resolving" });

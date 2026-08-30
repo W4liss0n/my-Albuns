@@ -172,10 +172,6 @@ const projectDialogPort: ProjectDialogPort = {
   }),
 };
 const projectStartupPort: ProjectStartupPort = {
-  recoveryStatus: async () => ({ kind: "none" }),
-  resolveRecovery: async () => {
-    throw new Error("Recuperação não configurada neste teste.");
-  },
   confirmUiReady: async () => undefined,
 };
 const canvasGraphicsDiagnosticProbe = () =>
@@ -262,35 +258,14 @@ function App({
   );
 }
 
-test("offers exactly the three Recovery choices before reading editor state", async () => {
-  const ownerLocation = window.location.href;
+test("keeps the Recovery decision out of the Project WebView startup", async () => {
   const load = vi.fn(async () => projection);
-  const recoveryStatus = vi.fn(async () => ({ kind: "available" }) as const);
-  const recoveredProjection: EditorProjection = {
-    ...projection,
-    state: {
-      ...projection.state,
-      dirty: true,
-      canUndo: false,
-      canRedo: false,
-      document: { ...projection.state.document, dpi: 360 },
-    },
-  };
-  const resolveRecovery = vi.fn(async () => ({
-    kind: "recovered" as const,
-    projection: recoveredProjection,
-  }));
-  const confirmUiReady = vi.fn(async () => undefined);
 
   render(
     <App
       exportPipelinePort={exportPipelinePort}
       mediaPreviewPort={mediaPreviewPort}
-      projectStartupPort={{
-        recoveryStatus,
-        resolveRecovery,
-        confirmUiReady,
-      }}
+      projectStartupPort={projectStartupPort}
       projectCorePort={{ ...projectCorePort, load }}
       projectWindowPort={projectWindowPort}
       graphicsProbe={canvasGraphicsDiagnosticProbe}
@@ -299,129 +274,20 @@ test("offers exactly the three Recovery choices before reading editor state", as
     />,
   );
 
-  const dialog = await screen.findByRole("dialog", {
-    name: "Recuperar trabalho não salvo?",
-  });
-  expect(screen.getAllByRole("dialog")).toHaveLength(1);
-  expect(dialog).toHaveAttribute("aria-modal", "true");
-  const titleId = dialog.getAttribute("aria-labelledby");
-  expect(titleId).toBeTruthy();
-  expect(document.getElementById(titleId!)).toHaveTextContent(
-    "Recuperar trabalho não salvo?",
-  );
-  expect(
-    document.querySelector("[data-project-owner-surface]"),
-  ).toBeInTheDocument();
-  expect(window.location.href).toBe(ownerLocation);
-  expect(
-    screen.getByRole("button", { name: "Reabrir e recuperar" }),
-  ).toHaveFocus();
-  expect(
-    screen.getAllByRole("button").map((button) => button.textContent),
-  ).toEqual([
-    "Agora não",
-    "Abrir última versão salva",
-    "Reabrir e recuperar",
-  ]);
-  expect(load).not.toHaveBeenCalled();
-  await waitFor(() => expect(confirmUiReady).toHaveBeenCalledOnce());
-
-  fireEvent.click(
-    screen.getByRole("button", { name: "Reabrir e recuperar" }),
-  );
-  await waitFor(() =>
-    expect(resolveRecovery).toHaveBeenCalledWith("reopenAndRecover"),
-  );
   expect(
     await screen.findByRole("button", { name: "Exportar Lâmina" }),
   ).toBeInTheDocument();
-  expect(load).not.toHaveBeenCalled();
-});
-
-test("requires a separate confirmation before discarding Recovery for the saved version", async () => {
-  const ownerLocation = window.location.href;
-  const load = vi.fn(async () => projection);
-  const resolveRecovery = vi.fn(async () => ({
-    kind: "openedLastSaved" as const,
-    projection,
-  }));
-  render(
-    <App
-      exportPipelinePort={exportPipelinePort}
-      mediaPreviewPort={mediaPreviewPort}
-      projectStartupPort={{
-        ...projectStartupPort,
-        recoveryStatus: async () => ({ kind: "available" }),
-        resolveRecovery,
-      }}
-      projectCorePort={{ ...projectCorePort, load }}
-      projectWindowPort={projectWindowPort}
-      graphicsProbe={canvasGraphicsDiagnosticProbe}
-      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
-      logger={silentLogger}
-    />,
-  );
-
-  const ownerSurface = document.querySelector("[data-project-owner-surface]");
-  fireEvent.click(
-    await screen.findByRole("button", { name: "Abrir última versão salva" }),
-  );
-  expect(resolveRecovery).not.toHaveBeenCalled();
-  const discardDialog = screen.getByRole("dialog", {
-    name: "Descartar o trabalho recuperável?",
-  });
-  expect(screen.getAllByRole("dialog")).toHaveLength(1);
-  expect(document.querySelector("[data-project-owner-surface]")).toBe(
-    ownerSurface,
-  );
-  expect(window.location.href).toBe(ownerLocation);
-  fireEvent.keyDown(discardDialog, { key: "Escape" });
+  expect(load).toHaveBeenCalledOnce();
   expect(
-    screen.getByRole("button", { name: "Abrir última versão salva" }),
-  ).toBeInTheDocument();
-  expect(resolveRecovery).not.toHaveBeenCalled();
-
-  fireEvent.click(
-    screen.getByRole("button", { name: "Abrir última versão salva" }),
-  );
-  fireEvent.click(
-    screen.getByRole("button", { name: "Descartar recuperação e abrir" }),
-  );
-  await waitFor(() =>
-    expect(resolveRecovery).toHaveBeenCalledWith(
-      "discardCheckpointAndOpenLastSaved",
-    ),
-  );
-  expect(load).not.toHaveBeenCalled();
+    screen.queryByRole("dialog", { name: "Recuperar trabalho não salvo?" }),
+  ).not.toBeInTheDocument();
+  expect(
+    document.querySelector("[data-project-owner-surface]"),
+  ).not.toBeInTheDocument();
 });
 
-test("defers opening without loading or discarding the Recovery checkpoint", async () => {
-  const load = vi.fn(async () => projection);
-  const resolveRecovery = vi.fn(async () => ({ kind: "deferred" as const }));
-  render(
-    <App
-      exportPipelinePort={exportPipelinePort}
-      mediaPreviewPort={mediaPreviewPort}
-      projectStartupPort={{
-        ...projectStartupPort,
-        recoveryStatus: async () => ({ kind: "available" }),
-        resolveRecovery,
-      }}
-      projectCorePort={{ ...projectCorePort, load }}
-      projectWindowPort={projectWindowPort}
-      graphicsProbe={canvasGraphicsDiagnosticProbe}
-      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
-      logger={silentLogger}
-    />,
-  );
 
-  fireEvent.click(await screen.findByRole("button", { name: "Agora não" }));
-  await waitFor(() =>
-    expect(resolveRecovery).toHaveBeenCalledWith("nowNot"),
-  );
-  expect(load).not.toHaveBeenCalled();
-  expect(screen.getByText("Fechando o Projeto…")).toBeInTheDocument();
-});
+
 
 test("surfaces the durable Save As terminal when the previous WebView is restored", async () => {
   const dialog = projectDialogHarness();

@@ -1,7 +1,21 @@
-import { useRef } from "react";
+import {
+  useLayoutEffect,
+  useRef,
+  type KeyboardEvent,
+  type ReactNode,
+  type RefObject,
+} from "react";
 
 import { ConfirmationDialog, InlineNotice } from "../ui";
-import { ModalDialogLayer } from "../ui/ModalDialogLayer";
+
+const FOCUSABLE_SELECTOR = [
+  "button:not(:disabled)",
+  "[href]",
+  "input:not(:disabled)",
+  "select:not(:disabled)",
+  "textarea:not(:disabled)",
+  '[tabindex]:not([tabindex="-1"])',
+].join(",");
 
 type ProjectRecoveryDialogState =
   | "available"
@@ -30,11 +44,10 @@ export function ProjectRecoveryDialog({
 
   if (state === "confirmDiscard") {
     return (
-      <ModalDialogLayer
+      <RecoveryDialogFocusScope
         focusKey={state}
         initialFocusRef={primaryActionRef}
         onEscape={onBack}
-        owner="project"
       >
         <ConfirmationDialog
           cancelAction={{ label: "Voltar", onClick: onBack }}
@@ -49,18 +62,17 @@ export function ProjectRecoveryDialog({
         >
           {error ? <InlineNotice tone="error">{error}</InlineNotice> : null}
         </ConfirmationDialog>
-      </ModalDialogLayer>
+      </RecoveryDialogFocusScope>
     );
   }
 
   return (
-    <ModalDialogLayer
+    <RecoveryDialogFocusScope
       focusKey={state}
       initialFocusRef={primaryActionRef}
       onEscape={() => {
         if (!busy) onDefer();
       }}
-      owner="project"
     >
       <ConfirmationDialog
         cancelAction={{
@@ -85,6 +97,63 @@ export function ProjectRecoveryDialog({
         {error ? <InlineNotice tone="error">{error}</InlineNotice> : null}
         {busy ? <p aria-live="polite">Concluindo…</p> : null}
       </ConfirmationDialog>
-    </ModalDialogLayer>
+    </RecoveryDialogFocusScope>
+  );
+}
+
+function RecoveryDialogFocusScope({
+  children,
+  focusKey,
+  initialFocusRef,
+  onEscape,
+}: {
+  children: ReactNode;
+  focusKey: string;
+  initialFocusRef: RefObject<HTMLElement | null>;
+  onEscape(): void;
+}) {
+  const scopeRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    initialFocusRef.current?.focus({ preventScroll: true });
+  }, [focusKey, initialFocusRef]);
+
+  const focusableElements = () =>
+    Array.from(
+      scopeRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR) ?? [],
+    ).filter((element) => !element.hidden);
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      onEscape();
+      return;
+    }
+    if (event.key !== "Tab") return;
+    const focusable = focusableElements();
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (!first || !last) {
+      event.preventDefault();
+      return;
+    }
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus({ preventScroll: true });
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus({ preventScroll: true });
+    }
+  };
+
+  return (
+    <div
+      className="project-recovery-dialog-scope"
+      onKeyDown={handleKeyDown}
+      ref={scopeRef}
+    >
+      {children}
+    </div>
   );
 }

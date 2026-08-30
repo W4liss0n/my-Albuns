@@ -310,7 +310,7 @@ mod tests {
         );
         assert_eq!(
             allowed_commands(&owned_dialog_permission),
-            BTreeSet::from(["owned_window_content_ready"])
+            BTreeSet::from(["owned_window_content_ready", "resolve_opening_recovery"])
         );
         assert_eq!(
             allowed_commands(&message_dialog_permission),
@@ -372,25 +372,27 @@ mod tests {
     }
 
     #[test]
-    fn recovery_commands_are_explicitly_allowed_only_to_project_window() {
+    fn recovery_decision_is_explicitly_allowed_only_to_the_opening_dialog() {
         let project_permission: serde_json::Value =
             serde_json::from_str(include_str!("../permissions/project-window.json"))
                 .expect("valid project permission");
         let global_permission: serde_json::Value =
             serde_json::from_str(include_str!("../permissions/global-window.json"))
                 .expect("valid global permission");
+        let owned_dialog_permission: serde_json::Value =
+            serde_json::from_str(include_str!("../permissions/owned-dialog-window.json"))
+                .expect("valid owned dialog permission");
         let project_commands = allowed_commands(&project_permission);
         let global_commands = allowed_commands(&global_permission);
+        let owned_dialog_commands = allowed_commands(&owned_dialog_permission);
 
-        for command in ["project_recovery_status", "resolve_project_recovery"] {
-            assert!(
-                project_commands.contains(command),
-                "the Project capability must explicitly allow {command}"
-            );
-            assert!(
-                !global_commands.contains(command),
-                "the Global capability must not inherit {command}"
-            );
+        assert!(owned_dialog_commands.contains("resolve_opening_recovery"));
+        assert!(!project_commands.contains("resolve_opening_recovery"));
+        assert!(!global_commands.contains("resolve_opening_recovery"));
+        for obsolete in ["project_recovery_status", "resolve_project_recovery"] {
+            assert!(!project_commands.contains(obsolete));
+            assert!(!global_commands.contains(obsolete));
+            assert!(!owned_dialog_commands.contains(obsolete));
         }
     }
 

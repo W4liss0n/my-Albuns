@@ -3,9 +3,11 @@ use std::io::{BufRead, Write};
 use myalbuns_paths::{NativePathDto, ProcessInstanceId, RootBindingPlan};
 use serde::{Deserialize, Serialize};
 
+use crate::ipc_contract::ProjectRecoveryDecision;
+
 use super::configuration::InitialProjectCreationConfiguration;
 
-pub(crate) const PROTOCOL_VERSION: u16 = 6;
+pub(crate) const PROTOCOL_VERSION: u16 = 7;
 const MAX_BOOTSTRAP_REQUEST_BYTES: u64 = 1024 * 1024;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -61,6 +63,15 @@ pub(crate) struct SaveExternalCopyRequest {
     pub(crate) launch_nonce: String,
     pub(crate) authority: TargetAuthority,
     pub(crate) authorization: CreateWriteAuthorization,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ProjectRecoveryRequest {
+    pub(crate) protocol_version: u16,
+    pub(crate) attempt_id: String,
+    pub(crate) launch_nonce: String,
+    pub(crate) decision: ProjectRecoveryDecision,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -130,6 +141,16 @@ pub(crate) enum HostTerminal {
         launch_nonce: String,
         host_pid: u32,
     },
+    RecoveryAvailable {
+        attempt_id: String,
+        launch_nonce: String,
+        host_pid: u32,
+    },
+    RecoveryDeferred {
+        attempt_id: String,
+        launch_nonce: String,
+        host_pid: u32,
+    },
     Failed {
         attempt_id: String,
         launch_nonce: String,
@@ -186,6 +207,22 @@ impl HostTerminal {
         }
     }
 
+    pub(crate) fn recovery_available(request: &BootstrapRequest) -> Self {
+        Self::RecoveryAvailable {
+            attempt_id: request.attempt_id.clone(),
+            launch_nonce: request.launch_nonce.clone(),
+            host_pid: std::process::id(),
+        }
+    }
+
+    pub(crate) fn recovery_deferred(request: &BootstrapRequest) -> Self {
+        Self::RecoveryDeferred {
+            attempt_id: request.attempt_id.clone(),
+            launch_nonce: request.launch_nonce.clone(),
+            host_pid: std::process::id(),
+        }
+    }
+
     pub(crate) fn uncorrelated_failure(stage: FailureStage, code: FailureCode) -> Self {
         Self::Failed {
             attempt_id: String::new(),
@@ -209,6 +246,12 @@ pub(crate) enum ValidatedTerminal {
         owner_process: ProcessInstanceId,
     },
     ExternalCopyNotWritable {
+        host_pid: u32,
+    },
+    RecoveryAvailable {
+        host_pid: u32,
+    },
+    RecoveryDeferred {
         host_pid: u32,
     },
     Failed {
@@ -242,6 +285,16 @@ pub(crate) fn validate_terminal(
             ..
         }
         | HostTerminal::ExternalCopyNotWritable {
+            attempt_id,
+            launch_nonce,
+            host_pid,
+        }
+        | HostTerminal::RecoveryAvailable {
+            attempt_id,
+            launch_nonce,
+            host_pid,
+        }
+        | HostTerminal::RecoveryDeferred {
             attempt_id,
             launch_nonce,
             host_pid,
@@ -282,6 +335,12 @@ pub(crate) fn validate_terminal(
         HostTerminal::ExternalCopyNotWritable { host_pid, .. } => {
             ValidatedTerminal::ExternalCopyNotWritable { host_pid }
         }
+        HostTerminal::RecoveryAvailable { host_pid, .. } => {
+            ValidatedTerminal::RecoveryAvailable { host_pid }
+        }
+        HostTerminal::RecoveryDeferred { host_pid, .. } => {
+            ValidatedTerminal::RecoveryDeferred { host_pid }
+        }
         HostTerminal::Failed {
             host_pid,
             stage,
@@ -305,6 +364,25 @@ pub(crate) fn read_save_external_copy_request(
     reader: impl BufRead,
 ) -> Result<SaveExternalCopyRequest, std::io::Error> {
     read_request_line(reader, "Salvar cópia como...")
+}
+
+pub(crate) fn read_project_recovery_request(
+    reader: impl BufRead,
+) -> Result<ProjectRecoveryRequest, std::io::Error> {
+    read_request_line(reader, "Recuperação")
+}
+
+pub(crate) fn validate_project_recovery_request(
+    bootstrap: &BootstrapRequest,
+    request: ProjectRecoveryRequest,
+) -> Result<ProjectRecoveryDecision, TerminalValidationError> {
+    if request.protocol_version != PROTOCOL_VERSION
+        || request.attempt_id != bootstrap.attempt_id
+        || request.launch_nonce != bootstrap.launch_nonce
+    {
+        return Err(TerminalValidationError::CorrelationMismatch);
+    }
+    Ok(request.decision)
 }
 
 fn read_request_line<T: serde::de::DeserializeOwned>(
@@ -519,6 +597,61 @@ mod tests {
             serde_json::from_value::<SaveExternalCopyRequest>(encoded)
                 .expect("the request deserializes"),
             request
+        );
+    }
+
+    #[test]
+    fn recovery_continuation_preserves_the_opening_attempt_and_closed_decision() {
+        let bootstrap = request();
+        let continuation = ProjectRecoveryRequest {
+            protocol_version: PROTOCOL_VERSION,
+            attempt_id: bootstrap.attempt_id.clone(),
+            launch_nonce: bootstrap.launch_nonce.clone(),
+            decision: ProjectRecoveryDecision::ReopenAndRecover,
+        };
+
+        let encoded = serde_json::to_value(&continuation).expect("the request serializes");
+        assert_eq!(encoded["decision"], "reopenAndRecover");
+        assert_eq!(
+            validate_project_recovery_request(
+                &bootstrap,
+                serde_json::from_value(encoded).expect("the request deserializes"),
+            ),
+            Ok(ProjectRecoveryDecision::ReopenAndRecover)
+        );
+
+        let mut wrong_attempt = continuation;
+        wrong_attempt.attempt_id = "another-attempt".into();
+        assert_eq!(
+            validate_project_recovery_request(&bootstrap, wrong_attempt),
+            Err(TerminalValidationError::CorrelationMismatch)
+        );
+    }
+
+    #[test]
+    fn recovery_signals_are_correlated_to_the_exact_spawned_host() {
+        let request = request();
+        let spawned_pid = std::process::id();
+
+        assert_eq!(
+            validate_terminal(
+                &request,
+                spawned_pid,
+                HostTerminal::recovery_available(&request),
+            ),
+            Ok(ValidatedTerminal::RecoveryAvailable {
+                host_pid: spawned_pid,
+            })
+        );
+        assert_eq!(
+            validate_terminal(
+                &request,
+                spawned_pid,
+                HostTerminal::recovery_deferred(&request),
+            ),
+            Ok(ValidatedTerminal::RecoveryDeferred {
+                host_pid: spawned_pid,
+            })
         );
     }
 

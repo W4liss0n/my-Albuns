@@ -29,9 +29,9 @@ use crate::{
     project_bootstrap::{
         BootstrapFailure, BootstrapFailureKind, BootstrapOutcome, CreateWriteAuthorization,
         FailureCode, FailureStage, InitialProjectConfiguration,
-        InitialProjectCreationConfiguration, PendingExternalCopyProcess,
-        ProjectConfigurationValidation, ProjectHostBootstrap, TargetAuthority,
-        validate_configuration,
+        InitialProjectCreationConfiguration, PendingExternalCopyProcess, PendingRecoveryProcess,
+        ProjectConfigurationValidation, ProjectHostBootstrap, RecoveryContinuationOutcome,
+        TargetAuthority, validate_configuration,
     },
     provisional_decoratives::{
         ProvisionalDecorativeError, ProvisionalDecorativeRegistry,
@@ -193,6 +193,7 @@ impl<T> PendingExternalCopyCoordinator<T> {
 #[derive(Clone)]
 struct GlobalRuntimeState {
     bootstrap: ProjectHostBootstrap,
+    global_webview_data_directory: PathBuf,
     graphics_gate: GraphicsLaunchGate,
     recent_projects: RecentProjectsStore,
     startup_failure: Arc<Mutex<Option<ProjectLaunchFailure>>>,
@@ -213,6 +214,9 @@ impl GlobalRuntimeState {
     ) -> Result<Self, std::io::Error> {
         Ok(Self {
             bootstrap: ProjectHostBootstrap::new(std::env::current_exe()?, HOST_TERMINAL_TIMEOUT),
+            global_webview_data_directory: app_paths
+                .webview_data_directory(GLOBAL_WEBVIEW_NAMESPACE)
+                .map_err(|error| std::io::Error::other(error.to_string()))?,
             graphics_gate: GraphicsLaunchGate::new(activation_projects),
             recent_projects: RecentProjectsStore::new(app_paths),
             startup_failure: Arc::new(Mutex::new(None)),
@@ -416,6 +420,14 @@ enum ConfirmedLaunch {
     },
 }
 
+enum ConfirmedProjectLaunch {
+    Completed(ProjectLaunchOutcome),
+    RecoveryAvailable {
+        pending: PendingRecoveryProcess,
+        recent_path: NativePathDto,
+    },
+}
+
 #[tauri::command]
 async fn complete_graphics_gate(
     app: AppHandle,
@@ -428,7 +440,7 @@ async fn complete_graphics_gate(
     match state.graphics_gate.complete(report) {
         GraphicsGateCompletion::Ready(projects) if !projects.is_empty() => {
             let _serial = state.activation_serial.lock().await;
-            let outcome = launch_activation_batch(state.clone(), projects).await;
+            let outcome = launch_activation_batch(&app, state.clone(), projects).await;
             match &outcome {
                 ProjectLaunchOutcome::Opened | ProjectLaunchOutcome::Focused => {
                     exit_global_after_handoff(&app)
@@ -604,7 +616,8 @@ async fn save_external_copy_as(app: AppHandle, window: WebviewWindow) -> Project
                 Some(recent_projects.promote(&ready.project_id, recent_path))
             }
             BootstrapOutcome::FocusExisting { .. } => None,
-            BootstrapOutcome::ExternalCopyNotWritable(_) => None,
+            BootstrapOutcome::ExternalCopyNotWritable(_)
+            | BootstrapOutcome::RecoveryAvailable(_) => None,
         };
         Ok::<_, BootstrapFailure>((outcome, recent_result))
     })
@@ -629,6 +642,16 @@ async fn save_external_copy_as(app: AppHandle, window: WebviewWindow) -> Project
             _,
         ))) => resolve_focus_existing(project_id, owner_process),
         Ok(Ok((BootstrapOutcome::ExternalCopyNotWritable(pending), _))) => {
+            drop(pending);
+            ProjectLaunchOutcome::Failed {
+                error: simple_failure(
+                    "invalid_host_terminal",
+                    "O Host não concluiu a criação da cópia.",
+                    "Abra novamente a cópia somente leitura.",
+                ),
+            }
+        }
+        Ok(Ok((BootstrapOutcome::RecoveryAvailable(pending), _))) => {
             drop(pending);
             ProjectLaunchOutcome::Failed {
                 error: simple_failure(
@@ -868,29 +891,154 @@ async fn launch_confirmed_project_with_progress(
     progress_owner_label: &str,
     restore_owner_on_failure: bool,
 ) -> ProjectLaunchOutcome {
-    let progress =
-        match native_dialog_window::show_launch_progress(app, progress_owner_label, progress_kind)
+    if let Some(rejection) = state.project_host_gate_rejection() {
+        return rejection;
+    }
+    let root_bindings = match path_io::capture_root_bindings(vec![project_path.clone()]).await {
+        Ok(root_bindings) => root_bindings,
+        Err(error) => {
+            return ProjectLaunchOutcome::Failed {
+                error: binding_failure(error),
+            };
+        }
+    };
+    launch_confirmed_project_with_bindings_and_progress(
+        app,
+        state,
+        project_path,
+        launch,
+        root_bindings,
+        progress_kind,
+        progress_owner_label,
+        restore_owner_on_failure,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn launch_confirmed_project_with_bindings_and_progress(
+    app: &AppHandle,
+    state: GlobalRuntimeState,
+    project_path: PathBuf,
+    launch: ConfirmedLaunch,
+    root_bindings: RootBindingPlan,
+    progress_kind: LaunchProgressKind,
+    progress_owner_label: &str,
+    restore_owner_on_failure: bool,
+) -> ProjectLaunchOutcome {
+    let mut progress = match native_dialog_window::show_launch_progress(
+        app,
+        progress_owner_label,
+        progress_kind,
+        &state.global_webview_data_directory,
+    )
+    .await
+    {
+        Ok(progress) => Some(progress),
+        Err(error) => {
+            tracing::warn!(
+                target: "myalbuns.desktop",
+                process_role = ProcessRole::Global.as_str(),
+                error = %error,
+                event = "project_launch_progress_dialog_unavailable",
+            );
+            None
+        }
+    };
+    let launch =
+        launch_confirmed_project_with_bindings(state.clone(), project_path, launch, root_bindings)
+            .await;
+    let (outcome, force_owner_restore) = match launch {
+        ConfirmedProjectLaunch::Completed(outcome) => (outcome, false),
+        ConfirmedProjectLaunch::RecoveryAvailable {
+            pending,
+            recent_path,
+        } => {
+            let Some(dialog) = progress.as_mut() else {
+                drop(pending);
+                return ProjectLaunchOutcome::Failed {
+                    error: simple_failure(
+                        "recovery_dialog_unavailable",
+                        "Não foi possível apresentar a decisão de Recuperação.",
+                        "Tente abrir o Projeto novamente.",
+                    ),
+                };
+            };
+            let attempt_id = pending.attempt_id().to_owned();
+            let decision = match dialog.request_recovery_decision(&attempt_id).await {
+                Ok(decision) => decision,
+                Err(error) => {
+                    tracing::warn!(
+                        target: "myalbuns.desktop",
+                        process_role = ProcessRole::Global.as_str(),
+                        error = %error,
+                        attempt_id,
+                        event = "project_recovery_dialog_unavailable",
+                    );
+                    drop(pending);
+                    return ProjectLaunchOutcome::Failed {
+                        error: simple_failure(
+                            "recovery_dialog_unavailable",
+                            "Não foi possível apresentar a decisão de Recuperação.",
+                            "Tente abrir o Projeto novamente.",
+                        ),
+                    };
+                }
+            };
+            let recent_projects = state.recent_projects.clone();
+            match tauri::async_runtime::spawn_blocking(move || {
+                let outcome = pending.resolve(decision)?;
+                let recent_result = match &outcome {
+                    RecoveryContinuationOutcome::Ready(ready) => {
+                        Some(recent_projects.promote(&ready.project_id, recent_path))
+                    }
+                    RecoveryContinuationOutcome::Deferred => None,
+                };
+                Ok::<_, BootstrapFailure>((outcome, recent_result))
+            })
             .await
-        {
-            Ok(progress) => Some(progress),
-            Err(error) => {
-                tracing::warn!(
-                    target: "myalbuns.desktop",
-                    process_role = ProcessRole::Global.as_str(),
-                    error = %error,
-                    event = "project_launch_progress_dialog_unavailable",
-                );
-                None
+            {
+                Ok(Ok((RecoveryContinuationOutcome::Ready(ready), recent_result))) => {
+                    if recent_result.is_some_and(|result| result.is_err()) {
+                        tracing::warn!(
+                            target: "myalbuns.desktop",
+                            process_role = ProcessRole::Global.as_str(),
+                            project_id = ready.project_id,
+                            event = "recent_project_promotion_failed",
+                        );
+                    }
+                    (ProjectLaunchOutcome::Opened, false)
+                }
+                Ok(Ok((RecoveryContinuationOutcome::Deferred, _))) => {
+                    (ProjectLaunchOutcome::Cancelled, true)
+                }
+                Ok(Err(failure)) => (
+                    ProjectLaunchOutcome::Failed {
+                        error: bootstrap_failure(failure),
+                    },
+                    true,
+                ),
+                Err(_) => (
+                    ProjectLaunchOutcome::Failed {
+                        error: simple_failure(
+                            "host_unavailable",
+                            "Não foi possível concluir a Recuperação do Projeto.",
+                            "Tente novamente. Se o problema continuar, reinicie o MyAlbuns.",
+                        ),
+                    },
+                    true,
+                ),
             }
-        };
-    let outcome = launch_confirmed_project(state, project_path, launch).await;
+        }
+    };
     if let Some(progress) = progress {
         progress.finish(
-            restore_owner_on_failure
-                && !matches!(
-                    outcome,
-                    ProjectLaunchOutcome::Opened | ProjectLaunchOutcome::Focused
-                ),
+            force_owner_restore
+                || restore_owner_on_failure
+                    && !matches!(
+                        outcome,
+                        ProjectLaunchOutcome::Opened | ProjectLaunchOutcome::Focused
+                    ),
         );
     }
     outcome
@@ -903,6 +1051,7 @@ fn latest_global_activation_terminal(app: AppHandle) -> Option<GlobalActivationT
         .latest()
 }
 
+#[cfg(test)]
 async fn launch_confirmed_project(
     state: GlobalRuntimeState,
     project_path: PathBuf,
@@ -919,7 +1068,19 @@ async fn launch_confirmed_project(
             };
         }
     };
-    launch_confirmed_project_with_bindings(state, project_path, launch, root_bindings).await
+    match launch_confirmed_project_with_bindings(state, project_path, launch, root_bindings).await {
+        ConfirmedProjectLaunch::Completed(outcome) => outcome,
+        ConfirmedProjectLaunch::RecoveryAvailable { pending, .. } => {
+            drop(pending);
+            ProjectLaunchOutcome::Failed {
+                error: simple_failure(
+                    "recovery_owner_required",
+                    "A Recuperação precisa do diálogo pertencente ao fluxo de abertura.",
+                    "Abra o Projeto pela Tela de Boas-vindas.",
+                ),
+            }
+        }
+    }
 }
 
 async fn launch_confirmed_project_with_bindings(
@@ -927,7 +1088,7 @@ async fn launch_confirmed_project_with_bindings(
     project_path: PathBuf,
     launch: ConfirmedLaunch,
     root_bindings: RootBindingPlan,
-) -> ProjectLaunchOutcome {
+) -> ConfirmedProjectLaunch {
     let native_path = NativePathDto::from(project_path);
     let recent_path = native_path.clone();
     let authority = TargetAuthority {
@@ -946,16 +1107,17 @@ async fn launch_confirmed_project_with_bindings(
         }?;
         let recent_result = match &outcome {
             BootstrapOutcome::Ready(ready) => {
-                Some(recent_projects.promote(&ready.project_id, recent_path))
+                Some(recent_projects.promote(&ready.project_id, recent_path.clone()))
             }
             BootstrapOutcome::FocusExisting { .. } => None,
-            BootstrapOutcome::ExternalCopyNotWritable(_) => None,
+            BootstrapOutcome::ExternalCopyNotWritable(_)
+            | BootstrapOutcome::RecoveryAvailable(_) => None,
         };
-        Ok::<_, BootstrapFailure>((outcome, recent_result))
+        Ok::<_, BootstrapFailure>((outcome, recent_result, recent_path))
     })
     .await
     {
-        Ok(Ok((BootstrapOutcome::Ready(ready), recent_result))) => {
+        Ok(Ok((BootstrapOutcome::Ready(ready), recent_result, _))) => {
             if recent_result.is_some_and(|result| result.is_err()) {
                 tracing::warn!(
                     target: "myalbuns.desktop",
@@ -964,7 +1126,7 @@ async fn launch_confirmed_project_with_bindings(
                     event = "recent_project_promotion_failed",
                 );
             }
-            ProjectLaunchOutcome::Opened
+            ConfirmedProjectLaunch::Completed(ProjectLaunchOutcome::Opened)
         }
         Ok(Ok((
             BootstrapOutcome::FocusExisting {
@@ -972,21 +1134,28 @@ async fn launch_confirmed_project_with_bindings(
                 owner_process,
             },
             _,
-        ))) => resolve_focus_existing(project_id, owner_process),
-        Ok(Ok((BootstrapOutcome::ExternalCopyNotWritable(pending), _))) => {
+            _,
+        ))) => ConfirmedProjectLaunch::Completed(resolve_focus_existing(project_id, owner_process)),
+        Ok(Ok((BootstrapOutcome::ExternalCopyNotWritable(pending), _, _))) => {
             state.remember_external_copy(pending);
-            ProjectLaunchOutcome::ExternalCopyNotWritable
+            ConfirmedProjectLaunch::Completed(ProjectLaunchOutcome::ExternalCopyNotWritable)
         }
-        Ok(Err(failure)) => ProjectLaunchOutcome::Failed {
+        Ok(Ok((BootstrapOutcome::RecoveryAvailable(pending), _, recent_path))) => {
+            ConfirmedProjectLaunch::RecoveryAvailable {
+                pending,
+                recent_path,
+            }
+        }
+        Ok(Err(failure)) => ConfirmedProjectLaunch::Completed(ProjectLaunchOutcome::Failed {
             error: bootstrap_failure(failure),
-        },
-        Err(_) => ProjectLaunchOutcome::Failed {
+        }),
+        Err(_) => ConfirmedProjectLaunch::Completed(ProjectLaunchOutcome::Failed {
             error: simple_failure(
                 "host_unavailable",
                 "Não foi possível iniciar a Janela do Projeto.",
                 "Tente novamente. Se o problema continuar, reinicie o MyAlbuns.",
             ),
-        },
+        }),
     }
 }
 
@@ -994,6 +1163,7 @@ async fn launch_confirmed_project_with_bindings(
 /// plan. Binding failure stops the batch before any Host side effect; after
 /// that boundary, one Host terminal does not suppress the remaining files.
 async fn launch_activation_batch(
+    app: &AppHandle,
     state: GlobalRuntimeState,
     projects: Vec<PathBuf>,
 ) -> ProjectLaunchOutcome {
@@ -1011,11 +1181,15 @@ async fn launch_activation_batch(
     };
     let mut summary = ActivationBatchSummary::default();
     for project in projects {
-        let outcome = launch_confirmed_project_with_bindings(
+        let outcome = launch_confirmed_project_with_bindings_and_progress(
+            app,
             state.clone(),
             project,
             ConfirmedLaunch::OpenExisting,
             root_bindings.clone(),
+            LaunchProgressKind::Opening,
+            GLOBAL_WINDOW_LABEL,
+            false,
         )
         .await;
         summary.observe(outcome);
@@ -1404,7 +1578,7 @@ async fn listen_for_forwarded_activations(app: AppHandle, state: GlobalRuntimeSt
             Some(ProjectLaunchOutcome::Failed { error })
         } else {
             let _serial = state.activation_serial.lock().await;
-            Some(launch_activation_batch(state.clone(), batch.projects).await)
+            Some(launch_activation_batch(&app, state.clone(), batch.projects).await)
         };
         let exit_was_waiting = primary.complete_activation();
 
@@ -1671,8 +1845,6 @@ pub(crate) fn run(direct_projects: Vec<PathBuf>) -> Result<(), Box<dyn std::erro
         GlobalActivationEntry::Primary(primary) => Arc::new(primary),
     };
     let initial_projects = primary_activation.initial_projects().to_vec();
-    let global_webview_data_directory =
-        app_paths.webview_data_directory(GLOBAL_WEBVIEW_NAMESPACE)?;
     let state = GlobalRuntimeState::new(&app_paths, initial_projects, Some(primary_activation))?;
     let cache_service = CacheService::new(app_paths.clone());
     let setup_state = state.clone();
@@ -1701,8 +1873,10 @@ pub(crate) fn run(direct_projects: Vec<PathBuf>) -> Result<(), Box<dyn std::erro
             // Both configured windows use `create: false`. Install the first
             // owned WebView before setup returns; the page-load terminal then
             // proves that Wry registered it before native policy is applied.
-            let (window, policy_readiness) =
-                build_global_window(&app_handle, global_webview_data_directory.clone())?;
+            let (window, policy_readiness) = build_global_window(
+                &app_handle,
+                setup_state.global_webview_data_directory.clone(),
+            )?;
             let managed_cache_service = app.state::<CacheService>().inner().clone();
             tauri::async_runtime::spawn(initialize_global_runtime(
                 app_handle.clone(),
@@ -1721,6 +1895,7 @@ pub(crate) fn run(direct_projects: Vec<PathBuf>) -> Result<(), Box<dyn std::erro
             complete_graphics_gate,
             crate::native_dialog_window::dismiss_owned_dialog,
             crate::native_dialog_window::owned_window_content_ready,
+            crate::native_dialog_window::resolve_opening_recovery,
             create_project,
             open_project,
             save_external_copy_as,
