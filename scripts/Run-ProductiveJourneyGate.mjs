@@ -1830,6 +1830,60 @@ try {
       })}`,
     );
   }
+
+  const forwardedRecoveryActivationCount = recordsFor(
+    "global_activation_forwarded",
+  ).length;
+  const queuedRecoveryActivationChild = spawn(applicationPath, [projectPath], {
+    cwd: workspace,
+    windowsHide: true,
+    stdio: "ignore",
+    env: recoveryApplicationEnvironment,
+  });
+  await waitForLogEvent(
+    "global_activation_forwarded",
+    forwardedRecoveryActivationCount + 1,
+    "forwarded activation queued behind Recovery",
+  );
+  await waitFor(
+    "forwarded activation process terminal",
+    () =>
+      queuedRecoveryActivationChild.exitCode !== null ||
+      queuedRecoveryActivationChild.signalCode !== null,
+    timeoutMilliseconds,
+  );
+  await delay(300);
+  const targetsWithQueuedActivation = await devToolsTargets(
+    recoveryGlobalDebugPort,
+    "Recovery owner with queued activation",
+  );
+  const recoveryTargetWithQueuedActivation = targetsWithQueuedActivation.find(
+    (target) =>
+      target.id === recoveryTargetSnapshot.recoveryTargets[0].id &&
+      target.url === recoveryTargetSnapshot.recoveryTargets[0].url,
+  );
+  const queuedActivationDialogCount = await recoveryDialogDriver.request(
+    "POST",
+    `/session/${recoveryDialogDriver.sessionId}/execute/sync`,
+    {
+      script:
+        "return document.querySelectorAll('[role=\"dialog\"]').length;",
+      args: [],
+    },
+  );
+  const activeHostsWithQueuedActivation = applicationProcesses().filter(isHost);
+  const singleHostDuringQueuedActivation =
+    activeHostsWithQueuedActivation.length === 1 &&
+    sameProcessInstance(activeHostsWithQueuedActivation[0], secondHost);
+  const queuedActivationPreservedOwner =
+    recoveryTargetWithQueuedActivation !== undefined &&
+    queuedActivationDialogCount === 1 &&
+    aliveProcessInstances([recoveryGlobal, secondHost]).length === 2;
+  if (!queuedActivationPreservedOwner || !singleHostDuringQueuedActivation) {
+    throw new Error(
+      "A forwarded activation replaced the correlated Recovery owner or duplicated its Host",
+    );
+  }
   await click(
     recoveryDialogDriver,
     "xpath",
@@ -2990,6 +3044,8 @@ try {
           stableOpeningOwner:
             recoveryGlobal.processId !== secondHost.processId &&
             recoveryPresentation.externalDialog,
+          queuedActivationPreservedOwner,
+          singleHostDuringQueuedActivation,
         },
         opaqueProjectKey:
           path.basename(recoveryCheckpointPath) === `${originalNamespace}.json` &&
