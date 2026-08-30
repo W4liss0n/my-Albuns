@@ -69,6 +69,12 @@ pub(crate) enum RecoveryContinuationOutcome {
     Deferred,
 }
 
+impl PendingExternalCopyProcess {
+    pub(crate) fn attempt_id(&self) -> &str {
+        &self.request.attempt_id
+    }
+}
+
 impl PendingRecoveryProcess {
     pub(crate) fn attempt_id(&self) -> &str {
         &self.request.attempt_id

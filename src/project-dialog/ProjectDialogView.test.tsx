@@ -185,6 +185,32 @@ test("projects generic operation failures through the standard message dialog", 
   expect(onAction).toHaveBeenCalledWith("dismissProjectOperationFailure");
 });
 
+test("projects a fatal graphics diagnostic through the owned Project dialog", async () => {
+  const user = userEvent.setup();
+  const onAction = vi.fn();
+
+  render(
+    <ProjectDialogView
+      onAction={onAction}
+      state={{
+        kind: "graphicsFailure",
+        reason: "O contexto WebGL2 foi perdido.",
+      }}
+    />,
+  );
+
+  const dialog = screen.getByRole("dialog", {
+    name: "O Canvas não pôde ser iniciado",
+  });
+  expect(within(dialog).getByRole("alert")).toHaveTextContent(
+    "O contexto WebGL2 foi perdido.",
+  );
+  await user.click(
+    within(dialog).getByRole("button", { name: "Fechar Projeto" }),
+  );
+  expect(onAction).toHaveBeenCalledWith("closeProjectAfterGraphicsFailure");
+});
+
 test("projects export success through the standard message dialog", async () => {
   const user = userEvent.setup();
   const onAction = vi.fn();

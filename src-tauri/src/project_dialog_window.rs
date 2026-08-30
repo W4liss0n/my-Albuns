@@ -42,6 +42,9 @@ impl ProjectDialogState {
             Self::ProjectOperationFailure { message } => Self::ProjectOperationFailure {
                 message: bound_text(message),
             },
+            Self::GraphicsFailure { reason } => Self::GraphicsFailure {
+                reason: bound_text(reason),
+            },
             Self::ExportProgress {
                 cancel_requested,
                 cancellable,
@@ -93,6 +96,7 @@ impl ProjectDialogState {
             ),
             Self::ProjectCloseFailure { .. }
             | Self::ProjectOperationFailure { .. }
+            | Self::GraphicsFailure { .. }
             | Self::ExportFailure { .. }
             | Self::ExportSuccess { .. } => (
                 440.0,

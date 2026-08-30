@@ -36,6 +36,7 @@ import { createProjectApplicationMenus } from "./projectApplicationMenus";
 import { useProjectCommandShortcuts } from "./useProjectCommandShortcuts";
 import { useProjectCloseController } from "./useProjectCloseController";
 import { useProjectEditorController } from "./useProjectEditorController";
+import { useProjectGraphicsFailureDialog } from "./useProjectGraphicsFailureDialog";
 import { useProjectOperationFailureDialog } from "./useProjectOperationFailureDialog";
 import { useAlbumInformationApplyController } from "./useAlbumInformationApplyController";
 import { SheetContextMenu } from "./SheetContextMenu";
@@ -65,6 +66,7 @@ interface ProjectWorkspaceProps {
   onRetryUnavailableMedia(mediaId: string): Promise<void>;
   onProjectionChange(projection: EditorProjection): void;
   onGraphicsUnavailable(diagnostic: GraphicsDiagnostic): void;
+  graphicsFailure?: Extract<GraphicsDiagnostic, { supported: false }> | null;
   onPreferencesReady(projectId: string): void;
   workspacePreferences:
     | { kind: "persistent"; port: WorkspacePreferencesPort }
@@ -85,6 +87,7 @@ export function ProjectWorkspace({
   onRetryUnavailableMedia,
   onProjectionChange,
   onGraphicsUnavailable,
+  graphicsFailure = null,
   onPreferencesReady,
   workspacePreferences: workspacePreferencesMode,
 }: ProjectWorkspaceProps) {
@@ -208,9 +211,18 @@ export function ProjectWorkspace({
     onProjectionChange,
     onError: reportCloseError,
   });
+  useProjectGraphicsFailureDialog({
+    closeCancelRevision: projectClose.explicitCancelRevision,
+    diagnostic: graphicsFailure,
+    onCloseProject: projectClose.requestClose,
+    projectDialogPort,
+  });
   const controller = useProjectEditorController({
     interactionBlocked:
-      exportActive || projectClose.interactionBlocked || saveAsBarrierActive,
+      exportActive ||
+      projectClose.interactionBlocked ||
+      saveAsBarrierActive ||
+      graphicsFailure !== null,
     projection,
     runProjectMutation,
     projectCorePort,
@@ -316,7 +328,10 @@ export function ProjectWorkspace({
     exportActive ||
     projectClose.interactionBlocked ||
     albumInformationApply.active ||
-    saveAsBarrierActive;
+    saveAsBarrierActive ||
+    graphicsFailure !== null;
+  const workspaceInteractionBlocked =
+    saveAsBarrierActive || graphicsFailure !== null;
   const sheetOrderSignature = projection.state.album.sheets
     .map((sheet) => sheet.id)
     .join(",");
@@ -557,7 +572,11 @@ export function ProjectWorkspace({
         <ExportPreviewControl
           ref={exportControlRef}
           dialogPort={projectDialogPort}
-          disabled={projectClose.interactionBlocked || saveAsBarrierActive}
+          disabled={
+            projectClose.interactionBlocked ||
+            saveAsBarrierActive ||
+            graphicsFailure !== null
+          }
           exportPipelinePort={exportPipelinePort}
           onActiveChange={setExportActive}
           projectId={projection.state.projectId}
@@ -566,9 +585,9 @@ export function ProjectWorkspace({
       </div>
 
       <div
-        aria-busy={saveAsBarrierActive || undefined}
+        aria-busy={workspaceInteractionBlocked || undefined}
         className="workspace-grid"
-        inert={saveAsBarrierActive}
+        inert={workspaceInteractionBlocked}
         ref={workspacePanels.workspaceRef}
         style={workspaceStyle}
       >

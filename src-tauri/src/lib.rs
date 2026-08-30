@@ -310,7 +310,11 @@ mod tests {
         );
         assert_eq!(
             allowed_commands(&owned_dialog_permission),
-            BTreeSet::from(["owned_window_content_ready", "resolve_opening_recovery"])
+            BTreeSet::from([
+                "owned_window_content_ready",
+                "resolve_opening_external_copy",
+                "resolve_opening_recovery",
+            ])
         );
         assert_eq!(
             allowed_commands(&message_dialog_permission),

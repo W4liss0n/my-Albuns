@@ -17,12 +17,14 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
 use windows::Win32::UI::Input::KeyboardAndMouse::IsWindowEnabled;
 
 use crate::{
-    desktop_webview_policy, global_runtime::GLOBAL_WINDOW_LABEL,
-    ipc_contract::ProjectRecoveryDecision,
+    desktop_webview_policy,
+    global_runtime::GLOBAL_WINDOW_LABEL,
+    ipc_contract::{OpeningExternalCopyDecision, ProjectRecoveryDecision},
 };
 
 const DIALOG_LOAD_TIMEOUT: Duration = Duration::from_secs(5);
 const DIALOG_WIDTH: f64 = 380.0;
+const EXTERNAL_COPY_DIALOG_WIDTH: f64 = 440.0;
 const PROJECT_RECOVERY_DIALOG_WIDTH: f64 = 492.0;
 const OWNED_WINDOW_READY_PARAMETER: &str = "ownedReadyToken";
 pub(crate) const OWNED_WINDOW_TITLEBAR_HEIGHT: f64 = 38.0;
@@ -30,8 +32,12 @@ const OPENING_PROGRESS_LABEL: &str = "dialog-opening-progress";
 const PROJECT_FAILURE_LABEL: &str = "dialog-project-failure";
 static NEXT_OWNED_WINDOW_READY_TOKEN: AtomicU64 = AtomicU64::new(1);
 static OWNED_WINDOW_READINESS: OnceLock<Mutex<OwnedWindowReadinessRegistry>> = OnceLock::new();
-static PROJECT_RECOVERY_DECISIONS: OnceLock<Mutex<ProjectRecoveryDecisionRegistry>> =
-    OnceLock::new();
+static PROJECT_RECOVERY_DECISIONS: OnceLock<
+    Mutex<OpeningDecisionRegistry<ProjectRecoveryDecision>>,
+> = OnceLock::new();
+static EXTERNAL_COPY_DECISIONS: OnceLock<
+    Mutex<OpeningDecisionRegistry<OpeningExternalCopyDecision>>,
+> = OnceLock::new();
 
 #[derive(Default)]
 struct OwnedWindowReadinessRegistry {
@@ -84,19 +90,23 @@ fn cancel_owned_window_readiness(label: &str, token: u64) {
     }
 }
 
-#[derive(Default)]
-struct ProjectRecoveryDecisionRegistry {
-    waiters: HashMap<String, tokio::sync::oneshot::Sender<ProjectRecoveryDecision>>,
+struct OpeningDecisionRegistry<T> {
+    waiters: HashMap<String, tokio::sync::oneshot::Sender<T>>,
 }
 
-impl ProjectRecoveryDecisionRegistry {
-    fn register(
-        &mut self,
-        attempt_id: &str,
-    ) -> io::Result<tokio::sync::oneshot::Receiver<ProjectRecoveryDecision>> {
+impl<T> Default for OpeningDecisionRegistry<T> {
+    fn default() -> Self {
+        Self {
+            waiters: HashMap::new(),
+        }
+    }
+}
+
+impl<T> OpeningDecisionRegistry<T> {
+    fn register(&mut self, attempt_id: &str) -> io::Result<tokio::sync::oneshot::Receiver<T>> {
         if attempt_id.is_empty() || self.waiters.contains_key(attempt_id) {
             return Err(io::Error::other(
-                "the Recovery decision attempt is not available",
+                "the opening decision attempt is not available",
             ));
         }
         let (sender, receiver) = tokio::sync::oneshot::channel();
@@ -104,18 +114,14 @@ impl ProjectRecoveryDecisionRegistry {
         Ok(receiver)
     }
 
-    fn resolve(
-        &mut self,
-        attempt_id: &str,
-        decision: ProjectRecoveryDecision,
-    ) -> Result<(), String> {
+    fn resolve(&mut self, attempt_id: &str, decision: T) -> Result<(), String> {
         let sender = self
             .waiters
             .remove(attempt_id)
-            .ok_or_else(|| "the Recovery decision attempt is not current".to_owned())?;
+            .ok_or_else(|| "the opening decision attempt is not current".to_owned())?;
         sender
             .send(decision)
-            .map_err(|_| "the Recovery decision owner is unavailable".to_owned())
+            .map_err(|_| "the opening decision owner is unavailable".to_owned())
     }
 
     fn cancel(&mut self, attempt_id: &str) {
@@ -123,14 +129,40 @@ impl ProjectRecoveryDecisionRegistry {
     }
 }
 
-fn project_recovery_decisions() -> &'static Mutex<ProjectRecoveryDecisionRegistry> {
-    PROJECT_RECOVERY_DECISIONS
-        .get_or_init(|| Mutex::new(ProjectRecoveryDecisionRegistry::default()))
+fn project_recovery_decisions() -> &'static Mutex<OpeningDecisionRegistry<ProjectRecoveryDecision>>
+{
+    PROJECT_RECOVERY_DECISIONS.get_or_init(|| Mutex::new(OpeningDecisionRegistry::default()))
+}
+
+fn external_copy_decisions() -> &'static Mutex<OpeningDecisionRegistry<OpeningExternalCopyDecision>>
+{
+    EXTERNAL_COPY_DECISIONS.get_or_init(|| Mutex::new(OpeningDecisionRegistry::default()))
 }
 
 fn cancel_project_recovery_decision(attempt_id: &str) {
     if let Ok(mut registry) = project_recovery_decisions().lock() {
         registry.cancel(attempt_id);
+    }
+}
+
+fn cancel_external_copy_decision(attempt_id: &str) {
+    if let Ok(mut registry) = external_copy_decisions().lock() {
+        registry.cancel(attempt_id);
+    }
+}
+
+#[derive(Clone)]
+enum OpeningDecisionAttempt {
+    ExternalCopy(String),
+    Recovery(String),
+}
+
+impl OpeningDecisionAttempt {
+    fn cancel(&self) {
+        match self {
+            Self::ExternalCopy(attempt_id) => cancel_external_copy_decision(attempt_id),
+            Self::Recovery(attempt_id) => cancel_project_recovery_decision(attempt_id),
+        }
     }
 }
 
@@ -154,6 +186,21 @@ pub(crate) fn resolve_opening_recovery(
     project_recovery_decisions()
         .lock()
         .map_err(|_| "the Recovery decision registry is unavailable".to_owned())?
+        .resolve(&attempt_id, decision)
+}
+
+#[tauri::command]
+pub(crate) fn resolve_opening_external_copy(
+    window: WebviewWindow,
+    attempt_id: String,
+    decision: OpeningExternalCopyDecision,
+) -> Result<(), String> {
+    if window.label() != OPENING_PROGRESS_LABEL {
+        return Err("the external-copy decision belongs only to the owned opening dialog".into());
+    }
+    external_copy_decisions()
+        .lock()
+        .map_err(|_| "the external-copy decision registry is unavailable".to_owned())?
         .resolve(&attempt_id, decision)
 }
 
@@ -211,34 +258,73 @@ impl ProjectFailureDialogContext {
 
 pub(crate) struct LaunchProgressDialog {
     closed: bool,
+    decision_attempt: Option<OpeningDecisionAttempt>,
     owner: WebviewWindow,
     owner_presentation: OwnerPresentation,
-    recovery_attempt_id: Option<String>,
     window: WebviewWindow,
 }
 
 impl LaunchProgressDialog {
+    pub(crate) async fn request_external_copy_decision(
+        &mut self,
+        attempt_id: &str,
+    ) -> io::Result<OpeningExternalCopyDecision> {
+        self.ensure_opening_decision_available("the external-copy decision")?;
+        resize_owned_window_width(&self.window, EXTERNAL_COPY_DIALOG_WIDTH)?;
+        let decision_receiver = external_copy_decisions()
+            .lock()
+            .map_err(|_| io::Error::other("the external-copy decision registry is unavailable"))?
+            .register(attempt_id)?;
+        self.request_opening_decision(
+            OpeningDecisionAttempt::ExternalCopy(attempt_id.to_owned()),
+            "external-copy",
+            decision_receiver,
+            "the external-copy decision",
+        )
+        .await
+    }
+
     pub(crate) async fn request_recovery_decision(
         &mut self,
         attempt_id: &str,
     ) -> io::Result<ProjectRecoveryDecision> {
-        if self.owner_presentation != OwnerPresentation::Replace
-            || self.recovery_attempt_id.is_some()
-        {
-            return Err(io::Error::other(
-                "Recovery is unavailable on this launch dialog",
-            ));
-        }
+        self.ensure_opening_decision_available("Recovery")?;
         resize_owned_window_width(&self.window, PROJECT_RECOVERY_DIALOG_WIDTH)?;
         let decision_receiver = project_recovery_decisions()
             .lock()
             .map_err(|_| io::Error::other("the Recovery decision registry is unavailable"))?
             .register(attempt_id)?;
-        self.recovery_attempt_id = Some(attempt_id.to_owned());
-        let destroyed_attempt_id = attempt_id.to_owned();
+        self.request_opening_decision(
+            OpeningDecisionAttempt::Recovery(attempt_id.to_owned()),
+            "project-recovery",
+            decision_receiver,
+            "the Recovery decision",
+        )
+        .await
+    }
+
+    fn ensure_opening_decision_available(&self, name: &str) -> io::Result<()> {
+        if self.owner_presentation != OwnerPresentation::Replace || self.decision_attempt.is_some()
+        {
+            return Err(io::Error::other(format!(
+                "{name} is unavailable on this launch dialog"
+            )));
+        }
+        Ok(())
+    }
+
+    async fn request_opening_decision<T>(
+        &mut self,
+        attempt: OpeningDecisionAttempt,
+        kind: &str,
+        decision_receiver: tokio::sync::oneshot::Receiver<T>,
+        name: &str,
+    ) -> io::Result<T> {
+        self.decision_attempt = Some(attempt.clone());
+        let destroyed_attempt = attempt.clone();
         self.window.on_window_event(move |event| {
             if matches!(event, WindowEvent::Destroyed) {
-                cancel_project_recovery_decision(&destroyed_attempt_id);
+                destroyed_attempt.cancel();
             }
         });
 
@@ -249,13 +335,15 @@ impl LaunchProgressDialog {
         let mut url = self.window.url().map_err(io::Error::other)?;
         url.set_path("/dialog.html");
         url.set_query(Some(&format!(
-            "kind=project-recovery&attemptId={}&{OWNED_WINDOW_READY_PARAMETER}={ready_token}",
-            encode_unbounded_component(attempt_id),
+            "kind={kind}&attemptId={}&{OWNED_WINDOW_READY_PARAMETER}={ready_token}",
+            encode_unbounded_component(match &attempt {
+                OpeningDecisionAttempt::ExternalCopy(attempt_id)
+                | OpeningDecisionAttempt::Recovery(attempt_id) => attempt_id,
+            }),
         )));
         if let Err(error) = self.window.navigate(url) {
             cancel_owned_window_readiness(self.window.label(), ready_token);
-            cancel_project_recovery_decision(attempt_id);
-            self.recovery_attempt_id = None;
+            self.cancel_opening_decision();
             return Err(io::Error::other(error));
         }
 
@@ -264,33 +352,39 @@ impl LaunchProgressDialog {
         match ready {
             Ok(Ok(())) => {}
             Ok(Err(_)) => {
-                cancel_project_recovery_decision(attempt_id);
-                self.recovery_attempt_id = None;
-                return Err(io::Error::other(
-                    "the Recovery dialog readiness became unavailable",
-                ));
+                self.cancel_opening_decision();
+                return Err(io::Error::other(format!(
+                    "{name} dialog readiness became unavailable"
+                )));
             }
             Err(_) => {
-                cancel_project_recovery_decision(attempt_id);
-                self.recovery_attempt_id = None;
+                self.cancel_opening_decision();
                 return Err(io::Error::new(
                     io::ErrorKind::TimedOut,
-                    "the Recovery dialog did not become ready",
+                    format!("{name} dialog did not become ready"),
                 ));
             }
         }
 
         let decision = decision_receiver.await.map_err(|_| {
-            io::Error::other("the Recovery dialog closed without a terminal decision")
-        })?;
-        self.recovery_attempt_id = None;
-        Ok(decision)
+            io::Error::other(format!("{name} dialog closed without a terminal decision"))
+        });
+        self.decision_attempt = None;
+        decision
+    }
+
+    fn cancel_opening_decision(&mut self) {
+        if let Some(attempt) = self.decision_attempt.take() {
+            attempt.cancel();
+        }
+    }
+
+    pub(crate) fn decision_window(&self) -> WebviewWindow {
+        self.window.clone()
     }
 
     pub(crate) fn finish(mut self, restore_owner_window: bool) {
-        if let Some(attempt_id) = self.recovery_attempt_id.take() {
-            cancel_project_recovery_decision(&attempt_id);
-        }
+        self.cancel_opening_decision();
         match self.owner_presentation {
             OwnerPresentation::Replace if restore_owner_window => {
                 let _ = self.window.destroy();
@@ -321,9 +415,7 @@ fn resize_owned_window_width(window: &WebviewWindow, width: f64) -> io::Result<(
 
 impl Drop for LaunchProgressDialog {
     fn drop(&mut self) {
-        if let Some(attempt_id) = self.recovery_attempt_id.take() {
-            cancel_project_recovery_decision(&attempt_id);
-        }
+        self.cancel_opening_decision();
         if !self.closed {
             match self.owner_presentation {
                 OwnerPresentation::BlockedBehindDialog => {
@@ -366,9 +458,9 @@ pub(crate) async fn show_launch_progress(
     }
     Ok(LaunchProgressDialog {
         closed: false,
+        decision_attempt: None,
         owner,
         owner_presentation,
-        recovery_attempt_id: None,
         window,
     })
 }
@@ -1039,7 +1131,7 @@ mod tests {
 
     #[test]
     fn recovery_decision_registry_accepts_one_terminal_for_the_exact_attempt() {
-        let mut registry = ProjectRecoveryDecisionRegistry::default();
+        let mut registry = OpeningDecisionRegistry::<ProjectRecoveryDecision>::default();
         let mut decision = registry
             .register("attempt-17")
             .expect("the first exact attempt is registered");
@@ -1071,7 +1163,7 @@ mod tests {
 
     #[test]
     fn cancelling_recovery_closes_the_pending_decision_without_a_fallback_choice() {
-        let mut registry = ProjectRecoveryDecisionRegistry::default();
+        let mut registry = OpeningDecisionRegistry::<ProjectRecoveryDecision>::default();
         let mut decision = registry
             .register("attempt-19")
             .expect("the attempt is registered");
@@ -1081,6 +1173,35 @@ mod tests {
         assert_eq!(
             decision.try_recv(),
             Err(tokio::sync::oneshot::error::TryRecvError::Closed)
+        );
+    }
+
+    #[test]
+    fn external_copy_decision_registry_is_distinct_and_exactly_correlated() {
+        let mut registry = OpeningDecisionRegistry::<OpeningExternalCopyDecision>::default();
+        let mut decision = registry
+            .register("external-attempt-7")
+            .expect("the external-copy attempt is registered");
+
+        assert!(
+            registry
+                .resolve("external-attempt-8", OpeningExternalCopyDecision::Cancel)
+                .is_err()
+        );
+        registry
+            .resolve(
+                "external-attempt-7",
+                OpeningExternalCopyDecision::SaveCopyAs,
+            )
+            .expect("the exact opening dialog resolves the attempt");
+        assert_eq!(
+            decision.try_recv(),
+            Ok(OpeningExternalCopyDecision::SaveCopyAs)
+        );
+        assert!(
+            registry
+                .resolve("external-attempt-7", OpeningExternalCopyDecision::Cancel)
+                .is_err()
         );
     }
 

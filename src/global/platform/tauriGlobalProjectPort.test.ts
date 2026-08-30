@@ -272,7 +272,6 @@ test.each([
 test.each([
   "opened",
   "focused",
-  "externalCopyNotWritable",
   "cancelled",
 ] as const)(
   "opens through the native backend and returns the exact %s terminal",
@@ -285,15 +284,6 @@ test.each([
     expect(invoke).toHaveBeenCalledWith("open_project");
   },
 );
-
-test("requests Salvar cópia como without exposing source or destination paths", async () => {
-  vi.mocked(invoke).mockResolvedValueOnce({ status: "cancelled" });
-
-  await expect(
-    tauriGlobalProjectPort.saveExternalCopyAs(),
-  ).resolves.toEqual({ status: "cancelled" });
-  expect(invoke).toHaveBeenCalledWith("save_external_copy_as");
-});
 
 test("keeps an actionable structured backend failure inside the application port", async () => {
   vi.mocked(invoke).mockResolvedValueOnce({
@@ -442,7 +432,7 @@ test("subscribes before snapshotting and delivers each activation terminal once"
     },
   });
 
-  emit({ sequence: 1, outcome: { status: "externalCopyNotWritable" } });
+  emit({ sequence: 1, outcome: { status: "cancelled" } });
   emit({
     sequence: 2,
     outcome: {
@@ -453,11 +443,11 @@ test("subscribes before snapshotting and delivers each activation terminal once"
       },
     },
   });
-  emit({ sequence: 3, outcome: { status: "externalCopyNotWritable" } });
+  emit({ sequence: 3, outcome: { status: "cancelled" } });
 
   expect(listener).toHaveBeenCalledTimes(2);
   expect(listener).toHaveBeenLastCalledWith({
-    status: "externalCopyNotWritable",
+    status: "cancelled",
   });
 });
 
@@ -468,7 +458,7 @@ test("does not let a stale snapshot overwrite an event received during subscript
     handler({
       payload: {
         sequence: 3,
-        outcome: { status: "externalCopyNotWritable" },
+        outcome: { status: "cancelled" },
       },
     } as never);
     return unlisten;
@@ -488,7 +478,7 @@ test("does not let a stale snapshot overwrite an event received during subscript
 
   expect(listener).toHaveBeenCalledOnce();
   expect(listener).toHaveBeenCalledWith({
-    status: "externalCopyNotWritable",
+    status: "cancelled",
   });
 });
 
@@ -503,7 +493,7 @@ test("fails closed on malformed activation terminal payloads", async () => {
   vi.mocked(invoke).mockResolvedValueOnce(null);
 
   await tauriGlobalProjectPort.onActivationTerminal(listener);
-  emit({ sequence: 0, outcome: { status: "externalCopyNotWritable" } });
+  emit({ sequence: 1, outcome: { status: "externalCopyNotWritable" } });
   emit({ sequence: 1, outcome: { status: "failed" } });
   emit({
     sequence: 2,

@@ -104,6 +104,26 @@ export function ProjectDialogView({
         />
       );
 
+    case "graphicsFailure":
+      return (
+        <MessageDialog
+          description={
+            <>
+              <p>{state.reason}</p>
+              <p>
+                O editor não continuará sem WebGL2 acelerado por hardware.
+              </p>
+            </>
+          }
+          secondaryAction={{
+            label: "Fechar Projeto",
+            onClick: () => onAction("closeProjectAfterGraphicsFailure"),
+          }}
+          title="O Canvas não pôde ser iniciado"
+          tone="error"
+        />
+      );
+
     case "exportProgress":
       return (
         <ProgressDialog
