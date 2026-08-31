@@ -5,6 +5,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot 'Local-Toolchain.ps1')
+. (Join-Path $PSScriptRoot 'Local-TauriBuild.ps1')
 . (Join-Path $PSScriptRoot 'Gate-SourceProvenance.ps1')
 . (Join-Path $PSScriptRoot 'Gate-ScratchDirectory.ps1')
 . (Join-Path $PSScriptRoot 'Gate-OwnedProcessJob.ps1')
@@ -69,15 +70,8 @@ try {
         Remove-Item -LiteralPath $applicationPath -Force
     }
 
-    & (Join-Path $PSScriptRoot 'Prepare-Sidecar.ps1') -Profile debug
-    if ($LASTEXITCODE -ne 0) {
-        throw "The focused debug Processor build failed with exit code $LASTEXITCODE."
-    }
-    $tauri = Join-Path $workspaceRoot 'node_modules\.bin\tauri.cmd'
-    if (-not (Test-Path -LiteralPath $tauri -PathType Leaf)) {
-        throw 'The local Tauri CLI does not exist. Run npm run setup:local.'
-    }
-    & $tauri build --debug --no-bundle
+    Invoke-MyAlbunsTauriBuild `
+        -TauriArguments @('--debug', '--no-bundle')
     if ($LASTEXITCODE -ne 0) {
         throw "The focused debug Tauri build failed with exit code $LASTEXITCODE."
     }
@@ -86,15 +80,8 @@ try {
         throw 'The focused debug Tauri build did not produce the desktop application.'
     }
     $applicationFile = Get-Item -LiteralPath $applicationPath
-    Push-Location $workspaceRoot
-    try {
-        $applicationRelativePath = (
-            Resolve-Path -LiteralPath $applicationPath -Relative
-        ).Replace('\', '/')
-    }
-    finally {
-        Pop-Location
-    }
+    $applicationRelativePath = Resolve-MyAlbunsWorkspaceRelativePath `
+        -Path $applicationPath
     $applicationArtifact = [ordered]@{
         buildMode = 'tauri-debug-custom-protocol'
         path = $applicationPath
