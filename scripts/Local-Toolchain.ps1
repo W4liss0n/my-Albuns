@@ -1,6 +1,16 @@
 . (Join-Path $PSScriptRoot 'Rust-Toolchain.ps1')
 
 function Initialize-MyAlbunsToolchain {
+    # Bypass an inherited PowerShell 7 module path before Windows PowerShell
+    # autoload resolves its incompatible Microsoft.PowerShell.Utility module.
+    $utilityModuleManifest = Join-Path `
+        $PSHOME `
+        'Modules\Microsoft.PowerShell.Utility\Microsoft.PowerShell.Utility.psd1'
+    Import-Module `
+        -Name $utilityModuleManifest `
+        -Global `
+        -ErrorAction Stop
+
     $script:WorkspaceRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
     $script:RustToolchain = Get-MyAlbunsRustToolchain -WorkspaceRoot $script:WorkspaceRoot
     $script:ToolRoot = Join-Path $script:WorkspaceRoot '.tools'
