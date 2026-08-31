@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -14,6 +14,39 @@ const workspace = path.resolve(scripts, "..");
 
 function source(name) {
   return readFileSync(path.join(scripts, name), "utf8");
+}
+
+function resolveCargoTargetDirectory(cargoTargetDirectory) {
+  const environment = { ...process.env };
+  for (const name of Object.keys(environment)) {
+    if (name.toUpperCase() === "CARGO_TARGET_DIR") delete environment[name];
+  }
+  if (cargoTargetDirectory !== undefined) {
+    environment.CARGO_TARGET_DIR = cargoTargetDirectory;
+  }
+  environment.MYALBUNS_GATE_WORKSPACE = workspace;
+  const result = spawnSync(
+    "powershell.exe",
+    [
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      String.raw`
+$ErrorActionPreference = 'Stop'
+. (Join-Path $env:MYALBUNS_GATE_WORKSPACE 'scripts\Local-Toolchain.ps1')
+$script:WorkspaceRoot = [System.IO.Path]::GetFullPath($env:MYALBUNS_GATE_WORKSPACE)
+[Console]::Out.Write((Resolve-MyAlbunsCargoTargetDirectory))
+`,
+    ],
+    {
+      cwd: workspace,
+      encoding: "utf8",
+      env: environment,
+      windowsHide: true,
+    },
+  );
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  return path.normalize(result.stdout.trim());
 }
 
 const hiddenOwnedWindowFixture = String.raw`
@@ -136,6 +169,38 @@ test("the wrapper builds and fingerprints the exact custom-protocol debug applic
   assert.match(wrapper, /applicationArtifact/u);
 });
 
+test("the focused artifact follows the canonical Cargo target directory", () => {
+  const absoluteTarget = path.join(workspace, ".scratch", "absolute-target");
+
+  assert.equal(
+    resolveCargoTargetDirectory(undefined),
+    path.join(workspace, "target"),
+  );
+  assert.equal(
+    resolveCargoTargetDirectory(absoluteTarget),
+    absoluteTarget,
+  );
+  assert.equal(
+    resolveCargoTargetDirectory(path.join(".scratch", "relative-target")),
+    path.join(workspace, ".scratch", "relative-target"),
+  );
+
+  const wrapper = source("Test-FocusedOwnedDialogGate.ps1");
+  assert.match(
+    wrapper,
+    /\$cargoTargetDirectory = Resolve-MyAlbunsCargoTargetDirectory/u,
+  );
+  assert.match(
+    wrapper,
+    /\$applicationPath = Join-Path\s+`\s*\n\s*\$cargoTargetDirectory\s+`\s*\n\s*'debug\\myalbuns-desktop\.exe'/u,
+  );
+  assert.match(wrapper, /path = \$applicationPath/u);
+  assert.doesNotMatch(
+    wrapper,
+    /relativePath = 'target\/debug\/myalbuns-desktop\.exe'/u,
+  );
+});
+
 test("external-copy readiness requires dispatch and its public terminal", async () => {
   const { confirmExternalCopyActivationLifecycle } = await import(
     "./FocusedOwnedDialogEvidence.mjs"
@@ -144,43 +209,81 @@ test("external-copy readiness requires dispatch and its public terminal", async 
     creationTimeUtc: "2026-08-31T02:00:01.000Z",
     processId: 4100,
   };
-  const terminal = {
+  const correlatedTerminal = {
+    attempt_id: "attempt-1",
+    event: "external_copy_activation_terminal",
+    host_process_id: 4100,
+    outcome: "cancelled",
+    timestamp: "2026-08-31T02:00:02.000Z",
+  };
+  const activationTerminal = {
     event: "global_activation_batch_completed",
     failed_count: 1,
     focused_count: 0,
     opened_count: 0,
     project_count: 1,
-    timestamp: "2026-08-31T02:00:02.000Z",
+    timestamp: "2026-08-31T02:00:03.000Z",
+  };
+  const evidence = {
+    activationTerminals: [activationTerminal],
+    attemptId: "attempt-1",
+    correlatedTerminals: [correlatedTerminal],
+    pendingHost: host,
   };
 
   assert.deepEqual(
-    confirmExternalCopyActivationLifecycle({
-      attemptId: "attempt-1",
-      pendingHost: host,
-      terminal,
-    }),
+    confirmExternalCopyActivationLifecycle(evidence),
     {
       activationDispatched: true,
+      hostCorrelated: true,
       publicTerminalObserved: true,
     },
   );
   assert.throws(
     () =>
       confirmExternalCopyActivationLifecycle({
-        attemptId: "attempt-1",
-        pendingHost: host,
-        terminal: undefined,
+        ...evidence,
+        correlatedTerminals: [
+          { ...correlatedTerminal, attempt_id: "another-attempt" },
+        ],
       }),
-    /terminal/u,
+    /attempt/u,
   );
   assert.throws(
     () =>
       confirmExternalCopyActivationLifecycle({
-        attemptId: "attempt-1",
-        pendingHost: host,
-        terminal: { ...terminal, timestamp: "2026-08-31T02:00:00.000Z" },
+        ...evidence,
+        correlatedTerminals: [
+          { ...correlatedTerminal, host_process_id: 4200 },
+        ],
       }),
-    /before the pending Host/u,
+    /Host/u,
+  );
+  assert.throws(
+    () =>
+      confirmExternalCopyActivationLifecycle({
+        ...evidence,
+        correlatedTerminals: [correlatedTerminal, correlatedTerminal],
+      }),
+    /exactly one correlated terminal/u,
+  );
+  assert.throws(
+    () =>
+      confirmExternalCopyActivationLifecycle({
+        ...evidence,
+        activationTerminals: [activationTerminal, activationTerminal],
+      }),
+    /exactly one activation terminal/u,
+  );
+  assert.throws(
+    () =>
+      confirmExternalCopyActivationLifecycle({
+        ...evidence,
+        correlatedTerminals: [
+          { ...correlatedTerminal, timestamp: host.creationTimeUtc },
+        ],
+      }),
+    /strictly after the pending Host/u,
   );
 
   const runner = source("Run-FocusedOwnedDialogGate.mjs");
@@ -193,7 +296,7 @@ test("external-copy readiness requires dispatch and its public terminal", async 
   );
   const scenario = runner.slice(scenarioStart, scenarioEnd);
   const terminalObservation = scenario.indexOf(
-    '"global_activation_batch_completed"',
+    '"external_copy_activation_terminal"',
   );
   const lifecycleConfirmation = scenario.indexOf(
     "confirmExternalCopyActivationLifecycle",
@@ -205,6 +308,43 @@ test("external-copy readiness requires dispatch and its public terminal", async 
       terminalObservation < lifecycleConfirmation &&
       lifecycleConfirmation < readyReturn,
   );
+  assert.match(scenario, /\.slice\(correlatedTerminalCount\)/u);
+  assert.match(scenario, /\.slice\(activationTerminalCount\)/u);
+  assert.doesNotMatch(scenario, /\.at\(-1\)/u);
+});
+
+test("Global publishes the exact external-copy attempt and Host terminal", () => {
+  const runtime = readFileSync(
+    path.join(workspace, "src-tauri", "src", "global_runtime.rs"),
+    "utf8",
+  );
+  const supervisor = readFileSync(
+    path.join(
+      workspace,
+      "src-tauri",
+      "src",
+      "project_bootstrap",
+      "supervisor.rs",
+    ),
+    "utf8",
+  );
+  const cancellationStart = runtime.indexOf(
+    "OpeningExternalCopyDecision::Cancel =>",
+  );
+  const saveCopyStart = runtime.indexOf(
+    "OpeningExternalCopyDecision::SaveCopyAs =>",
+    cancellationStart,
+  );
+  const cancellation = runtime.slice(cancellationStart, saveCopyStart);
+
+  assert.match(
+    supervisor,
+    /pub\(crate\) fn host_process_id\(&mut self\) -> u32/u,
+  );
+  assert.match(cancellation, /host_process_id = pending\.host_process_id\(\)/u);
+  assert.match(cancellation, /attempt_id = %attempt_id/u);
+  assert.match(cancellation, /host_process_id/u);
+  assert.match(cancellation, /event = "external_copy_activation_terminal"/u);
 });
 
 test("external-copy discovery observes its public decision before sampling the pending Host", () => {

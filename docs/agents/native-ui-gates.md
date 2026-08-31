@@ -11,8 +11,15 @@ failure. A failed visible run is diagnosed from its retained log and headless
 seams before another visible run is authorized.
 
 The focused gate builds its own debug Tauri `custom-protocol` application and
-records that executable's SHA-256. A plain `cargo build` is a development-server
-artifact and cannot satisfy the gate's source provenance.
+records that executable's canonical path and SHA-256. The path follows the
+repository's `CARGO_TARGET_DIR` resolver for default, absolute, and relative
+values. A plain `cargo build` is a development-server artifact and cannot
+satisfy the gate's source provenance.
+
+The external-copy scenario completes only after one public terminal correlates
+the dialog attempt to the exact pending Host process and one subsequent Global
+activation terminal closes that batch. Missing, additional, or mismatched
+records fail closed.
 
 Run the full productive journey only for integration, release, or with explicit
 permission. The focused gate neither imports nor invokes that journey and is not
