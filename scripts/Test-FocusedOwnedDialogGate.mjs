@@ -331,6 +331,13 @@ test("the wrapper builds and fingerprints the exact custom-protocol debug applic
 
 test("the focused gate excludes only its retained evidence root from source provenance", () => {
   const wrapper = source("Test-FocusedOwnedDialogGate.ps1");
+  const retainedRootValidation = wrapper.indexOf(
+    "Resolve-GateRetainedEvidenceRoot",
+  );
+  const timestampDerivation = wrapper.indexOf("$stamp =");
+  const evidenceChildCreation = wrapper.indexOf(
+    "New-Item -ItemType Directory -Force -Path $evidenceDirectory",
+  );
 
   assert.match(
     wrapper,
@@ -338,11 +345,16 @@ test("the focused gate excludes only its retained evidence root from source prov
   );
   assert.equal(
     wrapper.match(/-RetainedEvidenceRoot \$retainedEvidenceRoot/gu)?.length,
-    2,
+    3,
   );
   assert.doesNotMatch(
     wrapper,
     /-RetainedEvidenceRoot \$(?:scratchParent|workspaceRoot)/u,
+  );
+  assert.ok(
+    retainedRootValidation !== -1 &&
+      retainedRootValidation < timestampDerivation &&
+      retainedRootValidation < evidenceChildCreation,
   );
 });
 

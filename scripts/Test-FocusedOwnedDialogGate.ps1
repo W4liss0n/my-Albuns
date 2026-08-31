@@ -26,6 +26,9 @@ $retainedEvidenceRoot = [System.IO.Path]::GetFullPath(
     (Join-Path $scratchParent 'focused-owned-dialog-evidence')
 )
 New-Item -ItemType Directory -Force -Path $retainedEvidenceRoot | Out-Null
+$null = Resolve-GateRetainedEvidenceRoot `
+    -GitRoot $workspaceRoot `
+    -RetainedEvidenceRoot $retainedEvidenceRoot
 $runRoot = [System.IO.Path]::GetFullPath(
     (Join-Path `
         $scratchParent `

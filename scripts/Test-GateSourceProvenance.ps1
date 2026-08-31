@@ -158,6 +158,64 @@ try {
             -Path $junctionTarget `
             -AllowedParent $scratchRoot
     }
+
+    $rootJunctionTarget = Join-Path `
+        $scratchRoot `
+        "gate-source-provenance-root-target-$PID-$([Guid]::NewGuid().ToString('N'))"
+    $rootJunctionPath = Join-Path $fixtureRoot '.scratch\junction-evidence-root'
+    try {
+        New-Item -ItemType Directory -Force -Path $rootJunctionTarget | Out-Null
+        $sentinelPath = Join-Path $rootJunctionTarget 'sentinel.bin'
+        $sentinelBytes = [byte[]]@(17, 31, 63, 127, 251)
+        [System.IO.File]::WriteAllBytes($sentinelPath, $sentinelBytes)
+        New-Item `
+            -ItemType Junction `
+            -Path $rootJunctionPath `
+            -Target $rootJunctionTarget |
+            Out-Null
+        $entriesBefore = @(
+            Get-ChildItem -LiteralPath $rootJunctionTarget -Force |
+                Select-Object -ExpandProperty Name
+        )
+        $rootJunctionFailure = $null
+        try {
+            New-Item `
+                -ItemType Directory `
+                -Force `
+                -Path $rootJunctionPath |
+                Out-Null
+            Resolve-GateRetainedEvidenceRoot `
+                -GitRoot $fixtureRoot `
+                -RetainedEvidenceRoot $rootJunctionPath |
+                Out-Null
+            New-Item `
+                -ItemType Directory `
+                -Path (Join-Path $rootJunctionPath 'unexpected-child') |
+                Out-Null
+        }
+        catch {
+            $rootJunctionFailure = $_.Exception.Message
+        }
+        $entriesAfter = @(
+            Get-ChildItem -LiteralPath $rootJunctionTarget -Force |
+                Select-Object -ExpandProperty Name
+        )
+        if ($rootJunctionFailure -notmatch 'reparse point' `
+                -or [System.IO.File]::ReadAllBytes($sentinelPath).Count -ne $sentinelBytes.Count `
+                -or (Compare-Object $sentinelBytes ([System.IO.File]::ReadAllBytes($sentinelPath))) `
+                -or (Compare-Object $entriesBefore $entriesAfter) `
+                -or (Test-Path -LiteralPath (Join-Path $rootJunctionTarget 'unexpected-child'))) {
+            throw 'A retained evidence root junction was mutated before failing closed.'
+        }
+    }
+    finally {
+        if (Test-Path -LiteralPath $rootJunctionPath) {
+            [System.IO.Directory]::Delete($rootJunctionPath)
+        }
+        Remove-GateScratchDirectory `
+            -Path $rootJunctionTarget `
+            -AllowedParent $scratchRoot
+    }
     Remove-GateScratchDirectory `
         -Path $retainedEvidenceRoot `
         -AllowedParent (Split-Path -Parent $retainedEvidenceRoot)
@@ -325,7 +383,7 @@ try {
         throw 'A runner-shaped cleanup did not restore a clean evidence input tree.'
     }
 
-    Write-Output 'Gate source provenance: 15 assertions passed.'
+    Write-Output 'Gate source provenance: 16 assertions passed.'
 }
 finally {
     Remove-GateScratchDirectory `
