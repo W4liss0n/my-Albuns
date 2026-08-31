@@ -195,26 +195,54 @@ export async function switchToWebDriverWindow(
 ) {
   const deadline = Date.now() + timeoutMilliseconds;
   let handles = [];
-  do {
+  discovery: while (Date.now() < deadline) {
+    let remainingMilliseconds = deadline - Date.now();
+    if (remainingMilliseconds <= 0) break;
     handles = await driver.request(
       "GET",
       `/session/${driver.sessionId}/window/handles`,
+      undefined,
+      remainingMilliseconds,
     );
     for (const handle of handles) {
-      await driver.request("POST", `/session/${driver.sessionId}/window`, {
-        handle,
-      });
-      const url = await driver.request(
-        "POST",
-        `/session/${driver.sessionId}/execute/sync`,
-        { script: "return window.location.href;", args: [] },
-      );
+      let url;
+      try {
+        remainingMilliseconds = deadline - Date.now();
+        if (remainingMilliseconds <= 0) break discovery;
+        await driver.request(
+          "POST",
+          `/session/${driver.sessionId}/window`,
+          { handle },
+          remainingMilliseconds,
+        );
+        remainingMilliseconds = deadline - Date.now();
+        if (remainingMilliseconds <= 0) break discovery;
+        url = await driver.request(
+          "POST",
+          `/session/${driver.sessionId}/execute/sync`,
+          { script: "return window.location.href;", args: [] },
+          remainingMilliseconds,
+        );
+      } catch (error) {
+        if (!hasWebDriverError(error, "no such window")) throw error;
+        continue;
+      }
       if (predicate(url)) return { handle, url };
     }
-    if (Date.now() >= deadline) break;
-    await delay(50);
-  } while (true);
+    remainingMilliseconds = deadline - Date.now();
+    if (remainingMilliseconds <= 0) break;
+    await delay(Math.min(50, remainingMilliseconds));
+  }
   throw new Error(`${label} was not found among ${handles.length} WebViews`);
+}
+
+function hasWebDriverError(error, expectedError) {
+  let current = error;
+  while (current && typeof current === "object") {
+    if (current.webDriverError === expectedError) return true;
+    current = current.cause;
+  }
+  return false;
 }
 
 function probeTcpPort(port) {
@@ -254,9 +282,14 @@ export function createWebDriverClient(
     const text = await response.text();
     const payload = text ? JSON.parse(text) : { value: null };
     if (!response.ok || payload.value?.error) {
-      throw new Error(
+      const error = new Error(
         `${method} ${endpoint} failed (${response.status}): ${JSON.stringify(payload)}`,
       );
+      error.name = "WebDriverProtocolError";
+      error.httpStatus = response.status;
+      error.payload = payload;
+      error.webDriverError = payload.value?.error;
+      throw error;
     }
     return payload.value;
   };

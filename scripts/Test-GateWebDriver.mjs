@@ -91,7 +91,12 @@ test("uses the shared bounded W3C response contract", async () => {
     assert.deepEqual(await request("GET", "/status"), {
       sessionId: "session-01",
     });
-    await assert.rejects(request("POST", "/error", {}), /invalid argument/);
+    const protocolError = await request("POST", "/error", {}).then(
+      () => undefined,
+      (error) => error,
+    );
+    assert.match(protocolError.message, /invalid argument/);
+    assert.equal(protocolError.webDriverError, "invalid argument");
     await assert.rejects(request("GET", "/slow", undefined, 25), {
       name: "TimeoutError",
     });
@@ -188,4 +193,120 @@ test("resamples an owned dialog after a stale WebDriver window snapshot", async 
   });
   assert.equal(handleReadCount, 2);
   assert.equal(urlReadCount, 2);
+});
+
+test("resamples after a window closes between handle discovery and switch", async () => {
+  const noSuchWindow = Object.assign(new Error("the handle closed"), {
+    webDriverError: "no such window",
+  });
+  const wrappedNoSuchWindow = new Error("the WebDriver switch failed", {
+    cause: noSuchWindow,
+  });
+  let currentHandle;
+  let handleReadCount = 0;
+  const driver = {
+    sessionId: "session-01",
+    async request(method, endpoint, body) {
+      if (method === "GET" && endpoint.endsWith("/window/handles")) {
+        handleReadCount += 1;
+        return handleReadCount === 1 ? ["closed"] : ["target"];
+      }
+      if (method === "POST" && endpoint.endsWith("/window")) {
+        if (body.handle === "closed") throw wrappedNoSuchWindow;
+        currentHandle = body.handle;
+        return null;
+      }
+      if (method === "POST" && endpoint.endsWith("/execute/sync")) {
+        assert.equal(currentHandle, "target");
+        return "tauri://localhost/project-dialog.html";
+      }
+      throw new Error(`unexpected WebDriver request: ${method} ${endpoint}`);
+    },
+  };
+
+  const selected = await switchToWebDriverWindow(
+    driver,
+    (url) => new URL(url).pathname.endsWith("/project-dialog.html"),
+    "graphics Project dialog",
+    500,
+  );
+
+  assert.deepEqual(selected, {
+    handle: "target",
+    url: "tauri://localhost/project-dialog.html",
+  });
+  assert.equal(handleReadCount, 2);
+});
+
+test("limits every WebDriver request to the remaining discovery budget", async () => {
+  const observedTimeouts = [];
+  const driver = {
+    sessionId: "session-01",
+    async request(_method, _endpoint, _body, timeoutMilliseconds) {
+      observedTimeouts.push(timeoutMilliseconds);
+      await new Promise((_resolve, reject) =>
+        setTimeout(
+          () =>
+            reject(
+              Object.assign(new Error("request timed out"), {
+                name: "TimeoutError",
+              }),
+            ),
+          timeoutMilliseconds ?? 500,
+        ),
+      );
+    },
+  };
+  const startedAt = performance.now();
+
+  await assert.rejects(
+    switchToWebDriverWindow(
+      driver,
+      () => false,
+      "slow Project dialog",
+      30,
+    ),
+    { name: "TimeoutError" },
+  );
+
+  assert.ok(performance.now() - startedAt < 200);
+  assert.ok(
+    observedTimeouts.every(
+      (timeout) => Number.isFinite(timeout) && timeout > 0 && timeout <= 30,
+    ),
+  );
+});
+
+test("fails immediately on a non-transient WebDriver protocol error", async () => {
+  const protocolError = Object.assign(new Error("invalid handle"), {
+    webDriverError: "invalid argument",
+  });
+  const wrappedProtocolError = new Error("the WebDriver switch failed", {
+    cause: protocolError,
+  });
+  let handleReadCount = 0;
+  const driver = {
+    sessionId: "session-01",
+    async request(method, endpoint) {
+      if (method === "GET" && endpoint.endsWith("/window/handles")) {
+        handleReadCount += 1;
+        return ["invalid"];
+      }
+      throw wrappedProtocolError;
+    },
+  };
+  const startedAt = performance.now();
+
+  await assert.rejects(
+    switchToWebDriverWindow(
+      driver,
+      () => false,
+      "invalid Project dialog",
+      5_000,
+    ),
+    (error) => error === wrappedProtocolError,
+  );
+
+  assert.equal(handleReadCount, 1);
+  assert.ok(performance.now() - startedAt < 200);
 });
