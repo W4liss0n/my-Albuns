@@ -850,7 +850,19 @@ async fn launch_confirmed_project_with_bindings_and_progress(
                 };
                 match decision {
                     OpeningExternalCopyDecision::Cancel => {
-                        drop(pending.take());
+                        let mut pending = pending
+                            .take()
+                            .expect("the exact pending Host is cancelled once");
+                        let host_process_id = pending.host_process_id();
+                        drop(pending);
+                        tracing::info!(
+                            target: "myalbuns.desktop",
+                            process_role = ProcessRole::Global.as_str(),
+                            attempt_id = %attempt_id,
+                            host_process_id,
+                            outcome = "cancelled",
+                            event = "external_copy_activation_terminal",
+                        );
                         break (ProjectLaunchOutcome::Cancelled, true);
                     }
                     OpeningExternalCopyDecision::SaveCopyAs => {

@@ -265,6 +265,9 @@ function projectOwnerIsBlocked(state) {
 }
 
 async function observeExternalCopyScenario() {
+  const correlatedTerminalCount = recordsFor(
+    "external_copy_activation_terminal",
+  ).length;
   const activationTerminalCount = recordsFor(
     "global_activation_batch_completed",
   ).length;
@@ -465,15 +468,27 @@ async function observeExternalCopyScenario() {
     );
     driver = await disposeConfirmedWebDriver(driver);
     await waitForExit(hostInstance, "external-copy pending Host cleanup");
-    const activationTerminals = await waitForLogEvent(
+    await waitForLogEvent(
+      "external_copy_activation_terminal",
+      correlatedTerminalCount + 1,
+      "external-copy correlated activation terminal",
+    );
+    await waitForLogEvent(
       "global_activation_batch_completed",
       activationTerminalCount + 1,
       "external-copy public activation terminal",
     );
+    const correlatedTerminals = recordsFor(
+      "external_copy_activation_terminal",
+    ).slice(correlatedTerminalCount);
+    const activationTerminals = recordsFor(
+      "global_activation_batch_completed",
+    ).slice(activationTerminalCount);
     const activationLifecycle = confirmExternalCopyActivationLifecycle({
+      activationTerminals,
       attemptId,
+      correlatedTerminals,
       pendingHost: hostInstance,
-      terminal: activationTerminals.at(-1),
     });
     const restoredOwner = await waitForNativeWindowState(
       "external-copy Global restoration",

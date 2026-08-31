@@ -73,6 +73,10 @@ impl PendingExternalCopyProcess {
     pub(crate) fn attempt_id(&self) -> &str {
         &self.request.attempt_id
     }
+
+    pub(crate) fn host_process_id(&mut self) -> u32 {
+        self.child.child_mut().id()
+    }
 }
 
 impl PendingRecoveryProcess {
@@ -920,12 +924,13 @@ mod tests {
         let request = fixture_request();
         let child = pending_external_copy_host();
         let spawned_pid = child.id();
-        let pending = match supervise_child(child, request, Duration::from_secs(2))
+        let mut pending = match supervise_child(child, request, Duration::from_secs(2))
             .expect("the actionable terminal is accepted")
         {
             BootstrapOutcome::ExternalCopyNotWritable(pending) => pending,
             _ => panic!("the fixture must remain pending"),
         };
+        assert_eq!(pending.host_process_id(), spawned_pid);
 
         drop(pending);
 

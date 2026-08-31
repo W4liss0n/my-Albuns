@@ -16,6 +16,7 @@ if (-not $IsWindows -and $env:OS -ne 'Windows_NT') {
 }
 
 $workspaceRoot = $script:WorkspaceRoot
+$cargoTargetDirectory = Resolve-MyAlbunsCargoTargetDirectory
 $scratchParent = [System.IO.Path]::GetFullPath(
     (Join-Path $workspaceRoot '.scratch')
 )
@@ -62,8 +63,8 @@ try {
     }
 
     $applicationPath = Join-Path `
-        $workspaceRoot `
-        'target\debug\myalbuns-desktop.exe'
+        $cargoTargetDirectory `
+        'debug\myalbuns-desktop.exe'
     if ([System.IO.File]::Exists($applicationPath)) {
         Remove-Item -LiteralPath $applicationPath -Force
     }
@@ -87,7 +88,7 @@ try {
     $applicationFile = Get-Item -LiteralPath $applicationPath
     $applicationArtifact = [ordered]@{
         buildMode = 'tauri-debug-custom-protocol'
-        relativePath = 'target/debug/myalbuns-desktop.exe'
+        path = $applicationPath
         sha256 = (Get-FileHash `
                 -LiteralPath $applicationPath `
                 -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -161,6 +162,7 @@ try {
         -not $gate.externalCopy.exactPickerOwner -or
         -not $gate.externalCopy.samePendingHostAndRevision -or
         -not $gate.externalCopy.activationDispatched -or
+        -not $gate.externalCopy.hostCorrelated -or
         -not $gate.externalCopy.publicTerminalObserved -or
         -not $gate.externalCopy.terminalCleaned -or
         -not $gate.graphicsFailure.oneVisibleDialog -or
