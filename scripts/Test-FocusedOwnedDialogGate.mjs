@@ -270,6 +270,31 @@ test("local Tauri builds and the focused gate consume one shared build pipeline"
   assert.match(buildPipeline, /& \$tauriCommand build @TauriArguments/u);
 });
 
+test("the shared Sidecar pipeline keeps external Cargo targets inside their canonical owner", () => {
+  const sidecar = source("Prepare-Sidecar.ps1");
+
+  assert.match(
+    sidecar,
+    /\$baseTargetDirectory = Resolve-MyAlbunsCargoTargetDirectory/u,
+  );
+  assert.match(
+    sidecar,
+    /\$source\.StartsWith\(\s*\$targetDirectoryPrefix,/u,
+  );
+  assert.match(
+    sidecar,
+    /\$runtimeDestination\.StartsWith\(\s*\$targetDirectoryPrefix,/u,
+  );
+  assert.match(
+    sidecar,
+    /\$destination\.StartsWith\(\s*\$workspaceDirectoryPrefix,/u,
+  );
+  assert.doesNotMatch(
+    sidecar,
+    /\$(?:source|runtimeDestination)\.StartsWith\(\$script:WorkspaceRoot,/u,
+  );
+});
+
 test("the focused artifact follows the canonical Cargo target directory", () => {
   const absoluteTarget = path.join(workspace, ".scratch", "absolute-target");
 
