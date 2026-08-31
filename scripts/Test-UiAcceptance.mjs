@@ -120,6 +120,10 @@ test("the welcome preview declares a stable empty-recent-Projects scenario", () 
   assert.deepEqual(scenario.viewport, { width: 1280, height: 720 });
   assert.match(scenario.readySelector, /Nenhum Projeto recente/u);
   assert.match(scenario.readySelector, /not\(:has\(\.global-recent-list\)\)/u);
+  assert.match(
+    scenario.readySelector,
+    /not\(:has\(\.ui-empty-state__icon\)\)/u,
+  );
   assert.deepEqual(scenario.actions, [
     {
       type: "assert",
@@ -129,7 +133,7 @@ test("the welcome preview declares a stable empty-recent-Projects scenario", () 
     {
       type: "assert",
       selector:
-        ".global-shell:not(:has(.global-recent-list)):not(:has(.global-project-thumbnail))",
+        ".global-shell:not(:has(.global-recent-list)):not(:has(.global-project-thumbnail)):not(:has(.ui-empty-state__icon))",
     },
   ]);
 });

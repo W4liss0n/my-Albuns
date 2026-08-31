@@ -21,7 +21,7 @@
         "reason": "A referência visual vigente representa a Tela de Boas-vindas populada e não define o estado sem Projetos recentes."
       },
       "viewport": { "width": 1280, "height": 720 },
-      "readySelector": ".global-shell:has(.global-empty-state[role=\"status\"][aria-label=\"Nenhum Projeto recente\"]):not(:has(.global-recent-list)):not(:has(.global-project-thumbnail))",
+      "readySelector": ".global-shell:has(.global-empty-state[role=\"status\"][aria-label=\"Nenhum Projeto recente\"]):not(:has(.global-recent-list)):not(:has(.global-project-thumbnail)):not(:has(.ui-empty-state__icon))",
       "actions": [
         {
           "type": "assert",
@@ -29,7 +29,7 @@
         },
         {
           "type": "assert",
-          "selector": ".global-shell:not(:has(.global-recent-list)):not(:has(.global-project-thumbnail))"
+          "selector": ".global-shell:not(:has(.global-recent-list)):not(:has(.global-project-thumbnail)):not(:has(.ui-empty-state__icon))"
         }
       ]
     },

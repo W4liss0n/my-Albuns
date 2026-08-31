@@ -261,7 +261,6 @@ export function GlobalShell({
           <EmptyState
             className="global-empty-state"
             description="Os Projetos abertos recentemente aparecerão aqui."
-            icon={<AppIcon icon={FolderOpen} size={16} />}
             title="Nenhum Projeto recente"
           />
         ) : (
