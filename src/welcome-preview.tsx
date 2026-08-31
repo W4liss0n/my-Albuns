@@ -7,9 +7,12 @@ import type {
 } from "./global/application/globalProjectPort";
 import { GlobalShell } from "./global/GlobalShell";
 import { createNewProjectPortStub } from "./global/testing/newProjectPortStub";
+import { welcomePreviewRecentProjects } from "./test/welcomePreviewFixtures";
 import "./ui/theme.css";
 import "./ui/ui.css";
 import "./global/GlobalShell.css";
+
+const previewParameters = new URLSearchParams(window.location.search);
 
 const projectPort: GlobalProjectPort = {
   onActivationTerminal: async () => () => undefined,
@@ -20,15 +23,8 @@ const projectPort: GlobalProjectPort = {
     }
     return { status: "cancelled" };
   },
-  listRecentProjects: async () => [
-    { id: "p1", name: "Formatura Medicina 2026 — Turma B" },
-    { id: "p2", name: "Casamento Marina & Téo" },
-    { id: "p3", name: "Ensaio Helena — 6 meses" },
-    { id: "p4", name: "15 anos Beatriz" },
-    { id: "p5", name: "Corporativo Vetra — relatório anual" },
-    { id: "p6", name: "Batizado Antônio" },
-    { id: "p7", name: "Retrospectiva Estúdio 2025" },
-  ],
+  listRecentProjects: async () =>
+    welcomePreviewRecentProjects(previewParameters),
   openRecentProject: async () => ({ status: "cancelled" }),
   startupOpenFailure: async () => null,
 };
@@ -38,7 +34,6 @@ const failureDialogPort: ProjectFailureDialogPort = {
 };
 
 const newProjectPort = createNewProjectPortStub();
-const previewParameters = new URLSearchParams(window.location.search);
 
 const supportedGraphics = {
   supported: true,

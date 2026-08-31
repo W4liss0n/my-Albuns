@@ -103,6 +103,37 @@ test("the canonical UI acceptance manifest is valid and points to served files",
   }
 });
 
+test("the welcome preview declares a stable empty-recent-Projects scenario", () => {
+  const scenario = manifest.scenarios.find(
+    (candidate) => candidate.id === "welcome-empty",
+  );
+
+  assert.ok(scenario, "welcome-empty is missing");
+  assert.equal(
+    scenario.implementationPath,
+    "/welcome-preview.html?recents=empty",
+  );
+  assert.equal(scenario.comparison.kind, "implementation-only");
+  assert.equal(scenario.comparison.surface, "welcome-empty-state");
+  assert.match(scenario.comparison.reason, /referência visual vigente/iu);
+  assert.equal("referencePath" in scenario, false);
+  assert.deepEqual(scenario.viewport, { width: 1280, height: 720 });
+  assert.match(scenario.readySelector, /Nenhum Projeto recente/u);
+  assert.match(scenario.readySelector, /not\(:has\(\.global-recent-list\)\)/u);
+  assert.deepEqual(scenario.actions, [
+    {
+      type: "assert",
+      selector:
+        '.global-empty-state[role="status"][aria-label="Nenhum Projeto recente"]',
+    },
+    {
+      type: "assert",
+      selector:
+        ".global-shell:not(:has(.global-recent-list)):not(:has(.global-project-thumbnail))",
+    },
+  ]);
+});
+
 test("editor scenarios declare honest, surface-matched comparisons", () => {
   const editorScenarioIds = new Set([
     "album-information-validation-tooltip",
@@ -503,7 +534,7 @@ test("the manifest preserves Program 05 proofs and promotes Sheet reordering to 
     "sheet-reorder-invalid-target-preview",
   ]);
 
-  assert.equal(manifest.scenarios.length, 58 + Object.keys(expectedScenarios).length);
+  assert.equal(manifest.scenarios.length, 59 + Object.keys(expectedScenarios).length);
   for (const [id, actionTypes] of Object.entries(expectedScenarios)) {
     const scenario = scenariosById.get(id);
     assert.ok(scenario, `${id} is missing`);

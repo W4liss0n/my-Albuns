@@ -12,6 +12,28 @@
       "actions": []
     },
     {
+      "id": "welcome-empty",
+      "title": "Tela de Boas-vindas — sem Projetos recentes",
+      "implementationPath": "/welcome-preview.html?recents=empty",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "welcome-empty-state",
+        "reason": "A referência visual vigente representa a Tela de Boas-vindas populada e não define o estado sem Projetos recentes."
+      },
+      "viewport": { "width": 1280, "height": 720 },
+      "readySelector": ".global-shell:has(.global-empty-state[role=\"status\"][aria-label=\"Nenhum Projeto recente\"]):not(:has(.global-recent-list)):not(:has(.global-project-thumbnail))",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".global-empty-state[role=\"status\"][aria-label=\"Nenhum Projeto recente\"]"
+        },
+        {
+          "type": "assert",
+          "selector": ".global-shell:not(:has(.global-recent-list)):not(:has(.global-project-thumbnail))"
+        }
+      ]
+    },
+    {
       "id": "opening-progress-indeterminate",
       "title": "Diálogo de abertura — progresso indeterminado",
       "implementationPath": "/dialog.html?kind=opening-project",
