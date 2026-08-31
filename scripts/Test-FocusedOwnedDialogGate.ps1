@@ -86,9 +86,11 @@ try {
         throw 'The focused debug Tauri build did not produce the desktop application.'
     }
     $applicationFile = Get-Item -LiteralPath $applicationPath
+    $applicationRelativePath = [System.IO.Path]::GetRelativePath($workspaceRoot, $applicationPath).Replace('\', '/')
     $applicationArtifact = [ordered]@{
         buildMode = 'tauri-debug-custom-protocol'
         path = $applicationPath
+        relativePath = $applicationRelativePath
         sha256 = (Get-FileHash `
                 -LiteralPath $applicationPath `
                 -Algorithm SHA256).Hash.ToLowerInvariant()
