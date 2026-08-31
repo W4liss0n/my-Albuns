@@ -106,6 +106,23 @@ test("shows the global welcome surface without a Project workspace", () => {
   expect(screen.queryByTestId("album-canvas")).not.toBeInTheDocument();
 });
 
+test("uses the canonical text-only empty state for recent Projects", async () => {
+  render(
+    <GlobalShell
+      graphicsDiagnostic={supportedGraphics}
+      projectPort={createProjectPort()}
+    />,
+  );
+
+  const emptyState = await screen.findByRole("status", {
+    name: "Nenhum Projeto recente",
+  });
+  expect(emptyState).toHaveTextContent(
+    "Os Projetos abertos recentemente aparecerão aqui.",
+  );
+  expect(emptyState.querySelector(".ui-empty-state__icon")).toBeNull();
+});
+
 test("activates the Windows shortcuts displayed on welcome", async () => {
   const user = userEvent.setup();
   const openProject = vi.fn(async () => ({ status: "cancelled" as const }));
