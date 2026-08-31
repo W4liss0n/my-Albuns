@@ -663,7 +663,7 @@ test("external-copy discovery observes its public decision before sampling the p
   const runner = source("Run-FocusedOwnedDialogGate.mjs");
   const start = runner.indexOf("async function observeExternalCopyScenario()");
   const end = runner.indexOf("async function observeGraphicsScenario()", start);
-  const scenario = runner.slice(start, end);
+  const scenario = runner.slice(start, end).replaceAll("\r\n", "\n");
   const decisionTarget = scenario.indexOf(
     'const target = await waitFor("external-copy decision target"',
   );
