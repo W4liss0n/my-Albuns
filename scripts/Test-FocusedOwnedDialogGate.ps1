@@ -86,7 +86,15 @@ try {
         throw 'The focused debug Tauri build did not produce the desktop application.'
     }
     $applicationFile = Get-Item -LiteralPath $applicationPath
-    $applicationRelativePath = [System.IO.Path]::GetRelativePath($workspaceRoot, $applicationPath).Replace('\', '/')
+    Push-Location $workspaceRoot
+    try {
+        $applicationRelativePath = (
+            Resolve-Path -LiteralPath $applicationPath -Relative
+        ).Replace('\', '/')
+    }
+    finally {
+        Pop-Location
+    }
     $applicationArtifact = [ordered]@{
         buildMode = 'tauri-debug-custom-protocol'
         path = $applicationPath

@@ -196,7 +196,10 @@ test("the focused artifact follows the canonical Cargo target directory", () => 
   );
   assert.match(wrapper, /path = \$applicationPath/u);
   assert.match(wrapper, /relativePath = \$applicationRelativePath/u);
-  assert.match(wrapper, /GetRelativePath\(\$workspaceRoot, \$applicationPath\)/u);
+  assert.match(
+    wrapper,
+    /Resolve-Path -LiteralPath \$applicationPath -Relative/u,
+  );
   assert.doesNotMatch(
     wrapper,
     /relativePath = 'target\/debug\/myalbuns-desktop\.exe'/u,
