@@ -58,6 +58,110 @@ try {
         throw "Generated evidence was misclassified as a source input: $evidenceOnlyStatus"
     }
 
+    $retainedEvidenceRoot = Join-Path `
+        $fixtureRoot `
+        '.scratch\focused-owned-dialog-evidence'
+    foreach ($previousRun in @('previous-failure', 'previous-success')) {
+        $previousRunRoot = Join-Path $retainedEvidenceRoot $previousRun
+        New-Item -ItemType Directory -Force -Path $previousRunRoot | Out-Null
+        [System.IO.File]::WriteAllText(
+            (Join-Path $previousRunRoot 'evidence.json'),
+            "{`"retained`":true}`n",
+            [System.Text.UTF8Encoding]::new($false)
+        )
+    }
+    $retainedEvidenceSnapshot = Get-GateSourceSnapshot `
+        -WorkspaceRoot $fixtureRoot `
+        -EvidencePath $evidencePath `
+        -RetainedEvidenceRoot $retainedEvidenceRoot
+    if ($retainedEvidenceSnapshot.sourceInputsDirty) {
+        throw 'Prior evidence from the same gate dirtied its source inputs.'
+    }
+
+    $unrelatedOutputRoot = Join-Path $fixtureRoot '.scratch\unrelated-output'
+    New-Item -ItemType Directory -Force -Path $unrelatedOutputRoot | Out-Null
+    [System.IO.File]::WriteAllText(
+        (Join-Path $unrelatedOutputRoot 'untracked.json'),
+        "{`"unrelated`":true}`n",
+        [System.Text.UTF8Encoding]::new($false)
+    )
+    $unrelatedOutputStatus = @(
+        Get-GateSourceStatus `
+            -WorkspaceRoot $fixtureRoot `
+            -EvidencePath $evidencePath `
+            -RetainedEvidenceRoot $retainedEvidenceRoot
+    )
+    $unrelatedOutputSnapshot = Get-GateSourceSnapshot `
+        -WorkspaceRoot $fixtureRoot `
+        -EvidencePath $evidencePath `
+        -RetainedEvidenceRoot $retainedEvidenceRoot
+    if ($unrelatedOutputStatus.Count -ne 1 `
+            -or $unrelatedOutputStatus[0] -notmatch '\?\? \.scratch/unrelated-output/untracked\.json$' `
+            -or -not $unrelatedOutputSnapshot.sourceInputsDirty) {
+        throw "An unrelated untracked output was hidden by the evidence exclusion: $unrelatedOutputStatus"
+    }
+    Remove-GateScratchDirectory `
+        -Path $unrelatedOutputRoot `
+        -AllowedParent (Split-Path -Parent $unrelatedOutputRoot)
+
+    $escapedRootFailure = $null
+    try {
+        Get-GateSourceStatus `
+            -WorkspaceRoot $fixtureRoot `
+            -EvidencePath $evidencePath `
+            -RetainedEvidenceRoot $scratchRoot |
+            Out-Null
+    }
+    catch {
+        $escapedRootFailure = $_.Exception.Message
+    }
+    if ($escapedRootFailure -notmatch 'inside the Git worktree') {
+        throw 'A retained evidence root escaping the fixture did not fail closed.'
+    }
+
+    $junctionTarget = Join-Path `
+        $scratchRoot `
+        "gate-source-provenance-link-target-$PID-$([Guid]::NewGuid().ToString('N'))"
+    $junctionPath = Join-Path $retainedEvidenceRoot 'linked-run'
+    try {
+        New-Item -ItemType Directory -Force -Path $junctionTarget | Out-Null
+        [System.IO.File]::WriteAllText(
+            (Join-Path $junctionTarget 'outside.json'),
+            "{`"outside`":true}`n",
+            [System.Text.UTF8Encoding]::new($false)
+        )
+        New-Item `
+            -ItemType Junction `
+            -Path $junctionPath `
+            -Target $junctionTarget |
+            Out-Null
+        $junctionFailure = $null
+        try {
+            Get-GateSourceStatus `
+                -WorkspaceRoot $fixtureRoot `
+                -EvidencePath $evidencePath `
+                -RetainedEvidenceRoot $retainedEvidenceRoot |
+                Out-Null
+        }
+        catch {
+            $junctionFailure = $_.Exception.Message
+        }
+        if ($junctionFailure -notmatch 'reparse point') {
+            throw 'A junction below the retained evidence root did not fail closed.'
+        }
+    }
+    finally {
+        if (Test-Path -LiteralPath $junctionPath) {
+            [System.IO.Directory]::Delete($junctionPath)
+        }
+        Remove-GateScratchDirectory `
+            -Path $junctionTarget `
+            -AllowedParent $scratchRoot
+    }
+    Remove-GateScratchDirectory `
+        -Path $retainedEvidenceRoot `
+        -AllowedParent (Split-Path -Parent $retainedEvidenceRoot)
+
     [System.IO.File]::WriteAllText(
         (Join-Path $fixtureRoot 'vite.config.ts'),
         "export default { base: '/dirty-root-input/' };`n",
@@ -221,7 +325,7 @@ try {
         throw 'A runner-shaped cleanup did not restore a clean evidence input tree.'
     }
 
-    Write-Output 'Gate source provenance: 11 assertions passed.'
+    Write-Output 'Gate source provenance: 15 assertions passed.'
 }
 finally {
     Remove-GateScratchDirectory `

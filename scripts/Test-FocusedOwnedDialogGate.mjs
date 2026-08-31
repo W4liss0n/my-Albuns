@@ -329,6 +329,23 @@ test("the wrapper builds and fingerprints the exact custom-protocol debug applic
   assert.match(wrapper, /applicationArtifact/u);
 });
 
+test("the focused gate excludes only its retained evidence root from source provenance", () => {
+  const wrapper = source("Test-FocusedOwnedDialogGate.ps1");
+
+  assert.match(
+    wrapper,
+    /\$retainedEvidenceRoot\s*=\s*\[System\.IO\.Path\]::GetFullPath\(\s*\(Join-Path\s+\$scratchParent\s+'focused-owned-dialog-evidence'\)\s*\)/su,
+  );
+  assert.equal(
+    wrapper.match(/-RetainedEvidenceRoot \$retainedEvidenceRoot/gu)?.length,
+    2,
+  );
+  assert.doesNotMatch(
+    wrapper,
+    /-RetainedEvidenceRoot \$(?:scratchParent|workspaceRoot)/u,
+  );
+});
+
 test("public hashing consumers restore Windows PowerShell 5.1 artifact metadata", () => {
   const candidatePath = path.join(scripts, "FocusedOwnedDialogScenarios.mjs");
   const candidateContents = readFileSync(candidatePath);
