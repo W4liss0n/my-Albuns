@@ -62,3 +62,47 @@ function Resolve-MyAlbunsCargoTargetDirectory {
         (Join-Path $script:WorkspaceRoot $env:CARGO_TARGET_DIR)
     )
 }
+
+function Resolve-MyAlbunsWorkspaceRelativePath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Path
+    )
+
+    $workspaceRoot = [System.IO.Path]::GetFullPath($script:WorkspaceRoot)
+    $candidatePath = [System.IO.Path]::GetFullPath($Path)
+    $workspaceVolume = [System.IO.Path]::GetPathRoot($workspaceRoot)
+    $candidateVolume = [System.IO.Path]::GetPathRoot($candidatePath)
+    if (-not [string]::Equals(
+            $workspaceVolume,
+            $candidateVolume,
+            [System.StringComparison]::OrdinalIgnoreCase
+        )) {
+        return $null
+    }
+
+    $trimmedWorkspace = $workspaceRoot.TrimEnd([char[]] @('\', '/'))
+    $workspaceUri = [System.Uri]::new(
+        $trimmedWorkspace + [System.IO.Path]::DirectorySeparatorChar
+    )
+    $candidateUri = [System.Uri]::new($candidatePath)
+    $relativePath = [System.Uri]::UnescapeDataString(
+        $workspaceUri.MakeRelativeUri($candidateUri).ToString()
+    ).Replace('/', '\')
+    if ([System.IO.Path]::IsPathRooted($relativePath)) {
+        return $null
+    }
+
+    $roundTrip = [System.IO.Path]::GetFullPath(
+        (Join-Path $workspaceRoot $relativePath)
+    )
+    if (-not [string]::Equals(
+            $roundTrip,
+            $candidatePath,
+            [System.StringComparison]::OrdinalIgnoreCase
+        )) {
+        return $null
+    }
+
+    return $relativePath.Replace('\', '/')
+}

@@ -49,6 +49,86 @@ $script:WorkspaceRoot = [System.IO.Path]::GetFullPath($env:MYALBUNS_GATE_WORKSPA
   return path.normalize(result.stdout.trim());
 }
 
+function resolveWorkspaceRelativePath(candidatePath) {
+  const environment = {
+    ...process.env,
+    MYALBUNS_GATE_CANDIDATE: candidatePath,
+    MYALBUNS_GATE_WORKSPACE: workspace,
+  };
+  const result = spawnSync(
+    "powershell.exe",
+    [
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      String.raw`
+$ErrorActionPreference = 'Stop'
+. (Join-Path $env:MYALBUNS_GATE_WORKSPACE 'scripts\Local-Toolchain.ps1')
+$script:WorkspaceRoot = [System.IO.Path]::GetFullPath($env:MYALBUNS_GATE_WORKSPACE)
+$relativePath = Resolve-MyAlbunsWorkspaceRelativePath -Path $env:MYALBUNS_GATE_CANDIDATE
+@{ relativePath = $relativePath } | ConvertTo-Json -Compress
+`,
+    ],
+    {
+      cwd: workspace,
+      encoding: "utf8",
+      env: environment,
+      windowsHide: true,
+    },
+  );
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  return JSON.parse(result.stdout).relativePath ?? null;
+}
+
+function findAnotherVolumeCandidate() {
+  const result = spawnSync(
+    "powershell.exe",
+    [
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      String.raw`
+$workspaceRoot = [System.IO.Path]::GetPathRoot(
+  [System.IO.Path]::GetFullPath($env:MYALBUNS_GATE_WORKSPACE)
+)
+$otherRoot = Get-PSDrive -PSProvider FileSystem |
+  ForEach-Object { $_.Root } |
+  Where-Object {
+    -not [string]::IsNullOrWhiteSpace($_) -and
+    -not [string]::Equals(
+      [System.IO.Path]::GetPathRoot($_),
+      $workspaceRoot,
+      [System.StringComparison]::OrdinalIgnoreCase
+    )
+  } |
+  Select-Object -First 1
+if ($otherRoot) {
+  $candidate = Join-Path $otherRoot 'myalbuns-cross-volume-artifact.exe'
+  $actualVolume = $true
+}
+else {
+  $workspaceLetter = $workspaceRoot.Substring(0, 1).ToUpperInvariant()
+  $alternateLetter = if ($workspaceLetter -eq 'Z') { 'Y' } else { 'Z' }
+  $candidate = $alternateLetter + ':\myalbuns-cross-volume-artifact.exe'
+  $actualVolume = $false
+}
+@{
+  actualVolume = $actualVolume
+  candidate = $candidate
+} | ConvertTo-Json -Compress
+`,
+    ],
+    {
+      cwd: workspace,
+      encoding: "utf8",
+      env: { ...process.env, MYALBUNS_GATE_WORKSPACE: workspace },
+      windowsHide: true,
+    },
+  );
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  return JSON.parse(result.stdout);
+}
+
 const hiddenOwnedWindowFixture = String.raw`
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
@@ -145,7 +225,7 @@ test("the wrapper builds and fingerprints the exact custom-protocol debug applic
   const staleApplicationRemoval = wrapper.indexOf(
     "Remove-Item -LiteralPath $applicationPath -Force",
   );
-  const tauriBuild = wrapper.indexOf("& $tauri build --debug --no-bundle");
+  const tauriBuild = wrapper.indexOf("Invoke-MyAlbunsTauriBuild");
   const applicationLookup = wrapper.indexOf(
     "Test-Path -LiteralPath $applicationPath -PathType Leaf",
   );
@@ -159,14 +239,35 @@ test("the wrapper builds and fingerprints the exact custom-protocol debug applic
       tauriBuild < applicationLookup &&
       applicationLookup < fixturePreparation,
   );
-  assert.match(wrapper, /Prepare-Sidecar\.ps1'\) -Profile debug/u);
-  assert.match(wrapper, /node_modules\\\.bin\\tauri\.cmd/u);
-  assert.match(wrapper, /& \$tauri build --debug --no-bundle/u);
+  assert.match(wrapper, /Local-TauriBuild\.ps1/u);
+  assert.match(
+    wrapper,
+    /Invoke-MyAlbunsTauriBuild\s+`\s*\n\s*-TauriArguments @\('--debug', '--no-bundle'\)/u,
+  );
   assert.match(
     wrapper,
     /Get-FileHash\s+`\s*\n\s*-LiteralPath \$applicationPath\s+`\s*\n\s*-Algorithm SHA256/u,
   );
   assert.match(wrapper, /applicationArtifact/u);
+});
+
+test("local Tauri builds and the focused gate consume one shared build pipeline", () => {
+  const buildPipeline = source("Local-TauriBuild.ps1");
+  const localTauri = source("Invoke-LocalTauri.ps1");
+  const focusedGate = source("Test-FocusedOwnedDialogGate.ps1");
+
+  for (const consumer of [localTauri, focusedGate]) {
+    assert.match(consumer, /Local-TauriBuild\.ps1/u);
+    assert.match(consumer, /Invoke-MyAlbunsTauriBuild/u);
+    assert.doesNotMatch(consumer, /Prepare-Sidecar\.ps1/u);
+    assert.doesNotMatch(consumer, /node_modules\\\.bin\\tauri\.cmd/u);
+    assert.doesNotMatch(consumer, /& \$tauri(?:Command)? build/u);
+  }
+
+  assert.match(buildPipeline, /\$sidecarProfile/u);
+  assert.match(buildPipeline, /Prepare-Sidecar\.ps1/u);
+  assert.match(buildPipeline, /node_modules\\\.bin\\tauri\.cmd/u);
+  assert.match(buildPipeline, /& \$tauriCommand build @TauriArguments/u);
 });
 
 test("the focused artifact follows the canonical Cargo target directory", () => {
@@ -198,12 +299,33 @@ test("the focused artifact follows the canonical Cargo target directory", () => 
   assert.match(wrapper, /relativePath = \$applicationRelativePath/u);
   assert.match(
     wrapper,
-    /Resolve-Path -LiteralPath \$applicationPath -Relative/u,
+    /Resolve-MyAlbunsWorkspaceRelativePath\s+`\s*\n\s*-Path \$applicationPath/u,
   );
   assert.doesNotMatch(
     wrapper,
-    /relativePath = 'target\/debug\/myalbuns-desktop\.exe'/u,
+    /Resolve-Path -LiteralPath \$applicationPath -Relative/u,
   );
+});
+
+test("artifact metadata is relative only when it round-trips from the workspace", () => {
+  const workspaceArtifact = path.join(
+    workspace,
+    "target",
+    "debug",
+    "myalbuns-desktop.exe",
+  );
+  const otherVolume = findAnotherVolumeCandidate();
+
+  assert.equal(
+    resolveWorkspaceRelativePath(workspaceArtifact),
+    "target/debug/myalbuns-desktop.exe",
+  );
+  assert.notEqual(
+    path.parse(otherVolume.candidate).root.toLowerCase(),
+    path.parse(workspace).root.toLowerCase(),
+  );
+  assert.equal(resolveWorkspaceRelativePath(otherVolume.candidate), null);
+  assert.equal(typeof otherVolume.actualVolume, "boolean");
 });
 
 test("external-copy readiness requires dispatch and its public terminal", async () => {
