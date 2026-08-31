@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from "react";
+import { useId, type ReactNode, type Ref } from "react";
 import { CircleCheck, CircleX } from "lucide-react";
 
 import { ActionButton } from "./ActionButton";
@@ -13,6 +13,7 @@ interface MessageDialogProps {
   detail?: ReactNode;
   primaryAction?: DialogAction;
   secondaryAction?: DialogAction;
+  secondaryButtonRef?: Ref<HTMLButtonElement>;
   title: string;
   tone: MessageTone;
 }
@@ -22,6 +23,7 @@ export function MessageDialog({
   detail,
   primaryAction,
   secondaryAction,
+  secondaryButtonRef,
   title,
   tone,
 }: MessageDialogProps) {
@@ -34,6 +36,7 @@ export function MessageDialog({
           <ActionButton
             disabled={secondaryAction.disabled}
             onClick={secondaryAction.onClick}
+            ref={secondaryButtonRef}
           >
             {secondaryAction.label}
           </ActionButton>

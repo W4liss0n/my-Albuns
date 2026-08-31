@@ -205,9 +205,11 @@ test("projects a fatal graphics diagnostic through the owned Project dialog", as
   expect(within(dialog).getByRole("alert")).toHaveTextContent(
     "O contexto WebGL2 foi perdido.",
   );
-  await user.click(
-    within(dialog).getByRole("button", { name: "Fechar Projeto" }),
-  );
+  const closeProjectButton = within(dialog).getByRole("button", {
+    name: "Fechar Projeto",
+  });
+  expect(closeProjectButton).toHaveFocus();
+  await user.click(closeProjectButton);
   expect(onAction).toHaveBeenCalledWith("closeProjectAfterGraphicsFailure");
 });
 

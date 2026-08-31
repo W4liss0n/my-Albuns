@@ -1,3 +1,5 @@
+import { useLayoutEffect, useRef } from "react";
+
 import type {
   ProjectDialogAction,
   ProjectDialogState,
@@ -18,6 +20,14 @@ export function ProjectDialogView({
   onAction,
   state,
 }: ProjectDialogViewProps) {
+  const graphicsFailureActionRef = useRef<HTMLButtonElement>(null);
+
+  useLayoutEffect(() => {
+    if (state.kind === "graphicsFailure") {
+      graphicsFailureActionRef.current?.focus({ preventScroll: true });
+    }
+  }, [state.kind]);
+
   switch (state.kind) {
     case "albumInformationConfirmation":
       return (
@@ -119,6 +129,7 @@ export function ProjectDialogView({
             label: "Fechar Projeto",
             onClick: () => onAction("closeProjectAfterGraphicsFailure"),
           }}
+          secondaryButtonRef={graphicsFailureActionRef}
           title="O Canvas não pôde ser iniciado"
           tone="error"
         />
