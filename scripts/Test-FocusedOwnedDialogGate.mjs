@@ -195,6 +195,8 @@ test("the focused artifact follows the canonical Cargo target directory", () => 
     /\$applicationPath = Join-Path\s+`\s*\n\s*\$cargoTargetDirectory\s+`\s*\n\s*'debug\\myalbuns-desktop\.exe'/u,
   );
   assert.match(wrapper, /path = \$applicationPath/u);
+  assert.match(wrapper, /relativePath = \$applicationRelativePath/u);
+  assert.match(wrapper, /GetRelativePath\(\$workspaceRoot, \$applicationPath\)/u);
   assert.doesNotMatch(
     wrapper,
     /relativePath = 'target\/debug\/myalbuns-desktop\.exe'/u,
