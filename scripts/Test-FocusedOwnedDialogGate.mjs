@@ -329,16 +329,13 @@ test("the wrapper builds and fingerprints the exact custom-protocol debug applic
   assert.match(wrapper, /applicationArtifact/u);
 });
 
-test("the public toolchain restores Windows PowerShell 5.1 artifact metadata", () => {
+test("public hashing consumers restore Windows PowerShell 5.1 artifact metadata", () => {
   const candidatePath = path.join(scripts, "FocusedOwnedDialogScenarios.mjs");
   const candidateContents = readFileSync(candidatePath);
   const candidateStat = statSync(candidatePath);
   const metadata = fingerprintWithClobberedWindowsPowerShellModulePath(
     candidatePath,
   );
-  const wrapper = source("Test-FocusedOwnedDialogGate.ps1");
-  const initialization = wrapper.indexOf("Initialize-MyAlbunsToolchain");
-  const fingerprint = wrapper.indexOf("Get-FileHash");
 
   assert.match(metadata.powershellVersion, /^5\.1\./u);
   assert.equal(metadata.hashCommandModule, "Microsoft.PowerShell.Utility");
@@ -362,11 +359,27 @@ test("the public toolchain restores Windows PowerShell 5.1 artifact metadata", (
       new Date(metadata.lastWriteUtc).getTime() - candidateStat.mtime.getTime(),
     ) <= 1,
   );
-  assert.ok(
-    initialization !== -1 &&
-      fingerprint !== -1 &&
-      initialization < fingerprint,
-  );
+  for (const consumerName of [
+    "Test-FocusedOwnedDialogGate.ps1",
+    "Test-Issue10IdentityGate.ps1",
+  ]) {
+    const consumer = source(consumerName);
+    const initialization = consumer.indexOf("Initialize-MyAlbunsToolchain");
+    const fingerprint = consumer.indexOf("Get-FileHash");
+
+    assert.match(consumer, /Local-Toolchain\.ps1/u, consumerName);
+    assert.doesNotMatch(
+      consumer,
+      /Import-Module\s+Microsoft\.PowerShell\.Utility/u,
+      consumerName,
+    );
+    assert.ok(
+      initialization !== -1 &&
+        fingerprint !== -1 &&
+        initialization < fingerprint,
+      consumerName,
+    );
+  }
 });
 
 test("local Tauri builds and the focused gate consume one shared build pipeline", () => {
