@@ -347,10 +347,10 @@ fn setup_host(
                 policy_signal.observe(&window, payload.event());
             })
             .build()?;
-        #[cfg(debug_assertions)]
-        desktop_webview_policy::retire_inherited_debug_arguments_before_replacement()?;
         (window, Some(policy_readiness))
     };
+    #[cfg(debug_assertions)]
+    desktop_webview_policy::retire_inherited_debug_arguments_before_replacement()?;
     project_window.set_title(&initial_window_title)?;
     app.manage(app_paths);
     let app_handle = app.handle().clone();
