@@ -292,11 +292,7 @@ async function observeExternalCopyScenario() {
     child.pid,
     "external-copy Global",
   );
-  const hostInstance = await waitForNewApplication(
-    isBootstrapHost,
-    [],
-    "external-copy pending Host",
-  );
+  let hostInstance;
   let driver;
   try {
     const target = await waitFor("external-copy decision target", async () => {
@@ -320,6 +316,11 @@ async function observeExternalCopyScenario() {
     });
     const attemptId = new URL(target.url).searchParams.get("attemptId");
     if (!attemptId) throw new Error("The external-copy decision has no attemptId");
+    hostInstance = await waitForNewApplication(
+      isBootstrapHost,
+      [],
+      "external-copy pending Host",
+    );
 
     driver = await attachWebView2Driver({
       debugPort: globalDebugPort,

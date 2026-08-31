@@ -107,6 +107,28 @@ test("the focused runner reuses exact process, HWND, WebDriver, and scratch help
   assert.match(wrapper, /Remove-GateScratchDirectory/u);
 });
 
+test("external-copy discovery observes its public decision before sampling the pending Host", () => {
+  const runner = source("Run-FocusedOwnedDialogGate.mjs");
+  const start = runner.indexOf("async function observeExternalCopyScenario()");
+  const end = runner.indexOf("async function observeGraphicsScenario()", start);
+  const scenario = runner.slice(start, end);
+  const decisionTarget = scenario.indexOf(
+    'const target = await waitFor("external-copy decision target"',
+  );
+  const attemptCorrelation = scenario.indexOf(
+    'const attemptId = new URL(target.url).searchParams.get("attemptId")',
+  );
+  const pendingHost = scenario.indexOf(
+    'await waitForNewApplication(\n      isBootstrapHost,\n      [],\n      "external-copy pending Host"',
+  );
+
+  assert.ok(
+    decisionTarget !== -1 &&
+      decisionTarget < attemptCorrelation &&
+      attemptCorrelation < pendingHost,
+  );
+});
+
 test("the automated Project retires its inherited debug port before owned dialogs", () => {
   const productRuntime = readFileSync(
     path.join(workspace, "src-tauri", "src", "product_runtime.rs"),
