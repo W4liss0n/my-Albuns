@@ -49,6 +49,7 @@ New-Item -ItemType Directory -Force -Path $evidenceDirectory | Out-Null
 $sourceBefore = Get-GateSourceSnapshot `
     -WorkspaceRoot $workspaceRoot `
     -EvidencePath $OutputPath
+$applicationArtifact = $null
 $scope = $null
 $runRootCleaned = $false
 
@@ -63,8 +64,35 @@ try {
     $applicationPath = Join-Path `
         $workspaceRoot `
         'target\debug\myalbuns-desktop.exe'
+    if ([System.IO.File]::Exists($applicationPath)) {
+        Remove-Item -LiteralPath $applicationPath -Force
+    }
+
+    & (Join-Path $PSScriptRoot 'Prepare-Sidecar.ps1') -Profile debug
+    if ($LASTEXITCODE -ne 0) {
+        throw "The focused debug Processor build failed with exit code $LASTEXITCODE."
+    }
+    $tauri = Join-Path $workspaceRoot 'node_modules\.bin\tauri.cmd'
+    if (-not (Test-Path -LiteralPath $tauri -PathType Leaf)) {
+        throw 'The local Tauri CLI does not exist. Run npm run setup:local.'
+    }
+    & $tauri build --debug --no-bundle
+    if ($LASTEXITCODE -ne 0) {
+        throw "The focused debug Tauri build failed with exit code $LASTEXITCODE."
+    }
+
     if (-not (Test-Path -LiteralPath $applicationPath -PathType Leaf)) {
-        throw 'Build the debug desktop application headlessly before the focused native gate.'
+        throw 'The focused debug Tauri build did not produce the desktop application.'
+    }
+    $applicationFile = Get-Item -LiteralPath $applicationPath
+    $applicationArtifact = [ordered]@{
+        buildMode = 'tauri-debug-custom-protocol'
+        relativePath = 'target/debug/myalbuns-desktop.exe'
+        sha256 = (Get-FileHash `
+                -LiteralPath $applicationPath `
+                -Algorithm SHA256).Hash.ToLowerInvariant()
+        length = [long] $applicationFile.Length
+        lastWriteUtc = $applicationFile.LastWriteTimeUtc.ToString('o')
     }
     foreach ($knownFolder in @('Roaming', 'Local', 'Temporary')) {
         New-Item `
@@ -132,6 +160,8 @@ try {
         -not $gate.externalCopy.ownerDisabled -or
         -not $gate.externalCopy.exactPickerOwner -or
         -not $gate.externalCopy.samePendingHostAndRevision -or
+        -not $gate.externalCopy.activationDispatched -or
+        -not $gate.externalCopy.publicTerminalObserved -or
         -not $gate.externalCopy.terminalCleaned -or
         -not $gate.graphicsFailure.oneVisibleDialog -or
         -not $gate.graphicsFailure.ownerDisabled -or
@@ -160,6 +190,7 @@ try {
         collectedAtUtc = [DateTime]::UtcNow.ToString('o')
         gitCommit = $sourceBefore.gitCommit
         sourceInputsDirty = [bool] $sourceInputsDirty
+        applicationArtifact = $applicationArtifact
         scenarios = $expectedScenarios
         platform = [ordered]@{
             operatingSystem = [System.Environment]::OSVersion.VersionString
@@ -199,6 +230,7 @@ catch {
             gate = 'focused-owned-dialogs'
             collectedAtUtc = [DateTime]::UtcNow.ToString('o')
             gitCommit = $sourceBefore.gitCommit
+            applicationArtifact = $applicationArtifact
             error = [string] $caughtFailure.Exception.Message
             scriptStack = [string] $caughtFailure.ScriptStackTrace
             fullProductiveJourneyInvoked = $false

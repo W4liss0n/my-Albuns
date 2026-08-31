@@ -15,6 +15,7 @@ import {
   waitForProcessInstance,
 } from "./DevLifecycleProcessInstances.mjs";
 import { FOCUSED_OWNED_DIALOG_SCENARIOS } from "./FocusedOwnedDialogScenarios.mjs";
+import { confirmExternalCopyActivationLifecycle } from "./FocusedOwnedDialogEvidence.mjs";
 import {
   attachWebView2Driver,
   disposeConfirmedWebDriver,
@@ -264,6 +265,9 @@ function projectOwnerIsBlocked(state) {
 }
 
 async function observeExternalCopyScenario() {
+  const activationTerminalCount = recordsFor(
+    "global_activation_batch_completed",
+  ).length;
   const globalDebugPort = await findFreeTcpPortInRange(40_000, 44_999);
   const hostDebugPort = await findFreeTcpPortInRange(40_000, 44_999);
   const projectDialogDebugPort = await findFreeTcpPortInRange(40_000, 44_999);
@@ -461,6 +465,16 @@ async function observeExternalCopyScenario() {
     );
     driver = await disposeConfirmedWebDriver(driver);
     await waitForExit(hostInstance, "external-copy pending Host cleanup");
+    const activationTerminals = await waitForLogEvent(
+      "global_activation_batch_completed",
+      activationTerminalCount + 1,
+      "external-copy public activation terminal",
+    );
+    const activationLifecycle = confirmExternalCopyActivationLifecycle({
+      attemptId,
+      pendingHost: hostInstance,
+      terminal: activationTerminals.at(-1),
+    });
     const restoredOwner = await waitForNativeWindowState(
       "external-copy Global restoration",
       globalInstance,
@@ -490,6 +504,7 @@ async function observeExternalCopyScenario() {
       exactPickerOwner: cancelledPicker.exactProcess === true,
       samePendingHostAndRevision,
       terminalCleaned,
+      ...activationLifecycle,
       childOutputTail: childOutput().slice(-500),
     };
   } finally {

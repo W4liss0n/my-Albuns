@@ -107,6 +107,106 @@ test("the focused runner reuses exact process, HWND, WebDriver, and scratch help
   assert.match(wrapper, /Remove-GateScratchDirectory/u);
 });
 
+test("the wrapper builds and fingerprints the exact custom-protocol debug application", () => {
+  const wrapper = source("Test-FocusedOwnedDialogGate.ps1");
+  const staleApplicationRemoval = wrapper.indexOf(
+    "Remove-Item -LiteralPath $applicationPath -Force",
+  );
+  const tauriBuild = wrapper.indexOf("& $tauri build --debug --no-bundle");
+  const applicationLookup = wrapper.indexOf(
+    "Test-Path -LiteralPath $applicationPath -PathType Leaf",
+  );
+  const fixturePreparation = wrapper.indexOf(
+    "--example prepare_focused_owned_dialog_fixtures",
+  );
+
+  assert.ok(
+    staleApplicationRemoval !== -1 &&
+      staleApplicationRemoval < tauriBuild &&
+      tauriBuild < applicationLookup &&
+      applicationLookup < fixturePreparation,
+  );
+  assert.match(wrapper, /Prepare-Sidecar\.ps1'\) -Profile debug/u);
+  assert.match(wrapper, /node_modules\\\.bin\\tauri\.cmd/u);
+  assert.match(wrapper, /& \$tauri build --debug --no-bundle/u);
+  assert.match(
+    wrapper,
+    /Get-FileHash\s+`\s*\n\s*-LiteralPath \$applicationPath\s+`\s*\n\s*-Algorithm SHA256/u,
+  );
+  assert.match(wrapper, /applicationArtifact/u);
+});
+
+test("external-copy readiness requires dispatch and its public terminal", async () => {
+  const { confirmExternalCopyActivationLifecycle } = await import(
+    "./FocusedOwnedDialogEvidence.mjs"
+  );
+  const host = {
+    creationTimeUtc: "2026-08-31T02:00:01.000Z",
+    processId: 4100,
+  };
+  const terminal = {
+    event: "global_activation_batch_completed",
+    failed_count: 1,
+    focused_count: 0,
+    opened_count: 0,
+    project_count: 1,
+    timestamp: "2026-08-31T02:00:02.000Z",
+  };
+
+  assert.deepEqual(
+    confirmExternalCopyActivationLifecycle({
+      attemptId: "attempt-1",
+      pendingHost: host,
+      terminal,
+    }),
+    {
+      activationDispatched: true,
+      publicTerminalObserved: true,
+    },
+  );
+  assert.throws(
+    () =>
+      confirmExternalCopyActivationLifecycle({
+        attemptId: "attempt-1",
+        pendingHost: host,
+        terminal: undefined,
+      }),
+    /terminal/u,
+  );
+  assert.throws(
+    () =>
+      confirmExternalCopyActivationLifecycle({
+        attemptId: "attempt-1",
+        pendingHost: host,
+        terminal: { ...terminal, timestamp: "2026-08-31T02:00:00.000Z" },
+      }),
+    /before the pending Host/u,
+  );
+
+  const runner = source("Run-FocusedOwnedDialogGate.mjs");
+  const scenarioStart = runner.indexOf(
+    "async function observeExternalCopyScenario()",
+  );
+  const scenarioEnd = runner.indexOf(
+    "async function observeGraphicsScenario()",
+    scenarioStart,
+  );
+  const scenario = runner.slice(scenarioStart, scenarioEnd);
+  const terminalObservation = scenario.indexOf(
+    '"global_activation_batch_completed"',
+  );
+  const lifecycleConfirmation = scenario.indexOf(
+    "confirmExternalCopyActivationLifecycle",
+  );
+  const readyReturn = scenario.indexOf("return {", lifecycleConfirmation);
+
+  assert.ok(
+    terminalObservation !== -1 &&
+      terminalObservation < lifecycleConfirmation &&
+      lifecycleConfirmation < readyReturn,
+  );
+});
+
 test("external-copy discovery observes its public decision before sampling the pending Host", () => {
   const runner = source("Run-FocusedOwnedDialogGate.mjs");
   const start = runner.indexOf("async function observeExternalCopyScenario()");

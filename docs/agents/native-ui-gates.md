@@ -10,6 +10,10 @@ read-only external copy, and the Project owner reporting a late graphics
 failure. A failed visible run is diagnosed from its retained log and headless
 seams before another visible run is authorized.
 
+The focused gate builds its own debug Tauri `custom-protocol` application and
+records that executable's SHA-256. A plain `cargo build` is a development-server
+artifact and cannot satisfy the gate's source provenance.
+
 Run the full productive journey only for integration, release, or with explicit
 permission. The focused gate neither imports nor invokes that journey and is not
 part of any standard headless command.
