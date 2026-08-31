@@ -187,22 +187,33 @@ export async function attachWebView2Driver({
   };
 }
 
-export async function switchToWebDriverWindow(driver, predicate, label) {
-  const handles = await driver.request(
-    "GET",
-    `/session/${driver.sessionId}/window/handles`,
-  );
-  for (const handle of handles) {
-    await driver.request("POST", `/session/${driver.sessionId}/window`, {
-      handle,
-    });
-    const url = await driver.request(
-      "POST",
-      `/session/${driver.sessionId}/execute/sync`,
-      { script: "return window.location.href;", args: [] },
+export async function switchToWebDriverWindow(
+  driver,
+  predicate,
+  label,
+  timeoutMilliseconds = 30_000,
+) {
+  const deadline = Date.now() + timeoutMilliseconds;
+  let handles = [];
+  do {
+    handles = await driver.request(
+      "GET",
+      `/session/${driver.sessionId}/window/handles`,
     );
-    if (predicate(url)) return { handle, url };
-  }
+    for (const handle of handles) {
+      await driver.request("POST", `/session/${driver.sessionId}/window`, {
+        handle,
+      });
+      const url = await driver.request(
+        "POST",
+        `/session/${driver.sessionId}/execute/sync`,
+        { script: "return window.location.href;", args: [] },
+      );
+      if (predicate(url)) return { handle, url };
+    }
+    if (Date.now() >= deadline) break;
+    await delay(50);
+  } while (true);
   throw new Error(`${label} was not found among ${handles.length} WebViews`);
 }
 

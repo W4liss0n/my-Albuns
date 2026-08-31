@@ -7,6 +7,7 @@ import {
   disposeConfirmedWebDriver,
   findFreeTcpPort,
   findFreeTcpPortInRange,
+  switchToWebDriverWindow,
 } from "./GateWebDriver.mjs";
 
 test("clears an owned driver only after its teardown is confirmed", async () => {
@@ -140,4 +141,51 @@ test("serializes a parameterless W3C POST command as an empty JSON object", asyn
       server.close((error) => (error ? reject(error) : resolve())),
     );
   }
+});
+
+test("resamples an owned dialog after a stale WebDriver window snapshot", async () => {
+  const handleSnapshots = [["graphics-dialog"], ["graphics-dialog"]];
+  const urls = [
+    "data:,",
+    "tauri://localhost/project-dialog.html?kind=graphicsFailure",
+  ];
+  let currentHandle;
+  let handleReadCount = 0;
+  let urlReadCount = 0;
+  const driver = {
+    sessionId: "session-01",
+    async request(method, endpoint, body) {
+      if (method === "GET" && endpoint.endsWith("/window/handles")) {
+        const snapshot =
+          handleSnapshots[Math.min(handleReadCount, handleSnapshots.length - 1)];
+        handleReadCount += 1;
+        return snapshot;
+      }
+      if (method === "POST" && endpoint.endsWith("/window")) {
+        currentHandle = body.handle;
+        return null;
+      }
+      if (method === "POST" && endpoint.endsWith("/execute/sync")) {
+        assert.equal(currentHandle, "graphics-dialog");
+        const url = urls[Math.min(urlReadCount, urls.length - 1)];
+        urlReadCount += 1;
+        return url;
+      }
+      throw new Error(`unexpected WebDriver request: ${method} ${endpoint}`);
+    },
+  };
+
+  const selected = await switchToWebDriverWindow(
+    driver,
+    (url) => new URL(url).pathname.endsWith("/project-dialog.html"),
+    "graphics Project dialog",
+    500,
+  );
+
+  assert.deepEqual(selected, {
+    handle: "graphics-dialog",
+    url: urls[1],
+  });
+  assert.equal(handleReadCount, 2);
+  assert.equal(urlReadCount, 2);
 });
