@@ -1,7 +1,16 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { once } from "node:events";
-import { readFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -78,6 +87,75 @@ $relativePath = Resolve-MyAlbunsWorkspaceRelativePath -Path $env:MYALBUNS_GATE_C
   );
   assert.equal(result.status, 0, result.stderr || result.stdout);
   return JSON.parse(result.stdout).relativePath ?? null;
+}
+
+function fingerprintWithClobberedWindowsPowerShellModulePath(candidatePath) {
+  const clobberedModuleRoot = mkdtempSync(
+    path.join(tmpdir(), "myalbuns-powershell-modules-"),
+  );
+  const incompatibleUtilityModule = path.join(
+    clobberedModuleRoot,
+    "Microsoft.PowerShell.Utility",
+  );
+  mkdirSync(incompatibleUtilityModule);
+  writeFileSync(
+    path.join(
+      incompatibleUtilityModule,
+      "Microsoft.PowerShell.Utility.psd1",
+    ),
+    String.raw`@{
+  RootModule = 'Microsoft.PowerShell.Utility.Core.dll'
+  ModuleVersion = '99.0.0.0'
+  PowerShellVersion = '7.0'
+  CompatiblePSEditions = @('Core')
+  CmdletsToExport = @('Get-FileHash')
+}
+`,
+  );
+  const environment = { ...process.env };
+  for (const name of Object.keys(environment)) {
+    if (name.toUpperCase() === "PSMODULEPATH") delete environment[name];
+  }
+  environment.MYALBUNS_GATE_CANDIDATE = candidatePath;
+  environment.MYALBUNS_GATE_WORKSPACE = workspace;
+  environment.PSModulePath = clobberedModuleRoot;
+
+  try {
+    const result = spawnSync(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        String.raw`
+$ErrorActionPreference = 'Stop'
+. (Join-Path $env:MYALBUNS_GATE_WORKSPACE 'scripts\Local-Toolchain.ps1')
+Initialize-MyAlbunsToolchain
+$candidate = Get-Item -LiteralPath $env:MYALBUNS_GATE_CANDIDATE
+$fingerprint = Get-FileHash -LiteralPath $candidate.FullName -Algorithm SHA256
+[ordered]@{
+  powershellVersion = $PSVersionTable.PSVersion.ToString()
+  powershellHome = $PSHOME
+  hashCommandModule = (Get-Command Get-FileHash).ModuleName
+  hashCommandModulePath = (Get-Command Get-FileHash).Module.Path
+  sha256 = $fingerprint.Hash.ToLowerInvariant()
+  length = [long] $candidate.Length
+  lastWriteUtc = $candidate.LastWriteTimeUtc.ToString('o')
+} | ConvertTo-Json -Compress
+`,
+      ],
+      {
+        cwd: workspace,
+        encoding: "utf8",
+        env: environment,
+        windowsHide: true,
+      },
+    );
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    return JSON.parse(result.stdout);
+  } finally {
+    rmSync(clobberedModuleRoot, { force: true, recursive: true });
+  }
 }
 
 function findAnotherVolumeCandidate() {
@@ -249,6 +327,46 @@ test("the wrapper builds and fingerprints the exact custom-protocol debug applic
     /Get-FileHash\s+`\s*\n\s*-LiteralPath \$applicationPath\s+`\s*\n\s*-Algorithm SHA256/u,
   );
   assert.match(wrapper, /applicationArtifact/u);
+});
+
+test("the public toolchain restores Windows PowerShell 5.1 artifact metadata", () => {
+  const candidatePath = path.join(scripts, "FocusedOwnedDialogScenarios.mjs");
+  const candidateContents = readFileSync(candidatePath);
+  const candidateStat = statSync(candidatePath);
+  const metadata = fingerprintWithClobberedWindowsPowerShellModulePath(
+    candidatePath,
+  );
+  const wrapper = source("Test-FocusedOwnedDialogGate.ps1");
+  const initialization = wrapper.indexOf("Initialize-MyAlbunsToolchain");
+  const fingerprint = wrapper.indexOf("Get-FileHash");
+
+  assert.match(metadata.powershellVersion, /^5\.1\./u);
+  assert.equal(metadata.hashCommandModule, "Microsoft.PowerShell.Utility");
+  assert.equal(
+    path.dirname(metadata.hashCommandModulePath).toLowerCase(),
+    path
+      .join(
+        metadata.powershellHome,
+        "Modules",
+        "Microsoft.PowerShell.Utility",
+      )
+      .toLowerCase(),
+  );
+  assert.equal(
+    metadata.sha256,
+    createHash("sha256").update(candidateContents).digest("hex"),
+  );
+  assert.equal(metadata.length, candidateContents.length);
+  assert.ok(
+    Math.abs(
+      new Date(metadata.lastWriteUtc).getTime() - candidateStat.mtime.getTime(),
+    ) <= 1,
+  );
+  assert.ok(
+    initialization !== -1 &&
+      fingerprint !== -1 &&
+      initialization < fingerprint,
+  );
 });
 
 test("local Tauri builds and the focused gate consume one shared build pipeline", () => {
