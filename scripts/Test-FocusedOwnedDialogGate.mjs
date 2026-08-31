@@ -107,6 +107,28 @@ test("the focused runner reuses exact process, HWND, WebDriver, and scratch help
   assert.match(wrapper, /Remove-GateScratchDirectory/u);
 });
 
+test("the automated Project retires its inherited debug port before owned dialogs", () => {
+  const productRuntime = readFileSync(
+    path.join(workspace, "src-tauri", "src", "product_runtime.rs"),
+    "utf8",
+  );
+  const normalOwnerReady = productRuntime.indexOf(
+    "(window, Some(policy_readiness))",
+  );
+  const inheritedDebugPortRetired = productRuntime.indexOf(
+    "desktop_webview_policy::retire_inherited_debug_arguments_before_replacement()?",
+  );
+  const ownerConfigured = productRuntime.indexOf(
+    "project_window.set_title(&initial_window_title)?",
+  );
+
+  assert.ok(
+    normalOwnerReady !== -1 &&
+      normalOwnerReady < inheritedDebugPortRetired &&
+      inheritedDebugPortRetired < ownerConfigured,
+  );
+});
+
 test("the HWND probe closes over native owner chains from GUI-thread fallbacks", () => {
   const observer = source("NativeWindowObservation.mjs");
 
