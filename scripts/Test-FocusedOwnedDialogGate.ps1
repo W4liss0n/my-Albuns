@@ -22,6 +22,10 @@ $scratchParent = [System.IO.Path]::GetFullPath(
     (Join-Path $workspaceRoot '.scratch')
 )
 New-Item -ItemType Directory -Force -Path $scratchParent | Out-Null
+$retainedEvidenceRoot = [System.IO.Path]::GetFullPath(
+    (Join-Path $scratchParent 'focused-owned-dialog-evidence')
+)
+New-Item -ItemType Directory -Force -Path $retainedEvidenceRoot | Out-Null
 $runRoot = [System.IO.Path]::GetFullPath(
     (Join-Path `
         $scratchParent `
@@ -39,8 +43,8 @@ New-Item -ItemType Directory -Force -Path $runRoot | Out-Null
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {
     $stamp = [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff')
     $OutputPath = Join-Path `
-        $scratchParent `
-        "focused-owned-dialog-evidence\$stamp\report.json"
+        $retainedEvidenceRoot `
+        "$stamp\report.json"
 }
 elseif (-not [System.IO.Path]::IsPathRooted($OutputPath)) {
     $OutputPath = Join-Path $workspaceRoot $OutputPath
@@ -50,7 +54,8 @@ $evidenceDirectory = Split-Path -Parent $OutputPath
 New-Item -ItemType Directory -Force -Path $evidenceDirectory | Out-Null
 $sourceBefore = Get-GateSourceSnapshot `
     -WorkspaceRoot $workspaceRoot `
-    -EvidencePath $OutputPath
+    -EvidencePath $OutputPath `
+    -RetainedEvidenceRoot $retainedEvidenceRoot
 $applicationArtifact = $null
 $scope = $null
 $runRootCleaned = $false
@@ -179,7 +184,8 @@ try {
 
     $sourceAfter = Get-GateSourceSnapshot `
         -WorkspaceRoot $workspaceRoot `
-        -EvidencePath $OutputPath
+        -EvidencePath $OutputPath `
+        -RetainedEvidenceRoot $retainedEvidenceRoot
     $sourceInputsDirty = Test-GateSourceSnapshotsDirty `
         -Before $sourceBefore `
         -After $sourceAfter
