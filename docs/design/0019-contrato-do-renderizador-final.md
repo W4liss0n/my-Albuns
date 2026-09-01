@@ -65,6 +65,12 @@ O envelope não contém `RenderSnapshot`, documento `.myalbuns`,
 `CompositionPlan`, Sessão, Cache, unidade não selecionada nem fonte não
 referenciada.
 
+Todo pathname autoritativo desse grafo reutiliza diretamente o `NativePathDto`
+owned por `myalbuns-paths`. No wire Windows, sua única forma é
+`{"encoding":"windowsUtf16","units":[...]}`; o corpus e o envelope não
+definem alias, campo abreviado nem segundo codec para preparação, fontes ou
+raízes.
+
 Os bytes dos Originais continuam vindo do `CapturedSourceSet` separado e só
 podem preencher os `mediaId`s fechados pelo envelope. Dados operacionais não
 podem alterar a composição.

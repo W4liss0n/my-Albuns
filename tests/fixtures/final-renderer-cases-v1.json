@@ -127,19 +127,19 @@
             "mediaRefs": [
               {
                 "mediaId": "decorative-checker",
-                "nativePath": { "windowsUtf16": [67, 58, 92, 70, 111, 116, 111, 115, 92, 100, 101, 99, 111, 114, 97, 116, 105, 118, 111, 46, 112, 110, 103] }
+                "nativePath": { "encoding": "windowsUtf16", "units": [67, 58, 92, 70, 111, 116, 111, 115, 92, 100, 101, 99, 111, 114, 97, 116, 105, 118, 111, 46, 112, 110, 103] }
               },
               {
                 "mediaId": "photo-frac",
-                "nativePath": { "windowsUtf16": [67, 58, 92, 70, 111, 116, 111, 115, 92, 102, 114, 97, 231, 227, 111, 46, 112, 110, 103] }
+                "nativePath": { "encoding": "windowsUtf16", "units": [67, 58, 92, 70, 111, 116, 111, 115, 92, 102, 114, 97, 231, 227, 111, 46, 112, 110, 103] }
               },
               {
                 "mediaId": "photo-opaque",
-                "nativePath": { "windowsUtf16": [67, 58, 92, 70, 111, 116, 111, 115, 92, 111, 112, 97, 113, 117, 101, 46, 112, 110, 103] }
+                "nativePath": { "encoding": "windowsUtf16", "units": [67, 58, 92, 70, 111, 116, 111, 115, 92, 111, 112, 97, 113, 117, 101, 46, 112, 110, 103] }
               },
               {
                 "mediaId": "photo-blue",
-                "nativePath": { "windowsUtf16": [67, 58, 92, 70, 111, 116, 111, 115, 92, 98, 108, 117, 101, 46, 112, 110, 103] }
+                "nativePath": { "encoding": "windowsUtf16", "units": [67, 58, 92, 70, 111, 116, 111, 115, 92, 98, 108, 117, 101, 46, 112, 110, 103] }
               }
             ],
             "sheets": [
@@ -232,28 +232,28 @@
           "sourceGeometryFacts": [
             {
               "mediaId": "decorative-checker",
-              "nativePath": { "windowsUtf16": [67, 58, 92, 70, 111, 116, 111, 115, 92, 100, 101, 99, 111, 114, 97, 116, 105, 118, 111, 46, 112, 110, 103] },
+              "nativePath": { "encoding": "windowsUtf16", "units": [67, 58, 92, 70, 111, 116, 111, 115, 92, 100, 101, 99, 111, 114, 97, 116, 105, 118, 111, 46, 112, 110, 103] },
               "orientedWidthPx": 2,
               "orientedHeightPx": 2,
               "appliedOrientation": 1
             },
             {
               "mediaId": "photo-frac",
-              "nativePath": { "windowsUtf16": [67, 58, 92, 70, 111, 116, 111, 115, 92, 102, 114, 97, 231, 227, 111, 46, 112, 110, 103] },
+              "nativePath": { "encoding": "windowsUtf16", "units": [67, 58, 92, 70, 111, 116, 111, 115, 92, 102, 114, 97, 231, 227, 111, 46, 112, 110, 103] },
               "orientedWidthPx": 2,
               "orientedHeightPx": 2,
               "appliedOrientation": 1
             },
             {
               "mediaId": "photo-opaque",
-              "nativePath": { "windowsUtf16": [67, 58, 92, 70, 111, 116, 111, 115, 92, 111, 112, 97, 113, 117, 101, 46, 112, 110, 103] },
+              "nativePath": { "encoding": "windowsUtf16", "units": [67, 58, 92, 70, 111, 116, 111, 115, 92, 111, 112, 97, 113, 117, 101, 46, 112, 110, 103] },
               "orientedWidthPx": 1,
               "orientedHeightPx": 1,
               "appliedOrientation": 1
             },
             {
               "mediaId": "photo-blue",
-              "nativePath": { "windowsUtf16": [67, 58, 92, 70, 111, 116, 111, 115, 92, 98, 108, 117, 101, 46, 112, 110, 103] },
+              "nativePath": { "encoding": "windowsUtf16", "units": [67, 58, 92, 70, 111, 116, 111, 115, 92, 98, 108, 117, 101, 46, 112, 110, 103] },
               "orientedWidthPx": 1,
               "orientedHeightPx": 1,
               "appliedOrientation": 1
@@ -262,7 +262,7 @@
           "sourceObservations": [
             {
               "mediaId": "decorative-checker",
-              "nativePath": { "windowsUtf16": [67, 58, 92, 70, 111, 116, 111, 115, 92, 100, 101, 99, 111, 114, 97, 116, 105, 118, 111, 46, 112, 110, 103] },
+              "nativePath": { "encoding": "windowsUtf16", "units": [67, 58, 92, 70, 111, 116, 111, 115, 92, 100, 101, 99, 111, 114, 97, 116, 105, 118, 111, 46, 112, 110, 103] },
               "detectedFormat": "png",
               "sourceVariant": "png-static-rgba8",
               "encodedWidthPx": 2,
@@ -276,7 +276,7 @@
             },
             {
               "mediaId": "photo-frac",
-              "nativePath": { "windowsUtf16": [67, 58, 92, 70, 111, 116, 111, 115, 92, 102, 114, 97, 231, 227, 111, 46, 112, 110, 103] },
+              "nativePath": { "encoding": "windowsUtf16", "units": [67, 58, 92, 70, 111, 116, 111, 115, 92, 102, 114, 97, 231, 227, 111, 46, 112, 110, 103] },
               "detectedFormat": "png",
               "sourceVariant": "png-static-rgba8",
               "encodedWidthPx": 2,
@@ -290,7 +290,7 @@
             },
             {
               "mediaId": "photo-opaque",
-              "nativePath": { "windowsUtf16": [67, 58, 92, 70, 111, 116, 111, 115, 92, 111, 112, 97, 113, 117, 101, 46, 112, 110, 103] },
+              "nativePath": { "encoding": "windowsUtf16", "units": [67, 58, 92, 70, 111, 116, 111, 115, 92, 111, 112, 97, 113, 117, 101, 46, 112, 110, 103] },
               "detectedFormat": "jpeg",
               "sourceVariant": "jpeg-baseline-rgb8",
               "encodedWidthPx": 1,
@@ -304,7 +304,7 @@
             },
             {
               "mediaId": "photo-blue",
-              "nativePath": { "windowsUtf16": [67, 58, 92, 70, 111, 116, 111, 115, 92, 98, 108, 117, 101, 46, 112, 110, 103] },
+              "nativePath": { "encoding": "windowsUtf16", "units": [67, 58, 92, 70, 111, 116, 111, 115, 92, 98, 108, 117, 101, 46, 112, 110, 103] },
               "detectedFormat": "jpeg",
               "sourceVariant": "jpeg-baseline-rgb8",
               "encodedWidthPx": 1,
@@ -956,13 +956,13 @@
           },
           "preparation": {
             "destinationDirectory": {
-              "windowsUtf16": [67, 58, 92, 69, 120, 112, 111, 114, 116]
+              "encoding": "windowsUtf16", "units": [67, 58, 92, 69, 120, 112, 111, 114, 116]
             },
             "attemptDirectory": {
-              "windowsUtf16": [67, 58, 92, 69, 120, 112, 111, 114, 116, 92, 46, 109, 121, 97, 108, 98, 117, 110, 115, 45, 101, 120, 112, 111, 114, 116, 45, 48, 48, 48, 48, 48, 48, 48, 48, 45, 48, 48, 48, 48, 45, 52, 48, 48, 48, 45, 56, 48, 48, 48, 45, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 49, 55, 46, 116, 109, 112]
+              "encoding": "windowsUtf16", "units": [67, 58, 92, 69, 120, 112, 111, 114, 116, 92, 46, 109, 121, 97, 108, 98, 117, 110, 115, 45, 101, 120, 112, 111, 114, 116, 45, 48, 48, 48, 48, 48, 48, 48, 48, 45, 48, 48, 48, 48, 45, 52, 48, 48, 48, 45, 56, 48, 48, 48, 45, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 49, 55, 46, 116, 109, 112]
             },
             "outputPath": {
-              "windowsUtf16": [67, 58, 92, 69, 120, 112, 111, 114, 116, 92, 46, 109, 121, 97, 108, 98, 117, 110, 115, 45, 101, 120, 112, 111, 114, 116, 45, 48, 48, 48, 48, 48, 48, 48, 48, 45, 48, 48, 48, 48, 45, 52, 48, 48, 48, 45, 56, 48, 48, 48, 45, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 49, 55, 46, 116, 109, 112, 92, 97, 108, 98, 117, 109, 95, 48, 48, 49, 46, 106, 112, 103]
+              "encoding": "windowsUtf16", "units": [67, 58, 92, 69, 120, 112, 111, 114, 116, 92, 46, 109, 121, 97, 108, 98, 117, 110, 115, 45, 101, 120, 112, 111, 114, 116, 45, 48, 48, 48, 48, 48, 48, 48, 48, 45, 48, 48, 48, 48, 45, 52, 48, 48, 48, 45, 56, 48, 48, 48, 45, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 49, 55, 46, 116, 109, 112, 92, 97, 108, 98, 117, 109, 95, 48, 48, 49, 46, 106, 112, 103]
             }
           },
           "units": [
@@ -1029,11 +1029,11 @@
             {
               "mediaRef": {
                 "mediaId": "decorative-checker",
-                "nativePath": { "windowsUtf16": [67, 58, 92, 70, 111, 116, 111, 115, 92, 100, 101, 99, 111, 114, 97, 116, 105, 118, 111, 46, 112, 110, 103] }
+                "nativePath": { "encoding": "windowsUtf16", "units": [67, 58, 92, 70, 111, 116, 111, 115, 92, 100, 101, 99, 111, 114, 97, 116, 105, 118, 111, 46, 112, 110, 103] }
               },
               "sourceObservation": {
                 "mediaId": "decorative-checker",
-                "nativePath": { "windowsUtf16": [67, 58, 92, 70, 111, 116, 111, 115, 92, 100, 101, 99, 111, 114, 97, 116, 105, 118, 111, 46, 112, 110, 103] },
+                "nativePath": { "encoding": "windowsUtf16", "units": [67, 58, 92, 70, 111, 116, 111, 115, 92, 100, 101, 99, 111, 114, 97, 116, 105, 118, 111, 46, 112, 110, 103] },
                 "detectedFormat": "png",
                 "sourceVariant": "png-static-rgba8",
                 "encodedWidthPx": 2,
@@ -1049,11 +1049,11 @@
             {
               "mediaRef": {
                 "mediaId": "photo-blue",
-                "nativePath": { "windowsUtf16": [67, 58, 92, 70, 111, 116, 111, 115, 92, 98, 108, 117, 101, 46, 112, 110, 103] }
+                "nativePath": { "encoding": "windowsUtf16", "units": [67, 58, 92, 70, 111, 116, 111, 115, 92, 98, 108, 117, 101, 46, 112, 110, 103] }
               },
               "sourceObservation": {
                 "mediaId": "photo-blue",
-                "nativePath": { "windowsUtf16": [67, 58, 92, 70, 111, 116, 111, 115, 92, 98, 108, 117, 101, 46, 112, 110, 103] },
+                "nativePath": { "encoding": "windowsUtf16", "units": [67, 58, 92, 70, 111, 116, 111, 115, 92, 98, 108, 117, 101, 46, 112, 110, 103] },
                 "detectedFormat": "jpeg",
                 "sourceVariant": "jpeg-baseline-rgb8",
                 "encodedWidthPx": 1,
@@ -1069,11 +1069,11 @@
             {
               "mediaRef": {
                 "mediaId": "photo-frac",
-                "nativePath": { "windowsUtf16": [67, 58, 92, 70, 111, 116, 111, 115, 92, 102, 114, 97, 231, 227, 111, 46, 112, 110, 103] }
+                "nativePath": { "encoding": "windowsUtf16", "units": [67, 58, 92, 70, 111, 116, 111, 115, 92, 102, 114, 97, 231, 227, 111, 46, 112, 110, 103] }
               },
               "sourceObservation": {
                 "mediaId": "photo-frac",
-                "nativePath": { "windowsUtf16": [67, 58, 92, 70, 111, 116, 111, 115, 92, 102, 114, 97, 231, 227, 111, 46, 112, 110, 103] },
+                "nativePath": { "encoding": "windowsUtf16", "units": [67, 58, 92, 70, 111, 116, 111, 115, 92, 102, 114, 97, 231, 227, 111, 46, 112, 110, 103] },
                 "detectedFormat": "png",
                 "sourceVariant": "png-static-rgba8",
                 "encodedWidthPx": 2,
@@ -1091,8 +1091,8 @@
             "bindings": [
               {
                 "kind": "disk",
-                "logicalRoot": { "windowsUtf16": [67, 58, 92] },
-                "operationalRoot": { "windowsUtf16": [67, 58, 92] }
+                "logicalRoot": { "encoding": "windowsUtf16", "units": [67, 58, 92] },
+                "operationalRoot": { "encoding": "windowsUtf16", "units": [67, 58, 92] }
               }
             ]
           }
