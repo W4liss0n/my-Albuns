@@ -2,6 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-01
+updated: 2026-09-01
 ticket: 3-programa-04-renderizador-final
 ---
 
@@ -45,14 +46,22 @@ Inspeção e hashing dos Originais são I/O assíncrono fora da thread da interf
 a revisão só é congelada como snapshot depois que o resultado completo volta ao
 proprietário e continua atual.
 
-`ExportPipeline` valida o snapshot e deriva dele `ComposedOutputUnit`s
-imutáveis. O Processador pode receber somente essas projeções necessárias, e
-não precisa transportar o snapshot inteiro, mas cada decisão e parâmetro
-criativo recebido precisa ser derivado exclusivamente dele. Os bytes dos
-Originais continuam vindo do `CapturedSourceSet` separado e só podem preencher
-os `mediaId`s já fechados pela projeção. `RootBindingPlan`, destino, política de
-substituição, qualidade, cancelamento e correlação são dados operacionais;
-nenhum deles pode alterar a composição.
+`RenderSnapshot` é a entrada lógica pública de `ExportPipeline::plan`, mas não
+é DTO de IPC e nunca é serializado ou enviado ao Processador. Depois de validar
+o snapshot, `ExportPipeline` deriva um `ImagingRenderEnvelopeV1` owned e
+versionado. Esse envelope contém uma ou mais `ComposedOutputUnit`s selecionadas
+e ordenadas; exatamente um par `MediaRef + SourceObservation` para cada
+`mediaId` referenciado por essas unidades, sem falta, sobra ou duplicata; o
+mesmo `RootBindingPlan` congelado; destino preparado, formato, qualidade,
+cancelamento e correlação necessários à tentativa. `projectId` e Revisão são
+proveniência opaca para o Processador, não autorização para reabrir o Projeto.
+O envelope não contém `RenderSnapshot`, documento `.myalbuns`,
+`CompositionPlan`, Sessão, Cache, unidade não selecionada nem fonte não
+referenciada.
+
+Os bytes dos Originais continuam vindo do `CapturedSourceSet` separado e só
+podem preencher os `mediaId`s fechados pelo envelope. Dados operacionais não
+podem alterar a composição.
 
 O Processador não lê `.myalbuns`, não consulta a Sessão, não usa Cache como
 fonte, não invoca `CompositionCore` e não resolve uma segunda versão de
@@ -95,6 +104,10 @@ As Unidades de Exportação são derivadas antes da rasterização:
   sua superfície ativa;
 - `Por página` produz uma unidade para cada Página ativa, na ordem da
   Numeração de Página;
+- a numeração percorre somente lados ativos, sem reservar índice para lado
+  inativo: uma abertura direita seguida de Lâmina dupla e fechamento esquerdo
+  produz `right #1 | left #2, right #3 | left #4`, sem lacuna nem unidade para
+  os lados ausentes;
 - uma Página de Lâmina dupla é o recorte físico da metade correspondente e tem
   a origem traduzida para `(0, 0)` sem mudar as transformações dos elementos;
 - uma Lâmina estruturalmente de página única já possui somente sua Página
@@ -727,7 +740,7 @@ ausente, desconhecido, terminal livre ou variante não reconhecida falha. Uma
 versão futura é aditiva ou publica novo schema; não edita silenciosamente o
 significado de um caso existente.
 
-O corpus possui dois seams complementares, sem fingir que o tipo parcial hoje
+O corpus possui três seams complementares, sem fingir que o tipo parcial hoje
 implementado já é o contrato final:
 
 1. `CreativeStateV1 + MediaRefV1 + SourceObservationV1 +
@@ -735,19 +748,28 @@ implementado já é o contrato final:
    consumível, associação exata de pathname, projeção pura dos fatos e o plano
    criativo completo esperado;
 2. `ComposedOutputUnitV1 + NormalizedSourceV1 -> CanonicalRasterV1` traz a
-   projeção imutável, fontes normalizadas e pixels esperados.
+   projeção imutável, fontes normalizadas e pixels esperados;
+3. `ImagingRenderEnvelopeV1` liga uma composição e suas unidades selecionadas
+   aos pares exatos `MediaRefV1 + SourceObservationV1`, ao
+   `RootBindingPlanV1` e aos valores operacionais e de correlação, em schema
+   fechado que rejeita snapshot, documento e plano criativo brutos.
 
 O primeiro seam prova interpretação, ordem e geometria. O segundo prova a
 matriz Q32.32, centros de pixel, bilinear, alfa premultiplicado, Borda e
 Opacidade sem reimplementar `CompositionCore`. Assets codificados reais levam
 pathname relativo, tamanho e SHA-256, e congelam fatos antes e depois da
-orientação.
+orientação. O terceiro prova que o adapter futuro recebe uma projeção mínima e
+autocontida, não um snapshot disfarçado; ele é oráculo do contrato final, não
+alegação de que o protocolo JPEG transitório já transporta todos esses campos.
 
 O corpus cobre:
 
 - largura raster ímpar, centro e Páginas independentes;
 - entrada criativa completa, ordem por `zIndex` e desempate por `frameId`,
   transformação fracionária e unidades resolvidas;
+- abertura com somente a Página direita, Lâmina interna dupla e fechamento com
+  somente a Página esquerda, registrando o mesmo ID para `CompositionCore`,
+  Canvas e `ExportPipeline` e fixando as Páginas ativas como `1, 2, 3, 4`;
 - Pilha visual, stretch anisotrópico de decorativo de Ambos os lados contínuo
   na Página direita, bilinear por centro de pixel, transparência
   premultiplicada, Borda, Opacidade de grupo e Frame cruzando o centro;
@@ -796,7 +818,7 @@ As entregas posteriores possuem limites inequívocos:
 | Owner | Implementa sem redefinir |
 |---|---|
 | issue #13 | integração real de caminhos, UNC, mapeados, longos e códigos até a interface |
-| issue #35 | adapter do plano Q32.32, materialização JPEG/PNG, diálogo final, progresso, preparação e Publicação |
+| issue #35 | materialização do adapter e protocolo do envelope já fechado, plano Q32.32, JPEG/PNG, diálogo final, progresso, preparação e Publicação, sem redefinir o payload |
 | issue #37 | adaptador PDF sobre os mesmos rasters e ordem |
 | issue #38 | detecção, confirmação e remoção de Saídas órfãs finais pela gramática aceita |
 | issue #39 | `BatchRunner`, lease único, revalidação do Projeto, checkpoint e retomada por item |

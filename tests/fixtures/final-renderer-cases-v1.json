@@ -119,6 +119,7 @@
       "kind": "composition",
       "data": {
         "id": "fractional-transform-z-order-and-page-units",
+        "consumerAdapters": ["composition-core", "canvas", "export-pipeline"],
         "input": {
           "creativeState": {
             "revision": 7,
@@ -529,6 +530,209 @@
       }
     },
     {
+      "kind": "composition",
+      "data": {
+        "id": "single-active-edge-pages",
+        "consumerAdapters": ["composition-core", "canvas", "export-pipeline"],
+        "input": {
+          "creativeState": {
+            "revision": 8,
+            "dpi": 4,
+            "mediaRefs": [],
+            "sheets": [
+              {
+                "sheetId": "edge-initial",
+                "number": 1,
+                "activeSides": "right",
+                "widthUm": 50800,
+                "heightUm": 25400,
+                "background": {
+                  "scope": "per-side",
+                  "left": { "kind": "solid", "data": { "rgb": "#FF0000" } },
+                  "right": { "kind": "solid", "data": { "rgb": "#0000FF" } }
+                },
+                "frames": [],
+                "overlay": { "scope": "per-side", "left": null, "right": null }
+              },
+              {
+                "sheetId": "edge-internal",
+                "number": 2,
+                "activeSides": "both",
+                "widthUm": 50800,
+                "heightUm": 25400,
+                "background": {
+                  "scope": "per-side",
+                  "left": { "kind": "solid", "data": { "rgb": "#00FF00" } },
+                  "right": { "kind": "solid", "data": { "rgb": "#FF00FF" } }
+                },
+                "frames": [],
+                "overlay": { "scope": "per-side", "left": null, "right": null }
+              },
+              {
+                "sheetId": "edge-final",
+                "number": 3,
+                "activeSides": "left",
+                "widthUm": 50800,
+                "heightUm": 25400,
+                "background": {
+                  "scope": "per-side",
+                  "left": { "kind": "solid", "data": { "rgb": "#FFFF00" } },
+                  "right": { "kind": "solid", "data": { "rgb": "#00FFFF" } }
+                },
+                "frames": [],
+                "overlay": { "scope": "per-side", "left": null, "right": null }
+              }
+            ]
+          },
+          "sourceGeometryFacts": [],
+          "sourceObservations": []
+        },
+        "expectedPlan": {
+          "planVersion": 1,
+          "revision": 8,
+          "dpi": 4,
+          "referencedMediaIds": [],
+          "sheets": [
+            {
+              "sheetId": "edge-initial",
+              "surfaceRectUm": [0, 0, 25400, 25400],
+              "orderedLayers": [
+                {
+                  "kind": "base",
+                  "data": { "layerId": "base", "rectUm": [0, 0, 25400, 25400], "rgb": "#FFFFFF" }
+                },
+                {
+                  "kind": "background",
+                  "data": {
+                    "layerId": "background:right",
+                    "scope": "right",
+                    "rectUm": [0, 0, 25400, 25400],
+                    "paint": { "kind": "solid", "data": { "rgb": "#0000FF" } }
+                  }
+                }
+              ],
+              "outputUnits": [
+                {
+                  "unitId": "edge-initial:spread",
+                  "mode": "per-sheet",
+                  "logicalIndex": 1,
+                  "physicalSourceRectUm": [0, 0, 25400, 25400],
+                  "normalizedOriginUm": [0, 0],
+                  "widthPx": 4,
+                  "heightPx": 4
+                },
+                {
+                  "unitId": "edge-initial:right",
+                  "mode": "per-page",
+                  "logicalIndex": 1,
+                  "physicalSourceRectUm": [0, 0, 25400, 25400],
+                  "normalizedOriginUm": [0, 0],
+                  "widthPx": 4,
+                  "heightPx": 4
+                }
+              ]
+            },
+            {
+              "sheetId": "edge-internal",
+              "surfaceRectUm": [0, 0, 50800, 25400],
+              "orderedLayers": [
+                {
+                  "kind": "base",
+                  "data": { "layerId": "base", "rectUm": [0, 0, 50800, 25400], "rgb": "#FFFFFF" }
+                },
+                {
+                  "kind": "background",
+                  "data": {
+                    "layerId": "background:left",
+                    "scope": "left",
+                    "rectUm": [0, 0, 25400, 25400],
+                    "paint": { "kind": "solid", "data": { "rgb": "#00FF00" } }
+                  }
+                },
+                {
+                  "kind": "background",
+                  "data": {
+                    "layerId": "background:right",
+                    "scope": "right",
+                    "rectUm": [25400, 0, 25400, 25400],
+                    "paint": { "kind": "solid", "data": { "rgb": "#FF00FF" } }
+                  }
+                }
+              ],
+              "outputUnits": [
+                {
+                  "unitId": "edge-internal:spread",
+                  "mode": "per-sheet",
+                  "logicalIndex": 2,
+                  "physicalSourceRectUm": [0, 0, 50800, 25400],
+                  "normalizedOriginUm": [0, 0],
+                  "widthPx": 8,
+                  "heightPx": 4
+                },
+                {
+                  "unitId": "edge-internal:left",
+                  "mode": "per-page",
+                  "logicalIndex": 2,
+                  "physicalSourceRectUm": [0, 0, 25400, 25400],
+                  "normalizedOriginUm": [0, 0],
+                  "widthPx": 4,
+                  "heightPx": 4
+                },
+                {
+                  "unitId": "edge-internal:right",
+                  "mode": "per-page",
+                  "logicalIndex": 3,
+                  "physicalSourceRectUm": [25400, 0, 25400, 25400],
+                  "normalizedOriginUm": [0, 0],
+                  "widthPx": 4,
+                  "heightPx": 4
+                }
+              ]
+            },
+            {
+              "sheetId": "edge-final",
+              "surfaceRectUm": [0, 0, 25400, 25400],
+              "orderedLayers": [
+                {
+                  "kind": "base",
+                  "data": { "layerId": "base", "rectUm": [0, 0, 25400, 25400], "rgb": "#FFFFFF" }
+                },
+                {
+                  "kind": "background",
+                  "data": {
+                    "layerId": "background:left",
+                    "scope": "left",
+                    "rectUm": [0, 0, 25400, 25400],
+                    "paint": { "kind": "solid", "data": { "rgb": "#FFFF00" } }
+                  }
+                }
+              ],
+              "outputUnits": [
+                {
+                  "unitId": "edge-final:spread",
+                  "mode": "per-sheet",
+                  "logicalIndex": 3,
+                  "physicalSourceRectUm": [0, 0, 25400, 25400],
+                  "normalizedOriginUm": [0, 0],
+                  "widthPx": 4,
+                  "heightPx": 4
+                },
+                {
+                  "unitId": "edge-final:left",
+                  "mode": "per-page",
+                  "logicalIndex": 4,
+                  "physicalSourceRectUm": [0, 0, 25400, 25400],
+                  "normalizedOriginUm": [0, 0],
+                  "widthPx": 4,
+                  "heightPx": 4
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
       "kind": "canonical-raster",
       "data": {
         "id": "fractional-bilinear-alpha-border",
@@ -725,6 +929,157 @@
             ["AEC9B2FF", "3030D3FF"],
             ["C3C3D1FF", "CDCDCDFF"]
           ]
+        }
+      }
+    },
+    {
+      "kind": "imaging-envelope",
+      "data": {
+        "id": "imaging-envelope-right-page",
+        "compositionCaseId": "fractional-transform-z-order-and-page-units",
+        "canonicalRasterCaseId": "right-page-crossing-frame-q32",
+        "expectedEnvelope": {
+          "protocolVersion": 1,
+          "correlation": {
+            "requestId": "render-contract-0001",
+            "projectId": "project-golden"
+          },
+          "revision": 7,
+          "dpi": 4,
+          "preparedOutputPath": {
+            "windowsUtf16": [67, 58, 92, 69, 120, 112, 111, 114, 116, 92, 114, 101, 110, 100, 101, 114, 45, 99, 111, 110, 116, 114, 97, 99, 116, 45, 48, 48, 48, 49, 46, 106, 112, 103]
+          },
+          "units": [
+            {
+              "unitId": "sheet-1:right",
+              "widthPx": 2,
+              "heightPx": 4,
+              "dpi": 4,
+              "physicalSourceRectUm": [14605, 0, 14605, 25400],
+              "layers": [
+                { "kind": "base", "data": { "rgb": "#FFFFFF" } },
+                {
+                  "kind": "image",
+                  "data": {
+                    "layerId": "background:both",
+                    "sourceId": "decorative-checker",
+                    "clipRectPx": [0, 0, 2, 4],
+                    "sourceFromDestinationQ32": {
+                      "xx": "1867376250", "xy": "0", "tx": "5228653500",
+                      "yx": "0", "yy": "2147481100", "ty": "1073740550"
+                    },
+                    "opacityByte": 255,
+                    "blackAndWhite": false
+                  }
+                },
+                {
+                  "kind": "frame-group",
+                  "data": {
+                    "layerId": "frame:00000000-0000-4000-8000-000000000003",
+                    "sourceId": "photo-blue",
+                    "frameRectPx": [1, 1, 1, 2],
+                    "photoClipRectPx": [1, 1, 1, 2],
+                    "sourceFromDestinationQ32": {
+                      "xx": "2147481100", "xy": "0", "tx": "-644241782",
+                      "yx": "0", "yy": "2147481100", "ty": "-1073738002"
+                    },
+                    "borderFillRectsPx": [],
+                    "borderRgb": "#000000",
+                    "groupOpacityByte": 255,
+                    "blackAndWhite": false
+                  }
+                },
+                {
+                  "kind": "frame-group",
+                  "data": {
+                    "layerId": "frame:00000000-0000-4000-8000-000000000002",
+                    "sourceId": "photo-frac",
+                    "frameRectPx": [0, 0, 2, 4],
+                    "photoClipRectPx": [0, 0, 2, 4],
+                    "sourceFromDestinationQ32": {
+                      "xx": "413092900", "xy": "-1541678400", "tx": "6692685529",
+                      "yx": "-1541678400", "yy": "-413092900", "ty": "4337539717"
+                    },
+                    "borderFillRectsPx": [],
+                    "borderRgb": "#FFFF00",
+                    "groupOpacityByte": 128,
+                    "blackAndWhite": true
+                  }
+                }
+              ]
+            }
+          ],
+          "sources": [
+            {
+              "mediaRef": {
+                "mediaId": "decorative-checker",
+                "nativePath": { "windowsUtf16": [67, 58, 92, 70, 111, 116, 111, 115, 92, 100, 101, 99, 111, 114, 97, 116, 105, 118, 111, 46, 112, 110, 103] }
+              },
+              "sourceObservation": {
+                "mediaId": "decorative-checker",
+                "nativePath": { "windowsUtf16": [67, 58, 92, 70, 111, 116, 111, 115, 92, 100, 101, 99, 111, 114, 97, 116, 105, 118, 111, 46, 112, 110, 103] },
+                "detectedFormat": "png",
+                "sourceVariant": "png-static-rgba8",
+                "encodedWidthPx": 2,
+                "encodedHeightPx": 2,
+                "orientedWidthPx": 2,
+                "orientedHeightPx": 2,
+                "embeddedOrientation": 6,
+                "appliedOrientation": 1,
+                "colorProfile": "absent-assume-srgb",
+                "sha256FullFileV1": "5bbf46acb3dac92136a6ffbb13f9e144835703cbc776c55479da7fc8bf7f0b43"
+              }
+            },
+            {
+              "mediaRef": {
+                "mediaId": "photo-blue",
+                "nativePath": { "windowsUtf16": [67, 58, 92, 70, 111, 116, 111, 115, 92, 98, 108, 117, 101, 46, 112, 110, 103] }
+              },
+              "sourceObservation": {
+                "mediaId": "photo-blue",
+                "nativePath": { "windowsUtf16": [67, 58, 92, 70, 111, 116, 111, 115, 92, 98, 108, 117, 101, 46, 112, 110, 103] },
+                "detectedFormat": "jpeg",
+                "sourceVariant": "jpeg-baseline-rgb8",
+                "encodedWidthPx": 1,
+                "encodedHeightPx": 1,
+                "orientedWidthPx": 1,
+                "orientedHeightPx": 1,
+                "embeddedOrientation": 1,
+                "appliedOrientation": 1,
+                "colorProfile": "absent-assume-srgb",
+                "sha256FullFileV1": "4444444444444444444444444444444444444444444444444444444444444444"
+              }
+            },
+            {
+              "mediaRef": {
+                "mediaId": "photo-frac",
+                "nativePath": { "windowsUtf16": [67, 58, 92, 70, 111, 116, 111, 115, 92, 102, 114, 97, 231, 227, 111, 46, 112, 110, 103] }
+              },
+              "sourceObservation": {
+                "mediaId": "photo-frac",
+                "nativePath": { "windowsUtf16": [67, 58, 92, 70, 111, 116, 111, 115, 92, 102, 114, 97, 231, 227, 111, 46, 112, 110, 103] },
+                "detectedFormat": "png",
+                "sourceVariant": "png-static-rgba8",
+                "encodedWidthPx": 2,
+                "encodedHeightPx": 2,
+                "orientedWidthPx": 2,
+                "orientedHeightPx": 2,
+                "embeddedOrientation": 1,
+                "appliedOrientation": 1,
+                "colorProfile": "absent-assume-srgb",
+                "sha256FullFileV1": "2222222222222222222222222222222222222222222222222222222222222222"
+              }
+            }
+          ],
+          "rootBindingPlan": {
+            "bindings": [
+              {
+                "kind": "disk",
+                "logicalRoot": { "windowsUtf16": [67, 58, 92] },
+                "operationalRoot": { "windowsUtf16": [67, 58, 92] }
+              }
+            ]
+          }
         }
       }
     },
