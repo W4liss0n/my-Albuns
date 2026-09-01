@@ -6,8 +6,9 @@ use std::{
 };
 
 use image::{DynamicImage, GenericImageView, ImageDecoder, ImageFormat, ImageReader};
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 use sha2::{Digest, Sha256};
+use uuid::{Uuid, Version};
 
 const MICROMETERS_PER_INCH: u64 = 25_400;
 const Q32_ONE: i128 = 1_i128 << 32;
@@ -141,14 +142,14 @@ struct RasterGeometryExpectedV1 {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct CompositionCaseV1 {
     id: String,
-    consumer_adapters: Vec<ConsumerAdapterV1>,
+    adapter_registrations: Vec<ContractAdapterV1>,
     input: CompositionInputV1,
     expected_plan: ExpectedCompositionPlanV1,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "kebab-case")]
-enum ConsumerAdapterV1 {
+enum ContractAdapterV1 {
     CompositionCore,
     Canvas,
     ExportPipeline,
@@ -535,9 +536,11 @@ struct ImagingEnvelopeCaseV1 {
 struct ImagingRenderEnvelopeV1 {
     protocol_version: u32,
     correlation: ImagingCorrelationV1,
+    attempt: ImagingAttemptV1,
     revision: u64,
     dpi: u32,
-    prepared_output_path: NativePathV1,
+    format_options: ImagingFormatOptionsV1,
+    preparation: ImagingPreparationV1,
     units: Vec<ComposedOutputUnitV1>,
     sources: Vec<ImagingSourceV1>,
     root_binding_plan: RootBindingPlanV1,
@@ -548,6 +551,60 @@ struct ImagingRenderEnvelopeV1 {
 struct ImagingCorrelationV1 {
     request_id: String,
     project_id: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ImagingAttemptV1 {
+    #[serde(deserialize_with = "deserialize_canonical_uuid_v4")]
+    attempt_id: String,
+    cancellation_id: String,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[serde(tag = "format", rename_all = "kebab-case", deny_unknown_fields)]
+enum ImagingFormatOptionsV1 {
+    Jpeg {
+        #[serde(deserialize_with = "deserialize_jpeg_quality")]
+        quality: u8,
+    },
+    Png {},
+    Pdf {},
+}
+
+fn deserialize_canonical_uuid_v4<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = String::deserialize(deserializer)?;
+    let parsed = Uuid::parse_str(&value).map_err(serde::de::Error::custom)?;
+    if parsed.get_version() != Some(Version::Random) || parsed.hyphenated().to_string() != value {
+        return Err(serde::de::Error::custom(
+            "attemptId must be a canonical lowercase hyphenated UUID v4",
+        ));
+    }
+    Ok(value)
+}
+
+fn deserialize_jpeg_quality<'de, D>(deserializer: D) -> Result<u8, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let quality = u8::deserialize(deserializer)?;
+    if !(1..=100).contains(&quality) {
+        return Err(serde::de::Error::custom(
+            "JPEG quality must be in the inclusive range 1..=100",
+        ));
+    }
+    Ok(quality)
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ImagingPreparationV1 {
+    destination_directory: NativePathV1,
+    attempt_directory: NativePathV1,
+    output_path: NativePathV1,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -572,7 +629,7 @@ struct RootBindingV1 {
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "camelCase")]
 enum PathRootKindV1 {
     Disk,
     Unc,
@@ -974,21 +1031,20 @@ fn composition_case<'a>(corpus: &'a CorpusV1, case_id: &str) -> &'a CompositionC
         .expect("the named composition case exists")
 }
 
-fn export_pipeline_case_adapter(
-    case: &CompositionCaseV1,
-) -> Option<(&str, Vec<&ExpectedOutputUnitV1>)> {
-    case.consumer_adapters
-        .contains(&ConsumerAdapterV1::ExportPipeline)
-        .then(|| {
-            (
-                case.id.as_str(),
-                case.expected_plan
-                    .sheets
-                    .iter()
-                    .flat_map(|sheet| &sheet.output_units)
-                    .collect(),
-            )
+fn registered_composition_case_ids(
+    corpus: &CorpusV1,
+    adapter: ContractAdapterV1,
+) -> BTreeSet<&str> {
+    corpus
+        .cases
+        .iter()
+        .filter_map(|case| match case {
+            GoldenCaseV1::Composition(case) if case.adapter_registrations.contains(&adapter) => {
+                Some(case.id.as_str())
+            }
+            _ => None,
         })
+        .collect()
 }
 
 fn raster_edge(micrometers: u64, dpi: u32) -> u32 {
@@ -2525,11 +2581,11 @@ fn geometry_and_creative_state_produce_the_complete_expected_plan() {
         })
         .expect("the composition case exists");
     assert_eq!(
-        composition.consumer_adapters.as_slice(),
+        composition.adapter_registrations.as_slice(),
         &[
-            ConsumerAdapterV1::CompositionCore,
-            ConsumerAdapterV1::Canvas,
-            ConsumerAdapterV1::ExportPipeline,
+            ContractAdapterV1::CompositionCore,
+            ContractAdapterV1::Canvas,
+            ContractAdapterV1::ExportPipeline,
         ]
     );
     let actual = reference_plan(&composition.input, &corpus.algorithms.sampler);
@@ -2563,40 +2619,20 @@ fn geometry_and_creative_state_produce_the_complete_expected_plan() {
 
     let active_edges = composition_case(&corpus, "single-active-edge-pages");
     assert_eq!(
-        active_edges.consumer_adapters.as_slice(),
+        active_edges.adapter_registrations.as_slice(),
         &[
-            ConsumerAdapterV1::CompositionCore,
-            ConsumerAdapterV1::Canvas,
-            ConsumerAdapterV1::ExportPipeline,
+            ContractAdapterV1::CompositionCore,
+            ContractAdapterV1::Canvas,
+            ContractAdapterV1::ExportPipeline,
         ],
-        "the same case ID is the contract consumed by every composition adapter"
+        "the same case ID is assigned to every future contract adapter"
     );
     let active_edges_plan = reference_plan(&active_edges.input, &corpus.algorithms.sampler);
     assert_eq!(active_edges_plan, active_edges.expected_plan);
-}
-
-#[test]
-fn export_pipeline_adapter_consumes_single_active_edges_by_composition_case_id() {
-    let corpus = corpus();
-    let adapted = corpus
-        .cases
+    let page_units = active_edges_plan
+        .sheets
         .iter()
-        .filter_map(|case| match case {
-            GoldenCaseV1::Composition(case) => export_pipeline_case_adapter(case),
-            _ => None,
-        })
-        .collect::<BTreeMap<_, _>>();
-    assert_eq!(
-        adapted.keys().copied().collect::<BTreeSet<_>>(),
-        BTreeSet::from([
-            "fractional-transform-z-order-and-page-units",
-            "single-active-edge-pages",
-        ]),
-        "every registered ExportPipeline adapter dispatches through the case ID"
-    );
-
-    let page_units = adapted["single-active-edge-pages"]
-        .iter()
+        .flat_map(|sheet| &sheet.output_units)
         .filter(|unit| unit.mode == ExportModeV1::PerPage)
         .map(|unit| {
             (
@@ -2638,8 +2674,24 @@ fn export_pipeline_adapter_consumes_single_active_edges_by_composition_case_id()
             ),
             ("edge-final:left", 4, [0, 0, 25_400, 25_400], [0, 0], 4, 4,),
         ],
-        "only active Pages become normalized, gapless ExportPipeline units"
+        "only active Pages become normalized, gapless contract units"
     );
+}
+
+#[test]
+fn composition_case_ids_are_registered_for_every_contract_adapter() {
+    let corpus = corpus();
+    let expected = BTreeSet::from([
+        "fractional-transform-z-order-and-page-units",
+        "single-active-edge-pages",
+    ]);
+    for adapter in [
+        ContractAdapterV1::CompositionCore,
+        ContractAdapterV1::Canvas,
+        ContractAdapterV1::ExportPipeline,
+    ] {
+        assert_eq!(registered_composition_case_ids(&corpus, adapter), expected);
+    }
 }
 
 #[test]
@@ -2678,16 +2730,54 @@ fn imaging_envelope_is_closed_and_contains_only_the_selected_projection() {
         })
         .expect("the envelope names its selected canonical output unit");
     let envelope = &envelope_case.expected_envelope;
+    let RasterOriginV1::CompositionFrame(raster_origin) = &raster.origin else {
+        panic!("the selected envelope unit must remain linked to a composition");
+    };
+    assert_eq!(
+        raster_origin.composition_case_id,
+        envelope_case.composition_case_id
+    );
 
     assert_eq!(envelope.protocol_version, 1);
     assert_eq!(envelope.correlation.request_id, "render-contract-0001");
     assert_eq!(envelope.correlation.project_id, "project-golden");
+    assert_eq!(
+        envelope.attempt.attempt_id,
+        "00000000-0000-4000-8000-000000000017"
+    );
+    assert_eq!(
+        envelope.attempt.cancellation_id,
+        "cancel-render-contract-0001"
+    );
     assert_eq!(envelope.revision, composition.input.creative_state.revision);
     assert_eq!(envelope.dpi, composition.input.creative_state.dpi);
+    let ImagingFormatOptionsV1::Jpeg { quality } = envelope.format_options else {
+        panic!("the linked right-Page envelope is the JPEG quality oracle");
+    };
+    assert_eq!(quality, 87);
+    assert!((1..=100).contains(&quality));
     assert_eq!(
         envelope.units.as_slice(),
         std::slice::from_ref(&raster.input.unit)
     );
+
+    let destination_directory =
+        String::from_utf16(&envelope.preparation.destination_directory.windows_utf16)
+            .expect("the golden destination is valid UTF-16");
+    let attempt_directory =
+        String::from_utf16(&envelope.preparation.attempt_directory.windows_utf16)
+            .expect("the golden attempt directory is valid UTF-16");
+    let output_path = String::from_utf16(&envelope.preparation.output_path.windows_utf16)
+        .expect("the golden prepared output is valid UTF-16");
+    assert_eq!(destination_directory, r"C:\Export");
+    assert_eq!(
+        attempt_directory,
+        format!(
+            r"{destination_directory}\.myalbuns-export-{}.tmp",
+            envelope.attempt.attempt_id
+        )
+    );
+    assert_eq!(output_path, format!(r"{attempt_directory}\album_001.jpg"));
 
     let selected_source_ids = envelope.units[0]
         .layers
@@ -2735,7 +2825,19 @@ fn imaging_envelope_is_closed_and_contains_only_the_selected_projection() {
         );
     }
 
-    assert!(!envelope.root_binding_plan.bindings.is_empty());
+    assert_eq!(envelope.root_binding_plan.bindings.len(), 1);
+    assert_eq!(
+        envelope.root_binding_plan.bindings[0],
+        RootBindingV1 {
+            kind: PathRootKindV1::Disk,
+            logical_root: NativePathV1 {
+                windows_utf16: vec![67, 58, 92],
+            },
+            operational_root: NativePathV1 {
+                windows_utf16: vec![67, 58, 92],
+            },
+        }
+    );
     let logical_roots = envelope
         .root_binding_plan
         .bindings
@@ -2757,12 +2859,33 @@ fn imaging_envelope_is_closed_and_contains_only_the_selected_projection() {
                     .starts_with(&binding.logical_root.windows_utf16)
         }));
     }
-    assert!(envelope.root_binding_plan.bindings.iter().any(|binding| {
-        envelope
-            .prepared_output_path
-            .windows_utf16
-            .starts_with(&binding.logical_root.windows_utf16)
-    }));
+    for path in [
+        &envelope.preparation.destination_directory,
+        &envelope.preparation.attempt_directory,
+        &envelope.preparation.output_path,
+    ] {
+        assert!(envelope.root_binding_plan.bindings.iter().any(|binding| {
+            path.windows_utf16
+                .starts_with(&binding.logical_root.windows_utf16)
+        }));
+    }
+
+    for (wire, expected) in [
+        ("disk", PathRootKindV1::Disk),
+        ("unc", PathRootKindV1::Unc),
+        ("verbatimDisk", PathRootKindV1::VerbatimDisk),
+        ("verbatimUnc", PathRootKindV1::VerbatimUnc),
+        ("posix", PathRootKindV1::Posix),
+    ] {
+        assert_eq!(
+            serde_json::from_value::<PathRootKindV1>(serde_json::json!(wire))
+                .expect("every canonical RootBinding kind deserializes"),
+            expected
+        );
+    }
+    for noncanonical in ["verbatim-disk", "verbatim-unc"] {
+        assert!(serde_json::from_value::<PathRootKindV1>(serde_json::json!(noncanonical)).is_err());
+    }
 
     let corpus_path = workspace_root().join("tests/fixtures/final-renderer-cases-v1.json");
     let raw_corpus: serde_json::Value =
@@ -2793,7 +2916,18 @@ fn imaging_envelope_is_closed_and_contains_only_the_selected_projection() {
             "the closed envelope rejects {forbidden_field}"
         );
     }
-    for required_field in ["units", "sources", "rootBindingPlan"] {
+    for required_field in [
+        "protocolVersion",
+        "correlation",
+        "attempt",
+        "revision",
+        "dpi",
+        "formatOptions",
+        "preparation",
+        "units",
+        "sources",
+        "rootBindingPlan",
+    ] {
         let mut mutated = raw_envelope.clone();
         mutated
             .as_object_mut()
@@ -2803,6 +2937,60 @@ fn imaging_envelope_is_closed_and_contains_only_the_selected_projection() {
             serde_json::from_value::<ImagingRenderEnvelopeV1>(mutated).is_err(),
             "the closed envelope requires {required_field}"
         );
+    }
+
+    for malformed_format in [
+        serde_json::json!({ "format": "jpeg" }),
+        serde_json::json!({ "format": "jpeg", "quality": 0 }),
+        serde_json::json!({ "format": "jpeg", "quality": 101 }),
+        serde_json::json!({ "format": "png", "quality": 87 }),
+        serde_json::json!({ "format": "pdf", "quality": 87 }),
+    ] {
+        let mut mutated = raw_envelope.clone();
+        mutated
+            .as_object_mut()
+            .expect("the envelope is an object")
+            .insert("formatOptions".to_owned(), malformed_format.clone());
+        assert!(
+            serde_json::from_value::<ImagingRenderEnvelopeV1>(mutated).is_err(),
+            "the closed format union rejects {malformed_format}"
+        );
+    }
+
+    for noncanonical_attempt_id in [
+        "00000000-0000-1000-8000-000000000017",
+        "00000000000040008000000000000017",
+        "00000000-0000-4000-8000-00000000001A",
+    ] {
+        let mut mutated = raw_envelope.clone();
+        mutated["attempt"]["attemptId"] = serde_json::json!(noncanonical_attempt_id);
+        assert!(serde_json::from_value::<ImagingRenderEnvelopeV1>(mutated).is_err());
+    }
+    assert_eq!(
+        serde_json::from_value::<ImagingFormatOptionsV1>(serde_json::json!({
+            "format": "png"
+        }))
+        .expect("PNG has no JPEG-only option"),
+        ImagingFormatOptionsV1::Png {}
+    );
+    assert_eq!(
+        serde_json::from_value::<ImagingFormatOptionsV1>(serde_json::json!({
+            "format": "pdf"
+        }))
+        .expect("PDF has no JPEG-only option"),
+        ImagingFormatOptionsV1::Pdf {}
+    );
+
+    for (container, required_nested_field) in [
+        ("attempt", "cancellationId"),
+        ("preparation", "attemptDirectory"),
+    ] {
+        let mut mutated = raw_envelope.clone();
+        mutated[container]
+            .as_object_mut()
+            .expect("the nested envelope value is an object")
+            .remove(required_nested_field);
+        assert!(serde_json::from_value::<ImagingRenderEnvelopeV1>(mutated).is_err());
     }
 }
 

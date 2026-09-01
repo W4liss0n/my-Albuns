@@ -958,7 +958,7 @@ test.each([
 test("consumes the registered final-renderer case for gapless active Page labels", async () => {
   const adapted = adaptFinalRendererCaseForCanvas("single-active-edge-pages");
 
-  expect(adapted.consumerAdapters).toEqual([
+  expect(adapted.adapterRegistrations).toEqual([
     "composition-core",
     "canvas",
     "export-pipeline",
@@ -1073,7 +1073,7 @@ type GoldenCanvasLayerV1 =
 
 interface GoldenCanvasCompositionCase {
   id: string;
-  consumerAdapters: string[];
+  adapterRegistrations: string[];
   input: {
     creativeState: {
       sheets: Array<{
@@ -1112,7 +1112,7 @@ function adaptFinalRendererCaseForCanvas(caseId: string) {
   if (!rawCase) {
     throw new Error(`final-renderer Canvas case not found: ${caseId}`);
   }
-  if (!rawCase.data.consumerAdapters.includes("canvas")) {
+  if (!rawCase.data.adapterRegistrations.includes("canvas")) {
     throw new Error(`final-renderer case is not registered for Canvas: ${caseId}`);
   }
 
@@ -1179,7 +1179,7 @@ function adaptFinalRendererCaseForCanvas(caseId: string) {
 
   return {
     caseId: rawCase.data.id,
-    consumerAdapters: rawCase.data.consumerAdapters,
+    adapterRegistrations: rawCase.data.adapterRegistrations,
     compositionPlan,
     sheetBarMetadata,
   };

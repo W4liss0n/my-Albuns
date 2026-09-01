@@ -52,8 +52,14 @@ o snapshot, `ExportPipeline` deriva um `ImagingRenderEnvelopeV1` owned e
 versionado. Esse envelope contém uma ou mais `ComposedOutputUnit`s selecionadas
 e ordenadas; exatamente um par `MediaRef + SourceObservation` para cada
 `mediaId` referenciado por essas unidades, sem falta, sobra ou duplicata; o
-mesmo `RootBindingPlan` congelado; destino preparado, formato, qualidade,
-cancelamento e correlação necessários à tentativa. `projectId` e Revisão são
+mesmo `RootBindingPlan` congelado; e os valores operacionais e de correlação
+necessários à tentativa. Estes valores formam um schema fechado: `attemptId`
+UUID v4 canônico e `cancellationId` opaco; `formatOptions` como união marcada
+`jpeg { quality: 1..=100 }`, `png` ou `pdf`, sem `quality` nos dois últimos;
+e `preparation` com o Destino, sua filha direta reservada
+`.myalbuns-export-{attemptId}.tmp` e o pathname da saída dentro dessa filha.
+JPEG e PNG selecionam exatamente uma unidade por envelope; PDF pode selecionar
+uma ou mais unidades ordenadas para sua única saída. `projectId` e Revisão são
 proveniência opaca para o Processador, não autorização para reabrir o Projeto.
 O envelope não contém `RenderSnapshot`, documento `.myalbuns`,
 `CompositionPlan`, Sessão, Cache, unidade não selecionada nem fonte não
@@ -751,8 +757,9 @@ implementado já é o contrato final:
    projeção imutável, fontes normalizadas e pixels esperados;
 3. `ImagingRenderEnvelopeV1` liga uma composição e suas unidades selecionadas
    aos pares exatos `MediaRefV1 + SourceObservationV1`, ao
-   `RootBindingPlanV1` e aos valores operacionais e de correlação, em schema
-   fechado que rejeita snapshot, documento e plano criativo brutos.
+   `RootBindingPlanV1`, à união fechada de formato e opções, à tentativa e seu
+   cancelamento, e à preparação canônica sob o Destino, em schema fechado que
+   rejeita snapshot, documento e plano criativo brutos.
 
 O primeiro seam prova interpretação, ordem e geometria. O segundo prova a
 matriz Q32.32, centros de pixel, bilinear, alfa premultiplicado, Borda e
@@ -793,12 +800,17 @@ O corpus cobre:
 - alteração de Original, falta de atomicidade, primeira e última promoções com
   evidência, Publicação parcial e limpeza de órfãos somente após sucesso.
 
-`CompositionCore`, adaptador do Canvas e `ExportPipeline` devem consumir os
-mesmos IDs de caso mediante adapters explícitos para esses tipos de contrato. O
-núcleo compara o plano completo e unidades; Canvas compara geometria e ordem
-sem camadas transitórias; Exportação compara raster canônico e adaptadores. PNG
-e o raster embutido no PDF são exatos. JPEG compara estrutura e amostras
-decodificadas dentro da tolerância declarada, nunca bytes comprimidos.
+Cada caso de composição declara `adapterRegistrations` com os mesmos IDs para
+`CompositionCore`, Canvas e `ExportPipeline`. Esse registro atribui o caso a
+cada fronteira futura, mas não é evidência de que uma implementação a executou:
+um adapter só prova consumo quando realmente projeta sua entrada e compara sua
+saída. Neste Programa, o oráculo Rust independente compara o plano completo e
+as unidades, enquanto o adapter real do Canvas compara geometria e ordem sem
+camadas transitórias. A materialização de `CompositionCore` e
+`ExportPipeline` deverá executar esses IDs nos respectivos owners posteriores,
+sem transformar o registro em cobertura fictícia. PNG e o raster embutido no
+PDF são exatos. JPEG compara estrutura e amostras decodificadas dentro da
+tolerância declarada, nunca bytes comprimidos.
 
 Não são oráculos: screenshot do Canvas, hash permanente de JPEG/PDF, tamanho de
 arquivo, artefato de Cache ou render de PDF feito por um visualizador. Uma

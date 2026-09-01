@@ -119,7 +119,7 @@
       "kind": "composition",
       "data": {
         "id": "fractional-transform-z-order-and-page-units",
-        "consumerAdapters": ["composition-core", "canvas", "export-pipeline"],
+        "adapterRegistrations": ["composition-core", "canvas", "export-pipeline"],
         "input": {
           "creativeState": {
             "revision": 7,
@@ -533,7 +533,7 @@
       "kind": "composition",
       "data": {
         "id": "single-active-edge-pages",
-        "consumerAdapters": ["composition-core", "canvas", "export-pipeline"],
+        "adapterRegistrations": ["composition-core", "canvas", "export-pipeline"],
         "input": {
           "creativeState": {
             "revision": 8,
@@ -944,10 +944,26 @@
             "requestId": "render-contract-0001",
             "projectId": "project-golden"
           },
+          "attempt": {
+            "attemptId": "00000000-0000-4000-8000-000000000017",
+            "cancellationId": "cancel-render-contract-0001"
+          },
           "revision": 7,
           "dpi": 4,
-          "preparedOutputPath": {
-            "windowsUtf16": [67, 58, 92, 69, 120, 112, 111, 114, 116, 92, 114, 101, 110, 100, 101, 114, 45, 99, 111, 110, 116, 114, 97, 99, 116, 45, 48, 48, 48, 49, 46, 106, 112, 103]
+          "formatOptions": {
+            "format": "jpeg",
+            "quality": 87
+          },
+          "preparation": {
+            "destinationDirectory": {
+              "windowsUtf16": [67, 58, 92, 69, 120, 112, 111, 114, 116]
+            },
+            "attemptDirectory": {
+              "windowsUtf16": [67, 58, 92, 69, 120, 112, 111, 114, 116, 92, 46, 109, 121, 97, 108, 98, 117, 110, 115, 45, 101, 120, 112, 111, 114, 116, 45, 48, 48, 48, 48, 48, 48, 48, 48, 45, 48, 48, 48, 48, 45, 52, 48, 48, 48, 45, 56, 48, 48, 48, 45, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 49, 55, 46, 116, 109, 112]
+            },
+            "outputPath": {
+              "windowsUtf16": [67, 58, 92, 69, 120, 112, 111, 114, 116, 92, 46, 109, 121, 97, 108, 98, 117, 110, 115, 45, 101, 120, 112, 111, 114, 116, 45, 48, 48, 48, 48, 48, 48, 48, 48, 45, 48, 48, 48, 48, 45, 52, 48, 48, 48, 45, 56, 48, 48, 48, 45, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 49, 55, 46, 116, 109, 112, 92, 97, 108, 98, 117, 109, 95, 48, 48, 49, 46, 106, 112, 103]
+            }
           },
           "units": [
             {
