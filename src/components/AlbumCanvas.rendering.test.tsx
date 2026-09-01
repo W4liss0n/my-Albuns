@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 
+import finalRendererCorpus from "../../tests/fixtures/final-renderer-cases-v1.json";
 import type { LogEvent, Logger } from "../application/logging";
 import type { CompositionPlan } from "../domain/project";
 import {
@@ -915,6 +916,236 @@ test.each([
     expect(gradient?.destroyCount).toBe(1);
   },
 );
+
+test("consumes the registered final-renderer case for gapless active Page labels", async () => {
+  const adapted = adaptFinalRendererCaseForCanvas("single-active-edge-pages");
+
+  expect(adapted.consumerAdapters).toEqual([
+    "composition-core",
+    "canvas",
+    "export-pipeline",
+  ]);
+  expect(adapted.caseId).toBe("single-active-edge-pages");
+  renderCanvas({
+    compositionPlan: adapted.compositionPlan,
+    sheetBarMetadata: adapted.sheetBarMetadata,
+  });
+  await finishPixiInitialization();
+
+  expect(displayWithLabel("sheet-bar-page-right-edge-initial")).toMatchObject({
+    text: "1",
+  });
+  expect(displayWithLabel("sheet-bar-page-left-edge-internal")).toMatchObject({
+    text: "2",
+  });
+  expect(displayWithLabel("sheet-bar-page-right-edge-internal")).toMatchObject({
+    text: "3",
+  });
+  expect(displayWithLabel("sheet-bar-page-left-edge-final")).toMatchObject({
+    text: "4",
+  });
+  expect(
+    pixiLifecycle.displays.some(
+      ({ label }) => label === "sheet-bar-page-left-edge-initial",
+    ),
+  ).toBe(false);
+  expect(
+    pixiLifecycle.displays.some(
+      ({ label }) => label === "sheet-bar-page-right-edge-final",
+    ),
+  ).toBe(false);
+
+  expectCanvasPosition("sheet-active-content-edge-initial", 25.4, 0);
+  expectCanvasPosition("sheet-active-content-edge-internal", 0, 0);
+  expectCanvasPosition("sheet-active-content-edge-final", 0, 0);
+  expect(
+    backgroundLabels("sheet-active-content-edge-initial"),
+  ).toEqual(["background-color-#0000FF"]);
+  expect(
+    backgroundLabels("sheet-active-content-edge-internal"),
+  ).toEqual(["background-color-#00FF00", "background-color-#FF00FF"]);
+  expect(backgroundLabels("sheet-active-content-edge-final")).toEqual([
+    "background-color-#FFFF00",
+  ]);
+  expectCanvasRect("background-color-#0000FF", [0, 0, 25.4, 25.4]);
+  expectCanvasRect("background-color-#00FF00", [0, 0, 25.4, 25.4]);
+  expectCanvasRect("background-color-#FF00FF", [25.4, 0, 25.4, 25.4]);
+  expectCanvasRect("background-color-#FFFF00", [0, 0, 25.4, 25.4]);
+  expect(
+    pixiLifecycle.displays.some(
+      ({ label }) =>
+        label === "background-color-#FF0000" ||
+        label === "background-color-#00FFFF",
+    ),
+  ).toBe(false);
+});
+
+function expectCanvasPosition(label: string, x: number, y: number): void {
+  const display = displayWithLabel(label) as unknown as {
+    position: { x: number; y: number };
+  };
+  expect(display.position.x).toBeCloseTo(x, 8);
+  expect(display.position.y).toBeCloseTo(y, 8);
+}
+
+function expectCanvasRect(
+  label: string,
+  [x, y, width, height]: GoldenRectV1,
+): void {
+  const display = displayWithLabel(label) as unknown as {
+    rectCommands: Array<{
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    }>;
+  };
+  expect(display.rectCommands).toHaveLength(1);
+  expect(display.rectCommands[0].x).toBeCloseTo(x, 8);
+  expect(display.rectCommands[0].y).toBeCloseTo(y, 8);
+  expect(display.rectCommands[0].width).toBeCloseTo(width, 8);
+  expect(display.rectCommands[0].height).toBeCloseTo(height, 8);
+}
+
+function backgroundLabels(activeContentLabel: string): string[] {
+  const activeContent = displayWithLabel(activeContentLabel) as unknown as {
+    children: Array<{ label?: string }>;
+  };
+  return activeContent.children
+    .map(({ label }) => label)
+    .filter(
+      (label): label is string => label?.startsWith("background-color-") === true,
+    );
+}
+
+type GoldenRectV1 = [number, number, number, number];
+
+type GoldenCanvasLayerV1 =
+  | {
+      kind: "base";
+      data: { rectUm: GoldenRectV1; rgb: string };
+    }
+  | {
+      kind: "background";
+      data: {
+        rectUm: GoldenRectV1;
+        paint: { kind: "solid"; data: { rgb: string } };
+      };
+    };
+
+interface GoldenCanvasCompositionCase {
+  id: string;
+  consumerAdapters: string[];
+  input: {
+    creativeState: {
+      sheets: Array<{
+        sheetId: string;
+        number: number;
+        activeSides: "both" | "left" | "right";
+      }>;
+    };
+  };
+  expectedPlan: {
+    sheets: Array<{
+      sheetId: string;
+      surfaceRectUm: GoldenRectV1;
+      orderedLayers: GoldenCanvasLayerV1[];
+      outputUnits: Array<{
+        mode: "per-page" | "per-sheet";
+        logicalIndex: number;
+      }>;
+    }>;
+  };
+}
+
+function adaptFinalRendererCaseForCanvas(caseId: string) {
+  const rawCase = (finalRendererCorpus.cases as readonly unknown[]).find(
+    (candidate): candidate is {
+      kind: "composition";
+      data: GoldenCanvasCompositionCase;
+    } => {
+      if (typeof candidate !== "object" || candidate === null) {
+        return false;
+      }
+      const record = candidate as { kind?: unknown; data?: { id?: unknown } };
+      return record.kind === "composition" && record.data?.id === caseId;
+    },
+  );
+  if (!rawCase) {
+    throw new Error(`final-renderer Canvas case not found: ${caseId}`);
+  }
+  if (!rawCase.data.consumerAdapters.includes("canvas")) {
+    throw new Error(`final-renderer case is not registered for Canvas: ${caseId}`);
+  }
+
+  const creativeSheets = new Map(
+    rawCase.data.input.creativeState.sheets.map((sheet) => [
+      sheet.sheetId,
+      sheet,
+    ]),
+  );
+  const compositionPlan: CompositionPlan = {
+    frameBorder: { kind: "none" },
+    sheets: rawCase.data.expectedPlan.sheets.map((expectedSheet) => {
+      const creativeSheet = creativeSheets.get(expectedSheet.sheetId);
+      const [base, ...contentLayers] = expectedSheet.orderedLayers;
+      if (!creativeSheet || base?.kind !== "base") {
+        throw new Error(`missing creative Sheet: ${expectedSheet.sheetId}`);
+      }
+      const [, , widthUm, heightUm] = expectedSheet.surfaceRectUm;
+      const backgrounds = contentLayers.map((layer) => {
+        if (
+          layer.kind !== "background" ||
+          layer.data.paint.kind !== "solid"
+        ) {
+          throw new Error(
+            `unsupported Canvas layer in final-renderer case: ${expectedSheet.sheetId}`,
+          );
+        }
+        const [x, y, width, height] = layer.data.rectUm;
+        return {
+          kind: "color" as const,
+          rgb: layer.data.paint.data.rgb,
+          drawRect: { x, y, width, height },
+        };
+      });
+      const [baseX, baseY, baseWidth, baseHeight] = base.data.rectUm;
+      return {
+        sheetId: expectedSheet.sheetId,
+        number: creativeSheet.number,
+        activeSides: creativeSheet.activeSides,
+        widthUm,
+        heightUm,
+        base: {
+          rgb: base.data.rgb,
+          drawRect: {
+            x: baseX,
+            y: baseY,
+            width: baseWidth,
+            height: baseHeight,
+          },
+        },
+        backgrounds,
+        overlays: [],
+        frames: [],
+      };
+    }),
+  };
+  const sheetBarMetadata = rawCase.data.expectedPlan.sheets.map((sheet) => ({
+    sheetId: sheet.sheetId,
+    pageNumbers: sheet.outputUnits
+      .filter((unit) => unit.mode === "per-page")
+      .map((unit) => unit.logicalIndex),
+    layoutLocked: false,
+  }));
+
+  return {
+    caseId: rawCase.data.id,
+    consumerAdapters: rawCase.data.consumerAdapters,
+    compositionPlan,
+    sheetBarMetadata,
+  };
+}
 
 function createSinglePageComposition(
   activeSides: "left" | "right",

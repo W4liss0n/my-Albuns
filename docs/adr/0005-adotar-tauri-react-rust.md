@@ -1,7 +1,7 @@
 ---
 status: accepted
 date: 2026-07-28
-updated: 2026-08-10
+updated: 2026-09-01
 ---
 
 # Adotar Tauri 2, React/TypeScript e Rust com host independente por Projeto
@@ -15,7 +15,7 @@ Tauri 2 com React/TypeScript e Rust é a arquitetura aceita para o MVP. O spike 
 - React/TypeScript hospeda a interface e apenas o estado transitório das interações.
 - PixiJS sobre WebGL2 compõe a prévia interativa.
 - Um núcleo Rust compartilhado, denominado provisoriamente `myalbuns-core`, expõe a fronteira externa `ProjectCore` com dois modos: uma sessão editável e uma revisão persistida somente para leitura. Criação, abertura e transições da sessão permanecem operações distintas dentro dessa fronteira. Uma `ProjectSession` por Projeto aberto é a única proprietária mutável do estado criativo, e o modo somente leitura nunca instancia uma.
-- `MyAlbuns.Imaging.exe` decodifica originais, produz a representação reduzida do Cache e renderiza Exportações a partir de um `RenderSnapshot` imutável e validado.
+- `MyAlbuns.Imaging.exe` decodifica originais, produz a representação reduzida do Cache e renderiza Exportações a partir de projeções imutáveis derivadas exclusivamente de um `RenderSnapshot` validado; o snapshot é autoridade criativa, não payload de IPC.
 - `MyAlbuns.exe` hospeda Boas-vindas e as exclusividades globais estritamente necessárias, sem possuir estado criativo mutável de Projetos.
 
 `myalbuns-core` deve ser independente de Tauri, React, PixiJS e do Processador de Imagens. Tanto o host interativo quanto o caminho headless do lote usam a interface do `ProjectCore` para carregar e migrar o documento, resolver sua Identidade antes de Cache ou Recuperação, validar invariantes e produzir o `RenderSnapshot`. `MyAlbuns.Imaging.exe` nunca interpreta por conta própria o arquivo bruto do Projeto.
@@ -95,7 +95,7 @@ O spike produziu evidência reproduzível para:
 - uso do mesmo `myalbuns-core` no host interativo e no carregamento headless;
 - uma única `ProjectSession` mutável por Projeto, sem estado criativo duplicado no frontend, watcher, Cache ou Processador;
 - `CompositionCore` determinístico exercitado pela prévia e pela Exportação, distinguindo transformação da Foto de navegação do Canvas;
-- `RenderSnapshot` validado como única entrada criativa do Processador de Imagens, sem leitura autônoma do documento pelo Processador;
+- `RenderSnapshot` validado como única autoridade criativa e entrada lógica do `ExportPipeline`; o Processador recebe somente o envelope versionado derivado, nunca o snapshot ou o documento bruto, e não interpreta o Projeto autonomamente;
 - Cache, prévia e Exportação separados, com a saída final lendo somente originais;
 - `CacheEngine`, `ExportPipeline` e um `OperationGate` realmente global nas duas topologias, sem concessões concorrentes e com liberação em sucesso, falha, cancelamento ou queda do proprietário, sem formar um coordenador universal;
 - comparação A/B de memória, quantidade de processos, tempo de abertura, latência do Canvas, IPC, logs, empacotamento, recuperação e domínio de falha;

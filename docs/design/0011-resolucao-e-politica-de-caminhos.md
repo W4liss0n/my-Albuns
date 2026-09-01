@@ -1,7 +1,7 @@
 ---
 status: accepted
 document: design
-updated: 2026-08-10
+updated: 2026-09-01
 ---
 
 # Resolução e política de caminhos
@@ -72,14 +72,20 @@ let mut owner_paths = OperationPathContext::new(OperationKind::Export);
 
 let source = owner_paths.resolve_existing(source_path, ExpectedObject::RegularFile)?;
 let destination = owner_paths.resolve_destination(destination_path)?;
-let plan = owner_paths.freeze()?;
+let root_bindings = owner_paths.freeze()?;
 
 // Quando a fase seguinte existir em outro processo:
-ipc.send(render_snapshot, plan.clone())?;
+let envelope = export_plan.to_imaging_envelope(root_bindings.clone())?;
+ipc.send(envelope)?;
 
 // No processo participante:
-let worker_paths = OperationPathContext::from_plan(plan)?;
+let worker_paths = OperationPathContext::from_plan(root_bindings)?;
 ```
+
+`ExportPipeline` deriva o envelope somente do `RenderSnapshot` já validado e do
+plano de Exportação selecionado. O módulo de caminhos fornece o
+`RootBindingPlan`, mas não interpreta conteúdo criativo nem acrescenta o
+snapshot ao payload.
 
 `ResolvedPath` é um valor opaco. Ele conserva a forma escolhida para apresentação, a forma operacional nativa e a raiz classificada sem obrigar chamadores a conhecer regras de prefixo. Somente o módulo pode derivar caminhos filhos ou locais temporários a partir dele.
 

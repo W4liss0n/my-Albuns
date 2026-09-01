@@ -195,7 +195,7 @@ Esses stores podem compartilhar uma implementação interna pequena para criar t
 
 Os módulos acima permanecem neutros quanto à implantação para não espalhar detalhes de processo pelo núcleo. O [ADR 0005](../adr/0005-adotar-tauri-react-rust.md) mapeia essa arquitetura para um host independente por Projeto no MVP.
 
-Quando uma operação lógica atravessar processos, a IPC transporta somente valores imutáveis. Entre as cargas possíveis estão intenção consolidada, projeções autocontidas derivadas do `RenderSnapshot` e plano de bindings de raiz. O Processador não recebe outra interpretação do Projeto nem invoca `CompositionCore`; o [Contrato do Renderizador final](0019-contrato-do-renderizador-final.md) fixa essa fronteira. A implementação define quais desses valores realmente cruzam o processo e seu esquema concreto. Progresso e cancelamento usam mensagens ou handles limitados à tentativa. Nenhum processo mantém uma segunda cópia mutável do Projeto como fonte canônica.
+Quando uma operação lógica atravessar processos, a IPC transporta somente valores imutáveis. Para renderização, a carga é o envelope autocontido derivado do `RenderSnapshot`, acompanhado do mesmo plano de bindings de raiz; o snapshot, o documento bruto e o `CompositionPlan` não atravessam essa fronteira. O Processador não recebe outra interpretação do Projeto nem invoca `CompositionCore`; o [Contrato do Renderizador final](0019-contrato-do-renderizador-final.md) fixa os campos e invariantes semânticos desse envelope. Progresso e cancelamento usam mensagens ou handles limitados à tentativa. Nenhum processo mantém uma segunda cópia mutável do Projeto como fonte canônica.
 
 O baseline aceito é uma aplicação Tauri com Janelas e hosts separados, uma Sessão e um Processador de Imagens isolado por Projeto e um Processador temporário para o lote.
 
@@ -211,14 +211,14 @@ Os testes atravessam as interfaces que representam comportamento observável:
 - invalidação e reconstrução descartável do `CacheEngine`;
 - uma mesma suíte do `ExportPipeline` para Exportação normal e lote, com injeção de falhas antes e durante a Publicação;
 - aquisição e liberação de concessões em sucesso, falha e cancelamento;
-- transporte de snapshots e bindings sem criar outro proprietário mutável.
+- transporte do envelope de projeções derivadas e dos bindings, rejeitando snapshot, documento ou plano criativo brutos.
 
 Testes não dependem da quantidade final de crates nem atravessam seams internos apenas para observar detalhes de implementação.
 
 ## Decisões adiadas
 
 - nomes finais, crates e visibilidade pública das subdivisões internas;
-- transporte e esquema concretos da IPC;
+- codificação física, framing e materialização do adapter de IPC, sem alterar os campos e invariantes semânticos do envelope fechado pelo design 0019;
 - formato concreto de `RenderSnapshot`, `CompositionPlan` e patches;
 - algoritmo do Gerador de Layouts;
 - biblioteca concreta de codecs/PDF e otimizações internas que preservem o contrato aceito do renderizador;

@@ -101,6 +101,7 @@ enum GoldenCaseV1 {
     RasterGeometry(RasterGeometryCaseV1),
     Composition(CompositionCaseV1),
     CanonicalRaster(CanonicalRasterCaseV1),
+    ImagingEnvelope(ImagingEnvelopeCaseV1),
     SourceNormalization(SourceNormalizationCaseV1),
     FormatAdapters(Box<FormatAdaptersCaseV1>),
     OutputNames(OutputNamesCaseV1),
@@ -140,8 +141,17 @@ struct RasterGeometryExpectedV1 {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct CompositionCaseV1 {
     id: String,
+    consumer_adapters: Vec<ConsumerAdapterV1>,
     input: CompositionInputV1,
     expected_plan: ExpectedCompositionPlanV1,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+enum ConsumerAdapterV1 {
+    CompositionCore,
+    Canvas,
+    ExportPipeline,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -185,6 +195,8 @@ struct CreativeSheetV1 {
 #[serde(rename_all = "kebab-case")]
 enum ActiveSidesV1 {
     Both,
+    Left,
+    Right,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -507,6 +519,66 @@ struct ComposedOutputUnitV1 {
     dpi: u32,
     physical_source_rect_um: [u64; 4],
     layers: Vec<ProjectedLayerV1>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ImagingEnvelopeCaseV1 {
+    id: String,
+    composition_case_id: String,
+    canonical_raster_case_id: String,
+    expected_envelope: ImagingRenderEnvelopeV1,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ImagingRenderEnvelopeV1 {
+    protocol_version: u32,
+    correlation: ImagingCorrelationV1,
+    revision: u64,
+    dpi: u32,
+    prepared_output_path: NativePathV1,
+    units: Vec<ComposedOutputUnitV1>,
+    sources: Vec<ImagingSourceV1>,
+    root_binding_plan: RootBindingPlanV1,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ImagingCorrelationV1 {
+    request_id: String,
+    project_id: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ImagingSourceV1 {
+    media_ref: MediaRefV1,
+    source_observation: SourceObservationV1,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct RootBindingPlanV1 {
+    bindings: Vec<RootBindingV1>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct RootBindingV1 {
+    kind: PathRootKindV1,
+    logical_root: NativePathV1,
+    operational_root: NativePathV1,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+enum PathRootKindV1 {
+    Disk,
+    Unc,
+    VerbatimDisk,
+    VerbatimUnc,
+    Posix,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -883,11 +955,40 @@ fn case_id(case: &GoldenCaseV1) -> &str {
         GoldenCaseV1::RasterGeometry(case) => &case.id,
         GoldenCaseV1::Composition(case) => &case.id,
         GoldenCaseV1::CanonicalRaster(case) => &case.id,
+        GoldenCaseV1::ImagingEnvelope(case) => &case.id,
         GoldenCaseV1::SourceNormalization(case) => &case.id,
         GoldenCaseV1::FormatAdapters(case) => &case.id,
         GoldenCaseV1::OutputNames(case) => &case.id,
         GoldenCaseV1::Operational(case) => &case.id,
     }
+}
+
+fn composition_case<'a>(corpus: &'a CorpusV1, case_id: &str) -> &'a CompositionCaseV1 {
+    corpus
+        .cases
+        .iter()
+        .find_map(|case| match case {
+            GoldenCaseV1::Composition(case) if case.id == case_id => Some(case),
+            _ => None,
+        })
+        .expect("the named composition case exists")
+}
+
+fn export_pipeline_case_adapter(
+    case: &CompositionCaseV1,
+) -> Option<(&str, Vec<&ExpectedOutputUnitV1>)> {
+    case.consumer_adapters
+        .contains(&ConsumerAdapterV1::ExportPipeline)
+        .then(|| {
+            (
+                case.id.as_str(),
+                case.expected_plan
+                    .sheets
+                    .iter()
+                    .flat_map(|sheet| &sheet.output_units)
+                    .collect(),
+            )
+        })
 }
 
 fn raster_edge(micrometers: u64, dpi: u32) -> u32 {
@@ -1241,18 +1342,25 @@ fn reference_plan(input: &CompositionInputV1, sampler: &str) -> ExpectedComposit
     }
 
     let mut referenced_media_ids = BTreeSet::new();
+    let mut next_page_index = 1_u32;
     let sheets = input
         .creative_state
         .sheets
         .iter()
         .map(|sheet| {
-            assert_eq!(sheet.active_sides, ActiveSidesV1::Both);
             assert!(sheet.number > 0 && sheet.width_um > 0 && sheet.height_um > 0);
             assert_eq!(sheet.width_um % 2, 0, "the golden spread has equal pages");
-            let surface = [0, 0, sheet.width_um, sheet.height_um];
             let page_width = sheet.width_um / 2;
-            let left_rect = [0, 0, page_width, sheet.height_um];
-            let right_rect = [page_width, 0, page_width, sheet.height_um];
+            let local_page_rect = [0, 0, page_width, sheet.height_um];
+            let surface = match sheet.active_sides {
+                ActiveSidesV1::Both => [0, 0, sheet.width_um, sheet.height_um],
+                ActiveSidesV1::Left | ActiveSidesV1::Right => local_page_rect,
+            };
+            let left_rect = local_page_rect;
+            let right_rect = match sheet.active_sides {
+                ActiveSidesV1::Both => [page_width, 0, page_width, sheet.height_um],
+                ActiveSidesV1::Left | ActiveSidesV1::Right => local_page_rect,
+            };
             let mut ordered_layers = vec![PlannedLayerV1::Base(PlannedBaseV1 {
                 layer_id: "base".to_owned(),
                 rect_um: surface,
@@ -1271,22 +1379,32 @@ fn reference_plan(input: &CompositionInputV1, sampler: &str) -> ExpectedComposit
                     )));
                 }
                 CreativeBackgroundV1::PerSide { left, right } => {
-                    ordered_layers.push(PlannedLayerV1::Background(plan_decorative(
-                        "background:left",
-                        ScopeV1::Left,
-                        left_rect,
-                        left,
-                        &facts,
-                        &mut referenced_media_ids,
-                    )));
-                    ordered_layers.push(PlannedLayerV1::Background(plan_decorative(
-                        "background:right",
-                        ScopeV1::Right,
-                        right_rect,
-                        right,
-                        &facts,
-                        &mut referenced_media_ids,
-                    )));
+                    if matches!(
+                        sheet.active_sides,
+                        ActiveSidesV1::Both | ActiveSidesV1::Left
+                    ) {
+                        ordered_layers.push(PlannedLayerV1::Background(plan_decorative(
+                            "background:left",
+                            ScopeV1::Left,
+                            left_rect,
+                            left,
+                            &facts,
+                            &mut referenced_media_ids,
+                        )));
+                    }
+                    if matches!(
+                        sheet.active_sides,
+                        ActiveSidesV1::Both | ActiveSidesV1::Right
+                    ) {
+                        ordered_layers.push(PlannedLayerV1::Background(plan_decorative(
+                            "background:right",
+                            ScopeV1::Right,
+                            right_rect,
+                            right,
+                            &facts,
+                            &mut referenced_media_ids,
+                        )));
+                    }
                 }
             }
 
@@ -1352,45 +1470,63 @@ fn reference_plan(input: &CompositionInputV1, sampler: &str) -> ExpectedComposit
                     }
                 }
                 CreativeOverlayV1::PerSide { left, right } => {
-                    if let Some(image) = left {
+                    if matches!(
+                        sheet.active_sides,
+                        ActiveSidesV1::Both | ActiveSidesV1::Left
+                    ) && let Some(image) = left
+                    {
                         push_overlay("overlay:left", ScopeV1::Left, left_rect, image);
                     }
-                    if let Some(image) = right {
+                    if matches!(
+                        sheet.active_sides,
+                        ActiveSidesV1::Both | ActiveSidesV1::Right
+                    ) && let Some(image) = right
+                    {
                         push_overlay("overlay:right", ScopeV1::Right, right_rect, image);
                     }
                 }
             }
 
             let dpi = input.creative_state.dpi;
-            let output_units = vec![
-                ExpectedOutputUnitV1 {
-                    unit_id: format!("{}:spread", sheet.sheet_id),
-                    mode: ExportModeV1::PerSheet,
-                    logical_index: sheet.number,
-                    physical_source_rect_um: surface,
-                    normalized_origin_um: [0, 0],
-                    width_px: raster_edge(sheet.width_um, dpi),
-                    height_px: raster_edge(sheet.height_um, dpi),
-                },
-                ExpectedOutputUnitV1 {
+            let mut output_units = vec![ExpectedOutputUnitV1 {
+                unit_id: format!("{}:spread", sheet.sheet_id),
+                mode: ExportModeV1::PerSheet,
+                logical_index: sheet.number,
+                physical_source_rect_um: surface,
+                normalized_origin_um: [0, 0],
+                width_px: raster_edge(surface[2], dpi),
+                height_px: raster_edge(surface[3], dpi),
+            }];
+            if matches!(
+                sheet.active_sides,
+                ActiveSidesV1::Both | ActiveSidesV1::Left
+            ) {
+                output_units.push(ExpectedOutputUnitV1 {
                     unit_id: format!("{}:left", sheet.sheet_id),
                     mode: ExportModeV1::PerPage,
-                    logical_index: sheet.number * 2 - 1,
-                    physical_source_rect_um: [0, 0, page_width, sheet.height_um],
+                    logical_index: next_page_index,
+                    physical_source_rect_um: left_rect,
                     normalized_origin_um: [0, 0],
                     width_px: raster_edge(page_width, dpi),
                     height_px: raster_edge(sheet.height_um, dpi),
-                },
-                ExpectedOutputUnitV1 {
+                });
+                next_page_index += 1;
+            }
+            if matches!(
+                sheet.active_sides,
+                ActiveSidesV1::Both | ActiveSidesV1::Right
+            ) {
+                output_units.push(ExpectedOutputUnitV1 {
                     unit_id: format!("{}:right", sheet.sheet_id),
                     mode: ExportModeV1::PerPage,
-                    logical_index: sheet.number * 2,
-                    physical_source_rect_um: [page_width, 0, page_width, sheet.height_um],
+                    logical_index: next_page_index,
+                    physical_source_rect_um: right_rect,
                     normalized_origin_um: [0, 0],
                     width_px: raster_edge(page_width, dpi),
                     height_px: raster_edge(sheet.height_um, dpi),
-                },
-            ];
+                });
+                next_page_index += 1;
+            }
 
             ExpectedSheetPlanV1 {
                 sheet_id: sheet.sheet_id.clone(),
@@ -2290,6 +2426,7 @@ fn corpus_schema_ids_and_assets_are_closed_and_versioned() {
             "format-adapters-share-canonical-unit",
             "fractional-bilinear-alpha-border",
             "fractional-transform-z-order-and-page-units",
+            "imaging-envelope-right-page",
             "jpeg-exif-orientation-6",
             "last-promotion-candidate-confirmed",
             "minimum-three-digit-output-indices",
@@ -2299,6 +2436,7 @@ fn corpus_schema_ids_and_assets_are_closed_and_versioned() {
             "q16-half-up-tie",
             "right-page-crossing-frame-q32",
             "second-promotion-proven-untouched",
+            "single-active-edge-pages",
             "source-changes-during-capture",
             "source-identity-indeterminate",
             "tiff-associated-alpha-16",
@@ -2378,10 +2516,22 @@ fn geometry_and_creative_state_produce_the_complete_expected_plan() {
         .cases
         .iter()
         .find_map(|case| match case {
-            GoldenCaseV1::Composition(case) => Some(case),
+            GoldenCaseV1::Composition(case)
+                if case.id == "fractional-transform-z-order-and-page-units" =>
+            {
+                Some(case)
+            }
             _ => None,
         })
         .expect("the composition case exists");
+    assert_eq!(
+        composition.consumer_adapters.as_slice(),
+        &[
+            ConsumerAdapterV1::CompositionCore,
+            ConsumerAdapterV1::Canvas,
+            ConsumerAdapterV1::ExportPipeline,
+        ]
+    );
     let actual = reference_plan(&composition.input, &corpus.algorithms.sampler);
     assert_eq!(actual, composition.expected_plan);
 
@@ -2410,6 +2560,250 @@ fn geometry_and_creative_state_produce_the_complete_expected_plan() {
             "00000000-0000-4000-8000-000000000002",
         ]
     );
+
+    let active_edges = composition_case(&corpus, "single-active-edge-pages");
+    assert_eq!(
+        active_edges.consumer_adapters.as_slice(),
+        &[
+            ConsumerAdapterV1::CompositionCore,
+            ConsumerAdapterV1::Canvas,
+            ConsumerAdapterV1::ExportPipeline,
+        ],
+        "the same case ID is the contract consumed by every composition adapter"
+    );
+    let active_edges_plan = reference_plan(&active_edges.input, &corpus.algorithms.sampler);
+    assert_eq!(active_edges_plan, active_edges.expected_plan);
+}
+
+#[test]
+fn export_pipeline_adapter_consumes_single_active_edges_by_composition_case_id() {
+    let corpus = corpus();
+    let adapted = corpus
+        .cases
+        .iter()
+        .filter_map(|case| match case {
+            GoldenCaseV1::Composition(case) => export_pipeline_case_adapter(case),
+            _ => None,
+        })
+        .collect::<BTreeMap<_, _>>();
+    assert_eq!(
+        adapted.keys().copied().collect::<BTreeSet<_>>(),
+        BTreeSet::from([
+            "fractional-transform-z-order-and-page-units",
+            "single-active-edge-pages",
+        ]),
+        "every registered ExportPipeline adapter dispatches through the case ID"
+    );
+
+    let page_units = adapted["single-active-edge-pages"]
+        .iter()
+        .filter(|unit| unit.mode == ExportModeV1::PerPage)
+        .map(|unit| {
+            (
+                unit.unit_id.as_str(),
+                unit.logical_index,
+                unit.physical_source_rect_um,
+                unit.normalized_origin_um,
+                unit.width_px,
+                unit.height_px,
+            )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        page_units,
+        [
+            (
+                "edge-initial:right",
+                1,
+                [0, 0, 25_400, 25_400],
+                [0, 0],
+                4,
+                4,
+            ),
+            (
+                "edge-internal:left",
+                2,
+                [0, 0, 25_400, 25_400],
+                [0, 0],
+                4,
+                4,
+            ),
+            (
+                "edge-internal:right",
+                3,
+                [25_400, 0, 25_400, 25_400],
+                [0, 0],
+                4,
+                4,
+            ),
+            ("edge-final:left", 4, [0, 0, 25_400, 25_400], [0, 0], 4, 4,),
+        ],
+        "only active Pages become normalized, gapless ExportPipeline units"
+    );
+}
+
+#[test]
+fn imaging_envelope_is_closed_and_contains_only_the_selected_projection() {
+    let corpus = corpus();
+    let envelope_case = corpus
+        .cases
+        .iter()
+        .find_map(|case| match case {
+            GoldenCaseV1::ImagingEnvelope(case) if case.id == "imaging-envelope-right-page" => {
+                Some(case)
+            }
+            _ => None,
+        })
+        .expect("the closed Imaging envelope case exists");
+    let composition = corpus
+        .cases
+        .iter()
+        .find_map(|case| match case {
+            GoldenCaseV1::Composition(case) if case.id == envelope_case.composition_case_id => {
+                Some(case)
+            }
+            _ => None,
+        })
+        .expect("the envelope names its authoritative composition case");
+    let raster = corpus
+        .cases
+        .iter()
+        .find_map(|case| match case {
+            GoldenCaseV1::CanonicalRaster(case)
+                if case.id == envelope_case.canonical_raster_case_id =>
+            {
+                Some(case)
+            }
+            _ => None,
+        })
+        .expect("the envelope names its selected canonical output unit");
+    let envelope = &envelope_case.expected_envelope;
+
+    assert_eq!(envelope.protocol_version, 1);
+    assert_eq!(envelope.correlation.request_id, "render-contract-0001");
+    assert_eq!(envelope.correlation.project_id, "project-golden");
+    assert_eq!(envelope.revision, composition.input.creative_state.revision);
+    assert_eq!(envelope.dpi, composition.input.creative_state.dpi);
+    assert_eq!(
+        envelope.units.as_slice(),
+        std::slice::from_ref(&raster.input.unit)
+    );
+
+    let selected_source_ids = envelope.units[0]
+        .layers
+        .iter()
+        .filter_map(|layer| match layer {
+            ProjectedLayerV1::Image(layer) => Some(layer.source_id.as_str()),
+            ProjectedLayerV1::FrameGroup(layer) => Some(layer.source_id.as_str()),
+            ProjectedLayerV1::Base(_) | ProjectedLayerV1::Solid(_) => None,
+        })
+        .collect::<BTreeSet<_>>();
+    assert_eq!(
+        selected_source_ids,
+        BTreeSet::from(["decorative-checker", "photo-blue", "photo-frac"])
+    );
+    let envelope_source_ids = envelope
+        .sources
+        .iter()
+        .map(|source| source.media_ref.media_id.as_str())
+        .collect::<BTreeSet<_>>();
+    assert_eq!(envelope_source_ids.len(), envelope.sources.len());
+    assert_eq!(envelope_source_ids, selected_source_ids);
+    assert!(!envelope_source_ids.contains("photo-opaque"));
+
+    let media_refs = composition
+        .input
+        .creative_state
+        .media_refs
+        .iter()
+        .map(|media_ref| (media_ref.media_id.as_str(), media_ref))
+        .collect::<BTreeMap<_, _>>();
+    let observations = composition
+        .input
+        .source_observations
+        .iter()
+        .map(|observation| (observation.media_id.as_str(), observation))
+        .collect::<BTreeMap<_, _>>();
+    for source in &envelope.sources {
+        let media_id = source.media_ref.media_id.as_str();
+        assert_eq!(source.media_ref, *media_refs[media_id]);
+        assert_eq!(source.source_observation, *observations[media_id]);
+        assert_eq!(source.source_observation.media_id, media_id);
+        assert_eq!(
+            source.media_ref.native_path,
+            source.source_observation.native_path
+        );
+    }
+
+    assert!(!envelope.root_binding_plan.bindings.is_empty());
+    let logical_roots = envelope
+        .root_binding_plan
+        .bindings
+        .iter()
+        .map(|binding| binding.logical_root.windows_utf16.as_slice())
+        .collect::<BTreeSet<_>>();
+    assert_eq!(
+        logical_roots.len(),
+        envelope.root_binding_plan.bindings.len()
+    );
+    for source in &envelope.sources {
+        assert!(envelope.root_binding_plan.bindings.iter().any(|binding| {
+            !binding.logical_root.windows_utf16.is_empty()
+                && !binding.operational_root.windows_utf16.is_empty()
+                && source
+                    .media_ref
+                    .native_path
+                    .windows_utf16
+                    .starts_with(&binding.logical_root.windows_utf16)
+        }));
+    }
+    assert!(envelope.root_binding_plan.bindings.iter().any(|binding| {
+        envelope
+            .prepared_output_path
+            .windows_utf16
+            .starts_with(&binding.logical_root.windows_utf16)
+    }));
+
+    let corpus_path = workspace_root().join("tests/fixtures/final-renderer-cases-v1.json");
+    let raw_corpus: serde_json::Value =
+        serde_json::from_slice(&fs::read(corpus_path).expect("the raw corpus is readable"))
+            .expect("the raw corpus is valid JSON");
+    let raw_envelope = raw_corpus["cases"]
+        .as_array()
+        .expect("cases is an array")
+        .iter()
+        .find(|case| case["kind"] == "imaging-envelope")
+        .and_then(|case| case["data"].get("expectedEnvelope"))
+        .expect("the raw Imaging envelope exists")
+        .clone();
+    for forbidden_field in [
+        "renderSnapshot",
+        "projectDocument",
+        "compositionPlan",
+        "session",
+        "cache",
+    ] {
+        let mut mutated = raw_envelope.clone();
+        mutated
+            .as_object_mut()
+            .expect("the envelope is an object")
+            .insert(forbidden_field.to_owned(), serde_json::Value::Null);
+        assert!(
+            serde_json::from_value::<ImagingRenderEnvelopeV1>(mutated).is_err(),
+            "the closed envelope rejects {forbidden_field}"
+        );
+    }
+    for required_field in ["units", "sources", "rootBindingPlan"] {
+        let mut mutated = raw_envelope.clone();
+        mutated
+            .as_object_mut()
+            .expect("the envelope is an object")
+            .remove(required_field);
+        assert!(
+            serde_json::from_value::<ImagingRenderEnvelopeV1>(mutated).is_err(),
+            "the closed envelope requires {required_field}"
+        );
+    }
 }
 
 #[test]
