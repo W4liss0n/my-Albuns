@@ -5,7 +5,11 @@ use std::{
     path::{Component, Path, PathBuf},
 };
 
+#[cfg(windows)]
+use std::os::windows::ffi::OsStrExt;
+
 use image::{DynamicImage, GenericImageView, ImageDecoder, ImageFormat, ImageReader};
+use myalbuns_paths::{NativePathDto, PathRootKind, RootBindingPlan};
 use serde::{Deserialize, Deserializer};
 use sha2::{Digest, Sha256};
 use uuid::{Uuid, Version};
@@ -176,7 +180,7 @@ struct CreativeStateV1 {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct MediaRefV1 {
     media_id: String,
-    native_path: NativePathV1,
+    native_path: NativePathDto,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -297,7 +301,7 @@ struct FrameStyleV1 {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct SourceGeometryFactV1 {
     media_id: String,
-    native_path: NativePathV1,
+    native_path: NativePathDto,
     oriented_width_px: u32,
     oriented_height_px: u32,
     applied_orientation: u8,
@@ -307,7 +311,7 @@ struct SourceGeometryFactV1 {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct SourceObservationV1 {
     media_id: String,
-    native_path: NativePathV1,
+    native_path: NativePathDto,
     detected_format: DetectedFormatV1,
     source_variant: SourceVariantV1,
     encoded_width_px: u32,
@@ -338,12 +342,6 @@ enum SourceVariantV1 {
 #[serde(rename_all = "kebab-case")]
 enum ColorProfileObservationV1 {
     AbsentAssumeSrgb,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct NativePathV1 {
-    windows_utf16: Vec<u16>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -543,7 +541,7 @@ struct ImagingRenderEnvelopeV1 {
     preparation: ImagingPreparationV1,
     units: Vec<ComposedOutputUnitV1>,
     sources: Vec<ImagingSourceV1>,
-    root_binding_plan: RootBindingPlanV1,
+    root_binding_plan: RootBindingPlan,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -602,9 +600,9 @@ where
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ImagingPreparationV1 {
-    destination_directory: NativePathV1,
-    attempt_directory: NativePathV1,
-    output_path: NativePathV1,
+    destination_directory: NativePathDto,
+    attempt_directory: NativePathDto,
+    output_path: NativePathDto,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -612,30 +610,6 @@ struct ImagingPreparationV1 {
 struct ImagingSourceV1 {
     media_ref: MediaRefV1,
     source_observation: SourceObservationV1,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct RootBindingPlanV1 {
-    bindings: Vec<RootBindingV1>,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct RootBindingV1 {
-    kind: PathRootKindV1,
-    logical_root: NativePathV1,
-    operational_root: NativePathV1,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
-#[serde(rename_all = "camelCase")]
-enum PathRootKindV1 {
-    Disk,
-    Unc,
-    VerbatimDisk,
-    VerbatimUnc,
-    Posix,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -1031,6 +1005,40 @@ fn composition_case<'a>(corpus: &'a CorpusV1, case_id: &str) -> &'a CompositionC
         .expect("the named composition case exists")
 }
 
+fn collect_authoritative_native_path_wires<'a>(
+    value: &'a serde_json::Value,
+    paths: &mut Vec<&'a serde_json::Value>,
+) {
+    match value {
+        serde_json::Value::Array(values) => {
+            for value in values {
+                collect_authoritative_native_path_wires(value, paths);
+            }
+        }
+        serde_json::Value::Object(fields) => {
+            for (name, value) in fields {
+                if matches!(
+                    name.as_str(),
+                    "nativePath"
+                        | "destinationDirectory"
+                        | "attemptDirectory"
+                        | "outputPath"
+                        | "logicalRoot"
+                        | "operationalRoot"
+                ) {
+                    paths.push(value);
+                } else {
+                    collect_authoritative_native_path_wires(value, paths);
+                }
+            }
+        }
+        serde_json::Value::Null
+        | serde_json::Value::Bool(_)
+        | serde_json::Value::Number(_)
+        | serde_json::Value::String(_) => {}
+    }
+}
+
 fn registered_composition_case_ids(
     corpus: &CorpusV1,
     adapter: ContractAdapterV1,
@@ -1359,8 +1367,16 @@ fn reference_plan(input: &CompositionInputV1, sampler: &str) -> ExpectedComposit
         "every MediaRef has exactly one frozen source observation"
     );
     for (media_id, media_ref) in &media_refs {
-        assert!(!media_ref.native_path.windows_utf16.is_empty());
-        assert!(!media_ref.native_path.windows_utf16.contains(&0));
+        assert!(!media_ref.native_path.as_path().as_os_str().is_empty());
+        #[cfg(windows)]
+        assert!(
+            !media_ref
+                .native_path
+                .as_path()
+                .as_os_str()
+                .encode_wide()
+                .any(|unit| unit == 0)
+        );
         assert_eq!(
             media_ref.native_path, facts[*media_id].native_path,
             "geometry facts belong to the same mediaId + NativePathDto"
@@ -2525,6 +2541,38 @@ fn corpus_schema_ids_and_assets_are_closed_and_versioned() {
 }
 
 #[test]
+fn corpus_authoritative_paths_use_the_canonical_native_path_dto_wire() {
+    let corpus_path = workspace_root().join("tests/fixtures/final-renderer-cases-v1.json");
+    let raw_corpus: serde_json::Value =
+        serde_json::from_slice(&fs::read(corpus_path).expect("the raw corpus is readable"))
+            .expect("the raw corpus is valid JSON");
+    let mut path_wires = Vec::new();
+    collect_authoritative_native_path_wires(&raw_corpus, &mut path_wires);
+
+    assert_eq!(
+        path_wires.len(),
+        23,
+        "every authoritative pathname remains enrolled in the canonical DTO regression"
+    );
+    for wire in path_wires {
+        let native_path: NativePathDto = serde_json::from_value(wire.clone())
+            .expect("every corpus pathname uses the public NativePathDto wire");
+        assert_eq!(
+            serde_json::to_value(&native_path).expect("NativePathDto round-trips"),
+            *wire
+        );
+    }
+
+    assert!(
+        serde_json::from_value::<NativePathDto>(serde_json::json!({
+            "windowsUtf16": [67, 58, 92]
+        }))
+        .is_err(),
+        "the removed shadow pathname wire must stay invalid"
+    );
+}
+
+#[test]
 fn geometry_and_creative_state_produce_the_complete_expected_plan() {
     let corpus = corpus();
     let geometry = corpus
@@ -2761,23 +2809,21 @@ fn imaging_envelope_is_closed_and_contains_only_the_selected_projection() {
         std::slice::from_ref(&raster.input.unit)
     );
 
-    let destination_directory =
-        String::from_utf16(&envelope.preparation.destination_directory.windows_utf16)
-            .expect("the golden destination is valid UTF-16");
-    let attempt_directory =
-        String::from_utf16(&envelope.preparation.attempt_directory.windows_utf16)
-            .expect("the golden attempt directory is valid UTF-16");
-    let output_path = String::from_utf16(&envelope.preparation.output_path.windows_utf16)
-        .expect("the golden prepared output is valid UTF-16");
-    assert_eq!(destination_directory, r"C:\Export");
+    let destination_directory = Path::new(r"C:\Export");
+    let attempt_directory = destination_directory.join(format!(
+        ".myalbuns-export-{}.tmp",
+        envelope.attempt.attempt_id
+    ));
+    let output_path = attempt_directory.join("album_001.jpg");
     assert_eq!(
-        attempt_directory,
-        format!(
-            r"{destination_directory}\.myalbuns-export-{}.tmp",
-            envelope.attempt.attempt_id
-        )
+        envelope.preparation.destination_directory.as_path(),
+        destination_directory
     );
-    assert_eq!(output_path, format!(r"{attempt_directory}\album_001.jpg"));
+    assert_eq!(
+        envelope.preparation.attempt_directory.as_path(),
+        attempt_directory
+    );
+    assert_eq!(envelope.preparation.output_path.as_path(), output_path);
 
     let selected_source_ids = envelope.units[0]
         .layers
@@ -2825,67 +2871,80 @@ fn imaging_envelope_is_closed_and_contains_only_the_selected_projection() {
         );
     }
 
-    assert_eq!(envelope.root_binding_plan.bindings.len(), 1);
-    assert_eq!(
-        envelope.root_binding_plan.bindings[0],
-        RootBindingV1 {
-            kind: PathRootKindV1::Disk,
-            logical_root: NativePathV1 {
-                windows_utf16: vec![67, 58, 92],
-            },
-            operational_root: NativePathV1 {
-                windows_utf16: vec![67, 58, 92],
-            },
-        }
-    );
-    let logical_roots = envelope
+    envelope
         .root_binding_plan
-        .bindings
-        .iter()
-        .map(|binding| binding.logical_root.windows_utf16.as_slice())
-        .collect::<BTreeSet<_>>();
-    assert_eq!(
-        logical_roots.len(),
-        envelope.root_binding_plan.bindings.len()
-    );
+        .validate()
+        .expect("the golden RootBindingPlan is valid through its production owner");
+    let bindings = envelope.root_binding_plan.bindings();
+    assert_eq!(bindings.len(), 1);
+    assert_eq!(bindings[0].kind(), PathRootKind::Disk);
+    assert_eq!(bindings[0].logical_root(), Path::new(r"C:\"));
+    assert_eq!(bindings[0].operational_root(), Path::new(r"C:\"));
     for source in &envelope.sources {
-        assert!(envelope.root_binding_plan.bindings.iter().any(|binding| {
-            !binding.logical_root.windows_utf16.is_empty()
-                && !binding.operational_root.windows_utf16.is_empty()
-                && source
-                    .media_ref
-                    .native_path
-                    .windows_utf16
-                    .starts_with(&binding.logical_root.windows_utf16)
-        }));
+        assert!(
+            envelope
+                .root_binding_plan
+                .covers(source.media_ref.native_path.as_path())
+        );
     }
     for path in [
         &envelope.preparation.destination_directory,
         &envelope.preparation.attempt_directory,
         &envelope.preparation.output_path,
     ] {
-        assert!(envelope.root_binding_plan.bindings.iter().any(|binding| {
-            path.windows_utf16
-                .starts_with(&binding.logical_root.windows_utf16)
-        }));
+        assert!(envelope.root_binding_plan.covers(path.as_path()));
     }
 
     for (wire, expected) in [
-        ("disk", PathRootKindV1::Disk),
-        ("unc", PathRootKindV1::Unc),
-        ("verbatimDisk", PathRootKindV1::VerbatimDisk),
-        ("verbatimUnc", PathRootKindV1::VerbatimUnc),
-        ("posix", PathRootKindV1::Posix),
+        ("disk", PathRootKind::Disk),
+        ("unc", PathRootKind::Unc),
+        ("verbatimDisk", PathRootKind::VerbatimDisk),
+        ("verbatimUnc", PathRootKind::VerbatimUnc),
+        ("posix", PathRootKind::Posix),
     ] {
         assert_eq!(
-            serde_json::from_value::<PathRootKindV1>(serde_json::json!(wire))
+            serde_json::from_value::<PathRootKind>(serde_json::json!(wire))
                 .expect("every canonical RootBinding kind deserializes"),
             expected
         );
     }
     for noncanonical in ["verbatim-disk", "verbatim-unc"] {
-        assert!(serde_json::from_value::<PathRootKindV1>(serde_json::json!(noncanonical)).is_err());
+        assert!(serde_json::from_value::<PathRootKind>(serde_json::json!(noncanonical)).is_err());
     }
+
+    let mut envelope_native_paths = vec![
+        envelope.preparation.destination_directory.clone(),
+        envelope.preparation.attempt_directory.clone(),
+        envelope.preparation.output_path.clone(),
+    ];
+    for source in &envelope.sources {
+        envelope_native_paths.push(source.media_ref.native_path.clone());
+        envelope_native_paths.push(source.source_observation.native_path.clone());
+    }
+    for binding in bindings {
+        envelope_native_paths.push(NativePathDto::from_path(binding.logical_root()));
+        envelope_native_paths.push(NativePathDto::from_path(binding.operational_root()));
+    }
+    assert_eq!(envelope_native_paths.len(), 11);
+    for path in &envelope_native_paths {
+        let wire = serde_json::to_value(path).expect("NativePathDto serializes directly");
+        let restored: NativePathDto = serde_json::from_value(wire.clone())
+            .expect("every envelope pathname uses NativePathDto");
+        assert_eq!(restored.as_path(), path.as_path());
+        assert_eq!(
+            serde_json::to_value(&restored).expect("NativePathDto round-trips"),
+            wire
+        );
+    }
+    let root_plan_wire = serde_json::to_value(&envelope.root_binding_plan)
+        .expect("the production RootBindingPlan serializes");
+    let restored_root_plan: RootBindingPlan = serde_json::from_value(root_plan_wire.clone())
+        .expect("the production RootBindingPlan deserializes");
+    assert_eq!(restored_root_plan, envelope.root_binding_plan);
+    assert_eq!(
+        serde_json::to_value(restored_root_plan).expect("RootBindingPlan round-trips"),
+        root_plan_wire
+    );
 
     let corpus_path = workspace_root().join("tests/fixtures/final-renderer-cases-v1.json");
     let raw_corpus: serde_json::Value =
