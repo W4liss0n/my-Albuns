@@ -75,17 +75,17 @@ let destination = owner_paths.resolve_destination(destination_path)?;
 let root_bindings = owner_paths.freeze()?;
 
 // Quando a fase seguinte existir em outro processo:
-let envelope = export_plan.to_imaging_envelope(root_bindings.clone())?;
+let envelope = export_plan.to_imaging_envelope(render_snapshot, root_bindings.clone())?;
 ipc.send(envelope)?;
 
 // No processo participante:
 let worker_paths = OperationPathContext::from_plan(root_bindings)?;
 ```
 
-`ExportPipeline` deriva o envelope somente do `RenderSnapshot` já validado e do
-plano de Exportação selecionado. O módulo de caminhos fornece o
-`RootBindingPlan`, mas não interpreta conteúdo criativo nem acrescenta o
-snapshot ao payload.
+`ExportPipeline` conserva o `RenderSnapshot` validado inteiro dentro do envelope
+e acrescenta somente a seleção e os valores operacionais da Exportação. O módulo
+de caminhos fornece o mesmo `RootBindingPlan` ao envelope, mas não interpreta o
+snapshot nem qualquer conteúdo criativo.
 
 `ResolvedPath` é um valor opaco. Ele conserva a forma escolhida para apresentação, a forma operacional nativa e a raiz classificada sem obrigar chamadores a conhecer regras de prefixo. Somente o módulo pode derivar caminhos filhos ou locais temporários a partir dele.
 

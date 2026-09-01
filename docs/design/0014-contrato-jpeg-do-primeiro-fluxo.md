@@ -14,7 +14,8 @@ Fixar o primeiro corte real e verificável de `Exportar Lâmina`: uma única sa�
 O [Contrato do Renderizador final](0019-contrato-do-renderizador-final.md) é a
 decisão posterior para formatos, TIFF, qualidade, subsampling, captura de
 Originais, múltiplas unidades e Publicação. Este documento continua descrevendo
-o corte JPEG já entregue; uma divergência transitória sua não limita o contrato
+o corte JPEG já entregue; seu payload transitório de unidade única é substituído
+pelo envelope versionado que transporta o `RenderSnapshot` inteiro no contrato
 final.
 
 ## Operação visível

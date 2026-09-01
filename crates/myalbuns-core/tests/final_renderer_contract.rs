@@ -531,16 +531,25 @@ struct ImagingEnvelopeCaseV1 {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct RenderSnapshotV1 {
+    snapshot_version: u32,
+    project_id: String,
+    revision: u64,
+    dpi: u32,
+    composition_plan: ExpectedCompositionPlanV1,
+    sources: Vec<ImagingSourceV1>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ImagingRenderEnvelopeV1 {
     protocol_version: u32,
     correlation: ImagingCorrelationV1,
     attempt: ImagingAttemptV1,
-    revision: u64,
-    dpi: u32,
     format_options: ImagingFormatOptionsV1,
     preparation: ImagingPreparationV1,
-    units: Vec<ComposedOutputUnitV1>,
-    sources: Vec<ImagingSourceV1>,
+    render_snapshot: RenderSnapshotV1,
+    selected_unit_ids: Vec<String>,
     root_binding_plan: RootBindingPlan,
 }
 
@@ -548,7 +557,6 @@ struct ImagingRenderEnvelopeV1 {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ImagingCorrelationV1 {
     request_id: String,
-    project_id: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -610,6 +618,34 @@ struct ImagingPreparationV1 {
 struct ImagingSourceV1 {
     media_ref: MediaRefV1,
     source_observation: SourceObservationV1,
+}
+
+fn imaging_selection_is_valid(envelope: &ImagingRenderEnvelopeV1) -> bool {
+    let available_unit_ids = envelope
+        .render_snapshot
+        .composition_plan
+        .sheets
+        .iter()
+        .flat_map(|sheet| sheet.output_units.iter())
+        .map(|unit| unit.unit_id.as_str())
+        .collect::<BTreeSet<_>>();
+    let selected_unit_ids = envelope
+        .selected_unit_ids
+        .iter()
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
+    let has_valid_cardinality = match envelope.format_options {
+        ImagingFormatOptionsV1::Jpeg { .. } | ImagingFormatOptionsV1::Png {} => {
+            envelope.selected_unit_ids.len() == 1
+        }
+        ImagingFormatOptionsV1::Pdf {} => !envelope.selected_unit_ids.is_empty(),
+    };
+
+    has_valid_cardinality
+        && selected_unit_ids.len() == envelope.selected_unit_ids.len()
+        && selected_unit_ids
+            .iter()
+            .all(|unit_id| available_unit_ids.contains(unit_id))
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -2551,7 +2587,7 @@ fn corpus_authoritative_paths_use_the_canonical_native_path_dto_wire() {
 
     assert_eq!(
         path_wires.len(),
-        23,
+        25,
         "every authoritative pathname remains enrolled in the canonical DTO regression"
     );
     for wire in path_wires {
@@ -2743,7 +2779,7 @@ fn composition_case_ids_are_registered_for_every_contract_adapter() {
 }
 
 #[test]
-fn imaging_envelope_is_closed_and_contains_only_the_selected_projection() {
+fn imaging_envelope_carries_the_complete_snapshot_and_selects_only_known_units() {
     let corpus = corpus();
     let envelope_case = corpus
         .cases
@@ -2788,7 +2824,9 @@ fn imaging_envelope_is_closed_and_contains_only_the_selected_projection() {
 
     assert_eq!(envelope.protocol_version, 1);
     assert_eq!(envelope.correlation.request_id, "render-contract-0001");
-    assert_eq!(envelope.correlation.project_id, "project-golden");
+    let snapshot = &envelope.render_snapshot;
+    assert_eq!(snapshot.snapshot_version, 1);
+    assert_eq!(snapshot.project_id, "project-golden");
     assert_eq!(
         envelope.attempt.attempt_id,
         "00000000-0000-4000-8000-000000000017"
@@ -2797,17 +2835,32 @@ fn imaging_envelope_is_closed_and_contains_only_the_selected_projection() {
         envelope.attempt.cancellation_id,
         "cancel-render-contract-0001"
     );
-    assert_eq!(envelope.revision, composition.input.creative_state.revision);
-    assert_eq!(envelope.dpi, composition.input.creative_state.dpi);
+    assert_eq!(snapshot.revision, composition.input.creative_state.revision);
+    assert_eq!(snapshot.dpi, composition.input.creative_state.dpi);
+    assert_eq!(snapshot.composition_plan, composition.expected_plan);
     let ImagingFormatOptionsV1::Jpeg { quality } = envelope.format_options else {
         panic!("the linked right-Page envelope is the JPEG quality oracle");
     };
     assert_eq!(quality, 87);
     assert!((1..=100).contains(&quality));
     assert_eq!(
-        envelope.units.as_slice(),
-        std::slice::from_ref(&raster.input.unit)
+        envelope.selected_unit_ids.as_slice(),
+        std::slice::from_ref(&raster.input.unit.unit_id)
     );
+    let snapshot_unit_ids = snapshot
+        .composition_plan
+        .sheets
+        .iter()
+        .flat_map(|sheet| sheet.output_units.iter())
+        .map(|unit| unit.unit_id.as_str())
+        .collect::<BTreeSet<_>>();
+    assert!(
+        envelope
+            .selected_unit_ids
+            .iter()
+            .all(|unit_id| snapshot_unit_ids.contains(unit_id.as_str()))
+    );
+    assert!(imaging_selection_is_valid(envelope));
 
     let destination_directory = Path::new(r"C:\Export");
     let attempt_directory = destination_directory.join(format!(
@@ -2825,7 +2878,9 @@ fn imaging_envelope_is_closed_and_contains_only_the_selected_projection() {
     );
     assert_eq!(envelope.preparation.output_path.as_path(), output_path);
 
-    let selected_source_ids = envelope.units[0]
+    let selected_source_ids = raster
+        .input
+        .unit
         .layers
         .iter()
         .filter_map(|layer| match layer {
@@ -2838,14 +2893,23 @@ fn imaging_envelope_is_closed_and_contains_only_the_selected_projection() {
         selected_source_ids,
         BTreeSet::from(["decorative-checker", "photo-blue", "photo-frac"])
     );
-    let envelope_source_ids = envelope
+    let snapshot_source_ids = snapshot
         .sources
         .iter()
         .map(|source| source.media_ref.media_id.as_str())
         .collect::<BTreeSet<_>>();
-    assert_eq!(envelope_source_ids.len(), envelope.sources.len());
-    assert_eq!(envelope_source_ids, selected_source_ids);
-    assert!(!envelope_source_ids.contains("photo-opaque"));
+    assert_eq!(snapshot_source_ids.len(), snapshot.sources.len());
+    assert_eq!(
+        snapshot_source_ids,
+        snapshot
+            .composition_plan
+            .referenced_media_ids
+            .iter()
+            .map(String::as_str)
+            .collect::<BTreeSet<_>>()
+    );
+    assert!(snapshot_source_ids.contains("photo-opaque"));
+    assert!(!selected_source_ids.contains("photo-opaque"));
 
     let media_refs = composition
         .input
@@ -2860,7 +2924,7 @@ fn imaging_envelope_is_closed_and_contains_only_the_selected_projection() {
         .iter()
         .map(|observation| (observation.media_id.as_str(), observation))
         .collect::<BTreeMap<_, _>>();
-    for source in &envelope.sources {
+    for source in &snapshot.sources {
         let media_id = source.media_ref.media_id.as_str();
         assert_eq!(source.media_ref, *media_refs[media_id]);
         assert_eq!(source.source_observation, *observations[media_id]);
@@ -2880,13 +2944,27 @@ fn imaging_envelope_is_closed_and_contains_only_the_selected_projection() {
     assert_eq!(bindings[0].kind(), PathRootKind::Disk);
     assert_eq!(bindings[0].logical_root(), Path::new(r"C:\"));
     assert_eq!(bindings[0].operational_root(), Path::new(r"C:\"));
-    for source in &envelope.sources {
+    for source in snapshot
+        .sources
+        .iter()
+        .filter(|source| selected_source_ids.contains(source.media_ref.media_id.as_str()))
+    {
         assert!(
             envelope
                 .root_binding_plan
                 .covers(source.media_ref.native_path.as_path())
         );
     }
+    let unselected_source = snapshot
+        .sources
+        .iter()
+        .find(|source| source.media_ref.media_id == "photo-opaque")
+        .expect("the snapshot retains one source outside the selected unit closure");
+    assert!(
+        !envelope
+            .root_binding_plan
+            .covers(unselected_source.media_ref.native_path.as_path())
+    );
     for path in [
         &envelope.preparation.destination_directory,
         &envelope.preparation.attempt_directory,
@@ -2917,7 +2995,7 @@ fn imaging_envelope_is_closed_and_contains_only_the_selected_projection() {
         envelope.preparation.attempt_directory.clone(),
         envelope.preparation.output_path.clone(),
     ];
-    for source in &envelope.sources {
+    for source in &snapshot.sources {
         envelope_native_paths.push(source.media_ref.native_path.clone());
         envelope_native_paths.push(source.source_observation.native_path.clone());
     }
@@ -2925,7 +3003,7 @@ fn imaging_envelope_is_closed_and_contains_only_the_selected_projection() {
         envelope_native_paths.push(NativePathDto::from_path(binding.logical_root()));
         envelope_native_paths.push(NativePathDto::from_path(binding.operational_root()));
     }
-    assert_eq!(envelope_native_paths.len(), 11);
+    assert_eq!(envelope_native_paths.len(), 13);
     for path in &envelope_native_paths {
         let wire = serde_json::to_value(path).expect("NativePathDto serializes directly");
         let restored: NativePathDto = serde_json::from_value(wire.clone())
@@ -2959,9 +3037,12 @@ fn imaging_envelope_is_closed_and_contains_only_the_selected_projection() {
         .expect("the raw Imaging envelope exists")
         .clone();
     for forbidden_field in [
-        "renderSnapshot",
         "projectDocument",
         "compositionPlan",
+        "revision",
+        "dpi",
+        "units",
+        "sources",
         "session",
         "cache",
     ] {
@@ -2979,12 +3060,10 @@ fn imaging_envelope_is_closed_and_contains_only_the_selected_projection() {
         "protocolVersion",
         "correlation",
         "attempt",
-        "revision",
-        "dpi",
         "formatOptions",
         "preparation",
-        "units",
-        "sources",
+        "renderSnapshot",
+        "selectedUnitIds",
         "rootBindingPlan",
     ] {
         let mut mutated = raw_envelope.clone();
@@ -2996,6 +3075,44 @@ fn imaging_envelope_is_closed_and_contains_only_the_selected_projection() {
             serde_json::from_value::<ImagingRenderEnvelopeV1>(mutated).is_err(),
             "the closed envelope requires {required_field}"
         );
+    }
+
+    for required_snapshot_field in [
+        "snapshotVersion",
+        "projectId",
+        "revision",
+        "dpi",
+        "compositionPlan",
+        "sources",
+    ] {
+        let mut mutated = raw_envelope.clone();
+        mutated["renderSnapshot"]
+            .as_object_mut()
+            .expect("the RenderSnapshot is an object")
+            .remove(required_snapshot_field);
+        assert!(serde_json::from_value::<ImagingRenderEnvelopeV1>(mutated).is_err());
+    }
+
+    for forbidden_snapshot_field in ["projectDocument", "session", "cache", "units"] {
+        let mut mutated = raw_envelope.clone();
+        mutated["renderSnapshot"]
+            .as_object_mut()
+            .expect("the RenderSnapshot is an object")
+            .insert(forbidden_snapshot_field.to_owned(), serde_json::Value::Null);
+        assert!(serde_json::from_value::<ImagingRenderEnvelopeV1>(mutated).is_err());
+    }
+
+    for malformed_selection in [
+        serde_json::json!([]),
+        serde_json::json!(["missing:unit"]),
+        serde_json::json!(["sheet-1:right", "sheet-1:right"]),
+        serde_json::json!(["sheet-1:left", "sheet-1:right"]),
+    ] {
+        let mut mutated = raw_envelope.clone();
+        mutated["selectedUnitIds"] = malformed_selection;
+        let parsed = serde_json::from_value::<ImagingRenderEnvelopeV1>(mutated)
+            .expect("selection semantics are validated above serde");
+        assert!(!imaging_selection_is_valid(&parsed));
     }
 
     for malformed_format in [

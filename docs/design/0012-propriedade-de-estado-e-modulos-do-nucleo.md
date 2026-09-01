@@ -195,7 +195,7 @@ Esses stores podem compartilhar uma implementação interna pequena para criar t
 
 Os módulos acima permanecem neutros quanto à implantação para não espalhar detalhes de processo pelo núcleo. O [ADR 0005](../adr/0005-adotar-tauri-react-rust.md) mapeia essa arquitetura para um host independente por Projeto no MVP.
 
-Quando uma operação lógica atravessar processos, a IPC transporta somente valores imutáveis. Para renderização, a carga é o envelope autocontido derivado do `RenderSnapshot`, acompanhado do mesmo plano de bindings de raiz; o snapshot, o documento bruto e o `CompositionPlan` não atravessam essa fronteira. O Processador não recebe outra interpretação do Projeto nem invoca `CompositionCore`; o [Contrato do Renderizador final](0019-contrato-do-renderizador-final.md) fixa os campos e invariantes semânticos desse envelope. Progresso e cancelamento usam mensagens ou handles limitados à tentativa. Nenhum processo mantém uma segunda cópia mutável do Projeto como fonte canônica.
+Quando uma operação lógica atravessar processos, a IPC transporta somente valores imutáveis. Para renderização, a carga é um envelope autocontido que leva o `RenderSnapshot` validado inteiro e o mesmo plano de bindings de raiz; o documento bruto, a Sessão e o Cache não atravessam essa fronteira. O Processador consome o `CompositionPlan` já contido no snapshot, não interpreta novamente o Projeto nem invoca `CompositionCore`; o [Contrato do Renderizador final](0019-contrato-do-renderizador-final.md) fixa os campos e invariantes semânticos desse envelope. Progresso e cancelamento usam mensagens ou handles limitados à tentativa. Nenhum processo mantém uma segunda cópia mutável do Projeto como fonte canônica.
 
 O baseline aceito é uma aplicação Tauri com Janelas e hosts separados, uma Sessão e um Processador de Imagens isolado por Projeto e um Processador temporário para o lote.
 
@@ -211,7 +211,7 @@ Os testes atravessam as interfaces que representam comportamento observável:
 - invalidação e reconstrução descartável do `CacheEngine`;
 - uma mesma suíte do `ExportPipeline` para Exportação normal e lote, com injeção de falhas antes e durante a Publicação;
 - aquisição e liberação de concessões em sucesso, falha e cancelamento;
-- transporte do envelope de projeções derivadas e dos bindings, rejeitando snapshot, documento ou plano criativo brutos.
+- transporte do envelope com o `RenderSnapshot` inteiro e os bindings, rejeitando documento, Sessão, Cache e campos criativos duplicados fora do snapshot.
 
 Testes não dependem da quantidade final de crates nem atravessam seams internos apenas para observar detalhes de implementação.
 

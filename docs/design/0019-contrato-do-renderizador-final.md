@@ -46,24 +46,25 @@ Inspeção e hashing dos Originais são I/O assíncrono fora da thread da interf
 a revisão só é congelada como snapshot depois que o resultado completo volta ao
 proprietário e continua atual.
 
-`RenderSnapshot` é a entrada lógica pública de `ExportPipeline::plan`, mas não
-é DTO de IPC e nunca é serializado ou enviado ao Processador. Depois de validar
-o snapshot, `ExportPipeline` deriva um `ImagingRenderEnvelopeV1` owned e
-versionado. Esse envelope contém uma ou mais `ComposedOutputUnit`s selecionadas
-e ordenadas; exatamente um par `MediaRef + SourceObservation` para cada
-`mediaId` referenciado por essas unidades, sem falta, sobra ou duplicata; o
-mesmo `RootBindingPlan` congelado; e os valores operacionais e de correlação
-necessários à tentativa. Estes valores formam um schema fechado: `attemptId`
-UUID v4 canônico e `cancellationId` opaco; `formatOptions` como união marcada
-`jpeg { quality: 1..=100 }`, `png` ou `pdf`, sem `quality` nos dois últimos;
-e `preparation` com o Destino, sua filha direta reservada
+`RenderSnapshot` é a entrada lógica pública de `ExportPipeline::plan` e a única
+entrada criativa de `MyAlbuns.Imaging.exe`. Depois de validar o snapshot,
+`ExportPipeline` o conserva inteiro em um `ImagingRenderEnvelopeV1` owned e
+versionado; não cria uma segunda projeção criativa capaz de divergir. O wrapper
+acrescenta `selectedUnitIds`, o mesmo `RootBindingPlan` congelado e os valores
+operacionais e de correlação necessários à tentativa. `selectedUnitIds` é uma
+lista ordenada, sem repetição, cujos IDs precisam existir no `CompositionPlan`
+do snapshot. JPEG e PNG selecionam exatamente uma unidade; PDF seleciona uma ou
+mais unidades ordenadas para sua única saída.
+
+Os demais valores formam um schema fechado: `attemptId` UUID v4 canônico e
+`cancellationId` opaco; `formatOptions` como união marcada
+`jpeg { quality: 1..=100 }`, `png` ou `pdf`, sem `quality` nos dois últimos; e
+`preparation` com o Destino, sua filha direta reservada
 `.myalbuns-export-{attemptId}.tmp` e o pathname da saída dentro dessa filha.
-JPEG e PNG selecionam exatamente uma unidade por envelope; PDF pode selecionar
-uma ou mais unidades ordenadas para sua única saída. `projectId` e Revisão são
-proveniência opaca para o Processador, não autorização para reabrir o Projeto.
-O envelope não contém `RenderSnapshot`, documento `.myalbuns`,
-`CompositionPlan`, Sessão, Cache, unidade não selecionada nem fonte não
-referenciada.
+`projectId` e Revisão permanecem dentro do snapshot como proveniência opaca para
+o Processador, não como autorização para reabrir o Projeto. O envelope rejeita
+documento `.myalbuns`, Sessão e Cache, além de `revision`, `dpi`,
+`CompositionPlan`, unidades ou fontes duplicadas fora de `renderSnapshot`.
 
 Todo pathname autoritativo desse grafo reutiliza diretamente o `NativePathDto`
 owned por `myalbuns-paths`. No wire Windows, sua única forma é
@@ -71,14 +72,20 @@ owned por `myalbuns-paths`. No wire Windows, sua única forma é
 definem alias, campo abreviado nem segundo codec para preparação, fontes ou
 raízes.
 
-Os bytes dos Originais continuam vindo do `CapturedSourceSet` separado e só
-podem preencher os `mediaId`s fechados pelo envelope. Dados operacionais não
-podem alterar a composição.
+O snapshot conserva todos os descritores e observações exigidos pelo seu plano,
+inclusive os de unidades fora da seleção. O `ExportPlanner` calcula o fecho
+transitivo dos `mediaId`s usados por `selectedUnitIds`; somente essas fontes são
+abertas e revalidadas, e somente suas raízes precisam estar no
+`RootBindingPlan`. Uma fonte não selecionada não bloqueia a tentativa. Os bytes
+dos Originais vêm do `CapturedSourceSet` separado e só podem preencher esse
+fecho quando `mediaId + NativePathDto + SourceObservation` coincidem exatamente
+com o snapshot. Dados operacionais não podem alterar a composição.
 
 O Processador não lê `.myalbuns`, não consulta a Sessão, não usa Cache como
-fonte, não invoca `CompositionCore` e não resolve uma segunda versão de
-Background, Frame, Foto ou Overlay. A IPC carrega valores owned e versionados;
-nenhum participante conserva uma segunda cópia mutável do Projeto.
+fonte e não invoca `CompositionCore`: ele consome o `CompositionPlan` já
+validado dentro do snapshot e não resolve uma segunda versão de Background,
+Frame, Foto ou Overlay. A IPC carrega valores owned e versionados; nenhum
+participante conserva uma segunda cópia mutável do Projeto.
 
 ## Medidas físicas, DPI e unidades de saída
 
@@ -761,19 +768,20 @@ implementado já é o contrato final:
    criativo completo esperado;
 2. `ComposedOutputUnitV1 + NormalizedSourceV1 -> CanonicalRasterV1` traz a
    projeção imutável, fontes normalizadas e pixels esperados;
-3. `ImagingRenderEnvelopeV1` liga uma composição e suas unidades selecionadas
-   aos pares exatos `MediaRefV1 + SourceObservationV1`, ao
-   `RootBindingPlanV1`, à união fechada de formato e opções, à tentativa e seu
-   cancelamento, e à preparação canônica sob o Destino, em schema fechado que
-   rejeita snapshot, documento e plano criativo brutos.
+3. `ImagingRenderEnvelopeV1` transporta o `RenderSnapshotV1` completo e liga
+   seus `selectedUnitIds` ao mesmo `RootBindingPlanV1`, à união fechada de
+   formato e opções, à tentativa e seu cancelamento, e à preparação canônica sob
+   o Destino. O schema rejeita documento, Sessão, Cache e qualquer cópia de
+   Revisão, DPI, plano, unidades ou fontes fora do snapshot.
 
 O primeiro seam prova interpretação, ordem e geometria. O segundo prova a
 matriz Q32.32, centros de pixel, bilinear, alfa premultiplicado, Borda e
 Opacidade sem reimplementar `CompositionCore`. Assets codificados reais levam
 pathname relativo, tamanho e SHA-256, e congelam fatos antes e depois da
-orientação. O terceiro prova que o adapter futuro recebe uma projeção mínima e
-autocontida, não um snapshot disfarçado; ele é oráculo do contrato final, não
-alegação de que o protocolo JPEG transitório já transporta todos esses campos.
+orientação. O terceiro prova que o adapter futuro recebe o snapshot inteiro,
+que a seleção aponta somente para unidades dele e que nenhuma projeção criativa
+paralela pode divergir; ele é oráculo do contrato final, não alegação de que o
+protocolo JPEG transitório já transporta todos esses campos.
 
 O corpus cobre:
 
