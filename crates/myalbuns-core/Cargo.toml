@@ -14,4 +14,6 @@ uuid.workspace = true
 windows-sys.workspace = true
 
 [dev-dependencies]
+image = { workspace = true, features = ["jpeg", "png"] }
+sha2.workspace = true
 tempfile.workspace = true

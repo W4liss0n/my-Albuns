@@ -1875,9 +1875,11 @@ dependencies = [
 name = "myalbuns-core"
 version = "0.1.0"
 dependencies = [
+ "image",
  "myalbuns-paths",
  "serde",
  "serde_json",
+ "sha2",
  "tempfile",
  "thiserror 2.0.19",
  "ts-rs",
