@@ -1,11 +1,12 @@
 ---
 status: accepted
 date: 2026-07-27
+updated: 2026-09-01
 ---
 
 # Limpar saídas órfãs pela convenção de nomes
 
-Quando uma nova Exportação JPEG ou PNG do Álbum inteiro produzir menos arquivos que uma exportação anterior, o programa identifica saídas órfãs pelo padrão exato `{nome-do-projeto}_{índice com três dígitos}` e pela extensão selecionada. Os modos por Lâmina e por Página compartilham esse namespace: a convenção não permite distinguir qual modo criou um arquivo anterior. A limpeza não utiliza manifesto ou arquivo auxiliar, só ocorre após o usuário confirmar a sobrescrita e depois que todas as novas saídas do Projeto forem publicadas com sucesso conforme o ADR 0006.
+Quando uma nova Exportação JPEG ou PNG do Álbum inteiro produzir menos arquivos que uma exportação anterior, o programa identifica saídas órfãs pelo padrão exato `{nome-do-projeto}_{índice decimal com largura mínima de três dígitos}` e pela extensão selecionada. O índice é positivo: `001` a `999` usam três dígitos e `1000`, `1001` e seguintes crescem sem truncamento ou retorno a zero. Os modos por Lâmina e por Página compartilham esse namespace: a convenção não permite distinguir qual modo criou um arquivo anterior. A limpeza não utiliza manifesto ou arquivo auxiliar, só ocorre após o usuário confirmar a sobrescrita e depois que todas as novas saídas do Projeto forem publicadas com sucesso conforme o ADR 0006.
 
 ## Consequências
 
@@ -16,3 +17,4 @@ Quando uma nova Exportação JPEG ou PNG do Álbum inteiro produzir menos arquiv
 - Arquivos com outro Nome do Projeto ou outra extensão não são considerados, portanto podem permanecer após renomear o Projeto ou trocar o formato.
 - Um arquivo criado manualmente que coincida com o nome, a extensão e um índice órfão será indistinguível de uma saída anterior e poderá ser removido após a confirmação explícita de sobrescrita.
 - Nenhum arquivo de manifesto é criado no Destino da Exportação.
+- `000`, zeros à esquerda além da largura mínima e índices com sinal não pertencem ao padrão de limpeza.

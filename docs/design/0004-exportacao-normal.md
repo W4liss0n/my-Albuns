@@ -1,6 +1,7 @@
 ---
 status: accepted
 document: design
+updated: 2026-09-01
 ---
 
 # Exportação normal
@@ -56,11 +57,11 @@ Ao acionar `Exportar`, placeholders e originais necessários ausentes ou indispo
 
 ## Preparação e Publicação
 
-JPEG e PNG compartilham o namespace `{nome-do-projeto}_{NNN}` nos modos `Por lâmina` e `Por página`; o nome isolado não identifica o modo usado.
+JPEG e PNG compartilham o namespace `{nome-do-projeto}_{índice decimal com largura mínima de três dígitos}` nos modos `Por lâmina` e `Por página`; `001` a `999` conservam três dígitos e índices maiores crescem normalmente. O nome isolado não identifica o modo usado. O mapeamento de qualidade, os formatos e o comportamento acima de `999` pertencem ao [Contrato do Renderizador final](0019-contrato-do-renderizador-final.md).
 
 Ao iniciar, a operação adquire o `OperationLease` exclusivo; não existe fila de espera. O lease reserva em conjunto a concessão global, a pausa do Cache e o Processador de Imagens, e garante a devolução dos três recursos em sucesso, falha, cancelamento ou queda — a Exportação não os orquestra individualmente. O contrato do lease está em [Propriedade de estado e módulos do núcleo](0012-propriedade-de-estado-e-modulos-do-nucleo.md). Cancelamento e progresso continuam pertencendo somente à tentativa.
 
-O `ExportPipeline` possui internamente planejamento, execução e `Publisher`. Primeiro recebe `RenderSnapshot` e opções e devolve o plano com todas as dependências e raízes necessárias. O proprietário captura então o `RootBindingPlan` definido pela [política de caminhos](0011-resolucao-e-politica-de-caminhos.md) e inicia a execução. Se host e Processador participarem da tentativa, ambos recebem o mesmo plano; todo original necessário ainda é aberto e verificado.
+O `ExportPipeline` possui internamente planejamento, execução e `Publisher`. Primeiro recebe `RenderSnapshot` e opções e devolve o plano com todas as dependências e raízes necessárias. O proprietário captura então o `RootBindingPlan` definido pela [política de caminhos](0011-resolucao-e-politica-de-caminhos.md) e inicia a execução. Se host e Processador participarem da tentativa, ambos recebem o mesmo plano; todo Original necessário é aberto uma vez no conjunto imutável da tentativa e reutilizado por todas as Unidades de Exportação.
 
 Todas as saídas selecionadas são renderizadas e verificadas em uma pasta de preparação reservada dentro do próprio Destino antes da Publicação. Isso mantém preparação e nomes finais na mesma árvore de destino. Uma falha nessa fase não modifica os nomes finais.
 
