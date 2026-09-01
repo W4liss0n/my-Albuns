@@ -31,8 +31,19 @@ entregas precisam compartilhar.
 
 `RenderSnapshot` é a única autoridade criativa da tentativa. Ele contém a
 Revisão visível congelada, inclusive mudanças ainda não salvas, o DPI e um
-`CompositionPlan` já resolvido pelo `CompositionCore`. Criar o snapshot é o
-único ponto em que o estado do Projeto é interpretado para aquela tentativa.
+`CompositionPlan` já resolvido pelo `CompositionCore`, acompanhado do conjunto
+exato de descritores de fonte `mediaId + NativePathDto` que originou seus fatos
+de geometria e de uma `SourceObservation` por descritor. A observação congela
+formato e variante detectados, dimensões codificadas e orientadas,
+`embeddedOrientation`, `appliedOrientation` e identidade do ICC permitido ou
+ausência assumida como sRGB, além do digest `sha256-full-file-v1`. O pathname
+reversível permanece no descritor, não é duplicado no plano. Criar o snapshot é
+o único ponto em que o estado do Projeto é interpretado para aquela tentativa.
+`ProjectCore` é a única interface pública que o produz e valida, coordenando a
+revisão da `ProjectSession` com as observações autoritativas do `MediaResolver`.
+Inspeção e hashing dos Originais são I/O assíncrono fora da thread da interface;
+a revisão só é congelada como snapshot depois que o resultado completo volta ao
+proprietário e continua atual.
 
 `ExportPipeline` valida o snapshot e deriva dele `ComposedOutputUnit`s
 imutáveis. O Processador pode receber somente essas projeções necessárias, e
@@ -113,6 +124,12 @@ arquivos, Cache ou GPU e não cria nomes de saída. Para a mesma entrada
 versionada, devolve o mesmo plano ordenado. Fatos transitórios de uma fonte só
 entram depois de associados ao mesmo `mediaId + path` que os originou; ausência
 ou divergência bloqueia o snapshot em vez de usar uma dimensão de outra versão.
+O construtor do snapshot projeta de cada `SourceObservation` somente
+`mediaId + NativePathDto`, dimensões orientadas e `appliedOrientation` para essa
+entrada pura; `embeddedOrientation`, formato, variante e perfil continuam
+anexos ao snapshot para a validação de captura e não influenciam a composição.
+`CompositionCore` transporta a orientação efetiva no plano, mas não abre nem
+gira pixels.
 
 O plano fixa, em micrômetros:
 
@@ -153,6 +170,7 @@ ONE = 4.294.967.296
 roundSigned(n, d) = floor((n + d/2) / d), se n >= 0;
                     -floor((-n + d/2) / d), se n < 0
 qRatio(n, d) = roundSigned(n * ONE, d)
+qInt(n) = n * ONE
 qMul(a, b) = roundSigned(a * b, ONE)
 qDiv(a, b) = roundSigned(a * ONE, b)
 linearQ(a, x, b, y) = roundSigned(a * x + b * y, ONE)
@@ -164,43 +182,56 @@ ou resultado fora de `i64` é `ResourceLimitExceeded`. Em JSON/IPC, cada inteiro
 Q32.32 é uma string decimal canônica para não perder precisão em JavaScript.
 
 No sistema físico, X cresce para a direita e Y para baixo. Para Giro visual
-anti-horário, a rotação é:
+anti-horário, `R = [[C, S], [-S, C]]`, onde `C` e `S` são as entradas Q32.32
+da tabela. Pan positivo move o centro da Foto nos eixos locais já girados;
+Espelhamento não inverte o sentido do controle. Para eliminar qualquer escolha
+implícita de quantização, a direta e a inversa são construídas exatamente nesta
+ordem (`max` compara os inteiros Q32.32 e cada chamada arredonda uma vez):
 
 ```text
-R = [[ cos,  sin],
-     [-sin,  cos]]
+m = -ONE, se mirrorHorizontal; senão ONE
+W = qInt(innerWidthUm); H = qInt(innerHeightUm)
+Sw = qInt(orientedWidthPx); Sh = qInt(orientedHeightPx)
+
+requiredU = linearQ(abs(C), W, abs(S), H)
+requiredV = linearQ(abs(S), W, abs(C), H)
+baseScale = max(qDiv(requiredU, Sw), qDiv(requiredV, Sh))
+scale = qMul(baseScale, qRatio(userZoomMillionths, 1.000.000))
+
+overflowU = qDiv(max(qMul(Sw, scale) - requiredU, 0), qInt(2))
+overflowV = qDiv(max(qMul(Sh, scale) - requiredV, 0), qInt(2))
+panU = qMul(qRatio(panXMillionths, 1.000.000), overflowU)
+panV = qMul(qRatio(panYMillionths, 1.000.000), overflowV)
+
+centerX = qInt(innerXUm) + qDiv(W, qInt(2))
+centerY = qInt(innerYUm) + qDiv(H, qInt(2))
+photoCenterX = centerX + linearQ(C, panU, S, panV)
+photoCenterY = centerY + linearQ(-S, panU, C, panV)
+
+Dxx = qMul(qMul(m, C), scale)
+Dxy = qMul(qMul(m, S), scale)
+Dyx = qMul(-S, scale)
+Dyy = qMul(C, scale)
+sourceCenterX = qDiv(Sw, qInt(2))
+sourceCenterY = qDiv(Sh, qInt(2))
+Dtx = photoCenterX - linearQ(Dxx, sourceCenterX, Dxy, sourceCenterY)
+Dty = photoCenterY - linearQ(Dyx, sourceCenterX, Dyy, sourceCenterY)
+
+Ixx = qDiv(qMul(m, C), scale)
+Ixy = qDiv(-S, scale)
+Iyx = qDiv(qMul(m, S), scale)
+Iyy = qDiv(C, scale)
+Itx = sourceCenterX - linearQ(Ixx, photoCenterX, Ixy, photoCenterY)
+Ity = sourceCenterY - linearQ(Iyx, photoCenterX, Iyy, photoCenterY)
 ```
 
-Se `W × H` é a área interna do Frame e `Sw × Sh` são as dimensões em
-pixels do Original já orientado, o preenchimento e o Pan são definidos em
-aritmética racional a partir dos valores Q32.32:
-
-```text
-requiredU = abs(cos) * W + abs(sin) * H
-requiredV = abs(sin) * W + abs(cos) * H
-baseScale = max(requiredU / Sw, requiredV / Sh)
-scale = baseScale * userZoomMillionths / 1.000.000
-overflowU = max(Sw * scale - requiredU, 0) / 2
-overflowV = max(Sh * scale - requiredV, 0) / 2
-localPan = (panXMillionths * overflowU / 1.000.000,
-            panYMillionths * overflowV / 1.000.000)
-photoCenter = innerFrameCenter + R * localPan
-```
-
-Pan positivo move o centro da Foto nos eixos locais já girados; Espelhamento
-não inverte o sentido do controle. Com `M = diag(-1, 1)` para espelhada ou a
-identidade caso contrário, o Espelhamento posterior à rotação é `M * R` e a
-transformação da borda da fonte para o espaço físico é:
-
-```text
-physical = photoCenter + M * R * scale *
-           (sourceEdge - (Sw / 2, Sh / 2))
-```
-
-O plano conserva a direta e a inversa dessa afim como seis inteiros Q32.32 cada,
-construídas com as operações acima, sem inversão em ponto flutuante. Essa matriz é a autoridade tanto do
-Canvas quanto da Exportação; nenhum consumidor refaz preenchimento, Pan,
-Ângulo ou trigonometria. Para uma unidade com origem física `(ox, oy)`, o
+O plano conserva `physicalFromSourceQ32 = [Dxx, Dxy, Dtx, Dyx, Dyy, Dty]`
+e `sourceFromPhysicalQ32 = [Ixx, Ixy, Itx, Iyx, Iyy, Ity]`, sempre como seis
+inteiros Q32.32. A primeira leva coordenadas de borda da fonte ao espaço físico;
+a segunda é construída pela inversa analítica na mesma sequência inteira, sem
+inverter a matriz já quantizada nem usar ponto flutuante. As duas são autoridade
+do Canvas e da Exportação; nenhum consumidor refaz preenchimento, Pan, Ângulo ou
+trigonometria. Para uma unidade com origem física `(ox, oy)`, o
 `ComposedOutputUnit` deriva e congela a matriz destino→fonte usando os centros:
 
 ```text
@@ -208,8 +239,25 @@ physicalX(x) = ox + (2 * x + 1) * 12.700 / dpi
 physicalY(y) = oy + (2 * y + 1) * 12.700 / dpi
 ```
 
-Os seis coeficientes resultantes também são Q32.32. Somá-los com os índices
-inteiros `(x, y)` não introduz novo arredondamento.
+Essa projeção não combina novamente os racionais. A partir de
+`sourceFromPhysicalQ32 = [Ixx, Ixy, Itx, Iyx, Iyy, Ity]`, sua ordem exata é:
+
+```text
+step = qRatio(25.400, dpi)
+p0x = qInt(ox) + qRatio(12.700, dpi)
+p0y = qInt(oy) + qRatio(12.700, dpi)
+
+Sxx = qMul(Ixx, step); Sxy = qMul(Ixy, step)
+Syx = qMul(Iyx, step); Syy = qMul(Iyy, step)
+Stx = Itx + linearQ(Ixx, p0x, Ixy, p0y)
+Sty = Ity + linearQ(Iyx, p0x, Iyy, p0y)
+```
+
+`sourceFromDestinationQ32 = [Sxx, Sxy, Stx, Syx, Syy, Sty]` é congelada no
+`ComposedOutputUnit`. Seus seis coeficientes também são Q32.32; aplicá-los aos
+índices inteiros `(x, y)` não introduz novo arredondamento. Em uma Página direita,
+`ox` continua sendo a origem física dessa Página na Lâmina, embora o índice
+raster local reinicie em zero. Assim o recorte não recentraliza a Foto.
 
 ## Composição canônica
 
@@ -224,6 +272,20 @@ Background e Overlay de imagem são esticados independentemente nos eixos X e Y
 até seu retângulo resolvido. Não aplicam preservação de proporção, Pan ou Zoom.
 O alfa da fonte é preservado até `source-over`: um Background transparente
 revela a base branca e um Overlay transparente revela as camadas inferiores.
+
+Para retângulo físico `[rx, ry, rw, rh]` e fonte já orientada `Sw × Sh`, o
+stretch usa coordenadas de borda e a ordem inteira abaixo:
+
+```text
+xx = qRatio(Sw, rw); yy = qRatio(Sh, rh)
+xy = yx = 0
+tx = -qMul(xx, qInt(rx)); ty = -qMul(yy, qInt(ry))
+```
+
+Essa `sourceFromPhysicalQ32` passa pela mesma projeção
+`sourceFromDestinationQ32` definida acima para Fotos. Portanto um decorativo
+de Ambos os lados conserva uma única parametrização contínua ao cruzar o centro
+e ao gerar Páginas independentes; conteúdo por lado deriva sua própria matriz.
 
 Cada Frame é composto primeiro em uma camada transparente própria:
 
@@ -298,9 +360,10 @@ groupColor = sampleColor, ou zero quando groupAlpha = 0
 
 A Borda é uma fonte opaca dentro do anel do Frame e usa `source-over` sobre a
 Foto na camada transparente antes dessa opacidade de grupo. O inset satura
-separadamente em metade da largura e metade da altura; se a área interna ficar
-vazia, a Foto não contribui. Retângulos da Borda seguem `rasterEdge`: uma Borda
-física positiva pode ocupar zero pixels e não é forçada a um pixel.
+separadamente como `insetX = min(borderWidthUm, floor(frameWidthUm / 2))` e
+`insetY = min(borderWidthUm, floor(frameHeightUm / 2))`; se a área interna
+ficar vazia, a Foto não contribui. Retângulos da Borda seguem `rasterEdge`: uma
+Borda física positiva pode ocupar zero pixels e não é forçada a um pixel.
 
 Para fonte `s` sobre destino `d`, em canais não associados, a operação completa
 é:
@@ -323,19 +386,31 @@ Com base opaca, todo pixel ao fim da Pilha precisa ter alfa `255`. Alfa residual
 ## Originais e normalização de fonte
 
 O contrato de entrada é o resultado do Programa 03 — Mídias externas e Cache
-(issue #11), não o artefato de Cache. O plano leva `mediaId`, pathname nativo
-reversível e fatos observados necessários à geometria. Metadados do Monitor,
-fingerprint e representação reduzida podem antecipar problemas, mas não
-autorizam pixels finais.
+(issue #11), não o artefato de Cache. O `CompositionPlan` leva `mediaId` e os
+fatos observados necessários à geometria; o `RenderSnapshot` associa cada ID ao
+descritor separado com pathname nativo reversível. Um fato só é aceito quando
+seu par `mediaId + NativePathDto` coincide exatamente com a `MediaRef` criativa
+que o solicitou. A `SourceObservation` congelada registra formato, variante,
+dimensões antes e depois da orientação, `embeddedOrientation`,
+`appliedOrientation`, identidade ou ausência do perfil e
+`sha256-full-file-v1`; ela é evidência a ser revalidada, não autorização para
+reutilizar Cache. `embeddedOrientation` é o valor `1..=8` encontrado no
+metadado permitido, normalizado para `1` quando ausente. `appliedOrientation` é
+a instrução efetiva que o normalizador deve aplicar exatamente uma vez: igual
+ao valor embutido para JPEG e TIFF e sempre `1` para PNG, mesmo quando existe
+um chunk `eXIf`. Somente esse segundo campo entra em `SourceGeometryFacts` e no
+plano; ele não declara que `CompositionCore` já girou pixels. Metadados do
+Monitor, fingerprint e representação reduzida podem antecipar problemas, mas
+não autorizam pixels finais.
 
 Cada tentativa reabre os Originais e detecta o formato pelo conteúdo. A matriz
 final aceita:
 
 | Fonte | Normalização |
 |---|---|
-| JPEG RGB, YCbCr ou tons de cinza, 8-bit, baseline ou progressivo | RGB8; Orientation EXIF aplicada exatamente uma vez |
-| PNG estático RGB, RGBA, indexado ou tons de cinza, nas profundidades válidas até 16 bits | RGBA8; `tRNS` preservado; metadado de orientação não gira implicitamente |
-| TIFF de uma única página, RGB, RGBA ou tons de cinza, 8 ou 16 bits | RGBA8; orientação TIFF/EXIF aplicada exatamente uma vez; alfa associado ou não associado declarado por `ExtraSamples` |
+| JPEG RGB, YCbCr ou tons de cinza, 8-bit, baseline ou progressivo | RGB8; `appliedOrientation = embeddedOrientation`, aplicada exatamente uma vez |
+| PNG estático RGB, RGBA, indexado ou tons de cinza, nas profundidades válidas até 16 bits | RGBA8; `tRNS` preservado; `embeddedOrientation` é observado, mas `appliedOrientation = 1` |
+| TIFF de uma única página, RGB, RGBA ou tons de cinza, 8 ou 16 bits | RGBA8; `appliedOrientation = embeddedOrientation`, aplicada exatamente uma vez; alfa associado ou não associado declarado por `ExtraSamples` |
 | APNG, TIFF multipágina, CMYK, YCCK, multibanda ou variante fora da matriz | falha tipada antes da composição |
 
 Redução inteira de 16 para 8 bits usa
@@ -347,18 +422,21 @@ contraditórias produzem `UnsupportedColorProfile`; não existe conversão
 silenciosa de gamut. A normalização gera RGBA8 sRGB e toda saída incorpora o
 `sRGB2014.icc` v2 canônico.
 
-Em TIFF com `ExtraSamples=AssociatedAlpha`, cada canal é desassociado na
+Em TIFF, duas amostras `Gray + A` ou quatro `RGB + A` exigem exatamente uma
+entrada `ExtraSamples` para o canal alfa, declarada como `AssociatedAlpha` ou
+`UnassociatedAlpha`. Ausência, quantidade incompatível ou `Unspecified`
+produz `UnsupportedSourceVariant`; o decoder não presume que a segunda ou a
+quarta amostra seja alfa. Com `ExtraSamples=AssociatedAlpha`, cada canal é desassociado na
 profundidade original antes da redução: para máximo `M`, alfa zero produz cor
 zero; nos demais casos, `C = min(M, floor((P * M + A / 2) / A))`. Em
-`UnassociatedAlpha`, os canais já são retos. Quatro amostras sem marcador
-inequívoco ou valor de tag incompatível produz `UnsupportedSourceVariant`;
-canal associado maior que o alfa é `DecodeFailed`. O decoder nunca adivinha a
-semântica do quarto canal. PNG fornece alfa não associado conforme seu formato.
+`UnassociatedAlpha`, os canais já são retos. Canal associado maior que o alfa
+é `DecodeFailed`. PNG fornece alfa não associado conforme seu formato.
 
-Se dimensões orientadas, perfil, formato ou outra propriedade usada pelo
-snapshot diferir da observação congelada, a tentativa não recompõe com os
-novos fatos. Ela falha como `SourceChanged`; uma nova tentativa atualiza a
-observação e cria outro snapshot.
+Se formato, variante, dimensões codificadas ou orientadas,
+`embeddedOrientation`, `appliedOrientation`, perfil ou ausência de perfil
+diferir da `SourceObservation` congelada, a tentativa não recompõe com os novos
+fatos. Ela falha como `SourceChanged`; uma nova tentativa atualiza a observação
+e cria outro snapshot.
 
 ## Captura estável dos Originais
 
@@ -370,7 +448,8 @@ raízes e antes de renderizar a primeira unidade, o Processador:
 3. abre cada arquivo regular com leitura compartilhada, mas negando escrita e
    exclusão enquanto a captura estiver em uso;
 4. obtém identidade física, tamanho e datas pelo handle aberto;
-5. faz o preflight de codec e calcula `sha256-full-file-v1` no mesmo handle;
+5. faz o preflight de codec, calcula `sha256-full-file-v1` no mesmo handle e
+   compara todos os campos, inclusive o digest, à `SourceObservation`;
 6. confirma que identidade, tamanho e datas não mudaram durante a leitura;
 7. mantém o handle e os fatos normalizados até todas as preparações que usam a
    fonte estarem verificadas.
@@ -411,6 +490,12 @@ de segmentos permitidos, tamanho, SHA-256, bytes comprimidos e erros dentro da
 tolerância decodificada do corpus. Não pode mudar dimensões, DPI, perfil,
 baseline, `4:4:4`, ausência de metadados, raster de entrada nem ordenação das
 unidades. Hash do JPEG é recibo daquela tentativa, nunca golden permanente.
+O erro de cada amostra é `abs(decodedChannel - canonicalChannel)` depois de
+confirmar dimensões e perfil. O máximo considera todos os canais de todos os
+pixels; a média é `sum(error) / (width * height * 3)`. Ambos precisam respeitar
+os limites do caso; a comparação inteira é
+`sum(error) <= meanLimit * width * height * 3`, sem arredondar a média para
+baixo.
 
 ### PNG
 
@@ -438,14 +523,23 @@ Cada página usa `MediaBox` e `CropBox` iguais à dimensão física da unidade:
 
 ```text
 points = micrometers * 72 / 25.400
+pointsScaled6 = floor((micrometers * 72 * 1.000.000 + 12.700) / 25.400)
 ```
 
 O valor racional é emitido com até seis casas decimais, arredondado para o mais
-próximo e sem alterar os pixels. Uma imagem RGB8 lossless, associada a um
+próximo com empate para cima conforme `pointsScaled6`, removendo somente zeros
+decimais finais e sem alterar os pixels. Uma imagem RGB8 lossless, associada a um
 `ICCBased` sRGB2014, cobre exatamente a caixa. O teste extrai e compara o raster
 embutido e a caixa; renderização por visualizador ou screenshot não é oráculo.
 Compressão Flate, números de objetos, xref, ID e bytes do documento não são
 golden.
+
+A ordem de páginas é exatamente a ordem das Unidades de Exportação. Cada página
+referencia um único raster correspondente e usa `CropBox = MediaBox`, sem
+`Rotate`; a matriz de posicionamento é `[widthPoints 0 0 heightPoints 0 0]`, de
+modo que a imagem cobre a caixa sem margem, recorte adicional ou rotação. O
+corpus representa números PDF como decimais canônicos para também provar o
+arredondamento de seis casas.
 
 ## `ExportPipeline`: planejamento, preparação e Publicação
 
@@ -499,15 +593,18 @@ O `Publisher` incrementa `attemptedCount` antes de chamar a primitiva e
 - `NotStarted`, antes de qualquer chamada contra nome final;
 - `UntouchedByAttempt`, somente quando nenhuma promoção foi confirmada e a
   falha provou que o primeiro alvo ficou intacto;
-- `AllCandidatesConfirmed`, quando a falha ainda permitiu provar todos os
-  candidatos nos respectivos nomes finais;
+- `AllCandidatesConfirmed`, quando todos os candidatos foram confirmados nos
+  respectivos nomes finais, seja após todos os resultados `Committed`, seja
+  porque a falha final ainda provou `CandidateAtFinal`;
 - `PossiblyMixed`, quando já existe candidato confirmado e faltam saídas, ou
   quando qualquer alvo ficou `Indeterminate`.
 
 `0 <= confirmedPromotedCount <= attemptedCount <= totalFileCount` é invariante.
-Falha em `NotStarted` preserva seu código de preparação. Falha em
-`UntouchedByAttempt` ou `AllCandidatesConfirmed` é `PublicationFailed` e leva a
-evidência final. `PossiblyMixed` termina como:
+Conclusão de todas as chamadas como `Committed` em `AllCandidatesConfirmed` é
+`Completed`. Falha em `NotStarted` preserva seu código de preparação. Falha em
+`UntouchedByAttempt`, antes de qualquer promoção confirmada, é
+`PublicationFailed` e leva `failedOutput`, causa e evidência final. Depois da
+primeira promoção confirmada, qualquer falha da primitiva termina como:
 
 ```text
 PartialPublication {
@@ -522,9 +619,13 @@ PartialPublication {
 
 Logo, a primeira chamada inconclusiva já é `PartialPublication` com contagens
 `1/0/N`, mesmo sem promoção confirmada. A segunda chamada comprovadamente
-intacta depois de uma promoção também é parcial, com `2/1/N`. A propriedade
-`possibleMixedSet: true` é implícita no variante e não é um booleano que possa
-divergir.
+intacta depois de uma promoção também é parcial, com `2/1/N`. Uma falha final
+com `CandidateAtFinal` conserva `AllCandidatesConfirmed` como evidência dos
+nomes planejados, mas também é `PartialPublication`: o lote não concluiu todas
+as chamadas como `Committed`, nenhuma Saída órfã pode ser removida e o contrato
+aceito não permite apresentar esse refinamento como sucesso ou dispensar a
+nova Exportação integral. A propriedade `possibleMixedSet: true` é implícita no
+variante e não é um booleano que possa divergir.
 
 Esse terminal nunca é sucesso, não remove Saídas órfãs e orienta uma nova
 Exportação integral. Ele não tenta restaurar os arquivos já promovidos. Saídas
@@ -551,7 +652,8 @@ contexto estruturado, no mínimo:
 | nome final surge sob `CreateOnly` | `ExportConflict` |
 | Destino não sustenta a primitiva exigida | `AtomicReplacementUnsupported` |
 | falha da primitiva com alvo comprovadamente intacto e zero promoções | `PublicationFailed` com contagens, causa e evidência |
-| falha com promoção anterior ou estado inconclusivo, inclusive na primeira chamada | `PartialPublication` com contagens, alvo e causa |
+| falha final com `CandidateAtFinal` e todos os candidatos confirmados | `PartialPublication` com contagens, alvo, causa e evidência; nova Exportação integral recomendada |
+| falha em `PossiblyMixed`: candidatos faltantes depois de promoção, ou alvo `Indeterminate`, inclusive na primeira chamada | `PartialPublication` com contagens, alvo e causa |
 | cancelamento antes do claim | `Cancelled` |
 | pedido de cancelamento depois do claim | `TooLate` para o pedido; a Exportação segue até seu terminal |
 
@@ -628,8 +730,10 @@ significado de um caso existente.
 O corpus possui dois seams complementares, sem fingir que o tipo parcial hoje
 implementado já é o contrato final:
 
-1. `CreativeStateV1 + SourceGeometryFactsV1 -> ExpectedCompositionPlanV1`
-   traz estado criativo consumível e o plano completo esperado;
+1. `CreativeStateV1 + MediaRefV1 + SourceObservationV1 +
+   SourceGeometryFactsV1 -> ExpectedCompositionPlanV1` traz estado criativo
+   consumível, associação exata de pathname, projeção pura dos fatos e o plano
+   criativo completo esperado;
 2. `ComposedOutputUnitV1 + NormalizedSourceV1 -> CanonicalRasterV1` traz a
    projeção imutável, fontes normalizadas e pixels esperados.
 
@@ -644,16 +748,28 @@ O corpus cobre:
 - largura raster ímpar, centro e Páginas independentes;
 - entrada criativa completa, ordem por `zIndex` e desempate por `frameId`,
   transformação fracionária e unidades resolvidas;
-- Pilha visual, bilinear por centro de pixel, transparência premultiplicada,
-  Borda, Opacidade de grupo e Frame cruzando o centro;
-- asset JPEG real com orientação aplicada uma vez, Giro de 90°,
-  Espelhamento e Preto e branco;
-- mesma unidade e mesmo raster canônico para JPEG, PNG e PDF;
+- Pilha visual, stretch anisotrópico de decorativo de Ambos os lados contínuo
+  na Página direita, bilinear por centro de pixel, transparência
+  premultiplicada, Borda, Opacidade de grupo e Frame cruzando o centro;
+- asset JPEG real assimétrico com Orientation `6` aplicada uma vez e na direção
+  correta; separadamente, a composição cobre Giro, Espelhamento e Preto e
+  branco sem alegar que são o mesmo seam;
+- asset PNG real com alfa e chunk `eXIf` Orientation `6`, provando que a
+  observação congela `embeddedOrientation = 6`, projeta
+  `appliedOrientation = 1` e não aplica a orientação implicitamente; o caso de
+  normalização referencia diretamente a observação, o fato geométrico e o
+  digest integral desse asset, além da `NormalizedSource` consumida pelo raster
+  canônico ligado ao plano;
+- assets TIFF reais de 16 bits com alfa associado RGBA e não associado GrayA,
+  além de rejeição tipada de quatro amostras sem `ExtraSamples`;
+- rasters canônicos na mesma ordem para JPEG, PNG e PDF, inclusive caixa PDF
+  com arredondamento decimal não inteiro;
 - qualidade, metadados, perfil, densidade, caixas de PDF e tolerâncias
   observáveis por formato;
 - índices `998`, `999`, `1000` e `1001`;
-- alteração de Original, falta de atomicidade, primeira promoção
-  inconclusiva e Publicação parcial.
+- empate half-up e carry da conversão Q32.32 para Q16;
+- alteração de Original, falta de atomicidade, primeira e última promoções com
+  evidência, Publicação parcial e limpeza de órfãos somente após sucesso.
 
 `CompositionCore`, adaptador do Canvas e `ExportPipeline` devem consumir os
 mesmos IDs de caso mediante adapters explícitos para esses tipos de contrato. O

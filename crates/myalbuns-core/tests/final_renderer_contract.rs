@@ -60,6 +60,7 @@ enum AssetEncodingV1 {
 enum AssetDescriptorV1 {
     Jpeg(JpegDescriptorV1),
     Png(PngDescriptorV1),
+    Tiff(TiffDescriptorV1),
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -79,6 +80,17 @@ struct PngDescriptorV1 {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct TiffDescriptorV1 {
+    width_px: u32,
+    height_px: u32,
+    bits_per_sample: Vec<u16>,
+    samples_per_pixel: u16,
+    photometric: u16,
+    extra_samples: Vec<u16>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 #[serde(
     tag = "kind",
     content = "data",
@@ -90,7 +102,7 @@ enum GoldenCaseV1 {
     Composition(CompositionCaseV1),
     CanonicalRaster(CanonicalRasterCaseV1),
     SourceNormalization(SourceNormalizationCaseV1),
-    FormatAdapters(FormatAdaptersCaseV1),
+    FormatAdapters(Box<FormatAdaptersCaseV1>),
     OutputNames(OutputNamesCaseV1),
     Operational(OperationalCaseV1),
 }
@@ -137,6 +149,7 @@ struct CompositionCaseV1 {
 struct CompositionInputV1 {
     creative_state: CreativeStateV1,
     source_geometry_facts: Vec<SourceGeometryFactV1>,
+    source_observations: Vec<SourceObservationV1>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -144,7 +157,15 @@ struct CompositionInputV1 {
 struct CreativeStateV1 {
     revision: u64,
     dpi: u32,
+    media_refs: Vec<MediaRefV1>,
     sheets: Vec<CreativeSheetV1>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct MediaRefV1 {
+    media_id: String,
+    native_path: NativePathV1,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -155,9 +176,9 @@ struct CreativeSheetV1 {
     active_sides: ActiveSidesV1,
     width_um: u64,
     height_um: u64,
-    backgrounds: Vec<CreativeDecorativeV1>,
+    background: CreativeBackgroundV1,
     frames: Vec<CreativeFrameV1>,
-    overlays: Vec<CreativeDecorativeV1>,
+    overlay: CreativeOverlayV1,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
@@ -167,12 +188,27 @@ enum ActiveSidesV1 {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct CreativeDecorativeV1 {
-    layer_id: String,
-    scope: ScopeV1,
-    rect_um: [u64; 4],
-    paint: PaintV1,
+#[serde(tag = "scope", rename_all = "kebab-case", deny_unknown_fields)]
+enum CreativeBackgroundV1 {
+    Both {
+        both: CreativePaintV1,
+    },
+    PerSide {
+        left: CreativePaintV1,
+        right: CreativePaintV1,
+    },
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(tag = "scope", rename_all = "kebab-case", deny_unknown_fields)]
+enum CreativeOverlayV1 {
+    Both {
+        both: Option<ImagePaintV1>,
+    },
+    PerSide {
+        left: Option<ImagePaintV1>,
+        right: Option<ImagePaintV1>,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
@@ -190,14 +226,21 @@ enum ScopeV1 {
     rename_all = "kebab-case",
     deny_unknown_fields
 )]
-enum PaintV1 {
+enum CreativePaintV1 {
     Solid(SolidPaintV1),
+    Image(ImagePaintV1),
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct SolidPaintV1 {
     rgb: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ImagePaintV1 {
+    media_id: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -241,9 +284,53 @@ struct FrameStyleV1 {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct SourceGeometryFactV1 {
     media_id: String,
+    native_path: NativePathV1,
     oriented_width_px: u32,
     oriented_height_px: u32,
-    source_orientation: u8,
+    applied_orientation: u8,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SourceObservationV1 {
+    media_id: String,
+    native_path: NativePathV1,
+    detected_format: DetectedFormatV1,
+    source_variant: SourceVariantV1,
+    encoded_width_px: u32,
+    encoded_height_px: u32,
+    oriented_width_px: u32,
+    oriented_height_px: u32,
+    embedded_orientation: u8,
+    applied_orientation: u8,
+    color_profile: ColorProfileObservationV1,
+    sha256_full_file_v1: String,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+enum DetectedFormatV1 {
+    Jpeg,
+    Png,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+enum SourceVariantV1 {
+    JpegBaselineRgb8,
+    PngStaticRgba8,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+enum ColorProfileObservationV1 {
+    AbsentAssumeSrgb,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct NativePathV1 {
+    windows_utf16: Vec<u16>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -293,7 +380,29 @@ struct PlannedDecorativeV1 {
     layer_id: String,
     scope: ScopeV1,
     rect_um: [u64; 4],
-    paint: PaintV1,
+    paint: PlannedPaintV1,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(
+    tag = "kind",
+    content = "data",
+    rename_all = "kebab-case",
+    deny_unknown_fields
+)]
+enum PlannedPaintV1 {
+    Solid(SolidPaintV1),
+    Image(PlannedImagePaintV1),
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct PlannedImagePaintV1 {
+    media_id: String,
+    oriented_width_px: u32,
+    oriented_height_px: u32,
+    applied_orientation: u8,
+    source_from_physical_q32: AffineQ32V1,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -316,9 +425,10 @@ struct PlannedPhotoV1 {
     media_id: String,
     oriented_width_px: u32,
     oriented_height_px: u32,
-    source_orientation: u8,
+    applied_orientation: u8,
     transform: PhotoTransformV1,
     sampler: String,
+    physical_from_source_q32: AffineQ32V1,
     source_from_physical_q32: AffineQ32V1,
 }
 
@@ -356,8 +466,29 @@ enum ExportModeV1 {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct CanonicalRasterCaseV1 {
     id: String,
+    origin: RasterOriginV1,
     input: CanonicalRasterInputV1,
     expected_raster: CanonicalRasterV1,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(
+    tag = "kind",
+    content = "data",
+    rename_all = "kebab-case",
+    deny_unknown_fields
+)]
+enum RasterOriginV1 {
+    Standalone,
+    CompositionFrame(CompositionFrameLinkV1),
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct CompositionFrameLinkV1 {
+    composition_case_id: String,
+    unit_id: String,
+    frame_id: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -387,6 +518,7 @@ struct ComposedOutputUnitV1 {
 )]
 enum ProjectedLayerV1 {
     Base(ProjectedBaseV1),
+    Solid(ProjectedSolidV1),
     Image(ProjectedImageV1),
     FrameGroup(ProjectedFrameGroupV1),
 }
@@ -395,6 +527,15 @@ enum ProjectedLayerV1 {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ProjectedBaseV1 {
     rgb: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProjectedSolidV1 {
+    layer_id: String,
+    clip_rect_px: [u32; 4],
+    rgb: String,
+    opacity_byte: u8,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -416,7 +557,7 @@ struct ProjectedFrameGroupV1 {
     frame_rect_px: [u32; 4],
     photo_clip_rect_px: [u32; 4],
     source_from_destination_q32: AffineQ32V1,
-    border_width_px: u32,
+    border_fill_rects_px: Vec<[u32; 4]>,
     border_rgb: String,
     group_opacity_byte: u8,
     black_and_white: bool,
@@ -436,6 +577,8 @@ struct NormalizedSourceV1 {
 struct CanonicalRasterV1 {
     width_px: u32,
     height_px: u32,
+    dpi: u32,
+    color_space: String,
     rgba_rows: Vec<Vec<String>>,
 }
 
@@ -458,6 +601,8 @@ struct SourceNormalizationCaseV1 {
 enum NormalizedSourceExpectationV1 {
     JpegExif(JpegNormalizationV1),
     PngAlpha(PngNormalizationV1),
+    TiffAlpha(TiffNormalizationV1),
+    TiffRejected(TiffRejectionV1),
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -465,7 +610,8 @@ enum NormalizedSourceExpectationV1 {
 struct JpegNormalizationV1 {
     encoded_width_px: u32,
     encoded_height_px: u32,
-    orientation: u8,
+    embedded_orientation: u8,
+    applied_orientation: u8,
     oriented_width_px: u32,
     oriented_height_px: u32,
     apply_exactly_once: bool,
@@ -477,14 +623,46 @@ struct PngNormalizationV1 {
     width_px: u32,
     height_px: u32,
     rgba_rows: Vec<Vec<String>>,
+    linked_composition_case_id: String,
+    linked_raster_case_id: String,
+    linked_media_id: String,
+    embedded_orientation: u8,
+    applied_orientation: u8,
     orientation_metadata_ignored: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct TiffNormalizationV1 {
+    width_px: u32,
+    height_px: u32,
+    alpha_semantics: TiffAlphaSemanticsV1,
+    rgba_rows: Vec<Vec<String>>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+enum TiffAlphaSemanticsV1 {
+    AssociatedAlpha,
+    UnassociatedAlpha,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct TiffRejectionV1 {
+    error_code: NormalizationErrorV1,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+enum NormalizationErrorV1 {
+    UnsupportedSourceVariant,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct FormatAdaptersCaseV1 {
     id: String,
-    canonical_unit_id: String,
+    canonical_unit_ids: Vec<String>,
     expected: FormatExpectationsV1,
 }
 
@@ -507,6 +685,7 @@ struct JpegExpectationV1 {
     dpi: u32,
     icc: String,
     forbidden_metadata: Vec<String>,
+    decoded_error_metric: String,
     decoded_max_channel_error: u8,
     decoded_mean_error_at_most: u8,
 }
@@ -519,6 +698,7 @@ struct PngExpectationV1 {
     interlaced: bool,
     pixels_per_meter: u32,
     icc: String,
+    forbidden_chunks: Vec<String>,
     decoded_comparison: String,
 }
 
@@ -527,8 +707,11 @@ struct PngExpectationV1 {
 struct PdfExpectationV1 {
     extension: String,
     page_count: u32,
-    media_box_points: [u32; 2],
-    crop_box_points: [u32; 2],
+    page_order: Vec<String>,
+    media_boxes_points: Vec<[String; 2]>,
+    crop_boxes_points: Vec<[String; 2]>,
+    embedded_raster_order: Vec<String>,
+    placement: String,
     embedded_color_space: String,
     embedded_raster_comparison: String,
     lossless: bool,
@@ -617,10 +800,34 @@ struct OperationalExpectedV1 {
     publication_state: PublicationStateV1,
     attempted_count: u32,
     confirmed_promoted_count: u32,
+    failed_output: FailedOutputV1,
+    cause_code: CauseCodeV1,
     failed_target_evidence: TargetEvidenceV1,
     preparation_cleanup: PreparationCleanupV1,
     orphan_cleanup_runs: bool,
     full_export_recommended: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(
+    tag = "kind",
+    content = "data",
+    rename_all = "kebab-case",
+    deny_unknown_fields
+)]
+enum FailedOutputV1 {
+    NotApplicable,
+    Output(String),
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+enum CauseCodeV1 {
+    NotApplicable,
+    SourceChanged,
+    SourceIdentityIndeterminate,
+    AtomicReplacementUnsupported,
+    AtomicPromotionFailed,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
@@ -697,79 +904,246 @@ fn opacity_byte(percent: u8) -> u8 {
     ((u16::from(percent) * 255 + 50) / 100) as u8
 }
 
-fn quantize_q32(value: f64) -> i64 {
-    assert!(value.is_finite());
-    (value * Q32_ONE as f64).round() as i64
+fn round_signed(numerator: i128, denominator: i128) -> i128 {
+    assert!(denominator > 0);
+    if numerator >= 0 {
+        numerator
+            .checked_add(denominator / 2)
+            .expect("golden Q32.32 rounding does not overflow")
+            / denominator
+    } else {
+        -round_signed(
+            numerator
+                .checked_neg()
+                .expect("golden Q32.32 numerator is representable"),
+            denominator,
+        )
+    }
 }
 
-fn q32_string(value: f64) -> String {
-    quantize_q32(value).to_string()
+fn q_int(value: i128) -> i128 {
+    value
+        .checked_mul(Q32_ONE)
+        .expect("golden Q32.32 integer conversion does not overflow")
 }
 
-fn planned_affine(
+fn q_ratio(numerator: i128, denominator: i128) -> i128 {
+    round_signed(
+        numerator
+            .checked_mul(Q32_ONE)
+            .expect("golden Q32.32 ratio does not overflow"),
+        denominator,
+    )
+}
+
+fn q_mul(left: i128, right: i128) -> i128 {
+    round_signed(
+        left.checked_mul(right)
+            .expect("golden Q32.32 multiplication does not overflow"),
+        Q32_ONE,
+    )
+}
+
+fn q_div(numerator: i128, denominator: i128) -> i128 {
+    assert!(denominator > 0);
+    round_signed(
+        numerator
+            .checked_mul(Q32_ONE)
+            .expect("golden Q32.32 division does not overflow"),
+        denominator,
+    )
+}
+
+fn linear_q(a: i128, x: i128, b: i128, y: i128) -> i128 {
+    let numerator = a
+        .checked_mul(x)
+        .and_then(|left| b.checked_mul(y).and_then(|right| left.checked_add(right)))
+        .expect("golden Q32.32 linear combination does not overflow");
+    round_signed(numerator, Q32_ONE)
+}
+
+fn q32_decimal(value: i128) -> String {
+    i64::try_from(value)
+        .expect("golden Q32.32 value fits the contract's i64")
+        .to_string()
+}
+
+fn golden_trig_q32(angle_tenths: i32) -> (i128, i128) {
+    match angle_tenths.rem_euclid(3_600) {
+        0 => (Q32_ONE, 0),
+        1_050 => (-1_111_619_334, 4_148_619_834),
+        unsupported => panic!("the v1 corpus has no trig oracle for {unsupported} tenths"),
+    }
+}
+
+fn planned_affines(
     frame_rect: [u64; 4],
     border_width_um: u64,
     transform: &PhotoTransformV1,
     source_width: u32,
     source_height: u32,
-) -> AffineQ32V1 {
+) -> (AffineQ32V1, AffineQ32V1) {
     let inner = inset_rect(frame_rect, border_width_um);
-    let x = inner[0] as f64;
-    let y = inner[1] as f64;
-    let width = inner[2] as f64;
-    let height = inner[3] as f64;
-    let source_width = f64::from(source_width);
-    let source_height = f64::from(source_height);
-
-    let angle_degrees = f64::from(transform.quarter_turns_ccw) * 90.0
-        + f64::from(transform.fine_angle_tenths) / 10.0;
-    let radians = angle_degrees.to_radians();
-    let cosine = quantize_q32(radians.cos()) as f64 / Q32_ONE as f64;
-    let sine = quantize_q32(radians.sin()) as f64 / Q32_ONE as f64;
-    let required_x = cosine.abs() * width + sine.abs() * height;
-    let required_y = sine.abs() * width + cosine.abs() * height;
-    let base_scale = (required_x / source_width).max(required_y / source_height);
-    let scale = base_scale * f64::from(transform.user_zoom_millionths) / 1_000_000.0;
-    assert!(scale.is_finite() && scale > 0.0);
-
-    let overflow_x = (source_width * scale - required_x).max(0.0) / 2.0;
-    let overflow_y = (source_height * scale - required_y).max(0.0) / 2.0;
-    let pan_x = f64::from(transform.pan_x_millionths) / 1_000_000.0 * overflow_x;
-    let pan_y = f64::from(transform.pan_y_millionths) / 1_000_000.0 * overflow_y;
-    let center_x = x + width / 2.0 + cosine * pan_x + sine * pan_y;
-    let center_y = y + height / 2.0 - sine * pan_x + cosine * pan_y;
-
-    // Inverse of scale * M * R, where M is the post-rotation horizontal mirror.
-    let mirror_sign = if transform.mirror_horizontal {
-        -1.0
+    let width = q_int(i128::from(inner[2]));
+    let height = q_int(i128::from(inner[3]));
+    let source_width = q_int(i128::from(source_width));
+    let source_height = q_int(i128::from(source_height));
+    let angle_tenths =
+        i32::from(transform.quarter_turns_ccw) * 900 + i32::from(transform.fine_angle_tenths);
+    let (cosine, sine) = golden_trig_q32(angle_tenths);
+    let mirror = if transform.mirror_horizontal {
+        -Q32_ONE
     } else {
-        1.0
+        Q32_ONE
     };
-    let xx = cosine * mirror_sign / scale;
-    let xy = -sine / scale;
-    let yx = sine * mirror_sign / scale;
-    let yy = cosine / scale;
-    let tx = source_width / 2.0 - xx * center_x - xy * center_y;
-    let ty = source_height / 2.0 - yx * center_x - yy * center_y;
+
+    let required_x = linear_q(cosine.abs(), width, sine.abs(), height);
+    let required_y = linear_q(sine.abs(), width, cosine.abs(), height);
+    let base_scale = q_div(required_x, source_width).max(q_div(required_y, source_height));
+    let scale = q_mul(
+        base_scale,
+        q_ratio(i128::from(transform.user_zoom_millionths), 1_000_000),
+    );
+    assert!(scale > 0);
+
+    let overflow_x = q_div(
+        q_mul(source_width, scale)
+            .checked_sub(required_x)
+            .expect("golden horizontal overflow is representable")
+            .max(0),
+        q_int(2),
+    );
+    let overflow_y = q_div(
+        q_mul(source_height, scale)
+            .checked_sub(required_y)
+            .expect("golden vertical overflow is representable")
+            .max(0),
+        q_int(2),
+    );
+    let pan_x = q_mul(
+        q_ratio(i128::from(transform.pan_x_millionths), 1_000_000),
+        overflow_x,
+    );
+    let pan_y = q_mul(
+        q_ratio(i128::from(transform.pan_y_millionths), 1_000_000),
+        overflow_y,
+    );
+    let center_x = q_int(i128::from(inner[0])) + q_div(width, q_int(2));
+    let center_y = q_int(i128::from(inner[1])) + q_div(height, q_int(2));
+    let photo_center_x = center_x + linear_q(cosine, pan_x, sine, pan_y);
+    let photo_center_y = center_y + linear_q(-sine, pan_x, cosine, pan_y);
+
+    let direct_xx = q_mul(q_mul(mirror, cosine), scale);
+    let direct_xy = q_mul(q_mul(mirror, sine), scale);
+    let direct_yx = q_mul(-sine, scale);
+    let direct_yy = q_mul(cosine, scale);
+    let source_center_x = q_div(source_width, q_int(2));
+    let source_center_y = q_div(source_height, q_int(2));
+    let direct_tx =
+        photo_center_x - linear_q(direct_xx, source_center_x, direct_xy, source_center_y);
+    let direct_ty =
+        photo_center_y - linear_q(direct_yx, source_center_x, direct_yy, source_center_y);
+
+    let inverse_xx = q_div(q_mul(mirror, cosine), scale);
+    let inverse_xy = q_div(-sine, scale);
+    let inverse_yx = q_div(q_mul(mirror, sine), scale);
+    let inverse_yy = q_div(cosine, scale);
+    let inverse_tx =
+        source_center_x - linear_q(inverse_xx, photo_center_x, inverse_xy, photo_center_y);
+    let inverse_ty =
+        source_center_y - linear_q(inverse_yx, photo_center_x, inverse_yy, photo_center_y);
+
+    (
+        AffineQ32V1 {
+            xx: q32_decimal(direct_xx),
+            xy: q32_decimal(direct_xy),
+            tx: q32_decimal(direct_tx),
+            yx: q32_decimal(direct_yx),
+            yy: q32_decimal(direct_yy),
+            ty: q32_decimal(direct_ty),
+        },
+        AffineQ32V1 {
+            xx: q32_decimal(inverse_xx),
+            xy: q32_decimal(inverse_xy),
+            tx: q32_decimal(inverse_tx),
+            yx: q32_decimal(inverse_yx),
+            yy: q32_decimal(inverse_yy),
+            ty: q32_decimal(inverse_ty),
+        },
+    )
+}
+
+fn project_source_from_destination(
+    source_from_physical: &AffineQ32V1,
+    physical_origin_um: [u64; 2],
+    dpi: u32,
+) -> AffineQ32V1 {
+    let inverse_xx = i128::from(parse_q32(&source_from_physical.xx));
+    let inverse_xy = i128::from(parse_q32(&source_from_physical.xy));
+    let inverse_tx = i128::from(parse_q32(&source_from_physical.tx));
+    let inverse_yx = i128::from(parse_q32(&source_from_physical.yx));
+    let inverse_yy = i128::from(parse_q32(&source_from_physical.yy));
+    let inverse_ty = i128::from(parse_q32(&source_from_physical.ty));
+    let step = q_ratio(i128::from(MICROMETERS_PER_INCH), i128::from(dpi));
+    let first_x = q_int(i128::from(physical_origin_um[0]))
+        + q_ratio(i128::from(MICROMETERS_PER_INCH / 2), i128::from(dpi));
+    let first_y = q_int(i128::from(physical_origin_um[1]))
+        + q_ratio(i128::from(MICROMETERS_PER_INCH / 2), i128::from(dpi));
 
     AffineQ32V1 {
-        xx: q32_string(xx),
-        xy: q32_string(xy),
-        tx: q32_string(tx),
-        yx: q32_string(yx),
-        yy: q32_string(yy),
-        ty: q32_string(ty),
+        xx: q32_decimal(q_mul(inverse_xx, step)),
+        xy: q32_decimal(q_mul(inverse_xy, step)),
+        tx: q32_decimal(inverse_tx + linear_q(inverse_xx, first_x, inverse_xy, first_y)),
+        yx: q32_decimal(q_mul(inverse_yx, step)),
+        yy: q32_decimal(q_mul(inverse_yy, step)),
+        ty: q32_decimal(inverse_ty + linear_q(inverse_yx, first_x, inverse_yy, first_y)),
     }
+}
+
+fn decorative_source_from_physical(
+    rect_um: [u64; 4],
+    source_width_px: u32,
+    source_height_px: u32,
+) -> AffineQ32V1 {
+    assert!(rect_um[2] > 0 && rect_um[3] > 0);
+    assert!(source_width_px > 0 && source_height_px > 0);
+    let xx = q_ratio(i128::from(source_width_px), i128::from(rect_um[2]));
+    let yy = q_ratio(i128::from(source_height_px), i128::from(rect_um[3]));
+    AffineQ32V1 {
+        xx: q32_decimal(xx),
+        xy: "0".to_owned(),
+        tx: q32_decimal(-q_mul(xx, q_int(i128::from(rect_um[0])))),
+        yx: "0".to_owned(),
+        yy: q32_decimal(yy),
+        ty: q32_decimal(-q_mul(yy, q_int(i128::from(rect_um[1])))),
+    }
+}
+
+fn project_rect_to_unit(rect_um: [u64; 4], unit_rect_um: [u64; 4], dpi: u32) -> [u32; 4] {
+    let rect_right = rect_um[0] + rect_um[2];
+    let rect_bottom = rect_um[1] + rect_um[3];
+    let unit_right = unit_rect_um[0] + unit_rect_um[2];
+    let unit_bottom = unit_rect_um[1] + unit_rect_um[3];
+    let left = rect_um[0].max(unit_rect_um[0]);
+    let top = rect_um[1].max(unit_rect_um[1]);
+    let right = rect_right.min(unit_right).max(left);
+    let bottom = rect_bottom.min(unit_bottom).max(top);
+    let left_px = raster_edge(left - unit_rect_um[0], dpi);
+    let top_px = raster_edge(top - unit_rect_um[1], dpi);
+    let right_px = raster_edge(right - unit_rect_um[0], dpi);
+    let bottom_px = raster_edge(bottom - unit_rect_um[1], dpi);
+    [left_px, top_px, right_px - left_px, bottom_px - top_px]
 }
 
 fn inset_rect(rect: [u64; 4], inset: u64) -> [u64; 4] {
     assert!(rect[2] > 0 && rect[3] > 0);
-    assert!(inset <= rect[2] / 2 && inset <= rect[3] / 2);
+    let inset_x = inset.min(rect[2] / 2);
+    let inset_y = inset.min(rect[3] / 2);
     [
-        rect[0] + inset,
-        rect[1] + inset,
-        rect[2] - inset * 2,
-        rect[3] - inset * 2,
+        rect[0] + inset_x,
+        rect[1] + inset_y,
+        rect[2] - inset_x * 2,
+        rect[3] - inset_y * 2,
     ]
 }
 
@@ -777,23 +1151,94 @@ fn border_fill_rects(rect: [u64; 4], border: u64) -> Vec<[u64; 4]> {
     if border == 0 {
         return Vec::new();
     }
-    let inner = inset_rect(rect, border);
-    vec![
-        [rect[0], rect[1], rect[2], border],
-        [rect[0], rect[1] + rect[3] - border, rect[2], border],
-        [rect[0], inner[1], border, inner[3]],
-        [rect[0] + rect[2] - border, inner[1], border, inner[3]],
+    let inset_x = border.min(rect[2] / 2);
+    let inset_y = border.min(rect[3] / 2);
+    let inner_height = rect[3] - inset_y * 2;
+    [
+        [rect[0], rect[1], rect[2], inset_y],
+        [rect[0], rect[1] + rect[3] - inset_y, rect[2], inset_y],
+        [rect[0], rect[1] + inset_y, inset_x, inner_height],
+        [
+            rect[0] + rect[2] - inset_x,
+            rect[1] + inset_y,
+            inset_x,
+            inner_height,
+        ],
     ]
+    .into_iter()
+    .filter(|candidate| candidate[2] > 0 && candidate[3] > 0)
+    .collect()
 }
 
 fn reference_plan(input: &CompositionInputV1, sampler: &str) -> ExpectedCompositionPlanV1 {
     assert!(input.creative_state.dpi > 0);
+    let media_refs = input
+        .creative_state
+        .media_refs
+        .iter()
+        .map(|media_ref| (media_ref.media_id.as_str(), media_ref))
+        .collect::<BTreeMap<_, _>>();
+    assert_eq!(media_refs.len(), input.creative_state.media_refs.len());
     let facts = input
         .source_geometry_facts
         .iter()
         .map(|fact| (fact.media_id.as_str(), fact))
         .collect::<BTreeMap<_, _>>();
     assert_eq!(facts.len(), input.source_geometry_facts.len());
+    let observations = input
+        .source_observations
+        .iter()
+        .map(|observation| (observation.media_id.as_str(), observation))
+        .collect::<BTreeMap<_, _>>();
+    assert_eq!(observations.len(), input.source_observations.len());
+    assert_eq!(
+        media_refs.keys().copied().collect::<BTreeSet<_>>(),
+        facts.keys().copied().collect::<BTreeSet<_>>(),
+        "every MediaRef has exactly one geometry fact"
+    );
+    assert_eq!(
+        media_refs.keys().copied().collect::<BTreeSet<_>>(),
+        observations.keys().copied().collect::<BTreeSet<_>>(),
+        "every MediaRef has exactly one frozen source observation"
+    );
+    for (media_id, media_ref) in &media_refs {
+        assert!(!media_ref.native_path.windows_utf16.is_empty());
+        assert!(!media_ref.native_path.windows_utf16.contains(&0));
+        assert_eq!(
+            media_ref.native_path, facts[*media_id].native_path,
+            "geometry facts belong to the same mediaId + NativePathDto"
+        );
+        let observation = observations[*media_id];
+        let fact = facts[*media_id];
+        assert_eq!(media_ref.native_path, observation.native_path);
+        assert_eq!(fact.native_path, observation.native_path);
+        assert_eq!(fact.oriented_width_px, observation.oriented_width_px);
+        assert_eq!(fact.oriented_height_px, observation.oriented_height_px);
+        assert_eq!(fact.applied_orientation, observation.applied_orientation);
+        assert!((1..=8).contains(&observation.embedded_orientation));
+        assert!((1..=8).contains(&observation.applied_orientation));
+        assert!(observation.encoded_width_px > 0 && observation.encoded_height_px > 0);
+        assert_eq!(
+            observation.color_profile,
+            ColorProfileObservationV1::AbsentAssumeSrgb
+        );
+        validate_sha256(&observation.sha256_full_file_v1);
+        assert!(matches!(
+            (observation.detected_format, observation.source_variant),
+            (DetectedFormatV1::Jpeg, SourceVariantV1::JpegBaselineRgb8)
+                | (DetectedFormatV1::Png, SourceVariantV1::PngStaticRgba8)
+        ));
+        match observation.detected_format {
+            DetectedFormatV1::Jpeg => assert_eq!(
+                observation.applied_orientation, observation.embedded_orientation,
+                "JPEG applies its frozen EXIF Orientation exactly once"
+            ),
+            DetectedFormatV1::Png => assert_eq!(
+                observation.applied_orientation, 1,
+                "PNG eXIf is frozen but never projected as an image rotation"
+            ),
+        }
+    }
 
     let mut referenced_media_ids = BTreeSet::new();
     let sheets = input
@@ -805,22 +1250,45 @@ fn reference_plan(input: &CompositionInputV1, sampler: &str) -> ExpectedComposit
             assert!(sheet.number > 0 && sheet.width_um > 0 && sheet.height_um > 0);
             assert_eq!(sheet.width_um % 2, 0, "the golden spread has equal pages");
             let surface = [0, 0, sheet.width_um, sheet.height_um];
+            let page_width = sheet.width_um / 2;
+            let left_rect = [0, 0, page_width, sheet.height_um];
+            let right_rect = [page_width, 0, page_width, sheet.height_um];
             let mut ordered_layers = vec![PlannedLayerV1::Base(PlannedBaseV1 {
                 layer_id: "base".to_owned(),
                 rect_um: surface,
                 rgb: "#FFFFFF".to_owned(),
             })];
 
-            ordered_layers.extend(sheet.backgrounds.iter().map(|decorative| {
-                validate_rect_inside(decorative.rect_um, surface);
-                validate_paint(&decorative.paint);
-                PlannedLayerV1::Background(PlannedDecorativeV1 {
-                    layer_id: decorative.layer_id.clone(),
-                    scope: decorative.scope,
-                    rect_um: decorative.rect_um,
-                    paint: decorative.paint.clone(),
-                })
-            }));
+            match &sheet.background {
+                CreativeBackgroundV1::Both { both } => {
+                    ordered_layers.push(PlannedLayerV1::Background(plan_decorative(
+                        "background:both",
+                        ScopeV1::Both,
+                        surface,
+                        both,
+                        &facts,
+                        &mut referenced_media_ids,
+                    )));
+                }
+                CreativeBackgroundV1::PerSide { left, right } => {
+                    ordered_layers.push(PlannedLayerV1::Background(plan_decorative(
+                        "background:left",
+                        ScopeV1::Left,
+                        left_rect,
+                        left,
+                        &facts,
+                        &mut referenced_media_ids,
+                    )));
+                    ordered_layers.push(PlannedLayerV1::Background(plan_decorative(
+                        "background:right",
+                        ScopeV1::Right,
+                        right_rect,
+                        right,
+                        &facts,
+                        &mut referenced_media_ids,
+                    )));
+                }
+            }
 
             let mut frames = sheet.frames.iter().collect::<Vec<_>>();
             frames.sort_by_key(|frame| (frame.z_index, frame.frame_id.as_str()));
@@ -833,6 +1301,13 @@ fn reference_plan(input: &CompositionInputV1, sampler: &str) -> ExpectedComposit
                     .expect("every Photo has immutable source geometry facts");
                 referenced_media_ids.insert(frame.photo.media_id.clone());
                 let clip = inset_rect(frame.rect_um, frame.style.border_width_um);
+                let (physical_from_source_q32, source_from_physical_q32) = planned_affines(
+                    frame.rect_um,
+                    frame.style.border_width_um,
+                    &frame.photo.transform,
+                    fact.oriented_width_px,
+                    fact.oriented_height_px,
+                );
                 ordered_layers.push(PlannedLayerV1::FrameGroup(Box::new(PlannedFrameGroupV1 {
                     layer_id: format!("frame:{}", frame.frame_id),
                     frame_id: frame.frame_id.clone(),
@@ -849,32 +1324,43 @@ fn reference_plan(input: &CompositionInputV1, sampler: &str) -> ExpectedComposit
                         media_id: frame.photo.media_id.clone(),
                         oriented_width_px: fact.oriented_width_px,
                         oriented_height_px: fact.oriented_height_px,
-                        source_orientation: fact.source_orientation,
+                        applied_orientation: fact.applied_orientation,
                         transform: frame.photo.transform.clone(),
                         sampler: sampler.to_owned(),
-                        source_from_physical_q32: planned_affine(
-                            frame.rect_um,
-                            frame.style.border_width_um,
-                            &frame.photo.transform,
-                            fact.oriented_width_px,
-                            fact.oriented_height_px,
-                        ),
+                        physical_from_source_q32,
+                        source_from_physical_q32,
                     },
                 })));
             }
 
-            ordered_layers.extend(sheet.overlays.iter().map(|decorative| {
-                validate_rect_inside(decorative.rect_um, surface);
-                validate_paint(&decorative.paint);
-                PlannedLayerV1::Overlay(PlannedDecorativeV1 {
-                    layer_id: decorative.layer_id.clone(),
-                    scope: decorative.scope,
-                    rect_um: decorative.rect_um,
-                    paint: decorative.paint.clone(),
-                })
-            }));
+            let mut push_overlay =
+                |layer_id: &str, scope: ScopeV1, rect_um: [u64; 4], image: &ImagePaintV1| {
+                    let paint = CreativePaintV1::Image(image.clone());
+                    ordered_layers.push(PlannedLayerV1::Overlay(plan_decorative(
+                        layer_id,
+                        scope,
+                        rect_um,
+                        &paint,
+                        &facts,
+                        &mut referenced_media_ids,
+                    )));
+                };
+            match &sheet.overlay {
+                CreativeOverlayV1::Both { both } => {
+                    if let Some(image) = both {
+                        push_overlay("overlay:both", ScopeV1::Both, surface, image);
+                    }
+                }
+                CreativeOverlayV1::PerSide { left, right } => {
+                    if let Some(image) = left {
+                        push_overlay("overlay:left", ScopeV1::Left, left_rect, image);
+                    }
+                    if let Some(image) = right {
+                        push_overlay("overlay:right", ScopeV1::Right, right_rect, image);
+                    }
+                }
+            }
 
-            let page_width = sheet.width_um / 2;
             let dpi = input.creative_state.dpi;
             let output_units = vec![
                 ExpectedOutputUnitV1 {
@@ -924,9 +1410,51 @@ fn reference_plan(input: &CompositionInputV1, sampler: &str) -> ExpectedComposit
     }
 }
 
-fn validate_paint(paint: &PaintV1) {
+fn plan_decorative(
+    layer_id: &str,
+    scope: ScopeV1,
+    rect_um: [u64; 4],
+    paint: &CreativePaintV1,
+    facts: &BTreeMap<&str, &SourceGeometryFactV1>,
+    referenced_media_ids: &mut BTreeSet<String>,
+) -> PlannedDecorativeV1 {
+    PlannedDecorativeV1 {
+        layer_id: layer_id.to_owned(),
+        scope,
+        rect_um,
+        paint: plan_paint(paint, rect_um, facts, referenced_media_ids),
+    }
+}
+
+fn plan_paint(
+    paint: &CreativePaintV1,
+    rect_um: [u64; 4],
+    facts: &BTreeMap<&str, &SourceGeometryFactV1>,
+    referenced_media_ids: &mut BTreeSet<String>,
+) -> PlannedPaintV1 {
     match paint {
-        PaintV1::Solid(solid) => validate_rgb(&solid.rgb),
+        CreativePaintV1::Solid(solid) => {
+            validate_rgb(&solid.rgb);
+            PlannedPaintV1::Solid(solid.clone())
+        }
+        CreativePaintV1::Image(image) => {
+            let fact = facts
+                .get(image.media_id.as_str())
+                .copied()
+                .expect("every decorative image has immutable source geometry facts");
+            referenced_media_ids.insert(image.media_id.clone());
+            PlannedPaintV1::Image(PlannedImagePaintV1 {
+                media_id: image.media_id.clone(),
+                oriented_width_px: fact.oriented_width_px,
+                oriented_height_px: fact.oriented_height_px,
+                applied_orientation: fact.applied_orientation,
+                source_from_physical_q32: decorative_source_from_physical(
+                    rect_um,
+                    fact.oriented_width_px,
+                    fact.oriented_height_px,
+                ),
+            })
+        }
     }
 }
 
@@ -1172,6 +1700,22 @@ fn render_reference(input: &CanonicalRasterInputV1) -> CanonicalRasterV1 {
                 let rgb = parse_rgb(&base.rgb);
                 output.fill(Pixel { rgb, alpha: 255 });
             }
+            ProjectedLayerV1::Solid(solid) => {
+                assert!(saw_base);
+                assert!(layer_ids.insert(solid.layer_id.as_str()));
+                let source = Pixel {
+                    rgb: parse_rgb(&solid.rgb),
+                    alpha: solid.opacity_byte,
+                };
+                for y in 0..unit.height_px {
+                    for x in 0..unit.width_px {
+                        if contains_pixel(solid.clip_rect_px, x, y) {
+                            let index = (y * unit.width_px + x) as usize;
+                            output[index] = source_over(source, output[index]);
+                        }
+                    }
+                }
+            }
             ProjectedLayerV1::Image(image) => {
                 assert!(saw_base);
                 assert!(layer_ids.insert(image.layer_id.as_str()));
@@ -1198,15 +1742,16 @@ fn render_reference(input: &CanonicalRasterInputV1) -> CanonicalRasterV1 {
             ProjectedLayerV1::FrameGroup(frame) => {
                 assert!(saw_base);
                 assert!(layer_ids.insert(frame.layer_id.as_str()));
-                assert!(frame.border_width_px * 2 <= frame.frame_rect_px[2]);
-                assert!(frame.border_width_px * 2 <= frame.frame_rect_px[3]);
-                let expected_clip = [
-                    frame.frame_rect_px[0] + frame.border_width_px,
-                    frame.frame_rect_px[1] + frame.border_width_px,
-                    frame.frame_rect_px[2] - frame.border_width_px * 2,
-                    frame.frame_rect_px[3] - frame.border_width_px * 2,
-                ];
-                assert_eq!(frame.photo_clip_rect_px, expected_clip);
+                for border_rect in &frame.border_fill_rects_px {
+                    assert!(
+                        border_rect[0] >= frame.frame_rect_px[0]
+                            && border_rect[1] >= frame.frame_rect_px[1]
+                            && border_rect[0] + border_rect[2]
+                                <= frame.frame_rect_px[0] + frame.frame_rect_px[2]
+                            && border_rect[1] + border_rect[3]
+                                <= frame.frame_rect_px[1] + frame.frame_rect_px[3]
+                    );
+                }
                 let source = sources
                     .get(frame.source_id.as_str())
                     .expect("every Frame resolves a normalized source");
@@ -1227,7 +1772,12 @@ fn render_reference(input: &CanonicalRasterInputV1) -> CanonicalRasterV1 {
                             if frame.black_and_white {
                                 group = grayscale(group);
                             }
-                        } else {
+                        }
+                        if frame
+                            .border_fill_rects_px
+                            .iter()
+                            .any(|rect| contains_pixel(*rect, x, y))
+                        {
                             group = source_over(border, group);
                         }
                         group = apply_opacity(group, frame.group_opacity_byte);
@@ -1247,6 +1797,8 @@ fn render_reference(input: &CanonicalRasterInputV1) -> CanonicalRasterV1 {
     CanonicalRasterV1 {
         width_px: unit.width_px,
         height_px: unit.height_px,
+        dpi: unit.dpi,
+        color_space: "srgb2014".to_owned(),
         rgba_rows: rows,
     }
 }
@@ -1290,6 +1842,422 @@ fn decode_hex_asset(asset: &AssetV1) -> Vec<u8> {
     bytes
 }
 
+fn png_exif_orientation(bytes: &[u8]) -> Option<u16> {
+    const PNG_SIGNATURE: &[u8; 8] = b"\x89PNG\r\n\x1a\n";
+    if bytes.get(..8)? != PNG_SIGNATURE {
+        return None;
+    }
+    let mut offset = 8_usize;
+    while offset.checked_add(12)? <= bytes.len() {
+        let length = u32::from_be_bytes(bytes.get(offset..offset + 4)?.try_into().ok()?) as usize;
+        let kind = bytes.get(offset + 4..offset + 8)?;
+        let data_start = offset + 8;
+        let data_end = data_start.checked_add(length)?;
+        let data = bytes.get(data_start..data_end)?;
+        if kind == b"eXIf" {
+            let little_endian = match data.get(..2)? {
+                b"II" => true,
+                b"MM" => false,
+                _ => return None,
+            };
+            let read_u16 = |slice: &[u8]| {
+                let value: [u8; 2] = slice.try_into().ok()?;
+                Some(if little_endian {
+                    u16::from_le_bytes(value)
+                } else {
+                    u16::from_be_bytes(value)
+                })
+            };
+            let read_u32 = |slice: &[u8]| {
+                let value: [u8; 4] = slice.try_into().ok()?;
+                Some(if little_endian {
+                    u32::from_le_bytes(value)
+                } else {
+                    u32::from_be_bytes(value)
+                })
+            };
+            if read_u16(data.get(2..4)?)? != 42 {
+                return None;
+            }
+            let ifd = usize::try_from(read_u32(data.get(4..8)?)?).ok()?;
+            let count = usize::from(read_u16(data.get(ifd..ifd + 2)?)?);
+            for entry in 0..count {
+                let start = ifd.checked_add(2 + entry * 12)?;
+                let item = data.get(start..start + 12)?;
+                if read_u16(&item[0..2])? == 0x0112
+                    && read_u16(&item[2..4])? == 3
+                    && read_u32(&item[4..8])? == 1
+                {
+                    return read_u16(&item[8..10]);
+                }
+            }
+            return None;
+        }
+        offset = data_end.checked_add(4)?;
+    }
+    None
+}
+
+#[derive(Debug, Eq, PartialEq)]
+struct TiffProbe {
+    width_px: u32,
+    height_px: u32,
+    bits_per_sample: Vec<u16>,
+    samples_per_pixel: u16,
+    photometric: u16,
+    extra_samples: Vec<u16>,
+    samples: Vec<u16>,
+}
+
+fn tiff_u16(bytes: &[u8], offset: usize) -> u16 {
+    u16::from_le_bytes(
+        bytes[offset..offset + 2]
+            .try_into()
+            .expect("the TIFF SHORT is in bounds"),
+    )
+}
+
+fn tiff_u32(bytes: &[u8], offset: usize) -> u32 {
+    u32::from_le_bytes(
+        bytes[offset..offset + 4]
+            .try_into()
+            .expect("the TIFF LONG is in bounds"),
+    )
+}
+
+fn probe_tiff(bytes: &[u8]) -> TiffProbe {
+    assert_eq!(bytes.get(..4), Some(b"II*\0".as_slice()));
+    let ifd_offset = usize::try_from(tiff_u32(bytes, 4)).expect("IFD offset fits usize");
+    let entry_count = usize::from(tiff_u16(bytes, ifd_offset));
+    let mut fields = BTreeMap::<u16, (u16, u32, usize)>::new();
+    for index in 0..entry_count {
+        let entry = ifd_offset + 2 + index * 12;
+        let tag = tiff_u16(bytes, entry);
+        let field_type = tiff_u16(bytes, entry + 2);
+        let count = tiff_u32(bytes, entry + 4);
+        assert!(fields.insert(tag, (field_type, count, entry + 8)).is_none());
+    }
+    let values = |tag: u16| -> Vec<u32> {
+        let (field_type, count, value_field) = fields[&tag];
+        let item_size = match field_type {
+            3 => 2_usize,
+            4 => 4_usize,
+            _ => panic!("unsupported golden TIFF field type"),
+        };
+        let count = usize::try_from(count).expect("golden TIFF count fits usize");
+        let byte_length = item_size * count;
+        let start = if byte_length <= 4 {
+            value_field
+        } else {
+            usize::try_from(tiff_u32(bytes, value_field)).expect("TIFF value offset fits usize")
+        };
+        (0..count)
+            .map(|index| match field_type {
+                3 => u32::from(tiff_u16(bytes, start + index * item_size)),
+                4 => tiff_u32(bytes, start + index * item_size),
+                _ => unreachable!(),
+            })
+            .collect()
+    };
+    assert_eq!(values(259), [1], "the fixture is uncompressed");
+    assert_eq!(values(274), [1], "the fixture is top-left oriented");
+    assert_eq!(values(284), [1], "the fixture is chunky");
+    let width_px = values(256)[0];
+    let height_px = values(257)[0];
+    let bits_per_sample = values(258)
+        .into_iter()
+        .map(|value| u16::try_from(value).expect("bits fit SHORT"))
+        .collect::<Vec<_>>();
+    let samples_per_pixel = u16::try_from(values(277)[0]).expect("samples fit SHORT");
+    let photometric = u16::try_from(values(262)[0]).expect("photometric fits SHORT");
+    let extra_samples = if fields.contains_key(&338) {
+        values(338)
+            .into_iter()
+            .map(|value| u16::try_from(value).expect("ExtraSamples fits SHORT"))
+            .collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
+    let strip_offset = usize::try_from(values(273)[0]).expect("strip offset fits usize");
+    let strip_byte_count = usize::try_from(values(279)[0]).expect("strip size fits usize");
+    let strip = &bytes[strip_offset..strip_offset + strip_byte_count];
+    assert!(
+        bits_per_sample
+            .iter()
+            .all(|bits| *bits == bits_per_sample[0])
+    );
+    let samples = match bits_per_sample[0] {
+        8 => strip.iter().copied().map(u16::from).collect(),
+        16 => {
+            let (samples, remainder) = strip.as_chunks::<2>();
+            assert!(remainder.is_empty());
+            samples.iter().copied().map(u16::from_le_bytes).collect()
+        }
+        _ => panic!("unsupported golden TIFF depth"),
+    };
+    TiffProbe {
+        width_px,
+        height_px,
+        bits_per_sample,
+        samples_per_pixel,
+        photometric,
+        extra_samples,
+        samples,
+    }
+}
+
+fn reduce_tiff_sample(value: u32, bits: u16) -> u8 {
+    match bits {
+        8 => u8::try_from(value).expect("8-bit TIFF sample fits u8"),
+        16 => u8::try_from((value + 128) / 257).expect("reduced TIFF sample fits u8"),
+        _ => panic!("unsupported golden TIFF depth"),
+    }
+}
+
+fn normalize_tiff(probe: &TiffProbe) -> Result<Vec<Vec<String>>, NormalizationErrorV1> {
+    let semantics = match probe.extra_samples.as_slice() {
+        [1] => TiffAlphaSemanticsV1::AssociatedAlpha,
+        [2] => TiffAlphaSemanticsV1::UnassociatedAlpha,
+        _ => return Err(NormalizationErrorV1::UnsupportedSourceVariant),
+    };
+    let accepted_shape = (probe.photometric == 2 && probe.samples_per_pixel == 4)
+        || (probe.photometric == 1 && probe.samples_per_pixel == 2);
+    if !accepted_shape
+        || probe.bits_per_sample.len() != usize::from(probe.samples_per_pixel)
+        || !probe
+            .bits_per_sample
+            .iter()
+            .all(|bits| matches!(bits, 8 | 16))
+    {
+        return Err(NormalizationErrorV1::UnsupportedSourceVariant);
+    }
+    let bits = probe.bits_per_sample[0];
+    let maximum = if bits == 16 { 65_535_u32 } else { 255_u32 };
+    let channels = usize::from(probe.samples_per_pixel);
+    let rgba = probe
+        .samples
+        .chunks_exact(channels)
+        .map(|samples| {
+            let alpha = u32::from(samples[channels - 1]);
+            let straight = |value: u16| -> u32 {
+                let value = u32::from(value);
+                if semantics == TiffAlphaSemanticsV1::UnassociatedAlpha {
+                    value
+                } else if alpha == 0 {
+                    0
+                } else {
+                    assert!(value <= alpha, "associated color cannot exceed alpha");
+                    (value * maximum + alpha / 2) / alpha
+                }
+            };
+            let rgb = if probe.photometric == 2 {
+                [
+                    straight(samples[0]),
+                    straight(samples[1]),
+                    straight(samples[2]),
+                ]
+            } else {
+                [straight(samples[0]); 3]
+            };
+            format!(
+                "{:02X}{:02X}{:02X}{:02X}",
+                reduce_tiff_sample(rgb[0], bits),
+                reduce_tiff_sample(rgb[1], bits),
+                reduce_tiff_sample(rgb[2], bits),
+                reduce_tiff_sample(alpha, bits),
+            )
+        })
+        .collect::<Vec<_>>();
+    let width = usize::try_from(probe.width_px).expect("TIFF width fits usize");
+    Ok(rgba.chunks(width).map(<[_]>::to_vec).collect())
+}
+
+fn points_decimal_6(micrometers: u64) -> String {
+    let scaled = (u128::from(micrometers) * 72 * 1_000_000 + u128::from(MICROMETERS_PER_INCH / 2))
+        / u128::from(MICROMETERS_PER_INCH);
+    let integer = scaled / 1_000_000;
+    let fraction = scaled % 1_000_000;
+    if fraction == 0 {
+        return integer.to_string();
+    }
+    let mut fraction = format!("{fraction:06}");
+    while fraction.ends_with('0') {
+        fraction.pop();
+    }
+    format!("{integer}.{fraction}")
+}
+
+fn validate_raster_origin(corpus: &CorpusV1, raster_case: &CanonicalRasterCaseV1) {
+    let RasterOriginV1::CompositionFrame(link) = &raster_case.origin else {
+        return;
+    };
+    let composition = corpus
+        .cases
+        .iter()
+        .find_map(|case| match case {
+            GoldenCaseV1::Composition(case) if case.id == link.composition_case_id => Some(case),
+            _ => None,
+        })
+        .expect("a linked raster names a composition case");
+    let plan = reference_plan(&composition.input, &corpus.algorithms.sampler);
+    assert_eq!(plan, composition.expected_plan);
+    let planned_sheet = plan
+        .sheets
+        .iter()
+        .find(|sheet| {
+            sheet
+                .output_units
+                .iter()
+                .any(|unit| unit.unit_id == link.unit_id)
+        })
+        .expect("a linked raster names a planned sheet");
+    let planned_unit = planned_sheet
+        .output_units
+        .iter()
+        .find(|unit| unit.unit_id == link.unit_id)
+        .expect("a linked raster names a planned output unit");
+    let raster_unit = &raster_case.input.unit;
+    assert_eq!(raster_unit.unit_id, planned_unit.unit_id);
+    assert_eq!(raster_unit.width_px, planned_unit.width_px);
+    assert_eq!(raster_unit.height_px, planned_unit.height_px);
+    assert_eq!(raster_unit.dpi, plan.dpi);
+    assert_eq!(
+        raster_unit.physical_source_rect_um,
+        planned_unit.physical_source_rect_um
+    );
+
+    let planned_frame = plan
+        .sheets
+        .iter()
+        .flat_map(|sheet| &sheet.ordered_layers)
+        .find_map(|layer| match layer {
+            PlannedLayerV1::FrameGroup(frame) if frame.frame_id == link.frame_id => Some(frame),
+            _ => None,
+        })
+        .expect("a linked raster names a planned Frame");
+    let projected_frame = raster_unit
+        .layers
+        .iter()
+        .find_map(|layer| match layer {
+            ProjectedLayerV1::FrameGroup(frame) if frame.layer_id == planned_frame.layer_id => {
+                Some(frame)
+            }
+            _ => None,
+        })
+        .expect("the linked Frame is present in the output unit");
+    let origin = [
+        planned_unit.physical_source_rect_um[0],
+        planned_unit.physical_source_rect_um[1],
+    ];
+    assert_eq!(
+        projected_frame.source_from_destination_q32,
+        project_source_from_destination(
+            &planned_frame.photo.source_from_physical_q32,
+            origin,
+            plan.dpi,
+        )
+    );
+    assert_eq!(
+        projected_frame.frame_rect_px,
+        project_rect_to_unit(
+            planned_frame.frame_rect_um,
+            planned_unit.physical_source_rect_um,
+            plan.dpi,
+        )
+    );
+    assert_eq!(
+        projected_frame.photo_clip_rect_px,
+        project_rect_to_unit(
+            planned_frame.photo_clip_rect_um,
+            planned_unit.physical_source_rect_um,
+            plan.dpi,
+        )
+    );
+    let projected_borders = planned_frame
+        .border_fill_rects_um
+        .iter()
+        .map(|rect| project_rect_to_unit(*rect, planned_unit.physical_source_rect_um, plan.dpi))
+        .filter(|rect| rect[2] > 0 && rect[3] > 0)
+        .collect::<Vec<_>>();
+    assert_eq!(projected_frame.border_fill_rects_px, projected_borders);
+    assert_eq!(projected_frame.source_id, planned_frame.photo.media_id);
+    assert_eq!(projected_frame.border_rgb, planned_frame.border_rgb);
+    assert_eq!(
+        projected_frame.group_opacity_byte,
+        planned_frame.group_opacity_byte
+    );
+    assert_eq!(
+        projected_frame.black_and_white,
+        planned_frame.photo.transform.black_and_white
+    );
+
+    let (planned_decorative, planned_image) = planned_sheet
+        .ordered_layers
+        .iter()
+        .find_map(|layer| match layer {
+            PlannedLayerV1::Background(decorative) | PlannedLayerV1::Overlay(decorative) => {
+                match &decorative.paint {
+                    PlannedPaintV1::Image(image) => Some((decorative, image)),
+                    PlannedPaintV1::Solid(_) => None,
+                }
+            }
+            _ => None,
+        })
+        .expect("the composition seam includes a Both-sides decorative image");
+    assert_eq!(planned_decorative.scope, ScopeV1::Both);
+    let projected_decorative = raster_unit
+        .layers
+        .iter()
+        .find_map(|layer| match layer {
+            ProjectedLayerV1::Image(image) if image.layer_id == planned_decorative.layer_id => {
+                Some(image)
+            }
+            _ => None,
+        })
+        .expect("the Both-sides decorative image is projected into the Page");
+    assert_eq!(projected_decorative.source_id, planned_image.media_id);
+    assert_eq!(planned_image.applied_orientation, 1);
+    assert_eq!(
+        projected_decorative.clip_rect_px,
+        project_rect_to_unit(
+            planned_decorative.rect_um,
+            planned_unit.physical_source_rect_um,
+            plan.dpi,
+        )
+    );
+    assert_eq!(
+        projected_decorative.source_from_destination_q32,
+        project_source_from_destination(&planned_image.source_from_physical_q32, origin, plan.dpi,),
+        "Both-sides stretch remains continuous across the right Page origin"
+    );
+
+    let spread = planned_sheet
+        .output_units
+        .iter()
+        .find(|unit| unit.mode == ExportModeV1::PerSheet)
+        .expect("the linked sheet also exposes a spread unit");
+    assert_eq!(spread.width_px, planned_unit.width_px * 2 + 1);
+    let layer_order = raster_unit
+        .layers
+        .iter()
+        .map(|layer| match layer {
+            ProjectedLayerV1::Base(_) => "base",
+            ProjectedLayerV1::Solid(layer) => layer.layer_id.as_str(),
+            ProjectedLayerV1::Image(layer) => layer.layer_id.as_str(),
+            ProjectedLayerV1::FrameGroup(layer) => layer.layer_id.as_str(),
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        layer_order,
+        [
+            "base",
+            "background:both",
+            "frame:00000000-0000-4000-8000-000000000003",
+            "frame:00000000-0000-4000-8000-000000000002",
+        ]
+    );
+}
+
 #[test]
 fn corpus_schema_ids_and_assets_are_closed_and_versioned() {
     let corpus = corpus();
@@ -1323,12 +2291,19 @@ fn corpus_schema_ids_and_assets_are_closed_and_versioned() {
             "fractional-bilinear-alpha-border",
             "fractional-transform-z-order-and-page-units",
             "jpeg-exif-orientation-6",
+            "last-promotion-candidate-confirmed",
             "minimum-three-digit-output-indices",
             "odd-width-independent-pages",
             "png-alpha-normalization",
+            "q16-half-up-carry",
+            "q16-half-up-tie",
+            "right-page-crossing-frame-q32",
             "second-promotion-proven-untouched",
             "source-changes-during-capture",
             "source-identity-indeterminate",
+            "tiff-associated-alpha-16",
+            "tiff-four-samples-requires-extra-samples",
+            "tiff-unassociated-gray-alpha-16",
         ])
     );
 
@@ -1340,7 +2315,13 @@ fn corpus_schema_ids_and_assets_are_closed_and_versioned() {
     assert_eq!(asset_ids.len(), corpus.assets.len());
     assert_eq!(
         asset_ids,
-        BTreeSet::from(["jpeg-orientation-6-2x1", "png-rgba-2x2"])
+        BTreeSet::from([
+            "jpeg-orientation-6-2x1",
+            "png-rgba-2x2",
+            "tiff-associated-rgba16-1x1",
+            "tiff-missing-extra-rgba8-1x1",
+            "tiff-unassociated-graya16-1x1",
+        ])
     );
     for asset in &corpus.assets {
         assert_eq!(asset.sha256.len(), 64);
@@ -1432,27 +2413,37 @@ fn geometry_and_creative_state_produce_the_complete_expected_plan() {
 }
 
 #[test]
-fn composed_unit_produces_the_exact_fractional_alpha_raster() {
+fn composed_units_produce_exact_fractional_and_page_projection_rasters() {
     let corpus = corpus();
-    let case = corpus
+    let raster_cases = corpus
         .cases
         .iter()
-        .find_map(|case| match case {
+        .filter_map(|case| match case {
             GoldenCaseV1::CanonicalRaster(case) => Some(case),
             _ => None,
         })
-        .expect("the canonical raster case exists");
-    let actual = render_reference(&case.input);
-    assert_eq!(actual, case.expected_raster);
-    assert!(
-        actual
-            .rgba_rows
-            .iter()
-            .flatten()
-            .all(|pixel| pixel.ends_with("FF"))
-    );
+        .collect::<Vec<_>>();
+    assert_eq!(raster_cases.len(), 4);
+    for case in &raster_cases {
+        validate_raster_origin(&corpus, case);
+        let actual = render_reference(&case.input);
+        assert_eq!(actual, case.expected_raster);
+        assert_eq!(actual.dpi, case.input.unit.dpi);
+        assert_eq!(actual.color_space, "srgb2014");
+        assert!(
+            actual
+                .rgba_rows
+                .iter()
+                .flatten()
+                .all(|pixel| pixel.ends_with("FF"))
+        );
+    }
 
-    let photo = case
+    let alpha_case = raster_cases
+        .iter()
+        .find(|case| case.id == "fractional-bilinear-alpha-border")
+        .expect("the alpha-composition raster exists");
+    let photo = alpha_case
         .input
         .normalized_sources
         .iter()
@@ -1467,10 +2458,15 @@ fn composed_unit_produces_the_exact_fractional_alpha_raster() {
             .len(),
         4
     );
-    let frame = case.input.unit.layers.iter().find_map(|layer| match layer {
-        ProjectedLayerV1::FrameGroup(frame) => Some(frame),
-        _ => None,
-    });
+    let frame = alpha_case
+        .input
+        .unit
+        .layers
+        .iter()
+        .find_map(|layer| match layer {
+            ProjectedLayerV1::FrameGroup(frame) => Some(frame),
+            _ => None,
+        });
     let frame = frame.expect("the fractional Frame exists");
     assert_ne!(
         parse_q32(&frame.source_from_destination_q32.xx) % (Q32_ONE as i64),
@@ -1478,11 +2474,88 @@ fn composed_unit_produces_the_exact_fractional_alpha_raster() {
         "the oracle distinguishes bilinear sampling from nearest-neighbor"
     );
     assert!((1..=254).contains(&frame.group_opacity_byte));
+
+    let q16_case = raster_cases
+        .iter()
+        .find(|case| case.id == "q16-half-up-tie")
+        .expect("the Q16 half-up tie raster exists");
+    let q16_probe = q16_case
+        .input
+        .unit
+        .layers
+        .iter()
+        .find_map(|layer| match layer {
+            ProjectedLayerV1::Image(image) => Some(image),
+            _ => None,
+        });
+    let q16_probe = q16_probe.expect("the Q16 probe layer exists");
+    let tie_source = i128::from(parse_q32(&q16_probe.source_from_destination_q32.tx));
+    let tie_fraction_q32 = (tie_source - Q32_HALF).rem_euclid(Q32_ONE);
+    assert_eq!(tie_fraction_q32.div_euclid(Q16_ONE), 128);
+    assert_eq!(tie_fraction_q32.rem_euclid(Q16_ONE), Q16_ONE / 2);
+    let (_, tie_fraction) = q16_axis(tie_source);
+    assert_eq!(tie_fraction, 129, "Q32.32 to Q16 ties round half-up");
+    let carry_case = raster_cases
+        .iter()
+        .find(|case| case.id == "q16-half-up-carry")
+        .expect("the Q16 carry raster exists");
+    let carry_probe = carry_case
+        .input
+        .unit
+        .layers
+        .iter()
+        .find_map(|layer| match layer {
+            ProjectedLayerV1::Image(image) => Some(image),
+            _ => None,
+        });
+    let carry_probe = carry_probe.expect("the Q16 carry probe layer exists");
+    let carry_source = i128::from(parse_q32(&carry_probe.source_from_destination_q32.tx));
+    let carry_fraction_q32 = (carry_source - Q32_HALF).rem_euclid(Q32_ONE);
+    assert_eq!(carry_fraction_q32.div_euclid(Q16_ONE), Q16_ONE - 1);
+    assert_eq!(carry_fraction_q32.rem_euclid(Q16_ONE), Q16_ONE / 2);
+    assert_eq!(
+        q16_axis(carry_source),
+        (1, 0),
+        "a rounded Q16 weight of 65,536 carries into the texel index"
+    );
+
+    let page_case = raster_cases
+        .iter()
+        .find(|case| case.id == "right-page-crossing-frame-q32")
+        .expect("the linked right-Page raster exists");
+    let crossing_frame = page_case
+        .input
+        .unit
+        .layers
+        .iter()
+        .find_map(|layer| match layer {
+            ProjectedLayerV1::FrameGroup(frame) if frame.black_and_white => Some(frame),
+            _ => None,
+        })
+        .expect("the linked raster exercises Preto e branco");
+    assert_ne!(parse_q32(&crossing_frame.source_from_destination_q32.xy), 0);
+    assert_ne!(parse_q32(&crossing_frame.source_from_destination_q32.yx), 0);
+    assert!(
+        page_case
+            .expected_raster
+            .rgba_rows
+            .iter()
+            .flatten()
+            .any(|pixel| pixel.as_str() != "FFFFFFFF")
+    );
 }
 
 #[test]
-fn encoded_sources_fix_real_exif_and_png_alpha_normalization() {
+fn encoded_sources_fix_real_orientation_alpha_and_tiff_normalization() {
     let corpus = corpus();
+    let composition_inputs = corpus
+        .cases
+        .iter()
+        .filter_map(|case| match case {
+            GoldenCaseV1::Composition(case) => Some((case.id.as_str(), &case.input)),
+            _ => None,
+        })
+        .collect::<BTreeMap<_, _>>();
     let asset_bytes = corpus
         .assets
         .iter()
@@ -1507,22 +2580,35 @@ fn encoded_sources_fix_real_exif_and_png_alpha_normalization() {
                 assert!(expected.apply_exactly_once);
                 assert_eq!(expected.encoded_width_px, descriptor.encoded_width_px);
                 assert_eq!(expected.encoded_height_px, descriptor.encoded_height_px);
-                assert_eq!(expected.orientation, descriptor.exif_orientation);
-                let reader = ImageReader::with_format(Cursor::new(bytes), ImageFormat::Jpeg);
+                assert_eq!(expected.embedded_orientation, descriptor.exif_orientation);
+                assert_eq!(expected.applied_orientation, expected.embedded_orientation);
+                let reader = ImageReader::new(Cursor::new(bytes.as_slice()))
+                    .with_guessed_format()
+                    .expect("the JPEG signature is readable");
+                assert_eq!(reader.format(), Some(ImageFormat::Jpeg));
                 let mut decoder = reader.into_decoder().expect("the JPEG decoder opens");
                 assert_eq!(
                     decoder.dimensions(),
                     (expected.encoded_width_px, expected.encoded_height_px)
                 );
                 let orientation = decoder.orientation().expect("EXIF orientation is readable");
-                assert_eq!(orientation.to_exif(), expected.orientation);
-                let mut oriented =
-                    DynamicImage::from_decoder(decoder).expect("the JPEG pixels decode");
+                assert_eq!(orientation.to_exif(), expected.embedded_orientation);
+                let encoded = DynamicImage::from_decoder(decoder).expect("the JPEG pixels decode");
+                let encoded_rgb = encoded.to_rgb8();
+                assert_ne!(
+                    encoded_rgb.get_pixel(0, 0),
+                    encoded_rgb.get_pixel(1, 0),
+                    "the asymmetric JPEG makes Orientation direction observable"
+                );
+                let mut oriented = encoded;
                 oriented.apply_orientation(orientation);
                 assert_eq!(
                     oriented.dimensions(),
                     (expected.oriented_width_px, expected.oriented_height_px)
                 );
+                let oriented_rgb = oriented.to_rgb8();
+                assert_eq!(oriented_rgb.get_pixel(0, 0), encoded_rgb.get_pixel(0, 0));
+                assert_eq!(oriented_rgb.get_pixel(0, 1), encoded_rgb.get_pixel(1, 0));
                 let mut applied_twice = oriented.clone();
                 applied_twice.apply_orientation(orientation);
                 assert_ne!(
@@ -1537,11 +2623,18 @@ fn encoded_sources_fix_real_exif_and_png_alpha_normalization() {
             ) => {
                 assert!(descriptor.has_alpha);
                 assert!(expected.orientation_metadata_ignored);
+                assert_eq!(expected.applied_orientation, 1);
+                assert_eq!(
+                    png_exif_orientation(bytes),
+                    Some(expected.embedded_orientation.into())
+                );
                 assert_eq!(expected.width_px, descriptor.encoded_width_px);
                 assert_eq!(expected.height_px, descriptor.encoded_height_px);
-                let rgba = image::load_from_memory_with_format(bytes, ImageFormat::Png)
-                    .expect("the PNG pixels decode")
-                    .to_rgba8();
+                let reader = ImageReader::new(Cursor::new(bytes.as_slice()))
+                    .with_guessed_format()
+                    .expect("the PNG signature is readable");
+                assert_eq!(reader.format(), Some(ImageFormat::Png));
+                let rgba = reader.decode().expect("the PNG pixels decode").to_rgba8();
                 assert_eq!(rgba.dimensions(), (expected.width_px, expected.height_px));
                 let rows = rgba
                     .rows()
@@ -1556,6 +2649,97 @@ fn encoded_sources_fix_real_exif_and_png_alpha_normalization() {
                     })
                     .collect::<Vec<_>>();
                 assert_eq!(rows, expected.rgba_rows);
+
+                let linked_input = composition_inputs
+                    .get(expected.linked_composition_case_id.as_str())
+                    .expect("the PNG normalization case links to a composition input");
+                let observation = linked_input
+                    .source_observations
+                    .iter()
+                    .find(|candidate| candidate.media_id == expected.linked_media_id)
+                    .expect("the linked composition input freezes the PNG observation");
+                assert_eq!(observation.detected_format, DetectedFormatV1::Png);
+                assert_eq!(observation.source_variant, SourceVariantV1::PngStaticRgba8);
+                assert_eq!(observation.encoded_width_px, expected.width_px);
+                assert_eq!(observation.encoded_height_px, expected.height_px);
+                assert_eq!(observation.oriented_width_px, expected.width_px);
+                assert_eq!(observation.oriented_height_px, expected.height_px);
+                assert_eq!(
+                    observation.embedded_orientation,
+                    expected.embedded_orientation
+                );
+                assert_eq!(
+                    observation.applied_orientation,
+                    expected.applied_orientation
+                );
+                assert_eq!(observation.sha256_full_file_v1, asset.sha256);
+                let projected_fact = linked_input
+                    .source_geometry_facts
+                    .iter()
+                    .find(|candidate| candidate.media_id == expected.linked_media_id)
+                    .expect("the linked PNG observation projects one geometry fact");
+                assert_eq!(
+                    projected_fact.applied_orientation, expected.applied_orientation,
+                    "CompositionCore receives the effective orientation, not PNG eXIf"
+                );
+                let linked_raster = corpus
+                    .cases
+                    .iter()
+                    .find_map(|case| match case {
+                        GoldenCaseV1::CanonicalRaster(case)
+                            if case.id == expected.linked_raster_case_id =>
+                        {
+                            Some(case)
+                        }
+                        _ => None,
+                    })
+                    .expect("the PNG normalization case links to a canonical raster");
+                let normalized_source = linked_raster
+                    .input
+                    .normalized_sources
+                    .iter()
+                    .find(|source| source.source_id == expected.linked_media_id)
+                    .expect("the linked raster consumes the normalized PNG source");
+                assert_eq!(normalized_source.width_px, expected.width_px);
+                assert_eq!(normalized_source.height_px, expected.height_px);
+                assert_eq!(normalized_source.rgba_rows, expected.rgba_rows);
+            }
+            (
+                NormalizedSourceExpectationV1::TiffAlpha(expected),
+                AssetDescriptorV1::Tiff(descriptor),
+            ) => {
+                let probe = probe_tiff(bytes);
+                assert_eq!(probe.width_px, descriptor.width_px);
+                assert_eq!(probe.height_px, descriptor.height_px);
+                assert_eq!(probe.bits_per_sample, descriptor.bits_per_sample);
+                assert_eq!(probe.samples_per_pixel, descriptor.samples_per_pixel);
+                assert_eq!(probe.photometric, descriptor.photometric);
+                assert_eq!(probe.extra_samples, descriptor.extra_samples);
+                assert_eq!(probe.width_px, expected.width_px);
+                assert_eq!(probe.height_px, expected.height_px);
+                let semantics = match probe.extra_samples.as_slice() {
+                    [1] => TiffAlphaSemanticsV1::AssociatedAlpha,
+                    [2] => TiffAlphaSemanticsV1::UnassociatedAlpha,
+                    _ => panic!("an accepted TIFF has exactly one declared alpha"),
+                };
+                assert_eq!(semantics, expected.alpha_semantics);
+                assert_eq!(
+                    normalize_tiff(&probe).expect("the TIFF alpha declaration is accepted"),
+                    expected.rgba_rows
+                );
+            }
+            (
+                NormalizedSourceExpectationV1::TiffRejected(expected),
+                AssetDescriptorV1::Tiff(descriptor),
+            ) => {
+                let probe = probe_tiff(bytes);
+                assert_eq!(probe.width_px, descriptor.width_px);
+                assert_eq!(probe.height_px, descriptor.height_px);
+                assert_eq!(probe.bits_per_sample, descriptor.bits_per_sample);
+                assert_eq!(probe.samples_per_pixel, descriptor.samples_per_pixel);
+                assert_eq!(probe.photometric, descriptor.photometric);
+                assert_eq!(probe.extra_samples, descriptor.extra_samples);
+                assert_eq!(normalize_tiff(&probe), Err(expected.error_code));
             }
             _ => panic!("asset descriptor and normalization oracle disagree"),
         }
@@ -1569,14 +2753,15 @@ fn encoded_sources_fix_real_exif_and_png_alpha_normalization() {
 #[test]
 fn format_names_and_operational_oracles_enforce_the_remaining_contract() {
     let corpus = corpus();
-    let raster_case = corpus
+    let raster_cases = corpus
         .cases
         .iter()
-        .find_map(|case| match case {
+        .filter_map(|case| match case {
             GoldenCaseV1::CanonicalRaster(case) => Some(case),
             _ => None,
         })
-        .expect("the canonical unit exists");
+        .map(|case| (case.input.unit.unit_id.as_str(), case))
+        .collect::<BTreeMap<_, _>>();
     let formats = corpus
         .cases
         .iter()
@@ -1585,14 +2770,38 @@ fn format_names_and_operational_oracles_enforce_the_remaining_contract() {
             _ => None,
         })
         .expect("the format oracle exists");
-    assert_eq!(formats.canonical_unit_id, raster_case.input.unit.unit_id);
+    assert_eq!(
+        formats.canonical_unit_ids.len(),
+        formats
+            .canonical_unit_ids
+            .iter()
+            .collect::<BTreeSet<_>>()
+            .len()
+    );
+    assert_eq!(
+        formats
+            .canonical_unit_ids
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>(),
+        ["raster-alpha:spread", "q16-rounding:unit"]
+    );
+    let canonical_units = formats
+        .canonical_unit_ids
+        .iter()
+        .map(|unit_id| raster_cases[unit_id.as_str()])
+        .collect::<Vec<_>>();
     let expected = &formats.expected;
     assert_eq!(expected.jpeg.extension, ".jpg");
     assert_eq!(expected.jpeg.quality_input, 100);
     assert_eq!(expected.jpeg.process, "baseline-sof0");
     assert_eq!(expected.jpeg.subsampling, "4:4:4");
     assert_eq!(expected.jpeg.components, 3);
-    assert_eq!(expected.jpeg.dpi, raster_case.input.unit.dpi);
+    assert!(
+        canonical_units
+            .iter()
+            .all(|case| expected.jpeg.dpi == case.input.unit.dpi)
+    );
     assert_eq!(expected.jpeg.icc, "sRGB2014.icc");
     assert_eq!(
         expected
@@ -1611,6 +2820,10 @@ fn format_names_and_operational_oracles_enforce_the_remaining_contract() {
             "thumbnail",
         ])
     );
+    assert_eq!(
+        expected.jpeg.decoded_error_metric,
+        "per-channel-absolute-error; max over all channels; mean=sum/(width*height*3)"
+    );
     assert!(expected.jpeg.decoded_max_channel_error <= 8);
     assert!(expected.jpeg.decoded_mean_error_at_most <= 2);
 
@@ -1622,19 +2835,49 @@ fn format_names_and_operational_oracles_enforce_the_remaining_contract() {
         (expected.jpeg.dpi * 10_000 + 127) / 254
     );
     assert_eq!(expected.png.icc, expected.jpeg.icc);
+    assert_eq!(
+        expected
+            .png
+            .forbidden_chunks
+            .iter()
+            .map(String::as_str)
+            .collect::<BTreeSet<_>>(),
+        BTreeSet::from([
+            "acTL", "fcTL", "fdAT", "eXIf", "tEXt", "zTXt", "iTXt", "tIME",
+        ])
+    );
     assert_eq!(expected.png.decoded_comparison, "exact-canonical-rgb");
 
     assert_eq!(expected.pdf.extension, ".pdf");
-    assert_eq!(expected.pdf.page_count, 1);
-    assert_eq!(expected.pdf.media_box_points, expected.pdf.crop_box_points);
-    let rect = raster_case.input.unit.physical_source_rect_um;
     assert_eq!(
-        expected.pdf.media_box_points,
-        [
-            (rect[2] * 72 / MICROMETERS_PER_INCH) as u32,
-            (rect[3] * 72 / MICROMETERS_PER_INCH) as u32,
-        ]
+        usize::try_from(expected.pdf.page_count).expect("page count fits usize"),
+        canonical_units.len()
     );
+    assert_eq!(expected.pdf.page_order, formats.canonical_unit_ids);
+    assert_eq!(
+        expected.pdf.embedded_raster_order,
+        formats.canonical_unit_ids
+    );
+    assert_eq!(
+        expected.pdf.media_boxes_points,
+        expected.pdf.crop_boxes_points
+    );
+    let boxes = canonical_units
+        .iter()
+        .map(|case| {
+            let rect = case.input.unit.physical_source_rect_um;
+            [points_decimal_6(rect[2]), points_decimal_6(rect[3])]
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        expected.pdf.media_boxes_points, boxes,
+        "PDF boxes use the physical unit dimensions rounded to six decimals"
+    );
+    assert!(
+        boxes.iter().flatten().any(|value| value.contains('.')),
+        "the multi-page PDF oracle includes a non-integral physical box"
+    );
+    assert_eq!(expected.pdf.placement, "cover-media-box-no-rotation");
     assert_eq!(expected.pdf.embedded_color_space, "ICCBased-sRGB2014");
     assert_eq!(
         expected.pdf.embedded_raster_comparison,
@@ -1650,6 +2893,15 @@ fn format_names_and_operational_oracles_enforce_the_remaining_contract() {
             _ => None,
         })
         .expect("the output-name oracle exists");
+    assert_eq!(names.indices.as_slice(), &[1, 9, 10, 998, 999, 1000, 1001]);
+    assert_eq!(
+        names
+            .rejected_index_strings
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>(),
+        ["000", "0001", "+001", "-001", "1"]
+    );
     assert_eq!(names.indices.len(), names.expected_names.len());
     let formatted = names
         .indices
@@ -1672,7 +2924,7 @@ fn format_names_and_operational_oracles_enforce_the_remaining_contract() {
             _ => None,
         })
         .collect::<Vec<_>>();
-    assert_eq!(operational.len(), 7);
+    assert_eq!(operational.len(), 8);
     for case in operational {
         validate_operational_case(case);
     }
@@ -1725,7 +2977,7 @@ fn validate_operational_case(case: &OperationalCaseV1) {
         }
         PublicationStateV1::UntouchedByAttempt => {
             assert_eq!(expected.terminal, OperationalTerminalV1::PublicationFailed);
-            assert!(expected.attempted_count > 0);
+            assert_eq!(expected.attempted_count, 1);
             assert_eq!(expected.confirmed_promoted_count, 0);
             assert_eq!(
                 expected.failed_target_evidence,
@@ -1741,9 +2993,23 @@ fn validate_operational_case(case: &OperationalCaseV1) {
             );
             match expected.failed_target_evidence {
                 TargetEvidenceV1::CandidateAtFinal => {
-                    assert_eq!(expected.confirmed_promoted_count, expected.attempted_count)
+                    assert_eq!(expected.confirmed_promoted_count, expected.attempted_count);
+                    assert!(
+                        expected.attempted_count < context.total_file_count,
+                        "all candidates confirmed is not PossiblyMixed"
+                    );
                 }
-                TargetEvidenceV1::UntouchedByAttempt | TargetEvidenceV1::Indeterminate => {
+                TargetEvidenceV1::UntouchedByAttempt => {
+                    assert!(
+                        expected.confirmed_promoted_count > 0,
+                        "an untouched first target is UntouchedByAttempt, not PossiblyMixed"
+                    );
+                    assert_eq!(
+                        expected.confirmed_promoted_count + 1,
+                        expected.attempted_count
+                    )
+                }
+                TargetEvidenceV1::Indeterminate => {
                     assert_eq!(
                         expected.confirmed_promoted_count + 1,
                         expected.attempted_count
@@ -1753,13 +3019,19 @@ fn validate_operational_case(case: &OperationalCaseV1) {
             }
         }
         PublicationStateV1::AllCandidatesConfirmed => {
-            assert_eq!(expected.terminal, OperationalTerminalV1::Completed);
             assert_eq!(expected.attempted_count, context.total_file_count);
             assert_eq!(expected.confirmed_promoted_count, context.total_file_count);
-            assert_eq!(
-                expected.failed_target_evidence,
-                TargetEvidenceV1::NotApplicable
-            );
+            match expected.failed_target_evidence {
+                TargetEvidenceV1::NotApplicable => {
+                    assert_eq!(expected.terminal, OperationalTerminalV1::Completed)
+                }
+                TargetEvidenceV1::CandidateAtFinal => {
+                    assert_eq!(expected.terminal, OperationalTerminalV1::PartialPublication)
+                }
+                TargetEvidenceV1::UntouchedByAttempt | TargetEvidenceV1::Indeterminate => {
+                    panic!("all candidates require positive final evidence")
+                }
+            }
         }
     }
 
@@ -1781,6 +3053,8 @@ fn validate_operational_case(case: &OperationalCaseV1) {
             validate_sha256(&fault.after_sha256);
             assert_ne!(fault.before_sha256, fault.after_sha256);
             assert_eq!(expected.terminal, OperationalTerminalV1::SourceChanged);
+            assert_eq!(expected.failed_output, FailedOutputV1::NotApplicable);
+            assert_eq!(expected.cause_code, CauseCodeV1::SourceChanged);
         }
         FaultInjectionV1::SourceIdentityIndeterminate(fault) => {
             assert_eq!(case.owner_issue, 13);
@@ -1788,6 +3062,11 @@ fn validate_operational_case(case: &OperationalCaseV1) {
             assert_eq!(
                 expected.terminal,
                 OperationalTerminalV1::SourceIdentityIndeterminate
+            );
+            assert_eq!(expected.failed_output, FailedOutputV1::NotApplicable);
+            assert_eq!(
+                expected.cause_code,
+                CauseCodeV1::SourceIdentityIndeterminate
             );
         }
         FaultInjectionV1::AtomicProbeUnsupported(fault) => {
@@ -1797,16 +3076,28 @@ fn validate_operational_case(case: &OperationalCaseV1) {
                 expected.terminal,
                 OperationalTerminalV1::AtomicReplacementUnsupported
             );
+            assert_eq!(expected.failed_output, FailedOutputV1::NotApplicable);
+            assert_eq!(
+                expected.cause_code,
+                CauseCodeV1::AtomicReplacementUnsupported
+            );
         }
         FaultInjectionV1::PromotionFails(fault) => {
             assert_eq!(case.owner_issue, 35);
             assert!(!fault.failed_output.is_empty());
             assert_eq!(fault.attempt_number, expected.attempted_count);
             assert_eq!(fault.target_evidence, expected.failed_target_evidence);
+            assert_eq!(
+                expected.failed_output,
+                FailedOutputV1::Output(fault.failed_output.clone())
+            );
+            assert_eq!(expected.cause_code, CauseCodeV1::AtomicPromotionFailed);
         }
         FaultInjectionV1::None(_) => {
             assert_eq!(case.owner_issue, 38);
             assert_eq!(expected.terminal, OperationalTerminalV1::Completed);
+            assert_eq!(expected.failed_output, FailedOutputV1::NotApplicable);
+            assert_eq!(expected.cause_code, CauseCodeV1::NotApplicable);
         }
     }
 }
