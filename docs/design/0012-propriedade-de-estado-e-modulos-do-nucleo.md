@@ -1,7 +1,7 @@
 ---
 status: accepted
 document: design
-updated: 2026-08-10
+updated: 2026-09-01
 ---
 
 # Propriedade de estado e módulos do núcleo
@@ -142,7 +142,7 @@ Nenhum outro resultado confirma ausência. A assimetria é deliberada e segue o 
 Sua implementação possui três fases internas:
 
 1. `ExportPlanner` calcula unidades, dependências, raízes, nomes, conflitos e plano de saída;
-2. `ExportExecutor` abre originais, usa `CompositionCore`, renderiza e verifica a preparação;
+2. `ExportExecutor` captura os Originais e consome somente as unidades derivadas do `RenderSnapshot` já composto, renderiza e verifica a preparação;
 3. `Publisher` promove arquivos aos nomes finais e executa a limpeza de órfãos permitida.
 
 `ExportPipeline` possui o ciclo de vida da preparação; `ExportExecutor` grava e verifica as saídas nela, e o pipeline garante sua limpeza nos estados terminais tratáveis. `Publisher` segue a transação limitada do [ADR 0006](../adr/0006-publicar-exportacao-com-transacao-limitada.md). Staging no Destino permite substituição atômica por arquivo quando suportada, mas não oferece rollback do conjunto, backup integral ou manifesto persistente.
@@ -195,7 +195,7 @@ Esses stores podem compartilhar uma implementação interna pequena para criar t
 
 Os módulos acima permanecem neutros quanto à implantação para não espalhar detalhes de processo pelo núcleo. O [ADR 0005](../adr/0005-adotar-tauri-react-rust.md) mapeia essa arquitetura para um host independente por Projeto no MVP.
 
-Quando uma operação lógica atravessar processos, a IPC transporta somente valores imutáveis. Entre as cargas possíveis estão intenção consolidada, `RenderSnapshot`, plano de bindings de raiz e `CompositionPlan`. A implementação define quais desses valores realmente cruzam a fronteira e seu esquema concreto. Progresso e cancelamento usam mensagens ou handles limitados à tentativa. Nenhum processo mantém uma segunda cópia mutável do Projeto como fonte canônica.
+Quando uma operação lógica atravessar processos, a IPC transporta somente valores imutáveis. Entre as cargas possíveis estão intenção consolidada, projeções autocontidas derivadas do `RenderSnapshot` e plano de bindings de raiz. O Processador não recebe outra interpretação do Projeto nem invoca `CompositionCore`; o [Contrato do Renderizador final](0019-contrato-do-renderizador-final.md) fixa essa fronteira. A implementação define quais desses valores realmente cruzam o processo e seu esquema concreto. Progresso e cancelamento usam mensagens ou handles limitados à tentativa. Nenhum processo mantém uma segunda cópia mutável do Projeto como fonte canônica.
 
 O baseline aceito é uma aplicação Tauri com Janelas e hosts separados, uma Sessão e um Processador de Imagens isolado por Projeto e um Processador temporário para o lote.
 
@@ -206,7 +206,7 @@ Os testes atravessam as interfaces que representam comportamento observável:
 - comandos aplicados pela interface de sessão do `ProjectCore`, incluindo invariantes, Undo/Redo e mudanças pendentes;
 - carregamento, migração e Salvamento atômico pela interface do `ProjectCore`;
 - autorização de Identidade, movimentação, Cópia externa e `Salvar como` pela superfície pública, sem montar estado local antes do terminal autorizado;
-- casos dourados do `CompositionCore`, reutilizados por prévia e Exportação;
+- casos dourados versionados do `CompositionCore`, reutilizados por prévia e Exportação conforme o [corpus do Renderizador final](../../tests/fixtures/final-renderer-cases-v1.json);
 - propostas sem mutação do `MediaResolver`;
 - invalidação e reconstrução descartável do `CacheEngine`;
 - uma mesma suíte do `ExportPipeline` para Exportação normal e lote, com injeção de falhas antes e durante a Publicação;
@@ -221,7 +221,7 @@ Testes não dependem da quantidade final de crates nem atravessam seams internos
 - transporte e esquema concretos da IPC;
 - formato concreto de `RenderSnapshot`, `CompositionPlan` e patches;
 - algoritmo do Gerador de Layouts;
-- codecs, perfis de cor e implementação do renderizador;
+- biblioteca concreta de codecs/PDF e otimizações internas que preservem o contrato aceito do renderizador;
 - quantidade futura de workers ou paralelismo entre Álbuns;
 - qualquer ampliação do `CommandCatalog` para remapeamento;
 - representações adicionais de Cache sem necessidade medida.

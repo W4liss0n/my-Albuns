@@ -2,7 +2,7 @@
 status: ready-for-agent
 document: product-spec
 implementation-readiness: decision-tickets-required
-updated: 2026-08-19
+updated: 2026-09-01
 ---
 
 # Programa de Diagramação de Álbuns
@@ -386,7 +386,7 @@ A saída final será uma Exportação JPEG, PNG ou PDF, `Por lâmina` ou `Por p�
 1. Como pessoa diagramadora, quero exportar `Por página`, para receber cada lado ativo separadamente.
 1. Como pessoa diagramadora, quero recortar no centro um Frame atravessado durante a Exportação `Por página`, para separar corretamente os dois lados.
 1. Como pessoa diagramadora, quero numerar somente Páginas ativas, para evitar lacunas causadas por lados inativos.
-1. Como pessoa diagramadora, quero nomear JPEGs e PNGs como `{nome-do-projeto}_{índice de três dígitos}`, para obter nomes previsíveis.
+1. Como pessoa diagramadora, quero nomear JPEGs e PNGs como `{nome-do-projeto}_{índice decimal com largura mínima de três dígitos}`, para obter nomes previsíveis também depois de `999`.
 1. Como pessoa diagramadora, quero usar a posição da Lâmina ou a Numeração de Página como índice conforme o modo, para relacionar cada arquivo ao Álbum.
 1. Como pessoa diagramadora, quero que os modos `Por lâmina` e `Por página` compartilhem o mesmo namespace de nomes, para manter a convenção simples mesmo quando o modo não puder ser inferido pelo arquivo.
 1. Como pessoa diagramadora, quero preservar índices globais em uma seleção parcial, para conservar a posição original.
@@ -1030,7 +1030,7 @@ validação das superfícies descritas nesta seção.
 - No modo `Por página`, cada lado ativo gera uma unidade. Frames com Travessia central são recortados exatamente na divisão.
 - Lados inativos não geram arquivo, espaço em branco, número ou lacuna.
 - A Numeração de Página é sequencial somente entre Páginas ativas.
-- JPEG e PNG usam o namespace compartilhado `{nome-do-projeto}_{índice com três dígitos}`. O índice é a posição da Lâmina no modo `Por lâmina` e a Numeração de Página no modo `Por página`; o nome isolado não identifica o modo de origem.
+- JPEG e PNG usam o namespace compartilhado `{nome-do-projeto}_{índice decimal com largura mínima de três dígitos}`. O índice é a posição da Lâmina no modo `Por lâmina` e a Numeração de Página no modo `Por página`; `001` a `999` usam três dígitos e valores maiores crescem sem truncamento. O nome isolado não identifica o modo de origem.
 - Em uma Exportação parcial, índices preservam suas posições originais e não reiniciam em `001`.
 - PDF gera `{nome-do-projeto}.pdf`, com uma página por unidade do modo selecionado.
 - O Destino padrão é uma pasta com o Nome do Projeto ao lado do arquivo do Projeto; o usuário pode escolher outro local.
@@ -1164,7 +1164,7 @@ O [glossário do domínio](../../CONTEXT.md) é normativo somente para o signifi
 - [Garantir sempre um Layout compatível por arranjo de reserva](../adr/0008-garantir-layout-compativel-por-arranjo-de-reserva.md);
 - [Adotar `.myalbuns` como arquivo JSON versionado de Projeto](../adr/0009-adotar-arquivo-myalbuns-json-versionado.md).
 
-A organização reversível de dados locais e o contrato técnico do Cache estão em [Armazenamento local e Cache](../design/0010-armazenamento-local-e-cache.md). O módulo compartilhado, as formas aceitas e os bindings temporários de cada operação estão em [Resolução e política de caminhos](../design/0011-resolucao-e-politica-de-caminhos.md). A propriedade do estado e os módulos de trabalho estão em [Propriedade de estado e módulos do núcleo](../design/0012-propriedade-de-estado-e-modulos-do-nucleo.md).
+A organização reversível de dados locais e o contrato técnico do Cache estão em [Armazenamento local e Cache](../design/0010-armazenamento-local-e-cache.md). O módulo compartilhado, as formas aceitas e os bindings temporários de cada operação estão em [Resolução e política de caminhos](../design/0011-resolucao-e-politica-de-caminhos.md). A propriedade do estado e os módulos de trabalho estão em [Propriedade de estado e módulos do núcleo](../design/0012-propriedade-de-estado-e-modulos-do-nucleo.md). Composição canônica, JPEG, PNG, PDF, captura dos Originais, numeração e corpus dourado estão no [Contrato do Renderizador final](../design/0019-contrato-do-renderizador-final.md).
 
 O envelope `.myalbuns`, o DTO `windowsUtf16` e a política de evolução estão em [Contrato do Arquivo de Projeto v1](../design/0013-contrato-do-arquivo-de-projeto-v1.md). A autoridade de Identidade, o registro da última Localização, o Salvamento atômico e as transições públicas de `Salvar como` estão em [Contrato público de persistência do ProjectCore](../design/0015-contrato-publico-de-persistencia-do-project-core.md).
 
@@ -1177,12 +1177,10 @@ A garantia de Publicação é deliberadamente limitada: todas as saídas são pr
 As funcionalidades abaixo permanecem no produto, mas seus detalhes foram deliberadamente adiados e exigem decisões próprias antes da implementação correspondente:
 
 - algoritmo do Gerador de Layouts, diversidade e ordenação de candidatos e distribuição dos Blocos de Frames;
-- limite numérico da Mudança dimensional segura e transformação exata de geometria, Pan, Zoom e ponto focal;
+- limite numérico da Mudança dimensional segura e eventual ponto focal adicional;
 - formato e resolução da representação visual reduzida, representação concreta dos identificadores de geração/versão, algoritmo de fingerprint e eventual adoção de tiles depois do spike;
-- pipeline de renderização, incluindo qualidade e compressão, perfis de cor, orientação EXIF, tratamento de arquivos TIFF multipágina durante a importação e conversão de medidas físicas em pixels;
 - eventual paralelismo entre itens de lote, somente se medições demonstrarem ganho e preservarem o contrato serial observável;
 - perfis de hardware mínimo e recomendado e metas quantitativas de desempenho, que serão definidos somente após medições reais do spike;
-- comportamento da numeração de arquivos quando uma Exportação ultrapassar o índice `999`;
 - detalhes idiomáticos da implementação de movimentações e Cópias externas, sem alterar a autoridade, a evidência e os estados fechados definidos nos designs aceitos.
 
 O spike executável validou Tauri 2 com React/TypeScript e Rust para a primeira versão e comparou duas topologias: `(A)` um host independente por Projeto e `(B)` um host multiwindow com sessões isoladas. O [ADR 0005](../adr/0005-adotar-tauri-react-rust.md) aceita A: cada Projeto aberto possui seu próprio `MyAlbuns.Project.exe`, enquanto o processo global e o Processador de Imagens conservam responsabilidades separadas. A comparação de memória, GPU, processos, abertura, Canvas, falhas, Recuperação e custo operacional permanece registrada como evidência, não como comportamento do produto.

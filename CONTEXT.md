@@ -414,15 +414,18 @@ Pasta que recebe as saídas publicadas de um Projeto.
 **Formato de exportação**:
 Codificação da saída final, entre JPEG, PNG e PDF.
 
+**Unidade de Exportação**:
+Superfície final correspondente a uma Lâmina ou Página ativa, conforme o modo escolhido, que se torna uma imagem ou uma página do PDF.
+
 **Qualidade JPEG**:
 Nível de compressão usado por uma Exportação JPEG; o lote usa qualidade máxima.
 
 **Nome de imagem exportada**:
-Nome JPEG ou PNG no formato `{Nome do Projeto}_{índice com três dígitos}`, com índice de Lâmina no modo Por lâmina ou de Página no modo Por página.
+Nome JPEG ou PNG no formato `{Nome do Projeto}_{índice decimal com largura mínima de três dígitos}`, com índice de Lâmina no modo Por lâmina ou de Página no modo Por página.
 _Evitar_: Sufixos `lamina` e `pagina`
 
 **Namespace JPEG/PNG da Exportação**:
-Família compartilhada de nomes `{Nome do Projeto}_{NNN}` usada pelos modos Por lâmina e Por página em um mesmo Destino da Exportação. O nome isolado não identifica em qual modo uma saída foi produzida.
+Família compartilhada de nomes `{Nome do Projeto}_{índice decimal com largura mínima de três dígitos}` usada pelos modos Por lâmina e Por página em um mesmo Destino da Exportação. O nome isolado não identifica em qual modo uma saída foi produzida.
 
 **Conflito de exportação**:
 Existência, no Destino da Exportação, de um nome final que também pertence ao conjunto preparado.
