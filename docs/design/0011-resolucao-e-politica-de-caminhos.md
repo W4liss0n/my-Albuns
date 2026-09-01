@@ -75,7 +75,7 @@ let destination = owner_paths.resolve_destination(destination_path)?;
 let root_bindings = owner_paths.freeze()?;
 
 // Quando a fase seguinte existir em outro processo:
-let envelope = export_plan.to_imaging_envelope(render_snapshot, root_bindings.clone())?;
+let envelope = export_plan.into_imaging_envelope(root_bindings.clone())?;
 ipc.send(envelope)?;
 
 // No processo participante:

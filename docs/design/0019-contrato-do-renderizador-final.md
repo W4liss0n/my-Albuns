@@ -48,13 +48,17 @@ proprietário e continua atual.
 
 `RenderSnapshot` é a entrada lógica pública de `ExportPipeline::plan` e a única
 entrada criativa de `MyAlbuns.Imaging.exe`. Depois de validar o snapshot,
-`ExportPipeline` o conserva inteiro em um `ImagingRenderEnvelopeV1` owned e
-versionado; não cria uma segunda projeção criativa capaz de divergir. O wrapper
-acrescenta `selectedUnitIds`, o mesmo `RootBindingPlan` congelado e os valores
-operacionais e de correlação necessários à tentativa. `selectedUnitIds` é uma
+`ExportPipeline` move esse valor inteiro para o `ExportPlan` owned; não cria uma
+segunda projeção criativa capaz de divergir. A conversão do plano para
+`ImagingRenderEnvelopeV1` recebe somente o `RootBindingPlan` congelado: não há
+parâmetro para fornecer ou trocar o snapshot depois do planejamento. O wrapper
+acrescenta o plano de bindings aos `selectedUnitIds` e aos valores operacionais
+e de correlação já possuídos pelo `ExportPlan`. `selectedUnitIds` é uma
 lista ordenada, sem repetição, cujos IDs precisam existir no `CompositionPlan`
 do snapshot. JPEG e PNG selecionam exatamente uma unidade; PDF seleciona uma ou
-mais unidades ordenadas para sua única saída.
+mais unidades ordenadas para sua única saída. A seleção pertence ao
+`PlannedOutput` interno do plano e não pode ser substituída pelo chamador depois
+que suas dependências foram calculadas.
 
 Os demais valores formam um schema fechado: `attemptId` UUID v4 canônico e
 `cancellationId` opaco; `formatOptions` como união marcada
@@ -584,7 +588,11 @@ execute(exportPlan, rootBindingPlan, cancellation, progress) -> ExportResult
 
 `ExportPlanner` valida o snapshot e fecha antes da execução: escopo, modo,
 formato, qualidade, unidades e sua ordem, dependências, todas as raízes, nomes,
-Destino, conflitos e autorização `CreateOnly` ou `ReplaceConfirmed`. Nenhum
+Destino, conflitos e autorização `CreateOnly` ou `ReplaceConfirmed`. O
+`ExportPlan` possui o snapshot exato usado para derivar todos esses valores;
+nem `execute` nem `into_imaging_envelope(rootBindingPlan)` aceitam outro snapshot.
+Assim, um plano da revisão A não pode ser combinado com conteúdo da revisão B,
+mesmo que ambas reutilizem os mesmos IDs. Nenhum
 worker resolve uma raiz tardia. Capturar `RootBindingPlan` e todo I/O que possa
 alcançar disco ou rede ocorre fora da thread da interface.
 
@@ -768,11 +776,13 @@ implementado já é o contrato final:
    criativo completo esperado;
 2. `ComposedOutputUnitV1 + NormalizedSourceV1 -> CanonicalRasterV1` traz a
    projeção imutável, fontes normalizadas e pixels esperados;
-3. `ImagingRenderEnvelopeV1` transporta o `RenderSnapshotV1` completo e liga
-   seus `selectedUnitIds` ao mesmo `RootBindingPlanV1`, à união fechada de
-   formato e opções, à tentativa e seu cancelamento, e à preparação canônica sob
-   o Destino. O schema rejeita documento, Sessão, Cache e qualquer cópia de
-   Revisão, DPI, plano, unidades ou fontes fora do snapshot.
+3. `ExportPlanV1 + RootBindingPlanV1 -> ImagingRenderEnvelopeV1` move o
+   `RenderSnapshotV1` completo já possuído pelo plano e liga seus
+   `selectedUnitIds` ao mesmo plano de bindings, à união fechada de formato e
+   opções, à tentativa e seu cancelamento, e à preparação canônica sob o
+   Destino. A conversão não recebe outro snapshot. O schema rejeita documento,
+   Sessão, Cache e qualquer cópia de Revisão, DPI, plano, unidades ou fontes
+   fora do snapshot.
 
 O primeiro seam prova interpretação, ordem e geometria. O segundo prova a
 matriz Q32.32, centros de pixel, bilinear, alfa premultiplicado, Borda e

@@ -106,7 +106,7 @@ enum GoldenCaseV1 {
     RasterGeometry(RasterGeometryCaseV1),
     Composition(CompositionCaseV1),
     CanonicalRaster(CanonicalRasterCaseV1),
-    ImagingEnvelope(ImagingEnvelopeCaseV1),
+    ImagingEnvelope(Box<ImagingEnvelopeCaseV1>),
     SourceNormalization(SourceNormalizationCaseV1),
     FormatAdapters(Box<FormatAdaptersCaseV1>),
     OutputNames(OutputNamesCaseV1),
@@ -526,7 +526,18 @@ struct ImagingEnvelopeCaseV1 {
     id: String,
     composition_case_id: String,
     canonical_raster_case_id: String,
-    expected_envelope: ImagingRenderEnvelopeV1,
+    export_plan: ExportPlanV1,
+    root_binding_plan: RootBindingPlan,
+    substitution_probe: SnapshotSubstitutionProbeV1,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SnapshotSubstitutionProbeV1 {
+    layer_id: String,
+    replacement_rgb: String,
+    media_id: String,
+    replacement_sha256_full_file_v1: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -538,6 +549,33 @@ struct RenderSnapshotV1 {
     dpi: u32,
     composition_plan: ExpectedCompositionPlanV1,
     sources: Vec<ImagingSourceV1>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ExportPlanV1 {
+    protocol_version: u32,
+    correlation: ImagingCorrelationV1,
+    attempt: ImagingAttemptV1,
+    format_options: ImagingFormatOptionsV1,
+    preparation: ImagingPreparationV1,
+    render_snapshot: RenderSnapshotV1,
+    selected_unit_ids: Vec<String>,
+}
+
+impl ExportPlanV1 {
+    fn into_imaging_envelope(self, root_binding_plan: RootBindingPlan) -> ImagingRenderEnvelopeV1 {
+        ImagingRenderEnvelopeV1 {
+            protocol_version: self.protocol_version,
+            correlation: self.correlation,
+            attempt: self.attempt,
+            format_options: self.format_options,
+            preparation: self.preparation,
+            render_snapshot: self.render_snapshot,
+            selected_unit_ids: self.selected_unit_ids,
+            root_binding_plan,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -2779,7 +2817,7 @@ fn composition_case_ids_are_registered_for_every_contract_adapter() {
 }
 
 #[test]
-fn imaging_envelope_carries_the_complete_snapshot_and_selects_only_known_units() {
+fn export_plan_owns_the_complete_snapshot_used_by_the_imaging_envelope() {
     let corpus = corpus();
     let envelope_case = corpus
         .cases
@@ -2813,7 +2851,42 @@ fn imaging_envelope_carries_the_complete_snapshot_and_selects_only_known_units()
             _ => None,
         })
         .expect("the envelope names its selected canonical output unit");
-    let envelope = &envelope_case.expected_envelope;
+    let planned_snapshot = envelope_case.export_plan.render_snapshot.clone();
+    let mut substitute_snapshot = planned_snapshot.clone();
+    let substitute_layer = substitute_snapshot
+        .composition_plan
+        .sheets
+        .iter_mut()
+        .flat_map(|sheet| sheet.ordered_layers.iter_mut())
+        .find_map(|layer| match layer {
+            PlannedLayerV1::Base(base)
+                if base.layer_id == envelope_case.substitution_probe.layer_id =>
+            {
+                Some(base)
+            }
+            _ => None,
+        })
+        .expect("the substitution probe names one planned layer");
+    substitute_layer.rgb = envelope_case.substitution_probe.replacement_rgb.clone();
+    let substitute_source = substitute_snapshot
+        .sources
+        .iter_mut()
+        .find(|source| source.media_ref.media_id == envelope_case.substitution_probe.media_id)
+        .expect("the substitution probe names one snapshot source");
+    substitute_source.source_observation.sha256_full_file_v1 = envelope_case
+        .substitution_probe
+        .replacement_sha256_full_file_v1
+        .clone();
+    assert_eq!(substitute_snapshot.project_id, planned_snapshot.project_id);
+    assert_eq!(substitute_snapshot.revision, planned_snapshot.revision);
+    assert_ne!(substitute_snapshot, planned_snapshot);
+
+    let envelope = envelope_case
+        .export_plan
+        .clone()
+        .into_imaging_envelope(envelope_case.root_binding_plan.clone());
+    assert_eq!(envelope.render_snapshot, planned_snapshot);
+    assert_ne!(envelope.render_snapshot, substitute_snapshot);
     let RasterOriginV1::CompositionFrame(raster_origin) = &raster.origin else {
         panic!("the selected envelope unit must remain linked to a composition");
     };
@@ -2860,7 +2933,7 @@ fn imaging_envelope_carries_the_complete_snapshot_and_selects_only_known_units()
             .iter()
             .all(|unit_id| snapshot_unit_ids.contains(unit_id.as_str()))
     );
-    assert!(imaging_selection_is_valid(envelope));
+    assert!(imaging_selection_is_valid(&envelope));
 
     let destination_directory = Path::new(r"C:\Export");
     let attempt_directory = destination_directory.join(format!(
@@ -3028,14 +3101,52 @@ fn imaging_envelope_carries_the_complete_snapshot_and_selects_only_known_units()
     let raw_corpus: serde_json::Value =
         serde_json::from_slice(&fs::read(corpus_path).expect("the raw corpus is readable"))
             .expect("the raw corpus is valid JSON");
-    let raw_envelope = raw_corpus["cases"]
+    let raw_envelope_case = raw_corpus["cases"]
         .as_array()
         .expect("cases is an array")
         .iter()
         .find(|case| case["kind"] == "imaging-envelope")
-        .and_then(|case| case["data"].get("expectedEnvelope"))
-        .expect("the raw Imaging envelope exists")
+        .and_then(|case| case.get("data"))
+        .expect("the raw Imaging envelope case exists");
+    let raw_export_plan = raw_envelope_case
+        .get("exportPlan")
+        .expect("the raw ExportPlan exists")
         .clone();
+    let raw_root_binding_plan = raw_envelope_case
+        .get("rootBindingPlan")
+        .expect("the raw RootBindingPlan exists")
+        .clone();
+    let parsed_export_plan: ExportPlanV1 = serde_json::from_value(raw_export_plan.clone())
+        .expect("the closed ExportPlan owns its RenderSnapshot");
+    let mut raw_envelope = raw_export_plan.clone();
+    raw_envelope
+        .as_object_mut()
+        .expect("the ExportPlan is an object")
+        .insert("rootBindingPlan".to_owned(), raw_root_binding_plan);
+    let parsed_wire_envelope: ImagingRenderEnvelopeV1 =
+        serde_json::from_value(raw_envelope.clone())
+            .expect("the wire envelope is derived from ExportPlan plus RootBindingPlan");
+    assert_eq!(
+        parsed_export_plan.into_imaging_envelope(envelope_case.root_binding_plan.clone()),
+        parsed_wire_envelope
+    );
+    assert_eq!(parsed_wire_envelope, envelope);
+
+    let mut export_plan_with_late_snapshot = raw_export_plan.clone();
+    export_plan_with_late_snapshot
+        .as_object_mut()
+        .expect("the ExportPlan is an object")
+        .insert("lateRenderSnapshot".to_owned(), serde_json::Value::Null);
+    assert!(serde_json::from_value::<ExportPlanV1>(export_plan_with_late_snapshot).is_err());
+    let mut export_plan_with_early_bindings = raw_export_plan.clone();
+    export_plan_with_early_bindings
+        .as_object_mut()
+        .expect("the ExportPlan is an object")
+        .insert(
+            "rootBindingPlan".to_owned(),
+            raw_envelope["rootBindingPlan"].clone(),
+        );
+    assert!(serde_json::from_value::<ExportPlanV1>(export_plan_with_early_bindings).is_err());
     for forbidden_field in [
         "projectDocument",
         "compositionPlan",

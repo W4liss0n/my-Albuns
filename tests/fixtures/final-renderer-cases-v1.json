@@ -938,7 +938,7 @@
         "id": "imaging-envelope-right-page",
         "compositionCaseId": "fractional-transform-z-order-and-page-units",
         "canonicalRasterCaseId": "right-page-crossing-frame-q32",
-        "expectedEnvelope": {
+        "exportPlan": {
             "protocolVersion": 1,
             "correlation": { "requestId": "render-contract-0001" },
             "attempt": { "attemptId": "00000000-0000-4000-8000-000000000017", "cancellationId": "cancel-render-contract-0001" },
@@ -1221,16 +1221,22 @@
                 }
               ]
             },
-            "selectedUnitIds": ["sheet-1:right"],
-            "rootBindingPlan": {
-              "bindings": [
-                {
-                  "kind": "disk",
-                  "logicalRoot": { "encoding": "windowsUtf16", "units": [67, 58, 92] },
-                  "operationalRoot": { "encoding": "windowsUtf16", "units": [67, 58, 92] }
-                }
-              ]
-            }
+            "selectedUnitIds": ["sheet-1:right"]
+          },
+          "rootBindingPlan": {
+            "bindings": [
+              {
+                "kind": "disk",
+                "logicalRoot": { "encoding": "windowsUtf16", "units": [67, 58, 92] },
+                "operationalRoot": { "encoding": "windowsUtf16", "units": [67, 58, 92] }
+              }
+            ]
+          },
+          "substitutionProbe": {
+            "layerId": "base",
+            "replacementRgb": "#FEFEFE",
+            "mediaId": "photo-frac",
+            "replacementSha256FullFileV1": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           }
       }
     },

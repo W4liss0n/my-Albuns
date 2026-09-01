@@ -135,13 +135,13 @@ Nenhum outro resultado confirma ausência. A assimetria é deliberada e segue o 
 
 `ExportPipeline` possui uma interface em duas etapas porque as dependências precisam ser conhecidas antes de capturar caminhos:
 
-1. `plan(snapshot, options)` recebe um `RenderSnapshot` imutável e devolve um `ExportPlan` com unidades, dependências e raízes necessárias;
+1. `plan(snapshot, options)` recebe um `RenderSnapshot` imutável e devolve um `ExportPlan` que possui esse snapshot exato, além das unidades, dependências e raízes necessárias; o snapshot não volta a ser parâmetro em nenhuma etapa posterior;
 2. o proprietário resolve essas raízes em seu `OperationPathContext` e o congela em `RootBindingPlan`;
 3. `execute(export_plan, root_bindings, cancellation, progress)` executa a tentativa sem redescobrir raízes já capturadas.
 
 Sua implementação possui três fases internas:
 
-1. `ExportPlanner` calcula unidades, dependências, raízes, nomes, conflitos e plano de saída;
+1. `ExportPlanner` calcula unidades, dependências, raízes, nomes, conflitos e plano de saída, movendo o snapshot validado para dentro do `ExportPlan`;
 2. `ExportExecutor` captura os Originais e consome somente as unidades derivadas do `RenderSnapshot` já composto, renderiza e verifica a preparação;
 3. `Publisher` promove arquivos aos nomes finais e executa a limpeza de órfãos permitida.
 
@@ -195,7 +195,7 @@ Esses stores podem compartilhar uma implementação interna pequena para criar t
 
 Os módulos acima permanecem neutros quanto à implantação para não espalhar detalhes de processo pelo núcleo. O [ADR 0005](../adr/0005-adotar-tauri-react-rust.md) mapeia essa arquitetura para um host independente por Projeto no MVP.
 
-Quando uma operação lógica atravessar processos, a IPC transporta somente valores imutáveis. Para renderização, a carga é um envelope autocontido que leva o `RenderSnapshot` validado inteiro e o mesmo plano de bindings de raiz; o documento bruto, a Sessão e o Cache não atravessam essa fronteira. O Processador consome o `CompositionPlan` já contido no snapshot, não interpreta novamente o Projeto nem invoca `CompositionCore`; o [Contrato do Renderizador final](0019-contrato-do-renderizador-final.md) fixa os campos e invariantes semânticos desse envelope. Progresso e cancelamento usam mensagens ou handles limitados à tentativa. Nenhum processo mantém uma segunda cópia mutável do Projeto como fonte canônica.
+Quando uma operação lógica atravessar processos, a IPC transporta somente valores imutáveis. Para renderização, o `ExportPlan` já possui o `RenderSnapshot` validado inteiro, e sua conversão para o envelope recebe somente o mesmo plano de bindings de raiz; não existe parâmetro capaz de trocar o snapshot depois do planejamento. O documento bruto, a Sessão e o Cache não atravessam essa fronteira. O Processador consome o `CompositionPlan` já contido no snapshot, não interpreta novamente o Projeto nem invoca `CompositionCore`; o [Contrato do Renderizador final](0019-contrato-do-renderizador-final.md) fixa os campos e invariantes semânticos desse envelope. Progresso e cancelamento usam mensagens ou handles limitados à tentativa. Nenhum processo mantém uma segunda cópia mutável do Projeto como fonte canônica.
 
 O baseline aceito é uma aplicação Tauri com Janelas e hosts separados, uma Sessão e um Processador de Imagens isolado por Projeto e um Processador temporário para o lote.
 
