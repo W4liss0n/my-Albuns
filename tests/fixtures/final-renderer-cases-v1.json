@@ -1,0 +1,1664 @@
+{
+  "schemaVersion": 1,
+  "contract": "docs/design/0019-contrato-do-renderizador-final.md",
+  "algorithms": {
+    "fixedPoint": "q32.32-round-half-away-v1",
+    "sampler": "bilinear-premultiplied-q16-v1",
+    "alphaComposite": "porter-duff-source-over-u8-half-up-v1",
+    "rasterEdge": "floor((micrometers*dpi+12700)/25400)"
+  },
+  "assets": [
+    {
+      "id": "jpeg-orientation-6-2x1",
+      "relativePath": "tests/fixtures/final-renderer-assets/orientation-6-2x1.jpg.hex",
+      "encoding": "hex",
+      "decodedByteLength": 720,
+      "sha256": "fb8e5f14e418956f1aebe2b0e3af7bde9fd0f0541def5dbc26c4ac480f8e767d",
+      "descriptor": {
+        "kind": "jpeg",
+        "data": {
+          "encodedWidthPx": 2,
+          "encodedHeightPx": 1,
+          "exifOrientation": 6
+        }
+      }
+    },
+    {
+      "id": "png-rgba-2x2",
+      "relativePath": "tests/fixtures/final-renderer-assets/rgba-2x2.png.hex",
+      "encoding": "hex",
+      "decodedByteLength": 170,
+      "sha256": "5bbf46acb3dac92136a6ffbb13f9e144835703cbc776c55479da7fc8bf7f0b43",
+      "descriptor": {
+        "kind": "png",
+        "data": {
+          "encodedWidthPx": 2,
+          "encodedHeightPx": 2,
+          "hasAlpha": true
+        }
+      }
+    },
+    {
+      "id": "tiff-associated-rgba16-1x1",
+      "relativePath": "tests/fixtures/final-renderer-assets/associated-rgba16-1x1.tiff.hex",
+      "encoding": "hex",
+      "decodedByteLength": 174,
+      "sha256": "96254059ce255f3bdd69f634c57081a3060db076dc77f5116a693748a3bf49de",
+      "descriptor": {
+        "kind": "tiff",
+        "data": {
+          "widthPx": 1,
+          "heightPx": 1,
+          "bitsPerSample": [16, 16, 16, 16],
+          "samplesPerPixel": 4,
+          "photometric": 2,
+          "extraSamples": [1]
+        }
+      }
+    },
+    {
+      "id": "tiff-unassociated-graya16-1x1",
+      "relativePath": "tests/fixtures/final-renderer-assets/unassociated-graya16-1x1.tiff.hex",
+      "encoding": "hex",
+      "decodedByteLength": 162,
+      "sha256": "b1ceaa91e92401adea2be786339b458587e640f6d1e8d7d5d76af384a6d3833e",
+      "descriptor": {
+        "kind": "tiff",
+        "data": {
+          "widthPx": 1,
+          "heightPx": 1,
+          "bitsPerSample": [16, 16],
+          "samplesPerPixel": 2,
+          "photometric": 1,
+          "extraSamples": [2]
+        }
+      }
+    },
+    {
+      "id": "tiff-missing-extra-rgba8-1x1",
+      "relativePath": "tests/fixtures/final-renderer-assets/missing-extra-rgba8-1x1.tiff.hex",
+      "encoding": "hex",
+      "decodedByteLength": 158,
+      "sha256": "81eb286213ee05607077709503257e1200cc95a2036670d5aeb1f6cd2346f07f",
+      "descriptor": {
+        "kind": "tiff",
+        "data": {
+          "widthPx": 1,
+          "heightPx": 1,
+          "bitsPerSample": [8, 8, 8, 8],
+          "samplesPerPixel": 4,
+          "photometric": 2,
+          "extraSamples": []
+        }
+      }
+    }
+  ],
+  "cases": [
+    {
+      "kind": "raster-geometry",
+      "data": {
+        "id": "odd-width-independent-pages",
+        "input": {
+          "sheetWidthUm": 600000,
+          "sheetHeightUm": 300000,
+          "pageWidthUm": 300000,
+          "dpi": 300
+        },
+        "expected": {
+          "sheetWidthPx": 7087,
+          "sheetHeightPx": 3543,
+          "centerEdgePx": 3543,
+          "leftIntervalPx": [0, 3543],
+          "rightIntervalPx": [3543, 7087],
+          "independentPageWidthPx": 3543,
+          "independentPageHeightPx": 3543
+        }
+      }
+    },
+    {
+      "kind": "composition",
+      "data": {
+        "id": "fractional-transform-z-order-and-page-units",
+        "adapterRegistrations": ["composition-core", "canvas", "export-pipeline"],
+        "input": {
+          "creativeState": {
+            "revision": 7,
+            "dpi": 4,
+            "mediaRefs": [
+              {
+                "mediaId": "decorative-checker",
+                "nativePath": { "encoding": "windowsUtf16", "units": [67, 58, 92, 70, 111, 116, 111, 115, 92, 100, 101, 99, 111, 114, 97, 116, 105, 118, 111, 46, 112, 110, 103] }
+              },
+              {
+                "mediaId": "photo-frac",
+                "nativePath": { "encoding": "windowsUtf16", "units": [67, 58, 92, 70, 111, 116, 111, 115, 92, 102, 114, 97, 231, 227, 111, 46, 112, 110, 103] }
+              },
+              {
+                "mediaId": "photo-opaque",
+                "nativePath": { "encoding": "windowsUtf16", "units": [68, 58, 92, 65, 114, 99, 104, 105, 118, 101, 92, 111, 112, 97, 113, 117, 101, 46, 112, 110, 103] }
+              },
+              {
+                "mediaId": "photo-blue",
+                "nativePath": { "encoding": "windowsUtf16", "units": [67, 58, 92, 70, 111, 116, 111, 115, 92, 98, 108, 117, 101, 46, 112, 110, 103] }
+              }
+            ],
+            "sheets": [
+              {
+                "sheetId": "sheet-1",
+                "number": 1,
+                "activeSides": "both",
+                "widthUm": 29210,
+                "heightUm": 25400,
+                "background": {
+                  "scope": "both",
+                  "both": { "kind": "image", "data": { "mediaId": "decorative-checker" } }
+                },
+                "frames": [
+                  {
+                    "frameId": "00000000-0000-4000-8000-000000000002",
+                    "zIndex": 5,
+                    "rectUm": [6350, 0, 22860, 25400],
+                    "photo": {
+                      "mediaId": "photo-frac",
+                      "transform": {
+                        "quarterTurnsCcw": 1,
+                        "fineAngleTenths": 150,
+                        "mirrorHorizontal": true,
+                        "userZoomMillionths": 1250000,
+                        "panXMillionths": 250000,
+                        "panYMillionths": -500000,
+                        "blackAndWhite": true
+                      }
+                    },
+                    "style": {
+                      "borderWidthUm": 1270,
+                      "borderRgb": "#FFFF00",
+                      "opacityPercent": 50
+                    }
+                  },
+                  {
+                    "frameId": "00000000-0000-4000-8000-000000000003",
+                    "zIndex": 1,
+                    "rectUm": [22860, 6350, 6350, 12700],
+                    "photo": {
+                      "mediaId": "photo-blue",
+                      "transform": {
+                        "quarterTurnsCcw": 0,
+                        "fineAngleTenths": 0,
+                        "mirrorHorizontal": false,
+                        "userZoomMillionths": 1000000,
+                        "panXMillionths": 0,
+                        "panYMillionths": 0,
+                        "blackAndWhite": false
+                      }
+                    },
+                    "style": {
+                      "borderWidthUm": 0,
+                      "borderRgb": "#000000",
+                      "opacityPercent": 100
+                    }
+                  },
+                  {
+                    "frameId": "00000000-0000-4000-8000-000000000001",
+                    "zIndex": 5,
+                    "rectUm": [0, 6350, 12700, 12700],
+                    "photo": {
+                      "mediaId": "photo-opaque",
+                      "transform": {
+                        "quarterTurnsCcw": 0,
+                        "fineAngleTenths": 0,
+                        "mirrorHorizontal": false,
+                        "userZoomMillionths": 1000000,
+                        "panXMillionths": 0,
+                        "panYMillionths": 0,
+                        "blackAndWhite": false
+                      }
+                    },
+                    "style": {
+                      "borderWidthUm": 0,
+                      "borderRgb": "#000000",
+                      "opacityPercent": 100
+                    }
+                  }
+                ],
+                "overlay": {
+                  "scope": "per-side",
+                  "left": { "mediaId": "decorative-checker" },
+                  "right": null
+                }
+              }
+            ]
+          },
+          "sourceGeometryFacts": [
+            {
+              "mediaId": "decorative-checker",
+              "nativePath": { "encoding": "windowsUtf16", "units": [67, 58, 92, 70, 111, 116, 111, 115, 92, 100, 101, 99, 111, 114, 97, 116, 105, 118, 111, 46, 112, 110, 103] },
+              "orientedWidthPx": 2,
+              "orientedHeightPx": 2,
+              "appliedOrientation": 1
+            },
+            {
+              "mediaId": "photo-frac",
+              "nativePath": { "encoding": "windowsUtf16", "units": [67, 58, 92, 70, 111, 116, 111, 115, 92, 102, 114, 97, 231, 227, 111, 46, 112, 110, 103] },
+              "orientedWidthPx": 2,
+              "orientedHeightPx": 2,
+              "appliedOrientation": 1
+            },
+            {
+              "mediaId": "photo-opaque",
+              "nativePath": { "encoding": "windowsUtf16", "units": [68, 58, 92, 65, 114, 99, 104, 105, 118, 101, 92, 111, 112, 97, 113, 117, 101, 46, 112, 110, 103] },
+              "orientedWidthPx": 1,
+              "orientedHeightPx": 1,
+              "appliedOrientation": 1
+            },
+            {
+              "mediaId": "photo-blue",
+              "nativePath": { "encoding": "windowsUtf16", "units": [67, 58, 92, 70, 111, 116, 111, 115, 92, 98, 108, 117, 101, 46, 112, 110, 103] },
+              "orientedWidthPx": 1,
+              "orientedHeightPx": 1,
+              "appliedOrientation": 1
+            }
+          ],
+          "sourceObservations": [
+            {
+              "mediaId": "decorative-checker",
+              "nativePath": { "encoding": "windowsUtf16", "units": [67, 58, 92, 70, 111, 116, 111, 115, 92, 100, 101, 99, 111, 114, 97, 116, 105, 118, 111, 46, 112, 110, 103] },
+              "detectedFormat": "png",
+              "sourceVariant": "png-static-rgba8",
+              "encodedWidthPx": 2,
+              "encodedHeightPx": 2,
+              "orientedWidthPx": 2,
+              "orientedHeightPx": 2,
+              "embeddedOrientation": 6,
+              "appliedOrientation": 1,
+              "colorProfile": "absent-assume-srgb",
+              "sha256FullFileV1": "5bbf46acb3dac92136a6ffbb13f9e144835703cbc776c55479da7fc8bf7f0b43"
+            },
+            {
+              "mediaId": "photo-frac",
+              "nativePath": { "encoding": "windowsUtf16", "units": [67, 58, 92, 70, 111, 116, 111, 115, 92, 102, 114, 97, 231, 227, 111, 46, 112, 110, 103] },
+              "detectedFormat": "png",
+              "sourceVariant": "png-static-rgba8",
+              "encodedWidthPx": 2,
+              "encodedHeightPx": 2,
+              "orientedWidthPx": 2,
+              "orientedHeightPx": 2,
+              "embeddedOrientation": 1,
+              "appliedOrientation": 1,
+              "colorProfile": "absent-assume-srgb",
+              "sha256FullFileV1": "2222222222222222222222222222222222222222222222222222222222222222"
+            },
+            {
+              "mediaId": "photo-opaque",
+              "nativePath": { "encoding": "windowsUtf16", "units": [68, 58, 92, 65, 114, 99, 104, 105, 118, 101, 92, 111, 112, 97, 113, 117, 101, 46, 112, 110, 103] },
+              "detectedFormat": "jpeg",
+              "sourceVariant": "jpeg-baseline-rgb8",
+              "encodedWidthPx": 1,
+              "encodedHeightPx": 1,
+              "orientedWidthPx": 1,
+              "orientedHeightPx": 1,
+              "embeddedOrientation": 1,
+              "appliedOrientation": 1,
+              "colorProfile": "absent-assume-srgb",
+              "sha256FullFileV1": "3333333333333333333333333333333333333333333333333333333333333333"
+            },
+            {
+              "mediaId": "photo-blue",
+              "nativePath": { "encoding": "windowsUtf16", "units": [67, 58, 92, 70, 111, 116, 111, 115, 92, 98, 108, 117, 101, 46, 112, 110, 103] },
+              "detectedFormat": "jpeg",
+              "sourceVariant": "jpeg-baseline-rgb8",
+              "encodedWidthPx": 1,
+              "encodedHeightPx": 1,
+              "orientedWidthPx": 1,
+              "orientedHeightPx": 1,
+              "embeddedOrientation": 1,
+              "appliedOrientation": 1,
+              "colorProfile": "absent-assume-srgb",
+              "sha256FullFileV1": "4444444444444444444444444444444444444444444444444444444444444444"
+            }
+          ]
+        },
+        "expectedPlan": {
+          "planVersion": 1,
+          "revision": 7,
+          "dpi": 4,
+          "referencedMediaIds": ["decorative-checker", "photo-blue", "photo-frac", "photo-opaque"],
+          "sheets": [
+            {
+              "sheetId": "sheet-1",
+              "surfaceRectUm": [0, 0, 29210, 25400],
+              "orderedLayers": [
+                {
+                  "kind": "base",
+                  "data": {
+                    "layerId": "base",
+                    "rectUm": [0, 0, 29210, 25400],
+                    "rgb": "#FFFFFF"
+                  }
+                },
+                {
+                  "kind": "background",
+                  "data": {
+                    "layerId": "background:both",
+                    "scope": "both",
+                    "rectUm": [0, 0, 29210, 25400],
+                    "paint": {
+                      "kind": "image",
+                      "data": {
+                        "mediaId": "decorative-checker",
+                        "orientedWidthPx": 2,
+                        "orientedHeightPx": 2,
+                        "appliedOrientation": 1,
+                        "sourceFromPhysicalQ32": {
+                          "xx": "294075", "xy": "0", "tx": "0",
+                          "yx": "0", "yy": "338186", "ty": "0"
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "kind": "frame-group",
+                  "data": {
+                    "layerId": "frame:00000000-0000-4000-8000-000000000003",
+                    "frameId": "00000000-0000-4000-8000-000000000003",
+                    "zIndex": 1,
+                    "frameRectUm": [22860, 6350, 6350, 12700],
+                    "photoClipRectUm": [22860, 6350, 6350, 12700],
+                    "borderFillRectsUm": [],
+                    "borderRgb": "#000000",
+                    "groupOpacityByte": 255,
+                    "photo": {
+                      "mediaId": "photo-blue",
+                      "orientedWidthPx": 1,
+                      "orientedHeightPx": 1,
+                      "appliedOrientation": 1,
+                      "transform": {
+                        "quarterTurnsCcw": 0,
+                        "fineAngleTenths": 0,
+                        "mirrorHorizontal": false,
+                        "userZoomMillionths": 1000000,
+                        "panXMillionths": 0,
+                        "panYMillionths": 0,
+                        "blackAndWhite": false
+                      },
+                      "sampler": "bilinear-premultiplied-q16-v1",
+                      "physicalFromSourceQ32": {
+                        "xx": "54546084659200", "xy": "0", "tx": "84546431221760",
+                        "yx": "0", "yy": "54546084659200", "ty": "27273042329600"
+                      },
+                      "sourceFromPhysicalQ32": {
+                        "xx": "338186", "xy": "0", "tx": "-6657188862",
+                        "yx": "0", "yy": "338186", "ty": "-2147478552"
+                      }
+                    }
+                  }
+                },
+                {
+                  "kind": "frame-group",
+                  "data": {
+                    "layerId": "frame:00000000-0000-4000-8000-000000000001",
+                    "frameId": "00000000-0000-4000-8000-000000000001",
+                    "zIndex": 5,
+                    "frameRectUm": [0, 6350, 12700, 12700],
+                    "photoClipRectUm": [0, 6350, 12700, 12700],
+                    "borderFillRectsUm": [],
+                    "borderRgb": "#000000",
+                    "groupOpacityByte": 255,
+                    "photo": {
+                      "mediaId": "photo-opaque",
+                      "orientedWidthPx": 1,
+                      "orientedHeightPx": 1,
+                      "appliedOrientation": 1,
+                      "transform": {
+                        "quarterTurnsCcw": 0,
+                        "fineAngleTenths": 0,
+                        "mirrorHorizontal": false,
+                        "userZoomMillionths": 1000000,
+                        "panXMillionths": 0,
+                        "panYMillionths": 0,
+                        "blackAndWhite": false
+                      },
+                      "sampler": "bilinear-premultiplied-q16-v1",
+                      "physicalFromSourceQ32": {
+                        "xx": "54546084659200", "xy": "0", "tx": "0",
+                        "yx": "0", "yy": "54546084659200", "ty": "27273042329600"
+                      },
+                      "sourceFromPhysicalQ32": {
+                        "xx": "338186", "xy": "0", "tx": "2548",
+                        "yx": "0", "yy": "338186", "ty": "-2147478552"
+                      }
+                    }
+                  }
+                },
+                {
+                  "kind": "frame-group",
+                  "data": {
+                    "layerId": "frame:00000000-0000-4000-8000-000000000002",
+                    "frameId": "00000000-0000-4000-8000-000000000002",
+                    "zIndex": 5,
+                    "frameRectUm": [6350, 0, 22860, 25400],
+                    "photoClipRectUm": [7620, 1270, 20320, 22860],
+                    "borderFillRectsUm": [
+                      [6350, 0, 22860, 1270],
+                      [6350, 24130, 22860, 1270],
+                      [6350, 1270, 1270, 22860],
+                      [27940, 1270, 1270, 22860]
+                    ],
+                    "borderRgb": "#FFFF00",
+                    "groupOpacityByte": 128,
+                    "photo": {
+                      "mediaId": "photo-frac",
+                      "orientedWidthPx": 2,
+                      "orientedHeightPx": 2,
+                      "appliedOrientation": 1,
+                      "transform": {
+                        "quarterTurnsCcw": 1,
+                        "fineAngleTenths": 150,
+                        "mirrorHorizontal": true,
+                        "userZoomMillionths": 1250000,
+                        "panXMillionths": 250000,
+                        "panYMillionths": -500000,
+                        "blackAndWhite": true
+                      },
+                      "sampler": "bilinear-premultiplied-q16-v1",
+                      "physicalFromSourceQ32": {
+                        "xx": "18994981137010", "xy": "-70890234706423", "tx": "118358216131872",
+                        "yx": "-70890234706423", "yy": "-18994981137010", "ty": "143285418197439"
+                      },
+                      "sourceFromPhysicalQ32": {
+                        "xx": "65054", "xy": "-242784", "tx": "6306864609",
+                        "yx": "-242784", "yy": "-65054", "ty": "8860785687"
+                      }
+                    }
+                  }
+                },
+                {
+                  "kind": "overlay",
+                  "data": {
+                    "layerId": "overlay:left",
+                    "scope": "left",
+                    "rectUm": [0, 0, 14605, 25400],
+                    "paint": {
+                      "kind": "image",
+                      "data": {
+                        "mediaId": "decorative-checker",
+                        "orientedWidthPx": 2,
+                        "orientedHeightPx": 2,
+                        "appliedOrientation": 1,
+                        "sourceFromPhysicalQ32": {
+                          "xx": "588150", "xy": "0", "tx": "0",
+                          "yx": "0", "yy": "338186", "ty": "0"
+                        }
+                      }
+                    }
+                  }
+                }
+              ],
+              "outputUnits": [
+                {
+                  "unitId": "sheet-1:spread",
+                  "mode": "per-sheet",
+                  "logicalIndex": 1,
+                  "physicalSourceRectUm": [0, 0, 29210, 25400],
+                  "normalizedOriginUm": [0, 0],
+                  "widthPx": 5,
+                  "heightPx": 4
+                },
+                {
+                  "unitId": "sheet-1:left",
+                  "mode": "per-page",
+                  "logicalIndex": 1,
+                  "physicalSourceRectUm": [0, 0, 14605, 25400],
+                  "normalizedOriginUm": [0, 0],
+                  "widthPx": 2,
+                  "heightPx": 4
+                },
+                {
+                  "unitId": "sheet-1:right",
+                  "mode": "per-page",
+                  "logicalIndex": 2,
+                  "physicalSourceRectUm": [14605, 0, 14605, 25400],
+                  "normalizedOriginUm": [0, 0],
+                  "widthPx": 2,
+                  "heightPx": 4
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "kind": "composition",
+      "data": {
+        "id": "single-active-edge-pages",
+        "adapterRegistrations": ["composition-core", "canvas", "export-pipeline"],
+        "input": {
+          "creativeState": {
+            "revision": 8,
+            "dpi": 4,
+            "mediaRefs": [],
+            "sheets": [
+              {
+                "sheetId": "edge-initial",
+                "number": 1,
+                "activeSides": "right",
+                "widthUm": 50800,
+                "heightUm": 25400,
+                "background": {
+                  "scope": "per-side",
+                  "left": { "kind": "solid", "data": { "rgb": "#FF0000" } },
+                  "right": { "kind": "solid", "data": { "rgb": "#0000FF" } }
+                },
+                "frames": [],
+                "overlay": { "scope": "per-side", "left": null, "right": null }
+              },
+              {
+                "sheetId": "edge-internal",
+                "number": 2,
+                "activeSides": "both",
+                "widthUm": 50800,
+                "heightUm": 25400,
+                "background": {
+                  "scope": "per-side",
+                  "left": { "kind": "solid", "data": { "rgb": "#00FF00" } },
+                  "right": { "kind": "solid", "data": { "rgb": "#FF00FF" } }
+                },
+                "frames": [],
+                "overlay": { "scope": "per-side", "left": null, "right": null }
+              },
+              {
+                "sheetId": "edge-final",
+                "number": 3,
+                "activeSides": "left",
+                "widthUm": 50800,
+                "heightUm": 25400,
+                "background": {
+                  "scope": "per-side",
+                  "left": { "kind": "solid", "data": { "rgb": "#FFFF00" } },
+                  "right": { "kind": "solid", "data": { "rgb": "#00FFFF" } }
+                },
+                "frames": [],
+                "overlay": { "scope": "per-side", "left": null, "right": null }
+              }
+            ]
+          },
+          "sourceGeometryFacts": [],
+          "sourceObservations": []
+        },
+        "expectedPlan": {
+          "planVersion": 1,
+          "revision": 8,
+          "dpi": 4,
+          "referencedMediaIds": [],
+          "sheets": [
+            {
+              "sheetId": "edge-initial",
+              "surfaceRectUm": [0, 0, 25400, 25400],
+              "orderedLayers": [
+                {
+                  "kind": "base",
+                  "data": { "layerId": "base", "rectUm": [0, 0, 25400, 25400], "rgb": "#FFFFFF" }
+                },
+                {
+                  "kind": "background",
+                  "data": {
+                    "layerId": "background:right",
+                    "scope": "right",
+                    "rectUm": [0, 0, 25400, 25400],
+                    "paint": { "kind": "solid", "data": { "rgb": "#0000FF" } }
+                  }
+                }
+              ],
+              "outputUnits": [
+                {
+                  "unitId": "edge-initial:spread",
+                  "mode": "per-sheet",
+                  "logicalIndex": 1,
+                  "physicalSourceRectUm": [0, 0, 25400, 25400],
+                  "normalizedOriginUm": [0, 0],
+                  "widthPx": 4,
+                  "heightPx": 4
+                },
+                {
+                  "unitId": "edge-initial:right",
+                  "mode": "per-page",
+                  "logicalIndex": 1,
+                  "physicalSourceRectUm": [0, 0, 25400, 25400],
+                  "normalizedOriginUm": [0, 0],
+                  "widthPx": 4,
+                  "heightPx": 4
+                }
+              ]
+            },
+            {
+              "sheetId": "edge-internal",
+              "surfaceRectUm": [0, 0, 50800, 25400],
+              "orderedLayers": [
+                {
+                  "kind": "base",
+                  "data": { "layerId": "base", "rectUm": [0, 0, 50800, 25400], "rgb": "#FFFFFF" }
+                },
+                {
+                  "kind": "background",
+                  "data": {
+                    "layerId": "background:left",
+                    "scope": "left",
+                    "rectUm": [0, 0, 25400, 25400],
+                    "paint": { "kind": "solid", "data": { "rgb": "#00FF00" } }
+                  }
+                },
+                {
+                  "kind": "background",
+                  "data": {
+                    "layerId": "background:right",
+                    "scope": "right",
+                    "rectUm": [25400, 0, 25400, 25400],
+                    "paint": { "kind": "solid", "data": { "rgb": "#FF00FF" } }
+                  }
+                }
+              ],
+              "outputUnits": [
+                {
+                  "unitId": "edge-internal:spread",
+                  "mode": "per-sheet",
+                  "logicalIndex": 2,
+                  "physicalSourceRectUm": [0, 0, 50800, 25400],
+                  "normalizedOriginUm": [0, 0],
+                  "widthPx": 8,
+                  "heightPx": 4
+                },
+                {
+                  "unitId": "edge-internal:left",
+                  "mode": "per-page",
+                  "logicalIndex": 2,
+                  "physicalSourceRectUm": [0, 0, 25400, 25400],
+                  "normalizedOriginUm": [0, 0],
+                  "widthPx": 4,
+                  "heightPx": 4
+                },
+                {
+                  "unitId": "edge-internal:right",
+                  "mode": "per-page",
+                  "logicalIndex": 3,
+                  "physicalSourceRectUm": [25400, 0, 25400, 25400],
+                  "normalizedOriginUm": [0, 0],
+                  "widthPx": 4,
+                  "heightPx": 4
+                }
+              ]
+            },
+            {
+              "sheetId": "edge-final",
+              "surfaceRectUm": [0, 0, 25400, 25400],
+              "orderedLayers": [
+                {
+                  "kind": "base",
+                  "data": { "layerId": "base", "rectUm": [0, 0, 25400, 25400], "rgb": "#FFFFFF" }
+                },
+                {
+                  "kind": "background",
+                  "data": {
+                    "layerId": "background:left",
+                    "scope": "left",
+                    "rectUm": [0, 0, 25400, 25400],
+                    "paint": { "kind": "solid", "data": { "rgb": "#FFFF00" } }
+                  }
+                }
+              ],
+              "outputUnits": [
+                {
+                  "unitId": "edge-final:spread",
+                  "mode": "per-sheet",
+                  "logicalIndex": 3,
+                  "physicalSourceRectUm": [0, 0, 25400, 25400],
+                  "normalizedOriginUm": [0, 0],
+                  "widthPx": 4,
+                  "heightPx": 4
+                },
+                {
+                  "unitId": "edge-final:left",
+                  "mode": "per-page",
+                  "logicalIndex": 4,
+                  "physicalSourceRectUm": [0, 0, 25400, 25400],
+                  "normalizedOriginUm": [0, 0],
+                  "widthPx": 4,
+                  "heightPx": 4
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "kind": "canonical-raster",
+      "data": {
+        "id": "fractional-bilinear-alpha-border",
+        "origin": { "kind": "standalone" },
+        "input": {
+          "unit": {
+            "unitId": "raster-alpha:spread",
+            "widthPx": 3,
+            "heightPx": 3,
+            "dpi": 4,
+            "physicalSourceRectUm": [0, 0, 19050, 19050],
+            "layers": [
+              { "kind": "base", "data": { "rgb": "#FFFFFF" } },
+              {
+                "kind": "image",
+                "data": {
+                  "layerId": "background",
+                  "sourceId": "background",
+                  "clipRectPx": [0, 0, 3, 3],
+                  "sourceFromDestinationQ32": {
+                    "xx": "0", "xy": "0", "tx": "2147483648",
+                    "yx": "0", "yy": "0", "ty": "2147483648"
+                  },
+                  "opacityByte": 255,
+                  "blackAndWhite": false
+                }
+              },
+              {
+                "kind": "frame-group",
+                "data": {
+                  "layerId": "frame-alpha",
+                  "sourceId": "photo",
+                  "frameRectPx": [0, 0, 3, 3],
+                  "photoClipRectPx": [1, 1, 1, 1],
+                  "sourceFromDestinationQ32": {
+                    "xx": "1073741824", "xy": "0", "tx": "3221225472",
+                    "yx": "0", "yy": "1073741824", "ty": "3221225472"
+                  },
+                  "borderFillRectsPx": [
+                    [0, 0, 3, 1],
+                    [0, 2, 3, 1],
+                    [0, 1, 1, 1],
+                    [2, 1, 1, 1]
+                  ],
+                  "borderRgb": "#FFFF00",
+                  "groupOpacityByte": 128,
+                  "blackAndWhite": false
+                }
+              },
+              {
+                "kind": "image",
+                "data": {
+                  "layerId": "overlay",
+                  "sourceId": "overlay",
+                  "clipRectPx": [0, 0, 3, 3],
+                  "sourceFromDestinationQ32": {
+                    "xx": "0", "xy": "0", "tx": "2147483648",
+                    "yx": "0", "yy": "0", "ty": "2147483648"
+                  },
+                  "opacityByte": 255,
+                  "blackAndWhite": false
+                }
+              }
+            ]
+          },
+          "normalizedSources": [
+            { "sourceId": "background", "widthPx": 1, "heightPx": 1, "rgbaRows": [["204060FF"]] },
+            {
+              "sourceId": "photo",
+              "widthPx": 2,
+              "heightPx": 2,
+              "rgbaRows": [
+                ["FF000080", "00FF00FF"],
+                ["0000FF40", "FFFFFF00"]
+              ]
+            },
+            { "sourceId": "overlay", "widthPx": 1, "heightPx": 1, "rgbaRows": [["FFFFFF40"]] }
+          ]
+        },
+        "expectedRaster": {
+          "widthPx": 3,
+          "heightPx": 3,
+          "dpi": 4,
+          "colorSpace": "srgb2014",
+          "rgbaRows": [
+            ["ACB864FF", "ACB864FF", "ACB864FF"],
+            ["ACB864FF", "5F7D7EFF", "ACB864FF"],
+            ["ACB864FF", "ACB864FF", "ACB864FF"]
+          ]
+        }
+      }
+    },
+    {
+      "kind": "canonical-raster",
+      "data": {
+        "id": "right-page-crossing-frame-q32",
+        "origin": {
+          "kind": "composition-frame",
+          "data": {
+            "compositionCaseId": "fractional-transform-z-order-and-page-units",
+            "unitId": "sheet-1:right",
+            "frameId": "00000000-0000-4000-8000-000000000002"
+          }
+        },
+        "input": {
+          "unit": {
+            "unitId": "sheet-1:right",
+            "widthPx": 2,
+            "heightPx": 4,
+            "dpi": 4,
+            "physicalSourceRectUm": [14605, 0, 14605, 25400],
+            "layers": [
+              { "kind": "base", "data": { "rgb": "#FFFFFF" } },
+              {
+                "kind": "image",
+                "data": {
+                  "layerId": "background:both",
+                  "sourceId": "decorative-checker",
+                  "clipRectPx": [0, 0, 2, 4],
+                  "sourceFromDestinationQ32": {
+                    "xx": "1867376250", "xy": "0", "tx": "5228653500",
+                    "yx": "0", "yy": "2147481100", "ty": "1073740550"
+                  },
+                  "opacityByte": 255,
+                  "blackAndWhite": false
+                }
+              },
+              {
+                "kind": "frame-group",
+                "data": {
+                  "layerId": "frame:00000000-0000-4000-8000-000000000003",
+                  "sourceId": "photo-blue",
+                  "frameRectPx": [1, 1, 1, 2],
+                  "photoClipRectPx": [1, 1, 1, 2],
+                  "sourceFromDestinationQ32": {
+                    "xx": "2147481100", "xy": "0", "tx": "-644241782",
+                    "yx": "0", "yy": "2147481100", "ty": "-1073738002"
+                  },
+                  "borderFillRectsPx": [],
+                  "borderRgb": "#000000",
+                  "groupOpacityByte": 255,
+                  "blackAndWhite": false
+                }
+              },
+              {
+                "kind": "frame-group",
+                "data": {
+                  "layerId": "frame:00000000-0000-4000-8000-000000000002",
+                  "sourceId": "photo-frac",
+                  "frameRectPx": [0, 0, 2, 4],
+                  "photoClipRectPx": [0, 0, 2, 4],
+                  "sourceFromDestinationQ32": {
+                    "xx": "413092900", "xy": "-1541678400", "tx": "6692685529",
+                    "yx": "-1541678400", "yy": "-413092900", "ty": "4337539717"
+                  },
+                  "borderFillRectsPx": [],
+                  "borderRgb": "#FFFF00",
+                  "groupOpacityByte": 128,
+                  "blackAndWhite": true
+                }
+              }
+            ]
+          },
+          "normalizedSources": [
+            {
+              "sourceId": "decorative-checker",
+              "widthPx": 2,
+              "heightPx": 2,
+              "rgbaRows": [
+                ["FF000080", "00FF00FF"],
+                ["0000FF40", "FFFFFF00"]
+              ]
+            },
+            { "sourceId": "photo-blue", "widthPx": 1, "heightPx": 1, "rgbaRows": [["0000FFFF"]] },
+            {
+              "sourceId": "photo-frac",
+              "widthPx": 2,
+              "heightPx": 2,
+              "rgbaRows": [
+                ["FF000080", "00FF00FF"],
+                ["0000FF40", "FFFFFF00"]
+              ]
+            }
+          ]
+        },
+        "expectedRaster": {
+          "widthPx": 2,
+          "heightPx": 4,
+          "dpi": 4,
+          "colorSpace": "srgb2014",
+          "rgbaRows": [
+            ["63D248FF", "4EE04EFF"],
+            ["7BCC6BFF", "4747D9FF"],
+            ["AEC9B2FF", "3030D3FF"],
+            ["C3C3D1FF", "CDCDCDFF"]
+          ]
+        }
+      }
+    },
+    {
+      "kind": "imaging-envelope",
+      "data": {
+        "id": "imaging-envelope-right-page",
+        "compositionCaseId": "fractional-transform-z-order-and-page-units",
+        "canonicalRasterCaseId": "right-page-crossing-frame-q32",
+        "exportPlan": {
+            "protocolVersion": 1,
+            "correlation": { "requestId": "render-contract-0001" },
+            "attempt": { "attemptId": "00000000-0000-4000-8000-000000000017", "cancellationId": "cancel-render-contract-0001" },
+            "formatOptions": { "format": "jpeg", "quality": 87 },
+            "preparation": {
+              "destinationDirectory": { "encoding": "windowsUtf16", "units": [67, 58, 92, 69, 120, 112, 111, 114, 116] },
+              "attemptDirectory": { "encoding": "windowsUtf16", "units": [67, 58, 92, 69, 120, 112, 111, 114, 116, 92, 46, 109, 121, 97, 108, 98, 117, 110, 115, 45, 101, 120, 112, 111, 114, 116, 45, 48, 48, 48, 48, 48, 48, 48, 48, 45, 48, 48, 48, 48, 45, 52, 48, 48, 48, 45, 56, 48, 48, 48, 45, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 49, 55, 46, 116, 109, 112] },
+              "outputPath": { "encoding": "windowsUtf16", "units": [67, 58, 92, 69, 120, 112, 111, 114, 116, 92, 46, 109, 121, 97, 108, 98, 117, 110, 115, 45, 101, 120, 112, 111, 114, 116, 45, 48, 48, 48, 48, 48, 48, 48, 48, 45, 48, 48, 48, 48, 45, 52, 48, 48, 48, 45, 56, 48, 48, 48, 45, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 49, 55, 46, 116, 109, 112, 92, 97, 108, 98, 117, 109, 95, 48, 48, 49, 46, 106, 112, 103] }
+            },
+            "renderSnapshot": {
+              "snapshotVersion": 1,
+              "projectId": "project-golden",
+              "revision": 7,
+              "dpi": 4,
+              "compositionPlan": {
+                "planVersion": 1,
+                "revision": 7,
+                "dpi": 4,
+                "referencedMediaIds": ["decorative-checker", "photo-blue", "photo-frac", "photo-opaque"],
+                "sheets": [
+                  {
+                    "sheetId": "sheet-1",
+                    "surfaceRectUm": [0, 0, 29210, 25400],
+                    "orderedLayers": [
+                      {
+                        "kind": "base",
+                        "data": {
+                          "layerId": "base",
+                          "rectUm": [0, 0, 29210, 25400],
+                          "rgb": "#FFFFFF"
+                        }
+                      },
+                      {
+                        "kind": "background",
+                        "data": {
+                          "layerId": "background:both",
+                          "scope": "both",
+                          "rectUm": [0, 0, 29210, 25400],
+                          "paint": {
+                            "kind": "image",
+                            "data": {
+                              "mediaId": "decorative-checker",
+                              "orientedWidthPx": 2,
+                              "orientedHeightPx": 2,
+                              "appliedOrientation": 1,
+                              "sourceFromPhysicalQ32": { "xx": "294075", "xy": "0", "tx": "0", "yx": "0", "yy": "338186", "ty": "0" }
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "kind": "frame-group",
+                        "data": {
+                          "layerId": "frame:00000000-0000-4000-8000-000000000003",
+                          "frameId": "00000000-0000-4000-8000-000000000003",
+                          "zIndex": 1,
+                          "frameRectUm": [22860, 6350, 6350, 12700],
+                          "photoClipRectUm": [22860, 6350, 6350, 12700],
+                          "borderFillRectsUm": [],
+                          "borderRgb": "#000000",
+                          "groupOpacityByte": 255,
+                          "photo": {
+                            "mediaId": "photo-blue",
+                            "orientedWidthPx": 1,
+                            "orientedHeightPx": 1,
+                            "appliedOrientation": 1,
+                            "transform": {
+                              "quarterTurnsCcw": 0,
+                              "fineAngleTenths": 0,
+                              "mirrorHorizontal": false,
+                              "userZoomMillionths": 1000000,
+                              "panXMillionths": 0,
+                              "panYMillionths": 0,
+                              "blackAndWhite": false
+                            },
+                            "sampler": "bilinear-premultiplied-q16-v1",
+                            "physicalFromSourceQ32": { "xx": "54546084659200", "xy": "0", "tx": "84546431221760", "yx": "0", "yy": "54546084659200", "ty": "27273042329600" },
+                            "sourceFromPhysicalQ32": { "xx": "338186", "xy": "0", "tx": "-6657188862", "yx": "0", "yy": "338186", "ty": "-2147478552" }
+                          }
+                        }
+                      },
+                      {
+                        "kind": "frame-group",
+                        "data": {
+                          "layerId": "frame:00000000-0000-4000-8000-000000000001",
+                          "frameId": "00000000-0000-4000-8000-000000000001",
+                          "zIndex": 5,
+                          "frameRectUm": [0, 6350, 12700, 12700],
+                          "photoClipRectUm": [0, 6350, 12700, 12700],
+                          "borderFillRectsUm": [],
+                          "borderRgb": "#000000",
+                          "groupOpacityByte": 255,
+                          "photo": {
+                            "mediaId": "photo-opaque",
+                            "orientedWidthPx": 1,
+                            "orientedHeightPx": 1,
+                            "appliedOrientation": 1,
+                            "transform": {
+                              "quarterTurnsCcw": 0,
+                              "fineAngleTenths": 0,
+                              "mirrorHorizontal": false,
+                              "userZoomMillionths": 1000000,
+                              "panXMillionths": 0,
+                              "panYMillionths": 0,
+                              "blackAndWhite": false
+                            },
+                            "sampler": "bilinear-premultiplied-q16-v1",
+                            "physicalFromSourceQ32": { "xx": "54546084659200", "xy": "0", "tx": "0", "yx": "0", "yy": "54546084659200", "ty": "27273042329600" },
+                            "sourceFromPhysicalQ32": { "xx": "338186", "xy": "0", "tx": "2548", "yx": "0", "yy": "338186", "ty": "-2147478552" }
+                          }
+                        }
+                      },
+                      {
+                        "kind": "frame-group",
+                        "data": {
+                          "layerId": "frame:00000000-0000-4000-8000-000000000002",
+                          "frameId": "00000000-0000-4000-8000-000000000002",
+                          "zIndex": 5,
+                          "frameRectUm": [6350, 0, 22860, 25400],
+                          "photoClipRectUm": [7620, 1270, 20320, 22860],
+                          "borderFillRectsUm": [
+                            [6350, 0, 22860, 1270],
+                            [6350, 24130, 22860, 1270],
+                            [6350, 1270, 1270, 22860],
+                            [27940, 1270, 1270, 22860]
+                          ],
+                          "borderRgb": "#FFFF00",
+                          "groupOpacityByte": 128,
+                          "photo": {
+                            "mediaId": "photo-frac",
+                            "orientedWidthPx": 2,
+                            "orientedHeightPx": 2,
+                            "appliedOrientation": 1,
+                            "transform": {
+                              "quarterTurnsCcw": 1,
+                              "fineAngleTenths": 150,
+                              "mirrorHorizontal": true,
+                              "userZoomMillionths": 1250000,
+                              "panXMillionths": 250000,
+                              "panYMillionths": -500000,
+                              "blackAndWhite": true
+                            },
+                            "sampler": "bilinear-premultiplied-q16-v1",
+                            "physicalFromSourceQ32": { "xx": "18994981137010", "xy": "-70890234706423", "tx": "118358216131872", "yx": "-70890234706423", "yy": "-18994981137010", "ty": "143285418197439" },
+                            "sourceFromPhysicalQ32": { "xx": "65054", "xy": "-242784", "tx": "6306864609", "yx": "-242784", "yy": "-65054", "ty": "8860785687" }
+                          }
+                        }
+                      },
+                      {
+                        "kind": "overlay",
+                        "data": {
+                          "layerId": "overlay:left",
+                          "scope": "left",
+                          "rectUm": [0, 0, 14605, 25400],
+                          "paint": {
+                            "kind": "image",
+                            "data": {
+                              "mediaId": "decorative-checker",
+                              "orientedWidthPx": 2,
+                              "orientedHeightPx": 2,
+                              "appliedOrientation": 1,
+                              "sourceFromPhysicalQ32": { "xx": "588150", "xy": "0", "tx": "0", "yx": "0", "yy": "338186", "ty": "0" }
+                            }
+                          }
+                        }
+                      }
+                    ],
+                    "outputUnits": [
+                      {
+                        "unitId": "sheet-1:spread",
+                        "mode": "per-sheet",
+                        "logicalIndex": 1,
+                        "physicalSourceRectUm": [0, 0, 29210, 25400],
+                        "normalizedOriginUm": [0, 0],
+                        "widthPx": 5,
+                        "heightPx": 4
+                      },
+                      {
+                        "unitId": "sheet-1:left",
+                        "mode": "per-page",
+                        "logicalIndex": 1,
+                        "physicalSourceRectUm": [0, 0, 14605, 25400],
+                        "normalizedOriginUm": [0, 0],
+                        "widthPx": 2,
+                        "heightPx": 4
+                      },
+                      {
+                        "unitId": "sheet-1:right",
+                        "mode": "per-page",
+                        "logicalIndex": 2,
+                        "physicalSourceRectUm": [14605, 0, 14605, 25400],
+                        "normalizedOriginUm": [0, 0],
+                        "widthPx": 2,
+                        "heightPx": 4
+                      }
+                    ]
+                  }
+                ]
+              },
+              "sources": [
+                {
+                  "mediaRef": {
+                    "mediaId": "decorative-checker",
+                    "nativePath": { "encoding": "windowsUtf16", "units": [67, 58, 92, 70, 111, 116, 111, 115, 92, 100, 101, 99, 111, 114, 97, 116, 105, 118, 111, 46, 112, 110, 103] }
+                  },
+                  "sourceObservation": {
+                    "mediaId": "decorative-checker",
+                    "nativePath": { "encoding": "windowsUtf16", "units": [67, 58, 92, 70, 111, 116, 111, 115, 92, 100, 101, 99, 111, 114, 97, 116, 105, 118, 111, 46, 112, 110, 103] },
+                    "detectedFormat": "png",
+                    "sourceVariant": "png-static-rgba8",
+                    "encodedWidthPx": 2,
+                    "encodedHeightPx": 2,
+                    "orientedWidthPx": 2,
+                    "orientedHeightPx": 2,
+                    "embeddedOrientation": 6,
+                    "appliedOrientation": 1,
+                    "colorProfile": "absent-assume-srgb",
+                    "sha256FullFileV1": "5bbf46acb3dac92136a6ffbb13f9e144835703cbc776c55479da7fc8bf7f0b43"
+                  }
+                },
+                {
+                  "mediaRef": {
+                    "mediaId": "photo-blue",
+                    "nativePath": { "encoding": "windowsUtf16", "units": [67, 58, 92, 70, 111, 116, 111, 115, 92, 98, 108, 117, 101, 46, 112, 110, 103] }
+                  },
+                  "sourceObservation": {
+                    "mediaId": "photo-blue",
+                    "nativePath": { "encoding": "windowsUtf16", "units": [67, 58, 92, 70, 111, 116, 111, 115, 92, 98, 108, 117, 101, 46, 112, 110, 103] },
+                    "detectedFormat": "jpeg",
+                    "sourceVariant": "jpeg-baseline-rgb8",
+                    "encodedWidthPx": 1,
+                    "encodedHeightPx": 1,
+                    "orientedWidthPx": 1,
+                    "orientedHeightPx": 1,
+                    "embeddedOrientation": 1,
+                    "appliedOrientation": 1,
+                    "colorProfile": "absent-assume-srgb",
+                    "sha256FullFileV1": "4444444444444444444444444444444444444444444444444444444444444444"
+                  }
+                },
+                {
+                  "mediaRef": {
+                    "mediaId": "photo-frac",
+                    "nativePath": { "encoding": "windowsUtf16", "units": [67, 58, 92, 70, 111, 116, 111, 115, 92, 102, 114, 97, 231, 227, 111, 46, 112, 110, 103] }
+                  },
+                  "sourceObservation": {
+                    "mediaId": "photo-frac",
+                    "nativePath": { "encoding": "windowsUtf16", "units": [67, 58, 92, 70, 111, 116, 111, 115, 92, 102, 114, 97, 231, 227, 111, 46, 112, 110, 103] },
+                    "detectedFormat": "png",
+                    "sourceVariant": "png-static-rgba8",
+                    "encodedWidthPx": 2,
+                    "encodedHeightPx": 2,
+                    "orientedWidthPx": 2,
+                    "orientedHeightPx": 2,
+                    "embeddedOrientation": 1,
+                    "appliedOrientation": 1,
+                    "colorProfile": "absent-assume-srgb",
+                    "sha256FullFileV1": "2222222222222222222222222222222222222222222222222222222222222222"
+                  }
+                },
+                {
+                  "mediaRef": {
+                    "mediaId": "photo-opaque",
+                    "nativePath": { "encoding": "windowsUtf16", "units": [68, 58, 92, 65, 114, 99, 104, 105, 118, 101, 92, 111, 112, 97, 113, 117, 101, 46, 112, 110, 103] }
+                  },
+                  "sourceObservation": {
+                    "mediaId": "photo-opaque",
+                    "nativePath": { "encoding": "windowsUtf16", "units": [68, 58, 92, 65, 114, 99, 104, 105, 118, 101, 92, 111, 112, 97, 113, 117, 101, 46, 112, 110, 103] },
+                    "detectedFormat": "jpeg",
+                    "sourceVariant": "jpeg-baseline-rgb8",
+                    "encodedWidthPx": 1,
+                    "encodedHeightPx": 1,
+                    "orientedWidthPx": 1,
+                    "orientedHeightPx": 1,
+                    "embeddedOrientation": 1,
+                    "appliedOrientation": 1,
+                    "colorProfile": "absent-assume-srgb",
+                    "sha256FullFileV1": "3333333333333333333333333333333333333333333333333333333333333333"
+                  }
+                }
+              ]
+            },
+            "selectedUnitIds": ["sheet-1:right"]
+          },
+          "rootBindingPlan": {
+            "bindings": [
+              {
+                "kind": "disk",
+                "logicalRoot": { "encoding": "windowsUtf16", "units": [67, 58, 92] },
+                "operationalRoot": { "encoding": "windowsUtf16", "units": [67, 58, 92] }
+              }
+            ]
+          },
+          "substitutionProbe": {
+            "layerId": "base",
+            "replacementRgb": "#FEFEFE",
+            "mediaId": "photo-frac",
+            "replacementSha256FullFileV1": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+      }
+    },
+    {
+      "kind": "canonical-raster",
+      "data": {
+        "id": "q16-half-up-tie",
+        "origin": { "kind": "standalone" },
+        "input": {
+          "unit": {
+            "unitId": "q16-rounding:unit",
+            "widthPx": 1,
+            "heightPx": 1,
+            "dpi": 4,
+            "physicalSourceRectUm": [0, 0, 6351, 6351],
+            "layers": [
+              { "kind": "base", "data": { "rgb": "#FFFFFF" } },
+              {
+                "kind": "image",
+                "data": {
+                  "layerId": "q16-probe",
+                  "sourceId": "black-white",
+                  "clipRectPx": [0, 0, 1, 1],
+                  "sourceFromDestinationQ32": {
+                    "xx": "0", "xy": "0", "tx": "2155905024",
+                    "yx": "0", "yy": "0", "ty": "2147483648"
+                  },
+                  "opacityByte": 255,
+                  "blackAndWhite": false
+                }
+              }
+            ]
+          },
+          "normalizedSources": [
+            { "sourceId": "black-white", "widthPx": 2, "heightPx": 1, "rgbaRows": [["000000FF", "FFFFFFFF"]] }
+          ]
+        },
+        "expectedRaster": {
+          "widthPx": 1,
+          "heightPx": 1,
+          "dpi": 4,
+          "colorSpace": "srgb2014",
+          "rgbaRows": [["010101FF"]]
+        }
+      }
+    },
+    {
+      "kind": "canonical-raster",
+      "data": {
+        "id": "q16-half-up-carry",
+        "origin": { "kind": "standalone" },
+        "input": {
+          "unit": {
+            "unitId": "q16-carry:unit",
+            "widthPx": 1,
+            "heightPx": 1,
+            "dpi": 4,
+            "physicalSourceRectUm": [0, 0, 6351, 6351],
+            "layers": [
+              { "kind": "base", "data": { "rgb": "#FFFFFF" } },
+              {
+                "kind": "image",
+                "data": {
+                  "layerId": "q16-carry-probe",
+                  "sourceId": "black-white",
+                  "clipRectPx": [0, 0, 1, 1],
+                  "sourceFromDestinationQ32": {
+                    "xx": "0", "xy": "0", "tx": "6442418176",
+                    "yx": "0", "yy": "0", "ty": "2147483648"
+                  },
+                  "opacityByte": 255,
+                  "blackAndWhite": false
+                }
+              }
+            ]
+          },
+          "normalizedSources": [
+            { "sourceId": "black-white", "widthPx": 2, "heightPx": 1, "rgbaRows": [["000000FF", "FFFFFFFF"]] }
+          ]
+        },
+        "expectedRaster": {
+          "widthPx": 1,
+          "heightPx": 1,
+          "dpi": 4,
+          "colorSpace": "srgb2014",
+          "rgbaRows": [["FFFFFFFF"]]
+        }
+      }
+    },
+    {
+      "kind": "source-normalization",
+      "data": {
+        "id": "jpeg-exif-orientation-6",
+        "assetId": "jpeg-orientation-6-2x1",
+        "verificationOwnerIssue": 35,
+        "expected": {
+          "kind": "jpeg-exif",
+          "data": {
+            "encodedWidthPx": 2,
+            "encodedHeightPx": 1,
+            "embeddedOrientation": 6,
+            "appliedOrientation": 6,
+            "orientedWidthPx": 1,
+            "orientedHeightPx": 2,
+            "applyExactlyOnce": true
+          }
+        }
+      }
+    },
+    {
+      "kind": "source-normalization",
+      "data": {
+        "id": "png-alpha-normalization",
+        "assetId": "png-rgba-2x2",
+        "verificationOwnerIssue": 35,
+        "expected": {
+          "kind": "png-alpha",
+          "data": {
+            "widthPx": 2,
+            "heightPx": 2,
+            "rgbaRows": [
+              ["FF000080", "00FF00FF"],
+              ["0000FF40", "FFFFFF00"]
+            ],
+            "linkedCompositionCaseId": "fractional-transform-z-order-and-page-units",
+            "linkedRasterCaseId": "right-page-crossing-frame-q32",
+            "linkedMediaId": "decorative-checker",
+            "embeddedOrientation": 6,
+            "appliedOrientation": 1,
+            "orientationMetadataIgnored": true
+          }
+        }
+      }
+    },
+    {
+      "kind": "source-normalization",
+      "data": {
+        "id": "tiff-associated-alpha-16",
+        "assetId": "tiff-associated-rgba16-1x1",
+        "verificationOwnerIssue": 35,
+        "expected": {
+          "kind": "tiff-alpha",
+          "data": {
+            "widthPx": 1,
+            "heightPx": 1,
+            "alphaSemantics": "associated-alpha",
+            "rgbaRows": [["80400080"]]
+          }
+        }
+      }
+    },
+    {
+      "kind": "source-normalization",
+      "data": {
+        "id": "tiff-unassociated-gray-alpha-16",
+        "assetId": "tiff-unassociated-graya16-1x1",
+        "verificationOwnerIssue": 35,
+        "expected": {
+          "kind": "tiff-alpha",
+          "data": {
+            "widthPx": 1,
+            "heightPx": 1,
+            "alphaSemantics": "unassociated-alpha",
+            "rgbaRows": [["12121280"]]
+          }
+        }
+      }
+    },
+    {
+      "kind": "source-normalization",
+      "data": {
+        "id": "tiff-four-samples-requires-extra-samples",
+        "assetId": "tiff-missing-extra-rgba8-1x1",
+        "verificationOwnerIssue": 35,
+        "expected": {
+          "kind": "tiff-rejected",
+          "data": { "errorCode": "UnsupportedSourceVariant" }
+        }
+      }
+    },
+    {
+      "kind": "format-adapters",
+      "data": {
+        "id": "format-adapters-share-canonical-unit",
+        "canonicalUnitIds": ["raster-alpha:spread", "q16-rounding:unit"],
+        "expected": {
+          "jpeg": {
+            "extension": ".jpg",
+            "qualityInput": 100,
+            "process": "baseline-sof0",
+            "subsampling": "4:4:4",
+            "components": 3,
+            "dpi": 4,
+            "icc": "sRGB2014.icc",
+            "forbiddenMetadata": ["EXIF", "Orientation", "XMP", "GPS", "thumbnail", "comment", "date"],
+            "decodedErrorMetric": "per-channel-absolute-error; max over all channels; mean=sum/(width*height*3)",
+            "decodedMaxChannelError": 8,
+            "decodedMeanErrorAtMost": 2
+          },
+          "png": {
+            "extension": ".png",
+            "colorType": "rgb8",
+            "interlaced": false,
+            "pixelsPerMeter": 157,
+            "icc": "sRGB2014.icc",
+            "forbiddenChunks": ["acTL", "fcTL", "fdAT", "eXIf", "tEXt", "zTXt", "iTXt", "tIME"],
+            "decodedComparison": "exact-canonical-rgb"
+          },
+          "pdf": {
+            "extension": ".pdf",
+            "pageCount": 2,
+            "pageOrder": ["raster-alpha:spread", "q16-rounding:unit"],
+            "mediaBoxesPoints": [["54", "54"], ["18.002835", "18.002835"]],
+            "cropBoxesPoints": [["54", "54"], ["18.002835", "18.002835"]],
+            "embeddedRasterOrder": ["raster-alpha:spread", "q16-rounding:unit"],
+            "placement": "cover-media-box-no-rotation",
+            "embeddedColorSpace": "ICCBased-sRGB2014",
+            "embeddedRasterComparison": "exact-canonical-rgb",
+            "lossless": true
+          }
+        }
+      }
+    },
+    {
+      "kind": "output-names",
+      "data": {
+        "id": "minimum-three-digit-output-indices",
+        "projectName": "Album",
+        "extension": ".jpg",
+        "indices": [1, 9, 10, 998, 999, 1000, 1001],
+        "expectedNames": ["Album_001.jpg", "Album_009.jpg", "Album_010.jpg", "Album_998.jpg", "Album_999.jpg", "Album_1000.jpg", "Album_1001.jpg"],
+        "rejectedIndexStrings": ["000", "0001", "+001", "-001", "1"]
+      }
+    },
+    {
+      "kind": "operational",
+      "data": {
+        "id": "last-promotion-candidate-confirmed",
+        "ownerIssue": 35,
+        "context": { "totalFileCount": 2, "integralExport": true, "orphanRemovalConfirmed": true },
+        "injection": {
+          "kind": "promotion-fails",
+          "data": { "failedOutput": "Album_002.jpg", "attemptNumber": 2, "targetEvidence": "candidate-at-final" }
+        },
+        "expected": {
+          "terminal": "partial-publication",
+          "publicationState": "all-candidates-confirmed",
+          "attemptedCount": 2,
+          "confirmedPromotedCount": 2,
+          "failedOutput": { "kind": "output", "data": "Album_002.jpg" },
+          "causeCode": "atomic-promotion-failed",
+          "failedTargetEvidence": "candidate-at-final",
+          "preparationCleanup": "required-when-safe",
+          "orphanCleanupRuns": false,
+          "fullExportRecommended": true
+        }
+      }
+    },
+    {
+      "kind": "operational",
+      "data": {
+        "id": "source-changes-during-capture",
+        "ownerIssue": 35,
+        "context": { "totalFileCount": 2, "integralExport": true, "orphanRemovalConfirmed": true },
+        "injection": {
+          "kind": "source-digest-changes",
+          "data": { "mediaId": "photo-frac", "beforeSha256": "2222222222222222222222222222222222222222222222222222222222222222", "afterSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }
+        },
+        "expected": {
+          "terminal": "source-changed",
+          "publicationState": "not-started",
+          "attemptedCount": 0,
+          "confirmedPromotedCount": 0,
+          "failedOutput": { "kind": "not-applicable" },
+          "causeCode": "source-changed",
+          "failedTargetEvidence": "not-applicable",
+          "preparationCleanup": "required-when-safe",
+          "orphanCleanupRuns": false,
+          "fullExportRecommended": false
+        }
+      }
+    },
+    {
+      "kind": "operational",
+      "data": {
+        "id": "source-identity-indeterminate",
+        "ownerIssue": 13,
+        "context": { "totalFileCount": 2, "integralExport": true, "orphanRemovalConfirmed": true },
+        "injection": {
+          "kind": "source-identity-indeterminate",
+          "data": { "mediaId": "photo-frac" }
+        },
+        "expected": {
+          "terminal": "source-identity-indeterminate",
+          "publicationState": "not-started",
+          "attemptedCount": 0,
+          "confirmedPromotedCount": 0,
+          "failedOutput": { "kind": "not-applicable" },
+          "causeCode": "source-identity-indeterminate",
+          "failedTargetEvidence": "not-applicable",
+          "preparationCleanup": "required-when-safe",
+          "orphanCleanupRuns": false,
+          "fullExportRecommended": false
+        }
+      }
+    },
+    {
+      "kind": "operational",
+      "data": {
+        "id": "atomic-probe-unsupported",
+        "ownerIssue": 35,
+        "context": { "totalFileCount": 2, "integralExport": true, "orphanRemovalConfirmed": true },
+        "injection": {
+          "kind": "atomic-probe-unsupported",
+          "data": { "operation": "replace-confirmed" }
+        },
+        "expected": {
+          "terminal": "atomic-replacement-unsupported",
+          "publicationState": "not-started",
+          "attemptedCount": 0,
+          "confirmedPromotedCount": 0,
+          "failedOutput": { "kind": "not-applicable" },
+          "causeCode": "atomic-replacement-unsupported",
+          "failedTargetEvidence": "not-applicable",
+          "preparationCleanup": "required-when-safe",
+          "orphanCleanupRuns": false,
+          "fullExportRecommended": false
+        }
+      }
+    },
+    {
+      "kind": "operational",
+      "data": {
+        "id": "first-promotion-indeterminate",
+        "ownerIssue": 35,
+        "context": { "totalFileCount": 2, "integralExport": true, "orphanRemovalConfirmed": true },
+        "injection": {
+          "kind": "promotion-fails",
+          "data": { "failedOutput": "Album_001.jpg", "attemptNumber": 1, "targetEvidence": "indeterminate" }
+        },
+        "expected": {
+          "terminal": "partial-publication",
+          "publicationState": "possibly-mixed",
+          "attemptedCount": 1,
+          "confirmedPromotedCount": 0,
+          "failedOutput": { "kind": "output", "data": "Album_001.jpg" },
+          "causeCode": "atomic-promotion-failed",
+          "failedTargetEvidence": "indeterminate",
+          "preparationCleanup": "required-when-safe",
+          "orphanCleanupRuns": false,
+          "fullExportRecommended": true
+        }
+      }
+    },
+    {
+      "kind": "operational",
+      "data": {
+        "id": "first-promotion-proven-untouched",
+        "ownerIssue": 35,
+        "context": { "totalFileCount": 2, "integralExport": true, "orphanRemovalConfirmed": true },
+        "injection": {
+          "kind": "promotion-fails",
+          "data": { "failedOutput": "Album_001.jpg", "attemptNumber": 1, "targetEvidence": "untouched-by-attempt" }
+        },
+        "expected": {
+          "terminal": "publication-failed",
+          "publicationState": "untouched-by-attempt",
+          "attemptedCount": 1,
+          "confirmedPromotedCount": 0,
+          "failedOutput": { "kind": "output", "data": "Album_001.jpg" },
+          "causeCode": "atomic-promotion-failed",
+          "failedTargetEvidence": "untouched-by-attempt",
+          "preparationCleanup": "required-when-safe",
+          "orphanCleanupRuns": false,
+          "fullExportRecommended": false
+        }
+      }
+    },
+    {
+      "kind": "operational",
+      "data": {
+        "id": "second-promotion-proven-untouched",
+        "ownerIssue": 35,
+        "context": { "totalFileCount": 2, "integralExport": true, "orphanRemovalConfirmed": true },
+        "injection": {
+          "kind": "promotion-fails",
+          "data": { "failedOutput": "Album_002.jpg", "attemptNumber": 2, "targetEvidence": "untouched-by-attempt" }
+        },
+        "expected": {
+          "terminal": "partial-publication",
+          "publicationState": "possibly-mixed",
+          "attemptedCount": 2,
+          "confirmedPromotedCount": 1,
+          "failedOutput": { "kind": "output", "data": "Album_002.jpg" },
+          "causeCode": "atomic-promotion-failed",
+          "failedTargetEvidence": "untouched-by-attempt",
+          "preparationCleanup": "required-when-safe",
+          "orphanCleanupRuns": false,
+          "fullExportRecommended": true
+        }
+      }
+    },
+    {
+      "kind": "operational",
+      "data": {
+        "id": "complete-publication-allows-orphan-cleanup",
+        "ownerIssue": 38,
+        "context": { "totalFileCount": 2, "integralExport": true, "orphanRemovalConfirmed": true },
+        "injection": { "kind": "none", "data": {} },
+        "expected": {
+          "terminal": "completed",
+          "publicationState": "all-candidates-confirmed",
+          "attemptedCount": 2,
+          "confirmedPromotedCount": 2,
+          "failedOutput": { "kind": "not-applicable" },
+          "causeCode": "not-applicable",
+          "failedTargetEvidence": "not-applicable",
+          "preparationCleanup": "required-when-safe",
+          "orphanCleanupRuns": true,
+          "fullExportRecommended": false
+        }
+      }
+    }
+  ]
+}

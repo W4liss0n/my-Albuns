@@ -2,6 +2,7 @@
 status: accepted
 document: design
 date: 2026-08-03
+updated: 2026-09-01
 ---
 
 # Contrato JPEG do primeiro fluxo
@@ -10,13 +11,20 @@ date: 2026-08-03
 
 Fixar o primeiro corte real e verificável de `Exportar Lâmina`: uma única saída JPEG da Lâmina selecionada, produzida a partir do estado visível e do mesmo plano de composição consumido pelo Canvas. Este design torna normativa a parte aprovada da [pesquisa técnica](../research/0031-contrato-jpeg-do-primeiro-fluxo.md), sem declarar concluídos o [diálogo final de Exportação](0004-exportacao-normal.md), o Renderizador final ou o gerenciamento profissional de cor.
 
+O [Contrato do Renderizador final](0019-contrato-do-renderizador-final.md) é a
+decisão posterior para formatos, TIFF, qualidade, subsampling, captura de
+Originais, múltiplas unidades e Publicação. Este documento continua descrevendo
+o corte JPEG já entregue; seu payload transitório de unidade única é substituído
+pelo envelope versionado que transporta o `RenderSnapshot` inteiro no contrato
+final.
+
 ## Operação visível
 
 `Exportar Lâmina` já é uma funcionalidade real, não uma prova ou artefato interno. Neste corte:
 
 - o alvo é exatamente a Lâmina selecionada que originou o comando;
 - a operação congela um snapshot do estado atual, inclusive mudanças ainda não salvas, e nunca salva o Projeto como efeito colateral;
-- a interface obtém um único pathname final explícito, filtrado e concluído com `.jpg`; o nome sugerido segue `{Nome do Projeto}_{posição da Lâmina com três dígitos}.jpg`;
+- a interface obtém um único pathname final explícito, filtrado e concluído com `.jpg`; o nome sugerido segue `{Nome do Projeto}_{posição da Lâmina com largura mínima de três dígitos}.jpg`;
 - cancelar a escolha do destino não cria tentativa, temporário, Histórico ou mudança pendente;
 - um destino já existente exige confirmação explícita antes da tentativa e nunca é renomeado silenciosamente;
 - o plano leva até o `Publisher` a autorização imutável `CreateOnly` quando o nome estava livre ou `ReplaceConfirmed` quando a substituição foi confirmada; a autorização não é inferida novamente no fim da operação;

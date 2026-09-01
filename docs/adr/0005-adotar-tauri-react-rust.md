@@ -1,7 +1,7 @@
 ---
 status: accepted
 date: 2026-07-28
-updated: 2026-08-10
+updated: 2026-09-01
 ---
 
 # Adotar Tauri 2, React/TypeScript e Rust com host independente por Projeto
@@ -95,7 +95,7 @@ O spike produziu evidência reproduzível para:
 - uso do mesmo `myalbuns-core` no host interativo e no carregamento headless;
 - uma única `ProjectSession` mutável por Projeto, sem estado criativo duplicado no frontend, watcher, Cache ou Processador;
 - `CompositionCore` determinístico exercitado pela prévia e pela Exportação, distinguindo transformação da Foto de navegação do Canvas;
-- `RenderSnapshot` validado como única entrada criativa do Processador de Imagens, sem leitura autônoma do documento pelo Processador;
+- `RenderSnapshot` validado como única entrada criativa do Processador de Imagens, transportado dentro do envelope operacional sem leitura autônoma do documento pelo Processador;
 - Cache, prévia e Exportação separados, com a saída final lendo somente originais;
 - `CacheEngine`, `ExportPipeline` e um `OperationGate` realmente global nas duas topologias, sem concessões concorrentes e com liberação em sucesso, falha, cancelamento ou queda do proprietário, sem formar um coordenador universal;
 - comparação A/B de memória, quantidade de processos, tempo de abertura, latência do Canvas, IPC, logs, empacotamento, recuperação e domínio de falha;

@@ -1,7 +1,7 @@
 ---
 status: accepted
 document: design
-updated: 2026-08-10
+updated: 2026-09-01
 ---
 
 # Propriedade de estado e módulos do núcleo
@@ -135,14 +135,14 @@ Nenhum outro resultado confirma ausência. A assimetria é deliberada e segue o 
 
 `ExportPipeline` possui uma interface em duas etapas porque as dependências precisam ser conhecidas antes de capturar caminhos:
 
-1. `plan(snapshot, options)` recebe um `RenderSnapshot` imutável e devolve um `ExportPlan` com unidades, dependências e raízes necessárias;
+1. `plan(snapshot, options)` recebe um `RenderSnapshot` imutável e devolve um `ExportPlan` que possui esse snapshot exato, além das unidades, dependências e raízes necessárias; o snapshot não volta a ser parâmetro em nenhuma etapa posterior;
 2. o proprietário resolve essas raízes em seu `OperationPathContext` e o congela em `RootBindingPlan`;
 3. `execute(export_plan, root_bindings, cancellation, progress)` executa a tentativa sem redescobrir raízes já capturadas.
 
 Sua implementação possui três fases internas:
 
-1. `ExportPlanner` calcula unidades, dependências, raízes, nomes, conflitos e plano de saída;
-2. `ExportExecutor` abre originais, usa `CompositionCore`, renderiza e verifica a preparação;
+1. `ExportPlanner` calcula unidades, dependências, raízes, nomes, conflitos e plano de saída, movendo o snapshot validado para dentro do `ExportPlan`;
+2. `ExportExecutor` captura os Originais e consome somente as unidades derivadas do `RenderSnapshot` já composto, renderiza e verifica a preparação;
 3. `Publisher` promove arquivos aos nomes finais e executa a limpeza de órfãos permitida.
 
 `ExportPipeline` possui o ciclo de vida da preparação; `ExportExecutor` grava e verifica as saídas nela, e o pipeline garante sua limpeza nos estados terminais tratáveis. `Publisher` segue a transação limitada do [ADR 0006](../adr/0006-publicar-exportacao-com-transacao-limitada.md). Staging no Destino permite substituição atômica por arquivo quando suportada, mas não oferece rollback do conjunto, backup integral ou manifesto persistente.
@@ -195,7 +195,7 @@ Esses stores podem compartilhar uma implementação interna pequena para criar t
 
 Os módulos acima permanecem neutros quanto à implantação para não espalhar detalhes de processo pelo núcleo. O [ADR 0005](../adr/0005-adotar-tauri-react-rust.md) mapeia essa arquitetura para um host independente por Projeto no MVP.
 
-Quando uma operação lógica atravessar processos, a IPC transporta somente valores imutáveis. Entre as cargas possíveis estão intenção consolidada, `RenderSnapshot`, plano de bindings de raiz e `CompositionPlan`. A implementação define quais desses valores realmente cruzam a fronteira e seu esquema concreto. Progresso e cancelamento usam mensagens ou handles limitados à tentativa. Nenhum processo mantém uma segunda cópia mutável do Projeto como fonte canônica.
+Quando uma operação lógica atravessar processos, a IPC transporta somente valores imutáveis. Para renderização, o `ExportPlan` já possui o `RenderSnapshot` validado inteiro, e sua conversão para o envelope recebe somente o mesmo plano de bindings de raiz; não existe parâmetro capaz de trocar o snapshot depois do planejamento. O documento bruto, a Sessão e o Cache não atravessam essa fronteira. O Processador consome o `CompositionPlan` já contido no snapshot, não interpreta novamente o Projeto nem invoca `CompositionCore`; o [Contrato do Renderizador final](0019-contrato-do-renderizador-final.md) fixa os campos e invariantes semânticos desse envelope. Progresso e cancelamento usam mensagens ou handles limitados à tentativa. Nenhum processo mantém uma segunda cópia mutável do Projeto como fonte canônica.
 
 O baseline aceito é uma aplicação Tauri com Janelas e hosts separados, uma Sessão e um Processador de Imagens isolado por Projeto e um Processador temporário para o lote.
 
@@ -206,22 +206,22 @@ Os testes atravessam as interfaces que representam comportamento observável:
 - comandos aplicados pela interface de sessão do `ProjectCore`, incluindo invariantes, Undo/Redo e mudanças pendentes;
 - carregamento, migração e Salvamento atômico pela interface do `ProjectCore`;
 - autorização de Identidade, movimentação, Cópia externa e `Salvar como` pela superfície pública, sem montar estado local antes do terminal autorizado;
-- casos dourados do `CompositionCore`, reutilizados por prévia e Exportação;
+- casos dourados versionados do `CompositionCore`, reutilizados por prévia e Exportação conforme o [corpus do Renderizador final](../../tests/fixtures/final-renderer-cases-v1.json);
 - propostas sem mutação do `MediaResolver`;
 - invalidação e reconstrução descartável do `CacheEngine`;
 - uma mesma suíte do `ExportPipeline` para Exportação normal e lote, com injeção de falhas antes e durante a Publicação;
 - aquisição e liberação de concessões em sucesso, falha e cancelamento;
-- transporte de snapshots e bindings sem criar outro proprietário mutável.
+- transporte do envelope com o `RenderSnapshot` inteiro e os bindings, rejeitando documento, Sessão, Cache e campos criativos duplicados fora do snapshot.
 
 Testes não dependem da quantidade final de crates nem atravessam seams internos apenas para observar detalhes de implementação.
 
 ## Decisões adiadas
 
 - nomes finais, crates e visibilidade pública das subdivisões internas;
-- transporte e esquema concretos da IPC;
+- codificação física, framing e materialização do adapter de IPC, sem alterar os campos e invariantes semânticos do envelope fechado pelo design 0019;
 - formato concreto de `RenderSnapshot`, `CompositionPlan` e patches;
 - algoritmo do Gerador de Layouts;
-- codecs, perfis de cor e implementação do renderizador;
+- biblioteca concreta de codecs/PDF e otimizações internas que preservem o contrato aceito do renderizador;
 - quantidade futura de workers ou paralelismo entre Álbuns;
 - qualquer ampliação do `CommandCatalog` para remapeamento;
 - representações adicionais de Cache sem necessidade medida.
