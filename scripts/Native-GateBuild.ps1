@@ -12,17 +12,23 @@ function Get-NativeGateArtifact {
     }
 }
 
+function Assert-NativeGateBuildSource {
+    param([psobject] $Build, [psobject] $Source)
+    if ($Source.sourceInputsDirty -or $Build.gitCommit -cne $Source.gitCommit) {
+        throw 'The native build requires the same clean source commit. Rebuild before running a native scenario.'
+    }
+}
+
 function Read-NativeGateBuild {
     param([string] $ManifestPath, [string] $WorkspaceRoot)
     $manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
     $current = Get-GateSourceSnapshot -WorkspaceRoot $WorkspaceRoot -EvidencePath $ManifestPath
     if ($manifest.schemaVersion -ne 1 -or
         $manifest.buildMode -cne 'tauri-debug-custom-protocol' -or
-        $manifest.sourceInputsDirty -ne $false -or
-        $current.sourceInputsDirty -or
-        $manifest.gitCommit -cne $current.gitCommit) {
+        $manifest.sourceInputsDirty -ne $false) {
         throw 'The native build requires the same clean source commit. Run npm run build:native-tests after committing the source changes.'
     }
+    Assert-NativeGateBuildSource -Build $manifest -Source $current
     foreach ($name in @('application', 'fixture', 'processor')) {
         $expected = $manifest.$name
         if ($null -eq $expected -or [string]::IsNullOrWhiteSpace($expected.path)) {

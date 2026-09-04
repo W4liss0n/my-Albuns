@@ -4,11 +4,13 @@ $reportRoot = Join-Path $workspaceRoot '.tools\validation'
 New-Item -ItemType Directory -Force -Path $reportRoot | Out-Null
 $steps = @(
     @{ name = 'frontend-build'; arguments = @('run', 'build') },
-    @{ name = 'frontend-tests'; arguments = @('test', '--', '--maxWorkers=1') },
+    @{ name = 'frontend-tests'; arguments = @('test') },
     @{ name = 'automation-tests'; arguments = @('run', 'test:automation') },
     @{ name = 'rust-quality'; arguments = @('run', 'quality:rust') },
     @{ name = 'rust-tests'; arguments = @('run', 'test:rust') }
 )
+. (Join-Path $PSScriptRoot 'Gate-SourceProvenance.ps1')
+$sourceBefore = Get-GateSourceSnapshot -WorkspaceRoot $workspaceRoot -EvidencePath (Join-Path $reportRoot 'report.json')
 $results = @()
 $passed = $false
 $previousNativeProbeTests = $env:MYALBUNS_NATIVE_PROBE_TESTS
@@ -44,11 +46,13 @@ try {
     $passed = $true
 }
 finally {
+    $sourceAfter = Get-GateSourceSnapshot -WorkspaceRoot $workspaceRoot -EvidencePath (Join-Path $reportRoot 'report.json')
     $report = [ordered]@{
         schemaVersion = 1
         gate = 'headless-validation'
         collectedAtUtc = [DateTime]::UtcNow.ToString('o')
-        gitCommit = (& git rev-parse HEAD).Trim()
+        gitCommit = $sourceBefore.gitCommit
+        sourceInputsDirty = [bool] (Test-GateSourceSnapshotsDirty -Before $sourceBefore -After $sourceAfter)
         passed = $passed
         visibleNativeTestsInvoked = $false
         steps = $results

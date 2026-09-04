@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -65,12 +65,10 @@ test("an isolated launch returns the exact process instance without a PID handof
   const standardOutputPath = path.join(root, "fixture.out.log");
   const standardErrorPath = path.join(root, "fixture.err.log");
   const authorityPath = path.join(root, "fixture.instance.json");
+  writeFileSync(path.join(root, "fixture.cjs"), "setInterval(() => {}, 1000);\n");
   const instance = startProcessInstanceInOwnConsole({
-    executablePath: path.join(
-      process.env.SystemRoot,
-      "System32",
-      "notepad.exe",
-    ),
+    executablePath: process.execPath,
+    arguments: ["fixture.cjs"],
     workingDirectory: root,
     standardOutputPath,
     standardErrorPath,

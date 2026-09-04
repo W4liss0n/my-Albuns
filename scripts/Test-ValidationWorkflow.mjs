@@ -65,6 +65,9 @@ test("native build reuse rejects changed source, binary or commit", () => {
     const env = { MYALBUNS_TEST_BUILD_MODULE: path.join(scripts, "Native-GateBuild.ps1"), MYALBUNS_TEST_MANIFEST: manifestPath, MYALBUNS_TEST_REPO: repo };
     const accepted = powershell(command, env);
     assert.equal(accepted.status, 0, accepted.stderr || accepted.stdout);
+    const changedSnapshot = powershell(command + '; Assert-NativeGateBuildSource -Build ([pscustomobject]@{ gitCommit="A" }) -Source ([pscustomobject]@{ gitCommit="B"; sourceInputsDirty=$false }); throw "fixture must not run"', env);
+    assert.match(changedSnapshot.stderr, /same clean source commit/);
+    assert.doesNotMatch(changedSnapshot.stderr, /Exception: fixture must not run/);
     writeFileSync(binary, "changed");
     assert.match(powershell(command, env).stderr, /artifact changed/);
     writeFileSync(binary, bytes);

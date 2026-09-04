@@ -460,6 +460,7 @@ async function observeGraphicsScenario() {
     projectDriver = await attachWebView2Driver({
       debugPort: hostDebugPort,
       label: "focused Project owner",
+      driverLogPath: path.join(scratch, "webdriver-graphics-project.log"),
       nativeDriverPath,
       projectDialogDebugPort,
       sessionTimeoutMilliseconds: 60_000,

@@ -73,6 +73,7 @@ $sourceBefore = Get-GateSourceSnapshot `
     -WorkspaceRoot $workspaceRoot `
     -EvidencePath $OutputPath `
     -RetainedEvidenceRoot $retainedEvidenceRoot
+Assert-NativeGateBuildSource -Build $build -Source $sourceBefore
 $applicationArtifact = $build.application
 $scope = $null
 $runRootCleaned = $false
