@@ -41,6 +41,10 @@ jobs:
             .tools/cargo/registry
             .tools/cargo/git
           key: windows-2022-rust-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+      - name: Use the runner temporary directory for isolated fixtures
+        run: |
+          "TEMP=$env:RUNNER_TEMP" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "TMP=$env:RUNNER_TEMP" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Install locked frontend dependencies
         run: npm ci
       - name: Prepare pinned local Rust toolchain
