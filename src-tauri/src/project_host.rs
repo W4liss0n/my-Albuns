@@ -868,6 +868,10 @@ mod tests {
     }
 
     fn recovery_fixture() -> RecoveryFixture {
+        recovery_fixture_with_delay(Duration::from_millis(50))
+    }
+
+    fn recovery_fixture_with_delay(delay: Duration) -> RecoveryFixture {
         let root = tempfile::tempdir().expect("temporary Recovery Host fixture");
         let project_path = root.path().join("Projeto.myalbuns");
         let identity_lease_root = root.path().join("leases");
@@ -891,7 +895,7 @@ mod tests {
             &root.path().join("roaming"),
             &root.path().join("local"),
         ));
-        let coordinator = RecoveryCoordinator::with_delay(store.clone(), Duration::from_millis(50));
+        let coordinator = RecoveryCoordinator::with_delay(store.clone(), delay);
         let host = ProjectHost::with_recovery(project, coordinator.clone())
             .expect("the Host starts without a prior checkpoint");
         RecoveryFixture {
@@ -902,6 +906,27 @@ mod tests {
             store,
             coordinator,
             host,
+        }
+    }
+
+    async fn wait_for_checkpoint(
+        store: &RecoveryStore,
+        authority: &myalbuns_core::ProjectIdentityAuthority,
+    ) {
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        loop {
+            if store
+                .load(authority)
+                .expect("the checkpoint remains readable")
+                .is_some()
+            {
+                return;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "the scheduled checkpoint was not published"
+            );
+            tokio::time::sleep(Duration::from_millis(10)).await;
         }
     }
 
@@ -1355,13 +1380,13 @@ mod tests {
     #[test]
     fn save_as_failure_preserves_the_prior_recovery_and_success_changes_its_authority() {
         tauri::async_runtime::block_on(async {
-            let fixture = recovery_fixture();
+            let fixture = recovery_fixture_with_delay(Duration::from_millis(200));
             let dirty = fixture
                 .host
                 .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
                 .expect("the prior Session becomes recoverable")
                 .projection;
-            tokio::time::sleep(Duration::from_millis(90)).await;
+            wait_for_checkpoint(&fixture.store, &fixture.authority).await;
             let destination = fixture._root.path().join("Cópia independente.myalbuns");
             let mut context = OperationPathContext::new();
             context
@@ -1402,7 +1427,7 @@ mod tests {
                 .host
                 .apply_with_outcome(ProjectIntent::SetDpi { dpi: 420 })
                 .expect("new changes belong to the adopted identity");
-            tokio::time::sleep(Duration::from_millis(90)).await;
+            wait_for_checkpoint(&fixture.store, &next_authority).await;
             assert!(fixture.store.load(&fixture.authority).unwrap().is_none());
             assert!(fixture.store.load(&next_authority).unwrap().is_some());
             assert!(destination.is_file());
