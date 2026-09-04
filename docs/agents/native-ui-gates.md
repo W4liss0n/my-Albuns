@@ -1,6 +1,7 @@
 # Validation operating policy
 
-Use `npm run validate` for headless validation during interactive work. It runs
+Use `npm run validate` for headless validation during interactive work. It first
+builds the imaging processor required by Tauri, including on a fresh checkout, then runs
 frontend build/contracts/types, frontend tests, automation tests, Rust quality
 and Rust tests serially, retaining logs and a report in `.tools/validation/`.
 Focused test commands remain available while editing. The headless default

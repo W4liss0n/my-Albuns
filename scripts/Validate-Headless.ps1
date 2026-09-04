@@ -3,6 +3,7 @@ $workspaceRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $reportRoot = Join-Path $workspaceRoot '.tools\validation'
 New-Item -ItemType Directory -Force -Path $reportRoot | Out-Null
 $steps = @(
+    @{ name = 'processor-build'; arguments = @('run', 'sidecar:prepare') },
     @{ name = 'frontend-build'; arguments = @('run', 'build') },
     @{ name = 'frontend-tests'; arguments = @('test') },
     @{ name = 'automation-tests'; arguments = @('run', 'test:automation') },

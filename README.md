@@ -84,7 +84,8 @@ O Rust está fixado na versão exata declarada em [`rust-toolchain.toml`](rust-t
 
 ## Validação durante o desenvolvimento
 
-`npm run validate` é o comando padrão: executa build, contratos, tipos, testes
+`npm run validate` é o comando padrão: prepara o Processador de Imagens e executa
+build, contratos, tipos, testes
 React, testes da automação e verificações Rust sem abrir o MyAlbuns. O relatório
 e os logs por etapa ficam em `.tools/validation/`. Durante uma edição, os comandos
 de teste focados continuam disponíveis; não é necessário repetir a suíte inteira.
