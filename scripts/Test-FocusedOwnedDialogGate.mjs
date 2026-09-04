@@ -14,9 +14,15 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import ts from "typescript";
 
 import { waitForProcessInstance } from "./DevLifecycleProcessInstances.mjs";
 import { nativeOwnedWindowState } from "./NativeWindowObservation.mjs";
+import {
+  createNativeGateRuntime,
+  readOwnedDialogPresentation,
+  readProjectInteractionState,
+} from "./NativeGateRuntime.mjs";
 
 const scripts = path.dirname(fileURLToPath(import.meta.url));
 const workspace = path.resolve(scripts, "..");
@@ -99,10 +105,7 @@ function fingerprintWithClobberedWindowsPowerShellModulePath(candidatePath) {
   );
   mkdirSync(incompatibleUtilityModule);
   writeFileSync(
-    path.join(
-      incompatibleUtilityModule,
-      "Microsoft.PowerShell.Utility.psd1",
-    ),
+    path.join(incompatibleUtilityModule, "Microsoft.PowerShell.Utility.psd1"),
     String.raw`@{
   RootModule = 'Microsoft.PowerShell.Utility.Core.dll'
   ModuleVersion = '99.0.0.0'
@@ -250,9 +253,8 @@ async function waitForFixtureReady(child) {
 }
 
 test("the focused native gate has an exact closed two-scenario catalog", async () => {
-  const { FOCUSED_OWNED_DIALOG_SCENARIOS } = await import(
-    "./FocusedOwnedDialogScenarios.mjs"
-  );
+  const { FOCUSED_OWNED_DIALOG_SCENARIOS } =
+    await import("./FocusedOwnedDialogScenarios.mjs");
 
   assert.deepEqual(FOCUSED_OWNED_DIALOG_SCENARIOS, [
     "external-copy-opening-owner",
@@ -296,6 +298,83 @@ test("the focused runner reuses exact process, HWND, WebDriver, and scratch help
   assert.match(runner, /workspaceInert/u);
   assert.match(wrapper, /Gate-ScratchDirectory\.ps1/u);
   assert.match(wrapper, /Remove-GateScratchDirectory/u);
+});
+
+test("the native runners share one polling, process, log, and dialog runtime", async () => {
+  const focusedRunner = source("Run-FocusedOwnedDialogGate.mjs");
+  const productiveRunner = source("Run-ProductiveJourneyGate.mjs");
+
+  for (const runner of [focusedRunner, productiveRunner]) {
+    assert.match(runner, /from "\.\/NativeGateRuntime\.mjs"/u);
+    assert.match(runner, /createNativeGateRuntime/u);
+    assert.doesNotMatch(runner, /async function waitFor\(/u);
+    assert.doesNotMatch(runner, /function applicationProcesses\(/u);
+    assert.doesNotMatch(runner, /async function waitForNewApplication\(/u);
+    assert.doesNotMatch(runner, /async function waitForExit\(/u);
+    assert.doesNotMatch(runner, /function logRecords\(/u);
+    assert.doesNotMatch(runner, /function recordsFor\(/u);
+    assert.doesNotMatch(runner, /function driveNativeDialog\(/u);
+  }
+
+  const directory = mkdtempSync(
+    path.join(tmpdir(), "myalbuns-native-runtime-"),
+  );
+  const logs = path.join(directory, "Local", "MyAlbuns2", "Logs");
+  mkdirSync(logs, { recursive: true });
+  writeFileSync(
+    path.join(logs, "b.jsonl"),
+    '{"timestamp":"2026-09-01T02:00:00Z","event":"second"}\ninvalid\n',
+  );
+  writeFileSync(
+    path.join(logs, "a.jsonl"),
+    '{"timestamp":"2026-09-01T01:00:00Z","event":"first"}\n',
+  );
+  try {
+    const runtime = createNativeGateRuntime({
+      applicationPath: process.execPath,
+      defaultTimeoutMilliseconds: 5_000,
+      processDataRoot: directory,
+    });
+    assert.deepEqual(
+      runtime.logRecords().map((record) => record.event),
+      ["first", "second"],
+    );
+    let attempts = 0;
+    assert.equal(
+      await runtime.waitFor("eventual observation", () => {
+        attempts += 1;
+        if (attempts === 1) throw new Error("transient");
+        return attempts === 2 ? "ready" : undefined;
+      }),
+      "ready",
+    );
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
+
+  let observedRequest;
+  const presentation = await readOwnedDialogPresentation({
+    sessionId: "session-1",
+    async request(method, endpoint, body) {
+      observedRequest = { body, endpoint, method };
+      return { actions: ["Cancelar"], dialogCount: 1 };
+    },
+  });
+  assert.deepEqual(presentation, { actions: ["Cancelar"], dialogCount: 1 });
+  assert.equal(observedRequest.method, "POST");
+  assert.equal(observedRequest.endpoint, "/session/session-1/execute/sync");
+  assert.match(observedRequest.body.script, /aria-labelledby/u);
+
+  await readProjectInteractionState({
+    sessionId: "session-2",
+    async request(method, endpoint, body) {
+      observedRequest = { body, endpoint, method };
+      return { commandMenus: [], workspaceInert: false };
+    },
+  });
+  assert.equal(observedRequest.endpoint, "/session/session-2/execute/sync");
+  assert.match(observedRequest.body.script, /Menu principal/u);
+  assert.match(observedRequest.body.script, /workspace-grid/u);
 });
 
 test("the wrapper builds and fingerprints the exact custom-protocol debug application", () => {
@@ -362,20 +441,15 @@ test("public hashing consumers restore Windows PowerShell 5.1 artifact metadata"
   const candidatePath = path.join(scripts, "FocusedOwnedDialogScenarios.mjs");
   const candidateContents = readFileSync(candidatePath);
   const candidateStat = statSync(candidatePath);
-  const metadata = fingerprintWithClobberedWindowsPowerShellModulePath(
-    candidatePath,
-  );
+  const metadata =
+    fingerprintWithClobberedWindowsPowerShellModulePath(candidatePath);
 
   assert.match(metadata.powershellVersion, /^5\.1\./u);
   assert.equal(metadata.hashCommandModule, "Microsoft.PowerShell.Utility");
   assert.equal(
     path.dirname(metadata.hashCommandModulePath).toLowerCase(),
     path
-      .join(
-        metadata.powershellHome,
-        "Modules",
-        "Microsoft.PowerShell.Utility",
-      )
+      .join(metadata.powershellHome, "Modules", "Microsoft.PowerShell.Utility")
       .toLowerCase(),
   );
   assert.equal(
@@ -437,10 +511,7 @@ test("the shared Sidecar pipeline keeps external Cargo targets inside their cano
     sidecar,
     /\$baseTargetDirectory = Resolve-MyAlbunsCargoTargetDirectory/u,
   );
-  assert.match(
-    sidecar,
-    /\$source\.StartsWith\(\s*\$targetDirectoryPrefix,/u,
-  );
+  assert.match(sidecar, /\$source\.StartsWith\(\s*\$targetDirectoryPrefix,/u);
   assert.match(
     sidecar,
     /\$runtimeDestination\.StartsWith\(\s*\$targetDirectoryPrefix,/u,
@@ -462,10 +533,7 @@ test("the focused artifact follows the canonical Cargo target directory", () => 
     resolveCargoTargetDirectory(undefined),
     path.join(workspace, "target"),
   );
-  assert.equal(
-    resolveCargoTargetDirectory(absoluteTarget),
-    absoluteTarget,
-  );
+  assert.equal(resolveCargoTargetDirectory(absoluteTarget), absoluteTarget);
   assert.equal(
     resolveCargoTargetDirectory(path.join(".scratch", "relative-target")),
     path.join(workspace, ".scratch", "relative-target"),
@@ -514,9 +582,8 @@ test("artifact metadata is relative only when it round-trips from the workspace"
 });
 
 test("external-copy readiness requires dispatch and its public terminal", async () => {
-  const { confirmExternalCopyActivationLifecycle } = await import(
-    "./FocusedOwnedDialogEvidence.mjs"
-  );
+  const { confirmExternalCopyActivationLifecycle } =
+    await import("./FocusedOwnedDialogEvidence.mjs");
   const host = {
     creationTimeUtc: "2026-08-31T02:00:01.000Z",
     processId: 4100,
@@ -543,14 +610,11 @@ test("external-copy readiness requires dispatch and its public terminal", async 
     pendingHost: host,
   };
 
-  assert.deepEqual(
-    confirmExternalCopyActivationLifecycle(evidence),
-    {
-      activationDispatched: true,
-      hostCorrelated: true,
-      publicTerminalObserved: true,
-    },
-  );
+  assert.deepEqual(confirmExternalCopyActivationLifecycle(evidence), {
+    activationDispatched: true,
+    hostCorrelated: true,
+    publicTerminalObserved: true,
+  });
   assert.throws(
     () =>
       confirmExternalCopyActivationLifecycle({
@@ -565,9 +629,7 @@ test("external-copy readiness requires dispatch and its public terminal", async 
     () =>
       confirmExternalCopyActivationLifecycle({
         ...evidence,
-        correlatedTerminals: [
-          { ...correlatedTerminal, host_process_id: 4200 },
-        ],
+        correlatedTerminals: [{ ...correlatedTerminal, host_process_id: 4200 }],
       }),
     /Host/u,
   );
@@ -764,7 +826,13 @@ test("the visible gate is opt-in and absent from standard headless commands", ()
     focusedCommand,
     "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-FocusedOwnedDialogGate.ps1",
   );
-  for (const standard of ["test", "build", "typecheck", "test:rust", "quality:rust"]) {
+  for (const standard of [
+    "test",
+    "build",
+    "typecheck",
+    "test:rust",
+    "quality:rust",
+  ]) {
     assert.doesNotMatch(packageJson.scripts[standard], /FocusedOwnedDialog/u);
     assert.doesNotMatch(packageJson.scripts[standard], /native-owned-dialogs/u);
   }
@@ -783,4 +851,30 @@ test("the operational policy reserves the full journey for integration or explic
     /full productive journey.*integration.*release.*explicit\s+permission/isu,
   );
   assert.match(policy, /MYALBUNS_UI_SCENARIO_IDS/u);
+});
+
+test("native runner orchestration resolves every referenced identifier", () => {
+  const program = ts.createProgram(
+    ["Run-FocusedOwnedDialogGate.mjs", "Run-ProductiveJourneyGate.mjs"].map(
+      (name) => path.join(scripts, name),
+    ),
+    {
+      allowJs: true,
+      checkJs: true,
+      noEmit: true,
+      target: ts.ScriptTarget.ES2022,
+      module: ts.ModuleKind.NodeNext,
+      skipLibCheck: true,
+    },
+  );
+  // The runners do not yet have a complete type contract. Resolve names across
+  // their actual import graph, including late receipt and cleanup paths.
+  const unresolvedNames = ts.getPreEmitDiagnostics(program)
+    .filter((diagnostic) => [2304, 2552].includes(diagnostic.code))
+    .map((diagnostic) => {
+      const location = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start);
+      const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n");
+      return `${diagnostic.file.fileName}:${location.line + 1}: ${message}`;
+    });
+  assert.deepEqual(unresolvedNames, []);
 });

@@ -15,7 +15,6 @@ import {
   aliveProcessInstances,
   assertNoPreexistingProcessInstances,
   powershellJson,
-  processInstancesByExecutable,
   sameProcessInstance,
   terminateProcessInstance,
   waitForProcessInstance,
@@ -45,9 +44,18 @@ import {
   measureVisiblePointerGeometryScript,
   scrollIntoPointerViewportScript,
 } from "./WebDriverPointerGestures.mjs";
+import {
+  createNativeGateRuntime,
+  delay,
+  readProjectInteractionState,
+} from "./NativeGateRuntime.mjs";
 
-const [workspaceArgument, scratchArgument, applicationArgument, driverArgument] =
-  process.argv.slice(2);
+const [
+  workspaceArgument,
+  scratchArgument,
+  applicationArgument,
+  driverArgument,
+] = process.argv.slice(2);
 if (
   !workspaceArgument ||
   !scratchArgument ||
@@ -107,6 +115,25 @@ const webDriverSessionTimeoutMilliseconds = Math.min(
   60_000,
 );
 const driverTerminationTimeoutMilliseconds = 30_000;
+const {
+  applicationProcesses,
+  driveNativeDialog,
+  httpAvailable,
+  logRecords,
+  logText,
+  recordsFor,
+  waitFor,
+  waitForExit,
+  waitForLogEvent,
+  waitForNewApplication,
+} = createNativeGateRuntime({
+  applicationPath,
+  defaultTimeoutMilliseconds: 30_000,
+  nativeDialogDriver,
+  operationTimeoutMilliseconds: timeoutMilliseconds,
+  processDataRoot,
+  workspace,
+});
 
 for (const [label, candidate] of [
   ["workspace", workspace],
@@ -137,9 +164,6 @@ if (
 copyFileSync(photoFixturePath, photoPath);
 const originalPhoto = readFileSync(photoPath);
 
-const delay = (milliseconds) =>
-  new Promise((resolve) => setTimeout(resolve, milliseconds));
-
 async function waitForHttp(url, label, timeout = 30_000) {
   const deadline = Date.now() + timeout;
   let lastError;
@@ -155,19 +179,12 @@ async function waitForHttp(url, label, timeout = 30_000) {
     }
     await delay(50);
   }
-  throw new Error(`${label} did not become ready: ${lastError ?? "unknown error"}`, {
-    cause: lastError,
-  });
-}
-
-async function httpAvailable(url) {
-  try {
-    const response = await fetch(url, { signal: AbortSignal.timeout(500) });
-    await response.arrayBuffer();
-    return response.ok;
-  } catch {
-    return false;
-  }
+  throw new Error(
+    `${label} did not become ready: ${lastError ?? "unknown error"}`,
+    {
+      cause: lastError,
+    },
+  );
 }
 
 async function devToolsTargets(debugPort, label) {
@@ -189,9 +206,12 @@ async function waitForProjectDialogStateTarget(
     label,
     async () => {
       try {
-        const response = await fetch(`http://127.0.0.1:${debugPort}/json/list`, {
-          signal: AbortSignal.timeout(500),
-        });
+        const response = await fetch(
+          `http://127.0.0.1:${debugPort}/json/list`,
+          {
+            signal: AbortSignal.timeout(500),
+          },
+        );
         if (!response.ok) return undefined;
         const targets = await response.json();
         const matches = targets.filter((target) => {
@@ -233,13 +253,7 @@ async function startAttachedWebDriver(
   });
 }
 
-async function findElement(
-  driver,
-  using,
-  value,
-  label,
-  timeout = 30_000,
-) {
+async function findElement(driver, using, value, label, timeout = 30_000) {
   const deadline = Date.now() + timeout;
   let lastError;
   while (Date.now() < deadline) {
@@ -380,7 +394,9 @@ async function findApplicationMenuCommand(
     `//nav[@aria-label='Menu principal']//button[normalize-space()='${menuLabel}']`,
     `${label} menu`,
   );
-  if ((await elementAttribute(driver, menuTrigger, "aria-expanded")) !== "true") {
+  if (
+    (await elementAttribute(driver, menuTrigger, "aria-expanded")) !== "true"
+  ) {
     await clickElementWhenInteractable(driver, menuTrigger, `${label} menu`);
   }
   const command = await findElement(
@@ -435,9 +451,18 @@ async function selectApplicationMenuCommandUntilLogEvent(
       await delay(50);
     }
   }
-  throw new Error(`${label} produced no ${event} observation`, {
-    cause: lastError,
-  });
+  let interactionState;
+  try {
+    interactionState = await readProjectInteractionState(driver);
+  } catch (error) {
+    interactionState = { diagnosticError: String(error) };
+  }
+  throw new Error(
+    `${label} produced no ${event} observation; interactionState=${JSON.stringify(interactionState)}`,
+    {
+      cause: lastError,
+    },
+  );
 }
 
 async function applicationMenuCommandEnabled(
@@ -546,12 +571,7 @@ async function findAlbumInformationDpi(driver, label) {
     "Informações do Álbum",
     `${label} section`,
   );
-  return findElement(
-    driver,
-    "css selector",
-    "input[aria-label='DPI']",
-    label,
-  );
+  return findElement(driver, "css selector", "input[aria-label='DPI']", label);
 }
 
 async function replaceAlbumInformationDpi(driver, value, label) {
@@ -615,7 +635,9 @@ async function doubleClick(driver, using, value, label) {
       ],
     });
   } finally {
-    await driver.request("DELETE", `${endpoint}/actions`).catch(() => undefined);
+    await driver
+      .request("DELETE", `${endpoint}/actions`)
+      .catch(() => undefined);
   }
   return elementId;
 }
@@ -642,7 +664,12 @@ async function beginUncommittedPointerGesture(driver, using, value, label) {
 }
 
 async function sendEscape(driver) {
-  const body = await findElement(driver, "css selector", "body", "Project body");
+  const body = await findElement(
+    driver,
+    "css selector",
+    "body",
+    "Project body",
+  );
   await driver.request(
     "POST",
     `/session/${driver.sessionId}/element/${encodeURIComponent(body)}/value`,
@@ -698,10 +725,7 @@ async function changeFormControl(driver, using, value, nextValue, label) {
         element.dispatchEvent(new Event("change", { bubbles: true }));
         return element.value;
       `,
-      args: [
-        { "element-6066-11e4-a52e-4f735466cecf": elementId },
-        nextValue,
-      ],
+      args: [{ "element-6066-11e4-a52e-4f735466cecf": elementId }, nextValue],
     },
   );
   if (observedValue !== nextValue) {
@@ -725,17 +749,9 @@ async function elementAttribute(driver, elementId, attribute) {
 }
 
 async function observeSheetGrid(driver, label) {
-  const grid = await findElement(
-    driver,
-    "css selector",
-    ".sheet-grid",
-    label,
-  );
-  return driver.request(
-    "POST",
-    `/session/${driver.sessionId}/execute/sync`,
-    {
-      script: `
+  const grid = await findElement(driver, "css selector", ".sheet-grid", label);
+  return driver.request("POST", `/session/${driver.sessionId}/execute/sync`, {
+    script: `
         const grid = arguments[0];
         const slots = Array.from(
           grid.querySelectorAll(":scope > .sheet-grid-slot"),
@@ -749,9 +765,8 @@ async function observeSheetGrid(driver, label) {
           order: slots.map((slot) => slot.dataset.sheetId ?? ""),
         };
       `,
-      args: [{ "element-6066-11e4-a52e-4f735466cecf": grid }],
-    },
-  );
+    args: [{ "element-6066-11e4-a52e-4f735466cecf": grid }],
+  });
 }
 
 async function waitForSheetGrid(driver, label, predicate) {
@@ -765,12 +780,7 @@ async function waitForSheetGrid(driver, label, predicate) {
   );
 }
 
-async function dragSheetInGrid(
-  driver,
-  sourceSheetId,
-  targetSheetId,
-  label,
-) {
+async function dragSheetInGrid(driver, sourceSheetId, targetSheetId, label) {
   const source = await findElement(
     driver,
     "css selector",
@@ -784,7 +794,9 @@ async function dragSheetInGrid(
     `${label} target`,
   );
   if ((await elementAttribute(driver, source, "draggable")) === "true") {
-    throw new Error(`${label} unexpectedly fell back to native HTML drag-and-drop`);
+    throw new Error(
+      `${label} unexpectedly fell back to native HTML drag-and-drop`,
+    );
   }
   const endpoint = `/session/${driver.sessionId}`;
   const sourceElement = {
@@ -801,17 +813,12 @@ async function dragSheetInGrid(
     script: scrollIntoPointerViewportScript,
     args: [targetElement],
   });
-  const geometry = await driver.request(
-    "POST",
-    `${endpoint}/execute/sync`,
-    {
-      script: measureVisiblePointerGeometryScript,
-      args: [sourceElement, targetElement],
-    },
-  );
+  const geometry = await driver.request("POST", `${endpoint}/execute/sync`, {
+    script: measureVisiblePointerGeometryScript,
+    args: [sourceElement, targetElement],
+  });
   if (
-    (await elementAttribute(driver, source, "data-reorder-enabled")) !==
-    "true"
+    (await elementAttribute(driver, source, "data-reorder-enabled")) !== "true"
   ) {
     throw new Error(`${label} source was not ready for pointer reordering`);
   }
@@ -830,118 +837,17 @@ async function dragSheetInGrid(
       ],
     });
   } finally {
-    await driver.request("DELETE", `${endpoint}/actions`).catch(() => undefined);
+    await driver
+      .request("DELETE", `${endpoint}/actions`)
+      .catch(() => undefined);
   }
-}
-
-async function waitFor(label, predicate, timeout = 30_000) {
-  const deadline = Date.now() + timeout;
-  let observation;
-  while (Date.now() < deadline) {
-    observation = await predicate();
-    if (observation) return observation;
-    await delay(50);
-  }
-  throw new Error(`${label} was not observed: ${JSON.stringify(observation)}`);
-}
-
-function applicationProcesses() {
-  return processInstancesByExecutable(
-    applicationPath,
-    "myalbuns-desktop.exe",
-  );
 }
 
 function isHost(instance) {
   return instance.commandLine.includes("--myalbuns-project-host");
 }
-
-async function waitForNewApplication(predicate, known, label) {
-  return waitFor(
-    label,
-    () =>
-      applicationProcesses().find(
-        (instance) =>
-          predicate(instance) &&
-          !known.some((candidate) => sameProcessInstance(instance, candidate)),
-      ),
-    timeoutMilliseconds,
-  );
-}
-
-async function waitForExit(instance, label) {
-  await waitFor(
-    label,
-    () => aliveProcessInstances([instance]).length === 0,
-    timeoutMilliseconds,
-  );
-}
-
-function driveNativeDialog(instance, action, title, destination) {
-  const arguments_ = [
-    "-NoProfile",
-    "-NonInteractive",
-    "-ExecutionPolicy",
-    "Bypass",
-    "-File",
-    nativeDialogDriver,
-    "-Action",
-    action,
-    "-ProcessId",
-    String(instance.processId),
-    "-CreationTimeUtc",
-    instance.creationTimeUtc,
-    "-DialogTitle",
-    title,
-    "-TimeoutSeconds",
-    "30",
-  ];
-  if (destination) {
-    arguments_.push("-DestinationPath", destination);
-  }
-  const result = spawnSync("powershell.exe", arguments_, {
-    cwd: workspace,
-    windowsHide: true,
-    encoding: "utf8",
-  });
-  if (result.status !== 0) {
-    throw new Error(
-      `Native dialog automation failed: ${result.stderr || result.stdout}`,
-    );
-  }
-  return JSON.parse(result.stdout.trim());
-}
-
 function projectDataNamespace(projectId) {
   return `project-${createHash("sha256").update(projectId).digest("hex")}`;
-}
-
-function logRecords() {
-  const directory = path.join(processDataRoot, "Local", "MyAlbuns2", "Logs");
-  if (!existsSync(directory)) return [];
-  return readdirSync(directory)
-    .filter((name) => name.endsWith(".jsonl"))
-    .flatMap((name) =>
-      readFileSync(path.join(directory, name), "utf8")
-        .split(/\r?\n/)
-        .filter(Boolean)
-        .flatMap((line) => {
-          try {
-            return [JSON.parse(line)];
-          } catch {
-            return [];
-          }
-        }),
-    )
-    .sort((left, right) => String(left.timestamp).localeCompare(String(right.timestamp)));
-}
-
-function logText() {
-  return logRecords().map((record) => JSON.stringify(record)).join("\n");
-}
-
-function recordsFor(event) {
-  return logRecords().filter((record) => record.event === event);
 }
 
 function projectIntentRecords(processId, intent) {
@@ -1014,14 +920,6 @@ function sourceContainsNativePath(source, candidate) {
   );
 }
 
-async function waitForLogEvent(event, count, label) {
-  return waitFor(
-    label,
-    () => recordsFor(event).length >= count,
-    timeoutMilliseconds,
-  );
-}
-
 async function waitForHostUiReady(instance, label) {
   return waitFor(
     label,
@@ -1043,9 +941,7 @@ const applicationEnvironment = {
   MYALBUNS_PROCESS_GATE_DATA_ROOT: processDataRoot,
   MYALBUNS_DEV_GLOBAL_WEBVIEW_DEBUG_PORT: String(globalDebugPort),
   MYALBUNS_DEV_HOST_WEBVIEW_DEBUG_PORT: String(hostDebugPort),
-  MYALBUNS_DEV_ALTERNATE_HOST_WEBVIEW_DEBUG_PORT: String(
-    reopenedHostDebugPort,
-  ),
+  MYALBUNS_DEV_ALTERNATE_HOST_WEBVIEW_DEBUG_PORT: String(reopenedHostDebugPort),
   MYALBUNS_DEV_PROJECT_DIALOG_WEBVIEW_DEBUG_PORT: String(
     projectDialogDebugPort,
   ),
@@ -1267,16 +1163,16 @@ try {
     photoPath,
   );
   if (reselectedPhoto.action !== "select") {
-    throw new Error("The native existing JPEG Photo selection was not confirmed");
+    throw new Error(
+      "The native existing JPEG Photo selection was not confirmed",
+    );
   }
   await waitForLogEvent(
     "photo_import_existing_selected",
     1,
     "existing Photo selection terminal",
   );
-  const existingSelection = recordsFor(
-    "photo_import_existing_selected",
-  ).at(-1);
+  const existingSelection = recordsFor("photo_import_existing_selected").at(-1);
   const selectedMediaCard = await findElement(
     hostDriver,
     "css selector",
@@ -1337,7 +1233,9 @@ try {
     exportPath,
     photoPath,
     processDataRoot,
-  ].some((candidate) => sourceContainsNativePath(importedPageSource, candidate));
+  ].some((candidate) =>
+    sourceContainsNativePath(importedPageSource, candidate),
+  );
 
   await selectApplicationMenuCommand(
     hostDriver,
@@ -1382,7 +1280,9 @@ try {
     "WebView2",
     projectDataNamespace(savedDocument.projectId),
   );
-  if (webViewProcessesForDataDirectory(projectWebViewDataDirectory).length === 0) {
+  if (
+    webViewProcessesForDataDirectory(projectWebViewDataDirectory).length === 0
+  ) {
     throw new Error("The productive Host WebView2 process was not observable");
   }
 
@@ -1488,7 +1388,9 @@ try {
     exportPath,
     photoPath,
     processDataRoot,
-  ].some((candidate) => sourceContainsNativePath(reopenedPageSource, candidate));
+  ].some((candidate) =>
+    sourceContainsNativePath(reopenedPageSource, candidate),
+  );
   for (const label of ["Desfazer", "Refazer"]) {
     const enabled = await applicationMenuCommandEnabled(
       hostDriver,
@@ -1516,7 +1418,10 @@ try {
   );
 
   await replaceAlbumInformationDpi(hostDriver, "360", "unsaved DPI input");
-  await applyAlbumInformation(hostDriver, "Apply unsaved Album information action");
+  await applyAlbumInformation(
+    hostDriver,
+    "Apply unsaved Album information action",
+  );
   await waitForLogEvent("project_intent_applied", 3, "unsaved DPI application");
 
   const originalProjectId = savedDocument.projectId;
@@ -1654,9 +1559,7 @@ try {
       );
       const globalTargets = ownerTargets
         .filter((target) => target.type === "page")
-        .filter((target) =>
-        target.url.includes("global.html"),
-      );
+        .filter((target) => target.url.includes("global.html"));
       const recoveryTargets = ownerTargets
         .filter((target) => target.type === "page")
         .filter((target) => {
@@ -1768,10 +1671,11 @@ try {
       `The recovery prompt exposed unexpected choices: ${JSON.stringify(recoveryChoices)}`,
     );
   }
-  const recoveryActionsAreSingleLine = recoveryPresentation.actionGeometry.every(
-    (action) =>
-      action.lineCount === 1 && action.scrollWidth <= action.clientWidth + 1,
-  );
+  const recoveryActionsAreSingleLine =
+    recoveryPresentation.actionGeometry.every(
+      (action) =>
+        action.lineCount === 1 && action.scrollWidth <= action.clientWidth + 1,
+    );
   if (
     recoveryPresentation.dialogCount !== 1 ||
     recoveryPresentation.modalLayerCount !== 0 ||
@@ -1790,11 +1694,13 @@ try {
     hostWebViewBeforeDecision
   ) {
     throw new Error(
-      `Recovery was not one accessible external dialog in the stable opening owner: ${JSON.stringify({
-        ...recoveryPresentation,
-        hostWebViewBeforeDecision,
-        projectWindowTitleBeforeDecision,
-      })}`,
+      `Recovery was not one accessible external dialog in the stable opening owner: ${JSON.stringify(
+        {
+          ...recoveryPresentation,
+          hostWebViewBeforeDecision,
+          projectWindowTitleBeforeDecision,
+        },
+      )}`,
     );
   }
 
@@ -1833,8 +1739,7 @@ try {
     "POST",
     `/session/${recoveryDialogDriver.sessionId}/execute/sync`,
     {
-      script:
-        "return document.querySelectorAll('[role=\"dialog\"]').length;",
+      script: "return document.querySelectorAll('[role=\"dialog\"]').length;",
       args: [],
     },
   );
@@ -1858,9 +1763,7 @@ try {
     "Reopen and recover choice",
   );
   await waitForExit(recoveryGlobal, "recovery Global handoff");
-  recoveryDialogDriver = await disposeConfirmedWebDriver(
-    recoveryDialogDriver,
-  );
+  recoveryDialogDriver = await disposeConfirmedWebDriver(recoveryDialogDriver);
   await waitForHostUiReady(secondHost, "recovered Project UI ready");
   hostDriver = await startAttachedWebDriver(
     recoveryHostDebugPort,
@@ -1880,18 +1783,25 @@ try {
   );
   const projectRouteNormal = !recoveredOwnerUrl.includes("project-recovery");
 
-  const recoveredDpi = await findAlbumInformationDpi(hostDriver, "recovered DPI");
+  const recoveredDpi = await findAlbumInformationDpi(
+    hostDriver,
+    "recovered DPI",
+  );
   if ((await elementAttribute(hostDriver, recoveredDpi, "value")) !== "360") {
-    throw new Error("The recovered Project did not restore the checkpoint state");
+    throw new Error(
+      "The recovered Project did not restore the checkpoint state",
+    );
   }
   let recoveredHistoryEmpty = true;
   for (const label of ["Desfazer", "Refazer"]) {
-    if (await applicationMenuCommandEnabled(
-      hostDriver,
-      "Editar",
-      label,
-      `${label} after recovery`,
-    )) {
+    if (
+      await applicationMenuCommandEnabled(
+        hostDriver,
+        "Editar",
+        label,
+        `${label} after recovery`,
+      )
+    ) {
       recoveredHistoryEmpty = false;
     }
   }
@@ -1904,8 +1814,9 @@ try {
   const checkpointPreservedAfterRecovery =
     existsSync(recoveryCheckpointPath) &&
     readFileSync(recoveryCheckpointPath).equals(recoveryCheckpointBytes);
-  const projectFileUnchangedThroughRecovery =
-    readFileSync(projectPath).equals(projectBytesBeforeCrash);
+  const projectFileUnchangedThroughRecovery = readFileSync(projectPath).equals(
+    projectBytesBeforeCrash,
+  );
   if (
     !recoveredHistoryEmpty ||
     !recoveredUnsaved ||
@@ -1961,9 +1872,7 @@ try {
     },
     timeoutMilliseconds,
   );
-  const preSaveAsRecoveryCheckpointBytes = readFileSync(
-    recoveryCheckpointPath,
-  );
+  const preSaveAsRecoveryCheckpointBytes = readFileSync(recoveryCheckpointPath);
   const webviewStateRoot = path.join(
     processDataRoot,
     "Local",
@@ -2100,9 +2009,7 @@ try {
     () => existsSync(copiedCacheDirectory),
     timeoutMilliseconds,
   );
-  const emptyCacheStage = recordsFor(
-    "project_save_as_cache_staged_empty",
-  ).find(
+  const emptyCacheStage = recordsFor("project_save_as_cache_staged_empty").find(
     (record) =>
       record.project_id === copiedProjectId &&
       Number(record.cache_entry_count) === 0 &&
@@ -2153,7 +2060,9 @@ try {
     "project_webview_authority_ready",
   ).some((record) => Number(record.process_id) === secondHost.processId);
   if (!rebuiltWebviewReady) {
-    throw new Error("The Save As Host did not make its replacement WebView ready");
+    throw new Error(
+      "The Save As Host did not make its replacement WebView ready",
+    );
   }
 
   hostDriver = await startAttachedWebDriver(
@@ -2161,7 +2070,12 @@ try {
     "Save As Project Host",
     recoveryProjectDialogDebugPort,
   );
-  await findElement(hostDriver, "css selector", ".app-shell", "Save As Project UI");
+  await findElement(
+    hostDriver,
+    "css selector",
+    ".app-shell",
+    "Save As Project UI",
+  );
   const copiedAlbumDesign = await findElement(
     hostDriver,
     "xpath",
@@ -2193,7 +2107,9 @@ try {
   );
   const projectLocalSelectionReset = freshActiveSheetNumber === 1;
   if (!projectLocalSelectionReset) {
-    throw new Error("The Save As WebView inherited the previous local sheet selection");
+    throw new Error(
+      "The Save As WebView inherited the previous local sheet selection",
+    );
   }
   await click(
     hostDriver,
@@ -2219,7 +2135,9 @@ try {
   );
   const copiedDpi = await findAlbumInformationDpi(hostDriver, "Save As DPI");
   if ((await elementAttribute(hostDriver, copiedDpi, "value")) !== "360") {
-    throw new Error("The rebuilt Save As WebView did not adopt the copied projection");
+    throw new Error(
+      "The rebuilt Save As WebView did not adopt the copied projection",
+    );
   }
   const copiedPageSource = await hostDriver.request(
     "GET",
@@ -2316,10 +2234,7 @@ try {
     [firstHost, secondHost],
     "simultaneous original Project Host",
   );
-  await waitForExit(
-    originalGlobal,
-    "simultaneous original Global handoff",
-  );
+  await waitForExit(originalGlobal, "simultaneous original Global handoff");
   await waitForHostUiReady(
     originalHost,
     "simultaneous original Project UI ready",
@@ -2340,18 +2255,25 @@ try {
     "simultaneous original DPI",
   );
   if (
-    (await elementAttribute(originalDriver, simultaneousOriginalDpi, "value")) !==
-    "300"
+    (await elementAttribute(
+      originalDriver,
+      simultaneousOriginalDpi,
+      "value",
+    )) !== "300"
   ) {
-    throw new Error("The simultaneous original did not retain its saved content");
+    throw new Error(
+      "The simultaneous original did not retain its saved content",
+    );
   }
   for (const label of ["Desfazer", "Refazer"]) {
-    if (await applicationMenuCommandEnabled(
-      originalDriver,
-      "Editar",
-      label,
-      `${label} in simultaneous original`,
-    )) {
+    if (
+      await applicationMenuCommandEnabled(
+        originalDriver,
+        "Editar",
+        label,
+        `${label} in simultaneous original`,
+      )
+    ) {
       throw new Error(`The simultaneous original retained ${label} history`);
     }
   }
@@ -2360,7 +2282,9 @@ try {
     applicationProcesses().filter(isHost).length === 2 &&
     aliveProcessInstances([secondHost, originalHost]).length === 2;
   if (!simultaneousHostsOpen) {
-    throw new Error("The original and Save As copy were not open simultaneously");
+    throw new Error(
+      "The original and Save As copy were not open simultaneously",
+    );
   }
 
   const copiedBytesBeforeOriginalSave = readFileSync(saveAsPath);
@@ -2409,7 +2333,9 @@ try {
     independentlySavedOriginalDocument.project.document.dpi !== 320 ||
     !readFileSync(saveAsPath).equals(copiedBytesBeforeOriginalSave)
   ) {
-    throw new Error("Saving the simultaneous original crossed into the Save As copy");
+    throw new Error(
+      "Saving the simultaneous original crossed into the Save As copy",
+    );
   }
 
   await replaceAlbumInformationDpi(
@@ -2457,7 +2383,9 @@ try {
     independentlySavedCopyDocument.project.document.dpi === 420 &&
     readFileSync(projectPath).equals(independentlySavedOriginal);
   if (!isolatedIndependentSaves) {
-    throw new Error("Saving the Save As copy crossed into the original Project");
+    throw new Error(
+      "Saving the Save As copy crossed into the original Project",
+    );
   }
 
   await selectApplicationMenuCommandUntilLogEvent(
@@ -2551,7 +2479,11 @@ try {
     "Fechar",
     "close Export success feedback",
   );
-  await waitFor("exported JPEG", () => existsSync(exportPath), timeoutMilliseconds);
+  await waitFor(
+    "exported JPEG",
+    () => existsSync(exportPath),
+    timeoutMilliseconds,
+  );
   await waitForLogEvent("imaging_process_stopped", 1, "Processador terminal");
   const exported = readFileSync(exportPath);
   const emptyCacheAfterExport = summarizeOwnedCache(cacheRoot);
@@ -2576,7 +2508,9 @@ try {
     !readFileSync(saveAsPath).equals(independentlySavedCopy) ||
     !readFileSync(projectPath).equals(independentlySavedOriginal)
   ) {
-    throw new Error("Export mutated either independently saved Project document");
+    throw new Error(
+      "Export mutated either independently saved Project document",
+    );
   }
   const liveDpiInput = await findAlbumInformationDpi(
     hostDriver,
@@ -2656,14 +2590,15 @@ try {
       missingOriginalExportPath,
     );
     if (selectedMissingExport.action !== "select") {
-      throw new Error("The missing-Original Export destination was not confirmed");
+      throw new Error(
+        "The missing-Original Export destination was not confirmed",
+      );
     }
     await waitForLogEvent("export_failed", 1, "missing-Original failure");
     await waitFor(
       "missing-Original Processador spawn",
       () =>
-        exportProcessorAttempts().length ===
-        missingOriginalProcessorCount + 1,
+        exportProcessorAttempts().length === missingOriginalProcessorCount + 1,
       timeoutMilliseconds,
     );
     const missingOriginalAttempt = exportProcessorAttempts().at(-1);
@@ -2718,7 +2653,9 @@ try {
     copyFileSync(photoFixturePath, photoPath);
   }
   if (!readFileSync(photoPath).equals(originalPhoto)) {
-    throw new Error("The restored proof Original differs from the imported bytes");
+    throw new Error(
+      "The restored proof Original differs from the imported bytes",
+    );
   }
 
   await ensureInspectorSectionExpanded(
@@ -2734,11 +2671,7 @@ try {
       observation.order.length === 3 &&
       observation.order[1] === observation.focusedSheetId,
   );
-  const structuralIntentKinds = [
-    "add_sheet",
-    "reorder_sheet",
-    "delete_sheet",
-  ];
+  const structuralIntentKinds = ["add_sheet", "reorder_sheet", "delete_sheet"];
   const structuralIntentCountsBefore = Object.fromEntries(
     structuralIntentKinds.map((intent) => [
       intent,
@@ -2896,7 +2829,9 @@ try {
     );
   }
   const externalSourceBytes = readFileSync(externalCopyPath);
-  const externalSourceDocument = JSON.parse(externalSourceBytes.toString("utf8"));
+  const externalSourceDocument = JSON.parse(
+    externalSourceBytes.toString("utf8"),
+  );
   const externalGlobalDebugPort = await findFreeTcpPortInRange(40_000, 44_999);
   const externalHostDebugPort = await findFreeTcpPortInRange(40_000, 44_999);
   const externalProjectDialogDebugPort = await findFreeTcpPortInRange(
@@ -2932,8 +2867,9 @@ try {
     [firstHost, crashedHost, secondHost, originalHost],
     "first cancellable external-copy Project Host",
   );
-  const externalProjectWindowTitleBeforeDecision =
-    nativeWindowTitle(cancelledExternalCopyHost);
+  const externalProjectWindowTitleBeforeDecision = nativeWindowTitle(
+    cancelledExternalCopyHost,
+  );
   const externalHostWebViewBeforeDecision = await httpAvailable(
     `http://127.0.0.1:${externalHostDebugPort}/json/version`,
   );
@@ -3039,11 +2975,13 @@ try {
     externalHostWebViewBeforeDecision
   ) {
     throw new Error(
-      `The external-copy decision did not remain in the stable opening owner: ${JSON.stringify({
-        ...externalCopyPresentation,
-        externalHostWebViewBeforeDecision,
-        externalProjectWindowTitleBeforeDecision,
-      })}`,
+      `The external-copy decision did not remain in the stable opening owner: ${JSON.stringify(
+        {
+          ...externalCopyPresentation,
+          externalHostWebViewBeforeDecision,
+          externalProjectWindowTitleBeforeDecision,
+        },
+      )}`,
     );
   }
 
@@ -3060,11 +2998,13 @@ try {
       nativeState: nativeOwnedWindowState(instance),
     }));
     throw new Error(
-      `The external-copy decision did not replace and block its native Global owner: ${JSON.stringify({
-        expectedGlobal: externalCopyGlobal,
-        expectedState: firstExternalNativeOwner,
-        applicationWindowStates,
-      })}`,
+      `The external-copy decision did not replace and block its native Global owner: ${JSON.stringify(
+        {
+          expectedGlobal: externalCopyGlobal,
+          expectedState: firstExternalNativeOwner,
+          applicationWindowStates,
+        },
+      )}`,
     );
   }
 
@@ -3235,7 +3175,14 @@ try {
     sameProcessInstance(activeExternalHosts[0], queuedExternalCopyHost);
   if (!queuedActivationPreservedExternalOwner) {
     throw new Error(
-      "A real-path activation replaced the external-copy owner or duplicated its pending Host",
+      `A real-path activation replaced the external-copy owner or duplicated its pending Host: ${JSON.stringify({
+        expectedTarget: queuedExternalTargetSnapshot,
+        observedTarget: queuedExternalTarget,
+        queuedExternalDialogCount,
+        nativeOwner: queuedExternalNativeOwner,
+        expectedHost: queuedExternalCopyHost,
+        activeHosts: activeExternalHosts,
+      })}`,
     );
   }
 
@@ -3322,7 +3269,8 @@ try {
   const externalAttemptBeforePickerCancel = new URL(
     serialExternalTargetSnapshot.url,
   ).searchParams.get("attemptId");
-  const retryNativeOwnerBeforePicker = nativeOwnedWindowState(externalCopyGlobal);
+  const retryNativeOwnerBeforePicker =
+    nativeOwnedWindowState(externalCopyGlobal);
 
   await clickUntilLogEvent(
     externalCopyDialogDriver,
@@ -3342,16 +3290,18 @@ try {
     ".ui-owned-window-shell [role='dialog']",
     "external-copy decision after native picker cancellation",
   );
-  const externalAttemptAfterPickerCancel = await externalCopyDialogDriver.request(
-    "POST",
-    `/session/${externalCopyDialogDriver.sessionId}/execute/sync`,
-    {
-      script:
-        "return new URLSearchParams(window.location.search).get('attemptId');",
-      args: [],
-    },
-  );
-  const retryNativeOwnerAfterPicker = nativeOwnedWindowState(externalCopyGlobal);
+  const externalAttemptAfterPickerCancel =
+    await externalCopyDialogDriver.request(
+      "POST",
+      `/session/${externalCopyDialogDriver.sessionId}/execute/sync`,
+      {
+        script:
+          "return new URLSearchParams(window.location.search).get('attemptId');",
+        args: [],
+      },
+    );
+  const retryNativeOwnerAfterPicker =
+    nativeOwnedWindowState(externalCopyGlobal);
   const pickerCancellationPreservedAttempt =
     cancelledExternalCopyPicker.action === "cancel" &&
     externalAttemptBeforePickerCancel !== null &&
@@ -3451,9 +3401,8 @@ try {
   const externalSavedDocument = JSON.parse(
     readFileSync(externalSavedCopyPath).toString("utf8"),
   );
-  const externalSourcePreserved = readFileSync(externalCopyPath).equals(
-    externalSourceBytes,
-  );
+  const externalSourcePreserved =
+    readFileSync(externalCopyPath).equals(externalSourceBytes);
   const samePendingHostCompletedHandoff =
     applicationProcesses().filter(isHost).length === 1 &&
     aliveProcessInstances([externalCopyHost]).length === 1;
@@ -3464,10 +3413,8 @@ try {
     externalActivationBatches.length === 2 &&
     Number(externalActivationBatches[0]?.failed_count) === 1 &&
     Number(externalActivationBatches[1]?.opened_count) === 1 &&
-    aliveProcessInstances([
-      cancelledExternalCopyHost,
-      queuedExternalCopyHost,
-    ]).length === 0 &&
+    aliveProcessInstances([cancelledExternalCopyHost, queuedExternalCopyHost])
+      .length === 0 &&
     new Set([
       cancelledExternalCopyHost.processId,
       queuedExternalCopyHost.processId,
@@ -3519,7 +3466,9 @@ try {
     },
   );
   if (!contextLossDispatched) {
-    throw new Error("The productive Canvas did not accept the context-loss event");
+    throw new Error(
+      "The productive Canvas did not accept the context-loss event",
+    );
   }
   await waitForLogEvent(
     "canvas_context_lost",
@@ -3601,12 +3550,14 @@ try {
     blockedWorkspaceAfterGraphicsFailure.inlineFailureCount === 0;
   if (!graphicsDialogOwnedAndProjectBlocked) {
     throw new Error(
-      `The late graphics failure did not use one external Project-owned dialog: ${JSON.stringify({
-        blockedWorkspaceAfterGraphicsFailure,
-        graphicsNativeOwner,
-        graphicsPresentation,
-        targetCount: graphicsDialogTarget ? 1 : 0,
-      })}`,
+      `The late graphics failure did not use one external Project-owned dialog: ${JSON.stringify(
+        {
+          blockedWorkspaceAfterGraphicsFailure,
+          graphicsNativeOwner,
+          graphicsPresentation,
+          targetCount: graphicsDialogTarget ? 1 : 0,
+        },
+      )}`,
     );
   }
 
@@ -3664,7 +3615,8 @@ try {
         "POST",
         `/session/${dialogDriver.sessionId}/execute/sync`,
         {
-          script: "return document.querySelectorAll('[role=\"dialog\"]').length;",
+          script:
+            "return document.querySelectorAll('[role=\"dialog\"]').length;",
           args: [],
         },
       );
@@ -3766,8 +3718,7 @@ try {
     nativeOwnerReplaced: firstExternalOwnerWasReplaced,
     pickerCancellationPreservedAttempt,
     realPathActivationsCompletedSerially,
-    queuedActivationPreservedOwner:
-      queuedActivationPreservedExternalOwner,
+    queuedActivationPreservedOwner: queuedActivationPreservedExternalOwner,
     samePendingHostCompletedHandoff,
     sourcePreserved: externalSourcePreserved,
     revisionPreserved:
@@ -3883,7 +3834,8 @@ try {
       queuedExternalCopyHost.processId,
       externalCopyHost.processId,
       ...exportSpawns.map((record) => Number(record.imaging_process_id)),
-    ]).size !== 10 + exportSpawns.length
+    ]).size !==
+    10 + exportSpawns.length
   ) {
     throw new Error(
       "Global, Host, serialized external-copy attempts and both Processadores did not use distinct PIDs",
@@ -3925,8 +3877,7 @@ try {
             recoveryTargetSnapshot.recoveryTargets.length,
           hostWebViewBeforeDecision,
           projectRouteNormal,
-          projectVisibleBeforeDecision:
-            projectWindowTitleBeforeDecision !== "",
+          projectVisibleBeforeDecision: projectWindowTitleBeforeDecision !== "",
           sameOpeningWindow: recoveryPresentation.openedFromLoadingOwner,
           stableOpeningOwner:
             recoveryGlobal.processId !== secondHost.processId &&
@@ -3935,7 +3886,8 @@ try {
           singleHostDuringQueuedActivation,
         },
         opaqueProjectKey:
-          path.basename(recoveryCheckpointPath) === `${originalNamespace}.json` &&
+          path.basename(recoveryCheckpointPath) ===
+            `${originalNamespace}.json` &&
           !path.basename(recoveryCheckpointPath).includes(originalProjectId),
         completedActionCheckpointed: true,
         midGesturePreservedPreviousCheckpoint,
@@ -4016,7 +3968,10 @@ try {
       canvasPhotoSample,
       sourcePathExposedToWebView,
       terminalCounts: {
-        globalHandoffs: eventCount(logText(), "global_exited_after_project_handoff"),
+        globalHandoffs: eventCount(
+          logText(),
+          "global_exited_after_project_handoff",
+        ),
         hostReady: eventCount(logText(), "host_ready"),
         imagingStopped: records.filter(
           (record) =>
@@ -4030,6 +3985,51 @@ try {
       },
     }),
   );
+} catch (error) {
+  try {
+    const observations = {};
+    for (const [label, driver] of Object.entries({
+      globalDriver,
+      hostDriver,
+      originalDriver,
+      recoveryDialogDriver,
+      secondGlobalDriver,
+      externalCopyDialogDriver,
+      externalCopyHostDriver,
+    })) {
+      if (!driver) continue;
+      try {
+        observations[label] = await readProjectInteractionState(driver);
+        const screenshot = await driver.request(
+          "GET",
+          `/session/${driver.sessionId}/screenshot`,
+        );
+        writeFileSync(
+          path.join(scratch, `failure-${label}.png`),
+          Buffer.from(screenshot, "base64"),
+        );
+      } catch (observationError) {
+        observations[label] = {
+          ...observations[label],
+          observationError: String(observationError),
+        };
+      }
+    }
+    writeFileSync(
+      path.join(scratch, "failure.json"),
+      JSON.stringify({
+        error: String(error),
+        stack: error.stack,
+        observations,
+        processes: applicationProcesses(),
+        browsers: webViewProcessesForDataDirectory(scratch),
+        recentEvents: logRecords().slice(-20),
+      }, null, 2),
+    );
+  } catch (diagnosticError) {
+    console.error(`Productive journey diagnostics failed: ${diagnosticError}`);
+  }
+  throw error;
 } finally {
   let driverCleanupFailure;
   for (const driver of [

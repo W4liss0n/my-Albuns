@@ -1,15 +1,10 @@
 import { spawn, spawnSync } from "node:child_process";
-import {
-  existsSync,
-  readFileSync,
-  readdirSync,
-} from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import {
   aliveProcessInstances,
   assertNoPreexistingProcessInstances,
-  processInstancesByExecutable,
   sameProcessInstance,
   terminateProcessInstance,
   waitForProcessInstance,
@@ -27,9 +22,17 @@ import {
   nativeOwnedWindowState,
   nativeWindowTitle,
 } from "./NativeWindowObservation.mjs";
+import {
+  createNativeGateRuntime,
+  readOwnedDialogPresentation,
+} from "./NativeGateRuntime.mjs";
 
-const [workspaceArgument, scratchArgument, applicationArgument, driverArgument] =
-  process.argv.slice(2);
+const [
+  workspaceArgument,
+  scratchArgument,
+  applicationArgument,
+  driverArgument,
+] = process.argv.slice(2);
 if (
   !workspaceArgument ||
   !scratchArgument ||
@@ -47,10 +50,7 @@ const applicationPath = path.resolve(applicationArgument);
 const nativeDriverPath = path.resolve(driverArgument);
 const processDataRoot = path.join(scratch, "process-data");
 const fixture = JSON.parse(
-  readFileSync(
-    path.join(scratch, "focused-owned-dialog-fixture.json"),
-    "utf8",
-  ),
+  readFileSync(path.join(scratch, "focused-owned-dialog-fixture.json"), "utf8"),
 );
 const originalPath = path.resolve(fixture.originalPath);
 const externalCopyPath = path.resolve(fixture.externalCopyPath);
@@ -63,6 +63,23 @@ const nativeDialogDriver = path.join(
 const timeoutMilliseconds = Number(
   process.env.MYALBUNS_FOCUSED_DIALOG_TIMEOUT_MS ?? "90000",
 );
+const {
+  applicationProcesses,
+  collectChildOutput,
+  driveNativeDialog,
+  httpAvailable,
+  recordsFor,
+  waitFor,
+  waitForExit,
+  waitForLogEvent,
+  waitForNewApplication,
+} = createNativeGateRuntime({
+  applicationPath,
+  defaultTimeoutMilliseconds: timeoutMilliseconds,
+  nativeDialogDriver,
+  processDataRoot,
+  workspace,
+});
 
 if (
   FOCUSED_OWNED_DIALOG_SCENARIOS.length !== 2 ||
@@ -73,28 +90,6 @@ if (
   !Number.isSafeInteger(sourceRevision)
 ) {
   throw new Error("The focused owned-dialog fixture is incomplete");
-}
-
-const delay = (milliseconds) =>
-  new Promise((resolve) => setTimeout(resolve, milliseconds));
-
-async function waitFor(label, predicate, timeout = timeoutMilliseconds) {
-  const deadline = Date.now() + timeout;
-  let observation;
-  let lastError;
-  while (Date.now() < deadline) {
-    try {
-      observation = await predicate();
-      if (observation) return observation;
-    } catch (error) {
-      lastError = error;
-    }
-    await delay(50);
-  }
-  throw new Error(
-    `${label} was not observed: ${JSON.stringify(observation)}; ${lastError ?? "no error"}`,
-    { cause: lastError },
-  );
 }
 
 async function waitForNativeWindowState(label, instance, predicate) {
@@ -112,79 +107,8 @@ async function waitForNativeWindowState(label, instance, predicate) {
   }
 }
 
-async function httpAvailable(url) {
-  try {
-    const response = await fetch(url, { signal: AbortSignal.timeout(500) });
-    await response.arrayBuffer();
-    return response.ok;
-  } catch {
-    return false;
-  }
-}
-
-function applicationProcesses() {
-  return processInstancesByExecutable(
-    applicationPath,
-    path.basename(applicationPath),
-  );
-}
-
 function isBootstrapHost(instance) {
   return instance.commandLine.includes("--myalbuns-project-host");
-}
-
-async function waitForNewApplication(predicate, known, label) {
-  return waitFor(label, () =>
-    applicationProcesses().find(
-      (instance) =>
-        predicate(instance) &&
-        !known.some((candidate) => sameProcessInstance(instance, candidate)),
-    ),
-  );
-}
-
-async function waitForExit(instance, label) {
-  await waitFor(label, () => aliveProcessInstances([instance]).length === 0);
-}
-
-function collectChildOutput(child) {
-  let output = "";
-  child.stdout?.on("data", (chunk) => {
-    output += chunk.toString();
-  });
-  child.stderr?.on("data", (chunk) => {
-    output += chunk.toString();
-  });
-  return () => output;
-}
-
-function logRecords() {
-  const directory = path.join(processDataRoot, "Local", "MyAlbuns2", "Logs");
-  if (!existsSync(directory)) return [];
-  return readdirSync(directory)
-    .filter((name) => name.endsWith(".jsonl"))
-    .flatMap((name) =>
-      readFileSync(path.join(directory, name), "utf8")
-        .split(/\r?\n/u)
-        .filter(Boolean)
-        .flatMap((line) => {
-          try {
-            return [JSON.parse(line)];
-          } catch {
-            return [];
-          }
-        }),
-    );
-}
-
-function recordsFor(event) {
-  return logRecords().filter((record) => record.event === event);
-}
-
-async function waitForLogEvent(event, count, label) {
-  return waitFor(label, () =>
-    recordsFor(event).length >= count ? recordsFor(event) : undefined,
-  );
 }
 
 async function findElement(driver, using, value, label) {
@@ -208,41 +132,6 @@ async function click(driver, using, value, label) {
     "POST",
     `/session/${driver.sessionId}/element/${encodeURIComponent(element)}/click`,
   );
-}
-
-function driveNativeDialog(instance, action, title) {
-  const result = spawnSync(
-    "powershell.exe",
-    [
-      "-NoProfile",
-      "-NonInteractive",
-      "-ExecutionPolicy",
-      "Bypass",
-      "-File",
-      nativeDialogDriver,
-      "-Action",
-      action,
-      "-ProcessId",
-      String(instance.processId),
-      "-CreationTimeUtc",
-      instance.creationTimeUtc,
-      "-DialogTitle",
-      title,
-      "-TimeoutSeconds",
-      "30",
-    ],
-    {
-      cwd: workspace,
-      windowsHide: true,
-      encoding: "utf8",
-    },
-  );
-  if (result.status !== 0) {
-    throw new Error(
-      `Native dialog automation failed: ${result.stderr || result.stdout}`,
-    );
-  }
-  return JSON.parse(result.stdout.trim());
 }
 
 function readSourceRevision() {
@@ -322,7 +211,8 @@ async function observeExternalCopyScenario() {
       return decisions.length === 1 ? decisions[0] : undefined;
     });
     const attemptId = new URL(target.url).searchParams.get("attemptId");
-    if (!attemptId) throw new Error("The external-copy decision has no attemptId");
+    if (!attemptId)
+      throw new Error("The external-copy decision has no attemptId");
     hostInstance = await waitForNewApplication(
       isBootstrapHost,
       [],
@@ -353,27 +243,7 @@ async function observeExternalCopyScenario() {
       ".ui-owned-window-shell [role='dialog']",
       "external-copy dialog content",
     );
-    const presentation = await driver.request(
-      "POST",
-      `/session/${driver.sessionId}/execute/sync`,
-      {
-        script: `
-          const dialog = document.querySelector('[role="dialog"]');
-          const titleId = dialog?.getAttribute('aria-labelledby');
-          return {
-            actions: Array.from(dialog?.querySelectorAll('button') ?? [])
-              .map((button) => button.textContent.trim()),
-            ariaModal: dialog?.getAttribute('aria-modal') ?? null,
-            dialogCount: document.querySelectorAll('[role="dialog"]').length,
-            initialFocus: document.activeElement?.textContent?.trim() ?? null,
-            title: titleId
-              ? document.getElementById(titleId)?.textContent?.trim() ?? null
-              : null,
-          };
-        `,
-        args: [],
-      },
-    );
+    const presentation = await readOwnedDialogPresentation(driver);
     const nativeBeforePicker = await waitForNativeWindowState(
       "external-copy native owner",
       globalInstance,
@@ -495,10 +365,10 @@ async function observeExternalCopyScenario() {
       globalInstance,
       (state) =>
         state.dialogCount === 0 &&
-          state.windows.some(
-            (window) =>
-              window.ownerHwnd === 0 && window.visible && window.enabled,
-          ),
+        state.windows.some(
+          (window) =>
+            window.ownerHwnd === 0 && window.visible && window.enabled,
+        ),
     );
     const terminalCleaned =
       restoredOwner.dialogCount === 0 &&
@@ -632,29 +502,26 @@ async function observeGraphicsScenario() {
         return state.workspaceInert && state.workspaceBusy ? state : undefined;
       },
     );
-    const target = await waitFor(
-      "graphics Project dialog target",
-      async () => {
-        const targets = await webViewDevToolsTargets(
-          projectDialogDebugPort,
-          "graphics Project dialog",
-        );
-        const matches = targets.filter((candidate) => {
-          try {
-            return (
-              candidate.type === "page" &&
-              new URL(candidate.url).pathname.endsWith("/project-dialog.html") &&
-              decodeURIComponent(candidate.url).includes(
-                '\"kind\":\"graphicsFailure\"',
-              )
-            );
-          } catch {
-            return false;
-          }
-        });
-        return matches.length === 1 ? matches[0] : undefined;
-      },
-    );
+    const target = await waitFor("graphics Project dialog target", async () => {
+      const targets = await webViewDevToolsTargets(
+        projectDialogDebugPort,
+        "graphics Project dialog",
+      );
+      const matches = targets.filter((candidate) => {
+        try {
+          return (
+            candidate.type === "page" &&
+            new URL(candidate.url).pathname.endsWith("/project-dialog.html") &&
+            decodeURIComponent(candidate.url).includes(
+              '\"kind\":\"graphicsFailure\"',
+            )
+          );
+        } catch {
+          return false;
+        }
+      });
+      return matches.length === 1 ? matches[0] : undefined;
+    });
     dialogDriver = await attachWebView2Driver({
       debugPort: projectDialogDebugPort,
       label: "graphics Project dialog",
@@ -673,27 +540,7 @@ async function observeGraphicsScenario() {
       "[role='dialog']",
       "graphics dialog content",
     );
-    const presentation = await dialogDriver.request(
-      "POST",
-      `/session/${dialogDriver.sessionId}/execute/sync`,
-      {
-        script: `
-          const dialog = document.querySelector('[role="dialog"]');
-          const titleId = dialog?.getAttribute('aria-labelledby');
-          return {
-            actions: Array.from(dialog?.querySelectorAll('button') ?? [])
-              .map((button) => button.textContent.trim()),
-            ariaModal: dialog?.getAttribute('aria-modal') ?? null,
-            dialogCount: document.querySelectorAll('[role="dialog"]').length,
-            initialFocus: document.activeElement?.textContent?.trim() ?? null,
-            title: titleId
-              ? document.getElementById(titleId)?.textContent?.trim() ?? null
-              : null,
-          };
-        `,
-        args: [],
-      },
-    );
+    const presentation = await readOwnedDialogPresentation(dialogDriver);
     const nativeState = await waitForNativeWindowState(
       "graphics native owner",
       projectInstance,
@@ -709,7 +556,8 @@ async function observeGraphicsScenario() {
       presentation.ariaModal !== "true" ||
       presentation.title !== "O Canvas não pôde ser iniciado" ||
       presentation.initialFocus !== "Fechar Projeto" ||
-      JSON.stringify(presentation.actions) !== JSON.stringify(["Fechar Projeto"]) ||
+      JSON.stringify(presentation.actions) !==
+        JSON.stringify(["Fechar Projeto"]) ||
       !blockedProject.canvasMounted ||
       blockedProject.inlineAlertCount !== 0
     ) {
@@ -747,8 +595,10 @@ async function observeGraphicsScenario() {
       childOutputTail: childOutput().slice(-500),
     };
   } finally {
-    if (dialogDriver) dialogDriver = await disposeConfirmedWebDriver(dialogDriver);
-    if (projectDriver) projectDriver = await disposeConfirmedWebDriver(projectDriver);
+    if (dialogDriver)
+      dialogDriver = await disposeConfirmedWebDriver(dialogDriver);
+    if (projectDriver)
+      projectDriver = await disposeConfirmedWebDriver(projectDriver);
     if (aliveProcessInstances([projectInstance]).length !== 0) {
       terminateProcessInstance(projectInstance);
       await waitForExit(projectInstance, "graphics fallback cleanup");
@@ -756,8 +606,14 @@ async function observeGraphicsScenario() {
   }
 }
 
-assertNoPreexistingProcessInstances(applicationPath, path.basename(applicationPath));
-assertNoPreexistingProcessInstances(nativeDriverPath, path.basename(nativeDriverPath));
+assertNoPreexistingProcessInstances(
+  applicationPath,
+  path.basename(applicationPath),
+);
+assertNoPreexistingProcessInstances(
+  nativeDriverPath,
+  path.basename(nativeDriverPath),
+);
 
 let externalCopy;
 let graphicsFailure;
