@@ -30,7 +30,10 @@
     "test:save-as-journey": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-SaveAsJourney.ps1",
     "test:windows-path": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-WindowsPathGate.ps1",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "validate": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Validate-Headless.ps1",
+    "test:automation": "node --test --test-concurrency=1 scripts/Test-*.mjs",
+    "build:native-tests": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Build-NativeGate.ps1"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

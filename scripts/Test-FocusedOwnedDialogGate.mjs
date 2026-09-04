@@ -377,35 +377,15 @@ test("the native runners share one polling, process, log, and dialog runtime", a
   assert.match(observedRequest.body.script, /workspace-grid/u);
 });
 
-test("the wrapper builds and fingerprints the exact custom-protocol debug application", () => {
+test("the native build is prepared once and verified before scenario launch", () => {
   const wrapper = source("Test-FocusedOwnedDialogGate.ps1");
-  const staleApplicationRemoval = wrapper.indexOf(
-    "Remove-Item -LiteralPath $applicationPath -Force",
-  );
-  const tauriBuild = wrapper.indexOf("Invoke-MyAlbunsTauriBuild");
-  const applicationLookup = wrapper.indexOf(
-    "Test-Path -LiteralPath $applicationPath -PathType Leaf",
-  );
-  const fixturePreparation = wrapper.indexOf(
-    "--example prepare_focused_owned_dialog_fixtures",
-  );
-
-  assert.ok(
-    staleApplicationRemoval !== -1 &&
-      staleApplicationRemoval < tauriBuild &&
-      tauriBuild < applicationLookup &&
-      applicationLookup < fixturePreparation,
-  );
-  assert.match(wrapper, /Local-TauriBuild\.ps1/u);
-  assert.match(
-    wrapper,
-    /Invoke-MyAlbunsTauriBuild\s+`\s*\n\s*-TauriArguments @\('--debug', '--no-bundle'\)/u,
-  );
-  assert.match(
-    wrapper,
-    /Get-FileHash\s+`\s*\n\s*-LiteralPath \$applicationPath\s+`\s*\n\s*-Algorithm SHA256/u,
-  );
-  assert.match(wrapper, /applicationArtifact/u);
+  const build = source("Build-NativeGate.ps1");
+  assert.match(build, /Invoke-MyAlbunsTauriBuild/u);
+  assert.match(build, /--debug.*--no-bundle/u);
+  assert.match(build, /prepare_focused_owned_dialog_fixtures/u);
+  assert.match(wrapper, /Read-NativeGateBuild/u);
+  assert.ok(wrapper.indexOf("Read-NativeGateBuild") < wrapper.indexOf("& $fixturePath $runRoot"));
+  assert.doesNotMatch(wrapper, /Invoke-MyAlbunsTauriBuild|& \$script:CargoExecutable/u);
 });
 
 test("the focused gate excludes only its retained evidence root from source provenance", () => {
@@ -488,7 +468,7 @@ test("public hashing consumers restore Windows PowerShell 5.1 artifact metadata"
 test("local Tauri builds and the focused gate consume one shared build pipeline", () => {
   const buildPipeline = source("Local-TauriBuild.ps1");
   const localTauri = source("Invoke-LocalTauri.ps1");
-  const focusedGate = source("Test-FocusedOwnedDialogGate.ps1");
+  const focusedGate = source("Build-NativeGate.ps1");
 
   for (const consumer of [localTauri, focusedGate]) {
     assert.match(consumer, /Local-TauriBuild\.ps1/u);
@@ -539,25 +519,11 @@ test("the focused artifact follows the canonical Cargo target directory", () => 
     path.join(workspace, ".scratch", "relative-target"),
   );
 
-  const wrapper = source("Test-FocusedOwnedDialogGate.ps1");
-  assert.match(
-    wrapper,
-    /\$cargoTargetDirectory = Resolve-MyAlbunsCargoTargetDirectory/u,
-  );
-  assert.match(
-    wrapper,
-    /\$applicationPath = Join-Path\s+`\s*\n\s*\$cargoTargetDirectory\s+`\s*\n\s*'debug\\myalbuns-desktop\.exe'/u,
-  );
-  assert.match(wrapper, /path = \$applicationPath/u);
-  assert.match(wrapper, /relativePath = \$applicationRelativePath/u);
-  assert.match(
-    wrapper,
-    /Resolve-MyAlbunsWorkspaceRelativePath\s+`\s*\n\s*-Path \$applicationPath/u,
-  );
-  assert.doesNotMatch(
-    wrapper,
-    /Resolve-Path -LiteralPath \$applicationPath -Relative/u,
-  );
+  const build = source("Build-NativeGate.ps1");
+  assert.match(build, /Resolve-MyAlbunsCargoTargetDirectory/u);
+  assert.match(build, /Join-Path \$target 'debug\\myalbuns-desktop\.exe'/u);
+  assert.match(build, /Resolve-MyAlbunsWorkspaceRelativePath -Path \$applicationPath/u);
+  assert.match(source("Test-FocusedOwnedDialogGate.ps1"), /\$applicationPath = \$build.application.path/u);
 });
 
 test("artifact metadata is relative only when it round-trips from the workspace", () => {
@@ -774,7 +740,7 @@ test("the HWND probe closes over native owner chains from GUI-thread fallbacks",
   assert.match(observer, /ObserveOwnerChain/u);
 });
 
-test("the HWND probe observes an exact process with a hidden owned-window pair", async () => {
+test("the HWND probe observes an exact process with a hidden owned-window pair", { skip: process.env.MYALBUNS_NATIVE_PROBE_TESTS !== "1" }, async () => {
   const child = spawn(
     "powershell.exe",
     ["-NoProfile", "-NonInteractive", "-Command", hiddenOwnedWindowFixture],
@@ -848,7 +814,7 @@ test("the operational policy reserves the full journey for integration or explic
   );
 
   assert.match(policy, /headless.*interactive work/isu);
-  assert.match(policy, /focused native gate.*once after GREEN/isu);
+  assert.match(policy, /explicit.*AllowVisibleWindows/isu);
   assert.match(
     policy,
     /full productive journey.*integration.*release.*explicit\s+permission/isu,

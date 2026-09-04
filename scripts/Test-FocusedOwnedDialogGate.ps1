@@ -1,11 +1,17 @@
 param(
-    [string] $OutputPath
+    [string] $OutputPath,
+    [ValidateSet('all', 'external-copy-opening-owner', 'late-graphics-project-dialog')]
+    [string] $Scenario = 'all',
+    [string] $BuildManifestPath = '.tools\native-gate-build.json',
+    [switch] $AllowVisibleWindows
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Native-GatePolicy.ps1')
+Assert-NativeGateExecutionAllowed -AllowVisibleWindows:$AllowVisibleWindows
 
 . (Join-Path $PSScriptRoot 'Local-Toolchain.ps1')
-. (Join-Path $PSScriptRoot 'Local-TauriBuild.ps1')
+. (Join-Path $PSScriptRoot 'Native-GateBuild.ps1')
 . (Join-Path $PSScriptRoot 'Gate-SourceProvenance.ps1')
 . (Join-Path $PSScriptRoot 'Gate-ScratchDirectory.ps1')
 . (Join-Path $PSScriptRoot 'Gate-OwnedProcessJob.ps1')
@@ -17,7 +23,15 @@ if (-not $IsWindows -and $env:OS -ne 'Windows_NT') {
 }
 
 $workspaceRoot = $script:WorkspaceRoot
-$cargoTargetDirectory = Resolve-MyAlbunsCargoTargetDirectory
+if (-not [IO.Path]::IsPathRooted($BuildManifestPath)) {
+    $BuildManifestPath = Join-Path $workspaceRoot $BuildManifestPath
+}
+if (-not (Test-Path -LiteralPath $BuildManifestPath)) {
+    & (Join-Path $PSScriptRoot 'Build-NativeGate.ps1') -OutputPath $BuildManifestPath
+}
+$build = Read-NativeGateBuild -ManifestPath $BuildManifestPath -WorkspaceRoot $workspaceRoot
+$applicationPath = $build.application.path
+$fixturePath = $build.fixture.path
 $scratchParent = [System.IO.Path]::GetFullPath(
     (Join-Path $workspaceRoot '.scratch')
 )
@@ -59,47 +73,21 @@ $sourceBefore = Get-GateSourceSnapshot `
     -WorkspaceRoot $workspaceRoot `
     -EvidencePath $OutputPath `
     -RetainedEvidenceRoot $retainedEvidenceRoot
-$applicationArtifact = $null
+$applicationArtifact = $build.application
 $scope = $null
 $runRootCleaned = $false
+
+function Copy-NativeScenarioDiagnostics {
+    Get-ChildItem -LiteralPath $runRoot -File | Where-Object {
+        $_.Name -like 'webdriver-*.log' -or $_.Name -like 'failure-*'
+    } | ForEach-Object {
+        Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $evidenceDirectory $_.Name) -Force
+    }
+}
 
 try {
     $node = (Get-Command node.exe -ErrorAction Stop).Source
     $windowsPowerShell = (Get-Command powershell.exe -ErrorAction Stop).Source
-    & $node --test (Join-Path $PSScriptRoot 'Test-FocusedOwnedDialogGate.mjs')
-    if ($LASTEXITCODE -ne 0) {
-        throw "The focused owned-dialog structure tests failed with exit code $LASTEXITCODE."
-    }
-
-    $applicationPath = Join-Path `
-        $cargoTargetDirectory `
-        'debug\myalbuns-desktop.exe'
-    if ([System.IO.File]::Exists($applicationPath)) {
-        Remove-Item -LiteralPath $applicationPath -Force
-    }
-
-    Invoke-MyAlbunsTauriBuild `
-        -TauriArguments @('--debug', '--no-bundle')
-    if ($LASTEXITCODE -ne 0) {
-        throw "The focused debug Tauri build failed with exit code $LASTEXITCODE."
-    }
-
-    if (-not (Test-Path -LiteralPath $applicationPath -PathType Leaf)) {
-        throw 'The focused debug Tauri build did not produce the desktop application.'
-    }
-    $applicationFile = Get-Item -LiteralPath $applicationPath
-    $applicationRelativePath = Resolve-MyAlbunsWorkspaceRelativePath `
-        -Path $applicationPath
-    $applicationArtifact = [ordered]@{
-        buildMode = 'tauri-debug-custom-protocol'
-        path = $applicationPath
-        relativePath = $applicationRelativePath
-        sha256 = (Get-FileHash `
-                -LiteralPath $applicationPath `
-                -Algorithm SHA256).Hash.ToLowerInvariant()
-        length = [long] $applicationFile.Length
-        lastWriteUtc = $applicationFile.LastWriteTimeUtc.ToString('o')
-    }
     foreach ($knownFolder in @('Roaming', 'Local', 'Temporary')) {
         New-Item `
             -ItemType Directory `
@@ -111,13 +99,7 @@ try {
     $previousProcessDataRoot = $env:MYALBUNS_PROCESS_GATE_DATA_ROOT
     try {
         $env:MYALBUNS_PROCESS_GATE_DATA_ROOT = Join-Path $runRoot 'process-data'
-        & $script:CargoExecutable `
-            run `
-            --quiet `
-            -p myalbuns-desktop `
-            --example prepare_focused_owned_dialog_fixtures `
-            -- `
-            $runRoot
+        & $fixturePath $runRoot
         if ($LASTEXITCODE -ne 0) {
             throw "The focused fixture preparation failed with exit code $LASTEXITCODE."
         }
@@ -147,21 +129,18 @@ try {
             $workspaceRoot,
             $runRoot,
             $applicationPath,
-            $driver.nativeDriverPath
+            $driver.nativeDriverPath,
+            $Scenario
         )
     $gate = @($focused.output -split "`n" | Where-Object {
             -not [string]::IsNullOrWhiteSpace($_)
         }) |
         Select-Object -Last 1 |
         ConvertFrom-Json
-    $expectedScenarios = @(
-        'external-copy-opening-owner',
-        'late-graphics-project-dialog'
-    )
-    if (
-        @($gate.scenarios).Count -ne 2 -or
-        $gate.scenarios[0] -cne $expectedScenarios[0] -or
-        $gate.scenarios[1] -cne $expectedScenarios[1] -or
+    $expectedScenarios = if ($Scenario -eq 'all') {
+        @('external-copy-opening-owner', 'late-graphics-project-dialog')
+    } else { @($Scenario) }
+    $externalCopyInvalid = $expectedScenarios -contains 'external-copy-opening-owner' -and (
         -not $gate.externalCopy.oneVisibleDialog -or
         -not $gate.externalCopy.ownerDisabled -or
         -not $gate.externalCopy.exactPickerOwner -or
@@ -169,14 +148,17 @@ try {
         -not $gate.externalCopy.activationDispatched -or
         -not $gate.externalCopy.hostCorrelated -or
         -not $gate.externalCopy.publicTerminalObserved -or
-        -not $gate.externalCopy.terminalCleaned -or
+        -not $gate.externalCopy.terminalCleaned
+    )
+    $graphicsInvalid = $expectedScenarios -contains 'late-graphics-project-dialog' -and (
         -not $gate.graphicsFailure.oneVisibleDialog -or
         -not $gate.graphicsFailure.ownerDisabled -or
         -not $gate.graphicsFailure.workspaceInert -or
         $gate.graphicsFailure.exactAction -cne 'Fechar Projeto' -or
-        -not $gate.graphicsFailure.terminalCleaned -or
-        -not $gate.cleanupCompleted
-    ) {
+        -not $gate.graphicsFailure.terminalCleaned
+    )
+    if (($gate.scenarios -join ',') -cne ($expectedScenarios -join ',') -or
+        $externalCopyInvalid -or $graphicsInvalid -or -not $gate.cleanupCompleted) {
         throw "The focused native evidence is incomplete: $($gate | ConvertTo-Json -Depth 8 -Compress)"
     }
     $cleanup = Stop-GateProcessScope -Scope $scope
@@ -188,6 +170,8 @@ try {
     Copy-Item `
         -LiteralPath (Join-Path $runRoot 'focused-native.log') `
         -Destination (Join-Path $evidenceDirectory 'focused-native.log')
+
+    Copy-NativeScenarioDiagnostics
 
     Remove-GateScratchDirectory -Path $runRoot -AllowedParent $scratchParent
     $runRootCleaned = $true
@@ -206,7 +190,7 @@ try {
         gitCommit = $sourceBefore.gitCommit
         sourceInputsDirty = [bool] $sourceInputsDirty
         applicationArtifact = $applicationArtifact
-        scenarios = $expectedScenarios
+        scenarios = @($expectedScenarios)
         platform = [ordered]@{
             operatingSystem = [System.Environment]::OSVersion.VersionString
             architecture = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()
@@ -220,6 +204,7 @@ try {
             ownedProcessesAfter = [int] $cleanup.processesAfter
             ownedListenersAfter = [int] $cleanup.listenersAfter
         }
+        buildManifestSha256 = (Get-FileHash -LiteralPath $BuildManifestPath -Algorithm SHA256).Hash.ToLowerInvariant()
         fullProductiveJourneyInvoked = $false
     }
     $json = $report | ConvertTo-Json -Depth 10
@@ -257,6 +242,7 @@ catch {
                 -Destination (Join-Path $evidenceDirectory 'focused-native.log') `
                 -Force
         }
+        Copy-NativeScenarioDiagnostics
         $processLogs = Join-Path $runRoot 'process-data\Local\MyAlbuns2\Logs'
         if (Test-Path -LiteralPath $processLogs -PathType Container) {
             Copy-Item `

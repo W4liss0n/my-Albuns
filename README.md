@@ -81,3 +81,28 @@ Windows 10/11 x64 é o escopo inicial. No Windows 11 x64, o spike executável va
 ## Toolchain de desenvolvimento
 
 O Rust está fixado na versão exata declarada em [`rust-toolchain.toml`](rust-toolchain.toml), incluindo `clippy` e `rustfmt`. `npm run setup:local` instala essa versão dentro de `.tools/`, também em checkouts que já possuíam uma instalação local, e a torna o padrão do `rustup` local. Os comandos Rust do repositório devem ser executados pelos scripts `npm run check:rust`, `npm run test:rust` e `npm run quality:rust`, que selecionam a mesma versão fixada.
+
+## Validação durante o desenvolvimento
+
+`npm run validate` é o comando padrão: executa build, contratos, tipos, testes
+React, testes da automação e verificações Rust sem abrir o MyAlbuns. O relatório
+e os logs por etapa ficam em `.tools/validation/`. Durante uma edição, os comandos
+de teste focados continuam disponíveis; não é necessário repetir a suíte inteira.
+
+A captura `npm run ui:acceptance` também usa navegador sem janela. Selecione
+somente os estados afetados com `MYALBUNS_UI_SCENARIO_IDS`; a aprovação visual
+continua dependendo da revisão das capturas.
+
+Os testes com janelas ficam separados. O workflow **Validation** executa no
+Windows do GitHub a validação sem janelas e um piloto nativo de Cópia externa,
+retendo seus logs e capturas como artefatos. O piloto não aprova a jornada completa
+nem substitui a verificação de GPU no hardware final.
+
+Para um ambiente Windows reservado aos testes, `npm run build:native-tests`
+prepara uma única compilação com hashes e commit. O comando
+`npm run test:native-owned-dialogs -- -Scenario external-copy-opening-owner`
+seleciona somente esse cenário; `late-graphics-project-dialog` seleciona o outro.
+O binário é reaproveitado enquanto o commit, a fonte limpa e os hashes coincidirem.
+Execução local com janelas exige combinar o uso da área de trabalho e acrescentar
+`-AllowVisibleWindows`. A [política de validação](docs/agents/native-ui-gates.md)
+detalha os limites de cada prova e a jornada legada ainda pendente.

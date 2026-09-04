@@ -164,7 +164,7 @@ descendant.unref();`,
   assert.match(output, /OUTPUT_DRAINED/);
 });
 
-test("an unresponsive exact window makes bounded close fail without hanging cleanup", async () => {
+test("an unresponsive exact window makes bounded close fail without hanging cleanup", { skip: process.env.MYALBUNS_NATIVE_PROBE_TESTS !== "1" }, async () => {
   const child = spawn(
     "powershell.exe",
     [
@@ -199,7 +199,7 @@ test("an unresponsive exact window makes bounded close fail without hanging clea
   }
 });
 
-test("an exact responsive window receives bounded native close", async () => {
+test("an exact responsive window receives bounded native close", { skip: process.env.MYALBUNS_NATIVE_PROBE_TESTS !== "1" }, async () => {
   const child = spawn(
     "powershell.exe",
     [

@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import {
@@ -9,7 +9,7 @@ import {
   terminateProcessInstance,
   waitForProcessInstance,
 } from "./DevLifecycleProcessInstances.mjs";
-import { FOCUSED_OWNED_DIALOG_SCENARIOS } from "./FocusedOwnedDialogScenarios.mjs";
+import { FOCUSED_OWNED_DIALOG_SCENARIOS, selectFocusedOwnedDialogScenarios } from "./FocusedOwnedDialogScenarios.mjs";
 import { confirmExternalCopyActivationLifecycle } from "./FocusedOwnedDialogEvidence.mjs";
 import {
   attachWebView2Driver,
@@ -32,6 +32,7 @@ const [
   scratchArgument,
   applicationArgument,
   driverArgument,
+  scenarioArgument = "all",
 ] = process.argv.slice(2);
 if (
   !workspaceArgument ||
@@ -44,6 +45,7 @@ if (
   );
 }
 
+const selectedScenarios = selectFocusedOwnedDialogScenarios(scenarioArgument);
 const workspace = path.resolve(workspaceArgument);
 const scratch = path.resolve(scratchArgument);
 const applicationPath = path.resolve(applicationArgument);
@@ -90,6 +92,22 @@ if (
   !Number.isSafeInteger(sourceRevision)
 ) {
   throw new Error("The focused owned-dialog fixture is incomplete");
+}
+
+async function retainScenarioFailure(label, instance, driver, error) {
+  const diagnostic = { error: String(error) };
+  try {
+    diagnostic.nativeWindows = nativeOwnedWindowState(instance);
+    if (driver) {
+      const screenshot = await driver.request("GET", `/session/${driver.sessionId}/screenshot`);
+      writeFileSync(path.join(scratch, `failure-${label}.png`), Buffer.from(screenshot, "base64"));
+    }
+  } catch (observationError) {
+    diagnostic.observationError = String(observationError);
+  }
+  try {
+    writeFileSync(path.join(scratch, `failure-${label}.json`), JSON.stringify(diagnostic, null, 2));
+  } catch { /* The original scenario error remains authoritative. */ }
 }
 
 async function waitForNativeWindowState(label, instance, predicate) {
@@ -222,6 +240,7 @@ async function observeExternalCopyScenario() {
     driver = await attachWebView2Driver({
       debugPort: globalDebugPort,
       label: "external-copy opening owner",
+      driverLogPath: path.join(scratch, "webdriver-external-copy.log"),
       nativeDriverPath,
       sessionTimeoutMilliseconds: 60_000,
       workingDirectory: workspace,
@@ -392,6 +411,9 @@ async function observeExternalCopyScenario() {
       ...activationLifecycle,
       childOutputTail: childOutput().slice(-500),
     };
+  } catch (error) {
+    await retainScenarioFailure("external-copy", globalInstance, driver, error);
+    throw error;
   } finally {
     if (driver) driver = await disposeConfirmedWebDriver(driver);
     for (const instance of [hostInstance, globalInstance]) {
@@ -525,6 +547,7 @@ async function observeGraphicsScenario() {
     dialogDriver = await attachWebView2Driver({
       debugPort: projectDialogDebugPort,
       label: "graphics Project dialog",
+      driverLogPath: path.join(scratch, "webdriver-graphics-dialog.log"),
       nativeDriverPath,
       sessionTimeoutMilliseconds: 60_000,
       workingDirectory: workspace,
@@ -594,6 +617,9 @@ async function observeGraphicsScenario() {
       terminalCleaned,
       childOutputTail: childOutput().slice(-500),
     };
+  } catch (error) {
+    await retainScenarioFailure("graphics", projectInstance, dialogDriver ?? projectDriver, error);
+    throw error;
   } finally {
     if (dialogDriver)
       dialogDriver = await disposeConfirmedWebDriver(dialogDriver);
@@ -618,8 +644,12 @@ assertNoPreexistingProcessInstances(
 let externalCopy;
 let graphicsFailure;
 try {
-  externalCopy = await observeExternalCopyScenario();
-  graphicsFailure = await observeGraphicsScenario();
+  if (selectedScenarios.includes("external-copy-opening-owner")) {
+    externalCopy = await observeExternalCopyScenario();
+  }
+  if (selectedScenarios.includes("late-graphics-project-dialog")) {
+    graphicsFailure = await observeGraphicsScenario();
+  }
 } finally {
   for (const instance of applicationProcesses()) {
     terminateProcessInstance(instance);
@@ -641,7 +671,7 @@ console.log(
   JSON.stringify({
     schemaVersion: 1,
     gate: "focused-owned-dialogs",
-    scenarios: FOCUSED_OWNED_DIALOG_SCENARIOS,
+    scenarios: selectedScenarios,
     externalCopy,
     graphicsFailure,
     cleanupCompleted: applicationProcesses().length === 0,

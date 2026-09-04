@@ -1,9 +1,12 @@
 param(
     [string] $OutputPath,
-    [string] $ArtifactDirectory
+    [string] $ArtifactDirectory,
+    [switch] $AllowVisibleWindows
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Native-GatePolicy.ps1')
+Assert-NativeGateExecutionAllowed -AllowVisibleWindows:$AllowVisibleWindows
 
 . (Join-Path $PSScriptRoot 'Local-Toolchain.ps1')
 . (Join-Path $PSScriptRoot 'Gate-SourceProvenance.ps1')

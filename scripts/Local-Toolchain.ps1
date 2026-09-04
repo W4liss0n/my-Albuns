@@ -18,13 +18,22 @@ function Initialize-MyAlbunsToolchain {
     $script:RustupHome = Join-Path $script:ToolRoot 'rustup'
     $script:CargoExecutable = Join-Path $script:CargoHome 'bin\cargo.exe'
     $devCommand = 'C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\Tools\VsDevCmd.bat'
+    if (-not (Test-Path -LiteralPath $devCommand)) {
+        $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+        if (Test-Path -LiteralPath $vswhere) {
+            $installation = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+            if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($installation)) {
+                $devCommand = Join-Path $installation.Trim() 'Common7\Tools\VsDevCmd.bat'
+            }
+        }
+    }
     $cargoBin = Join-Path $script:CargoHome 'bin'
 
     if (-not (Test-Path -LiteralPath $script:CargoExecutable)) {
         throw 'The local Rust toolchain does not exist. Run npm run setup:local.'
     }
     if (-not (Test-Path -LiteralPath $devCommand)) {
-        throw 'Microsoft Visual Studio Build Tools 2022 was not found.'
+        throw 'A Visual Studio installation with the x64 C++ tools was not found.'
     }
     if ($env:MYALBUNS_LOCAL_TOOLCHAIN_INITIALIZED -eq '1') {
         $env:RUSTUP_HOME = $script:RustupHome

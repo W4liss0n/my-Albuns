@@ -1,4 +1,4 @@
-param([string] $OutputPath)
+param([string] $OutputPath, [switch] $AllowVisibleWindows)
 
 $ErrorActionPreference = 'Stop'
 
@@ -7,7 +7,8 @@ if ([string]::IsNullOrWhiteSpace($OutputPath)) {
 }
 
 & (Join-Path $PSScriptRoot 'Test-ProductiveJourney.ps1') `
-    -OutputPath $OutputPath
+    -OutputPath $OutputPath `
+    -AllowVisibleWindows:$AllowVisibleWindows
 if ($LASTEXITCODE -ne 0) {
     throw "The Issue #15 session recovery journey failed with exit code $LASTEXITCODE."
 }
