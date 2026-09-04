@@ -185,6 +185,13 @@ try {
         throw 'The focused owned-dialog process scope did not clean up.'
     }
 
+    Copy-Item `
+        -LiteralPath (Join-Path $runRoot 'focused-native.log') `
+        -Destination (Join-Path $evidenceDirectory 'focused-native.log')
+
+    Remove-GateScratchDirectory -Path $runRoot -AllowedParent $scratchParent
+    $runRootCleaned = $true
+
     $sourceAfter = Get-GateSourceSnapshot `
         -WorkspaceRoot $workspaceRoot `
         -EvidencePath $OutputPath `
@@ -221,12 +228,7 @@ try {
         $json + [System.Environment]::NewLine,
         [System.Text.UTF8Encoding]::new($false)
     )
-    Copy-Item `
-        -LiteralPath (Join-Path $runRoot 'focused-native.log') `
-        -Destination (Join-Path $evidenceDirectory 'focused-native.log')
 
-    Remove-GateScratchDirectory -Path $runRoot -AllowedParent $scratchParent
-    $runRootCleaned = $true
     Write-Output "Focused owned-dialog report: $OutputPath"
     Write-Output $json
 }
