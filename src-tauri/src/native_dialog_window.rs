@@ -740,9 +740,14 @@ impl DialogSurface for WebviewWindow {
 fn prepare_owner(owner: &impl DialogOwner, presentation: OwnerPresentation) -> io::Result<()> {
     match presentation {
         OwnerPresentation::Replace => {
-            owner.set_dialog_owner_enabled(false)?;
-            if let Err(error) = owner.hide_dialog_owner() {
-                let _ = owner.set_dialog_owner_enabled(true);
+            let was_visible = owner.is_dialog_owner_visible()?;
+            // Tao rewrites native styles when hiding a visible window, clearing
+            // WS_DISABLED. Apply the block after that visibility transition.
+            owner.hide_dialog_owner()?;
+            if let Err(error) = owner.set_dialog_owner_enabled(false) {
+                if was_visible {
+                    let _ = owner.show_dialog_owner();
+                }
                 return Err(error);
             }
             Ok(())
@@ -823,6 +828,7 @@ mod tests {
         actions: RefCell<Vec<String>>,
         enabled: Cell<bool>,
         visible: Cell<bool>,
+        fail_disable: bool,
     }
 
     impl Default for RecordingOwner {
@@ -831,6 +837,7 @@ mod tests {
                 actions: RefCell::new(Vec::new()),
                 enabled: Cell::new(true),
                 visible: Cell::new(true),
+                fail_disable: false,
             }
         }
     }
@@ -869,7 +876,11 @@ mod tests {
 
         fn hide_dialog_owner(&self) -> io::Result<()> {
             self.actions.borrow_mut().push("hide".into());
-            self.visible.set(false);
+            // Tao rebuilds native window styles when visibility changes. Its
+            // cached flags do not include the WS_DISABLED bit set by EnableWindow.
+            if self.visible.replace(false) {
+                self.enabled.set(true);
+            }
             Ok(())
         }
 
@@ -881,6 +892,9 @@ mod tests {
 
         fn set_dialog_owner_enabled(&self, enabled: bool) -> io::Result<()> {
             self.actions.borrow_mut().push(format!("enabled:{enabled}"));
+            if !enabled && self.fail_disable {
+                return Err(io::Error::other("injected owner disable failure"));
+            }
             self.enabled.set(enabled);
             Ok(())
         }
@@ -1206,11 +1220,26 @@ mod tests {
     }
 
     #[test]
+    fn failed_opening_block_restores_only_a_previously_visible_owner() {
+        for was_visible in [true, false] {
+            let owner = RecordingOwner {
+                visible: Cell::new(was_visible),
+                fail_disable: true,
+                ..RecordingOwner::default()
+            };
+
+            assert!(prepare_owner(&owner, OwnerPresentation::Replace).is_err());
+            assert_eq!(owner.visible.get(), was_visible);
+            assert!(owner.enabled.get());
+            assert_eq!(owner.actions.borrow().contains(&"show".into()), was_visible);
+        }
+    }
+    #[test]
     fn opening_transition_hides_then_restores_the_owner() {
         let owner = RecordingOwner::default();
 
         prepare_owner(&owner, OwnerPresentation::Replace).unwrap();
-        assert_eq!(owner.actions.take(), ["enabled:false", "hide"]);
+        assert_eq!(owner.actions.take(), ["hide", "enabled:false"]);
         assert!(!owner.enabled.get());
         assert!(!owner.visible.get());
 
