@@ -797,6 +797,9 @@ test("the HWND probe observes an exact process with a hidden owned-window pair",
     assert.ok(dialog);
     assert.equal(dialog.ownerHwnd, owner.hwnd);
     assert.equal(owner.visible, false);
+    assert.equal(owner.minimized, false);
+    assert.ok(owner.clientWidth > 0);
+    assert.ok(owner.clientHeight > 0);
     assert.equal(dialog.visible, false);
     assert.equal(state.dialogCount, 0);
   } finally {

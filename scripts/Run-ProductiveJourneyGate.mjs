@@ -3980,6 +3980,14 @@ try {
   );
 } catch (error) {
   try {
+    const processes = applicationProcesses();
+    const nativeWindows = processes.map((instance) => {
+      try {
+        return { instance, ...nativeOwnedWindowState(instance) };
+      } catch (observationError) {
+        return { instance, observationError: String(observationError) };
+      }
+    });
     const observations = {};
     for (const [label, driver] of Object.entries({
       globalDriver,
@@ -4015,7 +4023,8 @@ try {
         stack: error.stack,
         observations,
         childOutput: Object.fromEntries([...childOutputs].map(([pid, read]) => [pid, read()])),
-        processes: applicationProcesses(),
+        processes,
+        nativeWindows,
         browsers: webViewProcessesForDataDirectory(scratch),
         recentEvents: logRecords().slice(-20),
       }, null, 2),

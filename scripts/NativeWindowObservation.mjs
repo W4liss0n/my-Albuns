@@ -47,6 +47,9 @@ namespace MyAlbunsGate {
         public long OwnerHwnd { get; set; }
         public bool Visible { get; set; }
         public bool Enabled { get; set; }
+        public bool Minimized { get; set; }
+        public int? ClientWidth { get; set; }
+        public int? ClientHeight { get; set; }
         public string Title { get; set; }
     }
 
@@ -108,6 +111,12 @@ namespace MyAlbunsGate {
         [DllImport("user32.dll")]
         private static extern bool IsWindowEnabled(IntPtr hwnd);
 
+        [DllImport("user32.dll")]
+        private static extern bool IsIconic(IntPtr hwnd);
+
+        [DllImport("user32.dll")]
+        private static extern bool GetClientRect(IntPtr hwnd, out NativeRectangle rectangle);
+
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         private static extern int GetWindowText(IntPtr hwnd, StringBuilder text, int maximum);
 
@@ -138,11 +147,16 @@ namespace MyAlbunsGate {
                     !observedHandles.Add(hwnd.ToInt64())) continue;
                 var text = new StringBuilder(512);
                 GetWindowText(hwnd, text, text.Capacity);
+                NativeRectangle client;
+                var clientObserved = GetClientRect(hwnd, out client);
                 windows.Add(new NativeWindowSnapshot {
                     Hwnd = hwnd.ToInt64(),
                     OwnerHwnd = owner.ToInt64(),
                     Visible = IsWindowVisible(hwnd),
                     Enabled = IsWindowEnabled(hwnd),
+                    Minimized = IsIconic(hwnd),
+                    ClientWidth = clientObserved ? (int?)(client.Right - client.Left) : null,
+                    ClientHeight = clientObserved ? (int?)(client.Bottom - client.Top) : null,
                     Title = text.ToString(),
                 });
             }
@@ -203,6 +217,9 @@ $windows = @([MyAlbunsGate.NativeWindowProbe]::Snapshot([uint32]$env:MYALBUNS_GA
         ownerHwnd = [long]$_.OwnerHwnd
         visible = [bool]$_.Visible
         enabled = [bool]$_.Enabled
+        minimized = [bool]$_.Minimized
+        clientWidth = $_.ClientWidth
+        clientHeight = $_.ClientHeight
         title = [string]$_.Title
     }
 })
