@@ -117,6 +117,7 @@ const webDriverSessionTimeoutMilliseconds = Math.min(
 const driverTerminationTimeoutMilliseconds = 30_000;
 const {
   applicationProcesses,
+  collectChildOutput,
   driveNativeDialog,
   httpAvailable,
   logRecords,
@@ -955,12 +956,18 @@ const applicationEnvironment = {
 };
 
 assertNoPreexistingProcessInstances(applicationPath, "myalbuns-desktop.exe");
-const firstGlobalChild = spawn(applicationPath, [], {
-  cwd: workspace,
-  windowsHide: true,
-  stdio: ["ignore", "pipe", "pipe"],
-  env: applicationEnvironment,
-});
+const childOutputs = new Map();
+function launchApplication(arguments_, environment) {
+  const child = spawn(applicationPath, arguments_, {
+    cwd: workspace,
+    windowsHide: true,
+    stdio: ["ignore", "pipe", "pipe"],
+    env: environment,
+  });
+  childOutputs.set(child.pid, collectChildOutput(child));
+  return child;
+}
+const firstGlobalChild = launchApplication([], applicationEnvironment);
 const firstGlobal = await waitForProcessInstance(
   firstGlobalChild.pid,
   "first Global",
@@ -1532,12 +1539,7 @@ try {
     MYALBUNS_DEV_SAVE_AS_WEBVIEW_DEBUG_PORT: String(saveAsHostDebugPort),
     WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${recoveryGlobalDebugPort}`,
   };
-  const recoveryGlobalChild = spawn(applicationPath, [projectPath], {
-    cwd: workspace,
-    windowsHide: true,
-    stdio: ["ignore", "pipe", "pipe"],
-    env: recoveryApplicationEnvironment,
-  });
+  const recoveryGlobalChild = launchApplication([projectPath], recoveryApplicationEnvironment);
   recoveryGlobal = await waitForProcessInstance(
     recoveryGlobalChild.pid,
     "recovery Global",
@@ -2220,12 +2222,7 @@ try {
     ),
     WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${originalGlobalDebugPort}`,
   };
-  const originalGlobalChild = spawn(applicationPath, [projectPath], {
-    cwd: workspace,
-    windowsHide: true,
-    stdio: ["ignore", "pipe", "pipe"],
-    env: originalApplicationEnvironment,
-  });
+  const originalGlobalChild = launchApplication([projectPath], originalApplicationEnvironment);
   originalGlobal = await waitForProcessInstance(
     originalGlobalChild.pid,
     "simultaneous original Global",
@@ -2853,12 +2850,7 @@ try {
     ),
     WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${externalGlobalDebugPort}`,
   };
-  const externalGlobalChild = spawn(applicationPath, [externalCopyPath], {
-    cwd: workspace,
-    windowsHide: true,
-    stdio: ["ignore", "pipe", "pipe"],
-    env: externalApplicationEnvironment,
-  });
+  const externalGlobalChild = launchApplication([externalCopyPath], externalApplicationEnvironment);
   externalCopyGlobal = await waitForProcessInstance(
     externalGlobalChild.pid,
     "external-copy Global",
@@ -4022,6 +4014,7 @@ try {
         error: String(error),
         stack: error.stack,
         observations,
+        childOutput: Object.fromEntries([...childOutputs].map(([pid, read]) => [pid, read()])),
         processes: applicationProcesses(),
         browsers: webViewProcessesForDataDirectory(scratch),
         recentEvents: logRecords().slice(-20),
