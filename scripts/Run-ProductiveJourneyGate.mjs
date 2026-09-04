@@ -245,6 +245,7 @@ async function startAttachedWebDriver(
   return attachWebView2Driver({
     debugPort,
     driverTerminationTimeoutMilliseconds,
+    driverLogPath: path.join(scratch, `webdriver-${label.replace(/[^a-z0-9]+/gi, "-")}.log`),
     label,
     nativeDriverPath,
     projectDialogDebugPort,

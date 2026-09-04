@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import net from "node:net";
+import { once } from "node:events";
 
 import {
   aliveProcessInstances,
@@ -84,6 +85,7 @@ export async function webViewDevToolsTargets(debugPort, label) {
 export async function attachWebView2Driver({
   debugPort,
   driverTerminationTimeoutMilliseconds = 30_000,
+  driverLogPath,
   label,
   nativeDriverPath,
   projectDialogDebugPort,
@@ -97,7 +99,11 @@ export async function attachWebView2Driver({
   const driverPort = await findFreeTcpPort();
   const child = spawn(
     nativeDriverPath,
-    [`--port=${driverPort}`, "--host=127.0.0.1"],
+    [
+      `--port=${driverPort}`,
+      "--host=127.0.0.1",
+      ...(driverLogPath ? ["--verbose", `--log-path=${driverLogPath}`] : []),
+    ],
     {
       cwd: workingDirectory,
       windowsHide: true,
@@ -111,80 +117,103 @@ export async function attachWebView2Driver({
   child.stderr.on("data", (chunk) => {
     output += chunk.toString();
   });
-  const instance = await waitForProcessInstance(child.pid, `${label} WebDriver`);
-  const baseUrl = `http://127.0.0.1:${driverPort}`;
-  await waitForHttp(`${baseUrl}/status`, `${label} WebDriver`);
-  const rawRequest = createWebDriverClient(baseUrl);
-  const request = async (method, endpoint, body, timeout) => {
-    try {
-      return await rawRequest(method, endpoint, body, timeout);
-    } catch (error) {
-      throw new Error(
-        `${label} WebDriver ${method} ${endpoint} failed; driverExitCode=${child.exitCode}; output=${output.slice(-1_000)}`,
-        { cause: error },
-      );
+  let instance;
+  const stopDriver = async () => {
+    if (instance) terminateProcessInstance(instance);
+    else if (child.pid && child.exitCode === null && child.signalCode === null) {
+      child.kill();
+    }
+    const deadline = Date.now() + driverTerminationTimeoutMilliseconds;
+    while (
+      instance &&
+      aliveProcessInstances([instance]).length !== 0 &&
+      Date.now() < deadline
+    ) {
+      await delay(25);
+    }
+    if (instance && aliveProcessInstances([instance]).length !== 0) {
+      throw new Error(`${label} WebDriver did not terminate: ${JSON.stringify(instance)}`);
+    }
+    while (
+      child.pid &&
+      child.exitCode === null &&
+      child.signalCode === null &&
+      Date.now() < deadline
+    ) {
+      await delay(25);
+    }
+    if (child.pid && child.exitCode === null && child.signalCode === null) {
+      throw new Error(`${label} WebDriver process handle did not terminate`);
     }
   };
-  const session = await request(
-    "POST",
-    "/session",
-    {
-      capabilities: {
-        alwaysMatch: {
-          browserName: "webview2",
-          pageLoadStrategy: "none",
-          "ms:edgeChromium": true,
-          "ms:edgeOptions": {
-            debuggerAddress: `127.0.0.1:${debugPort}`,
+  try {
+    await once(child, "spawn");
+    instance = await waitForProcessInstance(child.pid, `${label} WebDriver`);
+    const baseUrl = `http://127.0.0.1:${driverPort}`;
+    await waitForHttp(`${baseUrl}/status`, `${label} WebDriver`);
+    const rawRequest = createWebDriverClient(baseUrl);
+    const request = async (method, endpoint, body, timeout) => {
+      try {
+        return await rawRequest(method, endpoint, body, timeout);
+      } catch (error) {
+        throw new Error(
+          `${label} WebDriver ${method} ${endpoint} failed; driverExitCode=${child.exitCode}; log=${driverLogPath ?? "stderr"}; output=${output.slice(-1_000)}`,
+          { cause: error },
+        );
+      }
+    };
+    const session = await request(
+      "POST",
+      "/session",
+      {
+        capabilities: {
+          alwaysMatch: {
+            browserName: "webview2",
+            pageLoadStrategy: "none",
+            "ms:edgeChromium": true,
+            "ms:edgeOptions": {
+              debuggerAddress: `127.0.0.1:${debugPort}`,
+            },
           },
         },
       },
-    },
-    sessionTimeoutMilliseconds,
-  );
-  if (!session.sessionId) {
-    throw new Error(`${label} WebDriver returned no session id`);
+      sessionTimeoutMilliseconds,
+    );
+    if (!session.sessionId) {
+      throw new Error(`${label} WebDriver returned no session id`);
+    }
+    const sessionId = session.sessionId;
+    await request("POST", `/session/${sessionId}/timeouts`, {
+      implicit: 250,
+      pageLoad: 5_000,
+      script: 5_000,
+    });
+    return {
+      projectDialogDebugPort,
+      request,
+      sessionId,
+      async dispose() {
+        try {
+          await request("DELETE", `/session/${sessionId}`);
+        } catch {
+          // The WebView can close before the attach-only session is deleted.
+        }
+        await stopDriver();
+        return output;
+      },
+    };
+  } catch (error) {
+    try {
+      await stopDriver();
+    } catch (cleanupError) {
+      throw new AggregateError(
+        [error, cleanupError],
+        `${label} WebDriver acquisition and cleanup failed`,
+        { cause: error },
+      );
+    }
+    throw error;
   }
-  const sessionId = session.sessionId;
-  await request("POST", `/session/${sessionId}/timeouts`, {
-    implicit: 250,
-    pageLoad: 5_000,
-    script: 5_000,
-  });
-  return {
-    projectDialogDebugPort,
-    request,
-    sessionId,
-    async dispose() {
-      try {
-        await request("DELETE", `/session/${sessionId}`);
-      } catch {
-        // The WebView can close before the attach-only session is deleted.
-      }
-      terminateProcessInstance(instance);
-      const deadline = Date.now() + driverTerminationTimeoutMilliseconds;
-      while (
-        aliveProcessInstances([instance]).length !== 0 &&
-        Date.now() < deadline
-      ) {
-        await delay(25);
-      }
-      if (aliveProcessInstances([instance]).length !== 0) {
-        throw new Error(`${label} WebDriver did not terminate`);
-      }
-      while (
-        child.exitCode === null &&
-        child.signalCode === null &&
-        Date.now() < deadline
-      ) {
-        await delay(25);
-      }
-      if (child.exitCode === null && child.signalCode === null) {
-        throw new Error(`${label} WebDriver process handle did not terminate`);
-      }
-      return output;
-    },
-  };
 }
 
 export async function switchToWebDriverWindow(

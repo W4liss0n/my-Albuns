@@ -1,8 +1,18 @@
 import assert from "node:assert/strict";
 import http from "node:http";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import {
+  processInstancesByExecutable,
+  terminateProcessInstance,
+} from "./DevLifecycleProcessInstances.mjs";
 import test from "node:test";
 
 import {
+  attachWebView2Driver,
   createWebDriverClient,
   disposeConfirmedWebDriver,
   findFreeTcpPort,
@@ -309,4 +319,66 @@ test("fails immediately on a non-transient WebDriver protocol error", async () =
 
   assert.equal(handleReadCount, 1);
   assert.ok(performance.now() - startedAt < 200);
+});
+
+test("failed driver acquisition releases its process and listener", {
+  skip: process.platform !== "win32",
+}, async (context) => {
+  const scratch = mkdtempSync(path.join(tmpdir(), "myalbuns-driver-acquisition-"));
+  const executable = path.join(scratch, "gate-driver-fixture.exe");
+  const fixture = fileURLToPath(new URL("./fixtures/GateWebDriverFixture.cs", import.meta.url));
+  const instances = () => processInstancesByExecutable(executable, path.basename(executable));
+  const debugPort = await findFreeTcpPort();
+  const endpoint = http.createServer((_request, response) => {
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ Browser: "fixture" }));
+  });
+  await new Promise((resolve) => endpoint.listen(debugPort, "127.0.0.1", resolve));
+  try {
+    const compiled = spawnSync("powershell.exe", [
+      "-NoProfile", "-NonInteractive", "-Command",
+      "Add-Type -Path $env:MYALBUNS_DRIVER_FIXTURE_SOURCE -OutputAssembly $env:MYALBUNS_DRIVER_FIXTURE_EXECUTABLE -OutputType ConsoleApplication",
+    ], {
+      encoding: "utf8",
+      windowsHide: true,
+      env: {
+        ...process.env,
+        MYALBUNS_DRIVER_FIXTURE_SOURCE: fixture,
+        MYALBUNS_DRIVER_FIXTURE_EXECUTABLE: executable,
+      },
+    });
+    assert.equal(compiled.status, 0, compiled.stderr || compiled.stdout);
+    for (const mode of ["session-timeout", "timeouts-rejected"]) {
+      await context.test(mode, async () => {
+        writeFileSync(path.join(scratch, "failure-mode.txt"), mode);
+        try {
+          const failure = await attachWebView2Driver({
+            debugPort,
+            label: "fixture",
+            nativeDriverPath: executable,
+            sessionTimeoutMilliseconds: 250,
+            workingDirectory: scratch,
+          }).then(() => assert.fail("acquisition unexpectedly succeeded"), (error) => error);
+          assert.match(failure.message, /fixture WebDriver POST/);
+          if (mode === "session-timeout") {
+            assert.equal(failure.cause.name, "TimeoutError");
+          } else {
+            assert.match(failure.cause.message, /fixture rejected timeouts/);
+          }
+          assert.deepEqual(instances(), [], "failed acquisition retained its process");
+          const driverPort = readFileSync(path.join(scratch, "driver-port.txt"), "utf8");
+          await assert.rejects(fetch(`http://127.0.0.1:${driverPort}/status`, {
+            signal: AbortSignal.timeout(500),
+          }));
+        } finally {
+          for (const instance of instances()) terminateProcessInstance(instance);
+        }
+      });
+    }
+  } finally {
+    for (const instance of instances()) terminateProcessInstance(instance);
+    await new Promise((resolve) => endpoint.close(resolve));
+    assert.equal(path.dirname(path.resolve(scratch)), path.resolve(tmpdir()));
+    rmSync(scratch, { recursive: true, force: true });
+  }
 });

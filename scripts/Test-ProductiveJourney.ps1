@@ -729,6 +729,13 @@ try {
                 -SourcePath $processLog.FullName `
                 -RelativePath $relativeLogPath
         }
+        foreach ($driverLog in @(
+                Get-ChildItem -LiteralPath $runRoot -File -Filter 'webdriver-*.log'
+            )) {
+            $retainedFiles += Copy-RetainedArtifact `
+                -SourcePath $driverLog.FullName `
+                -RelativePath $driverLog.Name
+        }
         foreach ($projectFile in @(
                 Get-ChildItem -LiteralPath $runRoot -Recurse -File |
                     Where-Object {
@@ -955,6 +962,41 @@ try {
     )
     Write-Output "Productive journey report: $OutputPath"
     Write-Output $json
+}
+catch {
+    $gateFailure = $_
+    if ($null -ne $retainedArtifactDirectory -and
+        (Test-Path -LiteralPath $runRoot -PathType Container)) {
+        try {
+            New-Item -ItemType Directory -Force -Path $retainedArtifactDirectory |
+                Out-Null
+            foreach ($diagnostic in @(
+                    Get-ChildItem -LiteralPath $runRoot -Recurse -File |
+                        Where-Object {
+                            $_.Extension -in @('.jsonl', '.log') -or
+                            $_.Name -eq 'failure.json' -or
+                            $_.Name -like 'failure-*.png'
+                        }
+                )) {
+                $relativePath = Get-ContainedRelativePath `
+                    -ParentPath $runRoot -ChildPath $diagnostic.FullName
+                Copy-RetainedArtifact `
+                    -SourcePath $diagnostic.FullName `
+                    -RelativePath $relativePath | Out-Null
+            }
+            [System.IO.File]::WriteAllText(
+                (Join-Path $retainedArtifactDirectory 'failure-wrapper.txt'),
+                $gateFailure.ToString() + [Environment]::NewLine +
+                    $gateFailure.ScriptStackTrace,
+                [System.Text.UTF8Encoding]::new($false)
+            )
+            Write-Warning "Productive journey failure diagnostics: $retainedArtifactDirectory"
+        }
+        catch {
+            Write-Warning "Could not retain productive journey failure diagnostics: $_"
+        }
+    }
+    throw $gateFailure
 }
 finally {
     if (-not $runRootCleaned -and (Test-Path -LiteralPath $runRoot)) {
