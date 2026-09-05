@@ -6346,3 +6346,34 @@ test.each([0, 2])("presents photo import rejections after committing %i valid fi
   await waitFor(() => expect(dialog.dismiss).toHaveBeenCalled());
   expect(onProjectionChange).toHaveBeenCalledOnce();
 });
+
+
+test("preserves partial import problems after dismissing a queued Save failure", async () => {
+  type ImportResult = Awaited<ReturnType<ProjectCorePort["importPhoto"]>>;
+  let resolveImport!: (value: ImportResult) => void;
+  const pendingImport = new Promise<ImportResult>((resolve) => { resolveImport = resolve; });
+  const dialog = projectDialogHarness();
+  const port = projectCorePortWithApply(async () => projection);
+  port.importPhoto = vi.fn(() => pendingImport);
+  port.save = vi.fn(async () => { throw new Error("Não foi possível salvar"); });
+  const problems = [{ fileName: "corrompida.jpg", reason: "JPEG corrompido" }];
+  render(<ProjectWorkspace exportPipelinePort={exportPipelinePort} projection={projection}
+    projectCorePort={port} projectDialogPort={dialog.port} onProjectionChange={vi.fn()} />);
+  fireEvent.click(screen.getByRole("button", { name: "Importar" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos JPEG…" }));
+  fireEvent.keyDown(window, { ctrlKey: true, key: "s" });
+  expect(port.save).not.toHaveBeenCalled();
+  await act(async () => {
+    resolveImport({ kind: "completed", projection, mediaIds: ["media-002"], importedCount: 1, problems });
+    await pendingImport;
+  });
+  await waitFor(() => expect(dialog.present).toHaveBeenLastCalledWith({
+    kind: "projectOperationFailure", message: "Não foi possível salvar",
+  }));
+  act(() => dialog.emit("dismissProjectOperationFailure"));
+  await waitFor(() => expect(dialog.present).toHaveBeenLastCalledWith({
+    kind: "photoImportProblems", importedCount: 1, problems,
+  }));
+  act(() => dialog.emit("dismissPhotoImportProblems"));
+  expect(port.save).toHaveBeenCalledOnce();
+});

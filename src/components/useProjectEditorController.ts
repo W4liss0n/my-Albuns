@@ -250,6 +250,7 @@ export function useProjectEditorController({
     message: mutations.message,
     importPending: mutations.importPending,
     photoImportResult: mutations.photoImportResult,
+    dismissPhotoImportResult: mutations.dismissPhotoImportResult,
     selectedFrame,
     selectedComposedPhoto,
     displayedPhotoZoom: photoGestures.displayedPhotoZoom,

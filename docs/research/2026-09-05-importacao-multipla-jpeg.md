@@ -19,7 +19,7 @@ Os JPEGs válidos entram no Painel mesmo quando outros arquivos são rejeitados.
 
 Os novos vínculos entram juntos em uma única ação do Histórico. Undo remove somente esses vínculos, Redo os restaura e as duplicatas preexistentes permanecem. Uma seleção sem novos vínculos não cria revisão, estado sujo nem Histórico.
 
-Ao concluir com rejeições, o diálogo de Problemas mostra `Arquivo` e `Motivo`, com rolagem para listas extensas. Fechar ou pressionar Esc dispensa o resultado sem desfazer a importação. Sucesso integral usa uma confirmação curta no Painel. O último item aceito ou reencontrado passa a ser a seleção do Painel.
+Ao concluir com rejeições, o diálogo de Problemas mostra `Arquivo` e `Motivo`, com rolagem para listas extensas. Fechar ou pressionar Esc dispensa o resultado sem desfazer a importação. Se um Salvamento enfileirado falhar depois da importação parcial, dispensar esse erro preserva e mostra a lista de arquivos rejeitados. Sucesso integral usa uma confirmação curta no Painel. O último item aceito ou reencontrado passa a ser a seleção do Painel.
 
 Salvar e reabrir preservam os vínculos externos. Os Originais não são regravados. Fotos importadas pelo lote seguem a composição existente e podem ser exportadas pelo Processador.
 

@@ -359,9 +359,7 @@ export function useProjectMutations({
     saveAs: () => void saveVisibleRevisionAs(),
     undo: () => void runHistoryCommand("canUndo", "undo"),
     redo: () => void runHistoryCommand("canRedo", "redo"),
-    dismissFeedback: () => {
-      setMessage(null);
-      setPhotoImportResult(null);
-    },
+    dismissFeedback: () => setMessage(null),
+    dismissPhotoImportResult: () => setPhotoImportResult(null),
   };
 }

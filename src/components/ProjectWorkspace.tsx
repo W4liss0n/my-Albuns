@@ -238,9 +238,13 @@ export function ProjectWorkspace({
     importResult: controller.photoImportResult,
     message: closeMessage ?? controller.message,
     projectDialogPort,
-    onDismiss: () => {
-      setCloseMessage(null);
-      controller.dismissFeedback();
+    onDismiss: (kind) => {
+      if (kind === "photoImportProblems") {
+        controller.dismissPhotoImportResult();
+      } else {
+        setCloseMessage(null);
+        controller.dismissFeedback();
+      }
     },
   });
   const updateWorkspacePanelSize = useCallback(

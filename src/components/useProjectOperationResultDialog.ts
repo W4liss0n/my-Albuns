@@ -12,7 +12,7 @@ interface ProjectOperationResultDialogOptions {
   importResult?: PhotoImportCompletion | null;
   message: string | null;
   projectDialogPort: ProjectDialogPort;
-  onDismiss(): void;
+  onDismiss(kind: "projectOperationFailure" | "photoImportProblems"): void;
 }
 
 export function useProjectOperationResultDialog({
@@ -47,10 +47,12 @@ export function useProjectOperationResultDialog({
       action !== "dismissProjectOperationFailure" &&
       action !== "dismissPhotoImportProblems"
     ) return;
+    const kind = action === "dismissPhotoImportProblems" ? "photoImportProblems" : "projectOperationFailure";
+    if (feedbackRef.current?.kind !== kind) return;
     presentedFeedbackRef.current = null;
     const session = dialogSessionRef.current;
     dialogSessionRef.current = null;
-    onDismissRef.current();
+    onDismissRef.current(kind);
     void session?.dismiss().catch(() => undefined);
   };
 
@@ -84,7 +86,7 @@ export function useProjectOperationResultDialog({
         presentedFeedbackRef.current = null;
         dialogSessionRef.current = null;
         void session.dismiss().catch(() => undefined);
-        onDismissRef.current();
+        onDismissRef.current(feedback.kind);
       });
     return () => {
       active = false;
