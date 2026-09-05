@@ -340,7 +340,7 @@ test("maps the Project and media ports to the desktop commands", async () => {
     visibleMediaIds: ["media-a-001"],
     preloadMediaIds: ["media-b-001"],
   };
-  const previews = await tauriMediaPreviewPort.prepareMediaPreviews(demand);
+  const previews = await tauriMediaPreviewPort.prepareMediaPreviews(demand, vi.fn());
 
   expect(invoke).toHaveBeenNthCalledWith(1, "project_state", {
     operationId: "project-load-1",
@@ -361,6 +361,7 @@ test("maps the Project and media ports to the desktop commands", async () => {
   });
   expect(invoke).toHaveBeenNthCalledWith(8, "prepare_media_previews", {
     demand,
+    onPreview: tauriBoundary.channels[0],
   });
   expect(retry).toEqual(retriedPreview);
   expect(previews?.[0].url).toBe("http://asset.localhost/cache-preview");
@@ -375,7 +376,7 @@ test("materializes an owned media-demand DTO at the native seam", async () => {
     preloadMediaIds,
     revision: 7,
     visibleMediaIds,
-  });
+  }, vi.fn());
 
   const request = vi.mocked(invoke).mock.calls[0][1] as {
     demand: {
@@ -393,6 +394,25 @@ test("materializes an owned media-demand DTO at the native seam", async () => {
   expect(request.demand.preloadMediaIds).not.toBe(preloadMediaIds);
 });
 
+
+test.each(["completed", "failed"])("streams each media preview before the batch finishes and ignores late events after %s", async (outcome) => {
+  let finish!: () => void;
+  vi.mocked(invoke).mockImplementationOnce(() => new Promise((resolve, reject) => {
+    finish = () => outcome === "completed" ? resolve([]) : reject(new Error("Falhou"));
+  }));
+  const publish = vi.fn();
+  const demand = { revision: 1, visibleMediaIds: ["photo-a", "photo-b"], preloadMediaIds: [] };
+  const completion = tauriMediaPreviewPort.prepareMediaPreviews(demand, publish).catch(() => undefined);
+  const channel = tauriBoundary.channels[0];
+  expect(invoke).toHaveBeenCalledWith("prepare_media_previews", { demand, onPreview: channel });
+  const preview = { mediaId: "photo-a", state: "ready", url: "http://myalbuns-cache.localhost/a" };
+  channel.onmessage(preview);
+  expect(publish).toHaveBeenCalledExactlyOnceWith(preview);
+  finish();
+  await completion;
+  channel.onmessage({ ...preview, mediaId: "photo-b" });
+  expect(publish).toHaveBeenCalledOnce();
+});
 
 test("confirms Project UI readiness through its single startup seam", async () => {
   await tauriProjectStartupPort.confirmUiReady();
@@ -801,7 +821,7 @@ test("normalizes typed media preview failures without losing their code or messa
     revision: 1,
     visibleMediaIds: ["media-a-001"],
     preloadMediaIds: [],
-  });
+  }, vi.fn());
 
   await expect(failure).rejects.toBeInstanceOf(MediaPreviewError);
   await expect(failure).rejects.toMatchObject({

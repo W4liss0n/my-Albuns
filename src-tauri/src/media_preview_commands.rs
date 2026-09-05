@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use myalbuns_imaging_protocol::CacheMediaSource;
 use myalbuns_paths::AppPaths;
-use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow, ipc::Channel};
 
 use crate::{
     cache_activity_gate::{CacheCancellation, CacheCancellationReason},
@@ -145,6 +145,7 @@ pub(crate) async fn retry_unavailable_media(
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn prepare_media_previews(
     demand: MediaPreviewDemand,
+    on_preview: Channel<MediaPreview>,
     window: WebviewWindow,
     app: AppHandle,
     project_host: State<'_, ProjectHost>,
@@ -248,6 +249,11 @@ pub(crate) async fn prepare_media_previews(
     }
     drop(causal_cache_permit);
     let mut previews = Vec::with_capacity(ordered_demand.len());
+    let mut publish_preview = |preview: MediaPreview| {
+        // A detached frontend must not turn a prepared cache artifact into a failure.
+        let _ = on_preview.send(preview.clone());
+        previews.push(preview);
+    };
     for media_id in ordered_demand {
         if !engine.demand_is_current(&demand_revision) {
             return Ok(Some(Vec::new()));
@@ -266,7 +272,7 @@ pub(crate) async fn prepare_media_previews(
         )
         .map_err(|_| MediaPreviewCommandError::read_failed())?;
         if state != MediaPreviewState::Ready {
-            previews.push(contextual_preview(
+            publish_preview(contextual_preview(
                 &engine,
                 &registry,
                 &app_paths,
@@ -277,6 +283,17 @@ pub(crate) async fn prepare_media_previews(
             ));
             continue;
         }
+        // The stable Monitor has already revoked changed source bindings. A still
+        // resident preview needs no new processor request or derived-file decode.
+        if let Some(preview) = engine
+            .commit_preview_if_demanded(&demand_revision, &media_id, || {
+                registry.retained_preview(&media_id, source.source_path(), state)
+            })
+            .flatten()
+        {
+            publish_preview(preview);
+            continue;
+        }
         let root_bindings = match path_io::capture_root_bindings(vec![
             namespace.paths().root().to_path_buf(),
             source.source_path().to_path_buf(),
@@ -285,7 +302,7 @@ pub(crate) async fn prepare_media_previews(
         {
             Ok(root_bindings) => root_bindings,
             Err(_) => {
-                previews.push(contextual_preview(
+                publish_preview(contextual_preview(
                     &engine,
                     &registry,
                     &app_paths,
@@ -353,7 +370,7 @@ pub(crate) async fn prepare_media_previews(
                 ) else {
                     return Ok(Some(Vec::new()));
                 };
-                previews.push(cache_publication_or_context(
+                publish_preview(cache_publication_or_context(
                     preview,
                     media_id.as_str(),
                     || {
@@ -393,7 +410,7 @@ pub(crate) async fn prepare_media_previews(
                     media_id,
                     event = "cache_media_unavailable",
                 );
-                previews.push(contextual_preview(
+                publish_preview(contextual_preview(
                     &engine,
                     &registry,
                     &app_paths,

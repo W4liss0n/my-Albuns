@@ -167,6 +167,16 @@ somente a chave opaca participa do nome do artefato.
 
 O baseline contém uma única representação visual reduzida por Foto ou Decorativo. A mesma representação atende ao Painel e ao Canvas; miniaturas de Lâmina podem ser montadas em memória. A [medição reproduzível do Programa 03A](../research/0032-representacao-reduzida-e-politica-de-decode.md) confirmou a representação única e rejeitou tiles, pirâmides e previews persistidos de Lâmina no MVP.
 
+Cada representação preparada é entregue à interface imediatamente, sem esperar
+as demais mídias da demanda. O Painel mantém em pré-carga o último trecho
+observado de cada aba, incluindo a margem de `122 px` acima e abaixo da área
+visível. Alternar Fotos e Decorativos não descarta esse trecho; rolar, filtrar,
+remover mídias ou fechar o Painel atualiza a demanda e libera o que saiu dela.
+Essa retenção não abrange todo o catálogo nem acumula trechos de rolagens
+anteriores. Depois da observação do Monitor, uma representação ainda residente
+e vinculada à mesma origem pode ser entregue novamente sem executar outro job;
+mudanças confirmadas continuam revogando a representação anterior.
+
 O maior lado mede no máximo `1.600 px`. Conteúdo opaco usa JPEG qualidade `84`; conteúdo que precisa preservar transparência usa PNG RGBA.
 O formato é propriedade do artefato derivado e integra seu caminho e o índice
 do Cache. Essa escolha não altera o original nem permite que a Exportação use a

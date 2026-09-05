@@ -14,6 +14,7 @@ import type {
   ExportProgressEvent,
   MediaPreview,
   MediaPreviewPort,
+  MediaPreviewRequest,
   ProjectStartupPort,
   ProjectCorePort,
   ProjectWindowPort,
@@ -660,6 +661,122 @@ test("prepares real media previews after opening without blocking the Workspace"
       }),
     ]),
   );
+});
+
+test("shows a ready preview while the remaining previews are still being prepared", async () => {
+  let publish: ((preview: MediaPreview) => void) | undefined;
+  let finish!: (previews: readonly MediaPreview[]) => void;
+  const prepareMediaPreviews = vi.fn((_demand: MediaPreviewRequest, onPreview: (preview: MediaPreview) => void) => {
+    publish = onPreview;
+    return new Promise<readonly MediaPreview[]>((resolve) => { finish = resolve; });
+  });
+  const preview: MediaPreview = {
+    mediaId: "media-001",
+    state: "ready",
+    url: "http://myalbuns-cache.localhost/first-ready",
+  };
+  render(
+    <App
+      mediaPreviewPort={{ ...mediaPreviewPort, prepareMediaPreviews }}
+      projectCorePort={{ ...projectCorePort, load: async () => representativeProjection }}
+      projectStartupPort={projectStartupPort}
+      projectWindowPort={projectWindowPort}
+      logger={silentLogger}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      graphicsProbe={canvasGraphicsDiagnosticProbe}
+    />,
+  );
+  await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalled());
+
+  act(() => publish?.(preview));
+
+  expect(document.querySelector('[data-media-id="media-001"] img')).toHaveAttribute("src", preview.url);
+  expect(screen.getByTestId("album-canvas")).toHaveAttribute("data-media-preview", preview.url);
+  await act(async () => finish([preview]));
+});
+
+test("shows warm Fotos immediately after returning from Decorativos while the next demand is pending", async () => {
+  vi.stubGlobal("IntersectionObserver", class {
+    constructor(private callback: IntersectionObserverCallback) {}
+    observe(target: HTMLElement) {
+      this.callback([{ target, isIntersecting: true } as unknown as IntersectionObserverEntry], this as unknown as IntersectionObserver);
+    }
+    disconnect() {}
+  });
+  const requests: {
+    demand: MediaPreviewRequest;
+    publish: (preview: MediaPreview) => void;
+    finish: (previews: readonly MediaPreview[]) => void;
+  }[] = [];
+  const prepareMediaPreviews: MediaPreviewPort["prepareMediaPreviews"] = (demand, publish) =>
+    new Promise((finish) => { requests.push({ demand, publish, finish }); });
+  const preview: MediaPreview = { mediaId: "media-002", state: "ready", url: "http://myalbuns-cache.localhost/warm-photo" };
+  const view = render(
+    <App
+      mediaPreviewPort={{ ...mediaPreviewPort, prepareMediaPreviews }}
+      projectCorePort={{ ...projectCorePort, load: async () => representativeProjection }}
+      projectStartupPort={projectStartupPort}
+      projectWindowPort={projectWindowPort}
+      logger={silentLogger}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      graphicsProbe={canvasGraphicsDiagnosticProbe}
+    />,
+  );
+  try {
+    await waitFor(() => expect(requests[requests.length - 1]?.demand.visibleMediaIds).toContain("media-002"));
+    act(() => requests[requests.length - 1].publish(preview));
+    expect(document.querySelector('[data-media-id="media-002"] img')).toHaveAttribute("src", preview.url);
+    fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
+    await waitFor(() => expect(requests[requests.length - 1]?.demand.preloadMediaIds).toContain("media-002"));
+    await act(async () => requests[requests.length - 1].finish([preview]));
+    fireEvent.click(screen.getByRole("button", { name: "Fotos" }));
+    expect(document.querySelector('[data-media-id="media-002"] img')).toHaveAttribute("src", preview.url);
+  } finally {
+    view.unmount();
+    vi.unstubAllGlobals();
+  }
+});
+
+test("ignores preview events and completion from a demand superseded by a Monitor refresh", async () => {
+  const requests: {
+    publish: (preview: MediaPreview) => void;
+    finish: (previews: readonly MediaPreview[]) => void;
+  }[] = [];
+  let notifyMediaChanged!: (mediaIds: readonly string[]) => void;
+  const prepareMediaPreviews: MediaPreviewPort["prepareMediaPreviews"] = (_demand, publish) =>
+    new Promise((finish) => { requests.push({ publish, finish }); });
+  const preview: MediaPreview = { mediaId: "media-001", state: "ready", url: "http://myalbuns-cache.localhost/new" };
+  render(
+    <App
+      mediaPreviewPort={{
+        ...mediaPreviewPort,
+        prepareMediaPreviews,
+        onMediaChanged: async (listener) => {
+          notifyMediaChanged = listener;
+          return () => undefined;
+        },
+      }}
+      projectCorePort={{ ...projectCorePort, load: async () => representativeProjection }}
+      projectStartupPort={projectStartupPort}
+      projectWindowPort={projectWindowPort}
+      logger={silentLogger}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      graphicsProbe={canvasGraphicsDiagnosticProbe}
+    />,
+  );
+  await waitFor(() => expect(requests).toHaveLength(1));
+  act(() => notifyMediaChanged(["media-001"]));
+  await waitFor(() => expect(requests).toHaveLength(2));
+  act(() => requests[1].publish(preview));
+  const stale = { ...preview, url: "http://myalbuns-cache.localhost/old" };
+  await act(async () => {
+    requests[0].publish(stale);
+    requests[0].finish([stale]);
+  });
+  expect(document.querySelector('[data-media-id="media-001"] img')).toHaveAttribute("src", preview.url);
+  await act(async () => requests[1].finish([preview]));
+  act(() => requests[1].publish(stale));
+  expect(document.querySelector('[data-media-id="media-001"] img')).toHaveAttribute("src", preview.url);
 });
 
 test("reprepares demanded media when the stable Monitor reports a change", async () => {
@@ -1518,7 +1635,7 @@ test("keeps one Monitor subscription while demand revisions change", async () =>
     revision: 2,
     visibleMediaIds: [],
     preloadMediaIds: [],
-  });
+  }, expect.any(Function));
 });
 
 test("cancels resident media demand when runtime graphics become unavailable", async () => {
@@ -1590,7 +1707,7 @@ test("cancels resident media demand when runtime graphics become unavailable", a
     revision: 2,
     visibleMediaIds: [],
     preloadMediaIds: [],
-  });
+  }, expect.any(Function));
 
   act(() => resolveGraphicsDialogPresentation?.());
   act(() => dialog.emit("closeProjectAfterGraphicsFailure"));

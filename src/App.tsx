@@ -432,6 +432,7 @@ function App({
     };
 
     let active = true;
+    let completed = false;
     const operationId = createLogInstanceId("media-preview");
     logger.write({
       level: "info",
@@ -441,9 +442,15 @@ function App({
       projectId,
     });
     mediaPreviewPort
-      .prepareMediaPreviews(demand)
+      .prepareMediaPreviews(demand, (preview) => {
+        if (!active || completed) return;
+        setMediaPreviews((current) =>
+          active ? { ...current, [preview.mediaId]: preview } : current,
+        );
+      })
       .then((previews) => {
         if (!active) return;
+        completed = true;
         setMediaPreviews(
           Object.fromEntries(
             (previews ?? []).map((preview) => [preview.mediaId, preview]),
@@ -459,6 +466,7 @@ function App({
       })
       .catch((error: unknown) => {
         if (!active) return;
+        completed = true;
         logger.write({
           level: "warn",
           component: "media-preview",

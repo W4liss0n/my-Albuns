@@ -679,7 +679,6 @@ impl CacheEngine {
         }
     }
 
-    #[cfg(test)]
     pub(crate) fn commit_preview_if_demanded<T>(
         &self,
         demand: &CacheDemandRevision,
@@ -2865,6 +2864,74 @@ mod tests {
     }
 
     #[test]
+    fn resident_preview_survives_demand_revisions_but_not_source_changes_or_retirement() {
+        tauri::async_runtime::block_on(async {
+            let fixture = fixture();
+            let engine = CacheEngine::default();
+            let registry = CachePreviewRegistry::new("project");
+            let project_id = fixture.work.namespace.project_id();
+            let source = &fixture.work.source;
+            let initial =
+                engine.reconcile_preview_demand(&registry, project_id, 1, [source.media_id()]);
+            let artifact = verified_preview_artifact(&fixture, &engine).await;
+            let ready = registry
+                .publish(
+                    &fixture.app_paths,
+                    &fixture.work.namespace,
+                    &artifact,
+                    source.source_path(),
+                )
+                .expect("the verified generation is resident");
+            let mut current =
+                engine.reconcile_preview_demand(&registry, project_id, 2, [source.media_id()]);
+            let lookup = |demand: &super::CacheDemandRevision, path: &std::path::Path| {
+                engine
+                    .commit_preview_if_demanded(demand, source.media_id(), || {
+                        registry.retained_preview(
+                            source.media_id(),
+                            path,
+                            crate::ipc_contract::MediaPreviewState::Ready,
+                        )
+                    })
+                    .flatten()
+            };
+            let artifact_path = fixture
+                .work
+                .namespace
+                .paths()
+                .preview_file(&artifact.media_id, &artifact.generation_id, artifact.format)
+                .expect("the fixture owns the published artifact");
+            std::fs::remove_file(artifact_path).expect("only resident bytes remain available");
+            assert_eq!(
+                lookup(&current, source.source_path()).unwrap().url,
+                ready.url
+            );
+            assert!(lookup(&initial, source.source_path()).is_none());
+            assert!(
+                lookup(
+                    &current,
+                    &source.source_path().with_file_name("relinked.jpg")
+                )
+                .is_none()
+            );
+
+            engine.apply_demand_media_update(
+                &fixture.work.namespace,
+                &registry,
+                &mut current,
+                &MediaRuntimeUpdate::for_test(
+                    1,
+                    vec![source.media_id().to_owned()],
+                    vec![source.media_id().to_owned()],
+                ),
+            );
+            assert!(lookup(&current, source.source_path()).is_none());
+            engine.reconcile_preview_demand(&registry, project_id, 3, std::iter::empty());
+            assert!(lookup(&current, source.source_path()).is_none());
+        });
+    }
+
+    #[test]
     fn absent_or_unavailable_media_preserves_the_last_known_preview_with_its_typed_state() {
         tauri::async_runtime::block_on(async {
             let fixture = fixture();
@@ -2905,6 +2972,16 @@ mod tests {
                 )
                 .expect("the unavailable state serves the last known representation");
             assert_eq!(unavailable.url, ready.url);
+            assert!(
+                registry
+                    .retained_preview(
+                        fixture.work.source.media_id(),
+                        fixture.work.source.source_path(),
+                        crate::ipc_contract::MediaPreviewState::Ready,
+                    )
+                    .is_none(),
+                "context retained after a failure cannot bypass source verification"
+            );
             let token = unavailable
                 .url
                 .expect("the retained preview remains opaque")
@@ -2961,6 +3038,24 @@ mod tests {
                 crate::ipc_contract::MediaPreviewState::CacheUnavailable
             );
             assert!(cache_failure.url.is_some());
+
+            registry
+                .publish(
+                    &fixture.app_paths,
+                    &fixture.work.namespace,
+                    &artifact,
+                    fixture.work.source.source_path(),
+                )
+                .expect("a verified publication can make the same generation reusable again");
+            assert!(
+                registry
+                    .retained_preview(
+                        fixture.work.source.media_id(),
+                        fixture.work.source.source_path(),
+                        crate::ipc_contract::MediaPreviewState::Ready,
+                    )
+                    .is_some()
+            );
 
             let artifact_path = fixture
                 .work

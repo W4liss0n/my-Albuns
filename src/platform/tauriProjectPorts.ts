@@ -373,18 +373,27 @@ export const tauriWorkspacePreferencesPort: WorkspacePreferencesPort = {
 };
 
 export const tauriMediaPreviewPort: MediaPreviewPort = {
-  prepareMediaPreviews: (demand) =>
-    invoke<IpcMediaPreview[] | null>("prepare_media_previews", {
-      demand: {
-        revision: demand.revision,
-        visibleMediaIds: [...demand.visibleMediaIds],
-        preloadMediaIds: [...demand.preloadMediaIds],
-      },
-    }).catch(
-      (error: unknown) => {
-        throw normalizeMediaPreviewError(error);
-      },
-    ),
+  prepareMediaPreviews: async (demand, publish) => {
+    const onPreview = new Channel<IpcMediaPreview>();
+    let active = true;
+    onPreview.onmessage = (preview) => {
+      if (active) publish(preview);
+    };
+    try {
+      return await invoke<IpcMediaPreview[] | null>("prepare_media_previews", {
+        demand: {
+          revision: demand.revision,
+          visibleMediaIds: [...demand.visibleMediaIds],
+          preloadMediaIds: [...demand.preloadMediaIds],
+        },
+        onPreview,
+      });
+    } catch (error: unknown) {
+      throw normalizeMediaPreviewError(error);
+    } finally {
+      active = false;
+    }
+  },
   retryUnavailableMedia: (mediaId) =>
     invoke<IpcMediaPreview>("retry_unavailable_media", { mediaId }).catch(
       (error: unknown) => {

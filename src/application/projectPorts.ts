@@ -252,6 +252,7 @@ export interface ProjectCorePort {
 export interface MediaPreviewPort {
   prepareMediaPreviews(
     demand: MediaPreviewRequest,
+    onPreview: (preview: MediaPreview) => void,
   ): Promise<readonly MediaPreview[] | null>;
   retryUnavailableMedia(mediaId: string): Promise<MediaPreview>;
   onMediaChanged(

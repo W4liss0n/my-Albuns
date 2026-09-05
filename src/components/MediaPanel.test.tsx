@@ -342,6 +342,91 @@ test("hydrates authoritative per-tab settings and publishes only the changed fie
   );
 });
 
+test("keeps the last observed viewport warm across Fotos and Decorativos", () => {
+  vi.stubGlobal("IntersectionObserver", class {
+    constructor(private callback: IntersectionObserverCallback) {}
+    observe(target: HTMLElement) {
+      this.callback([{ target, isIntersecting: target.dataset.mediaId !== "photo-retrato" } as unknown as IntersectionObserverEntry], this as unknown as IntersectionObserver);
+    }
+    disconnect() {}
+  });
+  const onDemandChange = vi.fn();
+  const view = render(
+    <MediaPanel
+      {...mediaPanelInteractions}
+      mediaItems={mediaItems}
+      mediaUsage={mediaUsage}
+      onFillPhoto={vi.fn()}
+      previewSource={{ kind: "connected", previews: {}, onDemandChange }}
+      preferences={{ kind: "local" }}
+    />,
+  );
+  try {
+    onDemandChange.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
+    expect(onDemandChange).toHaveBeenLastCalledWith({
+      visibleMediaIds: ["decorative-overlay"],
+      preloadMediaIds: ["photo-album-2", "photo-album-10"],
+    });
+    expect(onDemandChange.mock.calls.every(([demand]) =>
+      [...demand.visibleMediaIds, ...demand.preloadMediaIds].includes("photo-album-2"),
+    )).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Fotos" }));
+    expect(onDemandChange).toHaveBeenLastCalledWith({
+      visibleMediaIds: ["photo-album-2", "photo-album-10"],
+      preloadMediaIds: ["decorative-overlay"],
+    });
+  } finally {
+    view.unmount();
+    vi.unstubAllGlobals();
+  }
+});
+
+test("retires scrolled and removed media and ignores disconnected observers", () => {
+  const observers: { callback: IntersectionObserverCallback; targets: HTMLElement[] }[] = [];
+  vi.stubGlobal("IntersectionObserver", class {
+    targets: HTMLElement[] = [];
+    constructor(public callback: IntersectionObserverCallback) { observers.push(this); }
+    observe(target: HTMLElement) { this.targets.push(target); }
+    disconnect() {}
+  });
+  const onDemandChange = vi.fn();
+  const props = {
+    ...mediaPanelInteractions,
+    mediaItems,
+    mediaUsage,
+    onFillPhoto: vi.fn(),
+    previewSource: { kind: "connected" as const, previews: {}, onDemandChange },
+    preferences: { kind: "local" as const },
+  };
+  const view = render(<MediaPanel {...props} />);
+  const observeOnly = (index: number, mediaId: string) => {
+    const observer = observers[index];
+    observer.callback(observer.targets.map((target) => ({
+      target, isIntersecting: target.dataset.mediaId === mediaId,
+    }) as unknown as IntersectionObserverEntry), observer as unknown as IntersectionObserver);
+  };
+  try {
+    observeOnly(0, "photo-album-2");
+    observeOnly(1, "photo-album-2");
+    observeOnly(0, "photo-retrato");
+    observeOnly(1, "photo-retrato");
+    expect(onDemandChange).toHaveBeenLastCalledWith({ visibleMediaIds: ["photo-retrato"], preloadMediaIds: [] });
+    fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
+    observeOnly(2, "decorative-overlay");
+    observeOnly(3, "decorative-overlay");
+    expect(onDemandChange).toHaveBeenLastCalledWith({ visibleMediaIds: ["decorative-overlay"], preloadMediaIds: ["photo-retrato"] });
+    onDemandChange.mockClear();
+    observeOnly(0, "photo-album-2");
+    expect(onDemandChange).not.toHaveBeenCalled();
+    view.rerender(<MediaPanel {...props} mediaItems={mediaItems.filter(({ id }) => id !== "photo-retrato")} />);
+    expect(onDemandChange).toHaveBeenLastCalledWith({ visibleMediaIds: ["decorative-overlay"], preloadMediaIds: [] });
+  } finally {
+    view.unmount();
+    vi.unstubAllGlobals();
+  }
+});
+
 test("clears preview demand when the panel unmounts", () => {
   const onMediaDemandChange = vi.fn();
   const view = render(

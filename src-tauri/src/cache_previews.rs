@@ -26,8 +26,15 @@ pub(crate) struct CachePreviewRegistry {
 
 #[derive(Default)]
 struct CachePreviewPublication {
-    tokens_by_media: HashMap<String, (String, CacheSourceBinding, String)>,
+    tokens_by_media: HashMap<String, PublishedCachePreview>,
     previews_by_token: HashMap<String, Arc<PreparedCachePreview>>,
+}
+
+struct PublishedCachePreview {
+    generation_id: String,
+    source_binding: CacheSourceBinding,
+    token: String,
+    source_verified: bool,
 }
 
 struct PreparedCachePreview {
@@ -96,20 +103,22 @@ impl CachePreviewRegistry {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let source_binding = CacheSourceBinding::for_path(source_path);
-        if let Some((generation_id, published_binding, token)) =
-            publication.tokens_by_media.get(&artifact.media_id)
-            && generation_id == &artifact.generation_id
-            && published_binding == &source_binding
+        if let Some(published) = publication.tokens_by_media.get_mut(&artifact.media_id)
+            && published.generation_id == artifact.generation_id
+            && published.source_binding == source_binding
         {
+            published.source_verified = true;
             return Ok(MediaPreview {
                 media_id: artifact.media_id.clone(),
                 state: MediaPreviewState::Ready,
-                url: Some(opaque_image_url(CACHE_MEDIA_PROTOCOL_SCHEME, token)),
+                url: Some(opaque_image_url(
+                    CACHE_MEDIA_PROTOCOL_SCHEME,
+                    &published.token,
+                )),
             });
         }
-        if let Some((_, _, previous_token)) = publication.tokens_by_media.remove(&artifact.media_id)
-        {
-            publication.previews_by_token.remove(&previous_token);
+        if let Some(previous) = publication.tokens_by_media.remove(&artifact.media_id) {
+            publication.previews_by_token.remove(&previous.token);
         }
         let token = format!(
             "{}.{}",
@@ -118,11 +127,12 @@ impl CachePreviewRegistry {
         );
         publication.tokens_by_media.insert(
             artifact.media_id.clone(),
-            (
-                artifact.generation_id.clone(),
+            PublishedCachePreview {
+                generation_id: artifact.generation_id.clone(),
                 source_binding,
-                token.clone(),
-            ),
+                token: token.clone(),
+                source_verified: true,
+            },
         );
         publication.previews_by_token.insert(
             token.clone(),
@@ -149,8 +159,8 @@ impl CachePreviewRegistry {
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut removed = 0;
         for media_id in media_ids {
-            if let Some((_, _, token)) = publication.tokens_by_media.remove(media_id.as_ref()) {
-                publication.previews_by_token.remove(&token);
+            if let Some(published) = publication.tokens_by_media.remove(media_id.as_ref()) {
+                publication.previews_by_token.remove(&published.token);
                 removed += 1;
             }
         }
@@ -174,18 +184,28 @@ impl CachePreviewRegistry {
         source_path: &Path,
         state: MediaPreviewState,
     ) -> Option<MediaPreview> {
-        let publication = self
+        let mut publication = self
             .publication
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let (_, source_binding, token) = publication.tokens_by_media.get(media_id)?;
-        if !source_binding.matches_source_path(source_path) {
+        let published = publication.tokens_by_media.get_mut(media_id)?;
+        if !published.source_binding.matches_source_path(source_path)
+            || (state == MediaPreviewState::Ready && !published.source_verified)
+        {
             return None;
+        }
+        // Context retained after a read/cache failure is not proof that these
+        // bytes represent the current Original. Only verified publication is.
+        if state != MediaPreviewState::Ready {
+            published.source_verified = false;
         }
         Some(MediaPreview {
             media_id: media_id.to_owned(),
             state,
-            url: Some(opaque_image_url(CACHE_MEDIA_PROTOCOL_SCHEME, token)),
+            url: Some(opaque_image_url(
+                CACHE_MEDIA_PROTOCOL_SCHEME,
+                &published.token,
+            )),
         })
     }
 

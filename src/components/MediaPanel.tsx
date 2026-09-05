@@ -175,6 +175,10 @@ export function MediaPanel({
         : null;
   const gridRef = useRef<HTMLDivElement>(null);
   const transparentDragImageRef = useRef<HTMLCanvasElement>(null);
+  const observedDemandByKind = useRef<Record<MediaKind, MediaPreviewDemand>>({
+    photo: { visibleMediaIds: [], preloadMediaIds: [] },
+    decorative: { visibleMediaIds: [], preloadMediaIds: [] },
+  });
 
   useEffect(() => {
     if (!controlledThumbnailSizes) return;
@@ -224,29 +228,58 @@ export function MediaPanel({
 
   useEffect(() => {
     if (!onMediaDemandChange) return;
+    return () => {
+      onMediaDemandChange({ visibleMediaIds: [], preloadMediaIds: [] });
+    };
+  }, [onMediaDemandChange]);
+
+  useEffect(() => {
+    if (!onMediaDemandChange) return;
     const root = gridRef.current;
     const targets = root?.querySelectorAll<HTMLElement>("[data-media-id]");
-    onMediaDemandChange({ visibleMediaIds: [], preloadMediaIds: [] });
-    if (!root || !targets?.length || !("IntersectionObserver" in globalThis)) {
-      return () => {
-        onMediaDemandChange({ visibleMediaIds: [], preloadMediaIds: [] });
+    const snapshots = observedDemandByKind.current;
+    for (const kind of ["photo", "decorative"] as const) {
+      const allowed = new Set(
+        kind === activeMediaKind
+          ? visibleMediaIds
+          : mediaItems.filter((media) => media.kind === kind).map(({ id }) => id),
+      );
+      snapshots[kind] = {
+        visibleMediaIds: snapshots[kind].visibleMediaIds.filter((id) => allowed.has(id)),
+        preloadMediaIds: snapshots[kind].preloadMediaIds.filter((id) => allowed.has(id)),
       };
     }
-
-    const visible = new Set<string>();
-    const resident = new Set<string>();
+    const visible = new Set(snapshots[activeMediaKind].visibleMediaIds);
+    const resident = new Set([
+      ...visible,
+      ...snapshots[activeMediaKind].preloadMediaIds,
+    ]);
+    let active = true;
     const emitDemand = () => {
-      const visibleMediaIds = visibleMediaItems
-        .map(({ id }) => id)
-        .filter((mediaId) => visible.has(mediaId));
-      const preloadMediaIds = visibleMediaItems
-        .map(({ id }) => id)
+      const observedVisible = visibleMediaIds.filter((id) => visible.has(id));
+      const observedPreload = visibleMediaIds
         .filter(
           (mediaId) => resident.has(mediaId) && !visible.has(mediaId),
         );
-      onMediaDemandChange({ visibleMediaIds, preloadMediaIds });
+      snapshots[activeMediaKind] = {
+        visibleMediaIds: observedVisible,
+        preloadMediaIds: observedPreload,
+      };
+      const inactive = snapshots[activeMediaKind === "photo" ? "decorative" : "photo"];
+      onMediaDemandChange({
+        visibleMediaIds: observedVisible,
+        preloadMediaIds: [
+          ...observedPreload,
+          ...inactive.visibleMediaIds,
+          ...inactive.preloadMediaIds,
+        ],
+      });
     };
+    emitDemand();
+    if (!root || !targets?.length || !("IntersectionObserver" in globalThis)) return;
+
     const update = (entries: IntersectionObserverEntry[], set: Set<string>) => {
+      if (!active) return;
       for (const entry of entries) {
         const mediaId = (entry.target as HTMLElement).dataset.mediaId;
         if (!mediaId) continue;
@@ -268,11 +301,11 @@ export function MediaPanel({
       preloadObserver.observe(target);
     });
     return () => {
+      active = false;
       visibleObserver.disconnect();
       preloadObserver.disconnect();
-      onMediaDemandChange({ visibleMediaIds: [], preloadMediaIds: [] });
     };
-  }, [onMediaDemandChange, visibleMediaItems]);
+  }, [activeMediaKind, mediaItems, onMediaDemandChange, visibleMediaIds]);
 
   function updatePreferences(
     nextPreferences: Partial<MediaPanelViewPreferences>,

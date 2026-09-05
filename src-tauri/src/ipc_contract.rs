@@ -508,7 +508,7 @@ pub struct MediaPreviewDemand {
     pub(crate) preload_media_ids: Vec<String>,
 }
 
-#[derive(Serialize, TS)]
+#[derive(Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct MediaPreview {
     pub(crate) media_id: String,
