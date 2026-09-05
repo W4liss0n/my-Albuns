@@ -38,6 +38,12 @@ function DialogContent() {
     void Promise.resolve(windowControls.close()).catch(() => undefined);
   };
 
+  if (kind === "processing-images") {
+    return <ProgressDialog title="Processando Imagens" progress={{
+      kind: "determinate", completed: 0, total: 1, status: "0 de 1",
+    }} />;
+  }
+
   if (kind === "creating-project") {
     return (
       <ProgressDialog

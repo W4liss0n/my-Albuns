@@ -16,8 +16,8 @@ import {
 } from "./projectDialogContract";
 
 const states: readonly ProjectDialogState[] = [
-  { kind: "photoImportProgress", progress: { kind: "determinate", completed: 5, total: 12, status: "Arquivo 5 de 12" } },
-  { kind: "photoImportProblems", importedCount: 2, problems: [{ fileName: "ruim.jpg", reason: "JPEG corrompido" }] },
+  { kind: "imageProcessingProgress", progress: { kind: "determinate", completed: 5, total: 12, status: "5 de 12" } },
+  { kind: "imageProcessingProblems", importedCount: 2, problems: [{ fileName: "ruim.jpg", reason: "JPEG corrompido" }] },
   {
     busy: false,
     details: [{ label: "DPI", value: "300 → 240" }],
@@ -57,7 +57,7 @@ const actions: readonly ProjectDialogAction[] = [
   "dismissExport",
   "dismissProjectCloseFailure",
   "dismissProjectOperationFailure",
-  "dismissPhotoImportProblems",
+  "dismissImageProcessingProblems",
   "retryExport",
   "saveAndClose",
 ];

@@ -35,6 +35,14 @@ A linha de estado pode usar `X/Y` para a unidade própria da operação, como
 `Lâmina 18 de 42`. A janela não inventa tempo restante quando o produtor de
 progresso não consegue estimá-lo.
 
+O processamento de imagens usa `Processando Imagens` e `X de Y` em qualquer
+ação explícita que precise preparar imagens do Projeto. Uma unidade inclui a
+validação da origem e a conclusão do Cache, inclusive seu reuso quando válido.
+Uma imagem só avança o contador depois dessa preparação ou do registro de um
+problema; leitura e Cache não reiniciam a barra em fases separadas. Mudanças de
+área visível não cancelam o trabalho necessário à ação. Atualizações automáticas
+da origem continuam em segundo plano e preservam a prévia anterior até a troca.
+
 ## Progresso em lote
 
 O lote reutiliza a mesma barra geral e acrescenta somente um resumo compacto do
@@ -80,5 +88,5 @@ A Limpeza total do Cache pode reutilizar o mesmo componente quando executada sem
 A janela de progresso nunca se converte em relatório.
 
 - Sucesso integral fecha a janela e mostra uma confirmação curta.
-- Na importação de Fotos, sucesso integral fecha diretamente o progresso e devolve o foco ao Painel, sem diálogo de confirmação nem mensagem ao lado de Importar. A mesma regra vale quando todas as Fotos selecionadas já estão vinculadas.
+- No processamento de imagens, sucesso integral fecha diretamente o progresso e devolve o foco à origem da ação, sem diálogo de confirmação nem mensagem ao lado de Importar. A mesma regra vale quando todas as Fotos selecionadas já estão vinculadas. Problemas de Cache preservam imagens válidas já vinculadas e são apresentados junto dos arquivos rejeitados.
 - Itens ignorados ou com falha fecham o progresso e abrem a [Tela de Problemas](0005-tela-de-problemas.md) no contexto de resultado.

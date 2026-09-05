@@ -3,10 +3,10 @@ import type {
   ProjectDialogPort,
   ProjectDialogSession,
 } from "../application/projectDialogPort";
-import type { PhotoImportProgress } from "../application/projectPorts";
+import type { ImageProcessingProgress } from "../application/projectPorts";
 
-export function usePhotoImportProgressDialog(
-  progress: PhotoImportProgress | null,
+export function useImageProcessingProgressDialog(
+  progress: ImageProcessingProgress | null,
   port: ProjectDialogPort,
 ) {
   const sessionRef = useRef<ProjectDialogSession | null>(null);
@@ -22,15 +22,15 @@ export function usePhotoImportProgressDialog(
     sessionRef.current = session;
     void session
       .present({
-        kind: "photoImportProgress",
+        kind: "imageProcessingProgress",
         progress: progress.totalFiles > 0
           ? {
               kind: "determinate",
               completed: progress.completedFiles,
               total: progress.totalFiles,
-              status: `Arquivo ${progress.completedFiles} de ${progress.totalFiles}`,
+              status: `${progress.completedFiles} de ${progress.totalFiles}`,
             }
-          : { kind: "indeterminate", status: "Preparando importação…" },
+          : { kind: "indeterminate", status: "Aguarde…" },
       })
       .catch(() => {
         if (sessionRef.current === session) sessionRef.current = null;

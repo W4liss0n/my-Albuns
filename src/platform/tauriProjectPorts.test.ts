@@ -316,7 +316,7 @@ test("maps the Project and media ports to the desktop commands", async () => {
   await tauriProjectCorePort.load("project-load-1");
   await tauriProjectCorePort.validateAlbumInformation(information);
   await tauriProjectCorePort.apply(intent);
-  await tauriProjectCorePort.relink("media-a-001");
+  await tauriProjectCorePort.relink("media-a-001", vi.fn());
   await tauriProjectCorePort.undo();
   await tauriProjectCorePort.redo();
   const retriedPreview = {
@@ -327,6 +327,7 @@ test("maps the Project and media ports to the desktop commands", async () => {
   vi.mocked(invoke).mockResolvedValueOnce(retriedPreview);
   const retry = await tauriMediaPreviewPort.retryUnavailableMedia(
     "media-a-001",
+    vi.fn(),
   );
   vi.mocked(invoke).mockResolvedValueOnce([
     {
@@ -350,18 +351,21 @@ test("maps the Project and media ports to the desktop commands", async () => {
   });
   expect(invoke).toHaveBeenNthCalledWith(3, "apply_project_intent", {
     intent,
+    onProgress: tauriBoundary.channels[0],
   });
   expect(invoke).toHaveBeenNthCalledWith(4, "relink_media", {
     mediaId: "media-a-001",
+    onProgress: tauriBoundary.channels[1],
   });
-  expect(invoke).toHaveBeenNthCalledWith(5, "undo_project");
-  expect(invoke).toHaveBeenNthCalledWith(6, "redo_project");
+  expect(invoke).toHaveBeenNthCalledWith(5, "undo_project", { onProgress: tauriBoundary.channels[2] });
+  expect(invoke).toHaveBeenNthCalledWith(6, "redo_project", { onProgress: tauriBoundary.channels[3] });
   expect(invoke).toHaveBeenNthCalledWith(7, "retry_unavailable_media", {
     mediaId: "media-a-001",
+    onProgress: tauriBoundary.channels[4],
   });
   expect(invoke).toHaveBeenNthCalledWith(8, "prepare_media_previews", {
     demand,
-    onPreview: tauriBoundary.channels[0],
+    onPreview: tauriBoundary.channels[5],
   });
   expect(retry).toEqual(retriedPreview);
   expect(previews?.[0].url).toBe("http://asset.localhost/cache-preview");
@@ -479,8 +483,9 @@ test("maps Photo import, target resolution, and affected Frame outcomes", async 
 
   expect(invoke).toHaveBeenNthCalledWith(1, "apply_project_intent", {
     intent,
+    onProgress: tauriBoundary.channels[0],
   });
-  expect(invoke).toHaveBeenNthCalledWith(2, "import_photo", { onProgress: tauriBoundary.channels[0] });
+  expect(invoke).toHaveBeenNthCalledWith(2, "import_photo", { onProgress: tauriBoundary.channels[1] });
   expect(invoke).toHaveBeenNthCalledWith(3, "photo_drop_target", {
     sheetId: "sheet-001",
     xUm: 12_000,
@@ -836,7 +841,7 @@ test("normalizes typed unavailable-media retry failures at the IPC adapter", asy
     message: "A nova inspeção não pôde ser concluída.",
   });
 
-  const failure = tauriMediaPreviewPort.retryUnavailableMedia("media-a-001");
+  const failure = tauriMediaPreviewPort.retryUnavailableMedia("media-a-001", vi.fn());
 
   await expect(failure).rejects.toBeInstanceOf(MediaPreviewError);
   await expect(failure).rejects.toMatchObject({

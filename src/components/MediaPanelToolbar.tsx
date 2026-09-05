@@ -116,7 +116,7 @@ export function MediaPanelToolbar({
             )
           }
         >
-          <span>{importPending ? "Importando…" : "Importar"}</span>
+          <span>{importPending ? "Processando…" : "Importar"}</span>
           <AppIcon icon={ChevronDown} size={12} />
         </button>
         {openPopup === "import" && (

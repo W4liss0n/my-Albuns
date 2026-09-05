@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   ExportPipelinePort,
   MediaPreview,
+  ImageProcessingProgress,
   MediaPreviewDemand,
   ProjectCorePort,
   ProjectWindowPort,
@@ -38,7 +39,7 @@ import { useProjectCloseController } from "./useProjectCloseController";
 import { useProjectEditorController } from "./useProjectEditorController";
 import { useProjectGraphicsFailureDialog } from "./useProjectGraphicsFailureDialog";
 import { useProjectOperationResultDialog } from "./useProjectOperationResultDialog";
-import { usePhotoImportProgressDialog } from "./usePhotoImportProgressDialog";
+import { useImageProcessingProgressDialog } from "./useImageProcessingProgressDialog";
 import { useAlbumInformationApplyController } from "./useAlbumInformationApplyController";
 import { SheetContextMenu } from "./SheetContextMenu";
 import {
@@ -64,7 +65,7 @@ interface ProjectWorkspaceProps {
   projectCorePort: ProjectCorePort;
   mediaPreviews: Readonly<Record<string, MediaPreview>>;
   onMediaDemandChange(demand: MediaPreviewDemand): void;
-  onRetryUnavailableMedia(mediaId: string): Promise<void>;
+  onRetryUnavailableMedia(mediaId: string, onProgress: (progress: ImageProcessingProgress) => void): Promise<void>;
   onProjectionChange(projection: EditorProjection): void;
   onGraphicsUnavailable(diagnostic: GraphicsDiagnostic): void;
   graphicsFailure?: Extract<GraphicsDiagnostic, { supported: false }> | null;
@@ -235,14 +236,16 @@ export function ProjectWorkspace({
     onApply: controller.applyAlbumInformation,
     onError: setCloseMessage,
   });
-  usePhotoImportProgressDialog(controller.photoImportProgress, projectDialogPort);
+  useImageProcessingProgressDialog(controller.imageProcessingProgress, projectDialogPort);
   useProjectOperationResultDialog({
     importResult: controller.photoImportResult,
+    processingProblems: controller.imageProcessingProgress ? undefined : controller.imageProcessingProblems,
     message: closeMessage ?? controller.message,
     projectDialogPort,
     onDismiss: (kind) => {
-      if (kind === "photoImportProblems") {
+      if (kind === "imageProcessingProblems") {
         controller.dismissPhotoImportResult();
+        controller.dismissImageProcessingProblems();
       } else {
         setCloseMessage(null);
         controller.dismissFeedback();
@@ -715,7 +718,9 @@ export function ProjectWorkspace({
           onPhotoDragStart={setDraggedPhotoId}
           onPhotoDragEnd={() => setDraggedPhotoId(null)}
           onRelinkMedia={controller.relinkMedia}
-          onRetryUnavailableMedia={onRetryUnavailableMedia}
+          onRetryUnavailableMedia={(mediaId) => controller.retryUnavailableMedia(
+            (publish) => onRetryUnavailableMedia(mediaId, publish),
+          )}
           relinkDisabled={commandsBlocked}
           preferences={{
             kind: "controlled",

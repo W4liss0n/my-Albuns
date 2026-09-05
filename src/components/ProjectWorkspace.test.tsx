@@ -336,8 +336,8 @@ function projectCorePortWithApply(
       impact: { sheetWidthPx: 7_087, pageWidthPx: 3_543, heightPx: 3_543 },
     }),
     apply,
-    applyWithOutcome: async (intent) => ({
-      projection: await apply(intent),
+    applyWithOutcome: async (intent, publish) => ({
+      projection: await apply(intent, publish),
       affectedFrameId: "frame-001",
       affectedSheetId: null,
     }),
@@ -704,7 +704,7 @@ test("routes implicit menu and explicit context actions to their intended Sheets
       kind: "addSheet",
       anchorSheetId: "sheet-002",
       position: "after",
-    }),
+    }, expect.any(Function)),
   );
 
   act(() =>
@@ -725,7 +725,7 @@ test("routes implicit menu and explicit context actions to their intended Sheets
     expect(applyWithOutcome).toHaveBeenLastCalledWith({
       kind: "deleteSheet",
       sheetId: "sheet-003",
-    }),
+    }, expect.any(Function)),
   );
   expect(
     screen.queryByRole("menu", { name: "Ações da Lâmina 03" }),
@@ -874,7 +874,7 @@ test("routes Delete to the centered Sheet and guards text entry, Edit Mode, and 
     expect(applyWithOutcome).toHaveBeenCalledWith({
       kind: "deleteSheet",
       sheetId: "sheet-002",
-    }),
+    }, expect.any(Function)),
   );
 
   const media = screen.getByRole("button", { name: /Campo\.jpg/ });
@@ -1097,7 +1097,7 @@ test.each(queuedHistoryStructuralCases)(
       expect(applyWithOutcome).not.toHaveBeenCalled();
     } else {
       expect(applyWithOutcome).toHaveBeenCalledOnce();
-      expect(applyWithOutcome).toHaveBeenCalledWith(intent);
+      expect(applyWithOutcome).toHaveBeenCalledWith(intent, expect.any(Function));
     }
     expect(dialog.present).not.toHaveBeenCalledWith(
       expect.objectContaining({ kind: "projectOperationFailure" }),
@@ -1135,7 +1135,7 @@ test("routes implicit and explicit empty-edge conversions to their intended Shee
     expect(applyWithOutcome).toHaveBeenCalledWith({
       kind: "convertEdgeSheet",
       sheetId: "sheet-003",
-    }),
+    }, expect.any(Function)),
   );
 
   act(() =>
@@ -1156,7 +1156,7 @@ test("routes implicit and explicit empty-edge conversions to their intended Shee
   expect(applyWithOutcome).toHaveBeenLastCalledWith({
     kind: "convertEdgeSheet",
     sheetId: "sheet-003",
-  });
+  }, expect.any(Function));
 });
 
 test("commits one valid Grade reorder and keeps structural controls inert in Sheet Edit Mode", async () => {
@@ -1189,7 +1189,7 @@ test("commits one valid Grade reorder and keeps structural controls inert in She
       kind: "reorderSheet",
       sheetId: "sheet-001",
       targetIndex: 1,
-    }),
+    }, expect.any(Function)),
   );
   expect(applyWithOutcome).toHaveBeenCalledOnce();
 
@@ -1255,7 +1255,7 @@ test("previews a Bar reorder locally while the Grade stays confirmed, then commi
       kind: "reorderSheet",
       sheetId: "sheet-001",
       targetIndex: 1,
-    }),
+    }, expect.any(Function)),
   );
   expect(applyWithOutcome).toHaveBeenCalledOnce();
 });
@@ -2603,7 +2603,7 @@ test("edits and applies the complete Album design draft as one intent", async ()
           widthUm: 1_250,
         },
       },
-    }),
+    }, expect.any(Function)),
   );
 });
 
@@ -3220,7 +3220,7 @@ test("maps Borda zero to none and a positive value back to solid", async () => {
         ...projectionWithBorder.state.album.visualDefaults,
         frameBorder: { kind: "none" },
       },
-    }),
+    }, expect.any(Function)),
   );
 
   view.rerender(
@@ -3248,7 +3248,7 @@ test("maps Borda zero to none and a positive value back to solid", async () => {
           widthUm: 1_250,
         },
       },
-    }),
+    }, expect.any(Function)),
   );
 });
 
@@ -3515,7 +3515,7 @@ test("confirms and applies Album information as one authoritative Project change
       firstSheet: "double",
       lastSheet: "double",
     },
-  });
+  }, expect.any(Function));
   expect(onProjectionChange).toHaveBeenCalledWith(changedProjection);
 
   view.rerender(
@@ -4229,7 +4229,7 @@ test("materializes an Album Design draft over the projection produced by a pendi
         overlay: afterUndo.state.album.visualDefaults.overlay,
         frameBorder: afterUndo.state.album.visualDefaults.frameBorder,
       },
-    }),
+    }, expect.any(Function)),
   );
 });
 
@@ -4275,7 +4275,7 @@ test("applies an Album Design draft over its captured baseline when pending Undo
         overlay: projection.state.album.visualDefaults.overlay,
         frameBorder: projection.state.album.visualDefaults.frameBorder,
       },
-    }),
+    }, expect.any(Function)),
   );
 });
 
@@ -4368,7 +4368,7 @@ test("materializes an Album Information draft over the projection produced by a 
         firstSheet: "double",
         lastSheet: "double",
       },
-    }),
+    }, expect.any(Function)),
   );
 });
 
@@ -4436,7 +4436,7 @@ test("applies an Album Information draft over its captured baseline when pending
         firstSheet: "double",
         lastSheet: "double",
       },
-    }),
+    }, expect.any(Function)),
   );
 });
 
@@ -4639,7 +4639,7 @@ test("updates a stale Album Information summary and requires reconfirmation afte
         firstSheet: "double",
         lastSheet: "double",
       },
-    }),
+    }, expect.any(Function)),
   );
 });
 
@@ -4763,7 +4763,7 @@ test("makes Salvar como a terminal barrier after an accepted deferred import", a
   await waitFor(() =>
     expect(screen.getByRole("menuitem", { name: "Arquivo" })).toBeDisabled(),
   );
-  expect(screen.getByRole("button", { name: "Importando…" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Processando…" })).toBeDisabled();
 
   fireEvent.keyDown(document, { key: "Escape" });
   expect(
@@ -5271,6 +5271,7 @@ test("offers retry only for an unavailable occurrence and keeps Relink exclusive
   const projectCorePort: ProjectCorePort = {
     ...projectCorePortWithApply(async () => projection),
     relink,
+    load: async () => relinkedProjection,
   };
   const onProjectionChange = vi.fn();
   const onRetryUnavailableMedia = vi.fn(async () => undefined);
@@ -5328,8 +5329,8 @@ test("offers retry only for an unavailable occurrence and keeps Relink exclusive
     screen.getByRole("button", { name: /Tentar novamente o arquivo de/i }),
   );
 
-  await waitFor(() => expect(relink).toHaveBeenCalledWith("media-001"));
-  expect(onRetryUnavailableMedia).toHaveBeenCalledWith("media-002");
+  await waitFor(() => expect(relink).toHaveBeenCalledWith("media-001", expect.any(Function)));
+  expect(onRetryUnavailableMedia).toHaveBeenCalledWith("media-002", expect.any(Function));
   expect(onProjectionChange).toHaveBeenLastCalledWith(relinkedProjection);
 });
 
@@ -5827,7 +5828,7 @@ test("commits a slider zoom once without flashing a global busy state", async ()
     deltaPanX: 0,
     deltaPanY: 0,
     deltaZoom: 0.25,
-  });
+  }, expect.any(Function));
   expect(screen.queryByText("Aplicando alteração")).not.toBeInTheDocument();
   expect(exportButton).toBeEnabled();
 
@@ -5992,7 +5993,7 @@ test("does not let an old Project completion clear a new slider draft", async ()
     deltaPanX: 0,
     deltaPanY: 0,
     deltaZoom: 0.3,
-  });
+  }, expect.any(Function));
 });
 
 test("uses the Canvas-centered sheet for a media double click", () => {
@@ -6019,7 +6020,7 @@ test("uses the Canvas-centered sheet for a media double click", () => {
     sheetId: "sheet-002",
     mediaId: "media-002",
     mode: "normal",
-  });
+  }, expect.any(Function));
 });
 
 test("imports a JPEG through the Host boundary without inserting it automatically", async () => {
@@ -6092,13 +6093,13 @@ test.each(["completed", "cancelled", "failed"] as const)("shows photo import pro
   if (outcome !== "cancelled") {
     act(() => progress?.({ completedFiles: 0, totalFiles: 12 }));
     await waitFor(() => expect(dialogs.present).toHaveBeenCalledWith({
-      kind: "photoImportProgress",
-      progress: { kind: "determinate", completed: 0, total: 12, status: "Arquivo 0 de 12" },
+      kind: "imageProcessingProgress",
+      progress: { kind: "determinate", completed: 0, total: 12, status: "0 de 12" },
     }));
     act(() => progress({ completedFiles: 5, totalFiles: 12 }));
     await waitFor(() => expect(dialogs.present).toHaveBeenLastCalledWith({
-      kind: "photoImportProgress",
-      progress: { kind: "determinate", completed: 5, total: 12, status: "Arquivo 5 de 12" },
+      kind: "imageProcessingProgress",
+      progress: { kind: "determinate", completed: 5, total: 12, status: "5 de 12" },
     }));
   }
   await act(async () => {
@@ -6220,7 +6221,7 @@ test("resolves a mode-free target while dropping a Photo in the current Canvas m
     xUm: 25_000,
     yUm: 30_000,
     mode: "normal",
-  });
+  }, expect.any(Function));
   expect(useEditorView.getState().selectedFrameId).toBe("frame-001");
 
   act(() => canvasHarness.props?.onEditSheet?.("sheet-001"));
@@ -6333,7 +6334,7 @@ test("forwards simultaneous Canvas Pan and Zoom as one intent", () => {
     deltaPanX: 0.35,
     deltaPanY: -0.2,
     deltaZoom: 0.12,
-  });
+  }, expect.any(Function));
 });
 
 test("serializes Project mutations so projections cannot arrive out of order", async () => {
@@ -6411,10 +6412,10 @@ test.each([0, 2])("presents photo import rejections after committing %i valid fi
   fireEvent.click(screen.getByRole("button", { name: "Importar" }));
   fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos JPEG…" }));
   await waitFor(() => expect(dialog.present).toHaveBeenCalledWith({
-    kind: "photoImportProblems", importedCount, problems,
+    kind: "imageProcessingProblems", importedCount, problems,
   }));
   expect(onProjectionChange).toHaveBeenCalledExactlyOnceWith(projection);
-  act(() => dialog.emit("dismissPhotoImportProblems"));
+  act(() => dialog.emit("dismissImageProcessingProblems"));
   await waitFor(() => expect(dialog.dismiss).toHaveBeenCalled());
   expect(onProjectionChange).toHaveBeenCalledOnce();
 });
@@ -6444,8 +6445,8 @@ test("preserves partial import problems after dismissing a queued Save failure",
   }));
   act(() => dialog.emit("dismissProjectOperationFailure"));
   await waitFor(() => expect(dialog.present).toHaveBeenLastCalledWith({
-    kind: "photoImportProblems", importedCount: 1, problems,
+    kind: "imageProcessingProblems", importedCount: 1, problems,
   }));
-  act(() => dialog.emit("dismissPhotoImportProblems"));
+  act(() => dialog.emit("dismissImageProcessingProblems"));
   expect(port.save).toHaveBeenCalledOnce();
 });

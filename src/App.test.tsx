@@ -1409,10 +1409,10 @@ test("retries an unavailable occurrence explicitly and refreshes it without Reli
   fireEvent.click(retry);
 
   await waitFor(() =>
-    expect(retryUnavailableMedia).toHaveBeenCalledWith("media-001"),
+    expect(retryUnavailableMedia).toHaveBeenCalledWith("media-001", expect.any(Function)),
   );
   await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledTimes(2));
-  await waitFor(() => expect(load).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(load).toHaveBeenCalledTimes(3));
   expect(screen.getByTestId("album-canvas")).toHaveAttribute(
     "data-media-preview",
     recoveredUrl,
@@ -1920,4 +1920,39 @@ test("logs the typed media preview failure code without replacing it with unknow
       ]),
     ),
   );
+});
+
+test("keeps a created Project usable while reporting initial image cache problems", async () => {
+  const dialog = projectDialogHarness();
+  const problem = { fileName: "Fundo.png", reason: "A imagem foi vinculada, mas sua prévia não pôde ser preparada." };
+  let warn: Parameters<MediaPreviewPort["onCacheProcessorWarning"]>[0] | undefined;
+  const confirmUiReady = vi.fn(async () => {
+    warn?.({ state: "suspended", message: "O Cache foi suspenso." });
+    return [problem];
+  });
+  render(<App
+    exportPipelinePort={exportPipelinePort}
+    mediaPreviewPort={{ ...mediaPreviewPort, onCacheProcessorWarning: async (listener) => {
+      warn = listener;
+      return () => undefined;
+    } }}
+    projectStartupPort={{ confirmUiReady }}
+    projectCorePort={projectCorePort}
+    projectWindowPort={projectWindowPort}
+    projectDialogPort={dialog.port}
+    graphicsProbe={canvasGraphicsDiagnosticProbe}
+    canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+    logger={silentLogger}
+  />);
+  await waitFor(() => expect(dialog.present).toHaveBeenCalledWith({
+    kind: "projectOperationFailure", message: "O Cache foi suspenso.",
+  }));
+  act(() => dialog.emit("dismissProjectOperationFailure"));
+  await waitFor(() => expect(dialog.present).toHaveBeenCalledWith({
+    kind: "imageProcessingProblems", importedCount: null, problems: [problem],
+  }));
+  expect(confirmUiReady).toHaveBeenCalledOnce();
+  expect(screen.getByTestId("album-canvas")).toBeInTheDocument();
+  act(() => dialog.emit("dismissImageProcessingProblems"));
+  await waitFor(() => expect(dialog.dismiss).toHaveBeenCalled());
 });

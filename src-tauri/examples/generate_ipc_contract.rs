@@ -3,16 +3,17 @@ use std::{env, path::PathBuf};
 use myalbuns_desktop_lib::ipc_contract::{
     ApplicationSettings, CacheClearAllOutcome, CacheFreeResult, CacheProcessorState,
     CacheProcessorWarning, CacheServiceCommandError, CacheServiceStatus, CancelDisposition,
-    ExportCommandError, ExportEvent, ExportResult, FrontendLogEvent, ImportPhotoResult,
-    LinkedMediaChanged, MediaPanelSettings, MediaPanelTabSettings, MediaPreferenceKind,
-    MediaPreview, MediaPreviewCommandError, MediaPreviewDemand, MediaPreviewState,
-    MediaSortDirection, MediaThumbnailSizes, MediaUsageFilter, OpeningExternalCopyDecision,
-    PhotoImportProgress, ProjectCloseChoice, ProjectCloseRequestOutcome, ProjectCloseResolution,
-    ProjectDialogAction, ProjectDialogActionEvent, ProjectDialogPresentation, ProjectDialogState,
-    ProjectRecoveryDecision, SaveAsProjectCommandError, SaveAsProjectOutcome, SaveAsProjectResult,
-    SaveProjectCommandError, SaveProjectOutcome, SaveProjectResult, SettingsPreferenceChange,
-    WorkspacePanelKind, WorkspacePanelPreference, WorkspacePanelPreferences,
-    WorkspacePreferenceChange, WorkspacePreferences,
+    ExportCommandError, ExportEvent, ExportResult, FrontendLogEvent, ImageProcessingProgress,
+    ImportPhotoResult, LinkedMediaChanged, MediaPanelSettings, MediaPanelTabSettings,
+    MediaPreferenceKind, MediaPreview, MediaPreviewCommandError, MediaPreviewDemand,
+    MediaPreviewState, MediaSortDirection, MediaThumbnailSizes, MediaUsageFilter,
+    OpeningExternalCopyDecision, ProjectCloseChoice, ProjectCloseRequestOutcome,
+    ProjectCloseResolution, ProjectDialogAction, ProjectDialogActionEvent,
+    ProjectDialogPresentation, ProjectDialogState, ProjectRecoveryDecision,
+    SaveAsProjectCommandError, SaveAsProjectOutcome, SaveAsProjectResult, SaveProjectCommandError,
+    SaveProjectOutcome, SaveProjectResult, SettingsPreferenceChange, WorkspacePanelKind,
+    WorkspacePanelPreference, WorkspacePanelPreferences, WorkspacePreferenceChange,
+    WorkspacePreferences,
 };
 use ts_rs::{Config, TS};
 
@@ -51,7 +52,7 @@ fn main() {
     MediaPanelTabSettings::export_all(&config)
         .expect("media panel tab settings bindings should be generated");
     ImportPhotoResult::export_all(&config).expect("Photo import bindings should be generated");
-    PhotoImportProgress::export_all(&config)
+    ImageProcessingProgress::export_all(&config)
         .expect("Photo import progress bindings should be generated");
     MediaPreview::export_all(&config).expect("media preview bindings should be generated");
     MediaPreviewDemand::export_all(&config)

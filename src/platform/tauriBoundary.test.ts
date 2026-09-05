@@ -69,7 +69,7 @@ function extractInvokedCommands(sourcePaths: readonly string[]) {
     sourcePaths.flatMap((path) =>
       Array.from(
         sourceFiles[path].matchAll(
-          /\binvoke(?:<[^>]+>)?\(\s*["']([^"']+)["']/g,
+          /\binvoke(?:ImageProcessing)?(?:<[^>]+>)?\(\s*["']([^"']+)["']/g,
         ),
         (match) => match[1],
       ),
@@ -305,7 +305,7 @@ test("consumes the generated import result at the Tauri boundary", () => {
     'import type { ImportPhotoResult as IpcImportPhotoResult } from "./generated/ImportPhotoResult";',
   );
   expect(projectPortSource).toContain(
-    'invoke<IpcImportPhotoResult>("import_photo", { onProgress: progressChannel })',
+    'invokeImageProcessing<IpcImportPhotoResult>("import_photo", {}, onProgress)',
   );
 });
 

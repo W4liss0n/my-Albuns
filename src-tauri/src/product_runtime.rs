@@ -56,6 +56,13 @@ pub(crate) fn run(
     app_paths: AppPaths,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let (request, mut project) = opened.into_parts();
+    let initial_image_processing = InitialImageProcessing {
+        required: matches!(
+            request.intent,
+            crate::project_bootstrap::BootstrapIntent::CreateNew { .. }
+        ),
+        problems: tokio::sync::OnceCell::new(),
+    };
     #[cfg(debug_assertions)]
     crate::dev_host_registration::register_from_environment(&request.launch_nonce)?;
 
@@ -110,6 +117,7 @@ pub(crate) fn run(
         .plugin(tauri_plugin_shell::init())
         .manage(project_host)
         .manage(startup_handshake)
+        .manage(initial_image_processing)
         .manage(cache_previews)
         .manage(ActiveCacheNamespace::new(cache_namespace_owner))
         .manage(cache_service)
@@ -412,15 +420,69 @@ fn projection_identity(project_host: &ProjectHost) -> Result<(String, u64), io::
     Ok((projection.state.project_id, projection.state.revision))
 }
 
+struct InitialImageProcessing {
+    required: bool,
+    problems: tokio::sync::OnceCell<Mutex<Vec<crate::ipc_contract::ImageProcessingProblem>>>,
+}
+
+impl InitialImageProcessing {
+    async fn prepare(
+        &self,
+        app: &tauri::AppHandle,
+    ) -> Result<Vec<crate::ipc_contract::ImageProcessingProblem>, String> {
+        self.prepare_with(async {
+            let mut problems = Vec::new();
+            if self.required {
+                let catalog = app.state::<ProjectHost>().authorized_media_catalog()?;
+                if !catalog.bindings.is_empty() {
+                    let mut batch = crate::image_processing::ImageProcessingBatch::new(
+                        catalog.bindings.len() as u32,
+                        |progress| {
+                            if let Some(problem) = progress.problem {
+                                problems.push(problem);
+                            }
+                        },
+                    );
+                    for binding in &catalog.bindings {
+                        batch.prepare(app, binding).await;
+                    }
+                }
+            }
+            Ok::<_, String>(problems)
+        })
+        .await
+    }
+
+    async fn prepare_with(
+        &self,
+        preparation: impl std::future::Future<
+            Output = Result<Vec<crate::ipc_contract::ImageProcessingProblem>, String>,
+        >,
+    ) -> Result<Vec<crate::ipc_contract::ImageProcessingProblem>, String> {
+        let problems = self
+            .problems
+            .get_or_try_init(|| async { preparation.await.map(Mutex::new) })
+            .await?;
+        // Replacement WebViews share the Host state, but must not replay a
+        // warning already delivered to the initial Project window.
+        problems
+            .lock()
+            .map(|mut problems| std::mem::take(&mut *problems))
+            .map_err(|_| "could not collect initial image processing problems".into())
+    }
+}
+
 #[tauri::command]
-fn project_ui_ready(
+async fn project_ui_ready(
     window: tauri::WebviewWindow,
     startup: tauri::State<'_, ProjectStartupHandshake>,
-) -> Result<(), String> {
+    image_processing: tauri::State<'_, InitialImageProcessing>,
+) -> Result<Vec<crate::ipc_contract::ImageProcessingProblem>, String> {
     if window.label() != PROJECT_WINDOW_LABEL {
         return Err("UI confirmation belongs only to the Project window".into());
     }
 
+    let problems = image_processing.prepare(window.app_handle()).await?;
     match startup.confirm_ui_ready() {
         Ok(transition) => {
             if transition.newly_observed {
@@ -439,7 +501,7 @@ fn project_ui_ready(
                 })?;
                 start_linked_media_monitor_if_active(window.app_handle().clone());
             }
-            Ok(())
+            Ok(problems)
         }
         Err(error) => {
             tracing::error!(
@@ -761,7 +823,7 @@ mod tests {
     use myalbuns_paths::OperationPathContext;
 
     use super::{
-        PROJECT_WINDOW_LABEL, StartupReadiness, StartupSignal,
+        InitialImageProcessing, PROJECT_WINDOW_LABEL, StartupReadiness, StartupSignal,
         hydrate_project_from_recovered_cache, project_window_title, refresh_changed_photo_sources,
         refresh_project_photos_for_media_update,
     };
@@ -774,6 +836,54 @@ mod tests {
     #[test]
     fn productive_host_has_one_stable_project_window_label() {
         assert_eq!(PROJECT_WINDOW_LABEL, "project");
+    }
+
+    #[test]
+    fn initial_image_warnings_wait_for_preparation_and_are_not_replayed_to_replacement_webviews() {
+        use std::{
+            future::Future,
+            task::{Context, Poll, Waker},
+        };
+
+        tauri::async_runtime::block_on(async {
+            let processing = InitialImageProcessing {
+                required: true,
+                problems: tokio::sync::OnceCell::new(),
+            };
+            let (ready, preparation) = tokio::sync::oneshot::channel();
+            let mut initial = std::pin::pin!(
+                processing
+                    .prepare_with(async { preparation.await.map_err(|error| error.to_string()) })
+            );
+            let mut replacement = std::pin::pin!(processing.prepare_with(async {
+                panic!("a replacement WebView must not repeat initial preparation")
+            }));
+            let mut context = Context::from_waker(Waker::noop());
+            assert!(matches!(initial.as_mut().poll(&mut context), Poll::Pending));
+            assert!(matches!(
+                replacement.as_mut().poll(&mut context),
+                Poll::Pending
+            ));
+            ready
+                .send(vec![crate::ipc_contract::ImageProcessingProblem {
+                    file_name: "fundo.jpg".into(),
+                    reason: "Cache indisponível".into(),
+                }])
+                .unwrap();
+            let delivered = initial.await.unwrap();
+            assert_eq!(delivered.len(), 1);
+            assert_eq!(delivered[0].file_name, "fundo.jpg");
+            assert!(replacement.await.unwrap().is_empty());
+            assert!(
+                processing
+                    .prepare_with(async {
+                        panic!("Salvar como must not repeat initial preparation")
+                    })
+                    .await
+                    .unwrap()
+                    .is_empty()
+            );
+        });
     }
 
     #[test]

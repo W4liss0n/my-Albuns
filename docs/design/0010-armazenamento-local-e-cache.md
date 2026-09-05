@@ -194,6 +194,26 @@ O `RootBindingPlan` e os contextos locais que reutilizam uma raiz durante Import
 
 `CacheEngine` possui os jobs, o índice e as gerações. Cada job grava um temporário próprio, verifica se o pedido e o original ainda são atuais e promove o artefato imutável antes de publicar a entrada correspondente em `metadata.json`. Uma queda pode deixar temporários ou gerações não referenciadas, que são descartados no próximo uso, sem fazer o índice apontar para um arquivo incompleto.
 
+A preparação de imagens do Projeto é compartilhada por importação, Religação,
+nova tentativa de leitura e mudanças de edição ou Histórico que introduzam ou
+passem a usar outra imagem. Essas ações aguardam a origem validada e o Cache
+completo antes de terminar, reutilizando uma geração válida. O progresso
+`Processando Imagens — X de Y` conta a conclusão conjunta de cada imagem; uma
+falha de Cache gera um problema sem remover um vínculo válido. Salvar e Fechar
+aguardam a mesma fila de ações. Jobs necessários a essas ações sobrevivem à
+mudança de área visível, mas continuam sujeitos à obsolescência da origem e da
+Identidade. Artefatos de imagens fora da área visível ficam no disco; a preparação
+do lote não torna todas as prévias residentes em memória.
+
+Em Novo Projeto, a identidade ainda não existe durante a escolha de uma imagem
+decorativa. A seleção só retorna depois da leitura e decodificação completas; o
+registro provisório guarda os bytes codificados dessa prévia em memória,
+preservando orientação e perfil de cor. Sua liberação descarta os bytes, sem
+criar um arquivo ou namespace de Projeto. A criação revalida o Original e o
+Host prepara o Cache canônico após assumir a identidade, antes de liberar a
+Janela do Projeto. Problemas nessa preparação preservam o Projeto criado e
+aparecem como avisos na janela.
+
 ## Metadados
 
 `metadata.json` é um índice descartável e versionado. Ele mantém somente o necessário para localizar e validar a representação:
@@ -218,6 +238,12 @@ finais.
 ## Invalidação e propriedade
 
 O Monitor apenas sinaliza uma possível mudança e agrupa eventos. Depois de uma nova inspeção confirmar alteração estável, divergência de tamanho ou data, reaparecimento, Religação, versão incompatível ou artefato inválido, o `CacheEngine` invalida somente a mídia afetada. Pan, Zoom, Frame e Layout não invalidam a representação da fonte.
+
+Ao confirmar uma atualização automática da mesma origem, o Monitor invalida o
+reuso da prévia anterior, preservando seus bytes apenas para apresentação até a
+publicação verificada da sucessora. Não há diálogo de progresso nesse fluxo.
+Essa retenção não transfere pixels entre vínculos, Projetos ou Identidades e
+permanece limitada à demanda residente do Painel e do Canvas.
 
 É aceito no MVP o caso raro de uma alteração feita com o aplicativo fechado conservar exatamente tamanho e data. A Exportação reabre o original e não depende dessa concessão.
 

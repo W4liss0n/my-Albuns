@@ -22,17 +22,17 @@ const MAX_DIALOG_SESSION_ID_CHARS: usize = 128;
 impl ProjectDialogState {
     fn sanitized(self) -> Self {
         match self {
-            Self::PhotoImportProgress { progress } => Self::PhotoImportProgress {
+            Self::ImageProcessingProgress { progress } => Self::ImageProcessingProgress {
                 progress: progress.sanitized(),
             },
-            Self::PhotoImportProblems {
+            Self::ImageProcessingProblems {
                 imported_count,
                 problems,
-            } => Self::PhotoImportProblems {
+            } => Self::ImageProcessingProblems {
                 imported_count,
                 problems: problems
                     .into_iter()
-                    .map(|problem| crate::ipc_contract::PhotoImportProblem {
+                    .map(|problem| crate::ipc_contract::ImageProcessingProblem {
                         file_name: bound_text(problem.file_name),
                         reason: bound_text(problem.reason),
                     })
@@ -87,7 +87,7 @@ impl ProjectDialogState {
 
     fn initial_dimensions(&self) -> (f64, f64) {
         match self {
-            Self::PhotoImportProblems { .. } => (
+            Self::ImageProcessingProblems { .. } => (
                 640.0,
                 400.0 + native_dialog_window::OWNED_WINDOW_TITLEBAR_HEIGHT,
             ),
@@ -107,7 +107,7 @@ impl ProjectDialogState {
                 440.0,
                 202.0 + native_dialog_window::OWNED_WINDOW_TITLEBAR_HEIGHT,
             ),
-            Self::ExportProgress { .. } | Self::PhotoImportProgress { .. } => (
+            Self::ExportProgress { .. } | Self::ImageProcessingProgress { .. } => (
                 440.0,
                 176.0 + native_dialog_window::OWNED_WINDOW_TITLEBAR_HEIGHT,
             ),

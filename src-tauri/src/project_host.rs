@@ -364,7 +364,7 @@ impl ProjectHost {
     pub(crate) fn import_photos(
         &self,
         paths: Vec<std::path::PathBuf>,
-        on_progress: impl FnMut(crate::ipc_contract::PhotoImportProgress),
+        on_progress: impl FnMut(crate::ipc_contract::ImageProcessingProgress),
     ) -> Result<crate::ipc_contract::ImportPhotoResult, String> {
         let catalog = self.authorized_media_catalog()?;
         let proposal = crate::media_runtime::MediaResolver.propose_photo_imports(

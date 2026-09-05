@@ -13,6 +13,8 @@ import type {
   ExportPipelinePort,
   CacheProcessorWarning,
   MediaPreview,
+  ImageProcessingProgress,
+  ImageProcessingProblem,
   MediaPreviewDemand,
   MediaPreviewPort,
   ProjectStartupPort,
@@ -89,6 +91,7 @@ function App({
       : null;
   const [projection, setProjection] = useState<EditorProjection | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [initialImageProblems, setInitialImageProblems] = useState<readonly ImageProcessingProblem[]>([]);
   const [mediaPreviews, setMediaPreviews] = useState<
     Readonly<Record<string, MediaPreview>>
   >({});
@@ -119,13 +122,18 @@ function App({
   }, [logger]);
 
   useProjectOperationResultDialog({
+    processingProblems: initialImageProblems,
     message:
       initialGraphicsCloseError ??
       saveAsStartupFailure ??
       cacheProcessorWarning?.message ??
       null,
     projectDialogPort,
-    onDismiss: () => {
+    onDismiss: (kind) => {
+      if (kind === "imageProcessingProblems") {
+        setInitialImageProblems([]);
+        return;
+      }
       setInitialGraphicsCloseError(null);
       const dismissedSaveAsFailure = saveAsStartupFailure !== null;
       setSaveAsStartupFailure(null);
@@ -205,7 +213,7 @@ function App({
     setPreferencesReadyProject(readyProjectId);
   }, []);
   const retryUnavailableMedia = useCallback(
-    async (mediaId: string) => {
+    async (mediaId: string, onProgress: (progress: ImageProcessingProgress) => void) => {
       const operationId = createLogInstanceId("media-retry");
       logger.write({
         level: "info",
@@ -215,7 +223,7 @@ function App({
         projectId,
       });
       try {
-        const preview = await mediaPreviewPort.retryUnavailableMedia(mediaId);
+        const preview = await mediaPreviewPort.retryUnavailableMedia(mediaId, onProgress);
         if (preview.state !== "ready") {
           setMediaPreviews((current) => ({
             ...current,
@@ -385,7 +393,9 @@ function App({
       return;
     }
     uiReadyProject.current = projectId;
-    projectStartupPort.confirmUiReady().catch((error: unknown) => {
+    projectStartupPort.confirmUiReady().then((problems) => {
+      if (uiReadyProject.current === projectId && problems) setInitialImageProblems(problems);
+    }).catch((error: unknown) => {
       if (uiReadyProject.current === projectId) {
         uiReadyProject.current = "";
       }

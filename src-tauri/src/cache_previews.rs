@@ -148,6 +148,22 @@ impl CachePreviewRegistry {
         })
     }
 
+    pub(crate) fn mark_sources_changed<I, S>(&self, media_ids: I)
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        let mut publication = self
+            .publication
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        for media_id in media_ids {
+            if let Some(published) = publication.tokens_by_media.get_mut(media_id.as_ref()) {
+                published.source_verified = false;
+            }
+        }
+    }
+
     pub(crate) fn invalidate_media<I, S>(&self, media_ids: I) -> usize
     where
         I: IntoIterator<Item = S>,
@@ -360,7 +376,40 @@ mod tests {
             "resident bytes cannot cross a relink, Undo, or discarded binding"
         );
 
-        assert_eq!(registry.invalidate_media(["media-photo"]), 1);
+        registry.mark_sources_changed(["media-photo"]);
+        assert!(
+            registry
+                .retained_preview(
+                    "media-photo",
+                    &original_path,
+                    crate::ipc_contract::MediaPreviewState::Ready
+                )
+                .is_none()
+        );
+        let retained = registry.serve(
+            "main",
+            Request::builder()
+                .uri(format!("/{token}"))
+                .body(Vec::new())
+                .unwrap(),
+        );
+        assert_eq!(retained.status(), StatusCode::OK);
+        assert_eq!(retained.body(), &derived_bytes);
+        let mut successor = artifact.clone();
+        successor.generation_id = "g-derived-two".into();
+        let successor_path = namespace
+            .paths()
+            .preview_file(
+                &successor.media_id,
+                &successor.generation_id,
+                successor.format,
+            )
+            .unwrap();
+        std::fs::write(successor_path, &derived_bytes).unwrap();
+        let replacement = registry
+            .publish(&app_paths, &namespace, &successor, &original_path)
+            .unwrap();
+        assert_ne!(replacement.url.as_ref(), Some(&url));
         let revoked_request = Request::builder()
             .method(Method::GET)
             .uri(format!("/{token}"))

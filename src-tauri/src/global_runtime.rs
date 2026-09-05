@@ -24,7 +24,7 @@ use crate::{
     },
     ipc_contract::OpeningExternalCopyDecision,
     logging,
-    native_dialog_window::{self, LaunchProgressKind, ProjectFailureDialogContext},
+    native_dialog_window::{self, NativeProgressKind, ProjectFailureDialogContext},
     native_project_dialog, path_io,
     project_bootstrap::{
         BootstrapFailure, BootstrapFailureKind, BootstrapOutcome, CreateWriteAuthorization,
@@ -42,8 +42,10 @@ use crate::{
 
 pub(crate) const GLOBAL_WINDOW_LABEL: &str = "global";
 const GLOBAL_ACTIVATION_TERMINAL_EVENT: &str = "myalbuns://global-activation-terminal";
-const GLOBAL_WEBVIEW_NAMESPACE: &str = "global";
+pub(crate) const GLOBAL_WEBVIEW_NAMESPACE: &str = "global";
 const HOST_TERMINAL_TIMEOUT: Duration = Duration::from_secs(30);
+// Creating also decodes initial originals and prepares their canonical Cache.
+const HOST_CREATION_TIMEOUT: Duration = Duration::from_secs(300);
 
 type ScheduledCleanupResult = Result<CacheScheduledCleanupOutcome, String>;
 
@@ -135,7 +137,8 @@ impl GlobalRuntimeState {
         global_activation: Option<Arc<PrimaryGlobalActivation>>,
     ) -> Result<Self, std::io::Error> {
         Ok(Self {
-            bootstrap: ProjectHostBootstrap::new(std::env::current_exe()?, HOST_TERMINAL_TIMEOUT),
+            bootstrap: ProjectHostBootstrap::new(std::env::current_exe()?, HOST_TERMINAL_TIMEOUT)
+                .with_creation_timeout(HOST_CREATION_TIMEOUT),
             global_webview_data_directory: app_paths
                 .webview_data_directory(GLOBAL_WEBVIEW_NAMESPACE)
                 .map_err(|error| std::io::Error::other(error.to_string()))?,
@@ -313,7 +316,7 @@ enum ConfirmedProjectLaunch {
 
 #[derive(Clone, Copy)]
 struct ProjectLaunchProgress<'a> {
-    kind: LaunchProgressKind,
+    kind: NativeProgressKind,
     owner_label: &'a str,
     restore_owner_on_failure: bool,
 }
@@ -410,7 +413,7 @@ async fn open_project(app: AppHandle) -> ProjectLaunchOutcome {
         path,
         ConfirmedLaunch::OpenExisting,
         ProjectLaunchProgress {
-            kind: LaunchProgressKind::Opening,
+            kind: NativeProgressKind::Opening,
             owner_label: GLOBAL_WINDOW_LABEL,
             restore_owner_on_failure: false,
         },
@@ -630,7 +633,7 @@ async fn create_project(
             authorization: destination.1,
         },
         ProjectLaunchProgress {
-            kind: LaunchProgressKind::Creating,
+            kind: NativeProgressKind::Creating,
             owner_label: GLOBAL_WINDOW_LABEL,
             restore_owner_on_failure: true,
         },
@@ -698,7 +701,7 @@ async fn open_recent_project(app: AppHandle, project_id: String) -> ProjectLaunc
         path,
         ConfirmedLaunch::OpenExisting,
         ProjectLaunchProgress {
-            kind: LaunchProgressKind::Opening,
+            kind: NativeProgressKind::Opening,
             owner_label: GLOBAL_WINDOW_LABEL,
             restore_owner_on_failure: false,
         },
@@ -786,7 +789,7 @@ async fn launch_confirmed_project_with_bindings_and_progress(
     presentation: ProjectLaunchProgress<'_>,
     _launch_permit: &GlobalProjectLaunchPermit,
 ) -> ProjectLaunchOutcome {
-    let mut progress = match native_dialog_window::show_launch_progress(
+    let mut progress = match native_dialog_window::show_native_progress(
         app,
         presentation.owner_label,
         presentation.kind,
@@ -1134,7 +1137,7 @@ async fn launch_activation_batch(
             ConfirmedLaunch::OpenExisting,
             root_bindings.clone(),
             ProjectLaunchProgress {
-                kind: LaunchProgressKind::Opening,
+                kind: NativeProgressKind::Opening,
                 owner_label: GLOBAL_WINDOW_LABEL,
                 restore_owner_on_failure: false,
             },

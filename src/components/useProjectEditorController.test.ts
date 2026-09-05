@@ -97,7 +97,7 @@ test("routes editor changes through the shared Project mutation runner", async (
     deltaPanX: 0.1,
     deltaPanY: 0,
     deltaZoom: 0,
-  });
+  }, expect.any(Function));
 });
 
 test("enters the centered Sheet Edit Mode with Enter and returns to normal mode with Escape", () => {

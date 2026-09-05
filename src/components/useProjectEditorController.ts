@@ -249,7 +249,10 @@ export function useProjectEditorController({
   return {
     message: mutations.message,
     importPending: mutations.importPending,
-    photoImportProgress: mutations.photoImportProgress,
+    imageProcessingProgress: mutations.imageProcessingProgress,
+    imageProcessingProblems: mutations.imageProcessingProblems,
+    dismissImageProcessingProblems: mutations.dismissImageProcessingProblems,
+    retryUnavailableMedia: mutations.retryUnavailableMedia,
     photoImportResult: mutations.photoImportResult,
     dismissPhotoImportResult: mutations.dismissPhotoImportResult,
     selectedFrame,

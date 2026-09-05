@@ -12,6 +12,34 @@
       "actions": []
     },
     {
+      "id": "image-processing-cache-warning",
+      "title": "Processamento de imagens — falha de Cache",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22imageProcessingProblems%22%2C%22importedCount%22%3Anull%2C%22problems%22%3A%5B%7B%22fileName%22%3A%22Fundo.png%22%2C%22reason%22%3A%22A%20imagem%20foi%20vinculada%2C%20mas%20n%C3%A3o%20foi%20poss%C3%ADvel%20preparar%20sua%20miniatura.%22%7D%5D%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-problems-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "Problemas de preparação também são apresentados fora da importação, preservando a imagem válida conforme a política compartilhada aceita."
+      },
+      "viewport": { "width": 640, "height": 460 },
+      "readySelector": ".ui-problems-table",
+      "actions": []
+    },
+    {
+      "id": "provisional-image-processing",
+      "title": "Novo Projeto — processamento da imagem decorativa",
+      "implementationPath": "/dialog.html?kind=processing-images",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-progress-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "A política aceita de processamento compartilhado estende o mesmo progresso à preparação provisória, antes da identidade do Projeto."
+      },
+      "viewport": { "width": 440, "height": 360 },
+      "readySelector": "[role=\"progressbar\"]",
+      "actions": []
+    },
+    {
       "id": "welcome-empty",
       "title": "Tela de Boas-vindas — sem Projetos recentes",
       "implementationPath": "/welcome-preview.html?recents=empty",
@@ -1339,8 +1367,8 @@
     },
     {
       "id": "photo-import-progress",
-      "title": "Importação — progresso dos arquivos",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22photoImportProgress%22%2C%22progress%22%3A%7B%22kind%22%3A%22determinate%22%2C%22completed%22%3A5%2C%22total%22%3A12%2C%22status%22%3A%22Arquivo%205%20de%2012%22%7D%7D",
+      "title": "Processamento de imagens — progresso",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22imageProcessingProgress%22%2C%22progress%22%3A%7B%22kind%22%3A%22determinate%22%2C%22completed%22%3A5%2C%22total%22%3A12%2C%22status%22%3A%225%20de%2012%22%7D%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-import-dialog",
@@ -1378,8 +1406,8 @@
     },
     {
       "id": "photo-import-problems-partial",
-      "title": "Problemas na importação — sucesso parcial",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22photoImportProblems%22%2C%22importedCount%22%3A2%2C%22problems%22%3A%5B%7B%22fileName%22%3A%22DSC_0148.jpg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0152.jpeg%22%2C%22reason%22%3A%22O%20Arquivo%20escolhido%20n%C3%A3o%20est%C3%A1%20dispon%C3%ADvel.%22%7D%5D%7D",
+      "title": "Problemas no processamento — sucesso parcial",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22imageProcessingProblems%22%2C%22importedCount%22%3A2%2C%22problems%22%3A%5B%7B%22fileName%22%3A%22DSC_0148.jpg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0152.jpeg%22%2C%22reason%22%3A%22O%20Arquivo%20escolhido%20n%C3%A3o%20est%C3%A1%20dispon%C3%ADvel.%22%7D%5D%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-problems-dialog",
@@ -1395,8 +1423,8 @@
     },
     {
       "id": "photo-import-problems-rejected",
-      "title": "Problemas na importação — todos rejeitados e lista longa",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22photoImportProblems%22%2C%22importedCount%22%3A0%2C%22problems%22%3A%5B%7B%22fileName%22%3A%22Foto%20da%20turma%20%E2%80%94%20c%C3%B3pia%20com%20nome%20muito%20longo%20para%20testar%20a%20leitura%20de%20arquivos%20originais%20selecionados.jpg%22%2C%22reason%22%3A%22O%20Arquivo%20escolhido%20n%C3%A3o%20est%C3%A1%20dispon%C3%ADvel.%20Verifique%20o%20acesso%20ao%20local%20e%20selecione%20o%20arquivo%20novamente.%22%7D%2C%7B%22fileName%22%3A%22DSC_0001.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0002.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0003.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0004.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0005.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0006.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0007.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0008.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0009.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0010.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0011.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%5D%7D",
+      "title": "Problemas no processamento — todos rejeitados e lista longa",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22imageProcessingProblems%22%2C%22importedCount%22%3A0%2C%22problems%22%3A%5B%7B%22fileName%22%3A%22Foto%20da%20turma%20%E2%80%94%20c%C3%B3pia%20com%20nome%20muito%20longo%20para%20testar%20a%20leitura%20de%20arquivos%20originais%20selecionados.jpg%22%2C%22reason%22%3A%22O%20Arquivo%20escolhido%20n%C3%A3o%20est%C3%A1%20dispon%C3%ADvel.%20Verifique%20o%20acesso%20ao%20local%20e%20selecione%20o%20arquivo%20novamente.%22%7D%2C%7B%22fileName%22%3A%22DSC_0001.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0002.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0003.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0004.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0005.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0006.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0007.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0008.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0009.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0010.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0011.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%5D%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-problems-dialog",

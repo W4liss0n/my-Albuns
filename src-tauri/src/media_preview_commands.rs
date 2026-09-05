@@ -5,16 +5,15 @@ use myalbuns_paths::AppPaths;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow, ipc::Channel};
 
 use crate::{
-    cache_activity_gate::{CacheCancellation, CacheCancellationReason},
+    cache_activity_gate::CacheCancellation,
     cache_engine::{
         self, AuthorizedCacheNamespace, CACHE_PROCESSOR_SUSPENDED_MESSAGE, CacheEngine,
-        CacheFailure, CacheFailureStage, CacheFlightClaim, CacheProcessorStatus, CacheWork,
+        CacheFlightClaim, CacheProcessorStatus, CacheWork,
     },
     cache_previews::{CachePreviewError, CachePreviewRegistry},
     cache_service::ActiveCacheNamespace,
-    imaging_processor::{
-        ImagingProcessor, InvocationContext, InvocationFailureStage, TauriImagingTransport,
-    },
+    image_processing::{ImageProcessingBatch, execute_owned_cache},
+    imaging_processor::ImagingProcessor,
     ipc_contract::{
         CacheProcessorState, CacheProcessorWarning, LinkedMediaChanged, MediaPreview,
         MediaPreviewCommandError, MediaPreviewCommandErrorCode, MediaPreviewDemand,
@@ -65,6 +64,7 @@ impl MediaPreviewCommandError {
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn retry_unavailable_media(
     media_id: String,
+    on_progress: Channel<crate::ipc_contract::ImageProcessingProgress>,
     window: WebviewWindow,
     app: AppHandle,
     project_host: State<'_, ProjectHost>,
@@ -77,6 +77,9 @@ pub(crate) async fn retry_unavailable_media(
     if window.label() != PROJECT_WINDOW_LABEL {
         return Err(MediaPreviewCommandError::read_failed());
     }
+    let mut processing = ImageProcessingBatch::new(1, |progress| {
+        let _ = on_progress.send(progress);
+    });
     let _causal_cache_permit = engine
         .begin_cancellable_work(CacheCancellation::default())
         .await;
@@ -93,6 +96,7 @@ pub(crate) async fn retry_unavailable_media(
         .find(|binding| binding.media_id == media_id)
         .ok_or_else(MediaPreviewCommandError::read_failed)?;
     let source_path = binding.logical_path.clone();
+    let retry_binding = binding.clone();
     let monitor = media_monitor.inner().clone();
     let runtime = media_runtime.inner().clone();
     let retry_app = app.clone();
@@ -131,6 +135,22 @@ pub(crate) async fn retry_unavailable_media(
             .map_err(|_| MediaPreviewCommandError::read_failed())?;
     }
     let state = preview_state(inspection.availability());
+    drop(_causal_cache_permit);
+    if state == MediaPreviewState::Ready {
+        processing.prepare(&app, &retry_binding).await;
+    } else {
+        processing.complete(Some(crate::ipc_contract::ImageProcessingProblem {
+            file_name: source_path
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .into_owned(),
+            reason: match state {
+                MediaPreviewState::Absent => "O arquivo da imagem não foi encontrado. Use Religar para escolher sua nova localização.",
+                _ => "A origem da imagem continua indisponível. Reconecte o local e tente novamente.",
+            }.into(),
+        }));
+    }
     let retained = (state != MediaPreviewState::Ready)
         .then(|| registry.retained_preview(&media_id, &source_path, state))
         .flatten();
@@ -500,87 +520,6 @@ fn ordered_demand(demand: &MediaPreviewDemand) -> Vec<String> {
         .filter(|media_id| seen.insert(media_id.as_str()))
         .cloned()
         .collect()
-}
-
-#[allow(clippy::too_many_arguments)]
-async fn execute_owned_cache(
-    app: &AppHandle,
-    logging: &LoggingState,
-    app_paths: &myalbuns_paths::AppPaths,
-    engine: &CacheEngine,
-    processor: &ImagingProcessor,
-    work: CacheWork,
-    cancellation: CacheCancellation,
-) -> Result<cache_engine::CacheExecution, CacheFailure> {
-    loop {
-        match cancellation.reason() {
-            Some(CacheCancellationReason::Obsolete) => {
-                return Err(CacheFailure::new(
-                    CacheFailureStage::Cancelled,
-                    "A demanda de Cache ficou obsoleta.",
-                ));
-            }
-            Some(CacheCancellationReason::Paused) if !cancellation.resume_after_pause() => {
-                return Err(CacheFailure::new(
-                    CacheFailureStage::Cancelled,
-                    "A demanda de Cache não pôde ser retomada.",
-                ));
-            }
-            Some(CacheCancellationReason::Paused) | None => {}
-        }
-        let permit = engine.begin_cancellable_work(cancellation.clone()).await;
-        if cancellation.reason() == Some(CacheCancellationReason::Paused) {
-            drop(permit);
-            continue;
-        }
-        if cancellation.reason() == Some(CacheCancellationReason::Obsolete) {
-            drop(permit);
-            return Err(CacheFailure::new(
-                CacheFailureStage::Cancelled,
-                "A demanda de Cache ficou obsoleta.",
-            ));
-        }
-        let reservation = processor.reserve().await.map_err(|error| {
-            CacheFailure::new(
-                CacheFailureStage::Processor(InvocationFailureStage::ResolveSidecar),
-                error.to_string(),
-            )
-        })?;
-        if cancellation
-            .flag()
-            .load(std::sync::atomic::Ordering::Acquire)
-        {
-            drop(reservation);
-            drop(permit);
-            continue;
-        }
-        let context = InvocationContext::new(
-            work.request_id.clone(),
-            Some(work.namespace.project_id().to_owned()),
-        );
-        let mut transport = TauriImagingTransport::new(app, logging, &reservation);
-        let result = engine
-            .execute(
-                &mut transport,
-                app_paths,
-                work.clone(),
-                &context,
-                &cancellation,
-            )
-            .await;
-        drop(reservation);
-        drop(permit);
-        if result.as_ref().is_err_and(|failure| {
-            matches!(
-                failure.stage,
-                CacheFailureStage::Cancelled
-                    | CacheFailureStage::Processor(InvocationFailureStage::Cancelled)
-            ) && cancellation.reason() == Some(CacheCancellationReason::Paused)
-        }) {
-            continue;
-        }
-        return result;
-    }
 }
 
 #[cfg(test)]

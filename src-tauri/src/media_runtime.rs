@@ -12,11 +12,11 @@ use myalbuns_paths::{
     ExpectedObject, OperationPathContext, PhysicalFileIdentity, ResolveError, RootBindingPlan,
 };
 
-use crate::ipc_contract::PhotoImportProblem;
+use crate::ipc_contract::ImageProcessingProblem;
 
 pub(crate) struct PhotoImportsProposal {
     pub(crate) commands: Vec<ImportPhoto>,
-    pub(crate) problems: Vec<PhotoImportProblem>,
+    pub(crate) problems: Vec<ImageProcessingProblem>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -204,7 +204,7 @@ impl MediaResolver {
         &self,
         paths: Vec<PathBuf>,
         bindings: &[MediaBinding],
-        mut on_progress: impl FnMut(crate::ipc_contract::PhotoImportProgress),
+        mut on_progress: impl FnMut(crate::ipc_contract::ImageProcessingProgress),
     ) -> PhotoImportsProposal {
         let existing = bindings
             .iter()
@@ -217,9 +217,10 @@ impl MediaResolver {
             .filter(|path| seen.insert(path.clone()))
             .collect::<Vec<_>>();
         let total_files = paths.len() as u32;
-        on_progress(crate::ipc_contract::PhotoImportProgress {
+        on_progress(crate::ipc_contract::ImageProcessingProgress {
             completed_files: 0,
             total_files,
+            problem: None,
         });
         let mut context = OperationPathContext::new();
         let candidates = paths
@@ -245,7 +246,7 @@ impl MediaResolver {
             } else {
                 match capture.and_then(|()| inspect_media_source_in_plan(&plan, &path, true)) {
                     Ok(metadata) => commands.push(ImportPhoto::new(path, metadata)),
-                    Err(reason) => problems.push(PhotoImportProblem {
+                    Err(reason) => problems.push(ImageProcessingProblem {
                         file_name: path
                             .file_name()
                             .unwrap_or_default()
@@ -255,9 +256,10 @@ impl MediaResolver {
                     }),
                 }
             }
-            on_progress(crate::ipc_contract::PhotoImportProgress {
+            on_progress(crate::ipc_contract::ImageProcessingProgress {
                 completed_files: (index + 1) as u32,
                 total_files,
+                problem: None,
             });
         }
         PhotoImportsProposal { commands, problems }
@@ -417,10 +419,13 @@ fn inspect_media_source_in_plan(
     ) {
         std::mem::swap(&mut width, &mut height);
     }
-    if require_jpeg {
-        DynamicImage::from_decoder(decoder)
-            .map_err(|_| "O JPEG está corrompido ou não pôde ser decodificado.".to_string())?;
-    }
+    DynamicImage::from_decoder(decoder).map_err(|_| {
+        if require_jpeg {
+            "O JPEG está corrompido ou não pôde ser decodificado.".to_string()
+        } else {
+            "A imagem está corrompida ou não pôde ser decodificada.".to_string()
+        }
+    })?;
     PhotoSourceMetadata::new(
         width,
         height,

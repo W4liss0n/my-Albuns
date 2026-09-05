@@ -25,6 +25,7 @@ const HOST_WEBVIEW_DEBUG_PORT_ENV: &str = "MYALBUNS_DEV_HOST_WEBVIEW_DEBUG_PORT"
 pub(crate) struct ProjectHostBootstrap {
     executable: PathBuf,
     terminal_timeout: Duration,
+    creation_timeout: Duration,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -115,7 +116,13 @@ impl ProjectHostBootstrap {
         Self {
             executable,
             terminal_timeout,
+            creation_timeout: terminal_timeout,
         }
+    }
+
+    pub(crate) fn with_creation_timeout(mut self, timeout: Duration) -> Self {
+        self.creation_timeout = timeout;
+        self
     }
 
     pub(crate) fn open(
@@ -153,7 +160,11 @@ impl ProjectHostBootstrap {
 
     fn launch(&self, request: BootstrapRequest) -> Result<BootstrapOutcome, BootstrapFailure> {
         let child = spawn_host(&self.executable, &request.launch_nonce)?;
-        supervise_child(child, request, self.terminal_timeout)
+        let timeout = match request.intent {
+            BootstrapIntent::CreateNew { .. } => self.creation_timeout,
+            BootstrapIntent::OpenExisting => self.terminal_timeout,
+        };
+        supervise_child(child, request, timeout)
     }
 }
 

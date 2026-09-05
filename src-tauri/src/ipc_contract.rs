@@ -33,12 +33,12 @@ pub struct ProjectDialogDetail {
 )]
 #[ts(tag = "kind")]
 pub enum ProjectDialogState {
-    PhotoImportProgress {
+    ImageProcessingProgress {
         progress: ProjectDialogProgress,
     },
-    PhotoImportProblems {
-        imported_count: u32,
-        problems: Vec<PhotoImportProblem>,
+    ImageProcessingProblems {
+        imported_count: Option<u32>,
+        problems: Vec<ImageProcessingProblem>,
     },
     AlbumInformationConfirmation {
         busy: bool,
@@ -90,7 +90,7 @@ pub enum ProjectDialogAction {
     DismissExport,
     DismissProjectCloseFailure,
     DismissProjectOperationFailure,
-    DismissPhotoImportProblems,
+    DismissImageProcessingProblems,
     RetryExport,
     SaveAndClose,
 }
@@ -159,7 +159,7 @@ mod project_dialog_contract_tests {
     #[test]
     fn every_project_dialog_state_round_trips_through_its_discriminated_union() {
         let states = [
-            ProjectDialogState::PhotoImportProgress {
+            ProjectDialogState::ImageProcessingProgress {
                 progress: ProjectDialogProgress::Determinate {
                     completed: 5,
                     total: 12,
@@ -202,7 +202,7 @@ mod project_dialog_contract_tests {
             },
         ];
         let expected_kinds = [
-            "photoImportProgress",
+            "imageProcessingProgress",
             "albumInformationConfirmation",
             "projectCloseConfirmation",
             "projectCloseFailure",
@@ -522,11 +522,12 @@ pub struct LinkedMediaChanged {
     pub(crate) media_ids: Vec<String>,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-pub struct PhotoImportProgress {
+pub struct ImageProcessingProgress {
     pub(crate) completed_files: u32,
     pub(crate) total_files: u32,
+    pub(crate) problem: Option<ImageProcessingProblem>,
 }
 
 #[derive(Serialize, TS)]
@@ -546,7 +547,7 @@ pub enum ImportPhotoResult {
         projection: EditorProjection,
         media_ids: Vec<String>,
         imported_count: u32,
-        problems: Vec<PhotoImportProblem>,
+        problems: Vec<ImageProcessingProblem>,
     },
 }
 
@@ -1013,7 +1014,7 @@ pub struct FrontendLogEvent {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-pub struct PhotoImportProblem {
+pub struct ImageProcessingProblem {
     pub(crate) file_name: String,
     pub(crate) reason: String,
 }

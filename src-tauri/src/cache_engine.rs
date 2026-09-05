@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
     sync::{
         Arc, Mutex,
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -382,6 +382,7 @@ struct CacheFlight {
     media_id: String,
     publication_id: uuid::Uuid,
     cancellation: CacheCancellation,
+    required_by_processing: AtomicBool,
     result: Mutex<Option<FlightResult>>,
     completed: Notify,
 }
@@ -661,7 +662,10 @@ impl CacheEngine {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             flights.retain(|_, flight| {
-                if flight.project_id == project_id && !demanded.contains(flight.media_id.as_str()) {
+                if flight.project_id == project_id
+                    && !demanded.contains(flight.media_id.as_str())
+                    && !flight.required_by_processing.load(Ordering::Acquire)
+                {
                     flight.cancellation.cancel_obsolete();
                     return false;
                 }
@@ -840,6 +844,26 @@ impl CacheEngine {
         Some(claim)
     }
 
+    pub(crate) fn claim_for_processing(&self, work: &CacheWork) -> CacheFlightClaim {
+        let _transition_guard = self
+            .transition_and_publication_gate
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut flights = self
+            .flights
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let claim = self.claim_locked(work, &mut flights);
+        let flight = match &claim {
+            CacheFlightClaim::Owner(owner) => &owner.flight,
+            CacheFlightClaim::Waiter(waiter) => &waiter.flight,
+        };
+        // A user action must finish its cache even if the viewport moves away.
+        // Source invalidation, identity retirement and causal pauses still apply.
+        flight.required_by_processing.store(true, Ordering::Release);
+        claim
+    }
+
     fn claim_locked(
         &self,
         work: &CacheWork,
@@ -866,6 +890,7 @@ impl CacheEngine {
             media_id: work.source.media_id().to_owned(),
             publication_id: uuid::Uuid::new_v4(),
             cancellation: CacheCancellation::default(),
+            required_by_processing: AtomicBool::new(false),
             result: Mutex::new(None),
             completed: Notify::new(),
         });
@@ -1069,10 +1094,12 @@ impl CacheEngine {
             .intersection(&applied_media_ids)
             .cloned()
             .collect::<HashSet<_>>();
-        registry.invalidate_media(applied_revoked_previews.iter().map(String::as_str));
-        // A stable source change invalidates reuse and resident publication now,
-        // but the indexed generation remains the last atomic Cache publication
-        // until a verified successor replaces it. Planning revalidates its
+        registry.mark_sources_changed(applied_revoked_previews.intersection(&invalidated));
+        registry.invalidate_media(applied_revoked_previews.difference(&invalidated));
+        // A stable source change invalidates reuse, retaining the resident image
+        // for display until its verified successor can replace it atomically.
+        // The indexed generation also remains the last atomic publication.
+        // Planning revalidates its
         // fingerprint, so retaining it cannot make the stale bytes reusable.
         // `publish_cache_metadata` swaps the entry first and only then collects
         // the superseded file.
@@ -2861,6 +2888,43 @@ mod tests {
                 "Candidate to Absent cannot leave an addressable preview resident"
             );
         });
+    }
+
+    #[test]
+    fn image_processing_completes_offscreen_but_obsolete_sources_still_cancel() {
+        let fixture = fixture();
+        let engine = CacheEngine::default();
+        let registry = CachePreviewRegistry::new("project");
+        let project_id = fixture.work.namespace.project_id();
+        let CacheFlightClaim::Owner(owner) = engine.claim_for_processing(&fixture.work) else {
+            panic!("the processing action owns the first attempt");
+        };
+        engine.reconcile_preview_demand(&registry, project_id, 1, std::iter::empty());
+        assert!(
+            !owner
+                .cancellation()
+                .flag()
+                .load(std::sync::atomic::Ordering::Acquire)
+        );
+        assert!(matches!(
+            engine.claim_for_processing(&fixture.work),
+            CacheFlightClaim::Waiter(_)
+        ));
+        engine.apply_monitor_media_update(
+            &fixture.work.namespace,
+            &registry,
+            &MediaRuntimeUpdate::for_test(
+                1,
+                vec![fixture.work.source.media_id().to_owned()],
+                vec![fixture.work.source.media_id().to_owned()],
+            ),
+        );
+        assert!(
+            owner
+                .cancellation()
+                .flag()
+                .load(std::sync::atomic::Ordering::Acquire)
+        );
     }
 
     #[test]

@@ -6,32 +6,35 @@ import type {
   ProjectDialogSession,
 } from "../application/projectDialogPort";
 
-import type { PhotoImportCompletion } from "../application/projectPorts";
+import type { PhotoImportCompletion, ImageProcessingProblem } from "../application/projectPorts";
 
 interface ProjectOperationResultDialogOptions {
   importResult?: PhotoImportCompletion | null;
+  processingProblems?: readonly ImageProcessingProblem[];
   message: string | null;
   projectDialogPort: ProjectDialogPort;
-  onDismiss(kind: "projectOperationFailure" | "photoImportProblems"): void;
+  onDismiss(kind: "projectOperationFailure" | "imageProcessingProblems"): void;
 }
 
 export function useProjectOperationResultDialog({
   message,
   importResult,
+  processingProblems,
   projectDialogPort,
   onDismiss,
 }: ProjectOperationResultDialogOptions) {
   const feedback = useMemo(() => {
     if (message) return { kind: "projectOperationFailure" as const, message };
-    if (importResult?.problems.length) {
+    const problems = [...(importResult?.problems ?? []), ...(processingProblems ?? [])];
+    if (problems.length) {
       return {
-        kind: "photoImportProblems" as const,
-        importedCount: importResult.importedCount,
-        problems: importResult.problems,
+        kind: "imageProcessingProblems" as const,
+        importedCount: importResult?.problems.length ? importResult.importedCount : null,
+        problems,
       };
     }
     return null;
-  }, [message, importResult]);
+  }, [message, importResult, processingProblems]);
   const feedbackRef = useRef(feedback);
   const onDismissRef = useRef(onDismiss);
   const presentedFeedbackRef = useRef<typeof feedback>(null);
@@ -45,9 +48,9 @@ export function useProjectOperationResultDialog({
   actionListenerRef.current = (action) => {
     if (
       action !== "dismissProjectOperationFailure" &&
-      action !== "dismissPhotoImportProblems"
+      action !== "dismissImageProcessingProblems"
     ) return;
-    const kind = action === "dismissPhotoImportProblems" ? "photoImportProblems" : "projectOperationFailure";
+    const kind = action === "dismissImageProcessingProblems" ? "imageProcessingProblems" : "projectOperationFailure";
     if (feedbackRef.current?.kind !== kind) return;
     presentedFeedbackRef.current = null;
     const session = dialogSessionRef.current;

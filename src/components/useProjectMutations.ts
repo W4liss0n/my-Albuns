@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import type { PhotoImportCompletion, PhotoImportProgress } from "../application/projectPorts";
+import type { PhotoImportCompletion, ImageProcessingProgress } from "../application/projectPorts";
+import { createLogInstanceId } from "../application/logging";
+import { useImageProcessing } from "./useImageProcessing";
 
 import type {
   EditorProjection,
@@ -50,7 +52,7 @@ export function useProjectMutations({
 }: ProjectMutationsInput) {
   const [message, setMessage] = useState<string | null>(null);
   const [importPending, setImportPending] = useState(false);
-  const [photoImportProgress, setPhotoImportProgress] = useState<PhotoImportProgress | null>(null);
+  const imageProcessing = useImageProcessing(projection.state.projectId, runProjectMutation);
   const importAttemptRef = useRef({ pending: false });
   const [photoImportResult, setPhotoImportResult] = useState<PhotoImportCompletion | null>(null);
   const feedbackTokenRef = useRef(0);
@@ -60,7 +62,6 @@ export function useProjectMutations({
     setMessage(null);
     importAttemptRef.current = { pending: false };
     setImportPending(false);
-    setPhotoImportProgress(null);
     setPhotoImportResult(null);
     return () => { importAttemptRef.current = { pending: false }; };
   }, [runProjectMutation, projection.state.projectId]);
@@ -100,13 +101,14 @@ export function useProjectMutations({
   function applyIntent(intent: ProjectIntent) {
     const capturedProjection = projection;
     return runWithErrorFeedback((port, latestProjection) =>
-      port.apply(
+      imageProcessing.run((publish) => port.apply(
         materializeProjectIntent(
           intent,
           capturedProjection,
           latestProjection ?? capturedProjection,
         ),
-      ),
+        publish,
+      )),
     );
   }
 
@@ -134,7 +136,7 @@ export function useProjectMutations({
           }
           materializedIntent = materializedStructure;
         }
-        const result = await port.applyWithOutcome(materializedIntent);
+        const result = await imageProcessing.run((publish) => port.applyWithOutcome(materializedIntent, publish));
         affectedFrameId = result.affectedFrameId;
         affectedSheetId = result.affectedSheetId;
         return result.projection;
@@ -169,7 +171,7 @@ export function useProjectMutations({
         if (!effectiveProjection.state[availability]) {
           return Promise.resolve(effectiveProjection);
         }
-        return port[operation]();
+        return imageProcessing.run((publish) => port[operation](publish));
       },
       true,
     );
@@ -214,13 +216,14 @@ export function useProjectMutations({
   async function commitInteraction(intent: ProjectIntent) {
     const capturedProjection = projection;
     return commitMutation((port, latestProjection) =>
-      port.apply(
+      imageProcessing.run((publish) => port.apply(
         materializeProjectIntent(
           intent,
           capturedProjection,
           latestProjection ?? capturedProjection,
         ),
-      ),
+        publish,
+      )),
     );
   }
 
@@ -231,7 +234,7 @@ export function useProjectMutations({
       const effectiveProjection = latestProjection ?? projection;
       const materialized = draft.materializeAgainst(effectiveProjection);
       return materialized.changed
-        ? port.apply(materialized.intent)
+        ? imageProcessing.run((publish) => port.apply(materialized.intent, publish))
         : Promise.resolve(effectiveProjection);
     });
   }
@@ -272,7 +275,7 @@ export function useProjectMutations({
           return effectiveProjection;
         }
         applyRequested = true;
-        return port.apply(materialized.intent);
+        return imageProcessing.run((publish) => port.apply(materialized.intent, publish));
       },
     );
 
@@ -315,7 +318,9 @@ export function useProjectMutations({
   return {
     message,
     importPending,
-    photoImportProgress,
+    imageProcessingProgress: imageProcessing.progress,
+    imageProcessingProblems: imageProcessing.problems,
+    dismissImageProcessingProblems: imageProcessing.dismissProblems,
     photoImportResult,
     applyIntent,
     commitInteraction,
@@ -333,11 +338,7 @@ export function useProjectMutations({
       let result: PhotoImportCompletion | null = null;
       try {
         const completed = await runWithErrorFeedback(async (port) => {
-          const imported = await port.importPhoto((progress) => {
-            if (importAttemptRef.current === attempt && attempt.pending) {
-              setPhotoImportProgress(progress);
-            }
-          });
+          const imported = await imageProcessing.run((publish) => port.importPhoto(publish));
           if (imported.kind === "completed") result = imported;
           return imported.projection;
         });
@@ -349,7 +350,6 @@ export function useProjectMutations({
         if (importAttemptRef.current === attempt) {
           attempt.pending = false;
           setImportPending(false);
-          setPhotoImportProgress(null);
         }
       }
     },
@@ -362,8 +362,14 @@ export function useProjectMutations({
     },
     relinkMedia: (mediaId: string) =>
       void runWithErrorFeedback((port) =>
-        port.relink(mediaId),
+        imageProcessing.run((publish) => port.relink(mediaId, publish)),
       ),
+    retryUnavailableMedia: async (retry: (publish: (progress: ImageProcessingProgress) => void) => Promise<void>) => {
+      await runWithErrorFeedback(async (port) => {
+        await imageProcessing.run(retry);
+        return port.load(createLogInstanceId("media-retry"));
+      });
+    },
     save: () => void saveVisibleRevision(),
     saveAs: () => void saveVisibleRevisionAs(),
     undo: () => void runHistoryCommand("canUndo", "undo"),
