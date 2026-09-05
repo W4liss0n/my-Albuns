@@ -21,7 +21,17 @@ try {
     $applicationPath = Join-Path $target 'debug\myalbuns-desktop.exe'
     $sourceAfter = Get-GateSourceSnapshot -WorkspaceRoot $script:WorkspaceRoot -EvidencePath $OutputPath
     if (Test-GateSourceSnapshotsDirty -Before $sourceBefore -After $sourceAfter) {
-        throw 'The source changed while preparing the native test build.'
+        $changedPaths = @(Get-GateSourceStatus -WorkspaceRoot $script:WorkspaceRoot -EvidencePath $OutputPath)
+        $diagnostics = [ordered]@{
+            before = $sourceBefore
+            after = $sourceAfter
+            changedPaths = $changedPaths
+            trackedDiff = @(& git -C $script:WorkspaceRoot diff --no-ext-diff HEAD -- .)
+        }
+        $diagnosticsPath = [IO.Path]::ChangeExtension($OutputPath, '.source.json')
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $diagnosticsPath) | Out-Null
+        [IO.File]::WriteAllText($diagnosticsPath, ($diagnostics | ConvertTo-Json -Depth 5), [Text.UTF8Encoding]::new($false))
+        throw ("The source changed while preparing the native test build: " + ($changedPaths -join '; ') + ". Diagnostics: " + $diagnosticsPath)
     }
     $application = Get-NativeGateArtifact -Path $applicationPath
     $application.buildMode = 'tauri-debug-custom-protocol'

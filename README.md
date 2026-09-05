@@ -95,7 +95,8 @@ somente os estados afetados com `MYALBUNS_UI_SCENARIO_IDS`; a aprovação visual
 continua dependendo da revisão das capturas.
 
 Os testes com janelas ficam separados. O workflow **Validation** executa no
-Windows do GitHub a validação sem janelas e um piloto nativo de Cópia externa,
+Windows do GitHub, em jobs independentes, a validação sem janelas e um piloto
+nativo de Cópia externa,
 retendo seus logs e capturas como artefatos. O piloto não aprova a jornada completa
 nem substitui a verificação de GPU no hardware final.
 
