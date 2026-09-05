@@ -43,7 +43,10 @@ A failed run retains window diagnostics, screenshots where available, process
 logs and driver traces before cleanup. Inspect those artifacts before rerunning
 only the failed scenario. Do not add automatic retries to turn failures green.
 
-The Windows CI pilot runs `external-copy-opening-owner` on PR updates. Other
+The Windows CI pilot runs `external-copy-opening-owner` on PR updates.
+Headless and native steps retain independent outcomes: a headless failure keeps
+the workflow failed but does not suppress the pilot once toolchain, native build
+and observation prerequisites succeed. Cancellation stops either path. Other
 scenarios remain explicit until their hosted behavior is verified. Win32 probe
 fixtures are opt-in with `MYALBUNS_NATIVE_PROBE_TESTS=1`, only in that isolated
 native environment or during an explicitly authorized local native run.

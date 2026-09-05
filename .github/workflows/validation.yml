@@ -48,12 +48,17 @@ jobs:
       - name: Install locked frontend dependencies
         run: npm ci
       - name: Prepare pinned local Rust toolchain
+        id: toolchain
         run: ./scripts/Setup-LocalToolchain.ps1 -SkipNodeInstall
       - name: Validate without visible windows
         run: npm run validate
       - name: Prepare native test build once
+        id: native_build
+        if: ${{ !cancelled() && steps.toolchain.conclusion == 'success' }}
         run: npm run build:native-tests
       - name: Ensure WebView2 on the hosted runner
+        id: native_runtime
+        if: ${{ !cancelled() && steps.native_build.conclusion == 'success' }}
         run: |
           $runtimeRoot = Join-Path ${env:ProgramFiles(x86)} 'Microsoft\EdgeWebView\Application'
           if (-not (Test-Path -LiteralPath $runtimeRoot)) {
@@ -63,10 +68,14 @@ jobs:
             if ($installation.ExitCode -ne 0) { throw 'WebView2 installation failed.' }
           }
       - name: Check Win32 process and window observation in isolation
+        id: native_probes
+        if: ${{ !cancelled() && steps.native_runtime.conclusion == 'success' }}
         env:
           MYALBUNS_NATIVE_PROBE_TESTS: '1'
         run: node --test --test-concurrency=1 --test-name-pattern="HWND probe observes|exact.*window" scripts/Test-FocusedOwnedDialogGate.mjs scripts/Test-DevLifecycleProcessInstances.mjs
       - name: Run only the external-copy native scenario
+        id: native_scenario
+        if: ${{ !cancelled() && steps.native_probes.conclusion == 'success' }}
         timeout-minutes: 8
         run: npm run test:native-owned-dialogs -- -Scenario external-copy-opening-owner -OutputPath .scratch/focused-owned-dialog-evidence/ci/report.json
       - name: Retain validation evidence
