@@ -17,7 +17,6 @@ import {
 
 const states: readonly ProjectDialogState[] = [
   { kind: "photoImportProgress", progress: { kind: "determinate", completed: 5, total: 12, status: "Arquivo 5 de 12" } },
-  { kind: "photoImportSuccess", importedCount: 12 },
   { kind: "photoImportProblems", importedCount: 2, problems: [{ fileName: "ruim.jpg", reason: "JPEG corrompido" }] },
   {
     busy: false,
@@ -59,7 +58,6 @@ const actions: readonly ProjectDialogAction[] = [
   "dismissProjectCloseFailure",
   "dismissProjectOperationFailure",
   "dismissPhotoImportProblems",
-  "dismissPhotoImportSuccess",
   "retryExport",
   "saveAndClose",
 ];

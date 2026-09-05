@@ -80,4 +80,5 @@ A Limpeza total do Cache pode reutilizar o mesmo componente quando executada sem
 A janela de progresso nunca se converte em relatório.
 
 - Sucesso integral fecha a janela e mostra uma confirmação curta.
+- Na importação de Fotos, sucesso integral fecha diretamente o progresso e devolve o foco ao Painel, sem diálogo de confirmação nem mensagem ao lado de Importar. A mesma regra vale quando todas as Fotos selecionadas já estão vinculadas.
 - Itens ignorados ou com falha fecham o progresso e abrem a [Tela de Problemas](0005-tela-de-problemas.md) no contexto de resultado.

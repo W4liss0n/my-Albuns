@@ -29,7 +29,6 @@ const projectDialogActionMap = {
   dismissProjectCloseFailure: "dismissProjectCloseFailure",
   dismissProjectOperationFailure: "dismissProjectOperationFailure",
   dismissPhotoImportProblems: "dismissPhotoImportProblems",
-  dismissPhotoImportSuccess: "dismissPhotoImportSuccess",
   retryExport: "retryExport",
   saveAndClose: "saveAndClose",
 } as const satisfies Record<IpcProjectDialogAction, ProjectDialogAction> &
@@ -126,8 +125,6 @@ const stateDecoders: Record<
     const progress = decodeProgress(value.progress);
     return progress ? { kind: "photoImportProgress", progress } : null;
   },
-  photoImportSuccess: (value) => isWireU64(value.importedCount)
-    ? { kind: "photoImportSuccess", importedCount: value.importedCount } : null,
   photoImportProblems: (value) => {
     if (!isWireU64(value.importedCount) || !Array.isArray(value.problems)) return null;
     const problems: { fileName: string; reason: string }[] = [];
@@ -264,8 +261,6 @@ export function toIpcProjectDialogState(
   switch (state.kind) {
     case "photoImportProgress":
       return { kind: state.kind, progress: toIpcProjectDialogProgress(state.progress) };
-    case "photoImportSuccess":
-      return { kind: state.kind, importedCount: state.importedCount };
     case "photoImportProblems":
       return { kind: state.kind, importedCount: state.importedCount, problems: state.problems.map(problem => ({ ...problem })) };
     case "albumInformationConfirmation":
@@ -306,8 +301,6 @@ function fromIpcProjectDialogState(
   switch (state.kind) {
     case "photoImportProgress":
       return { kind: state.kind, progress: fromIpcProjectDialogProgress(state.progress) };
-    case "photoImportSuccess":
-      return { kind: state.kind, importedCount: state.importedCount };
     case "photoImportProblems":
       return { kind: state.kind, importedCount: state.importedCount, problems: state.problems.map(problem => ({ ...problem })) };
     case "albumInformationConfirmation":

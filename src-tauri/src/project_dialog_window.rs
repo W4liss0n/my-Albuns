@@ -25,9 +25,6 @@ impl ProjectDialogState {
             Self::PhotoImportProgress { progress } => Self::PhotoImportProgress {
                 progress: progress.sanitized(),
             },
-            Self::PhotoImportSuccess { imported_count } => {
-                Self::PhotoImportSuccess { imported_count }
-            }
             Self::PhotoImportProblems {
                 imported_count,
                 problems,
@@ -103,7 +100,6 @@ impl ProjectDialogState {
                 214.0 + native_dialog_window::OWNED_WINDOW_TITLEBAR_HEIGHT,
             ),
             Self::ProjectCloseFailure { .. }
-            | Self::PhotoImportSuccess { .. }
             | Self::ProjectOperationFailure { .. }
             | Self::GraphicsFailure { .. }
             | Self::ExportFailure { .. }

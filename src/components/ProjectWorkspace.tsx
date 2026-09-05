@@ -241,7 +241,7 @@ export function ProjectWorkspace({
     message: closeMessage ?? controller.message,
     projectDialogPort,
     onDismiss: (kind) => {
-      if (kind === "photoImportProblems" || kind === "photoImportSuccess") {
+      if (kind === "photoImportProblems") {
         controller.dismissPhotoImportResult();
       } else {
         setCloseMessage(null);

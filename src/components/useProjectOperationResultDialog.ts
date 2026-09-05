@@ -12,7 +12,7 @@ interface ProjectOperationResultDialogOptions {
   importResult?: PhotoImportCompletion | null;
   message: string | null;
   projectDialogPort: ProjectDialogPort;
-  onDismiss(kind: "projectOperationFailure" | "photoImportProblems" | "photoImportSuccess"): void;
+  onDismiss(kind: "projectOperationFailure" | "photoImportProblems"): void;
 }
 
 export function useProjectOperationResultDialog({
@@ -30,7 +30,6 @@ export function useProjectOperationResultDialog({
         problems: importResult.problems,
       };
     }
-    if (importResult) return { kind: "photoImportSuccess" as const, importedCount: importResult.importedCount };
     return null;
   }, [message, importResult]);
   const feedbackRef = useRef(feedback);
@@ -46,11 +45,9 @@ export function useProjectOperationResultDialog({
   actionListenerRef.current = (action) => {
     if (
       action !== "dismissProjectOperationFailure" &&
-      action !== "dismissPhotoImportProblems" &&
-      action !== "dismissPhotoImportSuccess"
+      action !== "dismissPhotoImportProblems"
     ) return;
-    const kind = action === "dismissPhotoImportProblems" ? "photoImportProblems" :
-      action === "dismissPhotoImportSuccess" ? "photoImportSuccess" : "projectOperationFailure";
+    const kind = action === "dismissPhotoImportProblems" ? "photoImportProblems" : "projectOperationFailure";
     if (feedbackRef.current?.kind !== kind) return;
     presentedFeedbackRef.current = null;
     const session = dialogSessionRef.current;

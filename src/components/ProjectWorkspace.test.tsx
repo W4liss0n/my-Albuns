@@ -6109,19 +6109,22 @@ test.each(["completed", "cancelled", "failed"] as const)("shows photo import pro
   if (outcome === "cancelled") expect(dialogs.present).not.toHaveBeenCalled();
   else {
     await waitFor(() => expect(dialogs.dismiss).toHaveBeenCalled());
-    expect(dialogs.present).toHaveBeenLastCalledWith(outcome === "completed"
-      ? { kind: "photoImportSuccess", importedCount: 12 }
-      : { kind: "projectOperationFailure", message: "Falha na importação." });
-    expect(dialogs.dismiss.mock.invocationCallOrder[0]).toBeLessThan(dialogs.present.mock.invocationCallOrder[dialogs.present.mock.calls.length - 1]);
+    if (outcome === "completed") {
+      expect(dialogs.present).toHaveBeenCalledTimes(2);
+      expect(screen.queryByText("12 Fotos importadas.")).not.toBeInTheDocument();
+    } else {
+      expect(dialogs.present).toHaveBeenLastCalledWith({ kind: "projectOperationFailure", message: "Falha na importação." });
+      expect(dialogs.dismiss.mock.invocationCallOrder[0]).toBeLessThan(dialogs.present.mock.invocationCallOrder[dialogs.present.mock.calls.length - 1]);
+    }
   }
 });
 
-test("confirms successful photo import in an owned dialog without toolbar status text", async () => {
+test.each([0, 12])("completes import with %i new Photos without a success dialog or toolbar status text", async (importedCount) => {
   const port = projectCorePortWithApply(async () => projection);
   port.importPhoto = vi.fn(async () => ({
     kind: "completed" as const,
     projection,
-    mediaIds: ["media-002"], importedCount: 12, problems: [],
+    mediaIds: ["media-002"], importedCount, problems: [],
   }));
   const dialogs = projectDialogHarness();
   render(
@@ -6135,9 +6138,9 @@ test("confirms successful photo import in an owned dialog without toolbar status
   );
   fireEvent.click(screen.getByRole("button", { name: "Importar" }));
   fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos JPEG…" }));
-  await waitFor(() => expect(dialogs.present).toHaveBeenCalledWith({
-    kind: "photoImportSuccess", importedCount: 12,
-  }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Importar" })).toBeEnabled());
+  expect(port.importPhoto).toHaveBeenCalledOnce();
+  expect(dialogs.present).not.toHaveBeenCalled();
   expect(screen.queryByText("12 Fotos importadas.")).not.toBeInTheDocument();
 });
 

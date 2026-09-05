@@ -36,9 +36,6 @@ pub enum ProjectDialogState {
     PhotoImportProgress {
         progress: ProjectDialogProgress,
     },
-    PhotoImportSuccess {
-        imported_count: u32,
-    },
     PhotoImportProblems {
         imported_count: u32,
         problems: Vec<PhotoImportProblem>,
@@ -94,7 +91,6 @@ pub enum ProjectDialogAction {
     DismissProjectCloseFailure,
     DismissProjectOperationFailure,
     DismissPhotoImportProblems,
-    DismissPhotoImportSuccess,
     RetryExport,
     SaveAndClose,
 }
@@ -138,10 +134,6 @@ mod project_dialog_contract_tests {
             ),
             (ProjectDialogAction::DismissExport, "dismissExport"),
             (
-                ProjectDialogAction::DismissPhotoImportSuccess,
-                "dismissPhotoImportSuccess",
-            ),
-            (
                 ProjectDialogAction::DismissProjectCloseFailure,
                 "dismissProjectCloseFailure",
             ),
@@ -174,7 +166,6 @@ mod project_dialog_contract_tests {
                     status: "Arquivo 5 de 12".into(),
                 },
             },
-            ProjectDialogState::PhotoImportSuccess { imported_count: 12 },
             ProjectDialogState::AlbumInformationConfirmation {
                 busy: false,
                 details: vec![ProjectDialogDetail {
@@ -212,7 +203,6 @@ mod project_dialog_contract_tests {
         ];
         let expected_kinds = [
             "photoImportProgress",
-            "photoImportSuccess",
             "albumInformationConfirmation",
             "projectCloseConfirmation",
             "projectCloseFailure",

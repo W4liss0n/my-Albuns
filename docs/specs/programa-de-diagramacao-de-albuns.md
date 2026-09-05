@@ -549,6 +549,7 @@ validação das superfícies descritas nesta seção.
 - `Cancelar` é a única ação opcional e só aparece quando a operação suporta interrupção segura; operações não canceláveis não mostram esse botão.
 - A janela não apresenta tabela por Projeto, múltiplas barras, lista de trabalhos simultâneos ou histórico item a item.
 - A janela de progresso nunca se transforma em resumo: sucesso integral a fecha e mostra uma confirmação curta; ignorados ou falhas abrem a Tela de Problemas com Projeto, Resultado e ações.
+- Na importação de Fotos, sucesso integral fecha diretamente o progresso, sem diálogo de finalização nem mensagem ao lado de Importar. Isso também vale quando todas as Fotos selecionadas já estão vinculadas. Arquivos rejeitados continuam abrindo a Tela de Problemas com Arquivo e Motivo.
 - A Janela do Projeto possui uma barra de menus superior com os grupos iniciais `Arquivo`, `Editar`, `Lâmina`, `Exibir`, `Ferramentas` e `Ajuda`.
 - `Lâmina` oferece `Adicionar antes`, `Adicionar depois`, `Duplicar Lâmina`, `Excluir` e `Converter extremidade`, usando a Lâmina mais centralizada como alvo.
 - Os mesmos comandos aparecem no menu de contexto da superfície ou Barra de uma Lâmina e usam o item clicado como alvo explícito. Abrir, fechar, cancelar com `Esc` ou dispensar o menu preserva a Lâmina centralizada, a seleção e a Transformação da visualização; somente o sucesso de um comando cuja regra própria determine centralização pode navegar. A conversão só é habilitada em uma extremidade válida.
