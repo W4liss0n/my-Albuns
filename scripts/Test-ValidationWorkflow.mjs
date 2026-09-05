@@ -25,7 +25,7 @@ test("native scenarios are independent selections and unknown selections fail cl
 });
 
 test("local desktop gates stop before toolchain, build or application launch", () => {
-  for (const script of ["Test-FocusedOwnedDialogGate.ps1", "Test-ProductiveJourney.ps1", "Test-DevLifecycle.ps1", "Test-Issue14OpeningLockGate.ps1", "Test-WindowsPathGate.ps1", "Test-ImagingRecovery.ps1", "Test-SaveAsJourney.ps1", "Test-SessionRecoveryJourney.ps1"]) {
+  for (const script of ["Test-FocusedOwnedDialogGate.ps1", "Test-ProjectCloseGate.ps1", "Test-ProductiveJourney.ps1", "Test-DevLifecycle.ps1", "Test-Issue14OpeningLockGate.ps1", "Test-WindowsPathGate.ps1", "Test-ImagingRecovery.ps1", "Test-SaveAsJourney.ps1", "Test-SessionRecoveryJourney.ps1"]) {
     const result = powershell('& $env:MYALBUNS_TEST_GATE', { MYALBUNS_TEST_GATE: path.join(scripts, script) });
     assert.notEqual(result.status, 0, script);
     assert.match(result.stderr, /Visible native tests are disabled locally/, script);

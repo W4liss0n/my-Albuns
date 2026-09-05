@@ -116,3 +116,13 @@ O binário é reaproveitado enquanto o commit, a fonte limpa e os hashes coincid
 Execução local com janelas exige combinar o uso da área de trabalho e acrescentar
 `-AllowVisibleWindows`. A [política de validação](docs/agents/native-ui-gates.md)
 detalha os limites de cada prova e a jornada legada ainda pendente.
+
+
+Para investigar apenas o fechamento após Salvar como, use
+`npm run test:native-project-close` no ambiente reservado. O cenário altera e
+salva original e cópia em Hosts distintos, fecha o original uma única vez e
+confirma a permanência da cópia antes de limpar os processos. Ele usa o mesmo
+build verificado e a mesma autorização dos demais gates. Em caso de falha,
+conserva a etapa interrompida, os registros, o estado das janelas e as capturas
+possíveis em `.scratch/project-close-evidence/`. Sua preparação e os testes da
+automação não constituem aprovação do fechamento nativo.

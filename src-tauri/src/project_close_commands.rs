@@ -35,6 +35,7 @@ pub(crate) fn request_project_close(
                 target: "myalbuns.desktop",
                 process_role = ProcessRole::DesktopHost.as_str(),
                 window_label = window.label(),
+                process_id = std::process::id(),
                 event = "clean_project_close_requested",
             );
             complete_project_close(&window);

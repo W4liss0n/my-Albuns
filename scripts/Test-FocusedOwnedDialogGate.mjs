@@ -28,7 +28,10 @@ const scripts = path.dirname(fileURLToPath(import.meta.url));
 const workspace = path.resolve(scripts, "..");
 
 function source(name) {
-  return readFileSync(path.join(scripts, name), "utf8");
+  const own = readFileSync(path.join(scripts, name), "utf8");
+  return name === "Test-FocusedOwnedDialogGate.ps1"
+    ? own + "\n" + readFileSync(path.join(scripts, "Invoke-FocusedNativeGate.ps1"), "utf8")
+    : own;
 }
 
 function resolveCargoTargetDirectory(cargoTargetDirectory) {
@@ -400,7 +403,7 @@ test("the focused gate excludes only its retained evidence root from source prov
 
   assert.match(
     wrapper,
-    /\$retainedEvidenceRoot\s*=\s*\[System\.IO\.Path\]::GetFullPath\(\s*\(Join-Path\s+\$scratchParent\s+'focused-owned-dialog-evidence'\)\s*\)/su,
+    /\$retainedEvidenceRoot\s*=\s*\[System\.IO\.Path\]::GetFullPath\(\s*\(Join-Path\s+\$scratchParent\s+\$retainedEvidenceName\)\s*\)/su,
   );
   assert.equal(
     wrapper.match(/-RetainedEvidenceRoot \$retainedEvidenceRoot/gu)?.length,

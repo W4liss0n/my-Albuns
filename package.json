@@ -24,6 +24,7 @@
     "ui:acceptance": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Run-UiAcceptance.ps1",
     "ui:acceptance:review": "node scripts/Review-UiAcceptance.mjs",
     "test:productive-journey": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-ProductiveJourney.ps1",
+    "test:native-project-close": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-ProjectCloseGate.ps1",
     "test:native-owned-dialogs": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-FocusedOwnedDialogGate.ps1",
     "test:session-recovery-journey": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-SessionRecoveryJourney.ps1",
     "test:opening-lock": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-Issue14OpeningLockGate.ps1",

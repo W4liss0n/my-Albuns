@@ -66,6 +66,58 @@ until their hosted behavior is verified. Win32 probe fixtures are opt-in with
 `MYALBUNS_NATIVE_PROBE_TESTS=1`, only in that isolated native environment or during
 an explicitly authorized local native run.
 
+## Focused saved-Project close
+
+`npm run test:native-project-close` selects only `saved-original-close`.
+It does not change the two owned-dialog selections, their default `all`, or the
+manual CI external-copy pilot. `Test-ProjectCloseGate.ps1` and the owned-dialog
+wrapper share `Invoke-FocusedNativeGate.ps1` for policy, verified build, isolated
+scratch, process ownership, receipt provenance and cleanup. The close runner
+also refuses a direct launch without the authorization marker supplied by that
+wrapper after its policy check. Do not set that marker manually.
+
+Prepare with `npm run build:native-tests` on clean committed source. Execute only
+on reserved Windows with hardware WebGL2 and an authorized desktop. A local run
+on that reserved environment still requires `-AllowVisibleWindows`; this task
+does not authorize a run on the user's daily desktop.
+
+The scenario makes one initial change, uses the public Save As dialog, reopens
+the original in another Host, saves the original at 320 DPI and the copy at
+420 DPI, and sends one File → Close Project action. It does not retry actions,
+force dirty-close choices, simulate graphics support or run export/recovery.
+Success requires a clean-close terminal from the exact original Host during the
+attempt, that Host's exit before cleanup, a visible enabled replacement Global,
+the exact copy Host still alive and responsive, independent identities, and
+unchanged saved revisions, DPI and file hashes. Windows belonging to the exited
+Host are considered gone as a consequence of its confirmed process exit.
+
+Evidence is retained under `.scratch/project-close-evidence/<run>/`:
+
+- `project-close-progress.json`: started/completed/failed steps and timestamps;
+- `project-close-before.json`: saved-state fingerprints and the original UI
+  immediately before the close action;
+- `project-close-observations.json` and `report.json`: successful observations
+  before cleanup and the verified build/source/cleanup receipt;
+- `failure-project-close.json`, `failure-*.png`, `webdriver-*.log`,
+  `process-logs/` and `focused-native.log`: available failure evidence captured
+  before fallback cleanup. Diagnostic failures are explicit and do not turn the
+  scenario green or suppress its original error.
+
+The timeout applies to observations, not to productive close behavior. Set
+`MYALBUNS_PROJECT_CLOSE_TIMEOUT_MS` only between 1000 and 180000 ms (default
+60000). A timeout identifies an incomplete phase; it is not proof of a specific
+root cause. Frontend log events still share IPC and have no Host PID: they are
+retained as clues, while Host terminals are matched by PID and attempt time.
+There is no automatic process dump or stack capture in this gate. If stage and
+driver diagnostics are insufficient, obtain a Host dump in the isolated
+environment before a separate diagnostic run's cleanup.
+
+Headless checks for this preparation:
+`node --test scripts/Test-ProjectCloseGate.mjs scripts/Test-ValidationWorkflow.mjs`.
+These exercise evidence rejection and the local launch guard; they do not start
+MyAlbuns or validate native behavior. The native failure remains unresolved
+until this scenario actually runs and supplies the required evidence.
+
 ## Full journey and existing evidence
 
 The full productive journey remains a separate integration/release check with

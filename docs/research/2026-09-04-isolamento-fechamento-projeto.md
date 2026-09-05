@@ -34,7 +34,7 @@ recebeu a resposta.
 Foram executados inicialmente 15 testes de fechamento da interface e 27 testes
 de sessão do Host, todos aprovados. Foram acrescentadas estas três provas:
 
-- Duas variantes em `src/components/ProjectWorkspace.test.tsx`: aplicar uma
+- Duas variantes em `src/platform/projectClose.integration.test.tsx`: aplicar uma
   alteração, salvar e solicitar fechamento com o salvamento ainda pendente ou
   já concluído. Exercitam o menu, a atualização da projeção, a fila real de
   mutações, o controlador e o adaptador de janela Tauri. As operações do Core e
@@ -51,7 +51,7 @@ de sessão do Host, todos aprovados. Foram acrescentadas estas três provas:
 Comandos focados, executados a partir da raiz do repositório:
 
 ```powershell
-npm test -- src/components/ProjectWorkspace.test.tsx -t 'dispatches close to IPC'
+npm test -- src/platform/projectClose.integration.test.tsx
 ```
 
 ```powershell
@@ -143,3 +143,41 @@ já falhou na inicialização gráfica e não fornece essa prova. Permanecem as
 restrições e os requisitos de autorização de
 `docs/agents/native-ui-gates.md`. Não repetir a jornada inteira nem alterar o
 fechamento com base em uma hipótese ainda não reproduzida.
+
+
+## Preparação do cenário nativo focado
+
+O comando `npm run test:native-project-close` prepara a execução exclusiva de
+`saved-original-close`, conforme a política acima. A automação preserva Salvar
+como e os dois Hosts da reprodução histórica. O comando de fechamento é enviado
+uma vez; seu terminal precisa conter o PID do original e pertencer à tentativa
+atual. Os critérios são verificados antes da limpeza: o encerramento posterior
+feito pelo próprio gate não pode produzir um falso sucesso.
+
+A CI do commit `6e016a4` revelou dois erros na localização da prova React:
+imports de Tauri fora da plataforma e seleção de adaptador fora da raiz de
+composição. A prova foi movida para
+`src/platform/projectClose.integration.test.tsx`; os dois cenários e os dez
+checks de fronteira passaram juntos. As regras de arquitetura foram mantidas.
+
+A preparação do runner, as provas de rejeição de evidência inválida e a compilação
+não reproduzem o travamento. A execução nativa permanece pendente de ambiente
+isolado. Este cenário retém logs, etapas, páginas e capturas possíveis; não coleta
+automaticamente pilhas do Host nem contorna o requisito gráfico do produto.
+
+
+Validação desta preparação: build/contratos/TypeScript e 742 testes React
+aprovados. O comando completo `npm run validate` parou em uma leitura JSON
+inválida da árvore de processos Win32, durante a automação. A falha não se
+reproduziu no teste isolado; a suíte de automação completa passou na rodada
+seguinte (118 aprovados, três probes nativos opt-in ignorados). Qualidade e suíte
+Rust foram executadas separadamente e passaram. Não foi alterado o observador
+de processos sem uma reprodução estável desse erro.
+
+A revisão corrigiu duas falhas na preparação: a exclusão estreita da pasta de
+evidências, para preservar o reuso do build, e a remoção de
+`TAURI_WEBVIEW_AUTOMATION` do ambiente. No produto, a presença dessa variável
+ativa o caminho especial mesmo quando seu texto é `false`; o cenário precisa
+da substituição normal do WebView após Salvar como. As 19 verificações focadas
+finais também rejeitam uma Global sem vínculo com o Host encerrado. As revisões
+de padrões e especificação não deixaram achados pendentes na preparação.
