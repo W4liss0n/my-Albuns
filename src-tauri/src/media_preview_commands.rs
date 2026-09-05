@@ -1,3 +1,4 @@
+use futures_util::StreamExt;
 use std::collections::{HashMap, HashSet};
 
 use myalbuns_imaging_protocol::CacheMediaSource;
@@ -274,17 +275,84 @@ pub(crate) async fn prepare_media_previews(
         let _ = on_preview.send(preview.clone());
         previews.push(preview);
     };
-    for media_id in ordered_demand {
-        if !engine.demand_is_current(&demand_revision) {
-            return Ok(Some(Vec::new()));
+    let preparation = DemandedPreviewPreparation {
+        app: &app,
+        window: &window,
+        engine: &engine,
+        registry: &registry,
+        processor: &processor,
+        logging: &logging,
+        app_paths: &app_paths,
+        namespace: &namespace,
+        demand_revision: &demand_revision,
+    };
+    let pending = futures_util::stream::iter(ordered_demand)
+        .map(|media_id| {
+            let binding = catalog_by_id[media_id.as_str()];
+            let state = projected_preview_state(observations.get(media_id.as_str()).copied());
+            preparation.prepare(binding, state)
+        })
+        .buffer_unordered(crate::imaging_processor::IMAGE_PROCESSING_CONCURRENCY);
+    tokio::pin!(pending);
+    let mut failure = None;
+    // Drain active jobs even if the demand changes, so their cancellation and
+    // exact process termination finish before their writer slots are reused.
+    while let Some(result) = pending.next().await {
+        match result {
+            Ok(Some(preview)) if engine.demand_is_current(&demand_revision) => {
+                publish_preview(preview)
+            }
+            Err(error) => {
+                failure.get_or_insert(error);
+            }
+            _ => {}
         }
-        let Some(state) = projected_preview_state(observations.get(media_id.as_str()).copied())
-        else {
-            continue;
+    }
+    if let Some(failure) = failure {
+        return Err(failure);
+    }
+    if !engine.demand_is_current(&demand_revision) {
+        return Ok(Some(Vec::new()));
+    }
+    Ok(Some(previews))
+}
+
+struct DemandedPreviewPreparation<'a> {
+    app: &'a AppHandle,
+    window: &'a WebviewWindow,
+    engine: &'a CacheEngine,
+    registry: &'a CachePreviewRegistry,
+    processor: &'a ImagingProcessor,
+    logging: &'a LoggingState,
+    app_paths: &'a AppPaths,
+    namespace: &'a AuthorizedCacheNamespace,
+    demand_revision: &'a cache_engine::CacheDemandRevision,
+}
+
+impl DemandedPreviewPreparation<'_> {
+    async fn prepare(
+        &self,
+        binding: &crate::media_runtime::MediaBinding,
+        state: Option<MediaPreviewState>,
+    ) -> Result<Option<MediaPreview>, MediaPreviewCommandError> {
+        let Self {
+            app,
+            window,
+            engine,
+            registry,
+            processor,
+            logging,
+            app_paths,
+            namespace,
+            demand_revision,
+        } = *self;
+        if !engine.demand_is_current(demand_revision) {
+            return Ok(None);
+        }
+        let Some(state) = state else {
+            return Ok(None);
         };
-        let binding = catalog_by_id
-            .get(media_id.as_str())
-            .expect("validated demand remains in the immutable catalog");
+        let media_id = binding.media_id.as_str();
         let source = CacheMediaSource::new(
             binding.media_id.clone(),
             binding.kind,
@@ -292,27 +360,25 @@ pub(crate) async fn prepare_media_previews(
         )
         .map_err(|_| MediaPreviewCommandError::read_failed())?;
         if state != MediaPreviewState::Ready {
-            publish_preview(contextual_preview(
-                &engine,
-                &registry,
-                &app_paths,
-                &namespace,
-                &demand_revision,
+            return Ok(Some(contextual_preview(
+                engine,
+                registry,
+                app_paths,
+                namespace,
+                demand_revision,
                 &source,
                 state,
-            ));
-            continue;
+            )));
         }
         // The stable Monitor has already revoked changed source bindings. A still
         // resident preview needs no new processor request or derived-file decode.
         if let Some(preview) = engine
-            .commit_preview_if_demanded(&demand_revision, &media_id, || {
-                registry.retained_preview(&media_id, source.source_path(), state)
+            .commit_preview_if_demanded(demand_revision, media_id, || {
+                registry.retained_preview(media_id, source.source_path(), state)
             })
             .flatten()
         {
-            publish_preview(preview);
-            continue;
+            return Ok(Some(preview));
         }
         let root_bindings = match path_io::capture_root_bindings(vec![
             namespace.paths().root().to_path_buf(),
@@ -322,16 +388,15 @@ pub(crate) async fn prepare_media_previews(
         {
             Ok(root_bindings) => root_bindings,
             Err(_) => {
-                publish_preview(contextual_preview(
-                    &engine,
-                    &registry,
-                    &app_paths,
-                    &namespace,
-                    &demand_revision,
+                return Ok(Some(contextual_preview(
+                    engine,
+                    registry,
+                    app_paths,
+                    namespace,
+                    demand_revision,
                     &source,
                     cache_failure_state(),
-                ));
-                continue;
+                )));
             }
         };
         let request_id = format!("cache-{}", uuid::Uuid::new_v4().simple());
@@ -341,8 +406,8 @@ pub(crate) async fn prepare_media_previews(
             source.clone(),
             root_bindings,
         );
-        let Some(claim) = engine.claim_demanded(&demand_revision, &work) else {
-            return Ok(Some(Vec::new()));
+        let Some(claim) = engine.claim_demanded(demand_revision, &work) else {
+            return Ok(None);
         };
         let preview_publication_authority = claim.preview_publication_authority();
         let execution = match claim {
@@ -350,11 +415,11 @@ pub(crate) async fn prepare_media_previews(
             CacheFlightClaim::Owner(owner) => {
                 let cancellation = owner.cancellation();
                 let result = execute_owned_cache(
-                    &app,
-                    &logging,
-                    &app_paths,
-                    &engine,
-                    &processor,
+                    app,
+                    logging,
+                    app_paths,
+                    engine,
+                    processor,
                     work,
                     cancellation,
                 )
@@ -364,8 +429,8 @@ pub(crate) async fn prepare_media_previews(
         };
         match execution {
             Ok(execution) => {
-                if !engine.demand_is_current(&demand_revision) {
-                    return Ok(Some(Vec::new()));
+                if !engine.demand_is_current(demand_revision) {
+                    return Ok(None);
                 }
                 if let Some(recovery) = execution.recovery {
                     tracing::warn!(
@@ -377,34 +442,34 @@ pub(crate) async fn prepare_media_previews(
                     );
                 }
                 let Some(preview) = engine.commit_claimed_preview_if_demanded(
-                    &demand_revision,
+                    demand_revision,
                     &preview_publication_authority,
                     || {
                         registry.publish(
-                            &app_paths,
-                            &namespace,
+                            app_paths,
+                            namespace,
                             execution.artifact(),
                             source.source_path(),
                         )
                     },
                 ) else {
-                    return Ok(Some(Vec::new()));
+                    return Ok(None);
                 };
-                publish_preview(cache_publication_or_context(
+                Ok(Some(cache_publication_or_context(
                     preview,
-                    media_id.as_str(),
+                    media_id,
                     || {
                         contextual_preview(
-                            &engine,
-                            &registry,
-                            &app_paths,
-                            &namespace,
-                            &demand_revision,
+                            engine,
+                            registry,
+                            app_paths,
+                            namespace,
+                            demand_revision,
                             &source,
                             cache_failure_state(),
                         )
                     },
-                ));
+                )))
             }
             Err(failure) => {
                 if engine.processor_status() == CacheProcessorStatus::Suspended
@@ -430,19 +495,18 @@ pub(crate) async fn prepare_media_previews(
                     media_id,
                     event = "cache_media_unavailable",
                 );
-                publish_preview(contextual_preview(
-                    &engine,
-                    &registry,
-                    &app_paths,
-                    &namespace,
-                    &demand_revision,
+                Ok(Some(contextual_preview(
+                    engine,
+                    registry,
+                    app_paths,
+                    namespace,
+                    demand_revision,
                     &source,
                     cache_failure_state(),
-                ));
+                )))
             }
         }
     }
-    Ok(Some(previews))
 }
 
 fn preview_state(availability: MediaAvailability) -> MediaPreviewState {

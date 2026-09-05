@@ -7,8 +7,8 @@ use std::{
 };
 
 use myalbuns_paths::{
-    AppPaths, AppPathsError, CachePathPlan, CacheWriterClaimStorage, ProcessInstanceHandle,
-    ProcessInstanceId,
+    AppPaths, AppPathsError, CachePathPlan, CacheWriterClaimStorage, CacheWriterSlot,
+    ProcessInstanceHandle, ProcessInstanceId,
 };
 use serde::{Deserialize, Serialize};
 use windows_sys::Win32::Foundation::WAIT_OBJECT_0;
@@ -50,7 +50,7 @@ pub(crate) struct ProcessorChildLifetime {
     job: Option<OwnedHandle>,
     process: ProcessInstanceHandle,
     process_instance: ProcessInstanceId,
-    claim_storage: Option<CacheWriterClaimStorage>,
+    claim_storage: Option<(CacheWriterClaimStorage, CacheWriterSlot)>,
 }
 
 /// Pins the validated Cache namespace and the exact claimed Process instance
@@ -61,33 +61,39 @@ pub(crate) struct ProcessorChildLifetime {
 /// namespace that it prepared before a pathname replacement.
 struct PreparedCacheWriterQuiescence {
     storage: CacheWriterClaimStorage,
+    writers: Vec<PreparedCacheWriter>,
+}
+
+struct PreparedCacheWriter {
+    slot: CacheWriterSlot,
     encoded_claim: Vec<u8>,
     process: Option<ProcessInstanceHandle>,
 }
 
 impl PreparedCacheWriterQuiescence {
     fn finish(self) -> io::Result<()> {
-        let Self {
-            storage,
-            encoded_claim,
-            process,
-        } = self;
-        if let Some(process) = process
-            && !process.wait_for_exit_timeout(CACHE_WRITER_WAIT_TIMEOUT)?
-        {
-            return Err(io::Error::new(
-                io::ErrorKind::TimedOut,
-                "the previous Cache writer did not terminate in time",
-            ));
+        let Self { storage, writers } = self;
+        for writer in &writers {
+            if let Some(process) = &writer.process
+                && !process.wait_for_exit_timeout(CACHE_WRITER_WAIT_TIMEOUT)?
+            {
+                return Err(io::Error::new(
+                    io::ErrorKind::TimedOut,
+                    "the previous Cache writer did not terminate in time",
+                ));
+            }
         }
-        if !storage
-            .remove_claim_if_matches(&encoded_claim)
-            .map_err(cache_storage_error)?
-        {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "the Cache writer claim changed during synchronization",
-            ));
+        // No namespace cleanup starts until every exact writer has exited.
+        for writer in writers {
+            if !storage
+                .remove_claim_if_matches(writer.slot, &writer.encoded_claim)
+                .map_err(cache_storage_error)?
+            {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "the Cache writer claim changed during synchronization",
+                ));
+            }
         }
         storage
             .discard_claim_temporaries()
@@ -155,6 +161,7 @@ impl ProcessorChildLifetime {
         &mut self,
         app_paths: &AppPaths,
         paths: &CachePathPlan,
+        slot: CacheWriterSlot,
     ) -> io::Result<()> {
         if self.claim_storage.is_some() {
             return Err(io::Error::new(
@@ -178,9 +185,9 @@ impl ProcessorChildLifetime {
         let encoded = serde_json::to_vec(&claim)
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
         storage
-            .publish_claim(&encoded)
+            .publish_claim(slot, &encoded)
             .map_err(cache_storage_error)?;
-        self.claim_storage = Some(storage);
+        self.claim_storage = Some((storage, slot));
         Ok(())
     }
 }
@@ -195,7 +202,7 @@ impl Drop for ProcessorChildLifetime {
         if unsafe { WaitForSingleObject(self.process.as_raw_handle(), 0) } != WAIT_OBJECT_0 {
             return;
         }
-        let Some(claim_storage) = self.claim_storage.take() else {
+        let Some((claim_storage, slot)) = self.claim_storage.take() else {
             return;
         };
         let expected = CacheWriterClaim {
@@ -203,7 +210,7 @@ impl Drop for ProcessorChildLifetime {
             process: self.process_instance,
         };
         if let Ok(encoded) = serde_json::to_vec(&expected) {
-            let _ = claim_storage.remove_claim_if_matches(&encoded);
+            let _ = claim_storage.remove_claim_if_matches(slot, &encoded);
         }
     }
 }
@@ -230,29 +237,27 @@ fn prepare_cache_writer_quiescence(
     else {
         return Ok(None);
     };
-    let encoded = match storage.read_claim().map_err(cache_storage_error)? {
-        Some(encoded) => encoded,
-        None => {
-            storage
-                .discard_claim_temporaries()
-                .map_err(cache_storage_error)?;
-            return Ok(None);
+    let mut writers = Vec::new();
+    for slot in CacheWriterSlot::ALL {
+        let Some(encoded) = storage.read_claim(slot).map_err(cache_storage_error)? else {
+            continue;
+        };
+        let claim: CacheWriterClaim = serde_json::from_slice(&encoded)
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+        if claim.schema_version != CACHE_WRITER_CLAIM_SCHEMA_VERSION {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "the Cache writer claim schema is incompatible",
+            ));
         }
-    };
-    let claim: CacheWriterClaim = serde_json::from_slice(&encoded)
-        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-    if claim.schema_version != CACHE_WRITER_CLAIM_SCHEMA_VERSION {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            "the Cache writer claim schema is incompatible",
-        ));
+        let process = ProcessInstanceHandle::open_if_running(claim.process, 0)?;
+        writers.push(PreparedCacheWriter {
+            slot,
+            encoded_claim: encoded,
+            process,
+        });
     }
-    let process = ProcessInstanceHandle::open_if_running(claim.process, 0)?;
-    Ok(Some(PreparedCacheWriterQuiescence {
-        storage,
-        encoded_claim: encoded,
-        process,
-    }))
+    Ok(Some(PreparedCacheWriterQuiescence { storage, writers }))
 }
 
 #[cfg(test)]
@@ -429,6 +434,70 @@ mod tests {
         assert!(claim_path.is_file());
     }
 
+    #[test]
+    fn a_live_second_writer_blocks_cleanup_of_the_first_claim_and_temporaries() {
+        use myalbuns_paths::CacheWriterSlot;
+        let root = tempfile::tempdir().unwrap();
+        let (app_paths, paths) = cache_fixture(root.path());
+        let mut worker = Command::new(env::current_exe().unwrap())
+            .arg("processor_lifetime::tests::processor_lifetime_worker_process")
+            .args(["--ignored", "--exact", "--nocapture"])
+            .env(WORKER_SPAWNED_ENV, root.path().join("second.spawned"))
+            .env(WORKER_ACTIVE_ENV, root.path().join("second.active"))
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap();
+        let exact = child_identity(&worker);
+        let stale =
+            ProcessInstanceId::from_wire(exact.process_id(), exact.creation_time_wire() + 1)
+                .unwrap();
+        let storage = app_paths
+            .open_cache_writer_claim_storage(&paths)
+            .unwrap()
+            .unwrap();
+        for (slot, process) in [
+            (CacheWriterSlot::First, stale),
+            (CacheWriterSlot::Second, exact),
+        ] {
+            let encoded = serde_json::to_vec(&CacheWriterClaim {
+                schema_version: CACHE_WRITER_CLAIM_SCHEMA_VERSION,
+                process,
+            })
+            .unwrap();
+            storage.publish_claim(slot, &encoded).unwrap();
+        }
+        let temporary = paths.root().join(".processor-writer-pending.tmp");
+        std::fs::write(&temporary, b"pending").unwrap();
+        let prepared = prepare_cache_writer_quiescence(&app_paths, &paths)
+            .unwrap()
+            .unwrap();
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let waiter = thread::spawn(move || {
+            sender.send(prepared.finish()).unwrap();
+        });
+        assert!(receiver.recv_timeout(Duration::from_millis(30)).is_err());
+        assert!(
+            storage
+                .read_claim(CacheWriterSlot::First)
+                .unwrap()
+                .is_some()
+        );
+        assert!(temporary.is_file());
+        worker.kill().unwrap();
+        worker.wait().unwrap();
+        receiver
+            .recv_timeout(Duration::from_secs(2))
+            .unwrap()
+            .unwrap();
+        waiter.join().unwrap();
+        for slot in CacheWriterSlot::ALL {
+            assert!(storage.read_claim(slot).unwrap().is_none());
+        }
+        assert!(!temporary.exists());
+    }
+
     #[cfg(windows)]
     #[test]
     fn writer_wait_finishes_in_the_held_namespace_and_preserves_external_claim_files() {
@@ -530,29 +599,49 @@ mod tests {
             .spawn()
             .expect("the independent Host process starts");
         wait_for_file(&host_ready, &mut host, "the Host");
-        let processor_id = std::fs::read_to_string(&host_ready)
-            .expect("the Host readiness is readable")
-            .trim()
-            .parse::<u32>()
-            .expect("the Host reports a Processor PID");
-
-        // SAFETY: the PID came from the ready Host and the returned handle is
-        // closed below after the wait assertions.
-        let processor = unsafe { OpenProcess(PROCESS_SYNCHRONIZE, 0, processor_id) };
-        assert!(!processor.is_null(), "the active Processor can be observed");
-        // SAFETY: processor is a live synchronization handle.
-        assert_eq!(unsafe { WaitForSingleObject(processor, 0) }, WAIT_TIMEOUT);
-
+        let processor_ids = std::fs::read_to_string(&host_ready)
+            .unwrap()
+            .lines()
+            .map(|line| line.parse::<u32>().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(processor_ids.len(), 2);
+        let processors = processor_ids
+            .into_iter()
+            .map(|id| {
+                // SAFETY: each PID is from the ready Host; the handle is closed below.
+                let process = unsafe { OpenProcess(PROCESS_SYNCHRONIZE, 0, id) };
+                assert!(!process.is_null());
+                // SAFETY: process is an owned synchronization handle.
+                assert_eq!(unsafe { WaitForSingleObject(process, 0) }, WAIT_TIMEOUT);
+                process
+            })
+            .collect::<Vec<_>>();
         host.kill().expect("the Host is terminated abruptly");
         host.wait().expect("the terminated Host is reaped");
-        // SAFETY: closing the Host-owned Job must signal the Processor handle.
-        assert_eq!(
-            unsafe { WaitForSingleObject(processor, 10_000) },
-            WAIT_OBJECT_0,
-            "the Processor cannot outlive the Host that owned its Cache namespace"
-        );
-        // SAFETY: processor is owned by this test and no longer used.
-        unsafe { CloseHandle(processor) };
+        for process in processors {
+            // SAFETY: closing each Host-owned Job must signal its Processor handle.
+            assert_eq!(
+                unsafe { WaitForSingleObject(process, 10_000) },
+                WAIT_OBJECT_0
+            );
+            // SAFETY: this test owns the handle and no longer uses it.
+            unsafe { CloseHandle(process) };
+        }
+        let (app_paths, paths) = cache_fixture(root.path());
+        let storage = app_paths
+            .open_cache_writer_claim_storage(&paths)
+            .unwrap()
+            .unwrap();
+        for slot in myalbuns_paths::CacheWriterSlot::ALL {
+            assert!(
+                storage.read_claim(slot).unwrap().is_some(),
+                "abrupt Host death retains every writer claim"
+            );
+        }
+        await_cache_writer_quiescence(&app_paths, &paths).unwrap();
+        for slot in myalbuns_paths::CacheWriterSlot::ALL {
+            assert!(storage.read_claim(slot).unwrap().is_none());
+        }
     }
 
     #[test]
@@ -563,30 +652,48 @@ mod tests {
             .parent()
             .expect("the ready path has a parent")
             .to_path_buf();
-        let worker_spawned = root.join("worker.spawned");
-        let worker_active = root.join("worker.active");
-        let mut worker = Command::new(env::current_exe().expect("the test executable is known"))
-            .arg("processor_lifetime::tests::processor_lifetime_worker_process")
-            .args(["--ignored", "--exact", "--nocapture"])
-            .env(WORKER_SPAWNED_ENV, &worker_spawned)
-            .env(WORKER_ACTIVE_ENV, &worker_active)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .expect("the Processor fixture starts");
-        wait_for_file(&worker_spawned, &mut worker, "the Processor");
-        let _lifetime = ProcessorChildLifetime::attach(child_identity(&worker))
-            .expect("the Host contains its Processor before dispatch");
-        worker
-            .stdin
-            .as_mut()
-            .expect("the Processor stdin is available")
-            .write_all(b"dispatch\n")
-            .expect("the Host dispatches work after containment");
-        wait_for_file(&worker_active, &mut worker, "the active Processor");
-        std::fs::write(host_ready, worker.id().to_string())
-            .expect("the Host publishes its contained Processor PID");
+        let (app_paths, paths) = cache_fixture(&root);
+        let mut workers = Vec::new();
+        let mut lifetimes = Vec::new();
+        for slot in myalbuns_paths::CacheWriterSlot::ALL {
+            let worker_spawned = root.join(format!("worker-{}.spawned", slot.index()));
+            let worker_active = root.join(format!("worker-{}.active", slot.index()));
+            let mut worker =
+                Command::new(env::current_exe().expect("the test executable is known"))
+                    .arg("processor_lifetime::tests::processor_lifetime_worker_process")
+                    .args(["--ignored", "--exact", "--nocapture"])
+                    .env(WORKER_SPAWNED_ENV, &worker_spawned)
+                    .env(WORKER_ACTIVE_ENV, &worker_active)
+                    .stdin(Stdio::piped())
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .spawn()
+                    .expect("the Processor fixture starts");
+            wait_for_file(&worker_spawned, &mut worker, "the Processor");
+            let mut lifetime = ProcessorChildLifetime::attach(child_identity(&worker))
+                .expect("the Host contains its Processor before dispatch");
+            lifetime
+                .publish_cache_writer_claim(&app_paths, &paths, slot)
+                .unwrap();
+            worker
+                .stdin
+                .as_mut()
+                .expect("the Processor stdin is available")
+                .write_all(b"dispatch\n")
+                .expect("the Host dispatches work after containment");
+            wait_for_file(&worker_active, &mut worker, "the active Processor");
+            lifetimes.push(lifetime);
+            workers.push(worker);
+        }
+        std::fs::write(
+            host_ready,
+            workers
+                .iter()
+                .map(|worker| worker.id().to_string())
+                .collect::<Vec<_>>()
+                .join("\n"),
+        )
+        .unwrap();
         thread::sleep(Duration::from_secs(120));
     }
 

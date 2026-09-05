@@ -151,10 +151,18 @@ pub(crate) async fn import_photo(
     let mut processing = ImageProcessingBatch::new(unique_count as u32, |progress| {
         let _ = on_progress.send(progress);
     });
+    // Original validation uses two blocking inspectors under the same budget
+    // as the sidecars. Reserve the whole budget until their proposal is ready.
+    let validation_reservation = app
+        .state::<crate::imaging_processor::ImagingProcessor>()
+        .reserve()
+        .await
+        .map_err(|error| error.to_string())?;
     let mut result =
         tauri::async_runtime::spawn_blocking(move || host.import_photos(paths, |_| {}))
             .await
             .map_err(|_| "Não foi possível concluir a importação das Fotos.".to_string())??;
+    drop(validation_reservation);
     if let ImportPhotoResult::Completed {
         projection,
         imported_count,
@@ -164,13 +172,16 @@ pub(crate) async fn import_photo(
     {
         problems.extend(unsupported);
         let catalog = state.authorized_media_catalog()?;
-        for path in &selected_paths {
-            if let Some(binding) = catalog.bindings.iter().find(|binding| {
-                binding.kind == myalbuns_core::MediaKind::Photo && &binding.logical_path == path
-            }) {
-                processing.prepare(&app, binding).await;
-            }
-        }
+        let bindings = selected_paths
+            .iter()
+            .filter_map(|path| {
+                catalog.bindings.iter().find(|binding| {
+                    binding.kind == myalbuns_core::MediaKind::Photo && &binding.logical_path == path
+                })
+            })
+            .cloned()
+            .collect();
+        processing.prepare_all(&app, bindings).await;
         for _ in problems.iter() {
             processing.complete(None);
         }

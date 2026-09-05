@@ -2,7 +2,7 @@
 status: ready-for-agent
 document: product-spec
 implementation-readiness: decision-tickets-required
-updated: 2026-09-01
+updated: 2026-09-05
 ---
 
 # Programa de Diagramação de Álbuns
@@ -959,7 +959,7 @@ validação das superfícies descritas nesta seção.
 - O baseline do spike para a pasta é `metadata.json` e `Media`, com uma representação reduzida por mídia e sem tiles ou previews de Lâmina persistidas em disco. Se as cenas e o Zoom representativos demonstrarem insuficiência, o relatório do spike revisa esse contrato antes da implementação ampla.
 - `metadata.json` é descartável e registra versão do schema, Identidade do Projeto, último uso e, por mídia, dimensões, formato, orientação EXIF, tamanho, datas, quantidade de páginas quando aplicável, perfil de cor básico e fingerprint.
 - Cada representação registra também uma versão de suas regras e uma geração única. Versão incompatível invalida a entrada.
-- Um único componente é o proprietário lógico dos jobs, índice, gerações, invalidação, pausa e manutenção do Cache. Fora de manutenção, um único Processador de Imagens atua como adaptador escritor de cada namespace. Cada job usa `.tmp` próprio, revalida que pedido, fingerprint e variante continuam atuais e descarta resultados obsoletos.
+- Um único componente é o proprietário lógico dos jobs, índice, gerações, invalidação, pausa e manutenção do Cache. Fora de manutenção, até dois Processadores de Imagens preparam mídias simultaneamente por Projeto, compartilhando o limite entre ações do usuário e miniaturas em segundo plano. Cada job usa `.tmp` e geração próprios, revalida que pedido, fingerprint e variante continuam atuais e descarta resultados obsoletos. A publicação do índice é serializada; a recuperação aguarda todos os escritores anteriores. A Exportação conserva acesso exclusivo à capacidade de processamento.
 - O artefato imutável é publicado antes de `metadata.json`; o índice serializado referencia a mesma geração e é substituído por último. Temporários e gerações não referenciadas ou antigas sem consumidores são descartados depois de reinício ou novo acesso.
 - Ao abrir ou acessar uma mídia, diferenças de tamanho ou data de alteração invalidam somente sua entrada. Evento do watcher, retorno de Arquivo ausente ou indisponível, Religação, schema incompatível ou artefato inválido também provocam regeneração localizada.
 - A abertura comum não recalcula o hash completo de todos os originais. É aceito o risco raro de uma alteração realizada enquanto o aplicativo está fechado conservar exatamente tamanho e data e não ser percebida.

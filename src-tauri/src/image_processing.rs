@@ -1,3 +1,4 @@
+use futures_util::{StreamExt, stream};
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::{
@@ -7,7 +8,8 @@ use crate::{
     },
     cache_service::ActiveCacheNamespace,
     imaging_processor::{
-        ImagingProcessor, InvocationContext, InvocationFailureStage, TauriImagingTransport,
+        IMAGE_PROCESSING_CONCURRENCY, ImagingProcessor, InvocationContext, InvocationFailureStage,
+        TauriImagingTransport,
     },
     logging::LoggingState,
     media_runtime::MediaBinding,
@@ -64,9 +66,9 @@ pub(crate) async fn prepare_changed_images(
         .collect::<Vec<_>>();
     if !bindings.is_empty() {
         let mut batch = ImageProcessingBatch::new(bindings.len() as u32, publish);
-        for binding in bindings {
-            batch.prepare(app, binding).await;
-        }
+        batch
+            .prepare_all(app, bindings.into_iter().cloned().collect())
+            .await;
     }
     Ok(())
 }
@@ -94,17 +96,42 @@ impl<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> ImageProcessingBatc
     }
 
     pub(crate) async fn prepare(&mut self, app: &AppHandle, binding: &MediaBinding) {
+        self.prepare_all(app, vec![binding.clone()]).await;
+    }
+
+    pub(crate) async fn prepare_all(&mut self, app: &AppHandle, bindings: Vec<MediaBinding>) {
         let synchronization = if !self.sources_synchronized {
             self.sources_synchronized = true;
             synchronize_processing_sources(app).await
         } else {
             Ok(())
         };
-        self.prepare_with(binding, async {
-            synchronization?;
-            prepare_project_image(app, binding).await
+        self.prepare_all_with(bindings, |binding| {
+            let synchronization = synchronization.clone();
+            async move {
+                synchronization?;
+                prepare_project_image(app, &binding).await
+            }
         })
         .await;
+    }
+
+    async fn prepare_all_with<Fut: std::future::Future<Output = Result<(), String>>>(
+        &mut self,
+        bindings: Vec<MediaBinding>,
+        preparation: impl Fn(MediaBinding) -> Fut,
+    ) {
+        let pending = stream::iter(bindings)
+            .map(|binding| {
+                let future = preparation(binding.clone());
+                async move { (binding, future.await) }
+            })
+            .buffer_unordered(IMAGE_PROCESSING_CONCURRENCY);
+        tokio::pin!(pending);
+        while let Some((binding, result)) = pending.next().await {
+            self.prepare_with(&binding, std::future::ready(result))
+                .await;
+        }
     }
 
     async fn prepare_with(
@@ -301,7 +328,7 @@ pub(crate) async fn execute_owned_cache(
                 "A demanda de Cache ficou obsoleta.",
             ));
         }
-        let reservation = processor.reserve().await.map_err(|error| {
+        let reservation = processor.reserve_cache().await.map_err(|error| {
             CacheFailure::new(
                 CacheFailureStage::Processor(InvocationFailureStage::ResolveSidecar),
                 error.to_string(),
@@ -352,6 +379,65 @@ mod tests {
         future::Future,
         task::{Context, Poll, Waker},
     };
+
+    #[test]
+    fn batch_fills_two_slots_and_reports_completion_order_without_stopping_on_error() {
+        tauri::async_runtime::block_on(async {
+            let published = RefCell::new(Vec::new());
+            let started = RefCell::new(Vec::new());
+            let bindings = (0..4)
+                .map(|index| MediaBinding {
+                    media_id: index.to_string(),
+                    kind: myalbuns_core::MediaKind::Photo,
+                    logical_path: format!("foto-{index}.jpg").into(),
+                })
+                .collect::<Vec<_>>();
+            let (senders, receivers): (Vec<_>, Vec<_>) = (0..4)
+                .map(|_| tokio::sync::oneshot::channel::<Result<(), String>>())
+                .unzip();
+            let receivers = RefCell::new(receivers.into_iter().map(Some).collect::<Vec<_>>());
+            let mut batch =
+                ImageProcessingBatch::new(4, |progress| published.borrow_mut().push(progress));
+            let pending = batch.prepare_all_with(bindings, |binding| {
+                let index = binding.media_id.parse::<usize>().unwrap();
+                started.borrow_mut().push(index);
+                let receiver = receivers.borrow_mut()[index].take().unwrap();
+                async move { receiver.await.unwrap() }
+            });
+            tokio::pin!(pending);
+            let poll = |pending: std::pin::Pin<&mut _>| {
+                Future::poll(pending, &mut Context::from_waker(Waker::noop()))
+            };
+            assert!(matches!(poll(pending.as_mut()), Poll::Pending));
+            assert_eq!(*started.borrow(), [0, 1]);
+            let mut senders = senders.into_iter().map(Some).collect::<Vec<_>>();
+            senders[1]
+                .take()
+                .unwrap()
+                .send(Err("Arquivo danificado".into()))
+                .unwrap();
+            assert!(matches!(poll(pending.as_mut()), Poll::Pending));
+            assert_eq!(*started.borrow(), [0, 1, 2]);
+            assert_eq!(
+                published.borrow()[1].problem.as_ref().unwrap().file_name,
+                "foto-1.jpg"
+            );
+            senders[2].take().unwrap().send(Ok(())).unwrap();
+            assert!(matches!(poll(pending.as_mut()), Poll::Pending));
+            assert_eq!(*started.borrow(), [0, 1, 2, 3]);
+            senders[3].take().unwrap().send(Ok(())).unwrap();
+            senders[0].take().unwrap().send(Ok(())).unwrap();
+            pending.await;
+            assert_eq!(
+                published
+                    .borrow()
+                    .iter()
+                    .map(|progress| progress.completed_files)
+                    .collect::<Vec<_>>(),
+                [0, 1, 2, 3, 4]
+            );
+        });
+    }
 
     #[test]
     fn progress_waits_for_cache_and_continues_after_a_failed_image() {

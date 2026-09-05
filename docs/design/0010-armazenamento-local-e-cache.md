@@ -1,7 +1,7 @@
 ---
 status: accepted
 document: design
-updated: 2026-08-21
+updated: 2026-09-05
 ---
 
 # Armazenamento local e Cache
@@ -247,7 +247,9 @@ permanece limitada à demanda residente do Painel e do Canvas.
 
 É aceito no MVP o caso raro de uma alteração feita com o aplicativo fechado conservar exatamente tamanho e data. A Exportação reabre o original e não depende dessa concessão.
 
-Fora de manutenção, o `CacheEngine` de cada Projeto é o proprietário lógico de seu namespace. O Processador de Imagens isolado daquela Sessão atua como único adaptador escritor dos arquivos. Jobs equivalentes podem ser agrupados e obsoletos cancelados. Cache não participa de Salvamento, Undo/Redo ou Recuperação.
+Fora de manutenção, o `CacheEngine` de cada Projeto é o proprietário lógico de seu namespace. Até dois Processadores de Imagens podem preparar mídias simultaneamente, com o mesmo limite para ações do usuário e miniaturas em segundo plano. Cada processo escreve uma geração própria; a atualização do índice permanece serializada pelo `CacheEngine`, e a coleta de gerações não remove candidatos de outros trabalhos ativos. Jobs equivalentes compartilham o resultado e obsoletos são cancelados. Cada escritor publica sua instância exata em um dos dois registros duráveis do namespace antes de receber trabalho; a recuperação espera a saída de todos eles antes de qualquer limpeza. O primeiro registro conserva o nome usado pela implementação anterior.
+
+A validação inicial dos JPEGs também usa até dois trabalhadores, sob uma reserva de toda a capacidade de processamento durante essa etapa. Os resultados são aplicados na ordem da seleção, em uma única ação do Histórico. A preparação do Cache informa conclusão por imagem, mesmo quando os resultados chegam fora de ordem, e uma falha individual não interrompe o lote. A Exportação aguarda a pausa do Cache e reserva toda a capacidade do Processador. Cache não participa de Salvamento, Undo/Redo ou Recuperação.
 
 ## Liberação de espaço
 

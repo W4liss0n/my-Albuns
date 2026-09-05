@@ -443,9 +443,7 @@ impl InitialImageProcessing {
                             }
                         },
                     );
-                    for binding in &catalog.bindings {
-                        batch.prepare(app, binding).await;
-                    }
+                    batch.prepare_all(app, catalog.bindings).await;
                 }
             }
             Ok::<_, String>(problems)

@@ -238,29 +238,39 @@ impl MediaResolver {
             })
             .collect::<Vec<_>>();
         let plan = context.freeze();
-        let mut commands = Vec::new();
-        let mut problems = Vec::new();
-        for (index, (path, capture)) in candidates.into_iter().enumerate() {
-            if existing.contains(path.as_path()) {
-                commands.push(ImportPhoto::select_existing(path));
-            } else {
-                match capture.and_then(|()| inspect_media_source_in_plan(&plan, &path, true)) {
-                    Ok(metadata) => commands.push(ImportPhoto::new(path, metadata)),
-                    Err(reason) => problems.push(ImageProcessingProblem {
+        let inspected = inspect_photo_candidates(
+            candidates,
+            |(path, capture)| {
+                if existing.contains(path.as_path()) {
+                    return Ok(ImportPhoto::select_existing(path));
+                }
+                capture
+                    .and_then(|()| inspect_media_source_in_plan(&plan, &path, true))
+                    .map(|metadata| ImportPhoto::new(path.clone(), metadata))
+                    .map_err(|reason| ImageProcessingProblem {
                         file_name: path
                             .file_name()
                             .unwrap_or_default()
                             .to_string_lossy()
                             .into_owned(),
                         reason,
-                    }),
-                }
+                    })
+            },
+            |completed_files| {
+                on_progress(crate::ipc_contract::ImageProcessingProgress {
+                    completed_files,
+                    total_files,
+                    problem: None,
+                })
+            },
+        );
+        let mut commands = Vec::new();
+        let mut problems = Vec::new();
+        for result in inspected {
+            match result {
+                Ok(command) => commands.push(command),
+                Err(problem) => problems.push(problem),
             }
-            on_progress(crate::ipc_contract::ImageProcessingProgress {
-                completed_files: (index + 1) as u32,
-                total_files,
-                problem: None,
-            });
         }
         PhotoImportsProposal { commands, problems }
     }
@@ -361,6 +371,47 @@ impl MediaResolver {
             observations,
         }
     }
+}
+
+/// Inspection can finish out of order; the proposal preserves the user's
+/// selection order so the eventual single creative command stays deterministic.
+fn inspect_photo_candidates<T: Send, R: Send>(
+    candidates: Vec<T>,
+    inspect: impl Fn(T) -> R + Sync,
+    mut completed: impl FnMut(u32),
+) -> Vec<R> {
+    let total = candidates.len();
+    let candidates = Mutex::new(candidates.into_iter().enumerate());
+    let (sender, receiver) = std::sync::mpsc::channel();
+    std::thread::scope(|scope| {
+        for _ in 0..total.min(crate::imaging_processor::IMAGE_PROCESSING_CONCURRENCY) {
+            let candidates = &candidates;
+            let inspect = &inspect;
+            let sender = sender.clone();
+            scope.spawn(move || {
+                loop {
+                    let Some((index, candidate)) = candidates
+                        .lock()
+                        .expect("the photo inspection queue is healthy")
+                        .next()
+                    else {
+                        break;
+                    };
+                    if sender.send((index, inspect(candidate))).is_err() {
+                        break;
+                    }
+                }
+            });
+        }
+        drop(sender);
+        let mut results = Vec::with_capacity(total);
+        for result in receiver {
+            results.push(result);
+            completed(results.len() as u32);
+        }
+        results.sort_unstable_by_key(|(index, _)| *index);
+        results.into_iter().map(|(_, result)| result).collect()
+    })
 }
 
 fn inspect_media_source(
@@ -685,6 +736,30 @@ fn file_time_millis(time: std::io::Result<SystemTime>) -> Option<u64> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn photo_inspections_overlap_with_two_workers_and_preserve_selection_order() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let active = AtomicUsize::new(0);
+        let peak = AtomicUsize::new(0);
+        let first_pair = std::sync::Barrier::new(2);
+        let mut progress = Vec::new();
+        let results = super::inspect_photo_candidates(
+            vec![0, 1, 2, 3, 4],
+            |index| {
+                let count = active.fetch_add(1, Ordering::AcqRel) + 1;
+                peak.fetch_max(count, Ordering::AcqRel);
+                if index < 2 {
+                    first_pair.wait();
+                }
+                active.fetch_sub(1, Ordering::AcqRel);
+                if index == 1 { Err(index) } else { Ok(index) }
+            },
+            |completed| progress.push(completed),
+        );
+        assert_eq!(peak.load(Ordering::Acquire), 2);
+        assert_eq!(results, [Ok(0), Err(1), Ok(2), Ok(3), Ok(4)]);
+        assert_eq!(progress, [1, 2, 3, 4, 5]);
+    }
     use std::{sync::mpsc, time::Duration};
 
     use image::{ImageFormat, Rgb, RgbImage};

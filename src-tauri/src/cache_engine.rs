@@ -1401,6 +1401,12 @@ async fn invoke_with_recovery<T: ImagingTransport>(
     let mut recovery = None;
     let progress = |_| {};
     loop {
+        if engine.processor_status() == CacheProcessorStatus::Suspended {
+            return Err(CacheFailure::new(
+                CacheFailureStage::ProcessorSuspended,
+                CACHE_PROCESSOR_SUSPENDED_MESSAGE,
+            ));
+        }
         match transport
             .invoke(
                 &command,
@@ -1884,11 +1890,13 @@ mod tests {
 
     enum Script {
         Complete(CacheArtifactFormat),
+        CompleteTogether(std::sync::Arc<tokio::sync::Barrier>),
         MalformedCounts,
         MalformedOrientation,
         MalformedPageCount,
         WrongRequestId,
         Crash(u32),
+        CrashAfterPeerSuspends(std::sync::Arc<CacheEngine>, u32),
         CrashWithInvalidCandidate(u32),
         PublishThenCrash(u32),
         CrashAndObsolete(u32, CacheCancellation),
@@ -1914,8 +1922,18 @@ mod tests {
             assert_eq!(operation, ImagingOperation::Cache);
             self.attempts.push(attempt);
             let script = self.scripts.pop_front().expect("one script per invocation");
+            if let Script::CompleteTogether(barrier) = script {
+                let result = complete(command, &self.app_paths, CacheArtifactFormat::Jpeg);
+                return Box::pin(async move {
+                    barrier.wait().await;
+                    result
+                });
+            }
             let result = match script {
                 Script::Complete(format) => complete(command, &self.app_paths, format),
+                Script::CompleteTogether(_) => {
+                    unreachable!("the concurrent completion returned above")
+                }
                 Script::MalformedCounts => complete_with(
                     command,
                     &self.app_paths,
@@ -1947,6 +1965,11 @@ mod tests {
                     })
                 }
                 Script::Crash(process_id) => {
+                    write_partial(command, &self.app_paths, process_id);
+                    Err(InvocationFailure::unexpected_termination(process_id))
+                }
+                Script::CrashAfterPeerSuspends(engine, process_id) => {
+                    engine.suspend_processor();
                     write_partial(command, &self.app_paths, process_id);
                     Err(InvocationFailure::unexpected_termination(process_id))
                 }
@@ -2073,6 +2096,119 @@ mod tests {
             work: CacheWork::new("cache-test", namespace, source, operation_context.freeze()),
             context: InvocationContext::new("cache-test", Some(project_id)),
         }
+    }
+
+    #[test]
+    fn a_peer_suspending_cache_prevents_recovery_of_an_already_dispatched_job() {
+        tauri::async_runtime::block_on(async {
+            let fixture = fixture();
+            let engine = std::sync::Arc::new(CacheEngine::default());
+            let mut transport = ScriptedTransport {
+                app_paths: fixture.app_paths.clone(),
+                scripts: VecDeque::from([
+                    Script::CrashAfterPeerSuspends(engine.clone(), 42),
+                    Script::Complete(CacheArtifactFormat::Jpeg),
+                ]),
+                attempts: Vec::new(),
+            };
+            let failure = engine
+                .execute(
+                    &mut transport,
+                    &fixture.app_paths,
+                    fixture.work.clone(),
+                    &fixture.context,
+                    &CacheCancellation::default(),
+                )
+                .await
+                .unwrap_err();
+            assert!(matches!(
+                failure.stage,
+                CacheFailureStage::ProcessorSuspended
+            ));
+            assert_eq!(transport.attempts, [1]);
+        });
+    }
+
+    #[test]
+    fn concurrent_cache_completions_preserve_both_candidates_and_merge_the_index() {
+        tauri::async_runtime::block_on(async {
+            let fixture = fixture();
+            let engine = CacheEngine::default();
+            let first = fixture.work.clone();
+            let second = CacheWork::new(
+                "cache-b",
+                first.namespace.clone(),
+                CacheMediaSource::new(
+                    "photo-b",
+                    MediaKind::Photo,
+                    first.source.source_path().to_path_buf(),
+                )
+                .unwrap(),
+                first.root_bindings.clone(),
+            );
+            let barrier = std::sync::Arc::new(tokio::sync::Barrier::new(2));
+            let run = |work: CacheWork| {
+                let engine = &engine;
+                let fixture = &fixture;
+                let barrier = barrier.clone();
+                async move {
+                    let CacheFlightClaim::Owner(owner) = engine.claim_for_processing(&work) else {
+                        panic!("distinct media own distinct jobs");
+                    };
+                    let cancellation = owner.cancellation();
+                    let context = InvocationContext::new(
+                        work.request_id.clone(),
+                        Some(work.namespace.project_id().to_owned()),
+                    );
+                    let mut transport = ScriptedTransport {
+                        app_paths: fixture.app_paths.clone(),
+                        scripts: VecDeque::from([Script::CompleteTogether(barrier)]),
+                        attempts: Vec::new(),
+                    };
+                    let result = engine
+                        .execute(
+                            &mut transport,
+                            &fixture.app_paths,
+                            work,
+                            &context,
+                            &cancellation,
+                        )
+                        .await;
+                    owner.complete(result).unwrap()
+                }
+            };
+            let (first, second) = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+                tokio::join!(run(first), run(second))
+            })
+            .await
+            .expect("both Cache jobs reach their publication barrier concurrently");
+            let storage = fixture
+                .app_paths
+                .prepare_cache_storage(fixture.work.namespace.paths())
+                .unwrap();
+            let metadata = super::load_metadata(&storage, fixture.work.namespace.paths()).unwrap();
+            assert_eq!(metadata.entries.len(), 2);
+            for execution in [first, second] {
+                let artifact = &execution.completion.artifacts[0];
+                assert!(
+                    metadata
+                        .entries
+                        .iter()
+                        .any(|entry| entry.media_id == artifact.media_id
+                            && entry.generation_id == artifact.generation_id)
+                );
+                let path = fixture
+                    .work
+                    .namespace
+                    .paths()
+                    .preview_file(&artifact.media_id, &artifact.generation_id, artifact.format)
+                    .unwrap();
+                assert!(
+                    path.is_file(),
+                    "a competing completion cannot collect an active candidate"
+                );
+            }
+        });
     }
 
     fn complete(

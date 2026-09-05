@@ -3,7 +3,7 @@ use std::{
     future::Future,
     pin::Pin,
     sync::{
-        Arc,
+        Arc, Mutex,
         atomic::{AtomicBool, Ordering},
     },
     time::Duration,
@@ -18,29 +18,42 @@ use myalbuns_imaging_protocol::{
     root_binding_plan_sha256 as digest_root_binding_plan,
 };
 use myalbuns_logging::{LOG_DIRECTORY_ENV, ProcessRole};
-use myalbuns_paths::AppPaths;
+use myalbuns_paths::{AppPaths, CacheWriterSlot};
 use tauri::{AppHandle, Manager};
 use tauri_plugin_shell::{
     ShellExt,
     process::{CommandChild, CommandEvent},
 };
-use tokio::sync::{Mutex as AsyncMutex, OwnedMutexGuard};
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 use crate::{logging::LoggingState, processor_lifetime::ProcessorChildLifetime};
 
 const PROCESS_TERMINATION_TIMEOUT: Duration = Duration::from_secs(5);
 const PROCESS_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
 
-#[derive(Debug, Default)]
+pub(crate) const IMAGE_PROCESSING_CONCURRENCY: usize = CacheWriterSlot::ALL.len();
+
+#[derive(Debug)]
 pub(crate) struct ImagingProcessor {
-    reservation: Arc<AsyncMutex<()>>,
-    quarantined: Arc<AtomicBool>,
+    permits: Arc<Semaphore>,
+    occupied: Arc<Mutex<[bool; IMAGE_PROCESSING_CONCURRENCY]>>,
+}
+
+impl Default for ImagingProcessor {
+    fn default() -> Self {
+        Self {
+            permits: Arc::new(Semaphore::new(IMAGE_PROCESSING_CONCURRENCY)),
+            occupied: Arc::new(Mutex::new([false; IMAGE_PROCESSING_CONCURRENCY])),
+        }
+    }
 }
 
 #[derive(Debug)]
 pub(crate) struct ProcessorReservation {
-    _guard: OwnedMutexGuard<()>,
-    quarantined: Arc<AtomicBool>,
+    _permit: OwnedSemaphorePermit,
+    permits: Arc<Semaphore>,
+    occupied: Arc<Mutex<[bool; IMAGE_PROCESSING_CONCURRENCY]>>,
+    cache_slot: Option<CacheWriterSlot>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -48,23 +61,64 @@ pub(crate) struct ProcessorUnavailable;
 
 impl ImagingProcessor {
     pub(crate) async fn reserve(&self) -> Result<ProcessorReservation, ProcessorUnavailable> {
-        if self.quarantined.load(Ordering::Acquire) {
+        self.acquire(false).await
+    }
+
+    pub(crate) async fn reserve_cache(&self) -> Result<ProcessorReservation, ProcessorUnavailable> {
+        self.acquire(true).await
+    }
+
+    async fn acquire(&self, cache: bool) -> Result<ProcessorReservation, ProcessorUnavailable> {
+        let count = if cache {
+            1
+        } else {
+            IMAGE_PROCESSING_CONCURRENCY as u32
+        };
+        let permit = self
+            .permits
+            .clone()
+            .acquire_many_owned(count)
+            .await
+            .map_err(|_| ProcessorUnavailable)?;
+        if self.permits.is_closed() {
             return Err(ProcessorUnavailable);
         }
-        let guard = self.reservation.clone().lock_owned().await;
-        if self.quarantined.load(Ordering::Acquire) {
-            return Err(ProcessorUnavailable);
-        }
+        let cache_slot = cache.then(|| {
+            let mut occupied = self
+                .occupied
+                .lock()
+                .expect("the Processor slot lock is healthy");
+            let slot = CacheWriterSlot::ALL
+                .into_iter()
+                .find(|slot| !occupied[slot.index()])
+                .expect("a Cache permit owns an available writer slot");
+            occupied[slot.index()] = true;
+            slot
+        });
         Ok(ProcessorReservation {
-            _guard: guard,
-            quarantined: Arc::clone(&self.quarantined),
+            _permit: permit,
+            permits: Arc::clone(&self.permits),
+            occupied: Arc::clone(&self.occupied),
+            cache_slot,
         })
     }
 }
 
 impl ProcessorReservation {
     pub(crate) fn quarantine(&self) {
-        self.quarantined.store(true, Ordering::Release);
+        // Closing wakes every waiter and prevents either operation from starting.
+        self.permits.close();
+    }
+}
+
+impl Drop for ProcessorReservation {
+    fn drop(&mut self) {
+        if let Some(slot) = self.cache_slot {
+            self.occupied
+                .lock()
+                .expect("the Processor slot lock is healthy")[slot.index()] = false;
+        }
+        // The permit is released only after its durable writer slot is available.
     }
 }
 
@@ -331,27 +385,38 @@ impl ImagingTransport for TauriImagingTransport<'_> {
         control: InvocationControl<'a>,
     ) -> InvocationFuture<'a> {
         Box::pin(async move {
-            protect_processor_after_invocation(
+            invoke_reserved(
                 self._reservation,
                 invoke_once(
                     self.app,
                     self.logging,
+                    self._reservation,
                     command,
                     context,
                     operation,
                     attempt,
                     control,
-                )
-                .await,
+                ),
             )
+            .await
         })
     }
 }
 
-fn protect_processor_after_invocation(
+async fn invoke_reserved(
     reservation: &ProcessorReservation,
-    result: Result<ImagingResponse, InvocationFailure>,
+    invocation: impl Future<Output = Result<ImagingResponse, InvocationFailure>>,
 ) -> Result<ImagingResponse, InvocationFailure> {
+    // A peer can quarantine the pool while this reservation is already held.
+    // Every attempt, including automatic recovery, must check before dispatch.
+    if reservation.permits.is_closed() {
+        return Err(InvocationFailure::at_stage(
+            InvocationFailureStage::ResolveSidecar,
+            None,
+            ProcessorUnavailable.to_string(),
+        ));
+    }
+    let result = invocation.await;
     if result
         .as_ref()
         .is_err_and(InvocationFailure::is_termination_unconfirmed)
@@ -361,9 +426,11 @@ fn protect_processor_after_invocation(
     result
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn invoke_once(
     app: &AppHandle,
     logging: &LoggingState,
+    reservation: &ProcessorReservation,
     command: &ImagingCommand,
     context: &InvocationContext,
     operation: ImagingOperation,
@@ -461,8 +528,13 @@ async fn invoke_once(
         }
     };
     if let ImagingCommand::BuildCache(request) = command
-        && let Err(error) = processor_lifetime
-            .publish_cache_writer_claim(&app.state::<AppPaths>(), &request.cache_paths)
+        && let Err(error) = processor_lifetime.publish_cache_writer_claim(
+            &app.state::<AppPaths>(),
+            &request.cache_paths,
+            reservation
+                .cache_slot
+                .expect("Cache invocation owns a writer slot"),
+        )
     {
         let claim_message =
             format!("Não foi possível publicar a autoridade do Processador sobre o Cache: {error}");
@@ -760,7 +832,7 @@ mod tests {
 
     use super::{
         ImagingProcessor, InvocationControl, InvocationFailure, InvocationFailureStage,
-        complete_invocation, decode_and_report_event_chunk, protect_processor_after_invocation,
+        complete_invocation, decode_and_report_event_chunk, invoke_reserved,
         receive_processor_handshake, wait_for_termination_for,
     };
 
@@ -787,6 +859,85 @@ mod tests {
                 .await
                 .expect("the Processor is available when its reservation is released")
                 .expect("the Processor remains healthy");
+        });
+    }
+
+    #[test]
+    fn cache_workers_overlap_but_export_waits_for_both_and_blocks_new_cache_work() {
+        tauri::async_runtime::block_on(async {
+            let processor = ImagingProcessor::default();
+            let first = processor.reserve_cache().await.unwrap();
+            let second = tokio::time::timeout(Duration::from_secs(1), processor.reserve_cache())
+                .await
+                .unwrap()
+                .unwrap();
+            assert_ne!(first.cache_slot, second.cache_slot);
+            let export = processor.reserve();
+            tokio::pin!(export);
+            assert!(
+                tokio::time::timeout(Duration::from_millis(20), &mut export)
+                    .await
+                    .is_err()
+            );
+            drop(first);
+            assert!(
+                tokio::time::timeout(Duration::from_millis(20), &mut export)
+                    .await
+                    .is_err()
+            );
+            let next = processor.reserve_cache();
+            tokio::pin!(next);
+            assert!(
+                tokio::time::timeout(Duration::from_millis(20), &mut next)
+                    .await
+                    .is_err()
+            );
+            drop(second);
+            let export = export.await.unwrap();
+            assert!(
+                tokio::time::timeout(Duration::from_millis(20), &mut next)
+                    .await
+                    .is_err()
+            );
+            drop(export);
+            assert!(next.await.is_ok());
+        });
+    }
+
+    #[test]
+    fn cache_worker_limit_reuses_slots_and_quarantine_wakes_queued_work() {
+        tauri::async_runtime::block_on(async {
+            let processor = ImagingProcessor::default();
+            let first = processor.reserve_cache().await.unwrap();
+            let second = processor.reserve_cache().await.unwrap();
+            let third = processor.reserve_cache();
+            tokio::pin!(third);
+            assert!(
+                tokio::time::timeout(Duration::from_millis(20), &mut third)
+                    .await
+                    .is_err()
+            );
+            let released_slot = first.cache_slot;
+            drop(first);
+            let third = third.await.unwrap();
+            assert_eq!(third.cache_slot, released_slot);
+            let queued = processor.reserve_cache();
+            tokio::pin!(queued);
+            assert!(
+                tokio::time::timeout(Duration::from_millis(20), &mut queued)
+                    .await
+                    .is_err()
+            );
+            third.quarantine();
+            assert!(
+                tokio::time::timeout(Duration::from_secs(1), queued)
+                    .await
+                    .unwrap()
+                    .is_err()
+            );
+            assert!(processor.reserve_cache().await.is_err());
+            assert!(processor.reserve().await.is_err());
+            drop((second, third));
         });
     }
 
@@ -823,11 +974,48 @@ mod tests {
                     "injected unconfirmed termination",
                 ));
 
-            let failure = protect_processor_after_invocation(&reservation, result)
+            let failure = invoke_reserved(&reservation, std::future::ready(result))
+                .await
                 .expect_err("the transport failure remains visible");
             assert!(failure.is_termination_unconfirmed());
             drop(reservation);
             assert!(processor.reserve().await.is_err());
+        });
+    }
+
+    #[test]
+    fn quarantined_peer_blocks_recovery_dispatch_through_an_existing_reservation() {
+        tauri::async_runtime::block_on(async {
+            let processor = ImagingProcessor::default();
+            let first = processor.reserve_cache().await.unwrap();
+            let second = processor.reserve_cache().await.unwrap();
+            let mut dispatched = 0;
+            let failure = invoke_reserved(&second, async {
+                dispatched += 1;
+                Err(InvocationFailure::unexpected_termination(42))
+            })
+            .await
+            .unwrap_err();
+            assert!(failure.is_unexpected_termination());
+            invoke_reserved(&first, async {
+                Err(InvocationFailure::termination_unconfirmed(
+                    43,
+                    "injected peer failure",
+                ))
+            })
+            .await
+            .unwrap_err();
+            let retry = invoke_reserved(&second, async {
+                dispatched += 1;
+                Err(InvocationFailure::unexpected_termination(44))
+            })
+            .await
+            .unwrap_err();
+            assert_eq!(retry.stage, InvocationFailureStage::ResolveSidecar);
+            assert_eq!(
+                dispatched, 1,
+                "an existing reservation cannot dispatch a recovery process after peer quarantine"
+            );
         });
     }
 

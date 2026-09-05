@@ -17,7 +17,31 @@ use crate::{
     },
 };
 
-const CACHE_WRITER_CLAIM_FILE: &str = ".processor-writer.v1.json";
+/// Durable identities for the bounded set of simultaneous Cache writers.
+/// The first slot keeps the original filename so recovery also covers old Hosts.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CacheWriterSlot {
+    First,
+    Second,
+}
+
+impl CacheWriterSlot {
+    pub const ALL: [Self; 2] = [Self::First, Self::Second];
+
+    pub const fn index(self) -> usize {
+        match self {
+            Self::First => 0,
+            Self::Second => 1,
+        }
+    }
+
+    const fn file_name(self) -> &'static str {
+        match self {
+            Self::First => ".processor-writer.v1.json",
+            Self::Second => ".processor-writer-2.v1.json",
+        }
+    }
+}
 const CACHE_WRITER_TEMPORARY_PREFIX: &str = ".processor-writer-";
 const CACHE_WRITER_CLAIM_MAX_BYTES: usize = 1024;
 
@@ -139,13 +163,13 @@ impl CacheWriterClaimStorage {
         self.project_cache.project()
     }
 
-    fn claim_path(&self) -> PathBuf {
-        self.project().logical_path.join(CACHE_WRITER_CLAIM_FILE)
+    fn claim_path(&self, slot: CacheWriterSlot) -> PathBuf {
+        self.project().logical_path.join(slot.file_name())
     }
 
     /// Atomically publishes one opaque, bounded claim inside the guarded
     /// namespace. Existing claims are never replaced.
-    pub fn publish_claim(&self, bytes: &[u8]) -> Result<(), AppPathsError> {
+    pub fn publish_claim(&self, slot: CacheWriterSlot, bytes: &[u8]) -> Result<(), AppPathsError> {
         validate_writer_claim_bytes(bytes)?;
         let temporary = self.project().logical_path.join(format!(
             "{CACHE_WRITER_TEMPORARY_PREFIX}{}.tmp",
@@ -165,7 +189,7 @@ impl CacheWriterClaimStorage {
             self.project(),
             &temporary,
             &file,
-            std::ffi::OsStr::new(CACHE_WRITER_CLAIM_FILE),
+            std::ffi::OsStr::new(slot.file_name()),
         ) {
             let _ = delete_open_file(self.project(), &temporary, &file);
             drop(file);
@@ -177,8 +201,8 @@ impl CacheWriterClaimStorage {
 
     /// Reads the claim through an open file whose physical parent is the
     /// guarded Project namespace.
-    pub fn read_claim(&self) -> Result<Option<Vec<u8>>, AppPathsError> {
-        let path = self.claim_path();
+    pub fn read_claim(&self, slot: CacheWriterSlot) -> Result<Option<Vec<u8>>, AppPathsError> {
+        let path = self.claim_path(slot);
         let mut file = match open_readable_file(self.project(), &path) {
             Ok(file) => file,
             Err(GuardedFsError::NotFound) => return Ok(None),
@@ -189,9 +213,13 @@ impl CacheWriterClaimStorage {
 
     /// Removes the claim only when the bytes observed through the guarded
     /// namespace still match the expected exact Process instance.
-    pub fn remove_claim_if_matches(&self, expected: &[u8]) -> Result<bool, AppPathsError> {
+    pub fn remove_claim_if_matches(
+        &self,
+        slot: CacheWriterSlot,
+        expected: &[u8],
+    ) -> Result<bool, AppPathsError> {
         validate_writer_claim_bytes(expected)?;
-        let path = self.claim_path();
+        let path = self.claim_path(slot);
         let mut file = match open_deletable_file(self.project(), &path) {
             Ok(file) => file,
             Err(GuardedFsError::NotFound) => return Ok(false),

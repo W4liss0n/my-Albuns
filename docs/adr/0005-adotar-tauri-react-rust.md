@@ -1,7 +1,7 @@
 ---
 status: accepted
 date: 2026-07-28
-updated: 2026-09-01
+updated: 2026-09-05
 ---
 
 # Adotar Tauri 2, React/TypeScript e Rust com host independente por Projeto
@@ -36,7 +36,7 @@ A interface externa do `ProjectCore` esconde quatro responsabilidades internas: 
 
 Um `CompositionCore` puro recebe valores imutáveis e produz planos determinísticos de recorte, preenchimento, transformação e ordem de desenho. Editor e Exportação reutilizam essa regra sem duplicá-la em TypeScript ou no Processador. A transformação persistente da Foto dentro do Frame é diferente da transformação transitória usada para navegar no Canvas.
 
-Referências persistentes de mídia pertencem ao Projeto. Disponibilidade observada, watcher e Cache não participam do estado criativo. Um `CacheEngine` é o proprietário lógico de jobs, índice, artefatos, invalidação, pausa e manutenção; o Processador de Imagens pode ser seu único adaptador escritor sem se tornar fonte canônica.
+Referências persistentes de mídia pertencem ao Projeto. Disponibilidade observada, watcher e Cache não participam do estado criativo. Um `CacheEngine` é o proprietário lógico de jobs, índice, artefatos, invalidação, pausa e manutenção. A preparação das imagens admite até dois Processadores simultâneos por Projeto, compartilhados pelos lotes de processamento e pela demanda de miniaturas. Cada processo escreve sua própria geração; somente o `CacheEngine` publica o índice, de forma serializada. Cada escritor possui um registro durável da instância exata e um Job do Windows; a recuperação aguarda todos os escritores anteriores antes de limpar o namespace. A Exportação reserva toda a capacidade do Processador e conserva sua exclusividade.
 
 A Exportação usa um único `ExportPipeline` para o fluxo normal e cada item do lote. Planejamento, execução e Publicação são fases internas; o lote permanece um chamador externo responsável por descoberta, pré-validação e checkpoint. O pipeline recebe snapshot imutável, abre originais e nunca salva, religa ou modifica um Projeto.
 

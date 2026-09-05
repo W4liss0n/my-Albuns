@@ -21,7 +21,7 @@ pub use app_paths::{AppPaths, project_data_namespace};
 pub use atomic_publish::{publish_new_file, replace_existing_file};
 pub use cache::{
     CacheArtifactFormat, CacheNamespaceUsage, CachePathPlan, CacheWriterClaimStorage,
-    PendingCachePublication, PreparedCacheStorage, SynchronizedCachePublication,
+    CacheWriterSlot, PendingCachePublication, PreparedCacheStorage, SynchronizedCachePublication,
 };
 pub use cache_schedule::CacheClearScheduleStorage;
 pub use error::AppPathsError;
