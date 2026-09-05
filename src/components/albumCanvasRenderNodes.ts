@@ -147,6 +147,7 @@ export function createSheetRenderNode(
   );
   sheetContainer.cursor = "default";
   sheetContainer.on("pointertap", (event: FederatedPointerEvent) => {
+    if (event.button !== 0) return;
     if (event.target === sheetContainer) {
       if (!dispatchSheetDoubleTap(event)) {
         callbacks.onSheetTap(sheet.sheetId);
@@ -360,6 +361,7 @@ export function createSheetRenderNode(
     frameSelectionLayer.addChild(frameDropOutline);
 
     frameContainer.on("pointertap", (event: FederatedPointerEvent) => {
+      if (event.button !== 0) return;
       event.stopPropagation();
       if (dispatchSheetDoubleTap(event)) return;
       if (!event.altKey) {
@@ -451,6 +453,7 @@ export function createSheetRenderNode(
   sheetBar.container.on(
     "pointertap",
     (event: FederatedPointerEvent) => {
+      if (event.button !== 0) return;
       if (event.target === sheetBar.container) {
         if (!dispatchSheetDoubleTap(event)) {
           callbacks.onSheetTap(sheet.sheetId);

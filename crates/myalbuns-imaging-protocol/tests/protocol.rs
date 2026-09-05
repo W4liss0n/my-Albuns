@@ -251,7 +251,7 @@ fn host_and_processor_share_one_serialized_protocol() {
         "render-42",
         snapshot.project_id.clone(),
         snapshot.revision,
-        NativePathDto::from(prepared_output_path),
+        NativePathDto::from(prepared_output_path.clone()),
         unit,
         snapshot.dpi,
         sources,
@@ -361,17 +361,15 @@ fn host_and_processor_share_one_serialized_protocol() {
         "a worker must never resolve a root omitted by the operation owner"
     );
     let mut non_jpeg_request = request.clone();
-    non_jpeg_request.prepared_output_path = NativePathDto::from(PathBuf::from(
-        r"C:\Temp\.myalbuns-export-render-42.tmp\Album_001.png",
-    ));
+    non_jpeg_request.prepared_output_path =
+        NativePathDto::from(prepared_output_path.with_extension("png"));
     assert!(
         non_jpeg_request.validate().is_err(),
         "the Processor rejects a JPEG payload prepared under a misleading extension"
     );
     let mut uppercase_jpeg_request = request.clone();
-    uppercase_jpeg_request.prepared_output_path = NativePathDto::from(PathBuf::from(
-        r"C:\Temp\.myalbuns-export-render-42.tmp\Album_001.JPG",
-    ));
+    uppercase_jpeg_request.prepared_output_path =
+        NativePathDto::from(prepared_output_path.with_extension("JPG"));
     assert!(
         uppercase_jpeg_request.validate().is_ok(),
         "Windows extension casing must not make the host and Processor disagree"

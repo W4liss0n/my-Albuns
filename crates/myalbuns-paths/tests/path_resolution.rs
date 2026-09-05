@@ -231,11 +231,10 @@ fn distinguishes_unbound_missing_and_unsupported_windows_paths() {
         ResolveError::UnsupportedNamespace
     );
     assert_eq!(
-        plan.resolve_existing(
-            std::path::Path::new(r"D:\Projeto.myalbum"),
-            ExpectedObject::RegularFile,
-        )
-        .unwrap_err(),
+        OperationPathContext::new()
+            .freeze()
+            .resolve_existing(&existing, ExpectedObject::RegularFile)
+            .unwrap_err(),
         ResolveError::UnboundRoot
     );
 }

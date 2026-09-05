@@ -19,6 +19,13 @@ pub(crate) fn request_project_close(
     window: Window,
     state: State<'_, ProjectHost>,
 ) -> Result<ProjectCloseRequestOutcome, SaveProjectCommandError> {
+    tracing::info!(
+        target: "myalbuns.desktop",
+        process_role = ProcessRole::DesktopHost.as_str(),
+        process_id = std::process::id(),
+        window_label = window.label(),
+        event = "project_close_command_received",
+    );
     match state
         .begin_close()
         .map_err(|_| SaveProjectCommandError::SessionUnavailable)?
@@ -28,6 +35,7 @@ pub(crate) fn request_project_close(
                 target: "myalbuns.desktop",
                 process_role = ProcessRole::DesktopHost.as_str(),
                 window_label = window.label(),
+                process_id = std::process::id(),
                 event = "clean_project_close_requested",
             );
             complete_project_close(&window);

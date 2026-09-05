@@ -1,20 +1,29 @@
 import {
-  useEffect,
   useRef,
   type CSSProperties,
-  type DragEvent as ReactDragEvent,
   type MouseEvent as ReactMouseEvent,
 } from "react";
 
-import type { ComposedSheet } from "../domain/project";
+import type {
+  ComposedSheet,
+  ProjectedFrameBorder,
+} from "../domain/project";
 import type { ViewportState } from "../state/viewport";
-import type { CanvasMetrics } from "./albumCanvasContract";
+import type {
+  CanvasMetrics,
+  SheetBarMetadata,
+} from "./albumCanvasContract";
 import {
+  CANVAS_MICROMETERS_PER_PIXEL,
   CANVAS_VERTICAL_MARGIN_PX,
   createCanvasSheetPresentation,
   type ContinuousCanvasLayout,
 } from "./canvasGeometry";
 import { createCanvasSheetViewGeometry } from "./canvasSheetViewGeometry";
+import {
+  SheetPreviewShell,
+  type SheetPreviewViewport,
+} from "./SheetPreview";
 import {
   SHEET_REORDER_INVALID_MESSAGE,
   sheetReorderAutoScrollVelocity,
@@ -22,6 +31,10 @@ import {
   type SheetReorderStatus,
 } from "./sheetReorderSession";
 import { SHEET_VISUAL_STYLE } from "./sheetVisualStyle";
+import {
+  useSheetPointerReorder,
+  type SheetReorderPointerPosition,
+} from "./useSheetPointerReorder";
 import "./SheetBarReorderOverlay.css";
 
 export interface SheetBarReorderOverlayProps {
@@ -29,6 +42,10 @@ export interface SheetBarReorderOverlayProps {
   readonly layout: ContinuousCanvasLayout;
   readonly metrics: CanvasMetrics | null;
   readonly bleedUm?: number;
+  readonly focusedSheetId?: string | null;
+  readonly frameBorder?: ProjectedFrameBorder;
+  readonly mediaPreviewUrls?: Readonly<Record<string, string>>;
+  readonly sheetBarMetadata?: readonly SheetBarMetadata[];
   readonly viewport: ViewportState;
   readonly representation: SheetReorderRepresentation;
   readonly status: SheetReorderStatus;
@@ -36,7 +53,8 @@ export interface SheetBarReorderOverlayProps {
   readonly onPreview: (draggedSheetId: string, targetIndex: number) => void;
   readonly onDrop: () => void;
   readonly onCancel: () => void;
-  readonly onNavigate: (sheetId: string) => void;
+  readonly onEditSheet: (sheetId: string) => void;
+  readonly onSelect: (sheetId: string) => void;
   readonly onContextMenu: (
     sheetId: string,
     position: { x: number; y: number },
@@ -58,17 +76,17 @@ export function SheetBarReorderOverlay(
   const confirmedIndexById = new Map(
     props.sheets.map((sheet, index) => [sheet.sheetId, index] as const),
   );
+  const sheetBarMetadataById = new Map(
+    (props.sheetBarMetadata ?? []).map((metadata) => [
+      metadata.sheetId,
+      metadata,
+    ]),
+  );
   const reorderEnabled = !props.disabled && props.status !== "committing";
   const placeholderEntry =
     props.representation.placeholderIndex === null
       ? null
       : entries[props.representation.placeholderIndex] ?? null;
-  const ghostSheetId = props.representation.ghost?.sheetId ?? null;
-  const ghostSheet = ghostSheetId ? sheetById.get(ghostSheetId) : undefined;
-  const ghostIndex = ghostSheetId
-    ? props.representation.order.indexOf(ghostSheetId)
-    : -1;
-  const ghostEntry = ghostIndex >= 0 ? entries[ghostIndex] ?? null : null;
   const firstSheetBounds =
     scale === null || !props.sheets[0]
       ? null
@@ -77,157 +95,55 @@ export function SheetBarReorderOverlay(
           scale,
           props.bleedUm,
         );
+  const overlayRef = useRef<HTMLDivElement | null>(null);
+  const ghostAnchorRef = useRef<GhostAnchor | null>(null);
+  const pointerReorder = useSheetPointerReorder({
+    enabled: reorderEnabled,
+    onActivate: props.onSelect,
+    onCancel: props.onCancel,
+    onDrop: props.onDrop,
+    onFinish: () => props.onAutoScrollVelocity(0),
+    onMove: reportAutoScroll,
+    onPreview: props.onPreview,
+    resolveTarget: ({ clientX }) =>
+      scale === null
+        ? null
+        : resolveHorizontalTarget(
+            entries,
+            scale,
+            props.viewport.offsetX,
+            overlayRef.current?.getBoundingClientRect().left ?? 0,
+            clientX,
+          ),
+    targetGeometryRevision: props.viewport.offsetX,
+    validRelease: (position) =>
+      pointInsideRenderedElement(overlayRef.current, position),
+  });
+  const ghostSheetId =
+    pointerReorder.pointer?.sourceId ??
+    props.representation.ghost?.sheetId ??
+    null;
+  const ghostSheet = ghostSheetId ? sheetById.get(ghostSheetId) : undefined;
+  const ghostIndex = ghostSheetId
+    ? props.representation.order.indexOf(ghostSheetId)
+    : -1;
+  const ghostEntry = ghostIndex >= 0 ? entries[ghostIndex] ?? null : null;
   const placeholderBounds =
     scale === null || !ghostSheet
       ? null
       : visibleSheetBounds(ghostSheet, scale, props.bleedUm);
   const ghostBounds = placeholderBounds;
-  const draggedSheetIdRef = useRef<string | null>(null);
-  const nativeDragImageCleanupRef = useRef<(() => void) | null>(null);
+  const ghostPageNumbers = ghostSheet
+    ? sheetBarMetadataById.get(ghostSheet.sheetId)?.pageNumbers ?? []
+    : [];
 
-  useEffect(
-    () => () => nativeDragImageCleanupRef.current?.(),
-    [],
-  );
-
-  useEffect(() => {
-    const cancelOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || !draggedSheetIdRef.current) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      draggedSheetIdRef.current = null;
-      props.onAutoScrollVelocity(0);
-      props.onCancel();
-    };
-    window.addEventListener("keydown", cancelOnEscape, true);
-    return () => window.removeEventListener("keydown", cancelOnEscape, true);
-  }, [props.onAutoScrollVelocity, props.onCancel]);
-
-  function beginReorder(
-    event: ReactDragEvent<HTMLButtonElement>,
-    sheetId: string,
-    targetIndex: number,
-  ) {
-    event.stopPropagation();
-    if (!reorderEnabled) {
-      event.preventDefault();
-      return;
-    }
-    draggedSheetIdRef.current = sheetId;
-    event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("text/plain", sheetId);
-    event.dataTransfer.setData("application/x-myalbuns-sheet", sheetId);
-    setNativeDragImage(
-      event,
-      sheetById.get(sheetId),
-      entries[targetIndex],
-    );
-    props.onPreview(sheetId, targetIndex);
-  }
-
-  function setNativeDragImage(
-    event: ReactDragEvent<HTMLButtonElement>,
-    sheet: ComposedSheet | undefined,
-    entry: (typeof entries)[number] | undefined,
-  ) {
-    nativeDragImageCleanupRef.current?.();
-    if (!sheet || !entry || scale === null) return;
-
-    const bounds = visibleSheetBounds(sheet, scale, props.bleedUm);
-    const overlayBounds = event.currentTarget
-      .closest<HTMLDivElement>(".sheet-bar-reorder-overlay")
-      ?.getBoundingClientRect();
-    const left =
-      (overlayBounds?.left ?? 0) +
-      entry.left * scale +
-      props.viewport.offsetX;
-    const top = (overlayBounds?.top ?? 0) + bounds.top;
-    const source = event.currentTarget;
-    const dragImage = document.createElement("span");
-    dragImage.className =
-      "sheet-bar-reorder-overlay__native-drag-image";
-    dragImage.textContent = `L${String(sheet.number).padStart(2, "0")}`;
-    Object.assign(dragImage.style, {
-      height: `${bounds.height}px`,
-      left: `${left}px`,
-      top: `${top}px`,
-      width: `${entry.width * scale}px`,
-    });
-    document.body.append(dragImage);
-
-    const offsetX = dragImageOffset(
-      event.clientX - left,
-      entry.width * scale,
-    );
-    const offsetY = dragImageOffset(
-      event.clientY - top,
-      bounds.height,
-    );
-
-    if (typeof event.dataTransfer.setDragImage === "function") {
-      try {
-        event.dataTransfer.setDragImage(dragImage, offsetX, offsetY);
-        scheduleNativeDragFeedbackCleanup(source, dragImage);
-        return;
-      } catch {
-        dragImage.remove();
-      }
-    } else {
-      dragImage.remove();
-    }
-
-    source.dataset.nativeDragFallback = "true";
-    scheduleNativeDragFeedbackCleanup(source, null);
-  }
-
-  function scheduleNativeDragFeedbackCleanup(
-    source: HTMLButtonElement,
-    dragImage: HTMLElement | null,
-  ) {
-    let cleanupTimer: number | null = null;
-    const cleanup = () => {
-      if (cleanupTimer !== null) window.clearTimeout(cleanupTimer);
-      dragImage?.remove();
-      delete source.dataset.nativeDragFallback;
-      if (nativeDragImageCleanupRef.current === cleanup) {
-        nativeDragImageCleanupRef.current = null;
-      }
-    };
-    nativeDragImageCleanupRef.current = cleanup;
-    cleanupTimer = window.setTimeout(cleanup, 0);
-  }
-
-  function previewReorder(
-    event: ReactDragEvent<HTMLButtonElement>,
-    targetIndex: number,
-  ) {
-    event.stopPropagation();
-    const draggedSheetId = draggedSheetIdRef.current;
-    if (!reorderEnabled || !draggedSheetId) return;
-    event.preventDefault();
-    props.onPreview(draggedSheetId, targetIndex);
-  }
-
-  function finishReorder(event: ReactDragEvent<HTMLButtonElement>) {
-    event.stopPropagation();
-    if (!draggedSheetIdRef.current) return;
-    draggedSheetIdRef.current = null;
-    props.onAutoScrollVelocity(0);
-    props.onCancel();
-  }
-
-  function reportAutoScroll(event: ReactDragEvent<HTMLDivElement>) {
-    event.stopPropagation();
-    if (!reorderEnabled || event.dataTransfer.effectAllowed !== "move") {
-      return;
-    }
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "move";
-    const bounds = event.currentTarget.getBoundingClientRect();
+  function reportAutoScroll(position: SheetReorderPointerPosition) {
+    const bounds = overlayRef.current?.getBoundingClientRect();
+    if (!bounds) return;
     props.onAutoScrollVelocity(
       sheetReorderAutoScrollVelocity({
         axis: "horizontal",
-        pointerPosition: event.clientX,
+        pointerPosition: position.clientX,
         viewportStart: bounds.left,
         viewportEnd: bounds.right,
       }),
@@ -247,6 +163,25 @@ export function SheetBarReorderOverlay(
     });
   }
 
+  function editSheetAtPointer(event: ReactMouseEvent<HTMLDivElement>) {
+    if (scale === null) return;
+    const slotIndex = resolveHorizontalSlotAtPoint(
+      entries,
+      scale,
+      props.viewport.offsetX,
+      overlayRef.current?.getBoundingClientRect().left ?? 0,
+      event.clientX,
+    );
+    const sheetId =
+      slotIndex === null
+        ? null
+        : props.representation.order[slotIndex] ?? null;
+    if (!sheetId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    props.onEditSheet(sheetId);
+  }
+
   return (
     <div
       aria-disabled={!reorderEnabled}
@@ -258,20 +193,12 @@ export function SheetBarReorderOverlay(
       data-sheet-order={props.sheets
         .map((sheet) => sheet.sheetId)
         .join(",")}
-      onDragOver={reportAutoScroll}
-      onDrop={(event) => {
-        event.stopPropagation();
-        if (
-          !reorderEnabled ||
-          event.dataTransfer.effectAllowed !== "move"
-        ) {
-          return;
-        }
-        event.preventDefault();
-        draggedSheetIdRef.current = null;
-        props.onAutoScrollVelocity(0);
-        props.onDrop();
-      }}
+      onDoubleClick={editSheetAtPointer}
+      onLostPointerCapture={pointerReorder.lostCapture}
+      onPointerCancel={pointerReorder.cancel}
+      onPointerMove={pointerReorder.move}
+      onPointerUp={pointerReorder.end}
+      ref={overlayRef}
       role="group"
     >
       <span
@@ -307,20 +234,11 @@ export function SheetBarReorderOverlay(
           scale,
           props.bleedUm,
         );
-        const freeRegionStart = Math.min(
-          fullWidth,
-          Math.max(
-            SHEET_VISUAL_STYLE.sheetBar.swapActionCenterPx +
-              SHEET_VISUAL_STYLE.sheetBar.actionSizePx / 2,
-            fullWidth / 2 +
-              SHEET_VISUAL_STYLE.sheetBar.actionSizePx / 2,
-          ),
-        );
         const style = {
           height: `${SHEET_VISUAL_STYLE.sheetBar.heightPx}px`,
-          left: `${entry.left * scale + props.viewport.offsetX + freeRegionStart}px`,
+          left: `${entry.left * scale + props.viewport.offsetX}px`,
           top: `${sheetBounds.top}px`,
-          width: `${Math.max(0, fullWidth - freeRegionStart)}px`,
+          width: `${fullWidth}px`,
         } satisfies CSSProperties;
         return [
           <button
@@ -332,17 +250,41 @@ export function SheetBarReorderOverlay(
             }
             data-sheet-id={sheet.sheetId}
             data-slot-index={index}
-            draggable={reorderEnabled}
             key={sheet.sheetId}
             onContextMenu={(event) =>
               openContextMenu(event, sheet.sheetId)
             }
-            onClick={() => props.onNavigate(sheet.sheetId)}
-            onDragEnd={finishReorder}
-            onDragEnter={(event) => previewReorder(event, index)}
-            onDragStart={(event) =>
-              beginReorder(event, sheet.sheetId, index)
-            }
+            onClick={(event) => {
+              if (
+                pointerReorder.consumeClickSuppression(sheet.sheetId)
+              ) {
+                event.preventDefault();
+                event.stopPropagation();
+                return;
+              }
+              props.onSelect(sheet.sheetId);
+            }}
+            onPointerDown={(event) => {
+              const overlayBounds =
+                overlayRef.current?.getBoundingClientRect();
+              const fullLeft =
+                entry.left * scale + props.viewport.offsetX;
+              ghostAnchorRef.current = {
+                height: sheetBounds.height,
+                offsetX:
+                  event.clientX -
+                  (overlayBounds?.left ?? 0) -
+                  fullLeft,
+                overlayLeft: overlayBounds?.left ?? 0,
+                top: sheetBounds.top,
+                width: fullWidth,
+              };
+              pointerReorder.begin(
+                event,
+                sheet.sheetId,
+                overlayRef.current,
+              );
+            }}
             style={style}
             type="button"
           >
@@ -359,16 +301,65 @@ export function SheetBarReorderOverlay(
         <span
           aria-hidden="true"
           className="sheet-bar-reorder-overlay__ghost"
+          data-active-sides={ghostSheet.activeSides}
+          data-origin-selected={
+            ghostSheet.sheetId === props.focusedSheetId || undefined
+          }
+          data-pointer-x={pointerReorder.pointer?.clientX}
+          data-pointer-y={pointerReorder.pointer?.clientY}
           data-sheet-id={ghostSheet.sheetId}
           data-testid="reorder-ghost"
-          style={{
-            height: `${ghostBounds.height}px`,
-            left: `${ghostEntry.left * scale + props.viewport.offsetX}px`,
-            top: `${ghostBounds.top}px`,
-            width: `${ghostEntry.width * scale}px`,
-          }}
+          style={ghostStyle(
+            pointerReorder.pointer,
+            ghostAnchorRef.current,
+            {
+              height: ghostBounds.height,
+              left: ghostEntry.left * scale + props.viewport.offsetX,
+              top: ghostBounds.top,
+              width: ghostEntry.width * scale,
+            },
+          )}
         >
-          {String(ghostSheet.number).padStart(2, "0")}
+          <SheetPreviewShell
+            className="sheet-bar-reorder-overlay__ghost-visual"
+            frameBorder={props.frameBorder}
+            mediaPreviewUrls={props.mediaPreviewUrls}
+            sheet={ghostSheet}
+            viewport={sheetPreviewViewport(
+              ghostSheet,
+              props.bleedUm,
+            )}
+          >
+            <span
+              className="sheet-bar-reorder-overlay__ghost-bar"
+              data-active-sides={ghostSheet.activeSides}
+              style={{
+                background: SHEET_VISUAL_STYLE.sheetBar.surface,
+                borderBottomColor:
+                  SHEET_VISUAL_STYLE.sheetBar.separator,
+                color: SHEET_VISUAL_STYLE.sheetBar.text,
+                height: `${SHEET_VISUAL_STYLE.sheetBar.heightPx}px`,
+              }}
+            >
+              {ghostSheet.activeSides === "both" ? (
+                <>
+                  <span data-page-side="left">
+                    {ghostPageNumbers[0]}
+                  </span>
+                  <span data-page-side="right">
+                    {ghostPageNumbers[1]}
+                  </span>
+                </>
+              ) : (
+                <span data-page-side={ghostSheet.activeSides}>
+                  {ghostPageNumbers[0]}
+                </span>
+              )}
+              <span className="sheet-bar-reorder-overlay__ghost-number">
+                L{String(ghostSheet.number).padStart(2, "0")}
+              </span>
+            </span>
+          </SheetPreviewShell>
         </span>
       ) : null}
       {props.status === "invalid" && props.representation.ghost ? (
@@ -384,9 +375,92 @@ export function SheetBarReorderOverlay(
   );
 }
 
-function dragImageOffset(pointerOffset: number, extent: number): number {
-  if (!Number.isFinite(pointerOffset) || !Number.isFinite(extent)) return 0;
-  return Math.round(Math.min(Math.max(pointerOffset, 0), Math.max(extent, 0)));
+interface GhostAnchor {
+  readonly height: number;
+  readonly offsetX: number;
+  readonly overlayLeft: number;
+  readonly top: number;
+  readonly width: number;
+}
+
+function ghostStyle(
+  pointer: ReturnType<typeof useSheetPointerReorder>["pointer"],
+  anchor: GhostAnchor | null,
+  fallback: { height: number; left: number; top: number; width: number },
+): CSSProperties {
+  if (!pointer || !anchor) {
+    return {
+      height: `${fallback.height}px`,
+      left: `${fallback.left}px`,
+      top: `${fallback.top}px`,
+      width: `${fallback.width}px`,
+    };
+  }
+  return {
+    height: `${anchor.height}px`,
+    left: `${pointer.clientX - anchor.overlayLeft - anchor.offsetX}px`,
+    top: `${anchor.top}px`,
+    width: `${anchor.width}px`,
+  };
+}
+
+function resolveHorizontalTarget(
+  entries: readonly { readonly left: number; readonly width: number }[],
+  scale: number,
+  viewportOffsetX: number,
+  overlayLeft: number,
+  clientX: number,
+): number | null {
+  if (entries.length === 0) return null;
+  const localX = clientX - overlayLeft;
+  let nearestIndex = 0;
+  let nearestDistance = Number.POSITIVE_INFINITY;
+  entries.forEach((entry, index) => {
+    const left = entry.left * scale + viewportOffsetX;
+    const right = left + entry.width * scale;
+    if (localX >= left && localX <= right) {
+      nearestIndex = index;
+      nearestDistance = 0;
+      return;
+    }
+    const distance = Math.min(Math.abs(localX - left), Math.abs(localX - right));
+    if (distance < nearestDistance) {
+      nearestIndex = index;
+      nearestDistance = distance;
+    }
+  });
+  return nearestIndex;
+}
+
+function resolveHorizontalSlotAtPoint(
+  entries: readonly { readonly left: number; readonly width: number }[],
+  scale: number,
+  viewportOffsetX: number,
+  overlayLeft: number,
+  clientX: number,
+): number | null {
+  const localX = clientX - overlayLeft;
+  const index = entries.findIndex((entry) => {
+    const left = entry.left * scale + viewportOffsetX;
+    const right = left + entry.width * scale;
+    return localX >= left && localX <= right;
+  });
+  return index < 0 ? null : index;
+}
+
+function pointInsideRenderedElement(
+  element: HTMLElement | null,
+  position: SheetReorderPointerPosition,
+): boolean {
+  if (!element) return false;
+  const bounds = element.getBoundingClientRect();
+  if (bounds.width === 0 && bounds.height === 0) return true;
+  return (
+    position.clientX >= bounds.left &&
+    position.clientX <= bounds.right &&
+    position.clientY >= bounds.top &&
+    position.clientY <= bounds.bottom
+  );
 }
 
 function visibleSheetBounds(
@@ -403,5 +477,26 @@ function visibleSheetBounds(
   return {
     height: geometry.height * scale,
     top: CANVAS_VERTICAL_MARGIN_PX + geometry.y * scale,
+  };
+}
+
+function sheetPreviewViewport(
+  sheet: ComposedSheet,
+  bleedUm: number | undefined,
+): SheetPreviewViewport {
+  const presentation = createCanvasSheetPresentation(sheet);
+  const activeBounds = createCanvasSheetViewGeometry(
+    sheet,
+    presentation,
+    bleedUm,
+    true,
+  ).activeBounds;
+  return {
+    xUm:
+      (activeBounds.x - presentation.activeOffsetXPx) *
+      CANVAS_MICROMETERS_PER_PIXEL,
+    yUm: activeBounds.y * CANVAS_MICROMETERS_PER_PIXEL,
+    widthUm: activeBounds.width * CANVAS_MICROMETERS_PER_PIXEL,
+    heightUm: activeBounds.height * CANVAS_MICROMETERS_PER_PIXEL,
   };
 }

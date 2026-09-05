@@ -10,6 +10,8 @@ src-tauri/binaries/*.exe
 .scratch/topology-corpus/
 .scratch/ui-acceptance/
 .scratch/productive-journey-evidence/
+.scratch/focused-owned-dialog-evidence/
+.scratch/project-close-evidence/
 benchmark-data/albums/*
 !benchmark-data/albums/README.md
 *.log

@@ -3,6 +3,7 @@ export { AppIcon } from "./AppIcon";
 export { ApplicationHeader } from "./ApplicationHeader";
 export { BrandWordmark } from "./BrandWordmark";
 export { ConfirmationDialog } from "./ConfirmationDialog";
+export { DialogFocusScope } from "./DialogFocusScope";
 export { EmptyState } from "./EmptyState";
 export { FailureNotice } from "./FailureNotice";
 export {

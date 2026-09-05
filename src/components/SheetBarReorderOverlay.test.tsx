@@ -1,70 +1,95 @@
-import {
-  createEvent,
-  fireEvent,
-  render,
-  screen,
-} from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { expect, test, vi } from "vitest";
 
 import type { ComposedSheet } from "../domain/project";
 import { createContinuousCanvasLayout } from "./canvasGeometry";
+import { createNormalCanvasLayout } from "./canvasSheetViewGeometry";
 import { SheetBarReorderOverlay } from "./SheetBarReorderOverlay";
 
 const sheets = [sheet("sheet-1", 1), sheet("sheet-2", 2)];
 const layout = createContinuousCanvasLayout(sheets);
 
-test("aligns enabled reorder handles with the scaled Sheet Bar slots", () => {
-  const { rerender } = render(<SheetBarReorderOverlay {...props()} />);
-
-  const first = screen.getByRole("button", {
-    name: "Reordenar Lâmina 01 pela Barra",
+test("aligns enabled pointer handles with the scaled Sheet Bar slots", () => {
+  const onPreview = vi.fn();
+  const { rerender } = render(
+    <SheetBarReorderOverlay {...props({ onPreview })} />,
+  );
+  const overlay = screen.getByRole("group", {
+    name: "Reordenação pela Barra da Lâmina",
   });
-  const second = screen.getByRole("button", {
-    name: "Reordenar Lâmina 02 pela Barra",
-  });
-  expect(first).toHaveStyle({ left: "88px", top: "28px", width: "37px" });
-  expect(second).toHaveStyle({ left: "234px", top: "28px", width: "37px" });
-  expect(first).toHaveAttribute("draggable", "true");
+  const first = barHandle(1);
+  const second = barHandle(2);
 
-  rerender(<SheetBarReorderOverlay {...props()} disabled />);
-  expect(first).toHaveAttribute("draggable", "false");
+  expect(first).toHaveStyle({ left: "25px", top: "28px", width: "100px" });
+  expect(second).toHaveStyle({ left: "171px", top: "28px", width: "100px" });
+  expect(first).not.toHaveAttribute("draggable");
+  expect(overlay).toHaveAttribute("aria-disabled", "false");
+
+  rerender(<SheetBarReorderOverlay {...props({ onPreview })} disabled />);
+  expect(overlay).toHaveAttribute("aria-disabled", "true");
+  pointerDown(first, 1, 100, 40);
+  pointerMove(first, 1, 240, 40);
+  expect(onPreview).not.toHaveBeenCalled();
 
   rerender(
-    <SheetBarReorderOverlay {...props({ status: "committing" })} />,
-  );
-  expect(first).toHaveAttribute("draggable", "false");
-});
-
-test("keeps reserved swap and layout hit regions outside the Bar reorder handle", () => {
-  const onNavigate = vi.fn();
-  const onPreview = vi.fn();
-  render(
     <SheetBarReorderOverlay
-      {...props({ onNavigate, onPreview })}
+      {...props({ onPreview, status: "committing" })}
     />,
   );
-  const first = screen.getByRole("button", {
-    name: "Reordenar Lâmina 01 pela Barra",
-  });
+  expect(overlay).toHaveAttribute("aria-disabled", "true");
+});
+
+test.each([
+  ["left page", 50],
+  ["right page", 100],
+] as const)(
+  "starts pointer reordering from the %s of the visible Sheet Bar",
+  (_side, startX) => {
+    const onCancel = vi.fn();
+    const onPreview = vi.fn();
+    const view = render(
+      <SheetBarReorderOverlay
+        {...props({ onCancel, onPreview })}
+      />,
+    );
+    setOverlayBounds();
+    const surface = barSurface();
+    const handle = barHandle(1);
+    pointerCapture(surface);
+
+    expectPointerCoordinateInsideHandle(handle, startX, 40);
+    pointerDown(handle, 70 + startX, startX, 40);
+    pointerMove(surface, 70 + startX, 240, 40);
+
+    expect(onPreview).toHaveBeenLastCalledWith("sheet-1", 1);
+    fireEvent.pointerCancel(surface, { pointerId: 70 + startX });
+    expect(onCancel).toHaveBeenCalledOnce();
+    view.unmount();
+  },
+);
+
+test("ignores pointer gestures outside every rendered Sheet Bar handle", () => {
+  const onSelect = vi.fn();
+  const onPreview = vi.fn();
+  render(
+    <SheetBarReorderOverlay {...props({ onSelect, onPreview })} />,
+  );
   const reservedSurface = screen.getByTestId(
     "sheet-reorder-bar-drop-zone",
   );
 
-  expect(first).toHaveStyle({ left: "88px", width: "37px" });
-  fireEvent.dragStart(reservedSurface, {
-    dataTransfer: { effectAllowed: "none", setData: vi.fn() },
+  fireEvent.pointerDown(reservedSurface, { button: 0, pointerId: 1 });
+  fireEvent.pointerMove(reservedSurface, {
+    clientX: 240,
+    pointerId: 1,
   });
   fireEvent.click(reservedSurface);
   expect(onPreview).not.toHaveBeenCalled();
-  expect(onNavigate).not.toHaveBeenCalled();
+  expect(onSelect).not.toHaveBeenCalled();
 
-  fireEvent.dragStart(first, {
-    dataTransfer: { effectAllowed: "none", setData: vi.fn() },
-  });
-  fireEvent.click(first);
-  expect(onPreview).toHaveBeenCalledWith("sheet-1", 0);
-  expect(onNavigate).toHaveBeenCalledWith("sheet-1");
+  fireEvent.click(barHandle(1));
+  expect(onSelect).toHaveBeenCalledWith("sheet-1");
 });
 
 test("moves neighboring handles and renders only the declared preview markers", () => {
@@ -85,17 +110,10 @@ test("moves neighboring handles and renders only the declared preview markers", 
     />,
   );
 
-  const movedNeighbor = screen.getByRole("button", {
-    name: "Reordenar Lâmina 01 pela Barra",
-  });
-  const dragged = screen.getByRole("button", {
-    name: "Reordenar Lâmina 02 pela Barra",
-  });
-  expect(movedNeighbor).toHaveStyle({ left: "234px" });
-  expect(movedNeighbor).toHaveAttribute("data-reorder-shift", "true");
-  expect(dragged).toHaveStyle({ left: "88px" });
-  expect(dragged).toHaveAttribute("data-reorder-ghost", "true");
-
+  expect(barHandle(1)).toHaveStyle({ left: "171px" });
+  expect(barHandle(1)).toHaveAttribute("data-reorder-shift", "true");
+  expect(barHandle(2)).toHaveStyle({ left: "25px" });
+  expect(barHandle(2)).toHaveAttribute("data-reorder-ghost", "true");
   expect(screen.getByTestId("reorder-placeholder")).toHaveStyle({
     height: "50px",
     left: "171px",
@@ -108,7 +126,6 @@ test("moves neighboring handles and renders only the declared preview markers", 
     top: "28px",
     width: "100px",
   });
-  expect(screen.getByTestId("reorder-ghost")).toHaveTextContent("02");
 
   rerender(
     <SheetBarReorderOverlay
@@ -128,6 +145,110 @@ test("moves neighboring handles and renders only the declared preview markers", 
   expect(screen.queryByTestId("reorder-placeholder")).not.toBeInTheDocument();
 });
 
+test("renders the exact double and single-page Sheet visual inside the Bar ghost", () => {
+  const doubleSheet = {
+    ...sheet("sheet-double", 3),
+    base: {
+      rgb: "#F2E4C8",
+      drawRect: { x: 0, y: 0, width: 200_000, height: 100_000 },
+    },
+    backgrounds: [
+      {
+        kind: "color" as const,
+        rgb: "#C9D8EC",
+        drawRect: { x: 0, y: 0, width: 200_000, height: 100_000 },
+      },
+    ],
+  } satisfies ComposedSheet;
+  const singleSheet = {
+    ...sheet("sheet-single", 4),
+    activeSides: "right" as const,
+    widthUm: 100_000,
+    base: {
+      rgb: "#E8D7CE",
+      drawRect: { x: 0, y: 0, width: 100_000, height: 100_000 },
+    },
+  } satisfies ComposedSheet;
+  const visualSheets = [doubleSheet, singleSheet];
+  const visualLayout = createContinuousCanvasLayout(visualSheets);
+  const visualMetadata = [
+    {
+      layoutLocked: false,
+      pageNumbers: [5, 6],
+      sheetId: doubleSheet.sheetId,
+    },
+    {
+      layoutLocked: false,
+      pageNumbers: [7],
+      sheetId: singleSheet.sheetId,
+    },
+  ];
+  const view = render(
+    <SheetBarReorderOverlay
+      {...props({
+        focusedSheetId: doubleSheet.sheetId,
+        layout: visualLayout,
+        representation: {
+          ghost: { sheetId: doubleSheet.sheetId },
+          order: visualSheets.map((item) => item.sheetId),
+          placeholderIndex: 1,
+        },
+        sheetBarMetadata: visualMetadata,
+        sheets: visualSheets,
+        status: "preview",
+      })}
+    />,
+  );
+
+  let ghost = screen.getByTestId("reorder-ghost");
+  let preview = ghost.querySelector(".sheet-preview");
+  expect(ghost).toHaveAttribute("data-active-sides", "both");
+  expect(ghost).toHaveAttribute("data-origin-selected", "true");
+  expect(preview).not.toBeNull();
+  expect(preview).toHaveAttribute("viewBox", "0 0 200000 100000");
+  expect(
+    preview?.querySelector('[data-preview-background-color="#C9D8EC"]'),
+  ).not.toBeNull();
+  expect(preview?.querySelector("line")).not.toBeNull();
+  expect(ghost.querySelector('[data-page-side="left"]')).toHaveTextContent(
+    "5",
+  );
+  expect(ghost.querySelector('[data-page-side="right"]')).toHaveTextContent(
+    "6",
+  );
+
+  view.rerender(
+    <SheetBarReorderOverlay
+      {...props({
+        focusedSheetId: doubleSheet.sheetId,
+        layout: visualLayout,
+        representation: {
+          ghost: { sheetId: singleSheet.sheetId },
+          order: visualSheets.map((item) => item.sheetId),
+          placeholderIndex: 0,
+        },
+        sheetBarMetadata: visualMetadata,
+        sheets: visualSheets,
+        status: "preview",
+      })}
+    />,
+  );
+  ghost = screen.getByTestId("reorder-ghost");
+  preview = ghost.querySelector(".sheet-preview");
+  expect(ghost).toHaveAttribute("data-active-sides", "right");
+  expect(ghost).not.toHaveAttribute("data-origin-selected");
+  expect(preview).toHaveAttribute("viewBox", "0 0 100000 100000");
+  expect(preview?.querySelector("line")).toBeNull();
+  expect(ghost.querySelector('[data-page-side="right"]')).toHaveTextContent(
+    "7",
+  );
+  expect(
+    ghost
+      .querySelector<HTMLElement>(".sheet-preview-shell")
+      ?.style.getPropertyValue("--sheet-inactive-side-gradient"),
+  ).toContain("linear-gradient");
+});
+
 test("matches full-size markers to the bleed-cropped visible Sheet bounds", () => {
   render(
     <SheetBarReorderOverlay
@@ -143,11 +264,7 @@ test("matches full-size markers to the bleed-cropped visible Sheet bounds", () =
     />,
   );
 
-  expect(
-    screen.getByRole("button", {
-      name: "Reordenar Lâmina 01 pela Barra",
-    }),
-  ).toHaveStyle({ top: "29.5px" });
+  expect(barHandle(1)).toHaveStyle({ top: "29.5px" });
   expect(screen.getByTestId("reorder-placeholder")).toHaveStyle({
     height: "47px",
     top: "29.5px",
@@ -156,279 +273,405 @@ test("matches full-size markers to the bleed-cropped visible Sheet bounds", () =
     height: "47px",
     top: "29.5px",
   });
+  expect(
+    screen.getByTestId("reorder-ghost").querySelector(".sheet-preview"),
+  ).toHaveAttribute("viewBox", "3000 3000 194000 94000");
 });
 
-test("routes native drag, drop, end, and context gestures through the Bar seam", () => {
-  const onPreview = vi.fn();
-  const onDrop = vi.fn();
-  const onCancel = vi.fn();
+test.each([
+  ["left", "3000 3000 97000 94000"],
+  ["right", "0 3000 97000 94000"],
+] as const)(
+  "preserves the side-specific Sangria crop for a %s single Page ghost",
+  (activeSides, expectedViewBox) => {
+    const singleSheet = {
+      ...sheet(`sheet-${activeSides}`, 1),
+      activeSides,
+      widthUm: 100_000,
+      base: {
+        rgb: "#FFFFFF",
+        drawRect: { x: 0, y: 0, width: 100_000, height: 100_000 },
+      },
+    } satisfies ComposedSheet;
+    render(
+      <SheetBarReorderOverlay
+        {...props({
+          bleedUm: 3_000,
+          layout: createNormalCanvasLayout([singleSheet], 3_000),
+          representation: {
+            ghost: { sheetId: singleSheet.sheetId },
+            order: [singleSheet.sheetId],
+            placeholderIndex: 0,
+          },
+          sheets: [singleSheet],
+          status: "preview",
+        })}
+      />,
+    );
+
+    expect(
+      screen.getByTestId("reorder-ghost").querySelector(".sheet-preview"),
+    ).toHaveAttribute("viewBox", expectedViewBox);
+  },
+);
+
+test("keeps selection, edit, and context gestures distinct from reorder", () => {
   const onContextMenu = vi.fn();
-  const onNavigate = vi.fn();
+  const onEditSheet = vi.fn();
+  const onSelect = vi.fn();
+  const onPreview = vi.fn();
   render(
     <SheetBarReorderOverlay
-      {...props({
-        onCancel,
-        onContextMenu,
-        onDrop,
-        onNavigate,
-        onPreview,
-      })}
+      {...props({ onContextMenu, onEditSheet, onPreview, onSelect })}
     />,
   );
-  const first = screen.getByRole("button", {
-    name: "Reordenar Lâmina 01 pela Barra",
-  });
-  const second = screen.getByRole("button", {
-    name: "Reordenar Lâmina 02 pela Barra",
-  });
-  const dataTransfer = {
-    dropEffect: "none",
-    effectAllowed: "none",
-    setData: vi.fn(),
-  };
 
-  fireEvent.dragStart(first, { dataTransfer });
-  expect(dataTransfer.effectAllowed).toBe("move");
-  expect(dataTransfer.setData).toHaveBeenCalledWith("text/plain", "sheet-1");
-  expect(onPreview).toHaveBeenLastCalledWith("sheet-1", 0);
-
-  fireEvent.dragEnter(second, { dataTransfer });
-  expect(onPreview).toHaveBeenLastCalledWith("sheet-1", 1);
-
-  fireEvent.drop(
-    screen.getByTestId("sheet-reorder-bar-drop-zone"),
-    { dataTransfer },
-  );
-  expect(onDrop).toHaveBeenCalledOnce();
-
-  fireEvent.dragEnd(first, { dataTransfer });
-  expect(onCancel).not.toHaveBeenCalled();
-
-  fireEvent.dragStart(first, { dataTransfer });
-  fireEvent.dragEnd(first, { dataTransfer });
-  expect(onCancel).toHaveBeenCalledOnce();
-
-  fireEvent.contextMenu(second, { clientX: 80, clientY: 120 });
+  fireEvent.contextMenu(barHandle(2), { clientX: 80, clientY: 120 });
   expect(onContextMenu).toHaveBeenCalledWith("sheet-2", { x: 80, y: 120 });
-  fireEvent.click(second);
-  expect(onNavigate).toHaveBeenCalledWith("sheet-2");
+  fireEvent.click(barHandle(2));
+  expect(onSelect).toHaveBeenCalledWith("sheet-2");
+  fireEvent.doubleClick(barHandle(2), { clientX: 220, clientY: 40 });
+  expect(onEditSheet).toHaveBeenCalledWith("sheet-2");
+  fireEvent.doubleClick(barSurface(), { clientX: 150, clientY: 40 });
+  expect(onEditSheet).toHaveBeenCalledOnce();
+  expect(onPreview).not.toHaveBeenCalled();
 });
 
-test("anchors a visible custom native drag image to the pointer", () => {
-  vi.useFakeTimers();
-  try {
-    render(<SheetBarReorderOverlay {...props()} />);
-    const first = screen.getByRole("button", {
-      name: "Reordenar Lâmina 01 pela Barra",
-    });
-    const overlay = screen.getByRole("group", {
-      name: "Reordenação pela Barra da Lâmina",
-    });
-    vi.spyOn(overlay, "getBoundingClientRect").mockReturnValue({
-      bottom: 560,
-      height: 500,
-      left: 10,
-      right: 650,
-      top: 60,
-      width: 640,
-      x: 10,
-      y: 60,
-      toJSON: () => ({}),
-    });
-    vi.spyOn(first, "getBoundingClientRect").mockReturnValue({
-      bottom: 68,
-      height: 40,
-      left: 20,
-      right: 120,
-      top: 28,
-      width: 100,
-      x: 20,
-      y: 28,
-      toJSON: () => ({}),
-    });
-    const setDragImage = vi.fn();
-    const dataTransfer = {
-      dropEffect: "none",
-      effectAllowed: "none",
-      setData: vi.fn(),
-      setDragImage,
-    };
+test("captures the pointer after press, crosses the threshold, and follows it in both directions", () => {
+  const onDrop = vi.fn();
+  const onSelect = vi.fn();
+  const onPreview = vi.fn();
+  render(
+    <SheetBarReorderOverlay
+      {...props({ onDrop, onPreview, onSelect })}
+    />,
+  );
+  setOverlayBounds();
+  const surface = barSurface();
+  const first = barHandle(1);
+  const second = barHandle(2);
+  const capture = pointerCapture(surface);
 
-    dragStartAt(first, 70, 108, dataTransfer);
+  pointerDown(first, 17, 100, 40);
+  expect(capture.set).toHaveBeenCalledWith(17);
+  pointerMove(surface, 17, 103, 40);
+  expect(onPreview).not.toHaveBeenCalled();
+  expect(screen.queryByTestId("reorder-ghost")).not.toBeInTheDocument();
 
-    expect(setDragImage).toHaveBeenCalledOnce();
-    const [dragImage, offsetX, offsetY] = setDragImage.mock.calls[0] as [
-      HTMLElement,
-      number,
-      number,
-    ];
-    expect(document.body).toContainElement(dragImage);
-    expect(dragImage).toHaveClass(
-      "sheet-bar-reorder-overlay__native-drag-image",
+  pointerMove(surface, 17, 240, 40);
+  expect(onPreview).toHaveBeenLastCalledWith("sheet-1", 1);
+  expect(screen.getByTestId("reorder-ghost")).toHaveStyle({
+    left: "165px",
+    top: "28px",
+  });
+  expect(screen.getByTestId("reorder-ghost")).toHaveAttribute(
+    "data-pointer-x",
+    "240",
+  );
+  pointerMove(surface, 17, 260, 90);
+  expect(screen.getByTestId("reorder-ghost")).toHaveStyle({
+    left: "185px",
+    top: "28px",
+  });
+  expect(screen.getByTestId("reorder-ghost")).toHaveAttribute(
+    "data-pointer-y",
+    "90",
+  );
+  pointerUp(surface, 17, 260, 90);
+  expect(capture.release).toHaveBeenCalledWith(17);
+  expect(onDrop).toHaveBeenCalledOnce();
+  fireEvent.click(first);
+  expect(onSelect).not.toHaveBeenCalled();
+
+  pointerDown(second, 18, 240, 40);
+  pointerMove(surface, 18, 50, 40);
+  expect(onPreview).toHaveBeenLastCalledWith("sheet-2", 0);
+  pointerUp(surface, 18, 50, 40);
+  expect(capture.release).toHaveBeenCalledWith(18);
+  expect(onDrop).toHaveBeenCalledTimes(2);
+});
+
+test("keeps a below-threshold press as an ordinary Sheet click", () => {
+  const onDrop = vi.fn();
+  const onSelect = vi.fn();
+  const onPreview = vi.fn();
+  render(
+    <SheetBarReorderOverlay
+      {...props({ onDrop, onPreview, onSelect })}
+    />,
+  );
+  const surface = barSurface();
+  const first = barHandle(1);
+  pointerCapture(surface);
+  pointerDown(first, 9, 100, 40);
+  pointerMove(surface, 9, 103, 40);
+  pointerUp(surface, 9, 103, 40);
+  expect(onSelect).toHaveBeenCalledWith("sheet-1");
+  fireEvent.click(first);
+
+  expect(onSelect).toHaveBeenCalledOnce();
+  expect(onPreview).not.toHaveBeenCalled();
+  expect(onDrop).not.toHaveBeenCalled();
+});
+
+test.each([
+  ["left page", 50],
+  ["right page", 100],
+] as const)(
+  "selects without reordering from a below-threshold press on the %s",
+  (_side, startX) => {
+    const onDrop = vi.fn();
+    const onPreview = vi.fn();
+    const onSelect = vi.fn();
+    render(
+      <SheetBarReorderOverlay
+        {...props({ onDrop, onPreview, onSelect })}
+      />,
     );
-    expect(dragImage).toHaveTextContent("L01");
-    expect(dragImage).toHaveStyle({
-      height: "50px",
-      left: "35px",
-      top: "88px",
-      width: "100px",
-    });
-    expect([offsetX, offsetY]).toEqual([35, 20]);
-    vi.runOnlyPendingTimers();
-    expect(document.body).not.toContainElement(dragImage);
-  } finally {
-    vi.useRealTimers();
-  }
-});
+    setOverlayBounds();
+    const surface = barSurface();
+    const handle = barHandle(1);
+    pointerCapture(surface);
+    expectPointerCoordinateInsideHandle(handle, startX, 40);
 
-test("falls back to a visible source when the custom drag image is rejected", () => {
+    pointerDown(handle, 180 + startX, startX, 40);
+    pointerMove(surface, 180 + startX, startX + 2, 40);
+    pointerUp(surface, 180 + startX, startX + 2, 40);
+
+    expect(onSelect).toHaveBeenCalledOnce();
+    expect(onSelect).toHaveBeenCalledWith("sheet-1");
+    expect(onPreview).not.toHaveBeenCalled();
+    expect(onDrop).not.toHaveBeenCalled();
+  },
+);
+
+test("expires synthetic click suppression before a later deliberate click", () => {
   vi.useFakeTimers();
+  const onSelect = vi.fn();
+  const view = render(
+    <SheetBarReorderOverlay {...props({ onSelect })} />,
+  );
   try {
-    render(<SheetBarReorderOverlay {...props()} />);
-    const first = screen.getByRole("button", {
-      name: "Reordenar Lâmina 01 pela Barra",
-    });
-    vi.spyOn(first, "getBoundingClientRect").mockReturnValue({
-      bottom: 68,
-      height: 40,
-      left: 20,
-      right: 120,
-      top: 28,
-      width: 100,
-      x: 20,
-      y: 28,
-      toJSON: () => ({}),
-    });
-    const dataTransfer = {
-      dropEffect: "none",
-      effectAllowed: "none",
-      setData: vi.fn(),
-      setDragImage: vi.fn(() => {
-        throw new Error("drag image unavailable");
-      }),
-    };
-
-    expect(() => dragStartAt(first, 70, 48, dataTransfer)).not.toThrow();
-    expect(first).toHaveAttribute("data-native-drag-fallback", "true");
-    expect(first).toHaveTextContent("L01");
-    expect(
-      document.querySelector(
-        ".sheet-bar-reorder-overlay__native-drag-image",
-      ),
-    ).not.toBeInTheDocument();
+    const surface = barSurface();
+    const first = barHandle(1);
+    pointerCapture(surface);
+    pointerDown(first, 19, 100, 40);
+    pointerUp(surface, 19, 100, 40);
+    expect(onSelect).toHaveBeenCalledOnce();
 
     vi.runOnlyPendingTimers();
-    expect(first).not.toHaveAttribute("data-native-drag-fallback");
+    fireEvent.click(first);
+    expect(onSelect).toHaveBeenCalledTimes(2);
   } finally {
+    view.unmount();
     vi.useRealTimers();
   }
 });
 
-test("reports progressive horizontal automatic scrolling at the Canvas edges", () => {
+test.each(["Escape", "pointercancel", "outside release"] as const)(
+  "cancels an active Bar pointer reorder once on %s",
+  (termination) => {
+    const onAutoScrollVelocity = vi.fn();
+    const onCancel = vi.fn();
+    const onDrop = vi.fn();
+    render(
+      <SheetBarReorderOverlay
+        {...props({ onAutoScrollVelocity, onCancel, onDrop })}
+      />,
+    );
+    setOverlayBounds();
+    const surface = barSurface();
+    const first = barHandle(1);
+    pointerCapture(surface);
+    pointerDown(first, 31, 100, 40);
+    pointerMove(surface, 31, 240, 40);
+
+    if (termination === "Escape") {
+      fireEvent.keyDown(window, { key: "Escape" });
+    } else if (termination === "pointercancel") {
+      fireEvent.pointerCancel(surface, { pointerId: 31 });
+    } else {
+      pointerUp(surface, 31, 700, 40);
+    }
+
+    expect(onCancel).toHaveBeenCalledOnce();
+    expect(onDrop).not.toHaveBeenCalled();
+    expect(onAutoScrollVelocity).toHaveBeenLastCalledWith(0);
+    expect(screen.queryByTestId("reorder-ghost")).not.toBeInTheDocument();
+  },
+);
+
+test("reports progressive horizontal auto-scroll from captured pointer coordinates", () => {
   const onAutoScrollVelocity = vi.fn();
   render(
     <SheetBarReorderOverlay
       {...props({ onAutoScrollVelocity })}
     />,
   );
-  const overlay = screen.getByRole("group", {
-    name: "Reordenação pela Barra da Lâmina",
-  });
-  vi.spyOn(overlay, "getBoundingClientRect").mockReturnValue({
-    bottom: 200,
-    height: 200,
-    left: 0,
-    right: 640,
-    top: 0,
-    width: 640,
-    x: 0,
-    y: 0,
-    toJSON: () => ({}),
-  });
-  const first = screen.getByRole("button", {
-    name: "Reordenar Lâmina 01 pela Barra",
-  });
-  const dropZone = screen.getByTestId("sheet-reorder-bar-drop-zone");
-  const dataTransfer = {
-    dropEffect: "none",
-    effectAllowed: "none",
-    setData: vi.fn(),
-  };
-  fireEvent.dragStart(first, { dataTransfer });
+  setOverlayBounds();
+  const surface = barSurface();
+  const first = barHandle(1);
+  pointerCapture(surface);
+  pointerDown(first, 41, 100, 40);
 
-  dragOverAt(dropZone, 36, dataTransfer);
+  pointerMove(surface, 41, 36, 40);
   expect(onAutoScrollVelocity).toHaveBeenLastCalledWith(-240);
-
-  dragOverAt(dropZone, 320, dataTransfer);
+  pointerMove(surface, 41, 320, 40);
   expect(onAutoScrollVelocity).toHaveBeenLastCalledWith(0);
-
-  dragOverAt(dropZone, 800, dataTransfer);
+  pointerMove(surface, 41, 800, 40);
   expect(onAutoScrollVelocity).toHaveBeenLastCalledWith(960);
-
-  fireEvent.dragEnd(first, { dataTransfer });
+  fireEvent.pointerCancel(surface, { pointerId: 41 });
   expect(onAutoScrollVelocity).toHaveBeenLastCalledWith(0);
 });
 
-test("cancels an active Bar drag once when Escape ends the native gesture", () => {
-  const onCancel = vi.fn();
+test("refreshes the Bar destination while viewport auto-scroll advances", () => {
+  const onPreview = vi.fn();
+  const view = render(
+    <SheetBarReorderOverlay {...props({ onPreview })} />,
+  );
+  setOverlayBounds();
+  const surface = barSurface();
+  const first = barHandle(1);
+  pointerCapture(surface);
+  pointerDown(first, 43, 100, 40);
+  pointerMove(surface, 43, 240, 40);
+  expect(onPreview).toHaveBeenLastCalledWith("sheet-1", 1);
+
+  onPreview.mockClear();
+  view.rerender(
+    <SheetBarReorderOverlay
+      {...props({ onPreview, viewport: { offsetX: 200 } })}
+    />,
+  );
+  expect(onPreview).toHaveBeenLastCalledWith("sheet-1", 0);
+});
+
+test("cancels and releases an active Bar reorder when its surface unmounts", () => {
   const onAutoScrollVelocity = vi.fn();
-  render(
+  const onCancel = vi.fn();
+  const view = render(
     <SheetBarReorderOverlay
       {...props({ onAutoScrollVelocity, onCancel })}
     />,
   );
-  const first = screen.getByRole("button", {
-    name: "Reordenar Lâmina 01 pela Barra",
-  });
-  const dataTransfer = {
-    dropEffect: "none",
-    effectAllowed: "none",
-    setData: vi.fn(),
-  };
+  setOverlayBounds();
+  const surface = barSurface();
+  const capture = pointerCapture(surface);
+  pointerDown(barHandle(1), 45, 100, 40);
+  pointerMove(surface, 45, 240, 40);
 
-  fireEvent.keyDown(window, { key: "Escape" });
-  expect(onCancel).not.toHaveBeenCalled();
+  view.unmount();
 
-  fireEvent.dragStart(first, { dataTransfer });
-  fireEvent.keyDown(window, { key: "Escape" });
-  expect(onCancel).toHaveBeenCalledOnce();
+  expect(capture.release).toHaveBeenCalledWith(45);
   expect(onAutoScrollVelocity).toHaveBeenLastCalledWith(0);
-
-  fireEvent.dragEnd(first, { dataTransfer });
   expect(onCancel).toHaveBeenCalledOnce();
 });
 
-function dragOverAt(
-  target: HTMLElement,
-  clientX: number,
-  dataTransfer: {
-    dropEffect: string;
-    effectAllowed: string;
-    setData: ReturnType<typeof vi.fn>;
-  },
-) {
-  const event = createEvent.dragOver(target, { dataTransfer });
-  Object.defineProperty(event, "clientX", { value: clientX });
-  fireEvent(target, event);
+function barHandle(number: number): HTMLButtonElement {
+  return screen.getByRole("button", {
+    name: `Reordenar Lâmina ${String(number).padStart(2, "0")} pela Barra`,
+  });
 }
 
-function dragStartAt(
-  target: HTMLElement,
+function barSurface(): HTMLElement {
+  return screen.getByRole("group", {
+    name: "Reordenação pela Barra da Lâmina",
+  });
+}
+
+function expectPointerCoordinateInsideHandle(
+  handle: HTMLElement,
   clientX: number,
   clientY: number,
-  dataTransfer: {
-    dropEffect: string;
-    effectAllowed: string;
-    setData: ReturnType<typeof vi.fn>;
-    setDragImage: ReturnType<typeof vi.fn>;
-  },
 ) {
-  const event = createEvent.dragStart(target, { dataTransfer });
-  Object.defineProperties(event, {
-    clientX: { value: clientX },
-    clientY: { value: clientY },
+  const left = Number.parseFloat(handle.style.left);
+  const top = Number.parseFloat(handle.style.top);
+  const width = Number.parseFloat(handle.style.width);
+  const height = Number.parseFloat(handle.style.height);
+  expect(clientX).toBeGreaterThanOrEqual(left);
+  expect(clientX).toBeLessThanOrEqual(left + width);
+  expect(clientY).toBeGreaterThanOrEqual(top);
+  expect(clientY).toBeLessThanOrEqual(top + height);
+}
+
+function pointerCapture(element: HTMLElement) {
+  const set = vi.fn();
+  const release = vi.fn();
+  Object.defineProperties(element, {
+    releasePointerCapture: { configurable: true, value: release },
+    setPointerCapture: { configurable: true, value: set },
   });
-  fireEvent(target, event);
+  return { release, set };
+}
+
+function pointerDown(
+  target: HTMLElement,
+  pointerId: number,
+  clientX: number,
+  clientY: number,
+) {
+  fireEvent.pointerDown(target, {
+    button: 0,
+    buttons: 1,
+    clientX,
+    clientY,
+    pointerId,
+    pointerType: "mouse",
+  });
+}
+
+function pointerMove(
+  target: HTMLElement,
+  pointerId: number,
+  clientX: number,
+  clientY: number,
+) {
+  fireEvent.pointerMove(target, {
+    buttons: 1,
+    clientX,
+    clientY,
+    pointerId,
+    pointerType: "mouse",
+  });
+}
+
+function pointerUp(
+  target: HTMLElement,
+  pointerId: number,
+  clientX: number,
+  clientY: number,
+) {
+  fireEvent.pointerUp(target, {
+    button: 0,
+    buttons: 0,
+    clientX,
+    clientY,
+    pointerId,
+    pointerType: "mouse",
+  });
+}
+
+function setOverlayBounds() {
+  vi.spyOn(
+    screen.getByRole("group", {
+      name: "Reordenação pela Barra da Lâmina",
+    }),
+    "getBoundingClientRect",
+  ).mockReturnValue(rect(0, 0, 640, 200));
+}
+
+function rect(left: number, top: number, right: number, bottom: number): DOMRect {
+  return {
+    bottom,
+    height: bottom - top,
+    left,
+    right,
+    top,
+    width: right - left,
+    x: left,
+    y: top,
+    toJSON: () => ({}),
+  };
 }
 
 function props(
@@ -442,7 +685,8 @@ function props(
     onCancel: vi.fn(),
     onContextMenu: vi.fn(),
     onDrop: vi.fn(),
-    onNavigate: vi.fn(),
+    onEditSheet: vi.fn(),
+    onSelect: vi.fn(),
     onPreview: vi.fn(),
     representation: {
       ghost: null,

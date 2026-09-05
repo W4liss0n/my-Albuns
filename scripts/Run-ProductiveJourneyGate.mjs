@@ -15,7 +15,6 @@ import {
   aliveProcessInstances,
   assertNoPreexistingProcessInstances,
   powershellJson,
-  processInstancesByExecutable,
   sameProcessInstance,
   terminateProcessInstance,
   waitForProcessInstance,
@@ -31,14 +30,32 @@ import {
   eventCount,
 } from "./ProductiveJourneyObservations.mjs";
 import {
-  createWebDriverClient,
+  attachWebView2Driver,
   disposeConfirmedWebDriver,
-  findFreeTcpPort,
   findFreeTcpPortInRange,
+  switchToWebDriverWindow,
 } from "./GateWebDriver.mjs";
+import {
+  nativeOwnedWindowState,
+  nativeWindowTitle,
+} from "./NativeWindowObservation.mjs";
+import {
+  buildCapturedPointerGestureActions,
+  measureVisiblePointerGeometryScript,
+  scrollIntoPointerViewportScript,
+} from "./WebDriverPointerGestures.mjs";
+import {
+  createNativeGateRuntime,
+  delay,
+  readProjectInteractionState,
+} from "./NativeGateRuntime.mjs";
 
-const [workspaceArgument, scratchArgument, applicationArgument, driverArgument] =
-  process.argv.slice(2);
+const [
+  workspaceArgument,
+  scratchArgument,
+  applicationArgument,
+  driverArgument,
+] = process.argv.slice(2);
 if (
   !workspaceArgument ||
   !scratchArgument ||
@@ -61,6 +78,14 @@ const { purgeOwnedCache, summarizeOwnedCache } = createOwnedCacheGuard({
 });
 const projectPath = path.join(scratch, "Jornada produtiva.myalbuns");
 const saveAsPath = path.join(scratch, "Jornada produtiva - Cópia.myalbuns");
+const externalCopyPath = path.join(
+  scratch,
+  "Jornada produtiva - Cópia externa somente leitura.myalbuns",
+);
+const externalSavedCopyPath = path.join(
+  scratch,
+  "Jornada produtiva - Cópia externa editável.myalbuns",
+);
 const exportPath = path.join(scratch, "Jornada produtiva_002.jpg");
 const missingOriginalExportPath = path.join(
   scratch,
@@ -90,6 +115,26 @@ const webDriverSessionTimeoutMilliseconds = Math.min(
   60_000,
 );
 const driverTerminationTimeoutMilliseconds = 30_000;
+const {
+  applicationProcesses,
+  collectChildOutput,
+  driveNativeDialog,
+  httpAvailable,
+  logRecords,
+  logText,
+  recordsFor,
+  waitFor,
+  waitForExit,
+  waitForLogEvent,
+  waitForNewApplication,
+} = createNativeGateRuntime({
+  applicationPath,
+  defaultTimeoutMilliseconds: 30_000,
+  nativeDialogDriver,
+  operationTimeoutMilliseconds: timeoutMilliseconds,
+  processDataRoot,
+  workspace,
+});
 
 for (const [label, candidate] of [
   ["workspace", workspace],
@@ -109,6 +154,8 @@ for (const knownFolder of ["Roaming", "Local", "Temporary"]) {
 if (
   existsSync(projectPath) ||
   existsSync(saveAsPath) ||
+  existsSync(externalCopyPath) ||
+  existsSync(externalSavedCopyPath) ||
   existsSync(exportPath) ||
   existsSync(missingOriginalExportPath) ||
   existsSync(photoPath)
@@ -117,9 +164,6 @@ if (
 }
 copyFileSync(photoFixturePath, photoPath);
 const originalPhoto = readFileSync(photoPath);
-
-const delay = (milliseconds) =>
-  new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 async function waitForHttp(url, label, timeout = 30_000) {
   const deadline = Date.now() + timeout;
@@ -136,9 +180,62 @@ async function waitForHttp(url, label, timeout = 30_000) {
     }
     await delay(50);
   }
-  throw new Error(`${label} did not become ready: ${lastError ?? "unknown error"}`, {
-    cause: lastError,
-  });
+  throw new Error(
+    `${label} did not become ready: ${lastError ?? "unknown error"}`,
+    {
+      cause: lastError,
+    },
+  );
+}
+
+async function devToolsTargets(debugPort, label) {
+  await waitForHttp(
+    `http://127.0.0.1:${debugPort}/json/list`,
+    `${label} DevTools targets`,
+  );
+  const response = await fetch(`http://127.0.0.1:${debugPort}/json/list`);
+  return response.json();
+}
+
+async function waitForProjectDialogStateTarget(
+  debugPort,
+  stateKind,
+  label,
+  excludedTargetIds = [],
+) {
+  return waitFor(
+    label,
+    async () => {
+      try {
+        const response = await fetch(
+          `http://127.0.0.1:${debugPort}/json/list`,
+          {
+            signal: AbortSignal.timeout(500),
+          },
+        );
+        if (!response.ok) return undefined;
+        const targets = await response.json();
+        const matches = targets.filter((target) => {
+          try {
+            return (
+              target.type === "page" &&
+              new URL(target.url).pathname.endsWith("/project-dialog.html") &&
+              decodeURIComponent(target.url).includes(
+                `\"kind\":\"${stateKind}\"`,
+              ) &&
+              !excludedTargetIds.includes(target.id)
+            );
+          } catch {
+            return false;
+          }
+        });
+        return matches.length === 1 ? matches[0] : undefined;
+      } catch {
+        return undefined;
+      }
+    },
+    timeoutMilliseconds,
+  );
 }
 
 async function startAttachedWebDriver(
@@ -146,100 +243,19 @@ async function startAttachedWebDriver(
   label,
   projectDialogDebugPort,
 ) {
-  await waitForHttp(
-    `http://127.0.0.1:${debugPort}/json/version`,
-    `${label} DevTools endpoint`,
-  );
-  const driverPort = await findFreeTcpPort();
-  const child = spawn(
+  return attachWebView2Driver({
+    debugPort,
+    driverTerminationTimeoutMilliseconds,
+    driverLogPath: path.join(scratch, `webdriver-${label.replace(/[^a-z0-9]+/gi, "-")}.log`),
+    label,
     nativeDriverPath,
-    [`--port=${driverPort}`, "--host=127.0.0.1"],
-    {
-      cwd: workspace,
-      windowsHide: true,
-      stdio: ["ignore", "pipe", "pipe"],
-    },
-  );
-  let output = "";
-  child.stdout.on("data", (chunk) => {
-    output += chunk.toString();
-  });
-  child.stderr.on("data", (chunk) => {
-    output += chunk.toString();
-  });
-  const instance = await waitForProcessInstance(child.pid, `${label} WebDriver`);
-  const baseUrl = `http://127.0.0.1:${driverPort}`;
-  await waitForHttp(`${baseUrl}/status`, `${label} WebDriver`);
-  const rawRequest = createWebDriverClient(baseUrl);
-  const request = async (method, endpoint, body, timeout) => {
-    try {
-      return await rawRequest(method, endpoint, body, timeout);
-    } catch (error) {
-      throw new Error(
-        `${label} WebDriver ${method} ${endpoint} failed; driverExitCode=${child.exitCode}; output=${output.slice(-1_000)}`,
-        { cause: error },
-      );
-    }
-  };
-  const session = await request("POST", "/session", {
-    capabilities: {
-      alwaysMatch: {
-        browserName: "webview2",
-        pageLoadStrategy: "none",
-        "ms:edgeChromium": true,
-        "ms:edgeOptions": {
-          debuggerAddress: `127.0.0.1:${debugPort}`,
-        },
-      },
-    },
-  }, webDriverSessionTimeoutMilliseconds);
-  if (!session.sessionId) {
-    throw new Error(`${label} WebDriver returned no session id`);
-  }
-  const sessionId = session.sessionId;
-  await request("POST", `/session/${sessionId}/timeouts`, {
-    implicit: 250,
-    pageLoad: 5_000,
-    script: 5_000,
-  });
-  return {
     projectDialogDebugPort,
-    request,
-    sessionId,
-    async dispose() {
-      try {
-        await request("DELETE", `/session/${sessionId}`);
-      } catch {
-        // The WebView can close before the attach-only session is deleted.
-      }
-      terminateProcessInstance(instance);
-      const deadline = Date.now() + driverTerminationTimeoutMilliseconds;
-      while (
-        aliveProcessInstances([instance]).length !== 0 &&
-        Date.now() < deadline
-      ) {
-        await delay(25);
-      }
-      if (aliveProcessInstances([instance]).length !== 0) {
-        throw new Error(`${label} WebDriver did not terminate`);
-      }
-      await waitFor(
-        `${label} WebDriver process handle terminal`,
-        () => child.exitCode !== null || child.signalCode !== null,
-        driverTerminationTimeoutMilliseconds,
-      );
-      return output;
-    },
-  };
+    sessionTimeoutMilliseconds: webDriverSessionTimeoutMilliseconds,
+    workingDirectory: workspace,
+  });
 }
 
-async function findElement(
-  driver,
-  using,
-  value,
-  label,
-  timeout = 30_000,
-) {
+async function findElement(driver, using, value, label, timeout = 30_000) {
   const deadline = Date.now() + timeout;
   let lastError;
   while (Date.now() < deadline) {
@@ -380,7 +396,9 @@ async function findApplicationMenuCommand(
     `//nav[@aria-label='Menu principal']//button[normalize-space()='${menuLabel}']`,
     `${label} menu`,
   );
-  if ((await elementAttribute(driver, menuTrigger, "aria-expanded")) !== "true") {
+  if (
+    (await elementAttribute(driver, menuTrigger, "aria-expanded")) !== "true"
+  ) {
     await clickElementWhenInteractable(driver, menuTrigger, `${label} menu`);
   }
   const command = await findElement(
@@ -435,9 +453,18 @@ async function selectApplicationMenuCommandUntilLogEvent(
       await delay(50);
     }
   }
-  throw new Error(`${label} produced no ${event} observation`, {
-    cause: lastError,
-  });
+  let interactionState;
+  try {
+    interactionState = await readProjectInteractionState(driver);
+  } catch (error) {
+    interactionState = { diagnosticError: String(error) };
+  }
+  throw new Error(
+    `${label} produced no ${event} observation; interactionState=${JSON.stringify(interactionState)}`,
+    {
+      cause: lastError,
+    },
+  );
 }
 
 async function applicationMenuCommandEnabled(
@@ -494,6 +521,20 @@ async function withProjectDialog(driver, label, operation) {
   }
 }
 
+function xpathLiteral(value) {
+  if (!value.includes("'")) return `'${value}'`;
+  if (!value.includes('"')) return `"${value}"`;
+  return `concat(${value
+    .split("'")
+    .map((part) => `'${part}'`)
+    .join(`, "'", `)})`;
+}
+
+function accessibleProjectDialogXpath(dialogLabel) {
+  const title = xpathLiteral(dialogLabel);
+  return `//*[@role='dialog' and @aria-modal='true' and @aria-labelledby = //*[normalize-space()=${title}]/@id]`;
+}
+
 async function clickProjectDialogAction(
   driver,
   dialogLabel,
@@ -504,7 +545,7 @@ async function clickProjectDialogAction(
     clickWhenEnabled(
       dialogDriver,
       "xpath",
-      `//*[@role='dialog' and @aria-label='${dialogLabel}']//button[normalize-space()='${actionLabel}']`,
+      `${accessibleProjectDialogXpath(dialogLabel)}//button[normalize-space()=${xpathLiteral(actionLabel)}]`,
       label,
     ),
   );
@@ -532,12 +573,7 @@ async function findAlbumInformationDpi(driver, label) {
     "Informações do Álbum",
     `${label} section`,
   );
-  return findElement(
-    driver,
-    "css selector",
-    "input[aria-label='DPI']",
-    label,
-  );
+  return findElement(driver, "css selector", "input[aria-label='DPI']", label);
 }
 
 async function replaceAlbumInformationDpi(driver, value, label) {
@@ -601,7 +637,9 @@ async function doubleClick(driver, using, value, label) {
       ],
     });
   } finally {
-    await driver.request("DELETE", `${endpoint}/actions`).catch(() => undefined);
+    await driver
+      .request("DELETE", `${endpoint}/actions`)
+      .catch(() => undefined);
   }
   return elementId;
 }
@@ -628,7 +666,12 @@ async function beginUncommittedPointerGesture(driver, using, value, label) {
 }
 
 async function sendEscape(driver) {
-  const body = await findElement(driver, "css selector", "body", "Project body");
+  const body = await findElement(
+    driver,
+    "css selector",
+    "body",
+    "Project body",
+  );
   await driver.request(
     "POST",
     `/session/${driver.sessionId}/element/${encodeURIComponent(body)}/value`,
@@ -684,10 +727,7 @@ async function changeFormControl(driver, using, value, nextValue, label) {
         element.dispatchEvent(new Event("change", { bubbles: true }));
         return element.value;
       `,
-      args: [
-        { "element-6066-11e4-a52e-4f735466cecf": elementId },
-        nextValue,
-      ],
+      args: [{ "element-6066-11e4-a52e-4f735466cecf": elementId }, nextValue],
     },
   );
   if (observedValue !== nextValue) {
@@ -711,17 +751,9 @@ async function elementAttribute(driver, elementId, attribute) {
 }
 
 async function observeSheetGrid(driver, label) {
-  const grid = await findElement(
-    driver,
-    "css selector",
-    ".sheet-grid",
-    label,
-  );
-  return driver.request(
-    "POST",
-    `/session/${driver.sessionId}/execute/sync`,
-    {
-      script: `
+  const grid = await findElement(driver, "css selector", ".sheet-grid", label);
+  return driver.request("POST", `/session/${driver.sessionId}/execute/sync`, {
+    script: `
         const grid = arguments[0];
         const slots = Array.from(
           grid.querySelectorAll(":scope > .sheet-grid-slot"),
@@ -735,9 +767,8 @@ async function observeSheetGrid(driver, label) {
           order: slots.map((slot) => slot.dataset.sheetId ?? ""),
         };
       `,
-      args: [{ "element-6066-11e4-a52e-4f735466cecf": grid }],
-    },
-  );
+    args: [{ "element-6066-11e4-a52e-4f735466cecf": grid }],
+  });
 }
 
 async function waitForSheetGrid(driver, label, predicate) {
@@ -751,12 +782,7 @@ async function waitForSheetGrid(driver, label, predicate) {
   );
 }
 
-async function dragSheetInGrid(
-  driver,
-  sourceSheetId,
-  targetSheetId,
-  label,
-) {
+async function dragSheetInGrid(driver, sourceSheetId, targetSheetId, label) {
   const source = await findElement(
     driver,
     "css selector",
@@ -769,8 +795,10 @@ async function dragSheetInGrid(
     `.sheet-grid-slot[data-sheet-id='${targetSheetId}']`,
     `${label} target`,
   );
-  if ((await elementAttribute(driver, source, "draggable")) !== "true") {
-    throw new Error(`${label} source is not publicly draggable`);
+  if ((await elementAttribute(driver, source, "draggable")) === "true") {
+    throw new Error(
+      `${label} unexpectedly fell back to native HTML drag-and-drop`,
+    );
   }
   const endpoint = `/session/${driver.sessionId}`;
   const sourceElement = {
@@ -780,9 +808,22 @@ async function dragSheetInGrid(
     "element-6066-11e4-a52e-4f735466cecf": target,
   };
   await driver.request("POST", `${endpoint}/execute/sync`, {
-    script: "arguments[0].scrollIntoView({ block: 'center', inline: 'nearest' });",
+    script: scrollIntoPointerViewportScript,
     args: [sourceElement],
   });
+  await driver.request("POST", `${endpoint}/execute/sync`, {
+    script: scrollIntoPointerViewportScript,
+    args: [targetElement],
+  });
+  const geometry = await driver.request("POST", `${endpoint}/execute/sync`, {
+    script: measureVisiblePointerGeometryScript,
+    args: [sourceElement, targetElement],
+  });
+  if (
+    (await elementAttribute(driver, source, "data-reorder-enabled")) !== "true"
+  ) {
+    throw new Error(`${label} source was not ready for pointer reordering`);
+  }
   try {
     await driver.request("POST", `${endpoint}/actions`, {
       actions: [
@@ -790,173 +831,25 @@ async function dragSheetInGrid(
           type: "pointer",
           id: "physical-album-structure-mouse",
           parameters: { pointerType: "mouse" },
-          actions: [
-            {
-              type: "pointerMove",
-              duration: 0,
-              origin: sourceElement,
-              x: 0,
-              y: 0,
-            },
-            { type: "pointerDown", button: 0 },
-            { type: "pause", duration: 200 },
-            {
-              type: "pointerMove",
-              duration: 200,
-              origin: sourceElement,
-              x: 10,
-              y: 10,
-            },
-            {
-              type: "pointerMove",
-              duration: 600,
-              origin: targetElement,
-              x: 0,
-              y: 0,
-            },
-            { type: "pause", duration: 250 },
-            { type: "pointerUp", button: 0 },
-          ],
+          actions: buildCapturedPointerGestureActions({
+            ...geometry,
+            phase: "drop",
+          }),
         },
       ],
     });
   } finally {
-    await driver.request("DELETE", `${endpoint}/actions`).catch(() => undefined);
+    await driver
+      .request("DELETE", `${endpoint}/actions`)
+      .catch(() => undefined);
   }
-}
-
-async function waitFor(label, predicate, timeout = 30_000) {
-  const deadline = Date.now() + timeout;
-  let observation;
-  while (Date.now() < deadline) {
-    observation = await predicate();
-    if (observation) return observation;
-    await delay(50);
-  }
-  throw new Error(`${label} was not observed: ${JSON.stringify(observation)}`);
-}
-
-function applicationProcesses() {
-  return processInstancesByExecutable(
-    applicationPath,
-    "myalbuns-desktop.exe",
-  );
 }
 
 function isHost(instance) {
   return instance.commandLine.includes("--myalbuns-project-host");
 }
-
-async function waitForNewApplication(predicate, known, label) {
-  return waitFor(
-    label,
-    () =>
-      applicationProcesses().find(
-        (instance) =>
-          predicate(instance) &&
-          !known.some((candidate) => sameProcessInstance(instance, candidate)),
-      ),
-    timeoutMilliseconds,
-  );
-}
-
-async function waitForExit(instance, label) {
-  await waitFor(
-    label,
-    () => aliveProcessInstances([instance]).length === 0,
-    timeoutMilliseconds,
-  );
-}
-
-function driveNativeDialog(instance, action, title, destination) {
-  const arguments_ = [
-    "-NoProfile",
-    "-NonInteractive",
-    "-ExecutionPolicy",
-    "Bypass",
-    "-File",
-    nativeDialogDriver,
-    "-Action",
-    action,
-    "-ProcessId",
-    String(instance.processId),
-    "-CreationTimeUtc",
-    instance.creationTimeUtc,
-    "-DialogTitle",
-    title,
-    "-TimeoutSeconds",
-    "30",
-  ];
-  if (destination) {
-    arguments_.push("-DestinationPath", destination);
-  }
-  const result = spawnSync("powershell.exe", arguments_, {
-    cwd: workspace,
-    windowsHide: true,
-    encoding: "utf8",
-  });
-  if (result.status !== 0) {
-    throw new Error(
-      `Native dialog automation failed: ${result.stderr || result.stdout}`,
-    );
-  }
-  return JSON.parse(result.stdout.trim());
-}
-
-function nativeWindowTitle(instance) {
-  const encoded = powershellJson(
-    String.raw`
-$observed = Get-CimInstance Win32_Process -Filter "ProcessId = $env:MYALBUNS_GATE_WINDOW_PID" -ErrorAction Stop
-if ($null -eq $observed -or $observed.CreationDate.ToUniversalTime().ToString('O') -cne $env:MYALBUNS_GATE_WINDOW_CREATED) {
-    throw 'The native window no longer belongs to the expected process instance.'
-}
-$process = Get-Process -Id ([int]$env:MYALBUNS_GATE_WINDOW_PID) -ErrorAction Stop
-[void]$process.Handle
-if ($process.HasExited) {
-    throw 'The native window process exited before its title was observed.'
-}
-$titleBytes = [System.Text.Encoding]::UTF8.GetBytes([string]$process.MainWindowTitle)
-$titleBase64 = [System.Convert]::ToBase64String($titleBytes)
-[Console]::Out.Write((ConvertTo-Json -InputObject $titleBase64 -Compress))
-`,
-    {
-      MYALBUNS_GATE_WINDOW_PID: String(instance.processId),
-      MYALBUNS_GATE_WINDOW_CREATED: instance.creationTimeUtc,
-    },
-  );
-  return Buffer.from(encoded, "base64").toString("utf8");
-}
-
 function projectDataNamespace(projectId) {
   return `project-${createHash("sha256").update(projectId).digest("hex")}`;
-}
-
-function logRecords() {
-  const directory = path.join(processDataRoot, "Local", "MyAlbuns2", "Logs");
-  if (!existsSync(directory)) return [];
-  return readdirSync(directory)
-    .filter((name) => name.endsWith(".jsonl"))
-    .flatMap((name) =>
-      readFileSync(path.join(directory, name), "utf8")
-        .split(/\r?\n/)
-        .filter(Boolean)
-        .flatMap((line) => {
-          try {
-            return [JSON.parse(line)];
-          } catch {
-            return [];
-          }
-        }),
-    )
-    .sort((left, right) => String(left.timestamp).localeCompare(String(right.timestamp)));
-}
-
-function logText() {
-  return logRecords().map((record) => JSON.stringify(record)).join("\n");
-}
-
-function recordsFor(event) {
-  return logRecords().filter((record) => record.event === event);
 }
 
 function projectIntentRecords(processId, intent) {
@@ -1029,14 +922,6 @@ function sourceContainsNativePath(source, candidate) {
   );
 }
 
-async function waitForLogEvent(event, count, label) {
-  return waitFor(
-    label,
-    () => recordsFor(event).length >= count,
-    timeoutMilliseconds,
-  );
-}
-
 async function waitForHostUiReady(instance, label) {
   return waitFor(
     label,
@@ -1058,9 +943,7 @@ const applicationEnvironment = {
   MYALBUNS_PROCESS_GATE_DATA_ROOT: processDataRoot,
   MYALBUNS_DEV_GLOBAL_WEBVIEW_DEBUG_PORT: String(globalDebugPort),
   MYALBUNS_DEV_HOST_WEBVIEW_DEBUG_PORT: String(hostDebugPort),
-  MYALBUNS_DEV_ALTERNATE_HOST_WEBVIEW_DEBUG_PORT: String(
-    reopenedHostDebugPort,
-  ),
+  MYALBUNS_DEV_ALTERNATE_HOST_WEBVIEW_DEBUG_PORT: String(reopenedHostDebugPort),
   MYALBUNS_DEV_PROJECT_DIALOG_WEBVIEW_DEBUG_PORT: String(
     projectDialogDebugPort,
   ),
@@ -1073,12 +956,18 @@ const applicationEnvironment = {
 };
 
 assertNoPreexistingProcessInstances(applicationPath, "myalbuns-desktop.exe");
-const firstGlobalChild = spawn(applicationPath, [], {
-  cwd: workspace,
-  windowsHide: true,
-  stdio: ["ignore", "pipe", "pipe"],
-  env: applicationEnvironment,
-});
+const childOutputs = new Map();
+function launchApplication(arguments_, environment) {
+  const child = spawn(applicationPath, arguments_, {
+    cwd: workspace,
+    windowsHide: true,
+    stdio: ["ignore", "pipe", "pipe"],
+    env: environment,
+  });
+  childOutputs.set(child.pid, collectChildOutput(child));
+  return child;
+}
+const firstGlobalChild = launchApplication([], applicationEnvironment);
 const firstGlobal = await waitForProcessInstance(
   firstGlobalChild.pid,
   "first Global",
@@ -1087,6 +976,7 @@ let globalDriver;
 let hostDriver;
 let originalDriver;
 let secondGlobalDriver;
+let recoveryDialogDriver;
 let firstHost;
 let secondGlobal;
 let secondHost;
@@ -1096,6 +986,13 @@ let originalGlobal;
 let originalHost;
 let originalReplacementGlobal;
 let finalGlobal;
+let externalCopyDialogDriver;
+let externalCopyHostDriver;
+let externalCopyGlobal;
+let cancelledExternalCopyHost;
+let queuedExternalCopyHost;
+let externalCopyHost;
+let externalCopyReplacementGlobal;
 
 try {
   globalDriver = await startAttachedWebDriver(globalDebugPort, "first Global");
@@ -1226,13 +1123,15 @@ try {
       await findElement(
         hostDriver,
         "css selector",
-        ".sheet-grid > .sheet-grid-slot > button.active > span",
+        ".sheet-grid > .sheet-grid-slot > button.active .sheet-tile__number",
         "active sheet number",
       ),
     ),
   );
-  if (!Number.isInteger(activeSheetNumber)) {
-    throw new Error("The productive UI exposed no active sheet number");
+  if (activeSheetNumber !== 2) {
+    throw new Error(
+      `The productive Grade click did not activate Sheet 2 (observed ${activeSheetNumber})`,
+    );
   }
   await replaceAlbumInformationDpi(hostDriver, "300", "DPI input");
   await applyAlbumInformation(hostDriver, "Apply Album information action");
@@ -1272,16 +1171,16 @@ try {
     photoPath,
   );
   if (reselectedPhoto.action !== "select") {
-    throw new Error("The native existing JPEG Photo selection was not confirmed");
+    throw new Error(
+      "The native existing JPEG Photo selection was not confirmed",
+    );
   }
   await waitForLogEvent(
     "photo_import_existing_selected",
     1,
     "existing Photo selection terminal",
   );
-  const existingSelection = recordsFor(
-    "photo_import_existing_selected",
-  ).at(-1);
+  const existingSelection = recordsFor("photo_import_existing_selected").at(-1);
   const selectedMediaCard = await findElement(
     hostDriver,
     "css selector",
@@ -1342,7 +1241,9 @@ try {
     exportPath,
     photoPath,
     processDataRoot,
-  ].some((candidate) => sourceContainsNativePath(importedPageSource, candidate));
+  ].some((candidate) =>
+    sourceContainsNativePath(importedPageSource, candidate),
+  );
 
   await selectApplicationMenuCommand(
     hostDriver,
@@ -1387,7 +1288,9 @@ try {
     "WebView2",
     projectDataNamespace(savedDocument.projectId),
   );
-  if (webViewProcessesForDataDirectory(projectWebViewDataDirectory).length === 0) {
+  if (
+    webViewProcessesForDataDirectory(projectWebViewDataDirectory).length === 0
+  ) {
     throw new Error("The productive Host WebView2 process was not observable");
   }
 
@@ -1459,7 +1362,7 @@ try {
       await findElement(
         hostDriver,
         "css selector",
-        ".sheet-grid > .sheet-grid-slot > button.active > span",
+        ".sheet-grid > .sheet-grid-slot > button.active .sheet-tile__number",
         "reopened active sheet number",
       ),
     ),
@@ -1493,7 +1396,9 @@ try {
     exportPath,
     photoPath,
     processDataRoot,
-  ].some((candidate) => sourceContainsNativePath(reopenedPageSource, candidate));
+  ].some((candidate) =>
+    sourceContainsNativePath(reopenedPageSource, candidate),
+  );
   for (const label of ["Desfazer", "Refazer"]) {
     const enabled = await applicationMenuCommandEnabled(
       hostDriver,
@@ -1521,7 +1426,10 @@ try {
   );
 
   await replaceAlbumInformationDpi(hostDriver, "360", "unsaved DPI input");
-  await applyAlbumInformation(hostDriver, "Apply unsaved Album information action");
+  await applyAlbumInformation(
+    hostDriver,
+    "Apply unsaved Album information action",
+  );
   await waitForLogEvent("project_intent_applied", 3, "unsaved DPI application");
 
   const originalProjectId = savedDocument.projectId;
@@ -1631,12 +1539,7 @@ try {
     MYALBUNS_DEV_SAVE_AS_WEBVIEW_DEBUG_PORT: String(saveAsHostDebugPort),
     WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${recoveryGlobalDebugPort}`,
   };
-  const recoveryGlobalChild = spawn(applicationPath, [projectPath], {
-    cwd: workspace,
-    windowsHide: true,
-    stdio: ["ignore", "pipe", "pipe"],
-    env: recoveryApplicationEnvironment,
-  });
+  const recoveryGlobalChild = launchApplication([projectPath], recoveryApplicationEnvironment);
   recoveryGlobal = await waitForProcessInstance(
     recoveryGlobalChild.pid,
     "recovery Global",
@@ -1646,38 +1549,229 @@ try {
     [firstHost, crashedHost],
     "recovery Project Host",
   );
-  await waitForExit(recoveryGlobal, "recovery Global handoff");
-  await waitForHostUiReady(secondHost, "recovery choice UI ready");
-  hostDriver = await startAttachedWebDriver(
-    recoveryHostDebugPort,
-    "recovery Project Host",
-    recoveryProjectDialogDebugPort,
+  const projectWindowTitleBeforeDecision = nativeWindowTitle(secondHost);
+  const hostWebViewBeforeDecision = await httpAvailable(
+    `http://127.0.0.1:${recoveryHostDebugPort}/json/version`,
   );
-  const recoveryChoices = await hostDriver.request(
+  const recoveryTargetSnapshot = await waitFor(
+    "external Recovery dialog target",
+    async () => {
+      const ownerTargets = await devToolsTargets(
+        recoveryGlobalDebugPort,
+        "recovery Global opening owner",
+      );
+      const globalTargets = ownerTargets
+        .filter((target) => target.type === "page")
+        .filter((target) => target.url.includes("global.html"));
+      const recoveryTargets = ownerTargets
+        .filter((target) => target.type === "page")
+        .filter((target) => {
+          try {
+            const url = new URL(target.url);
+            return (
+              url.pathname.endsWith("/dialog.html") &&
+              url.searchParams.get("kind") === "project-recovery"
+            );
+          } catch {
+            return false;
+          }
+        });
+      return globalTargets.length >= 1 && recoveryTargets.length === 1
+        ? { globalTargets, recoveryTargets }
+        : undefined;
+    },
+    timeoutMilliseconds,
+  );
+  recoveryDialogDriver = await startAttachedWebDriver(
+    recoveryGlobalDebugPort,
+    "external recovery opening dialog",
+  );
+  await switchToWebDriverWindow(
+    recoveryDialogDriver,
+    (url) => {
+      const parsed = new URL(url);
+      return (
+        parsed.pathname.endsWith("/dialog.html") &&
+        parsed.searchParams.get("kind") === "project-recovery"
+      );
+    },
+    "external Recovery dialog WebView",
+  );
+  await findElement(
+    recoveryDialogDriver,
+    "css selector",
+    ".ui-owned-window-shell [role='dialog']",
+    "external Recovery decision",
+  );
+  const recoveryPresentation = await recoveryDialogDriver.request(
     "POST",
-    `/session/${hostDriver.sessionId}/execute/sync`,
+    `/session/${recoveryDialogDriver.sessionId}/execute/sync`,
     {
-      script: `return Array.from(document.querySelectorAll('.recovery-actions button')).map((button) => button.textContent.trim());`,
+      script: `
+        const dialog = document.querySelector('[role="dialog"]');
+        const title = dialog?.getAttribute('aria-labelledby');
+        const transition = document.querySelector('[data-opening-owner-transition]');
+        const shell = document.querySelector('.ui-owned-window-shell');
+        const actionGeometry = Array.from(dialog?.querySelectorAll('button') ?? [])
+          .map((button) => {
+            const range = document.createRange();
+            range.selectNodeContents(button);
+            const lineTops = [];
+            for (const rect of range.getClientRects()) {
+              if (rect.width <= 0 || rect.height <= 0) continue;
+              if (!lineTops.some((top) => Math.abs(top - rect.top) <= 1)) {
+                lineTops.push(rect.top);
+              }
+            }
+            const bounds = button.getBoundingClientRect();
+            return {
+              clientWidth: button.clientWidth,
+              height: bounds.height,
+              label: button.textContent.trim(),
+              lineCount: lineTops.length,
+              scrollWidth: button.scrollWidth,
+              width: bounds.width,
+            };
+          });
+        return {
+          actionGeometry,
+          ariaModal: dialog?.getAttribute('aria-modal') ?? null,
+          choices: Array.from(dialog?.querySelectorAll('button') ?? [])
+            .map((button) => button.textContent.trim()),
+          contentFitted:
+            shell !== null &&
+            Math.abs(document.documentElement.clientHeight - shell.scrollHeight) <= 2,
+          dialogCount: document.querySelectorAll('[role="dialog"]').length,
+          externalDialog:
+            window.location.pathname.endsWith('/dialog.html') &&
+            new URLSearchParams(window.location.search).get('kind') === 'project-recovery',
+          fullPageRecoveryCount: document.querySelectorAll('.startup-surface .recovery-actions').length,
+          initialFocus: document.activeElement?.textContent?.trim() ?? null,
+          modalLayerCount: document.querySelectorAll('.ui-modal-dialog-layer').length,
+          openedFromLoadingOwner:
+            transition?.getAttribute('data-opening-owner-transition') === 'true',
+          ownerSurfaceCount: document.querySelectorAll('[data-project-owner-surface]').length,
+          ownedShellCount: document.querySelectorAll('.ui-owned-window-shell').length,
+          title: title ? document.getElementById(title)?.textContent?.trim() ?? null : null,
+          url: window.location.href,
+          viewportHeight: document.documentElement.clientHeight,
+          viewportWidth: document.documentElement.clientWidth,
+        };
+      `,
       args: [],
     },
   );
+  const recoveryChoices = recoveryPresentation.choices;
   if (
     JSON.stringify(recoveryChoices) !==
     JSON.stringify([
-      "Reabrir e recuperar",
-      "Abrir última versão salva",
       "Agora não",
+      "Abrir última versão salva",
+      "Reabrir e recuperar",
     ])
   ) {
     throw new Error(
       `The recovery prompt exposed unexpected choices: ${JSON.stringify(recoveryChoices)}`,
     );
   }
+  const recoveryActionsAreSingleLine =
+    recoveryPresentation.actionGeometry.every(
+      (action) =>
+        action.lineCount === 1 && action.scrollWidth <= action.clientWidth + 1,
+    );
+  if (
+    recoveryPresentation.dialogCount !== 1 ||
+    recoveryPresentation.modalLayerCount !== 0 ||
+    recoveryPresentation.ownerSurfaceCount !== 0 ||
+    recoveryPresentation.ownedShellCount !== 1 ||
+    recoveryPresentation.fullPageRecoveryCount !== 0 ||
+    recoveryPresentation.ariaModal !== "true" ||
+    recoveryPresentation.title !== "Recuperar trabalho não salvo?" ||
+    recoveryPresentation.initialFocus !== "Reabrir e recuperar" ||
+    !recoveryActionsAreSingleLine ||
+    !recoveryPresentation.contentFitted ||
+    recoveryPresentation.viewportWidth !== 492 ||
+    !recoveryPresentation.externalDialog ||
+    !recoveryPresentation.openedFromLoadingOwner ||
+    projectWindowTitleBeforeDecision !== "" ||
+    hostWebViewBeforeDecision
+  ) {
+    throw new Error(
+      `Recovery was not one accessible external dialog in the stable opening owner: ${JSON.stringify(
+        {
+          ...recoveryPresentation,
+          hostWebViewBeforeDecision,
+          projectWindowTitleBeforeDecision,
+        },
+      )}`,
+    );
+  }
+
+  const forwardedRecoveryActivationCount = recordsFor(
+    "global_activation_forwarded",
+  ).length;
+  const queuedRecoveryActivationChild = spawn(applicationPath, [projectPath], {
+    cwd: workspace,
+    windowsHide: true,
+    stdio: "ignore",
+    env: recoveryApplicationEnvironment,
+  });
+  await waitForLogEvent(
+    "global_activation_forwarded",
+    forwardedRecoveryActivationCount + 1,
+    "forwarded activation queued behind Recovery",
+  );
+  await waitFor(
+    "forwarded activation process terminal",
+    () =>
+      queuedRecoveryActivationChild.exitCode !== null ||
+      queuedRecoveryActivationChild.signalCode !== null,
+    timeoutMilliseconds,
+  );
+  await delay(300);
+  const targetsWithQueuedActivation = await devToolsTargets(
+    recoveryGlobalDebugPort,
+    "Recovery owner with queued activation",
+  );
+  const recoveryTargetWithQueuedActivation = targetsWithQueuedActivation.find(
+    (target) =>
+      target.id === recoveryTargetSnapshot.recoveryTargets[0].id &&
+      target.url === recoveryTargetSnapshot.recoveryTargets[0].url,
+  );
+  const queuedActivationDialogCount = await recoveryDialogDriver.request(
+    "POST",
+    `/session/${recoveryDialogDriver.sessionId}/execute/sync`,
+    {
+      script: "return document.querySelectorAll('[role=\"dialog\"]').length;",
+      args: [],
+    },
+  );
+  const activeHostsWithQueuedActivation = applicationProcesses().filter(isHost);
+  const singleHostDuringQueuedActivation =
+    activeHostsWithQueuedActivation.length === 1 &&
+    sameProcessInstance(activeHostsWithQueuedActivation[0], secondHost);
+  const queuedActivationPreservedOwner =
+    recoveryTargetWithQueuedActivation !== undefined &&
+    queuedActivationDialogCount === 1 &&
+    aliveProcessInstances([recoveryGlobal, secondHost]).length === 2;
+  if (!queuedActivationPreservedOwner || !singleHostDuringQueuedActivation) {
+    throw new Error(
+      "A forwarded activation replaced the correlated Recovery owner or duplicated its Host",
+    );
+  }
   await click(
-    hostDriver,
+    recoveryDialogDriver,
     "xpath",
     "//button[normalize-space()='Reabrir e recuperar']",
     "Reopen and recover choice",
+  );
+  await waitForExit(recoveryGlobal, "recovery Global handoff");
+  recoveryDialogDriver = await disposeConfirmedWebDriver(recoveryDialogDriver);
+  await waitForHostUiReady(secondHost, "recovered Project UI ready");
+  hostDriver = await startAttachedWebDriver(
+    recoveryHostDebugPort,
+    "recovery Project Host",
+    recoveryProjectDialogDebugPort,
   );
   await findElement(
     hostDriver,
@@ -1685,18 +1779,32 @@ try {
     ".app-shell",
     "recovered Project UI",
   );
-  const recoveredDpi = await findAlbumInformationDpi(hostDriver, "recovered DPI");
+  const recoveredOwnerUrl = await hostDriver.request(
+    "POST",
+    `/session/${hostDriver.sessionId}/execute/sync`,
+    { script: "return window.location.href;", args: [] },
+  );
+  const projectRouteNormal = !recoveredOwnerUrl.includes("project-recovery");
+
+  const recoveredDpi = await findAlbumInformationDpi(
+    hostDriver,
+    "recovered DPI",
+  );
   if ((await elementAttribute(hostDriver, recoveredDpi, "value")) !== "360") {
-    throw new Error("The recovered Project did not restore the checkpoint state");
+    throw new Error(
+      "The recovered Project did not restore the checkpoint state",
+    );
   }
   let recoveredHistoryEmpty = true;
   for (const label of ["Desfazer", "Refazer"]) {
-    if (await applicationMenuCommandEnabled(
-      hostDriver,
-      "Editar",
-      label,
-      `${label} after recovery`,
-    )) {
+    if (
+      await applicationMenuCommandEnabled(
+        hostDriver,
+        "Editar",
+        label,
+        `${label} after recovery`,
+      )
+    ) {
       recoveredHistoryEmpty = false;
     }
   }
@@ -1709,8 +1817,9 @@ try {
   const checkpointPreservedAfterRecovery =
     existsSync(recoveryCheckpointPath) &&
     readFileSync(recoveryCheckpointPath).equals(recoveryCheckpointBytes);
-  const projectFileUnchangedThroughRecovery =
-    readFileSync(projectPath).equals(projectBytesBeforeCrash);
+  const projectFileUnchangedThroughRecovery = readFileSync(projectPath).equals(
+    projectBytesBeforeCrash,
+  );
   if (
     !recoveredHistoryEmpty ||
     !recoveredUnsaved ||
@@ -1766,9 +1875,7 @@ try {
     },
     timeoutMilliseconds,
   );
-  const preSaveAsRecoveryCheckpointBytes = readFileSync(
-    recoveryCheckpointPath,
-  );
+  const preSaveAsRecoveryCheckpointBytes = readFileSync(recoveryCheckpointPath);
   const webviewStateRoot = path.join(
     processDataRoot,
     "Local",
@@ -1905,9 +2012,7 @@ try {
     () => existsSync(copiedCacheDirectory),
     timeoutMilliseconds,
   );
-  const emptyCacheStage = recordsFor(
-    "project_save_as_cache_staged_empty",
-  ).find(
+  const emptyCacheStage = recordsFor("project_save_as_cache_staged_empty").find(
     (record) =>
       record.project_id === copiedProjectId &&
       Number(record.cache_entry_count) === 0 &&
@@ -1958,7 +2063,9 @@ try {
     "project_webview_authority_ready",
   ).some((record) => Number(record.process_id) === secondHost.processId);
   if (!rebuiltWebviewReady) {
-    throw new Error("The Save As Host did not make its replacement WebView ready");
+    throw new Error(
+      "The Save As Host did not make its replacement WebView ready",
+    );
   }
 
   hostDriver = await startAttachedWebDriver(
@@ -1966,7 +2073,12 @@ try {
     "Save As Project Host",
     recoveryProjectDialogDebugPort,
   );
-  await findElement(hostDriver, "css selector", ".app-shell", "Save As Project UI");
+  await findElement(
+    hostDriver,
+    "css selector",
+    ".app-shell",
+    "Save As Project UI",
+  );
   const copiedAlbumDesign = await findElement(
     hostDriver,
     "xpath",
@@ -1991,14 +2103,16 @@ try {
       await findElement(
         hostDriver,
         "css selector",
-        ".sheet-grid > .sheet-grid-slot > button.active > span",
+        ".sheet-grid > .sheet-grid-slot > button.active .sheet-tile__number",
         "fresh Save As active sheet number",
       ),
     ),
   );
   const projectLocalSelectionReset = freshActiveSheetNumber === 1;
   if (!projectLocalSelectionReset) {
-    throw new Error("The Save As WebView inherited the previous local sheet selection");
+    throw new Error(
+      "The Save As WebView inherited the previous local sheet selection",
+    );
   }
   await click(
     hostDriver,
@@ -2015,7 +2129,7 @@ try {
           await findElement(
             hostDriver,
             "css selector",
-            ".sheet-grid > .sheet-grid-slot > button.active > span",
+            ".sheet-grid > .sheet-grid-slot > button.active .sheet-tile__number",
             "Save As selected sheet number",
           ),
         ),
@@ -2024,7 +2138,9 @@ try {
   );
   const copiedDpi = await findAlbumInformationDpi(hostDriver, "Save As DPI");
   if ((await elementAttribute(hostDriver, copiedDpi, "value")) !== "360") {
-    throw new Error("The rebuilt Save As WebView did not adopt the copied projection");
+    throw new Error(
+      "The rebuilt Save As WebView did not adopt the copied projection",
+    );
   }
   const copiedPageSource = await hostDriver.request(
     "GET",
@@ -2106,12 +2222,7 @@ try {
     ),
     WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${originalGlobalDebugPort}`,
   };
-  const originalGlobalChild = spawn(applicationPath, [projectPath], {
-    cwd: workspace,
-    windowsHide: true,
-    stdio: ["ignore", "pipe", "pipe"],
-    env: originalApplicationEnvironment,
-  });
+  const originalGlobalChild = launchApplication([projectPath], originalApplicationEnvironment);
   originalGlobal = await waitForProcessInstance(
     originalGlobalChild.pid,
     "simultaneous original Global",
@@ -2121,10 +2232,7 @@ try {
     [firstHost, secondHost],
     "simultaneous original Project Host",
   );
-  await waitForExit(
-    originalGlobal,
-    "simultaneous original Global handoff",
-  );
+  await waitForExit(originalGlobal, "simultaneous original Global handoff");
   await waitForHostUiReady(
     originalHost,
     "simultaneous original Project UI ready",
@@ -2145,18 +2253,25 @@ try {
     "simultaneous original DPI",
   );
   if (
-    (await elementAttribute(originalDriver, simultaneousOriginalDpi, "value")) !==
-    "300"
+    (await elementAttribute(
+      originalDriver,
+      simultaneousOriginalDpi,
+      "value",
+    )) !== "300"
   ) {
-    throw new Error("The simultaneous original did not retain its saved content");
+    throw new Error(
+      "The simultaneous original did not retain its saved content",
+    );
   }
   for (const label of ["Desfazer", "Refazer"]) {
-    if (await applicationMenuCommandEnabled(
-      originalDriver,
-      "Editar",
-      label,
-      `${label} in simultaneous original`,
-    )) {
+    if (
+      await applicationMenuCommandEnabled(
+        originalDriver,
+        "Editar",
+        label,
+        `${label} in simultaneous original`,
+      )
+    ) {
       throw new Error(`The simultaneous original retained ${label} history`);
     }
   }
@@ -2165,7 +2280,9 @@ try {
     applicationProcesses().filter(isHost).length === 2 &&
     aliveProcessInstances([secondHost, originalHost]).length === 2;
   if (!simultaneousHostsOpen) {
-    throw new Error("The original and Save As copy were not open simultaneously");
+    throw new Error(
+      "The original and Save As copy were not open simultaneously",
+    );
   }
 
   const copiedBytesBeforeOriginalSave = readFileSync(saveAsPath);
@@ -2214,7 +2331,9 @@ try {
     independentlySavedOriginalDocument.project.document.dpi !== 320 ||
     !readFileSync(saveAsPath).equals(copiedBytesBeforeOriginalSave)
   ) {
-    throw new Error("Saving the simultaneous original crossed into the Save As copy");
+    throw new Error(
+      "Saving the simultaneous original crossed into the Save As copy",
+    );
   }
 
   await replaceAlbumInformationDpi(
@@ -2262,7 +2381,9 @@ try {
     independentlySavedCopyDocument.project.document.dpi === 420 &&
     readFileSync(projectPath).equals(independentlySavedOriginal);
   if (!isolatedIndependentSaves) {
-    throw new Error("Saving the Save As copy crossed into the original Project");
+    throw new Error(
+      "Saving the Save As copy crossed into the original Project",
+    );
   }
 
   await selectApplicationMenuCommandUntilLogEvent(
@@ -2356,7 +2477,11 @@ try {
     "Fechar",
     "close Export success feedback",
   );
-  await waitFor("exported JPEG", () => existsSync(exportPath), timeoutMilliseconds);
+  await waitFor(
+    "exported JPEG",
+    () => existsSync(exportPath),
+    timeoutMilliseconds,
+  );
   await waitForLogEvent("imaging_process_stopped", 1, "Processador terminal");
   const exported = readFileSync(exportPath);
   const emptyCacheAfterExport = summarizeOwnedCache(cacheRoot);
@@ -2381,7 +2506,9 @@ try {
     !readFileSync(saveAsPath).equals(independentlySavedCopy) ||
     !readFileSync(projectPath).equals(independentlySavedOriginal)
   ) {
-    throw new Error("Export mutated either independently saved Project document");
+    throw new Error(
+      "Export mutated either independently saved Project document",
+    );
   }
   const liveDpiInput = await findAlbumInformationDpi(
     hostDriver,
@@ -2461,14 +2588,15 @@ try {
       missingOriginalExportPath,
     );
     if (selectedMissingExport.action !== "select") {
-      throw new Error("The missing-Original Export destination was not confirmed");
+      throw new Error(
+        "The missing-Original Export destination was not confirmed",
+      );
     }
     await waitForLogEvent("export_failed", 1, "missing-Original failure");
     await waitFor(
       "missing-Original Processador spawn",
       () =>
-        exportProcessorAttempts().length ===
-        missingOriginalProcessorCount + 1,
+        exportProcessorAttempts().length === missingOriginalProcessorCount + 1,
       timeoutMilliseconds,
     );
     const missingOriginalAttempt = exportProcessorAttempts().at(-1);
@@ -2489,14 +2617,14 @@ try {
         const failureDialog = await findElement(
           dialogDriver,
           "xpath",
-          "//*[@role='dialog' and @aria-label='Exportação não concluída']",
+          accessibleProjectDialogXpath("Exportação não concluída"),
           "actionable missing-Original message",
         );
         const text = await elementText(dialogDriver, failureDialog);
         await clickWhenEnabled(
           dialogDriver,
           "xpath",
-          "//*[@role='dialog' and @aria-label='Exportação não concluída']//button[normalize-space()='Fechar']",
+          `${accessibleProjectDialogXpath("Exportação não concluída")}//button[normalize-space()=${xpathLiteral("Fechar")}]`,
           "close missing-Original feedback",
         );
         return text;
@@ -2523,7 +2651,9 @@ try {
     copyFileSync(photoFixturePath, photoPath);
   }
   if (!readFileSync(photoPath).equals(originalPhoto)) {
-    throw new Error("The restored proof Original differs from the imported bytes");
+    throw new Error(
+      "The restored proof Original differs from the imported bytes",
+    );
   }
 
   await ensureInspectorSectionExpanded(
@@ -2539,11 +2669,7 @@ try {
       observation.order.length === 3 &&
       observation.order[1] === observation.focusedSheetId,
   );
-  const structuralIntentKinds = [
-    "add_sheet",
-    "reorder_sheet",
-    "delete_sheet",
-  ];
+  const structuralIntentKinds = ["add_sheet", "reorder_sheet", "delete_sheet"];
   const structuralIntentCountsBefore = Object.fromEntries(
     structuralIntentKinds.map((intent) => [
       intent,
@@ -2689,6 +2815,931 @@ try {
   terminateProcessInstance(finalGlobal);
   await waitForExit(finalGlobal, "final Global cleanup");
 
+  copyFileSync(projectPath, externalCopyPath);
+  const readonlyResult = spawnSync("attrib.exe", ["+R", externalCopyPath], {
+    cwd: workspace,
+    windowsHide: true,
+    encoding: "utf8",
+  });
+  if (readonlyResult.status !== 0) {
+    throw new Error(
+      `The external-copy fixture could not become read-only: ${readonlyResult.stderr || readonlyResult.stdout}`,
+    );
+  }
+  const externalSourceBytes = readFileSync(externalCopyPath);
+  const externalSourceDocument = JSON.parse(
+    externalSourceBytes.toString("utf8"),
+  );
+  const externalGlobalDebugPort = await findFreeTcpPortInRange(40_000, 44_999);
+  const externalHostDebugPort = await findFreeTcpPortInRange(40_000, 44_999);
+  const externalProjectDialogDebugPort = await findFreeTcpPortInRange(
+    40_000,
+    44_999,
+  );
+  const externalApplicationEnvironment = {
+    ...process.env,
+    MYALBUNS_PROCESS_GATE_DATA_ROOT: processDataRoot,
+    MYALBUNS_DEV_GLOBAL_WEBVIEW_DEBUG_PORT: String(externalGlobalDebugPort),
+    MYALBUNS_DEV_HOST_WEBVIEW_DEBUG_PORT: String(externalHostDebugPort),
+    MYALBUNS_DEV_PROJECT_DIALOG_WEBVIEW_DEBUG_PORT: String(
+      externalProjectDialogDebugPort,
+    ),
+    MYALBUNS_DEV_PROJECT_DIALOG_WEBVIEW_DATA_DIRECTORY: path.join(
+      scratch,
+      "external-copy-project-dialog-webview",
+    ),
+    WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${externalGlobalDebugPort}`,
+  };
+  const externalGlobalChild = launchApplication([externalCopyPath], externalApplicationEnvironment);
+  externalCopyGlobal = await waitForProcessInstance(
+    externalGlobalChild.pid,
+    "external-copy Global",
+  );
+  cancelledExternalCopyHost = await waitForNewApplication(
+    isHost,
+    [firstHost, crashedHost, secondHost, originalHost],
+    "first cancellable external-copy Project Host",
+  );
+  const externalProjectWindowTitleBeforeDecision = nativeWindowTitle(
+    cancelledExternalCopyHost,
+  );
+  const externalHostWebViewBeforeDecision = await httpAvailable(
+    `http://127.0.0.1:${externalHostDebugPort}/json/version`,
+  );
+  const externalTargetSnapshot = await waitFor(
+    "external-copy opening dialog target",
+    async () => {
+      const ownerTargets = await devToolsTargets(
+        externalGlobalDebugPort,
+        "external-copy Global opening owner",
+      );
+      const globalTargets = ownerTargets
+        .filter((target) => target.type === "page")
+        .filter((target) => target.url.includes("global.html"));
+      const decisionTargets = ownerTargets
+        .filter((target) => target.type === "page")
+        .filter((target) => {
+          try {
+            const url = new URL(target.url);
+            return (
+              url.pathname.endsWith("/dialog.html") &&
+              url.searchParams.get("kind") === "external-copy"
+            );
+          } catch {
+            return false;
+          }
+        });
+      return globalTargets.length >= 1 && decisionTargets.length === 1
+        ? { globalTargets, decisionTargets }
+        : undefined;
+    },
+    timeoutMilliseconds,
+  );
+  externalCopyDialogDriver = await startAttachedWebDriver(
+    externalGlobalDebugPort,
+    "external-copy opening dialog",
+  );
+  await switchToWebDriverWindow(
+    externalCopyDialogDriver,
+    (url) => {
+      const parsed = new URL(url);
+      return (
+        parsed.pathname.endsWith("/dialog.html") &&
+        parsed.searchParams.get("kind") === "external-copy"
+      );
+    },
+    "external-copy decision WebView",
+  );
+  await findElement(
+    externalCopyDialogDriver,
+    "css selector",
+    ".ui-owned-window-shell [role='dialog']",
+    "external-copy decision",
+  );
+  const externalCopyPresentation = await externalCopyDialogDriver.request(
+    "POST",
+    `/session/${externalCopyDialogDriver.sessionId}/execute/sync`,
+    {
+      script: `
+        const dialog = document.querySelector('[role="dialog"]');
+        const title = dialog?.getAttribute('aria-labelledby');
+        const transition = document.querySelector('[data-opening-owner-transition]');
+        const shell = document.querySelector('.ui-owned-window-shell');
+        return {
+          ariaModal: dialog?.getAttribute('aria-modal') ?? null,
+          choices: Array.from(dialog?.querySelectorAll('button') ?? [])
+            .map((button) => button.textContent.trim()),
+          contentFitted:
+            shell !== null &&
+            Math.abs(document.documentElement.clientHeight - shell.scrollHeight) <= 2,
+          dialogCount: document.querySelectorAll('[role="dialog"]').length,
+          externalDialog:
+            window.location.pathname.endsWith('/dialog.html') &&
+            new URLSearchParams(window.location.search).get('kind') === 'external-copy',
+          initialFocus: document.activeElement?.textContent?.trim() ?? null,
+          modalLayerCount: document.querySelectorAll('.ui-modal-dialog-layer').length,
+          openedFromLoadingOwner:
+            transition?.getAttribute('data-opening-owner-transition') === 'true',
+          ownerSurfaceCount: document.querySelectorAll('[data-project-owner-surface]').length,
+          ownedShellCount: document.querySelectorAll('.ui-owned-window-shell').length,
+          title: title ? document.getElementById(title)?.textContent?.trim() ?? null : null,
+          viewportWidth: document.documentElement.clientWidth,
+        };
+      `,
+      args: [],
+    },
+  );
+  const externalChoices = ["Cancelar", "Salvar cópia como…"];
+  if (
+    JSON.stringify(externalCopyPresentation.choices) !==
+      JSON.stringify(externalChoices) ||
+    externalCopyPresentation.dialogCount !== 1 ||
+    externalCopyPresentation.modalLayerCount !== 0 ||
+    externalCopyPresentation.ownerSurfaceCount !== 0 ||
+    externalCopyPresentation.ownedShellCount !== 1 ||
+    externalCopyPresentation.ariaModal !== "true" ||
+    externalCopyPresentation.title !== "Cópia externa somente leitura" ||
+    externalCopyPresentation.initialFocus !== "Salvar cópia como…" ||
+    !externalCopyPresentation.contentFitted ||
+    externalCopyPresentation.viewportWidth !== 440 ||
+    !externalCopyPresentation.externalDialog ||
+    !externalCopyPresentation.openedFromLoadingOwner ||
+    externalProjectWindowTitleBeforeDecision !== "" ||
+    externalHostWebViewBeforeDecision
+  ) {
+    throw new Error(
+      `The external-copy decision did not remain in the stable opening owner: ${JSON.stringify(
+        {
+          ...externalCopyPresentation,
+          externalHostWebViewBeforeDecision,
+          externalProjectWindowTitleBeforeDecision,
+        },
+      )}`,
+    );
+  }
+
+  const firstExternalNativeOwner = nativeOwnedWindowState(externalCopyGlobal);
+  const firstExternalOwnerWasReplaced =
+    firstExternalNativeOwner.dialogCount === 1 &&
+    firstExternalNativeOwner.dialog?.visible === true &&
+    firstExternalNativeOwner.dialog?.enabled === true &&
+    firstExternalNativeOwner.owner?.visible === false &&
+    firstExternalNativeOwner.owner?.enabled === false;
+  if (!firstExternalOwnerWasReplaced) {
+    const applicationWindowStates = applicationProcesses().map((instance) => ({
+      instance,
+      nativeState: nativeOwnedWindowState(instance),
+    }));
+    throw new Error(
+      `The external-copy decision did not replace and block its native Global owner: ${JSON.stringify(
+        {
+          expectedGlobal: externalCopyGlobal,
+          expectedState: firstExternalNativeOwner,
+          applicationWindowStates,
+        },
+      )}`,
+    );
+  }
+
+  await click(
+    externalCopyDialogDriver,
+    "xpath",
+    "//button[normalize-space()='Cancelar']",
+    "first external-copy cancellation",
+  );
+  externalCopyDialogDriver = await disposeConfirmedWebDriver(
+    externalCopyDialogDriver,
+  );
+  await waitForExit(
+    cancelledExternalCopyHost,
+    "cancelled external-copy pending Host cleanup",
+  );
+  const nativeOwnerAfterExternalCancel = await waitFor(
+    "Global owner restoration after external-copy cancellation",
+    () => {
+      const state = nativeOwnedWindowState(externalCopyGlobal);
+      return state.dialogCount === 0 &&
+        state.windows.some(
+          (window) =>
+            window.ownerHwnd === 0 && window.visible && window.enabled,
+        )
+        ? state
+        : undefined;
+    },
+    timeoutMilliseconds,
+  );
+  const cancelRestoredGlobalAndCleanedHost =
+    aliveProcessInstances([externalCopyGlobal]).length === 1 &&
+    aliveProcessInstances([cancelledExternalCopyHost]).length === 0 &&
+    nativeOwnerAfterExternalCancel.dialogCount === 0;
+
+  const externalActivationBatchCount = recordsFor(
+    "global_activation_batch_completed",
+  ).length;
+  const firstForwardedExternalActivationCount = recordsFor(
+    "global_activation_forwarded",
+  ).length;
+  const firstForwardedExternalActivation = spawn(
+    applicationPath,
+    [externalCopyPath],
+    {
+      cwd: workspace,
+      windowsHide: true,
+      stdio: "ignore",
+      env: externalApplicationEnvironment,
+    },
+  );
+  await waitForLogEvent(
+    "global_activation_forwarded",
+    firstForwardedExternalActivationCount + 1,
+    "first real-path external-copy activation",
+  );
+  await waitFor(
+    "first forwarded external-copy client terminal",
+    () =>
+      firstForwardedExternalActivation.exitCode !== null ||
+      firstForwardedExternalActivation.signalCode !== null,
+    timeoutMilliseconds,
+  );
+  queuedExternalCopyHost = await waitForNewApplication(
+    isHost,
+    [
+      firstHost,
+      crashedHost,
+      secondHost,
+      originalHost,
+      cancelledExternalCopyHost,
+    ],
+    "queued external-copy Project Host",
+  );
+  const queuedExternalTargetSnapshot = await waitFor(
+    "queued external-copy opening dialog target",
+    async () => {
+      const targets = await devToolsTargets(
+        externalGlobalDebugPort,
+        "queued external-copy opening owner",
+      );
+      const decisionTargets = targets.filter((target) => {
+        try {
+          const url = new URL(target.url);
+          return (
+            url.pathname.endsWith("/dialog.html") &&
+            url.searchParams.get("kind") === "external-copy" &&
+            target.id !== externalTargetSnapshot.decisionTargets[0].id
+          );
+        } catch {
+          return false;
+        }
+      });
+      return decisionTargets.length === 1 ? decisionTargets[0] : undefined;
+    },
+    timeoutMilliseconds,
+  );
+  externalCopyDialogDriver = await startAttachedWebDriver(
+    externalGlobalDebugPort,
+    "queued external-copy opening dialog",
+  );
+  await switchToWebDriverWindow(
+    externalCopyDialogDriver,
+    (url) => {
+      const parsed = new URL(url);
+      return (
+        parsed.pathname.endsWith("/dialog.html") &&
+        parsed.searchParams.get("kind") === "external-copy"
+      );
+    },
+    "queued external-copy decision WebView",
+  );
+  await findElement(
+    externalCopyDialogDriver,
+    "css selector",
+    ".ui-owned-window-shell [role='dialog']",
+    "queued external-copy decision",
+  );
+
+  const secondForwardedExternalActivationCount = recordsFor(
+    "global_activation_forwarded",
+  ).length;
+  const queuedExternalActivationChild = spawn(
+    applicationPath,
+    [externalCopyPath],
+    {
+      cwd: workspace,
+      windowsHide: true,
+      stdio: "ignore",
+      env: externalApplicationEnvironment,
+    },
+  );
+  await waitFor(
+    "queued external-copy activation client terminal",
+    () =>
+      queuedExternalActivationChild.exitCode !== null ||
+      queuedExternalActivationChild.signalCode !== null,
+    timeoutMilliseconds,
+  );
+  await delay(300);
+  const targetsWithQueuedExternalActivation = await devToolsTargets(
+    externalGlobalDebugPort,
+    "external-copy owner with queued path activation",
+  );
+  const queuedExternalTarget = targetsWithQueuedExternalActivation.find(
+    (target) =>
+      target.id === queuedExternalTargetSnapshot.id &&
+      target.url === queuedExternalTargetSnapshot.url,
+  );
+  const queuedExternalDialogCount = await externalCopyDialogDriver.request(
+    "POST",
+    `/session/${externalCopyDialogDriver.sessionId}/execute/sync`,
+    {
+      script: "return document.querySelectorAll('[role=\"dialog\"]').length;",
+      args: [],
+    },
+  );
+  const queuedExternalNativeOwner = nativeOwnedWindowState(externalCopyGlobal);
+  const activeExternalHosts = applicationProcesses().filter(isHost);
+  const queuedActivationPreservedExternalOwner =
+    queuedExternalTarget !== undefined &&
+    queuedExternalDialogCount === 1 &&
+    queuedExternalNativeOwner.dialogCount === 1 &&
+    queuedExternalNativeOwner.dialog?.enabled === true &&
+    queuedExternalNativeOwner.owner?.visible === false &&
+    queuedExternalNativeOwner.owner?.enabled === false &&
+    activeExternalHosts.length === 1 &&
+    sameProcessInstance(activeExternalHosts[0], queuedExternalCopyHost);
+  if (!queuedActivationPreservedExternalOwner) {
+    throw new Error(
+      `A real-path activation replaced the external-copy owner or duplicated its pending Host: ${JSON.stringify({
+        expectedTarget: queuedExternalTargetSnapshot,
+        observedTarget: queuedExternalTarget,
+        queuedExternalDialogCount,
+        nativeOwner: queuedExternalNativeOwner,
+        expectedHost: queuedExternalCopyHost,
+        activeHosts: activeExternalHosts,
+      })}`,
+    );
+  }
+
+  await click(
+    externalCopyDialogDriver,
+    "xpath",
+    "//button[normalize-space()='Cancelar']",
+    "queued external-copy cancellation",
+  );
+  externalCopyDialogDriver = await disposeConfirmedWebDriver(
+    externalCopyDialogDriver,
+  );
+  await waitForExit(
+    queuedExternalCopyHost,
+    "queued external-copy pending Host cleanup",
+  );
+  await waitForLogEvent(
+    "global_activation_forwarded",
+    secondForwardedExternalActivationCount + 1,
+    "real-path activation consumed after the preceding decision terminal",
+  );
+  await waitForLogEvent(
+    "global_activation_batch_completed",
+    externalActivationBatchCount + 1,
+    "cancelled queued external-copy activation terminal",
+  );
+
+  externalCopyHost = await waitForNewApplication(
+    isHost,
+    [
+      firstHost,
+      crashedHost,
+      secondHost,
+      originalHost,
+      cancelledExternalCopyHost,
+      queuedExternalCopyHost,
+    ],
+    "serial external-copy retry Host",
+  );
+  const serialExternalTargetSnapshot = await waitFor(
+    "serial external-copy retry dialog target",
+    async () => {
+      const targets = await devToolsTargets(
+        externalGlobalDebugPort,
+        "serial external-copy retry owner",
+      );
+      const decisionTargets = targets.filter((target) => {
+        try {
+          const url = new URL(target.url);
+          return (
+            url.pathname.endsWith("/dialog.html") &&
+            url.searchParams.get("kind") === "external-copy" &&
+            target.id !== queuedExternalTargetSnapshot.id
+          );
+        } catch {
+          return false;
+        }
+      });
+      return decisionTargets.length === 1 ? decisionTargets[0] : undefined;
+    },
+    timeoutMilliseconds,
+  );
+  externalCopyDialogDriver = await startAttachedWebDriver(
+    externalGlobalDebugPort,
+    "serial external-copy retry dialog",
+  );
+  await switchToWebDriverWindow(
+    externalCopyDialogDriver,
+    (url) => {
+      const parsed = new URL(url);
+      return (
+        parsed.pathname.endsWith("/dialog.html") &&
+        parsed.searchParams.get("kind") === "external-copy"
+      );
+    },
+    "serial external-copy retry WebView",
+  );
+  await findElement(
+    externalCopyDialogDriver,
+    "css selector",
+    ".ui-owned-window-shell [role='dialog']",
+    "serial external-copy retry decision",
+  );
+  const externalAttemptBeforePickerCancel = new URL(
+    serialExternalTargetSnapshot.url,
+  ).searchParams.get("attemptId");
+  const retryNativeOwnerBeforePicker =
+    nativeOwnedWindowState(externalCopyGlobal);
+
+  await clickUntilLogEvent(
+    externalCopyDialogDriver,
+    "xpath",
+    "//button[normalize-space()='Salvar cópia como…']",
+    "native_save_dialog_opening",
+    "external-copy first Save Copy As action",
+  );
+  const cancelledExternalCopyPicker = driveNativeDialog(
+    externalCopyGlobal,
+    "cancel",
+    "Criar Projeto MyAlbuns",
+  );
+  await findElement(
+    externalCopyDialogDriver,
+    "css selector",
+    ".ui-owned-window-shell [role='dialog']",
+    "external-copy decision after native picker cancellation",
+  );
+  const externalAttemptAfterPickerCancel =
+    await externalCopyDialogDriver.request(
+      "POST",
+      `/session/${externalCopyDialogDriver.sessionId}/execute/sync`,
+      {
+        script:
+          "return new URLSearchParams(window.location.search).get('attemptId');",
+        args: [],
+      },
+    );
+  const retryNativeOwnerAfterPicker =
+    nativeOwnedWindowState(externalCopyGlobal);
+  const pickerCancellationPreservedAttempt =
+    cancelledExternalCopyPicker.action === "cancel" &&
+    externalAttemptBeforePickerCancel !== null &&
+    externalAttemptAfterPickerCancel === externalAttemptBeforePickerCancel &&
+    aliveProcessInstances([externalCopyHost]).length === 1 &&
+    applicationProcesses().filter(isHost).length === 1 &&
+    retryNativeOwnerBeforePicker.dialog?.ownerHwnd ===
+      retryNativeOwnerAfterPicker.dialog?.ownerHwnd &&
+    retryNativeOwnerAfterPicker.dialogCount === 1 &&
+    retryNativeOwnerAfterPicker.owner?.visible === false &&
+    retryNativeOwnerAfterPicker.owner?.enabled === false;
+  if (!pickerCancellationPreservedAttempt) {
+    throw new Error(
+      "Cancelling the external-copy picker did not return to the same opening owner, attempt, and Host",
+    );
+  }
+
+  const emptyActivationForwardedCount = recordsFor(
+    "global_activation_forwarded",
+  ).length;
+  const queuedEmptyActivationChild = spawn(applicationPath, [], {
+    cwd: workspace,
+    windowsHide: true,
+    stdio: "ignore",
+    env: externalApplicationEnvironment,
+  });
+  await waitFor(
+    "queued pathless activation client terminal",
+    () =>
+      queuedEmptyActivationChild.exitCode !== null ||
+      queuedEmptyActivationChild.signalCode !== null,
+    timeoutMilliseconds,
+  );
+  await delay(300);
+  const nativeOwnerWithQueuedEmptyActivation =
+    nativeOwnedWindowState(externalCopyGlobal);
+  const emptyActivationPreservedPendingOwner =
+    nativeOwnerWithQueuedEmptyActivation.dialogCount === 1 &&
+    nativeOwnerWithQueuedEmptyActivation.dialog?.ownerHwnd ===
+      retryNativeOwnerAfterPicker.dialog?.ownerHwnd &&
+    nativeOwnerWithQueuedEmptyActivation.owner?.visible === false &&
+    nativeOwnerWithQueuedEmptyActivation.owner?.enabled === false &&
+    aliveProcessInstances([externalCopyHost]).length === 1;
+  if (!emptyActivationPreservedPendingOwner) {
+    throw new Error(
+      "A queued pathless activation altered the pending external-copy owner",
+    );
+  }
+
+  await clickUntilLogEvent(
+    externalCopyDialogDriver,
+    "xpath",
+    "//button[normalize-space()='Salvar cópia como…']",
+    "native_save_dialog_opening",
+    "external-copy retried Save Copy As action",
+  );
+  const selectedExternalCopy = driveNativeDialog(
+    externalCopyGlobal,
+    "select",
+    "Criar Projeto MyAlbuns",
+    externalSavedCopyPath,
+  );
+  if (selectedExternalCopy.action !== "select") {
+    throw new Error("The external-copy destination was not confirmed");
+  }
+  await waitForLogEvent(
+    "global_activation_forwarded",
+    emptyActivationForwardedCount + 1,
+    "pathless activation consumed after successful external-copy handoff",
+  );
+  await waitForExit(externalCopyGlobal, "external-copy Global handoff");
+  await waitForLogEvent(
+    "global_activation_batch_completed",
+    externalActivationBatchCount + 2,
+    "serial external-copy activation handoff terminal",
+  );
+  const emptyActivationDidNotResurrectGlobal =
+    aliveProcessInstances([externalCopyGlobal]).length === 0;
+  externalCopyDialogDriver = await disposeConfirmedWebDriver(
+    externalCopyDialogDriver,
+  );
+  await waitForHostUiReady(
+    externalCopyHost,
+    "external-copy Project UI ready in the pending Host",
+  );
+  externalCopyHostDriver = await startAttachedWebDriver(
+    externalHostDebugPort,
+    "external-copy Project Host",
+    externalProjectDialogDebugPort,
+  );
+  await findElement(
+    externalCopyHostDriver,
+    "css selector",
+    ".app-shell",
+    "external-copy Project UI",
+  );
+  const externalSavedDocument = JSON.parse(
+    readFileSync(externalSavedCopyPath).toString("utf8"),
+  );
+  const externalSourcePreserved =
+    readFileSync(externalCopyPath).equals(externalSourceBytes);
+  const samePendingHostCompletedHandoff =
+    applicationProcesses().filter(isHost).length === 1 &&
+    aliveProcessInstances([externalCopyHost]).length === 1;
+  const externalActivationBatches = recordsFor(
+    "global_activation_batch_completed",
+  ).slice(externalActivationBatchCount);
+  const realPathActivationsCompletedSerially =
+    externalActivationBatches.length === 2 &&
+    Number(externalActivationBatches[0]?.failed_count) === 1 &&
+    Number(externalActivationBatches[1]?.opened_count) === 1 &&
+    aliveProcessInstances([cancelledExternalCopyHost, queuedExternalCopyHost])
+      .length === 0 &&
+    new Set([
+      cancelledExternalCopyHost.processId,
+      queuedExternalCopyHost.processId,
+      externalCopyHost.processId,
+    ]).size === 3;
+  if (
+    !externalSourcePreserved ||
+    !samePendingHostCompletedHandoff ||
+    !realPathActivationsCompletedSerially ||
+    externalSavedDocument.projectId === externalSourceDocument.projectId ||
+    externalSavedDocument.revision !== externalSourceDocument.revision
+  ) {
+    throw new Error(
+      "Saving the external copy changed its source, revision, identity isolation, or pending Host",
+    );
+  }
+  const graphicsMutationCount = recordsFor("project_intent_applied").length;
+  await replaceAlbumInformationDpi(
+    externalCopyHostDriver,
+    "420",
+    "graphics-failure dirty DPI input",
+  );
+  await applyAlbumInformation(
+    externalCopyHostDriver,
+    "graphics-failure dirty Album information action",
+  );
+  await waitForLogEvent(
+    "project_intent_applied",
+    graphicsMutationCount + 1,
+    "graphics-failure dirty Project mutation",
+  );
+
+  const contextLostCount = recordsFor("canvas_context_lost").length;
+  const contextRestoreFailedCount = recordsFor(
+    "canvas_context_restore_failed",
+  ).length;
+  const contextLossDispatched = await externalCopyHostDriver.request(
+    "POST",
+    `/session/${externalCopyHostDriver.sessionId}/execute/sync`,
+    {
+      script: `
+        const canvas = document.querySelector('canvas.pixi-canvas');
+        if (!canvas) return false;
+        return canvas.dispatchEvent(
+          new Event('webglcontextlost', { bubbles: false, cancelable: true }),
+        ) === false;
+      `,
+      args: [],
+    },
+  );
+  if (!contextLossDispatched) {
+    throw new Error(
+      "The productive Canvas did not accept the context-loss event",
+    );
+  }
+  await waitForLogEvent(
+    "canvas_context_lost",
+    contextLostCount + 1,
+    "productive Canvas context loss",
+  );
+  await waitForLogEvent(
+    "canvas_context_restore_failed",
+    contextRestoreFailedCount + 1,
+    "productive Canvas restore timeout",
+  );
+  const blockedWorkspaceAfterGraphicsFailure = await waitFor(
+    "immediate Project interaction block after graphics failure",
+    async () => {
+      const state = await externalCopyHostDriver.request(
+        "POST",
+        `/session/${externalCopyHostDriver.sessionId}/execute/sync`,
+        {
+          script: `
+            const grid = document.querySelector('.workspace-grid');
+            const exportButton = document.querySelector("button[aria-label='Exportar Lâmina']");
+            return {
+              canvasStillMounted: document.querySelector('canvas.pixi-canvas') !== null,
+              exportDisabled: exportButton?.disabled === true,
+              inlineFailureCount: document.querySelectorAll('.startup-surface [role="alert"]').length,
+              workspaceBusy: grid?.getAttribute('aria-busy') === 'true',
+              workspaceInert: grid?.hasAttribute('inert') === true,
+            };
+          `,
+          args: [],
+        },
+      );
+      return state.workspaceInert && state.workspaceBusy && state.exportDisabled
+        ? state
+        : undefined;
+    },
+    timeoutMilliseconds,
+  );
+  const graphicsDialogTarget = await waitForProjectDialogStateTarget(
+    externalProjectDialogDebugPort,
+    "graphicsFailure",
+    "graphics-failure Project dialog target",
+  );
+  const graphicsPresentation = await withProjectDialog(
+    externalCopyHostDriver,
+    "graphics-failure presentation",
+    (dialogDriver) =>
+      dialogDriver.request(
+        "POST",
+        `/session/${dialogDriver.sessionId}/execute/sync`,
+        {
+          script: `
+            const dialog = document.querySelector('[role="dialog"]');
+            const titleId = dialog?.getAttribute('aria-labelledby');
+            return {
+              ariaModal: dialog?.getAttribute('aria-modal') ?? null,
+              dialogCount: document.querySelectorAll('[role="dialog"]').length,
+              externalProjectDialog: window.location.pathname.endsWith('/project-dialog.html'),
+              title: titleId ? document.getElementById(titleId)?.textContent?.trim() ?? null : null,
+            };
+          `,
+          args: [],
+        },
+      ),
+  );
+  const graphicsNativeOwner = nativeOwnedWindowState(externalCopyHost);
+  const graphicsDialogOwnedAndProjectBlocked =
+    graphicsDialogTarget !== undefined &&
+    graphicsPresentation.dialogCount === 1 &&
+    graphicsPresentation.ariaModal === "true" &&
+    graphicsPresentation.externalProjectDialog &&
+    graphicsPresentation.title === "O Canvas não pôde ser iniciado" &&
+    graphicsNativeOwner.dialogCount === 1 &&
+    graphicsNativeOwner.dialog?.visible === true &&
+    graphicsNativeOwner.dialog?.enabled === true &&
+    graphicsNativeOwner.owner?.visible === true &&
+    graphicsNativeOwner.owner?.enabled === false &&
+    blockedWorkspaceAfterGraphicsFailure.canvasStillMounted &&
+    blockedWorkspaceAfterGraphicsFailure.inlineFailureCount === 0;
+  if (!graphicsDialogOwnedAndProjectBlocked) {
+    throw new Error(
+      `The late graphics failure did not use one external Project-owned dialog: ${JSON.stringify(
+        {
+          blockedWorkspaceAfterGraphicsFailure,
+          graphicsNativeOwner,
+          graphicsPresentation,
+          targetCount: graphicsDialogTarget ? 1 : 0,
+        },
+      )}`,
+    );
+  }
+
+  const dirtyGraphicsCloseCount = recordsFor(
+    "dirty_project_close_confirmation_required",
+  ).length;
+  await clickProjectDialogAction(
+    externalCopyHostDriver,
+    "O Canvas não pôde ser iniciado",
+    "Fechar Projeto",
+    "graphics-failure close request",
+  );
+  await waitForLogEvent(
+    "dirty_project_close_confirmation_required",
+    dirtyGraphicsCloseCount + 1,
+    "dirty close confirmation after graphics failure",
+  );
+  const firstGraphicsCloseTarget = await waitForProjectDialogStateTarget(
+    externalProjectDialogDebugPort,
+    "projectCloseConfirmation",
+    "dirty close confirmation Project dialog target",
+    [graphicsDialogTarget.id],
+  );
+  const cancelledGraphicsCloseCount = recordsFor(
+    "project_close_cancelled",
+  ).length;
+  await clickProjectDialogAction(
+    externalCopyHostDriver,
+    "Salvar alterações antes de fechar?",
+    "Cancelar",
+    "cancel dirty close after graphics failure",
+  );
+  await waitForLogEvent(
+    "project_close_cancelled",
+    cancelledGraphicsCloseCount + 1,
+    "cancelled dirty close after graphics failure",
+  );
+  const rearmedGraphicsTarget = await waitForProjectDialogStateTarget(
+    externalProjectDialogDebugPort,
+    "graphicsFailure",
+    "rearmed graphics-failure Project dialog target",
+    [graphicsDialogTarget.id, firstGraphicsCloseTarget.id],
+  );
+  const rearmedGraphicsPresentation = await withProjectDialog(
+    externalCopyHostDriver,
+    "rearmed graphics-failure presentation",
+    async (dialogDriver) => {
+      await findElement(
+        dialogDriver,
+        "xpath",
+        accessibleProjectDialogXpath("O Canvas não pôde ser iniciado"),
+        "rearmed graphics-failure dialog",
+      );
+      return dialogDriver.request(
+        "POST",
+        `/session/${dialogDriver.sessionId}/execute/sync`,
+        {
+          script:
+            "return document.querySelectorAll('[role=\"dialog\"]').length;",
+          args: [],
+        },
+      );
+    },
+  );
+  const rearmedGraphicsNativeOwner = nativeOwnedWindowState(externalCopyHost);
+  const cancelledCloseRearmedSingleGraphicsDialog =
+    rearmedGraphicsTarget !== undefined &&
+    rearmedGraphicsPresentation === 1 &&
+    rearmedGraphicsNativeOwner.dialogCount === 1 &&
+    rearmedGraphicsNativeOwner.owner?.visible === true &&
+    rearmedGraphicsNativeOwner.owner?.enabled === false &&
+    aliveProcessInstances([externalCopyHost]).length === 1;
+  if (!cancelledCloseRearmedSingleGraphicsDialog) {
+    throw new Error(
+      "Cancelling dirty Project close did not rearm exactly one graphics-failure dialog",
+    );
+  }
+
+  const secondDirtyGraphicsCloseCount = recordsFor(
+    "dirty_project_close_confirmation_required",
+  ).length;
+  await clickProjectDialogAction(
+    externalCopyHostDriver,
+    "O Canvas não pôde ser iniciado",
+    "Fechar Projeto",
+    "second graphics-failure close request",
+  );
+  await waitForLogEvent(
+    "dirty_project_close_confirmation_required",
+    secondDirtyGraphicsCloseCount + 1,
+    "second dirty close confirmation after graphics failure",
+  );
+  await waitForProjectDialogStateTarget(
+    externalProjectDialogDebugPort,
+    "projectCloseConfirmation",
+    "second dirty close confirmation Project dialog target",
+    [
+      graphicsDialogTarget.id,
+      firstGraphicsCloseTarget.id,
+      rearmedGraphicsTarget.id,
+    ],
+  );
+  await clickProjectDialogAction(
+    externalCopyHostDriver,
+    "Salvar alterações antes de fechar?",
+    "Descartar e fechar",
+    "discard dirty Project after graphics failure",
+  ).catch(async (error) => {
+    if (recordsFor("project_close_discarded").length === 0) throw error;
+  });
+  externalCopyHostDriver = await disposeConfirmedWebDriver(
+    externalCopyHostDriver,
+  );
+  await waitForExit(
+    externalCopyHost,
+    "external-copy Project Host close after graphics failure",
+  );
+  const graphicsFailureTerminalCleanedHost =
+    aliveProcessInstances([externalCopyHost]).length === 0;
+  externalCopyReplacementGlobal = await waitForNewApplication(
+    (instance) => !isHost(instance),
+    [
+      firstGlobal,
+      secondGlobal,
+      recoveryGlobal,
+      originalGlobal,
+      originalReplacementGlobal,
+      finalGlobal,
+      externalCopyGlobal,
+    ],
+    "external-copy replacement Global",
+  );
+  terminateProcessInstance(externalCopyReplacementGlobal);
+  await waitForExit(
+    externalCopyReplacementGlobal,
+    "external-copy replacement Global cleanup",
+  );
+
+  const externalCopyOpening = {
+    choices: externalCopyPresentation.choices,
+    dialogCount: externalCopyPresentation.dialogCount,
+    modalLayerCount: externalCopyPresentation.modalLayerCount,
+    ownedShellCount: externalCopyPresentation.ownedShellCount,
+    ariaModal: externalCopyPresentation.ariaModal,
+    title: externalCopyPresentation.title,
+    initialFocus: externalCopyPresentation.initialFocus,
+    viewportWidth: externalCopyPresentation.viewportWidth,
+    externalDialog: externalCopyPresentation.externalDialog,
+    openedFromLoadingOwner: externalCopyPresentation.openedFromLoadingOwner,
+    globalRoutePreserved: externalTargetSnapshot.globalTargets.length >= 1,
+    decisionDialogTargetCount: externalTargetSnapshot.decisionTargets.length,
+    hostWebViewBeforeDecision: externalHostWebViewBeforeDecision,
+    projectVisibleBeforeDecision:
+      externalProjectWindowTitleBeforeDecision !== "",
+    cancelRestoredGlobalAndCleanedHost,
+    emptyActivationDidNotResurrectGlobal,
+    emptyActivationPreservedPendingOwner,
+    nativeOwnerReplaced: firstExternalOwnerWasReplaced,
+    pickerCancellationPreservedAttempt,
+    realPathActivationsCompletedSerially,
+    queuedActivationPreservedOwner: queuedActivationPreservedExternalOwner,
+    samePendingHostCompletedHandoff,
+    sourcePreserved: externalSourcePreserved,
+    revisionPreserved:
+      externalSavedDocument.revision === externalSourceDocument.revision,
+    identityIsolated:
+      externalSavedDocument.projectId !== externalSourceDocument.projectId,
+    pickerOwnedByOpeningProcess: selectedExternalCopy.exactProcess === true,
+  };
+
+  const graphicsFailure = {
+    cancelledCloseRearmedSingleDialog:
+      cancelledCloseRearmedSingleGraphicsDialog,
+    dialogOwnedByProject: graphicsDialogOwnedAndProjectBlocked,
+    hostCleanedAfterTerminal: graphicsFailureTerminalCleanedHost,
+    inlineFailureCount: blockedWorkspaceAfterGraphicsFailure.inlineFailureCount,
+    ownerEnabledWhileOpen: graphicsNativeOwner.owner?.enabled ?? null,
+    ownerVisibleWhileOpen: graphicsNativeOwner.owner?.visible ?? null,
+    projectCanvasRemainedMounted:
+      blockedWorkspaceAfterGraphicsFailure.canvasStillMounted,
+    projectDialogTargetCount: graphicsDialogTarget ? 1 : 0,
+    workspaceBusyBeforeDialogTerminal:
+      blockedWorkspaceAfterGraphicsFailure.workspaceBusy,
+    workspaceInertBeforeDialogTerminal:
+      blockedWorkspaceAfterGraphicsFailure.workspaceInert,
+    exportDisabledBeforeDialogTerminal:
+      blockedWorkspaceAfterGraphicsFailure.exportDisabled,
+  };
+
   const bootstrapCorrelations = [
     {
       globalProcessId: firstGlobal.processId,
@@ -2705,6 +3756,10 @@ try {
     {
       globalProcessId: originalGlobal.processId,
       hostProcessId: originalHost.processId,
+    },
+    {
+      globalProcessId: externalCopyGlobal.processId,
+      hostProcessId: externalCopyHost.processId,
     },
   ];
   await waitFor(
@@ -2767,11 +3822,16 @@ try {
       secondHost.processId,
       originalGlobal.processId,
       originalHost.processId,
+      externalCopyGlobal.processId,
+      cancelledExternalCopyHost.processId,
+      queuedExternalCopyHost.processId,
+      externalCopyHost.processId,
       ...exportSpawns.map((record) => Number(record.imaging_process_id)),
-    ]).size !== 6 + exportSpawns.length
+    ]).size !==
+    10 + exportSpawns.length
   ) {
     throw new Error(
-      "Global, Host and both Processadores did not use distinct PIDs",
+      "Global, Host, serialized external-copy attempts and both Processadores did not use distinct PIDs",
     );
   }
   if (applicationProcesses().length !== 0) {
@@ -2800,8 +3860,27 @@ try {
         creativeRevision: recoveryCheckpoint.creativeState.revision,
         recoveredDpi: recoveryCheckpoint.creativeState.project.document.dpi,
         promptChoices: recoveryChoices,
+        presentation: {
+          ...recoveryPresentation,
+          recoveredOwnerUrl,
+          owner: "global-opening",
+          globalRoutePreserved:
+            recoveryTargetSnapshot.globalTargets.length >= 1,
+          recoveryDialogTargetCount:
+            recoveryTargetSnapshot.recoveryTargets.length,
+          hostWebViewBeforeDecision,
+          projectRouteNormal,
+          projectVisibleBeforeDecision: projectWindowTitleBeforeDecision !== "",
+          sameOpeningWindow: recoveryPresentation.openedFromLoadingOwner,
+          stableOpeningOwner:
+            recoveryGlobal.processId !== secondHost.processId &&
+            recoveryPresentation.externalDialog,
+          queuedActivationPreservedOwner,
+          singleHostDuringQueuedActivation,
+        },
         opaqueProjectKey:
-          path.basename(recoveryCheckpointPath) === `${originalNamespace}.json` &&
+          path.basename(recoveryCheckpointPath) ===
+            `${originalNamespace}.json` &&
           !path.basename(recoveryCheckpointPath).includes(originalProjectId),
         completedActionCheckpointed: true,
         midGesturePreservedPreviousCheckpoint,
@@ -2818,6 +3897,8 @@ try {
         lockReleasedToDistinctHost:
           crashedHost.processId !== secondHost.processId,
       },
+      externalCopyOpening,
+      graphicsFailure,
       saveAs: {
         cancelledBeforeCore: cancelledSaveAsBeforeCore,
         createAuthorization: "createOnly",
@@ -2865,6 +3946,10 @@ try {
         host: secondHost.processId,
         simultaneousOriginalGlobal: originalGlobal.processId,
         simultaneousOriginalHost: originalHost.processId,
+        externalCopyGlobal: externalCopyGlobal.processId,
+        cancelledExternalCopyHost: cancelledExternalCopyHost.processId,
+        queuedExternalCopyHost: queuedExternalCopyHost.processId,
+        externalCopyHost: externalCopyHost.processId,
         imaging: Number(successfulSpawn.imaging_process_id),
         missingOriginalImaging: Number(missingOriginalSpawn.imaging_process_id),
       },
@@ -2876,7 +3961,10 @@ try {
       canvasPhotoSample,
       sourcePathExposedToWebView,
       terminalCounts: {
-        globalHandoffs: eventCount(logText(), "global_exited_after_project_handoff"),
+        globalHandoffs: eventCount(
+          logText(),
+          "global_exited_after_project_handoff",
+        ),
         hostReady: eventCount(logText(), "host_ready"),
         imagingStopped: records.filter(
           (record) =>
@@ -2890,13 +3978,71 @@ try {
       },
     }),
   );
+} catch (error) {
+  try {
+    const processes = applicationProcesses();
+    const nativeWindows = processes.map((instance) => {
+      try {
+        return { instance, ...nativeOwnedWindowState(instance) };
+      } catch (observationError) {
+        return { instance, observationError: String(observationError) };
+      }
+    });
+    const observations = {};
+    for (const [label, driver] of Object.entries({
+      globalDriver,
+      hostDriver,
+      originalDriver,
+      recoveryDialogDriver,
+      secondGlobalDriver,
+      externalCopyDialogDriver,
+      externalCopyHostDriver,
+    })) {
+      if (!driver) continue;
+      try {
+        observations[label] = await readProjectInteractionState(driver);
+        const screenshot = await driver.request(
+          "GET",
+          `/session/${driver.sessionId}/screenshot`,
+        );
+        writeFileSync(
+          path.join(scratch, `failure-${label}.png`),
+          Buffer.from(screenshot, "base64"),
+        );
+      } catch (observationError) {
+        observations[label] = {
+          ...observations[label],
+          observationError: String(observationError),
+        };
+      }
+    }
+    writeFileSync(
+      path.join(scratch, "failure.json"),
+      JSON.stringify({
+        error: String(error),
+        stack: error.stack,
+        observations,
+        childOutput: Object.fromEntries([...childOutputs].map(([pid, read]) => [pid, read()])),
+        processes,
+        nativeWindows,
+        browsers: webViewProcessesForDataDirectory(scratch),
+        recentEvents: logRecords().slice(-20),
+      }, null, 2),
+    );
+  } catch (diagnosticError) {
+    console.error(`Productive journey diagnostics failed: ${diagnosticError}`);
+  }
+  throw error;
 } finally {
   let driverCleanupFailure;
   for (const driver of [
     globalDriver,
     hostDriver,
     originalDriver,
+    recoveryDialogDriver,
     secondGlobalDriver,
+    externalCopyDialogDriver,
+    externalCopyHostDriver,
   ]) {
     if (driver) {
       try {
@@ -2908,6 +4054,13 @@ try {
   }
   for (const instance of applicationProcesses()) {
     terminateProcessInstance(instance);
+  }
+  if (existsSync(externalCopyPath)) {
+    spawnSync("attrib.exe", ["-R", externalCopyPath], {
+      cwd: workspace,
+      windowsHide: true,
+      encoding: "utf8",
+    });
   }
   if (driverCleanupFailure) {
     throw driverCleanupFailure;

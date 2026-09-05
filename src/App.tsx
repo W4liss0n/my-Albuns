@@ -16,7 +16,6 @@ import type {
   MediaPreviewDemand,
   MediaPreviewPort,
   ProjectStartupPort,
-  ProjectRecoveryDecision,
   ProjectCorePort,
   ProjectWindowPort,
 } from "./application/projectPorts";
@@ -30,8 +29,10 @@ import {
   type CanvasGraphicsDiagnosticProbe,
 } from "./components/canvasGraphicsDiagnosticProbeContext";
 import { ProjectWorkspace } from "./components/ProjectWorkspace";
+import { useProjectCloseController } from "./components/useProjectCloseController";
 import { useProjectMutationRunner } from "./components/useProjectMutationRunner";
 import { useProjectOperationFailureDialog } from "./components/useProjectOperationFailureDialog";
+import { useProjectGraphicsFailureDialog } from "./components/useProjectGraphicsFailureDialog";
 import { BrandWordmark, InlineNotice } from "./ui";
 import "./ui/theme.css";
 import "./ui/ui.css";
@@ -64,15 +65,6 @@ interface MediaPreviewSubscription {
   port: MediaPreviewPort;
 }
 
-type RecoveryStartupState =
-  | "checking"
-  | "none"
-  | "available"
-  | "confirmDiscard"
-  | "resolving"
-  | "resolved"
-  | "deferred";
-
 function App({
   exportPipelinePort,
   mediaPreviewPort,
@@ -90,11 +82,13 @@ function App({
   const [runtimeGraphicsDiagnostic, setRuntimeGraphicsDiagnostic] =
     useState<GraphicsDiagnostic | null>(null);
   const editorGraphics = runtimeGraphicsDiagnostic ?? graphics;
+  const initialGraphicsFailure = !graphics.supported ? graphics : null;
+  const runtimeGraphicsFailure =
+    runtimeGraphicsDiagnostic && !runtimeGraphicsDiagnostic.supported
+      ? runtimeGraphicsDiagnostic
+      : null;
   const [projection, setProjection] = useState<EditorProjection | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [recoveryStartup, setRecoveryStartup] =
-    useState<RecoveryStartupState>("checking");
-  const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const [mediaPreviews, setMediaPreviews] = useState<
     Readonly<Record<string, MediaPreview>>
   >({});
@@ -108,6 +102,9 @@ function App({
   const [saveAsStartupFailure, setSaveAsStartupFailure] = useState(() =>
     projectSaveAsStartupFailure(window.location.hash),
   );
+  const [initialGraphicsCloseError, setInitialGraphicsCloseError] = useState<
+    string | null
+  >(null);
   const [preferencesReadyProject, setPreferencesReadyProject] = useState("");
   const [mediaChangeSubscription, setMediaChangeSubscription] =
     useState<MediaPreviewSubscription | null>(null);
@@ -115,7 +112,6 @@ function App({
     useState<MediaPreviewSubscription | null>(null);
   const mediaDemandSequence = useRef({ projectId: "", revision: 0 });
   const uiReadyProject = useRef("");
-  const recoveryUiReady = useRef(false);
   const loggerRef = useRef(logger);
 
   useEffect(() => {
@@ -123,9 +119,14 @@ function App({
   }, [logger]);
 
   useProjectOperationFailureDialog({
-    message: saveAsStartupFailure ?? cacheProcessorWarning?.message ?? null,
+    message:
+      initialGraphicsCloseError ??
+      saveAsStartupFailure ??
+      cacheProcessorWarning?.message ??
+      null,
     projectDialogPort,
     onDismiss: () => {
+      setInitialGraphicsCloseError(null);
       const dismissedSaveAsFailure = saveAsStartupFailure !== null;
       setSaveAsStartupFailure(null);
       setCacheProcessorWarning(null);
@@ -141,28 +142,6 @@ function App({
 
   useEffect(() => {
     if (!graphics.supported) return;
-    let active = true;
-    projectStartupPort.recoveryStatus().then(
-      (status) => {
-        if (!active) return;
-        setRecoveryStartup(status.kind === "available" ? "available" : "none");
-      },
-      (error: unknown) => {
-        if (!active) return;
-        setLoadError(
-          error instanceof Error
-            ? error.message
-            : "Não foi possível verificar a Recuperação do Projeto.",
-        );
-      },
-    );
-    return () => {
-      active = false;
-    };
-  }, [graphics.supported, projectStartupPort]);
-
-  useEffect(() => {
-    if (!graphics.supported || recoveryStartup !== "none") return;
     let active = true;
     const operationId = createLogInstanceId("project-load");
     logger.write({
@@ -206,56 +185,7 @@ function App({
     return () => {
       active = false;
     };
-  }, [graphics.supported, logger, projectCorePort, recoveryStartup]);
-
-  useEffect(() => {
-    if (
-      recoveryUiReady.current ||
-      !["available", "confirmDiscard", "resolving"].includes(recoveryStartup)
-    ) {
-      return;
-    }
-    recoveryUiReady.current = true;
-    projectStartupPort.confirmUiReady().catch((error: unknown) => {
-      recoveryUiReady.current = false;
-      logger.write({
-        level: "error",
-        component: "application",
-        event: "project_recovery_ui_ready_failed",
-        reason: logReasonFromError(error),
-      });
-      setLoadError("Não foi possível confirmar a interface de Recuperação.");
-    });
-  }, [logger, projectStartupPort, recoveryStartup]);
-
-  const resolveRecovery = useCallback(
-    async (decision: ProjectRecoveryDecision) => {
-      setRecoveryError(null);
-      setRecoveryStartup("resolving");
-      try {
-        const resolution = await projectStartupPort.resolveRecovery(decision);
-        if (resolution.kind === "deferred") {
-          setRecoveryStartup("deferred");
-          return;
-        }
-        setMediaDemand({ visibleMediaIds: [], preloadMediaIds: [] });
-        setProjection(resolution.projection);
-        setRecoveryStartup("resolved");
-      } catch (error: unknown) {
-        setRecoveryError(
-          error instanceof Error
-            ? error.message
-            : "Não foi possível concluir a escolha de Recuperação.",
-        );
-        setRecoveryStartup(
-          decision === "discardCheckpointAndOpenLastSaved"
-            ? "confirmDiscard"
-            : "available",
-        );
-      }
-    },
-    [projectStartupPort],
-  );
+  }, [graphics.supported, logger, projectCorePort]);
 
   useEffect(() => {
     logger.write({
@@ -552,13 +482,9 @@ function App({
     projectId,
   ]);
 
-  if (!editorGraphics.supported) {
-    return <ProjectGraphicsFailure diagnostic={editorGraphics} />;
-  }
-
   if (loadError) {
     return (
-      <main className="startup-surface">
+      <main className="startup-surface ui-chrome-selection-scope">
         <section className="startup-card" role="alert">
           <BrandWordmark compact />
           <p className="eyebrow">MyAlbuns</p>
@@ -569,105 +495,21 @@ function App({
     );
   }
 
-  if (recoveryStartup === "deferred") {
+  if (initialGraphicsFailure) {
     return (
-      <main className="startup-surface" aria-busy="true">
-        <section className="startup-card">
-          <BrandWordmark compact />
-          <span className="loading-mark" aria-hidden="true" />
-          <p>Fechando o Projeto…</p>
-        </section>
-      </main>
-    );
-  }
-
-  if (recoveryStartup === "confirmDiscard") {
-    return (
-      <main className="startup-surface">
-        <section className="startup-card">
-          <BrandWordmark compact />
-          <p className="eyebrow">Recuperação de sessão</p>
-          <h1>Descartar o trabalho recuperável?</h1>
-          <p>
-            A última versão salva será aberta e o trabalho recuperável será
-            removido definitivamente.
-          </p>
-          {recoveryError && (
-            <InlineNotice tone="error">{recoveryError}</InlineNotice>
-          )}
-          <div className="recovery-actions">
-            <button
-              className="recovery-primary"
-              type="button"
-              onClick={() =>
-                void resolveRecovery("discardCheckpointAndOpenLastSaved")
-              }
-            >
-              Descartar recuperação e abrir
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setRecoveryError(null);
-                setRecoveryStartup("available");
-              }}
-            >
-              Voltar
-            </button>
-          </div>
-        </section>
-      </main>
-    );
-  }
-
-  if (recoveryStartup === "available" || recoveryStartup === "resolving") {
-    const busy = recoveryStartup === "resolving";
-    return (
-      <main className="startup-surface">
-        <section className="startup-card">
-          <BrandWordmark compact />
-          <p className="eyebrow">Recuperação de sessão</p>
-          <h1>Recuperar trabalho não salvo?</h1>
-          <p>
-            O MyAlbuns encontrou trabalho concluído depois da última versão
-            salva deste Projeto.
-          </p>
-          {recoveryError && (
-            <InlineNotice tone="error">{recoveryError}</InlineNotice>
-          )}
-          <div className="recovery-actions">
-            <button
-              className="recovery-primary"
-              disabled={busy}
-              type="button"
-              onClick={() => void resolveRecovery("reopenAndRecover")}
-            >
-              Reabrir e recuperar
-            </button>
-            <button
-              disabled={busy}
-              type="button"
-              onClick={() => setRecoveryStartup("confirmDiscard")}
-            >
-              Abrir última versão salva
-            </button>
-            <button
-              disabled={busy}
-              type="button"
-              onClick={() => void resolveRecovery("nowNot")}
-            >
-              Agora não
-            </button>
-          </div>
-          {busy && <p aria-live="polite">Concluindo…</p>}
-        </section>
-      </main>
+      <InitialProjectGraphicsFailureController
+        diagnostic={initialGraphicsFailure}
+        onCloseError={setInitialGraphicsCloseError}
+        onProjectionChange={setProjection}
+        projectDialogPort={projectDialogPort}
+        projectWindowPort={projectWindowPort}
+      />
     );
   }
 
   if (!projection) {
     return (
-      <main className="startup-surface" aria-busy="true">
+      <main className="startup-surface ui-chrome-selection-scope" aria-busy="true">
         <section className="startup-card">
           <BrandWordmark compact />
           <span className="loading-mark" aria-hidden="true" />
@@ -694,6 +536,7 @@ function App({
           onRetryUnavailableMedia={retryUnavailableMedia}
           onProjectionChange={setProjection}
           onGraphicsUnavailable={setRuntimeGraphicsDiagnostic}
+          graphicsFailure={runtimeGraphicsFailure}
           onPreferencesReady={handlePreferencesReady}
           workspacePreferences={
             workspacePreferencesPort
@@ -704,6 +547,37 @@ function App({
       </CanvasGraphicsDiagnosticProbeProvider>
     </LoggingProvider>
   );
+}
+
+const noPendingProjectMutations = async () => null;
+
+function InitialProjectGraphicsFailureController({
+  diagnostic,
+  onCloseError,
+  onProjectionChange,
+  projectDialogPort,
+  projectWindowPort,
+}: {
+  diagnostic: Extract<GraphicsDiagnostic, { supported: false }>;
+  onCloseError(message: string): void;
+  onProjectionChange(projection: EditorProjection): void;
+  projectDialogPort: ProjectDialogPort;
+  projectWindowPort: ProjectWindowPort;
+}) {
+  const projectClose = useProjectCloseController({
+    onError: onCloseError,
+    onProjectionChange,
+    projectDialogPort,
+    projectWindowPort,
+    waitForPendingMutations: noPendingProjectMutations,
+  });
+  useProjectGraphicsFailureDialog({
+    closeCancelRevision: projectClose.explicitCancelRevision,
+    diagnostic,
+    onCloseProject: projectClose.requestClose,
+    projectDialogPort,
+  });
+  return null;
 }
 
 function sameMediaDemand(
@@ -720,27 +594,6 @@ function sameStrings(left: readonly string[], right: readonly string[]) {
   return (
     left.length === right.length &&
     left.every((value, index) => value === right[index])
-  );
-}
-
-function ProjectGraphicsFailure({
-  diagnostic,
-}: {
-  diagnostic: Extract<GraphicsDiagnostic, { supported: false }>;
-}) {
-  return (
-    <main className="startup-surface">
-      <section className="startup-card" role="alert">
-        <BrandWordmark compact />
-        <p className="eyebrow">Editor indisponível</p>
-        <h1>O Canvas não pôde ser iniciado</h1>
-        <InlineNotice tone="error">{diagnostic.reason}</InlineNotice>
-        <InlineNotice className="support-note">
-          Feche esta Janela do Projeto e use o Diagnóstico gráfico da
-          Boas-vindas antes de tentar novamente.
-        </InlineNotice>
-      </section>
-    </main>
   );
 }
 

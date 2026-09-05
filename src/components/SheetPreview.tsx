@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useId, type CSSProperties, type ReactNode } from "react";
 
 import type {
   ComposedBackground,
@@ -10,21 +10,89 @@ import type {
 import { CANVAS_MICROMETERS_PER_PIXEL } from "./canvasGeometry";
 import {
   frameOutlineStyle,
+  inactiveSideCssGradient,
   photoPaletteIndexForStripe,
   SHEET_VISUAL_STYLE,
 } from "./sheetVisualStyle";
 import "./SheetPreview.css";
 
+export interface SheetPreviewViewport {
+  readonly xUm: number;
+  readonly yUm: number;
+  readonly widthUm: number;
+  readonly heightUm: number;
+}
+
 interface SheetPreviewProps {
   sheet: ComposedSheet;
   frameBorder?: ProjectedFrameBorder;
   mediaPreviewUrls?: Readonly<Record<string, string>>;
+  viewport?: SheetPreviewViewport;
+}
+
+interface SheetPreviewShellProps extends SheetPreviewProps {
+  children?: ReactNode;
+  className?: string;
+}
+
+type SheetPreviewShellStyle = CSSProperties & {
+  "--sheet-inactive-side-gradient"?: string;
+};
+
+function sheetPreviewShellStyle(
+  activeSides: ComposedSheet["activeSides"],
+): SheetPreviewShellStyle {
+  return activeSides === "both"
+    ? {}
+    : {
+        "--sheet-inactive-side-gradient":
+          inactiveSideCssGradient(activeSides),
+      };
+}
+
+function sheetPreviewViewBox(
+  sheet: ComposedSheet,
+  viewport: SheetPreviewViewport | undefined,
+) {
+  return viewport
+    ? `${viewport.xUm} ${viewport.yUm} ${viewport.widthUm} ${viewport.heightUm}`
+    : `0 0 ${sheet.widthUm} ${sheet.heightUm}`;
+}
+
+export function SheetPreviewShell({
+  children,
+  className,
+  frameBorder,
+  mediaPreviewUrls,
+  sheet,
+  viewport,
+}: SheetPreviewShellProps) {
+  return (
+    <span
+      className={
+        className
+          ? `sheet-preview-shell ${className}`
+          : "sheet-preview-shell"
+      }
+      data-active-sides={sheet.activeSides}
+      style={sheetPreviewShellStyle(sheet.activeSides)}
+    >
+      <SheetPreview
+        frameBorder={frameBorder}
+        mediaPreviewUrls={mediaPreviewUrls}
+        sheet={sheet}
+        viewport={viewport}
+      />
+      {children}
+    </span>
+  );
 }
 
 export function SheetPreview({
   sheet,
   frameBorder = { kind: "none" },
   mediaPreviewUrls = {},
+  viewport,
 }: SheetPreviewProps) {
   const instanceId = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   const label = `Prévia da Lâmina ${String(sheet.number).padStart(2, "0")}`;
@@ -39,7 +107,7 @@ export function SheetPreview({
       focusable="false"
       preserveAspectRatio="xMidYMid meet"
       role="img"
-      viewBox={`0 0 ${sheet.widthUm} ${sheet.heightUm}`}
+      viewBox={sheetPreviewViewBox(sheet, viewport)}
       xmlns="http://www.w3.org/2000/svg"
     >
       <title>{label}</title>

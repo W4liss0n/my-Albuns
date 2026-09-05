@@ -2,9 +2,13 @@
   "permission": [
     {
       "identifier": "owned-dialog-window-commands",
-      "description": "Allows an owned dialog window to report that its fitted content is ready to be shown.",
+      "description": "Allows an owned opening dialog window to report fitted readiness and resolve the correlated Recovery or external-copy decision.",
       "commands": {
-        "allow": ["owned_window_content_ready"],
+        "allow": [
+          "owned_window_content_ready",
+          "resolve_opening_external_copy",
+          "resolve_opening_recovery"
+        ],
         "deny": []
       }
     }

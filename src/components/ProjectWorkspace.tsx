@@ -36,6 +36,7 @@ import { createProjectApplicationMenus } from "./projectApplicationMenus";
 import { useProjectCommandShortcuts } from "./useProjectCommandShortcuts";
 import { useProjectCloseController } from "./useProjectCloseController";
 import { useProjectEditorController } from "./useProjectEditorController";
+import { useProjectGraphicsFailureDialog } from "./useProjectGraphicsFailureDialog";
 import { useProjectOperationFailureDialog } from "./useProjectOperationFailureDialog";
 import { useAlbumInformationApplyController } from "./useAlbumInformationApplyController";
 import { SheetContextMenu } from "./SheetContextMenu";
@@ -65,6 +66,7 @@ interface ProjectWorkspaceProps {
   onRetryUnavailableMedia(mediaId: string): Promise<void>;
   onProjectionChange(projection: EditorProjection): void;
   onGraphicsUnavailable(diagnostic: GraphicsDiagnostic): void;
+  graphicsFailure?: Extract<GraphicsDiagnostic, { supported: false }> | null;
   onPreferencesReady(projectId: string): void;
   workspacePreferences:
     | { kind: "persistent"; port: WorkspacePreferencesPort }
@@ -85,6 +87,7 @@ export function ProjectWorkspace({
   onRetryUnavailableMedia,
   onProjectionChange,
   onGraphicsUnavailable,
+  graphicsFailure = null,
   onPreferencesReady,
   workspacePreferences: workspacePreferencesMode,
 }: ProjectWorkspaceProps) {
@@ -208,9 +211,18 @@ export function ProjectWorkspace({
     onProjectionChange,
     onError: reportCloseError,
   });
+  useProjectGraphicsFailureDialog({
+    closeCancelRevision: projectClose.explicitCancelRevision,
+    diagnostic: graphicsFailure,
+    onCloseProject: projectClose.requestClose,
+    projectDialogPort,
+  });
   const controller = useProjectEditorController({
     interactionBlocked:
-      exportActive || projectClose.interactionBlocked || saveAsBarrierActive,
+      exportActive ||
+      projectClose.interactionBlocked ||
+      saveAsBarrierActive ||
+      graphicsFailure !== null,
     projection,
     runProjectMutation,
     projectCorePort,
@@ -316,7 +328,10 @@ export function ProjectWorkspace({
     exportActive ||
     projectClose.interactionBlocked ||
     albumInformationApply.active ||
-    saveAsBarrierActive;
+    saveAsBarrierActive ||
+    graphicsFailure !== null;
+  const workspaceInteractionBlocked =
+    saveAsBarrierActive || graphicsFailure !== null;
   const sheetOrderSignature = projection.state.album.sheets
     .map((sheet) => sheet.id)
     .join(",");
@@ -417,13 +432,23 @@ export function ProjectWorkspace({
     ],
   );
   const cancelSheetReorder = useCallback(() => {
+    if (structuralCommandsBlocked) {
+      updateSheetReorder(
+        createSheetReorderSession(projection.state.album.sheets),
+      );
+      return;
+    }
     const transition = reduceSheetReorderSession(
       sheetReorderSessionRef.current,
       projection.state.album.sheets,
       { type: "escape" },
     );
     updateSheetReorder(transition.session);
-  }, [projection.state.album.sheets, updateSheetReorder]);
+  }, [
+    projection.state.album.sheets,
+    structuralCommandsBlocked,
+    updateSheetReorder,
+  ]);
   useEffect(() => {
     if (
       sheetReorderSession.status !== "preview" &&
@@ -452,6 +477,24 @@ export function ProjectWorkspace({
     projection.state.album.sheets,
     implicitSheetId ?? "",
   );
+  const sheetReorderGestureActive =
+    sheetReorderSession.status === "preview" ||
+    sheetReorderSession.status === "invalid";
+  const sheetNavigationActive =
+    canvasMode.kind === "normal" &&
+    controller.selectedFrame === null &&
+    draggedPhotoId === null &&
+    sheetContextMenu === null &&
+    !commandsBlocked &&
+    !structuralCommandsBlocked &&
+    !sheetReorderGestureActive;
+  const openSheetContextMenu = useCallback(
+    (sheetId: string, position: { x: number; y: number }) => {
+      if (structuralCommandsBlocked) return;
+      setSheetContextMenu({ position, sheetId });
+    },
+    [structuralCommandsBlocked],
+  );
   useProjectCommandShortcuts({
     canDeleteSheet: implicitSheetAvailability.canDelete,
     canRedo: projection.state.canRedo,
@@ -461,11 +504,15 @@ export function ProjectWorkspace({
       void controller.deleteSheet();
     },
     disabled: commandsBlocked,
+    navigateToNextSheet: () => controller.navigateToAdjacentSheet("next"),
+    navigateToPreviousSheet: () =>
+      controller.navigateToAdjacentSheet("previous"),
     redo: controller.redo,
     save: controller.save,
     saveAs: controller.saveAs,
     sheetShortcutActive: controller.selectedFrame === null,
     sheetCommandsDisabled: structuralCommandsBlocked,
+    sheetNavigationActive,
     undo: controller.undo,
   });
   const applicationMenus = createProjectApplicationMenus({
@@ -510,7 +557,7 @@ export function ProjectWorkspace({
   });
 
   return (
-    <div className="app-shell">
+    <div className="app-shell ui-chrome-selection-scope">
       <ApplicationHeader
         context={projection.state.projectName}
         metadata={projectMetadata}
@@ -525,7 +572,11 @@ export function ProjectWorkspace({
         <ExportPreviewControl
           ref={exportControlRef}
           dialogPort={projectDialogPort}
-          disabled={projectClose.interactionBlocked || saveAsBarrierActive}
+          disabled={
+            projectClose.interactionBlocked ||
+            saveAsBarrierActive ||
+            graphicsFailure !== null
+          }
           exportPipelinePort={exportPipelinePort}
           onActiveChange={setExportActive}
           projectId={projection.state.projectId}
@@ -534,9 +585,9 @@ export function ProjectWorkspace({
       </div>
 
       <div
-        aria-busy={saveAsBarrierActive || undefined}
+        aria-busy={workspaceInteractionBlocked || undefined}
         className="workspace-grid"
-        inert={saveAsBarrierActive}
+        inert={workspaceInteractionBlocked}
         ref={workspacePanels.workspaceRef}
         style={workspaceStyle}
       >
@@ -560,7 +611,7 @@ export function ProjectWorkspace({
                 previewSheetReorder("bar", draggedSheetId, targetIndex),
               onDrop: () => dropSheetReorder("bar"),
               onCancel: cancelSheetReorder,
-              onNavigate: controller.navigateToSheet,
+              onSelect: controller.canvasProps.onFocusSheet,
             }}
             mediaPreviewUrls={mediaPreviewUrls}
             technicalGuides={{
@@ -569,11 +620,7 @@ export function ProjectWorkspace({
             }}
             onMediaDemandChange={setCanvasMediaDemand}
             onGraphicsUnavailable={onGraphicsUnavailable}
-            onOpenSheetContextMenu={(sheetId, position) => {
-              if (structuralCommandsBlocked) return;
-              controller.navigateToSheet(sheetId);
-              setSheetContextMenu({ position, sheetId });
-            }}
+            onOpenSheetContextMenu={openSheetContextMenu}
           />
         </section>
 
@@ -620,11 +667,7 @@ export function ProjectWorkspace({
           onPresentationUnitChange={changePresentationUnit}
           onValidateAlbumInformation={projectCorePort.validateAlbumInformation}
           onNavigateToSheet={controller.navigateToSheet}
-          onOpenSheetContextMenu={(sheetId, position) => {
-            if (structuralCommandsBlocked) return;
-            controller.navigateToSheet(sheetId);
-            setSheetContextMenu({ position, sheetId });
-          }}
+          onOpenSheetContextMenu={openSheetContextMenu}
           sheetReorder={{
             disabled: structuralCommandsBlocked,
             representation: sheetReorderRepresentation(

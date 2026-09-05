@@ -122,6 +122,22 @@ export function useProjectNavigation(projection: EditorProjection) {
     ],
   );
 
+  const navigateToAdjacentSheet = useCallback(
+    (direction: "previous" | "next") => {
+      const sheetIds = projection.state.album.sheets.map((sheet) => sheet.id);
+      const currentCenteredSheetId = useEditorView.getState().centeredSheetId;
+      const currentIndex = currentCenteredSheetId
+        ? sheetIds.indexOf(currentCenteredSheetId)
+        : 0;
+      const targetIndex =
+        (currentIndex >= 0 ? currentIndex : 0) +
+        (direction === "previous" ? -1 : 1);
+      const targetSheetId = sheetIds[targetIndex];
+      if (targetSheetId) navigateToSheet(targetSheetId);
+    },
+    [navigateToSheet, projection.state.album.sheets],
+  );
+
   function beginSheetEdit(sheetId: string) {
     const selectedBelongsToSheet = projection.state.album.sheets
       .find((sheet) => sheet.id === sheetId)
@@ -150,6 +166,7 @@ export function useProjectNavigation(projection: EditorProjection) {
     enterSheetEdit: beginSheetEdit,
     exitSheetEdit,
     handleCanvasMetricsChange,
+    navigateToAdjacentSheet,
     navigateToSheet,
   };
 }

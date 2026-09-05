@@ -2,10 +2,13 @@ param(
     [string] $OutputPath,
     [string] $UncRoot,
     [string] $DriveLetter,
-    [string] $ScratchRoot
+    [string] $ScratchRoot,
+    [switch] $AllowVisibleWindows
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Native-GatePolicy.ps1')
+Assert-NativeGateExecutionAllowed -AllowVisibleWindows:$AllowVisibleWindows
 
 . (Join-Path $PSScriptRoot 'Local-Toolchain.ps1')
 . (Join-Path $PSScriptRoot 'Gate-SourceProvenance.ps1')

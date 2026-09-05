@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-08-27
-updated: 2026-08-27
+updated: 2026-08-30
 ticket: 4-programa-05-arquitetura-de-ui-mapa-de-telas-e-interacao-do-editor
 ---
 
@@ -45,6 +45,9 @@ O fixed point que originou esta consolidação é
 | `native.project-name-location` | [Nome e local](0003-criacao-de-projeto.md) | diálogo nativo pertencente à Boas-vindas | #13 | abre somente após `Criar Projeto` |
 | `project.normal` | [Janela do Projeto — Modo normal](0001-estrutura-da-janela-do-projeto.md) | Janela do Projeto | #9 | integrada em cortes incrementais |
 | `project.edit` | [Janela do Projeto — Modo de edição](0001-estrutura-da-janela-do-projeto.md) | Janela do Projeto | #20 e #22 | contrato aceito e protótipo verificável |
+| `project.recovery` | [Recuperação de sessão](../specs/programa-de-diagramacao-de-albuns.md#identidade-sessão-e-persistência) | tentativa Global de abertura e Host pendente correlacionado | #15 | a janela externa de progresso transiciona para a decisão antes de existir Janela do Projeto |
+| `project.external-copy-decision` | [Cópia externa](../research/0035-movimentacao-e-copia-externa.md) | tentativa Global de abertura e Host pendente correlacionado | #10 | a mesma janela externa de progresso oferece `Salvar cópia como…` ou `Cancelar`; não existe card na Global |
+| `project.graphics-failure` | [Falha tardia de WebGL2](../research/0014-webgl2-limites-e-pressao-grafica.md) | Janela do Projeto | #1 | diálogo externo pertencente bloqueia o Projeto; nunca substitui o workspace por página de erro |
 | `project.export` | [Exportação](0004-exportacao-normal.md) | Janela do Projeto originadora | #35 | contrato aceito; resultados pertencem à tentativa |
 | `global.batch-export` | [Exportação em lote](0006-configuracao-da-exportacao-em-lote.md) | processo global exclusivo | #39 | desabilitada até integração |
 | `project.batch-generation` | [Geração em lote](0008-configuracao-da-geracao-em-lote.md) | Janela do Projeto originadora | #36 | acessível somente pelo Projeto |
@@ -65,6 +68,10 @@ flowchart LR
   P[global.new-project.personalization<br/>Personalização]
   N[native.project-name-location<br/>Nome e local]
   PN[project.normal<br/>Modo normal]
+  RC[project.recovery<br/>Recuperação]
+  EC[project.external-copy-decision<br/>Cópia externa]
+  GF[project.graphics-failure<br/>Falha gráfica]
+  END[Projeto encerrado]
   PE[project.edit<br/>Modo de edição]
   EX[project.export<br/>Exportação]
   BE[global.batch-export<br/>Exportação em lote]
@@ -80,10 +87,18 @@ flowchart LR
   N -->|cancelar| P
   W -->|Abrir / Recente| PG
   PG -->|abertura concluída| PN
+  PG -->|checkpoint disponível| RC
+  PG -->|Cópia externa somente leitura| EC
+  RC -->|recuperar ou abrir salva| PN
+  RC -->|Agora não| W
+  EC -->|Salvar cópia como…| PN
+  EC -->|Cancelar| W
   PG -->|falha de abertura| W
   PN <-->|duplo clique ou Enter / Esc| PE
   PN --> EX
   PN --> BG
+  PN -->|falha tardia de WebGL2| GF
+  GF -->|Fechar Projeto| END
   W -.->|desabilitado até #39| BE
   W -.->|quando ligado| ST
   PN -.->|quando ligado| ST
@@ -106,6 +121,12 @@ para essas superfícies não criam um owner global compartilhado.
 | Configurações | `Continuar` | Personalização | preserva os valores válidos | `Voltar` retorna a Configurações |
 | Personalização | `Criar Projeto` | Nome e local | abre diálogo nativo pertencente | cancelar preserva o formulário e não cria arquivo |
 | Boas-vindas ou Windows | abrir Projeto | Progresso de abertura | a origem é retirada apenas nessa operação | falha restaura a origem atrás do diálogo pertencente |
+| Progresso de abertura | checkpoint disponível | Recuperação | a mesma janela externa pertencente à Global muda de progresso para decisão; o Host fica correlacionado e a Janela do Projeto ainda não existe/não é exibida | `Esc` ou `Agora não` preserva o checkpoint e restaura a Global; fechar/falhar recolhe diálogo e Host sem duplicar Sessão |
+| Progresso de abertura | Cópia externa somente leitura | Decisão de Cópia externa | a mesma janela externa pertencente à Global muda de progresso para decisão e conserva o Host, a fonte opaca e a tentativa exata; a Janela do Projeto ainda não existe/não é exibida | `Cancelar` recolhe Host e diálogo; cancelar só o seletor de destino retorna à mesma decisão; falha restaura a Global sem Sessão parcial |
+| Decisão de Cópia externa | `Salvar cópia como…` | Modo normal | o seletor nativo pertence à janela de decisão e a autoridade do destino continua o mesmo Host; fonte, Revisão e bytes permanecem preservados | destino cancelado retorna à decisão; destino inválido falha de modo explícito e recolhe a tentativa |
+| Recuperação | `Reabrir e recuperar` | Modo normal | cria uma sessão não salva no mesmo Host, uma única vez | falha mantém terminal explícito e não abre segunda sessão |
+| Recuperação | `Abrir última versão salva` | confirmação no mesmo modal e Modo normal | só descarta o checkpoint após confirmação e sucesso | cancelar retorna à decisão; falha não descarta por aproximação |
+| Modo normal | falha tardia irrecuperável de WebGL2 | Falha gráfica | o diálogo externo pertencente bloqueia a Janela do Projeto, o Canvas perde autoridade e a demanda residente é cancelada; o workspace não é substituído | `Fechar Projeto` usa o fechamento existente; se sua confirmação for cancelada, o aviso gráfico volta a ocupar a sessão serializada |
 | Modo normal | duplo clique na Lâmina ou `Enter` | Modo de edição | isola a Lâmina, fecha/suspende Barra e Layouts e inicia em `Ajustar Lâmina` | `Esc` descarta `ViewportTransform`, restaura painéis e centraliza a Lâmina |
 | Modo normal | arrastar pela Barra ou Grade | prévia local de reordenação | somente a superfície originadora mostra placeholder, ghost e deslocamento | `Esc` ou drop inválido restaura; drop válido comita uma ação e sincroniza a outra superfície |
 | Modo normal | `Exportar` | Exportação | pertence à Janela do Projeto | cancelar/fechar retorna ao mesmo Projeto |
@@ -113,15 +134,26 @@ para essas superfícies não criam um owner global compartilhado.
 | operação | início mensurável | Progresso | pertence e bloqueia somente a proprietária prevista | sucesso fecha; falhas/ignorados seguem para Problemas |
 | Problemas | corrigir/repetir | nova tentativa ou Progresso | usa o mesmo owner da operação | fechar retorna à proprietária |
 
+Ao transicionar de Progresso para Recuperação ou Cópia externa, a mesma janela externa é
+redimensionada e recentralizada para a largura própria de cada decisão, sem ampliar
+os demais diálogos. As ações mantêm seus rótulos em uma linha; se
+o ambiente realmente restringir a largura, o rodapé as organiza verticalmente
+sem quebrar os rótulos nem alterar ordem, foco ou semântica.
+
 ## Modos e ownership da interação do editor
 
 ### Modo normal
 
 - O Canvas contínuo mantém todas as Lâminas interativas e sem Zoom manual.
-- Barra da Lâmina e Grade navegam e iniciam a mesma operação de reordenação.
-- Clique sem vencer o limiar de arraste centraliza a Lâmina; somente depois do
+- As teclas físicas `←` e `→` centralizam a Lâmina física anterior e seguinte pelo catálogo público de comandos. Não existem botões permanentes de anterior/próxima nos cantos; controles editáveis, diálogos, menus, Modo de edição e gestos com semântica própria conservam ownership do teclado.
+- A roda navega horizontalmente sobre toda a superfície e Barra da Lâmina, sem zona morta assimétrica; um controle só a retém quando possui semântica específica de wheel.
+- Abrir ou dispensar o menu contextual não navega, seleciona ou centraliza. O alvo clicado permanece explícito para seus comandos, independentemente da Lâmina centralizada.
+- Barra da Lâmina e Grade iniciam a mesma operação de reordenação, mas não compartilham a semântica do clique: a Barra seleciona/ativa sem navegar nem alterar `viewport.offsetX`, enquanto a Grade centraliza a Lâmina.
+- Clique sem vencer o limiar de arraste aplica a semântica da superfície originadora; somente depois do
   limiar surgem placeholder, ghost e deslocamento intermediário. Soltar fora da
-  superfície originadora ou receber `pointercancel` cancela sem commit.
+  superfície originadora ou receber `pointercancel` cancela sem commit. Barra e
+  Grade usam eventos de ponteiro e captura real; o ghost acompanha o ponteiro e
+  o auto-scroll continua atualizando destinos nas respectivas bordas.
 - A ordem confirmada não muda durante a prévia. A representação oposta não
   anima e só sincroniza no drop válido.
 - Reordenação e demais comandos estruturais pertencem ao owner #9.
@@ -179,9 +211,16 @@ renderizada e uma revisão explícita posterior decide `accepted`, `rejected` ou
 | mapa e nomes atuais | `ui-architecture-map` |
 | entrada/saída do Modo de edição | `canvas-sheet-editing`, `canvas-sheet-editing-exit` |
 | Zoom por teclado, roda, reset e teto | `editor-zoom-keyboard-in`, `editor-zoom-keyboard-out`, `editor-zoom-wheel`, `editor-zoom-reset`, `editor-zoom-cap` |
-| comandos de estrutura física | `sheet-structure-application-menu`, `sheet-structure-context-menu` |
+| comandos de estrutura física e alvo contextual explícito | `sheet-structure-application-menu`, `sheet-structure-context-menu`, `canvas-context-menu-surface-preserves-viewport` |
+| navegação física sem botões permanentes | `canvas-keyboard-next-sheet`, `canvas-keyboard-previous-sheet` |
+| roda sobre a Barra inteira | `canvas-wheel-sheet-bar-forward`, `canvas-wheel-sheet-bar-backward` |
 | reordenação pela Barra | `sheet-reorder-bar-preview`, `sheet-reorder-bar-commit`, `sheet-reorder-cancelled` |
 | reordenação pela Grade | `sheet-reorder-grid-preview`, `sheet-reorder-grid-commit`, `sheet-reorder-invalid-target-preview`, `sheet-reorder-invalid-drop` |
+| seleção semântica de texto | `project-text-selection-policy`, `new-project-operational-failure-dialog` |
+| Recuperação em diálogo externo do fluxo de abertura | `project-recovery-modal` |
+| Cópia externa no mesmo diálogo do fluxo de abertura | `external-copy-opening-dialog` |
+| falha gráfica tardia em diálogo pertencente ao Projeto | `project-graphics-failure` |
+| splitters finos e alvo interativo | `project-splitters-normal-100`, `project-splitter-horizontal-hover-125`, `project-splitter-vertical-focus-150`, `project-splitters-resized` |
 | seleção múltipla e mistos | `frame-multi-selection-mixed`, `frame-multi-selection-absolute-edit` |
 | mover, redimensionar e travar | `frame-manipulation-move`, `frame-manipulation-resize`, `frame-layout-locked` |
 

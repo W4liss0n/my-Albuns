@@ -16,16 +16,28 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
 #[cfg(windows)]
 use windows::Win32::UI::Input::KeyboardAndMouse::IsWindowEnabled;
 
-use crate::{desktop_webview_policy, global_runtime::GLOBAL_WINDOW_LABEL};
+use crate::{
+    desktop_webview_policy,
+    global_runtime::GLOBAL_WINDOW_LABEL,
+    ipc_contract::{OpeningExternalCopyDecision, ProjectRecoveryDecision},
+};
 
 const DIALOG_LOAD_TIMEOUT: Duration = Duration::from_secs(5);
 const DIALOG_WIDTH: f64 = 380.0;
+const EXTERNAL_COPY_DIALOG_WIDTH: f64 = 440.0;
+const PROJECT_RECOVERY_DIALOG_WIDTH: f64 = 492.0;
 const OWNED_WINDOW_READY_PARAMETER: &str = "ownedReadyToken";
 pub(crate) const OWNED_WINDOW_TITLEBAR_HEIGHT: f64 = 38.0;
 const OPENING_PROGRESS_LABEL: &str = "dialog-opening-progress";
 const PROJECT_FAILURE_LABEL: &str = "dialog-project-failure";
 static NEXT_OWNED_WINDOW_READY_TOKEN: AtomicU64 = AtomicU64::new(1);
 static OWNED_WINDOW_READINESS: OnceLock<Mutex<OwnedWindowReadinessRegistry>> = OnceLock::new();
+static PROJECT_RECOVERY_DECISIONS: OnceLock<
+    Mutex<OpeningDecisionRegistry<ProjectRecoveryDecision>>,
+> = OnceLock::new();
+static EXTERNAL_COPY_DECISIONS: OnceLock<
+    Mutex<OpeningDecisionRegistry<OpeningExternalCopyDecision>>,
+> = OnceLock::new();
 
 #[derive(Default)]
 struct OwnedWindowReadinessRegistry {
@@ -78,12 +90,118 @@ fn cancel_owned_window_readiness(label: &str, token: u64) {
     }
 }
 
+struct OpeningDecisionRegistry<T> {
+    waiters: HashMap<String, tokio::sync::oneshot::Sender<T>>,
+}
+
+impl<T> Default for OpeningDecisionRegistry<T> {
+    fn default() -> Self {
+        Self {
+            waiters: HashMap::new(),
+        }
+    }
+}
+
+impl<T> OpeningDecisionRegistry<T> {
+    fn register(&mut self, attempt_id: &str) -> io::Result<tokio::sync::oneshot::Receiver<T>> {
+        if attempt_id.is_empty() || self.waiters.contains_key(attempt_id) {
+            return Err(io::Error::other(
+                "the opening decision attempt is not available",
+            ));
+        }
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        self.waiters.insert(attempt_id.to_owned(), sender);
+        Ok(receiver)
+    }
+
+    fn resolve(&mut self, attempt_id: &str, decision: T) -> Result<(), String> {
+        let sender = self
+            .waiters
+            .remove(attempt_id)
+            .ok_or_else(|| "the opening decision attempt is not current".to_owned())?;
+        sender
+            .send(decision)
+            .map_err(|_| "the opening decision owner is unavailable".to_owned())
+    }
+
+    fn cancel(&mut self, attempt_id: &str) {
+        self.waiters.remove(attempt_id);
+    }
+}
+
+fn project_recovery_decisions() -> &'static Mutex<OpeningDecisionRegistry<ProjectRecoveryDecision>>
+{
+    PROJECT_RECOVERY_DECISIONS.get_or_init(|| Mutex::new(OpeningDecisionRegistry::default()))
+}
+
+fn external_copy_decisions() -> &'static Mutex<OpeningDecisionRegistry<OpeningExternalCopyDecision>>
+{
+    EXTERNAL_COPY_DECISIONS.get_or_init(|| Mutex::new(OpeningDecisionRegistry::default()))
+}
+
+fn cancel_project_recovery_decision(attempt_id: &str) {
+    if let Ok(mut registry) = project_recovery_decisions().lock() {
+        registry.cancel(attempt_id);
+    }
+}
+
+fn cancel_external_copy_decision(attempt_id: &str) {
+    if let Ok(mut registry) = external_copy_decisions().lock() {
+        registry.cancel(attempt_id);
+    }
+}
+
+#[derive(Clone)]
+enum OpeningDecisionAttempt {
+    ExternalCopy(String),
+    Recovery(String),
+}
+
+impl OpeningDecisionAttempt {
+    fn cancel(&self) {
+        match self {
+            Self::ExternalCopy(attempt_id) => cancel_external_copy_decision(attempt_id),
+            Self::Recovery(attempt_id) => cancel_project_recovery_decision(attempt_id),
+        }
+    }
+}
+
 #[tauri::command]
 pub(crate) fn owned_window_content_ready(window: WebviewWindow, token: u64) -> Result<(), String> {
     owned_window_readiness()
         .lock()
         .map_err(|_| "the owned window readiness registry is unavailable".to_owned())?
         .signal(window.label(), token)
+}
+
+#[tauri::command]
+pub(crate) fn resolve_opening_recovery(
+    window: WebviewWindow,
+    attempt_id: String,
+    decision: ProjectRecoveryDecision,
+) -> Result<(), String> {
+    if window.label() != OPENING_PROGRESS_LABEL {
+        return Err("Recovery belongs only to the owned opening dialog".into());
+    }
+    project_recovery_decisions()
+        .lock()
+        .map_err(|_| "the Recovery decision registry is unavailable".to_owned())?
+        .resolve(&attempt_id, decision)
+}
+
+#[tauri::command]
+pub(crate) fn resolve_opening_external_copy(
+    window: WebviewWindow,
+    attempt_id: String,
+    decision: OpeningExternalCopyDecision,
+) -> Result<(), String> {
+    if window.label() != OPENING_PROGRESS_LABEL {
+        return Err("the external-copy decision belongs only to the owned opening dialog".into());
+    }
+    external_copy_decisions()
+        .lock()
+        .map_err(|_| "the external-copy decision registry is unavailable".to_owned())?
+        .resolve(&attempt_id, decision)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -140,13 +258,133 @@ impl ProjectFailureDialogContext {
 
 pub(crate) struct LaunchProgressDialog {
     closed: bool,
+    decision_attempt: Option<OpeningDecisionAttempt>,
     owner: WebviewWindow,
     owner_presentation: OwnerPresentation,
     window: WebviewWindow,
 }
 
 impl LaunchProgressDialog {
+    pub(crate) async fn request_external_copy_decision(
+        &mut self,
+        attempt_id: &str,
+    ) -> io::Result<OpeningExternalCopyDecision> {
+        self.ensure_opening_decision_available("the external-copy decision")?;
+        resize_owned_window_width(&self.window, EXTERNAL_COPY_DIALOG_WIDTH)?;
+        let decision_receiver = external_copy_decisions()
+            .lock()
+            .map_err(|_| io::Error::other("the external-copy decision registry is unavailable"))?
+            .register(attempt_id)?;
+        self.request_opening_decision(
+            OpeningDecisionAttempt::ExternalCopy(attempt_id.to_owned()),
+            "external-copy",
+            decision_receiver,
+            "the external-copy decision",
+        )
+        .await
+    }
+
+    pub(crate) async fn request_recovery_decision(
+        &mut self,
+        attempt_id: &str,
+    ) -> io::Result<ProjectRecoveryDecision> {
+        self.ensure_opening_decision_available("Recovery")?;
+        resize_owned_window_width(&self.window, PROJECT_RECOVERY_DIALOG_WIDTH)?;
+        let decision_receiver = project_recovery_decisions()
+            .lock()
+            .map_err(|_| io::Error::other("the Recovery decision registry is unavailable"))?
+            .register(attempt_id)?;
+        self.request_opening_decision(
+            OpeningDecisionAttempt::Recovery(attempt_id.to_owned()),
+            "project-recovery",
+            decision_receiver,
+            "the Recovery decision",
+        )
+        .await
+    }
+
+    fn ensure_opening_decision_available(&self, name: &str) -> io::Result<()> {
+        if self.owner_presentation != OwnerPresentation::Replace || self.decision_attempt.is_some()
+        {
+            return Err(io::Error::other(format!(
+                "{name} is unavailable on this launch dialog"
+            )));
+        }
+        Ok(())
+    }
+
+    async fn request_opening_decision<T>(
+        &mut self,
+        attempt: OpeningDecisionAttempt,
+        kind: &str,
+        decision_receiver: tokio::sync::oneshot::Receiver<T>,
+        name: &str,
+    ) -> io::Result<T> {
+        self.decision_attempt = Some(attempt.clone());
+        let destroyed_attempt = attempt.clone();
+        self.window.on_window_event(move |event| {
+            if matches!(event, WindowEvent::Destroyed) {
+                destroyed_attempt.cancel();
+            }
+        });
+
+        let (ready_token, ready_receiver) = owned_window_readiness()
+            .lock()
+            .map_err(|_| io::Error::other("the owned window readiness registry is unavailable"))?
+            .register(self.window.label());
+        let mut url = self.window.url().map_err(io::Error::other)?;
+        url.set_path("/dialog.html");
+        url.set_query(Some(&format!(
+            "kind={kind}&attemptId={}&{OWNED_WINDOW_READY_PARAMETER}={ready_token}",
+            encode_unbounded_component(match &attempt {
+                OpeningDecisionAttempt::ExternalCopy(attempt_id)
+                | OpeningDecisionAttempt::Recovery(attempt_id) => attempt_id,
+            }),
+        )));
+        if let Err(error) = self.window.navigate(url) {
+            cancel_owned_window_readiness(self.window.label(), ready_token);
+            self.cancel_opening_decision();
+            return Err(io::Error::other(error));
+        }
+
+        let ready = tokio::time::timeout(DIALOG_LOAD_TIMEOUT, ready_receiver).await;
+        cancel_owned_window_readiness(self.window.label(), ready_token);
+        match ready {
+            Ok(Ok(())) => {}
+            Ok(Err(_)) => {
+                self.cancel_opening_decision();
+                return Err(io::Error::other(format!(
+                    "{name} dialog readiness became unavailable"
+                )));
+            }
+            Err(_) => {
+                self.cancel_opening_decision();
+                return Err(io::Error::new(
+                    io::ErrorKind::TimedOut,
+                    format!("{name} dialog did not become ready"),
+                ));
+            }
+        }
+
+        let decision = decision_receiver.await.map_err(|_| {
+            io::Error::other(format!("{name} dialog closed without a terminal decision"))
+        });
+        self.decision_attempt = None;
+        decision
+    }
+
+    fn cancel_opening_decision(&mut self) {
+        if let Some(attempt) = self.decision_attempt.take() {
+            attempt.cancel();
+        }
+    }
+
+    pub(crate) fn decision_window(&self) -> WebviewWindow {
+        self.window.clone()
+    }
+
     pub(crate) fn finish(mut self, restore_owner_window: bool) {
+        self.cancel_opening_decision();
         match self.owner_presentation {
             OwnerPresentation::Replace if restore_owner_window => {
                 let _ = self.window.destroy();
@@ -163,8 +401,21 @@ impl LaunchProgressDialog {
     }
 }
 
+fn resize_owned_window_width(window: &WebviewWindow, width: f64) -> io::Result<()> {
+    let scale_factor = window.scale_factor().map_err(io::Error::other)?;
+    let current_size = window
+        .inner_size()
+        .map_err(io::Error::other)?
+        .to_logical::<f64>(scale_factor);
+    window
+        .set_size(tauri::LogicalSize::new(width, current_size.height))
+        .map_err(io::Error::other)?;
+    window.center().map_err(io::Error::other)
+}
+
 impl Drop for LaunchProgressDialog {
     fn drop(&mut self) {
+        self.cancel_opening_decision();
         if !self.closed {
             match self.owner_presentation {
                 OwnerPresentation::BlockedBehindDialog => {
@@ -183,6 +434,7 @@ pub(crate) async fn show_launch_progress(
     app: &AppHandle,
     owner_label: &str,
     kind: LaunchProgressKind,
+    owner_webview_data_directory: &Path,
 ) -> io::Result<LaunchProgressDialog> {
     let owner = owned_window(app, owner_label)?;
     let window = build_hidden_owned_window(
@@ -194,7 +446,7 @@ pub(crate) async fn show_launch_progress(
             width: DIALOG_WIDTH,
             height: 126.0 + OWNED_WINDOW_TITLEBAR_HEIGHT,
             browser_arguments: None,
-            browser_data_directory: None,
+            browser_data_directory: Some(owner_webview_data_directory),
         },
     )
     .await?;
@@ -206,6 +458,7 @@ pub(crate) async fn show_launch_progress(
     }
     Ok(LaunchProgressDialog {
         closed: false,
+        decision_attempt: None,
         owner,
         owner_presentation,
         window,
@@ -486,7 +739,19 @@ impl DialogSurface for WebviewWindow {
 
 fn prepare_owner(owner: &impl DialogOwner, presentation: OwnerPresentation) -> io::Result<()> {
     match presentation {
-        OwnerPresentation::Replace => owner.hide_dialog_owner(),
+        OwnerPresentation::Replace => {
+            let was_visible = owner.is_dialog_owner_visible()?;
+            // Tao rewrites native styles when hiding a visible window, clearing
+            // WS_DISABLED. Apply the block after that visibility transition.
+            owner.hide_dialog_owner()?;
+            if let Err(error) = owner.set_dialog_owner_enabled(false) {
+                if was_visible {
+                    let _ = owner.show_dialog_owner();
+                }
+                return Err(error);
+            }
+            Ok(())
+        }
         OwnerPresentation::BlockedBehindDialog => {
             if !owner.is_dialog_owner_visible()? {
                 owner.show_dialog_owner()?;
@@ -563,6 +828,7 @@ mod tests {
         actions: RefCell<Vec<String>>,
         enabled: Cell<bool>,
         visible: Cell<bool>,
+        fail_disable: bool,
     }
 
     impl Default for RecordingOwner {
@@ -571,6 +837,7 @@ mod tests {
                 actions: RefCell::new(Vec::new()),
                 enabled: Cell::new(true),
                 visible: Cell::new(true),
+                fail_disable: false,
             }
         }
     }
@@ -609,7 +876,11 @@ mod tests {
 
         fn hide_dialog_owner(&self) -> io::Result<()> {
             self.actions.borrow_mut().push("hide".into());
-            self.visible.set(false);
+            // Tao rebuilds native window styles when visibility changes. Its
+            // cached flags do not include the WS_DISABLED bit set by EnableWindow.
+            if self.visible.replace(false) {
+                self.enabled.set(true);
+            }
             Ok(())
         }
 
@@ -621,6 +892,9 @@ mod tests {
 
         fn set_dialog_owner_enabled(&self, enabled: bool) -> io::Result<()> {
             self.actions.borrow_mut().push(format!("enabled:{enabled}"));
+            if !enabled && self.fail_disable {
+                return Err(io::Error::other("injected owner disable failure"));
+            }
             self.enabled.set(enabled);
             Ok(())
         }
@@ -870,11 +1144,104 @@ mod tests {
     }
 
     #[test]
+    fn recovery_decision_registry_accepts_one_terminal_for_the_exact_attempt() {
+        let mut registry = OpeningDecisionRegistry::<ProjectRecoveryDecision>::default();
+        let mut decision = registry
+            .register("attempt-17")
+            .expect("the first exact attempt is registered");
+
+        assert!(registry.register("attempt-17").is_err());
+        assert!(
+            registry
+                .resolve("attempt-18", ProjectRecoveryDecision::NowNot)
+                .is_err()
+        );
+        assert_eq!(
+            decision.try_recv(),
+            Err(tokio::sync::oneshot::error::TryRecvError::Empty)
+        );
+
+        registry
+            .resolve("attempt-17", ProjectRecoveryDecision::ReopenAndRecover)
+            .expect("the correlated decision resolves once");
+        assert_eq!(
+            decision.try_recv(),
+            Ok(ProjectRecoveryDecision::ReopenAndRecover)
+        );
+        assert!(
+            registry
+                .resolve("attempt-17", ProjectRecoveryDecision::NowNot)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn cancelling_recovery_closes_the_pending_decision_without_a_fallback_choice() {
+        let mut registry = OpeningDecisionRegistry::<ProjectRecoveryDecision>::default();
+        let mut decision = registry
+            .register("attempt-19")
+            .expect("the attempt is registered");
+
+        registry.cancel("attempt-19");
+
+        assert_eq!(
+            decision.try_recv(),
+            Err(tokio::sync::oneshot::error::TryRecvError::Closed)
+        );
+    }
+
+    #[test]
+    fn external_copy_decision_registry_is_distinct_and_exactly_correlated() {
+        let mut registry = OpeningDecisionRegistry::<OpeningExternalCopyDecision>::default();
+        let mut decision = registry
+            .register("external-attempt-7")
+            .expect("the external-copy attempt is registered");
+
+        assert!(
+            registry
+                .resolve("external-attempt-8", OpeningExternalCopyDecision::Cancel)
+                .is_err()
+        );
+        registry
+            .resolve(
+                "external-attempt-7",
+                OpeningExternalCopyDecision::SaveCopyAs,
+            )
+            .expect("the exact opening dialog resolves the attempt");
+        assert_eq!(
+            decision.try_recv(),
+            Ok(OpeningExternalCopyDecision::SaveCopyAs)
+        );
+        assert!(
+            registry
+                .resolve("external-attempt-7", OpeningExternalCopyDecision::Cancel)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn failed_opening_block_restores_only_a_previously_visible_owner() {
+        for was_visible in [true, false] {
+            let owner = RecordingOwner {
+                visible: Cell::new(was_visible),
+                fail_disable: true,
+                ..RecordingOwner::default()
+            };
+
+            assert!(prepare_owner(&owner, OwnerPresentation::Replace).is_err());
+            assert_eq!(owner.visible.get(), was_visible);
+            assert!(owner.enabled.get());
+            assert_eq!(owner.actions.borrow().contains(&"show".into()), was_visible);
+        }
+    }
+    #[test]
     fn opening_transition_hides_then_restores_the_owner() {
         let owner = RecordingOwner::default();
 
         prepare_owner(&owner, OwnerPresentation::Replace).unwrap();
-        assert_eq!(owner.actions.take(), ["hide"]);
+        assert_eq!(owner.actions.take(), ["hide", "enabled:false"]);
+        assert!(!owner.enabled.get());
+        assert!(!owner.visible.get());
 
         release_owner(&owner, OwnerPresentation::Replace, false);
         assert_eq!(owner.actions.take(), ["enabled:true", "show"]);

@@ -599,7 +599,7 @@ mod tests {
             let authority = authority(&project);
             let store = store(root.path());
             let coordinator =
-                RecoveryCoordinator::with_delay(store.clone(), Duration::from_millis(50));
+                RecoveryCoordinator::with_delay(store.clone(), Duration::from_secs(3600));
             coordinator
                 .schedule(
                     authority.clone(),
@@ -608,6 +608,7 @@ mod tests {
                         .expect("the completed action is consolidated"),
                 )
                 .expect("the action is scheduled");
+            let generation = coordinator.state.lock().unwrap().generation;
             let checkpoint = store
                 .checkpoint_path(&authority)
                 .expect("the checkpoint path is valid");
@@ -616,7 +617,11 @@ mod tests {
 
             assert!(coordinator.finish(&authority).is_err());
             std::fs::remove_dir(&checkpoint).expect("the local obstruction is released");
-            tokio::time::sleep(Duration::from_millis(100)).await;
+            // Drive the real scheduled worker after the failed finish; debounce timing
+            // is covered separately, and must not race this obstruction fixture.
+            coordinator
+                .publish_if_current(generation)
+                .expect("the preserved pending checkpoint can still be published");
 
             assert!(
                 store

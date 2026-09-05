@@ -20,16 +20,20 @@ use crate::{
     desktop_webview_policy,
     export_attempts::ExportAttempts,
     imaging_processor::ImagingProcessor,
-    ipc_contract::LinkedMediaChanged,
+    ipc_contract::{LinkedMediaChanged, ProjectRecoveryDecision as IpcProjectRecoveryDecision},
     logging,
     media_runtime::{MediaBinding, MediaMonitor, MediaMonitorPoll, MediaResolver, MediaRuntime},
     operation_gate::OperationGate,
     project_bootstrap::{
         BootstrapRequest, BootstrappedHostProject, FailureCode, FailureStage, HostTerminal,
-        write_host_terminal,
+        read_project_recovery_request, validate_project_recovery_request, write_host_terminal,
     },
-    project_host::ProjectCloseRequestOutcome,
-    project_host::ProjectHost,
+    project_host::{
+        ProjectCloseRequestOutcome, ProjectHost,
+        ProjectRecoveryDecision as HostProjectRecoveryDecision,
+        ProjectRecoveryResolution as HostProjectRecoveryResolution,
+        ProjectRecoveryStatus as HostProjectRecoveryStatus,
+    },
     project_recovery::{RecoveryCoordinator, RecoveryStore},
     project_webview_authority::ProjectWebviewAuthority,
     project_window_lifecycle::{
@@ -63,6 +67,9 @@ pub(crate) fn run(
     let initial_window_title = project_window_title(project.project_path());
     let recovery = RecoveryCoordinator::new(RecoveryStore::new(app_paths.clone()));
     let project_host = ProjectHost::with_recovery(project, recovery.clone())?;
+    if !resolve_startup_recovery(&request, &project_host)? {
+        return Ok(());
+    }
     let cache_previews = CachePreviewRegistry::new(PROJECT_WINDOW_LABEL);
     let media_protocol_registry = cache_previews.clone();
     let setup_paths = app_paths.clone();
@@ -84,7 +91,7 @@ pub(crate) fn run(
             .find(|window| window.label == PROJECT_WINDOW_LABEL)
             .ok_or_else(|| io::Error::other("the Project window configuration does not exist"))?;
         project_config.create = true;
-        project_config.visible = true;
+        project_config.visible = false;
     }
 
     let run_result = tauri::Builder::default()
@@ -171,8 +178,6 @@ pub(crate) fn run(
             crate::logging::frontend_log,
             crate::native_dialog_window::owned_window_content_ready,
             project_ui_ready,
-            crate::project_commands::project_recovery_status,
-            crate::project_commands::resolve_project_recovery,
             crate::project_commands::project_state,
             crate::project_commands::validate_album_information,
             crate::project_commands::apply_project_intent,
@@ -201,6 +206,74 @@ pub(crate) fn run(
         .run(context);
     run_result?;
     Ok(())
+}
+
+fn resolve_startup_recovery(
+    request: &BootstrapRequest,
+    project_host: &ProjectHost,
+) -> Result<bool, Box<dyn std::error::Error>> {
+    if project_host.recovery_status().map_err(io::Error::other)? == HostProjectRecoveryStatus::None
+    {
+        return Ok(true);
+    }
+
+    write_host_terminal(
+        io::stdout().lock(),
+        &HostTerminal::recovery_available(request),
+    )?;
+    let continuation = match read_project_recovery_request(io::stdin().lock()) {
+        Ok(continuation) => continuation,
+        Err(_) => {
+            write_host_terminal(
+                io::stdout().lock(),
+                &HostTerminal::failed(request, FailureStage::Decode, FailureCode::InvalidRequest),
+            )?;
+            return Ok(false);
+        }
+    };
+    let decision = match validate_project_recovery_request(request, continuation) {
+        Ok(decision) => decision,
+        Err(_) => {
+            write_host_terminal(
+                io::stdout().lock(),
+                &HostTerminal::failed(
+                    request,
+                    FailureStage::Protocol,
+                    FailureCode::CorrelationMismatch,
+                ),
+            )?;
+            return Ok(false);
+        }
+    };
+    let host_decision = match decision {
+        IpcProjectRecoveryDecision::ReopenAndRecover => {
+            HostProjectRecoveryDecision::ReopenAndRecover
+        }
+        IpcProjectRecoveryDecision::DiscardCheckpointAndOpenLastSaved => {
+            HostProjectRecoveryDecision::DiscardCheckpointAndOpenLastSaved
+        }
+        IpcProjectRecoveryDecision::NowNot => HostProjectRecoveryDecision::NowNot,
+    };
+    match project_host.resolve_recovery(host_decision) {
+        Ok(
+            HostProjectRecoveryResolution::Recovered(_)
+            | HostProjectRecoveryResolution::OpenedLastSaved(_),
+        ) => Ok(true),
+        Ok(HostProjectRecoveryResolution::Deferred) => {
+            write_host_terminal(
+                io::stdout().lock(),
+                &HostTerminal::recovery_deferred(request),
+            )?;
+            Ok(false)
+        }
+        Err(_) => {
+            write_host_terminal(
+                io::stdout().lock(),
+                &HostTerminal::failed(request, FailureStage::Resolve, FailureCode::IoFailure),
+            )?;
+            Ok(false)
+        }
+    }
 }
 
 fn hydrate_project_from_recovered_cache(
@@ -274,10 +347,10 @@ fn setup_host(
                 policy_signal.observe(&window, payload.event());
             })
             .build()?;
-        #[cfg(debug_assertions)]
-        desktop_webview_policy::retire_inherited_debug_arguments_before_replacement()?;
         (window, Some(policy_readiness))
     };
+    #[cfg(debug_assertions)]
+    desktop_webview_policy::retire_inherited_debug_arguments_before_replacement()?;
     project_window.set_title(&initial_window_title)?;
     app.manage(app_paths);
     let app_handle = app.handle().clone();
@@ -287,7 +360,6 @@ fn setup_host(
             if let Some(policy_readiness) = policy_readiness {
                 policy_readiness.wait().await?;
             }
-            project_window.show()?;
             let transition = startup_handshake.mark_host_ready()?;
             if transition.newly_observed {
                 tracing::info!(
@@ -301,6 +373,7 @@ fn setup_host(
                 );
             }
             if transition.startup_completed {
+                startup_handshake.complete_startup(&project_window)?;
                 start_linked_media_monitor_if_active(app_handle.clone());
             }
             Ok::<_, Box<dyn std::error::Error + Send + Sync>>(())
@@ -360,6 +433,10 @@ fn project_ui_ready(
                 );
             }
             if transition.startup_completed {
+                startup.complete_startup(&window).map_err(|error| {
+                    startup.emit_failed(FailureStage::Initialize, FailureCode::IoFailure);
+                    error.to_string()
+                })?;
                 start_linked_media_monitor_if_active(window.app_handle().clone());
             }
             Ok(())
@@ -646,13 +723,19 @@ impl ProjectStartupHandshake {
             .state
             .lock()
             .map_err(|_| io::Error::other("the startup handshake is unavailable"))?;
-        let transition = state.readiness.observe(signal);
-        if transition.startup_completed {
-            let project_id = state.project_id.clone();
-            let revision = state.revision;
-            state.terminal.emit_ready(&project_id, revision)?;
-        }
-        Ok(transition)
+        Ok(state.readiness.observe(signal))
+    }
+
+    fn complete_startup(&self, project_window: &tauri::WebviewWindow) -> io::Result<()> {
+        project_window.show().map_err(io::Error::other)?;
+        project_window.set_focus().map_err(io::Error::other)?;
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_| io::Error::other("the startup handshake is unavailable"))?;
+        let project_id = state.project_id.clone();
+        let revision = state.revision;
+        state.terminal.emit_ready(&project_id, revision)
     }
 
     fn emit_failed(&self, stage: FailureStage, code: FailureCode) {

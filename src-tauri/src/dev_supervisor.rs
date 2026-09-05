@@ -482,6 +482,10 @@ enum HostLeaseEvent {
         lease_id: HostLeaseId,
         process_id: u32,
     },
+    Registered {
+        lease_id: HostLeaseId,
+        process_id: u32,
+    },
     Disconnected {
         lease_id: HostLeaseId,
         process_id: u32,
@@ -510,6 +514,17 @@ impl DevelopmentLifecycle {
                 self.host_seen = true;
                 self.active_hosts.insert(lease_id);
                 eprintln!(r#"{{"event":"dev_host_connected","processId":{process_id}}}"#);
+            }
+            HostLeaseEvent::Registered {
+                lease_id,
+                process_id,
+            } => {
+                if self.active_hosts.contains(&lease_id) {
+                    eprintln!(r#"{{"event":"dev_host_registered","processId":{process_id}}}"#);
+                } else {
+                    self.tracking_failed = true;
+                    eprintln!(r#"{{"event":"dev_host_tracking_failed","processId":{process_id}}}"#);
+                }
             }
             HostLeaseEvent::Disconnected {
                 lease_id,
@@ -791,7 +806,12 @@ fn track_host_lease(
         let _ = write_host_lease_response(&mut connection, HOST_LEASE_REJECTED_RESPONSE);
         return;
     }
-    let _ = write_host_lease_response(&mut connection, HOST_LEASE_REGISTERED_RESPONSE);
+    if write_host_lease_response(&mut connection, HOST_LEASE_REGISTERED_RESPONSE).is_ok() {
+        let _ = sender.send(HostLeaseEvent::Registered {
+            lease_id,
+            process_id,
+        });
+    }
     drop(connection);
     // The authenticated process handle is the durable lease. TCP is only the
     // bootstrap channel; WebView2 may reset inherited sockets during handoff.
@@ -1114,6 +1134,13 @@ mod tests {
             event => panic!("unexpected lease event: {event:?}"),
         };
         assert_eq!(process_id, process.id());
+        assert!(matches!(
+            server.events().recv_timeout(Duration::from_secs(1)),
+            Ok(HostLeaseEvent::Registered {
+                lease_id: registered_lease,
+                process_id: registered_process,
+            }) if registered_lease == lease_id && registered_process == process_id
+        ));
 
         assert_eq!(
             authorize_process_instance(&server, &credential, process_instance),
@@ -1185,6 +1212,13 @@ mod tests {
             } => (lease_id, process_id),
             event => panic!("unexpected lease event: {event:?}"),
         };
+        assert!(matches!(
+            server.events().recv_timeout(Duration::from_secs(1)),
+            Ok(HostLeaseEvent::Registered {
+                lease_id: registered_lease,
+                process_id: registered_process,
+            }) if registered_lease == lease_id && registered_process == process_id
+        ));
         assert!(
             server
                 .events()
