@@ -566,6 +566,11 @@ impl ProjectHost {
             .state
             .lock()
             .map_err(|_| SESSION_UNAVAILABLE_MESSAGE.to_string())?;
+        tracing::info!(
+            target: "myalbuns.desktop",
+            process_id = std::process::id(),
+            event = "project_close_session_acquired",
+        );
         let mut session = state.take_session()?;
         if session.phase.is_recovery_pending() {
             return Ok(ProjectCloseRequestOutcome::CloseImmediately);
@@ -579,8 +584,20 @@ impl ProjectHost {
             state.restore_session(session);
             return Ok(ProjectCloseRequestOutcome::ConfirmationRequired);
         }
+        tracing::info!(
+            target: "myalbuns.desktop",
+            process_id = std::process::id(),
+            event = "project_close_recovery_finishing",
+        );
         match self.finish_recovery(&session.project) {
-            Ok(_) => Ok(ProjectCloseRequestOutcome::CloseImmediately),
+            Ok(_) => {
+                tracing::info!(
+                    target: "myalbuns.desktop",
+                    process_id = std::process::id(),
+                    event = "project_close_recovery_finished",
+                );
+                Ok(ProjectCloseRequestOutcome::CloseImmediately)
+            }
             Err(error) => {
                 state.restore_session(session);
                 Err(error.to_string())
@@ -1051,7 +1068,7 @@ mod tests {
                 .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
                 .expect("the completed action becomes recoverable")
                 .projection;
-            tokio::time::sleep(Duration::from_millis(90)).await;
+            wait_for_checkpoint(&fixture.store, &fixture.authority).await;
             let checkpoint = fixture
                 .store
                 .checkpoint_path(&fixture.authority)
@@ -1300,7 +1317,7 @@ mod tests {
                 .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
                 .expect("the older-base action becomes recoverable")
                 .projection;
-            tokio::time::sleep(Duration::from_millis(90)).await;
+            wait_for_checkpoint(&fixture.store, &fixture.authority).await;
             let older_checkpoint = fixture
                 .store
                 .load(&fixture.authority)
@@ -1432,6 +1449,86 @@ mod tests {
             assert!(fixture.store.load(&next_authority).unwrap().is_some());
             assert!(destination.is_file());
         });
+    }
+
+    #[test]
+    fn saved_original_closes_after_save_as_and_independent_copy_edits() {
+        let (completed, result) = std::sync::mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            tauri::async_runtime::block_on(async {
+                let fixture = recovery_fixture();
+                let changed = fixture
+                    .host
+                    .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
+                    .expect("the first Host changes the original")
+                    .projection;
+                let copy_path = fixture._root.path().join("Cópia independente.myalbuns");
+                let mut context = OperationPathContext::new();
+                context
+                    .capture(&copy_path)
+                    .expect("the copy destination is captured");
+                fixture
+                    .host
+                    .save_as(SaveAsProjectRequest::new(
+                        changed.state.revision,
+                        ProjectLocation::new(copy_path.clone(), context.freeze()),
+                        SaveAsAuthorization::CreateOnly,
+                    ))
+                    .expect("Save As adopts the copy and releases the original");
+
+                let original = ProjectHost::with_recovery(
+                    open_editable_project(&fixture.project_path, &fixture.identity_lease_root),
+                    RecoveryCoordinator::with_delay(
+                        fixture.store.clone(),
+                        Duration::from_millis(50),
+                    ),
+                )
+                .expect("a separate Host reopens the saved original");
+                let original_change = original
+                    .apply_with_outcome(ProjectIntent::SetDpi { dpi: 320 })
+                    .expect("the original changes independently")
+                    .projection;
+                let original_save = original.clone();
+                tauri::async_runtime::spawn_blocking(move || {
+                    original_save.save(original_change.state.revision)
+                })
+                .await
+                .expect("the original save worker returns")
+                .expect("the original is saved");
+                let copy_change = fixture
+                    .host
+                    .apply_with_outcome(ProjectIntent::SetDpi { dpi: 420 })
+                    .expect("the copy changes independently")
+                    .projection;
+                let copy_save = fixture.host.clone();
+                tauri::async_runtime::spawn_blocking(move || {
+                    copy_save.save(copy_change.state.revision)
+                })
+                .await
+                .expect("the copy save worker returns")
+                .expect("the copy is saved");
+
+                assert_eq!(
+                    original.begin_close(),
+                    Ok(ProjectCloseRequestOutcome::CloseImmediately)
+                );
+                assert!(original.projection().is_err());
+                let reopened = open_project(&fixture.project_path, &fixture.identity_lease_root);
+                assert_eq!(reopened.projection().unwrap().state.document.dpi, 320);
+                assert_eq!(fixture.host.projection().unwrap().state.document.dpi, 420);
+                assert!(!fixture.host.projection().unwrap().state.dirty);
+                assert!(fixture.store.load(&fixture.authority).unwrap().is_none());
+            });
+            completed
+                .send(())
+                .expect("the bounded close observation remains available");
+        });
+        result
+            .recv_timeout(Duration::from_secs(5))
+            .expect("closing the saved original must finish without blocking the independent copy");
+        worker
+            .join()
+            .expect("the close reproduction worker succeeds");
     }
 
     #[test]

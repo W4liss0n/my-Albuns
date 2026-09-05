@@ -10,7 +10,9 @@ import {
   type ProjectCloseChoice,
   type ProjectWindowPort,
 } from "../application/projectPorts";
+import { createLogInstanceId, logReasonFromError } from "../application/logging";
 import type { EditorProjection } from "../domain/project";
+import { useLogger } from "./loggingContext";
 import type { ProjectMutationOutcome } from "./useProjectMutationRunner";
 
 type ClosePhase =
@@ -52,6 +54,19 @@ export function useProjectCloseController({
   onProjectionChange,
   onError,
 }: ProjectCloseControllerOptions) {
+  const logger = useLogger();
+  const logClose = useCallback(
+    (operationId: string, event: string, reason?: string) => {
+      try {
+        logger.write({
+          level: "info", component: "project-close", event, operationId, reason,
+        });
+      } catch {
+        // Diagnostics must never change the close decision or hold the workspace.
+      }
+    },
+    [logger],
+  );
   const [explicitCancelRevision, setExplicitCancelRevision] = useState(0);
   const [phase, setPhase] = useState<ClosePhase>("idle");
   const phaseRef = useRef<ClosePhase>("idle");
@@ -114,9 +129,14 @@ export function useProjectCloseController({
 
   const requestClose = useCallback(async () => {
     if (requestBlockedRef.current || phaseRef.current !== "idle") return null;
+    const operationId = createLogInstanceId("project-close");
     transition("requesting");
+    logClose(operationId, "project_close_requested");
     try {
       const pendingOutcome = await waitForPendingMutations();
+      logClose(
+        operationId, "project_close_mutations_settled", pendingOutcome?.status ?? "idle",
+      );
       if (!hasClosePhase(phaseRef, "requesting")) return;
       if (
         pendingOutcome?.status === "failed" ||
@@ -125,7 +145,12 @@ export function useProjectCloseController({
         transition("idle");
         return null;
       }
+      logClose(operationId, "project_close_ipc_requested");
       const outcome = await projectWindowPort.requestClose();
+      logClose(
+        operationId, "project_close_ipc_resolved",
+        outcome.kind === "closed" ? "closed" : "confirmation_required",
+      );
       if (outcome.kind === "confirmationRequired") {
         presentConfirmation();
       } else {
@@ -133,11 +158,15 @@ export function useProjectCloseController({
       }
       return outcome;
     } catch (error: unknown) {
+      logClose(
+        operationId, "project_close_request_failed", logReasonFromError(error),
+      );
       transition("idle");
       onError(closeErrorMessage(error));
       return null;
     }
   }, [
+    logClose,
     onError,
     presentConfirmation,
     projectWindowPort,
