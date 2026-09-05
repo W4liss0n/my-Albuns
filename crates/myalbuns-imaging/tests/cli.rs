@@ -497,6 +497,29 @@ fn processor_never_replaces_an_existing_preparation() {
 
 #[test]
 fn processor_builds_one_reduced_representation_per_real_photo() {
+    assert_reduced_photo_cache_round_trip(&[]);
+}
+
+#[cfg(windows)]
+#[test]
+fn processor_builds_preview_for_adobe_jpeg_with_standard_windows_srgb() {
+    mod windows_srgb {
+        include!("support/windows_srgb.rs");
+    }
+    let profile = windows_srgb::standard_profile();
+    let mut metadata = vec![
+        0xff, 0xee, 0, 19, b'A', b'd', b'o', b'b', b'e', 0, 100, 0x80, 0, 0, 0, 1, 5, 0, 2, 0x49,
+        0x44,
+    ];
+    metadata.extend_from_slice(&[0xff, 0xe2]);
+    metadata.extend_from_slice(&((profile.len() + 16) as u16).to_be_bytes());
+    metadata.extend_from_slice(b"ICC_PROFILE\0\x01\x01");
+    metadata.extend_from_slice(&profile);
+
+    assert_reduced_photo_cache_round_trip(&metadata);
+}
+
+fn assert_reduced_photo_cache_round_trip(jpeg_metadata: &[u8]) {
     let source_dir = tempfile::tempdir().expect("temporary source directory");
     let cache = TestCache::new("build");
     let log_dir = tempfile::tempdir().expect("temporary log directory");
@@ -508,6 +531,11 @@ fn processor_builds_one_reduced_representation_per_real_photo() {
     source
         .save_with_format(&source_path, ImageFormat::Jpeg)
         .expect("the real JPEG fixture is written");
+    if !jpeg_metadata.is_empty() {
+        let mut bytes = std::fs::read(&source_path).expect("the generated JPEG is readable");
+        bytes.splice(2..2, jpeg_metadata.iter().copied());
+        std::fs::write(&source_path, bytes).expect("the fixture receives exporter metadata");
+    }
     let original_source = std::fs::read(&source_path).expect("the source is readable");
     let source_sha256 = format!("{:x}", Sha256::digest(&original_source));
     let cache_paths = cache.paths.clone();

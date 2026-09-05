@@ -18,6 +18,7 @@ use myalbuns_imaging_protocol::{
     CACHE_MAX_DECODER_ALLOC_BYTES, CacheBasicColorProfile, ImagingFailureCode, ImagingPathCode,
 };
 use myalbuns_paths::ResolvedObject;
+use sha2::{Digest, Sha256};
 
 pub(crate) const MAX_DECODED_SOURCE_PIXELS_TOTAL: u64 = 134_217_728;
 const MAX_ALLOWED_ICC_PROFILE_BYTES: usize = 60_988;
@@ -33,6 +34,13 @@ const SRGB_V4_PREFERENCE_DISPLAY: &[u8] =
     include_bytes!("../assets/sRGB_v4_ICC_preference_displayclass.icc");
 const ALLOWED_SRGB_PROFILES: &[&[u8]] =
     &[SRGB_2014, SRGB_V4_PREFERENCE, SRGB_V4_PREFERENCE_DISPLAY];
+// The legacy HP/Microsoft sRGB profile is recognized by its complete digest;
+// the application neither redistributes it nor trusts the installed OS profile.
+const SRGB_WINDOWS_PROFILE_BYTES: usize = 3_144;
+const SRGB_WINDOWS_PROFILE_SHA256: [u8; 32] = [
+    0x2b, 0x3a, 0xa1, 0x64, 0x57, 0x79, 0xa9, 0xe6, 0x34, 0x74, 0x4f, 0xaf, 0x9b, 0x01, 0xe9, 0x10,
+    0x2b, 0x0c, 0x9b, 0x88, 0xfd, 0x6d, 0xec, 0xed, 0x79, 0x34, 0xdf, 0x86, 0xb9, 0x49, 0xaf, 0x7e,
+];
 
 #[derive(Debug)]
 pub(crate) struct SourceFailure {
@@ -411,8 +419,10 @@ fn preflight_jpeg(
             }
         } else if marker == 0xee {
             let payload = read_segment(reader, payload_length)?;
+            // Adobe defines the color header in the first 12 bytes. Exporters may
+            // append application data; those bytes do not change the transform.
             if payload.starts_with(b"Adobe")
-                && (payload.len() != 12 || adobe_transform.replace(payload[11]).is_some())
+                && (payload.len() < 12 || adobe_transform.replace(payload[11]).is_some())
             {
                 return Err(SourceFailure::new(
                     ImagingFailureCode::UnsupportedColorModel,
@@ -869,7 +879,10 @@ fn validate_png_iccp_chunk(payload: &[u8]) -> Result<(), SourceFailure> {
 }
 
 fn validate_icc_profile(profile: &[u8]) -> Result<(), SourceFailure> {
-    if ALLOWED_SRGB_PROFILES.contains(&profile) {
+    if ALLOWED_SRGB_PROFILES.contains(&profile)
+        || (profile.len() == SRGB_WINDOWS_PROFILE_BYTES
+            && Sha256::digest(profile)[..] == SRGB_WINDOWS_PROFILE_SHA256)
+    {
         Ok(())
     } else {
         Err(unsupported_profile(
@@ -1628,6 +1641,43 @@ mod render_source_tests {
         );
     }
 
+    #[cfg(windows)]
+    #[test]
+    fn windows_srgb_jpeg_and_png_decode_without_accepting_modified_profiles() {
+        mod windows_srgb {
+            include!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/support/windows_srgb.rs"
+            ));
+        }
+        let profile = windows_srgb::standard_profile();
+        let without_profile = jpeg_fixture(None, ExtendedColorType::Rgb8, &[10, 20, 30]);
+        let with_profile = jpeg_fixture(Some(&profile), ExtendedColorType::Rgb8, &[10, 20, 30]);
+        assert_eq!(
+            decode_fixture(&with_profile).expect("the standard Windows sRGB JPEG decodes"),
+            decode_fixture(&without_profile).unwrap()
+        );
+
+        let mut iccp = b"sRGB\0\0".to_vec();
+        iccp.extend_from_slice(&zlib_stored(&profile));
+        let png = png_fixture(8, 2, &[0, 10, 20, 30], &[(b"iCCP", &iccp)]);
+        assert_eq!(
+            decode_fixture(&png).unwrap().get_pixel(0, 0).0,
+            [10, 20, 30, 255]
+        );
+
+        let mut changed = profile;
+        let last = changed.len() - 1;
+        changed[last] ^= 1;
+        let jpeg = jpeg_fixture(Some(&changed), ExtendedColorType::Rgb8, &[10, 20, 30]);
+        assert_eq!(
+            decode_fixture(&jpeg)
+                .expect_err("the profile name alone never authorizes it")
+                .code,
+            ImagingFailureCode::UnsupportedColorProfile
+        );
+    }
+
     #[test]
     fn png_color_declarations_accept_srgb_values_and_reject_contradictions() {
         let srgb_gamma = 45_455_u32.to_be_bytes();
@@ -1820,6 +1870,49 @@ mod render_source_tests {
                 .code,
             ImagingFailureCode::UnsupportedColorModel
         );
+    }
+
+    #[test]
+    fn jpeg_adobe_app14_extension_preserves_supported_pixels() {
+        let jpeg = jpeg_fixture(None, ExtendedColorType::Rgb8, &[10, 20, 30]);
+        let expected = decode_fixture(&jpeg).expect("the JPEG without APP14 decodes");
+        let mut extended = jpeg;
+        // The Adobe color header occupies 12 bytes; exporters can append data.
+        let segment = [
+            0xff, 0xee, 0, 19, b'A', b'd', b'o', b'b', b'e', 0, 100, 0x80, 0, 0, 0, 1, 5, 0, 2,
+            0x49, 0x44,
+        ];
+        extended.splice(2..2, segment);
+        let actual = decode_fixture(&extended)
+            .expect("a complete Adobe header with extension bytes remains a supported JPEG");
+        assert_eq!(
+            actual, expected,
+            "extension bytes do not alter color interpretation"
+        );
+    }
+
+    #[test]
+    fn jpeg_adobe_app14_still_rejects_incomplete_duplicate_and_ycck_headers() {
+        let header = b"Adobe\0\x64\x80\0\0\0\x01";
+        for (payload, copies) in [
+            (&header[..11], 1),
+            (&header[..], 2),
+            (&b"Adobe\0\x64\x80\0\0\0\x02extension"[..], 1),
+        ] {
+            let mut jpeg = jpeg_fixture(None, ExtendedColorType::Rgb8, &[10, 20, 30]);
+            let mut segment = vec![0xff, 0xee];
+            segment.extend_from_slice(&((payload.len() + 2) as u16).to_be_bytes());
+            segment.extend_from_slice(payload);
+            for _ in 0..copies {
+                jpeg.splice(2..2, segment.iter().copied());
+            }
+            assert_eq!(
+                decode_fixture(&jpeg)
+                    .expect_err("unsupported Adobe color metadata is refused")
+                    .code,
+                ImagingFailureCode::UnsupportedColorModel
+            );
+        }
     }
 
     #[test]
