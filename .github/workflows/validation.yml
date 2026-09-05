@@ -3,6 +3,12 @@ name: Validation
 on:
   pull_request:
   workflow_dispatch:
+    inputs:
+      native_runner:
+        description: 'Optional hosted Windows x64 runner label with hardware WebGL2; leave empty for headless only'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
@@ -64,7 +70,8 @@ jobs:
 
   native:
     name: Native external-copy pilot
-    runs-on: windows-2022
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.native_runner != '' }}
+    runs-on: "${{ inputs.native_runner || 'windows-2022' }}"
     timeout-minutes: 45
     defaults:
       run:

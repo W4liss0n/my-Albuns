@@ -17,8 +17,8 @@ of the captured evidence; a successful capture alone is not visual approval.
 
 Visible native gates are disabled locally unless the user gives explicit
 permission for that run and the command receives `-AllowVisibleWindows`.
-A hosted GitHub Actions runner is the default execution environment. Do not
-work around this policy by invoking a JavaScript runner directly. Do not use a
+Use an isolated Windows environment with verified hardware WebGL2 for native
+acceptance. Do not work around this policy by invoking a JavaScript runner directly. Do not use a
 self-hosted runner on the user's desktop without their explicit permission.
 The previous automatic focused run after GREEN is superseded.
 
@@ -43,15 +43,28 @@ A failed run retains window diagnostics, screenshots where available, process
 logs and driver traces before cleanup. Inspect those artifacts before rerunning
 only the failed scenario. Do not add automatic retries to turn failures green.
 
-The Windows CI pilot runs `external-copy-opening-owner` on PR updates.
-Headless validation and the native pilot run as separate, parallel jobs with
-separate artifacts. Rerun only the failed job when its environment or code has
-changed. Either failure keeps the workflow failed; neither job suppresses the
-other. A native build that detects source changes retains the changed paths and
-source snapshots before refusing to run the scenario. Other
-scenarios remain explicit until their hosted behavior is verified. Win32 probe
-fixtures are opt-in with `MYALBUNS_NATIVE_PROBE_TESTS=1`, only in that isolated
-native environment or during an explicitly authorized local native run.
+PR updates run headless validation automatically. The native CI pilot is manual:
+supply `native_runner` with a configured hosted Windows x64 runner label that has
+verified hardware WebGL2. An empty input runs headless validation only. Manual
+dispatch requires this workflow on the default branch; do not merge unresolved
+product work just to enable it.
+
+The pilot on standard `windows-2022` at `f83304f` reached the application's safe
+mode: hardware WebGL2 could not be created, so project opening was correctly
+blocked. Its [retained diagnostics](https://github.com/W4liss0n/my-Albuns/actions/runs/33935287054)
+include the startup page text and screenshot. The pilot is not approved. Do not
+repeat it on that environment without a relevant change, or bypass the product's
+graphics policy to obtain a passing result.
+
+When selected, headless validation and the native pilot run as separate, parallel
+jobs with separate artifacts. A skipped native job provides no native acceptance
+evidence. Rerun only the failed job when its environment or code has changed.
+Either failure keeps the workflow failed; neither job suppresses the other. A
+native build that detects source changes retains changed paths and source
+snapshots before refusing to run the scenario. Other scenarios remain explicit
+until their hosted behavior is verified. Win32 probe fixtures are opt-in with
+`MYALBUNS_NATIVE_PROBE_TESTS=1`, only in that isolated native environment or during
+an explicitly authorized local native run.
 
 ## Full journey and existing evidence
 

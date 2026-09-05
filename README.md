@@ -94,11 +94,19 @@ A captura `npm run ui:acceptance` também usa navegador sem janela. Selecione
 somente os estados afetados com `MYALBUNS_UI_SCENARIO_IDS`; a aprovação visual
 continua dependendo da revisão das capturas.
 
-Os testes com janelas ficam separados. O workflow **Validation** executa no
-Windows do GitHub, em jobs independentes, a validação sem janelas e um piloto
-nativo de Cópia externa,
-retendo seus logs e capturas como artefatos. O piloto não aprova a jornada completa
-nem substitui a verificação de GPU no hardware final.
+Os testes com janelas ficam separados. O workflow **Validation** executa a
+validação sem janelas automaticamente nas PRs. O piloto nativo de Cópia externa
+fica disponível para execução manual, informando em `native_runner` o rótulo de
+um runner Windows x64 hospedado com WebGL2 por hardware confirmado. Deixar o campo
+vazio executa somente a validação sem janelas.
+
+O [piloto no runner comum `windows-2022`](https://github.com/W4liss0n/my-Albuns/actions/runs/33935287054)
+confirmou que o aplicativo entra em modo seguro porque esse ambiente não conseguiu
+criar WebGL2 por hardware. Por isso, o piloto permanece fora da rotina automática
+e ainda não está aprovado. Seus logs e capturas ficam retidos como artefatos.
+A execução manual pelo GitHub exige que o workflow esteja na branch padrão.
+O piloto não aprova a jornada completa nem substitui a verificação de GPU no
+hardware final.
 
 Para um ambiente Windows reservado aos testes, `npm run build:native-tests`
 prepara uma única compilação com hashes e commit. O comando
