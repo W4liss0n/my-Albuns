@@ -94,11 +94,19 @@ if (
   throw new Error("The focused owned-dialog fixture is incomplete");
 }
 
-async function retainScenarioFailure(label, instance, driver, error) {
-  const diagnostic = { error: String(error) };
+async function retainScenarioFailure(label, instance, driver, error, details = {}) {
+  const diagnostic = { ...details, error: String(error) };
   try {
     diagnostic.nativeWindows = nativeOwnedWindowState(instance);
     if (driver) {
+      try {
+        diagnostic.page = await driver.request("POST", `/session/${driver.sessionId}/execute/sync`, {
+          script: "return { url: location.href, title: document.title, text: document.body?.innerText ?? '' };",
+          args: [],
+        });
+      } catch (pageError) {
+        diagnostic.pageError = String(pageError);
+      }
       const screenshot = await driver.request("GET", `/session/${driver.sessionId}/screenshot`);
       writeFileSync(path.join(scratch, `failure-${label}.png`), Buffer.from(screenshot, "base64"));
     }
@@ -208,6 +216,7 @@ async function observeExternalCopyScenario() {
   );
   let hostInstance;
   let driver;
+  let decisionObserved = false;
   try {
     const target = await waitFor("external-copy decision target", async () => {
       const targets = await webViewDevToolsTargets(
@@ -228,6 +237,7 @@ async function observeExternalCopyScenario() {
       });
       return decisions.length === 1 ? decisions[0] : undefined;
     });
+    decisionObserved = true;
     const attemptId = new URL(target.url).searchParams.get("attemptId");
     if (!attemptId)
       throw new Error("The external-copy decision has no attemptId");
@@ -412,7 +422,25 @@ async function observeExternalCopyScenario() {
       childOutputTail: childOutput().slice(-500),
     };
   } catch (error) {
-    await retainScenarioFailure("external-copy", globalInstance, driver, error);
+    let diagnosticDriverError;
+    if (!driver && !decisionObserved) {
+      try {
+        driver = await attachWebView2Driver({
+          debugPort: globalDebugPort,
+          label: "external-copy startup diagnostic",
+          driverLogPath: path.join(scratch, "webdriver-external-copy.log"),
+          nativeDriverPath,
+          sessionTimeoutMilliseconds: 30_000,
+          workingDirectory: workspace,
+        });
+      } catch (attachError) {
+        diagnosticDriverError = String(attachError);
+      }
+    }
+    await retainScenarioFailure("external-copy", globalInstance, driver, error, {
+      childOutputTail: childOutput().slice(-4_000),
+      diagnosticDriverError,
+    });
     throw error;
   } finally {
     if (driver) driver = await disposeConfirmedWebDriver(driver);
