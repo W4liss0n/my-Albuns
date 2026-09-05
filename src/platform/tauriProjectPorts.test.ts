@@ -407,9 +407,11 @@ test("maps Photo import, target resolution, and affected Frame outcomes", async 
     affectedSheetId: null,
   };
   const importOutcome = {
-    kind: "imported" as const,
+    kind: "completed" as const,
     projection: representativeProjection,
-    mediaId: "media-imported",
+    mediaIds: ["media-imported"],
+    importedCount: 1,
+    problems: [],
   };
   vi.mocked(invoke)
     .mockResolvedValueOnce(mutationOutcome)

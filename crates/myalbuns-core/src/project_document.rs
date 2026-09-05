@@ -655,11 +655,13 @@ impl ProjectDocument {
         Ok(candidate)
     }
 
-    pub(crate) fn with_imported_photo(&self, media_id: Uuid, path: PathBuf) -> Result<Self, ()> {
+    pub(crate) fn with_imported_photos(&self, links: Vec<(Uuid, PathBuf)>) -> Result<Self, ()> {
         let mut candidate = self.clone();
-        candidate
-            .media
-            .push(MediaRef::new(media_id, MediaKind::Photo, path));
+        candidate.media.extend(
+            links
+                .into_iter()
+                .map(|(media_id, path)| MediaRef::new(media_id, MediaKind::Photo, path)),
+        );
         validate_project_state(&candidate)?;
         Ok(candidate)
     }

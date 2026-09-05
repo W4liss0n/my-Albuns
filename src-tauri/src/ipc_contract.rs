@@ -33,6 +33,10 @@ pub struct ProjectDialogDetail {
 )]
 #[ts(tag = "kind")]
 pub enum ProjectDialogState {
+    PhotoImportProblems {
+        imported_count: u32,
+        problems: Vec<PhotoImportProblem>,
+    },
     AlbumInformationConfirmation {
         busy: bool,
         details: Vec<ProjectDialogDetail>,
@@ -83,6 +87,7 @@ pub enum ProjectDialogAction {
     DismissExport,
     DismissProjectCloseFailure,
     DismissProjectOperationFailure,
+    DismissPhotoImportProblems,
     RetryExport,
     SaveAndClose,
 }
@@ -518,15 +523,12 @@ pub enum ImportPhotoResult {
         #[ts(type = "import(\"../../domain/project\").EditorProjection")]
         projection: EditorProjection,
     },
-    Imported {
+    Completed {
         #[ts(type = "import(\"../../domain/project\").EditorProjection")]
         projection: EditorProjection,
-        media_id: String,
-    },
-    Selected {
-        #[ts(type = "import(\"../../domain/project\").EditorProjection")]
-        projection: EditorProjection,
-        media_id: String,
+        media_ids: Vec<String>,
+        imported_count: u32,
+        problems: Vec<PhotoImportProblem>,
     },
 }
 
@@ -989,4 +991,11 @@ pub struct FrontendLogEvent {
     pub(crate) width: Option<u32>,
     pub(crate) height: Option<u32>,
     pub(crate) sheet_count: Option<usize>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct PhotoImportProblem {
+    pub(crate) file_name: String,
+    pub(crate) reason: String,
 }

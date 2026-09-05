@@ -236,3 +236,24 @@ test("projects export success through the standard message dialog", async () => 
   await user.click(within(dialog).getByRole("button", { name: "Fechar" }));
   expect(onAction).toHaveBeenCalledWith("dismissExport");
 });
+
+
+test("shows rejected photo files in Problems and closes without a creative action", async () => {
+  const user = userEvent.setup();
+  const onAction = vi.fn();
+  render(<ProjectDialogView onAction={onAction} state={{
+    kind: "photoImportProblems", importedCount: 2,
+    problems: [
+      { fileName: "quebrada.jpg", reason: "JPEG corrompido" },
+      { fileName: "ausente.jpg", reason: "Arquivo indisponível" },
+    ],
+  }} />);
+  const dialog = screen.getByRole("dialog", { name: "Problemas na importação" });
+  expect(within(dialog).getByRole("columnheader", { name: "Arquivo" })).toBeInTheDocument();
+  expect(within(dialog).getByRole("columnheader", { name: "Motivo" })).toBeInTheDocument();
+  expect(within(dialog).getByRole("row", { name: "quebrada.jpg JPEG corrompido" })).toBeInTheDocument();
+  expect(within(dialog).getByText("2 Fotos importadas. 2 arquivos não foram importados.")).toBeInTheDocument();
+  expect(within(dialog).getByRole("button", { name: "Fechar" })).toHaveFocus();
+  await user.keyboard("{Escape}");
+  expect(onAction).toHaveBeenCalledExactlyOnceWith("dismissPhotoImportProblems");
+});

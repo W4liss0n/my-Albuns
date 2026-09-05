@@ -31,7 +31,7 @@ import {
 import { ProjectWorkspace } from "./components/ProjectWorkspace";
 import { useProjectCloseController } from "./components/useProjectCloseController";
 import { useProjectMutationRunner } from "./components/useProjectMutationRunner";
-import { useProjectOperationFailureDialog } from "./components/useProjectOperationFailureDialog";
+import { useProjectOperationResultDialog } from "./components/useProjectOperationResultDialog";
 import { useProjectGraphicsFailureDialog } from "./components/useProjectGraphicsFailureDialog";
 import { BrandWordmark, InlineNotice } from "./ui";
 import "./ui/theme.css";
@@ -118,7 +118,7 @@ function App({
     loggerRef.current = logger;
   }, [logger]);
 
-  useProjectOperationFailureDialog({
+  useProjectOperationResultDialog({
     message:
       initialGraphicsCloseError ??
       saveAsStartupFailure ??

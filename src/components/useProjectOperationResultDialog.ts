@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 import type {
   ProjectDialogAction,
@@ -6,30 +6,48 @@ import type {
   ProjectDialogSession,
 } from "../application/projectDialogPort";
 
-interface ProjectOperationFailureDialogOptions {
+import type { PhotoImportCompletion } from "../application/projectPorts";
+
+interface ProjectOperationResultDialogOptions {
+  importResult?: PhotoImportCompletion | null;
   message: string | null;
   projectDialogPort: ProjectDialogPort;
   onDismiss(): void;
 }
 
-export function useProjectOperationFailureDialog({
+export function useProjectOperationResultDialog({
   message,
+  importResult,
   projectDialogPort,
   onDismiss,
-}: ProjectOperationFailureDialogOptions) {
-  const messageRef = useRef(message);
+}: ProjectOperationResultDialogOptions) {
+  const feedback = useMemo(() => {
+    if (message) return { kind: "projectOperationFailure" as const, message };
+    if (importResult?.problems.length) {
+      return {
+        kind: "photoImportProblems" as const,
+        importedCount: importResult.importedCount,
+        problems: importResult.problems,
+      };
+    }
+    return null;
+  }, [message, importResult]);
+  const feedbackRef = useRef(feedback);
   const onDismissRef = useRef(onDismiss);
-  const presentedMessageRef = useRef<string | null>(null);
+  const presentedFeedbackRef = useRef<typeof feedback>(null);
   const dialogSessionRef = useRef<ProjectDialogSession | null>(null);
   const actionListenerRef = useRef<(action: ProjectDialogAction) => void>(
     () => undefined,
   );
 
-  messageRef.current = message;
+  feedbackRef.current = feedback;
   onDismissRef.current = onDismiss;
   actionListenerRef.current = (action) => {
-    if (action !== "dismissProjectOperationFailure") return;
-    presentedMessageRef.current = null;
+    if (
+      action !== "dismissProjectOperationFailure" &&
+      action !== "dismissPhotoImportProblems"
+    ) return;
+    presentedFeedbackRef.current = null;
     const session = dialogSessionRef.current;
     dialogSessionRef.current = null;
     onDismissRef.current();
@@ -37,15 +55,15 @@ export function useProjectOperationFailureDialog({
   };
 
   useEffect(() => {
-    if (!message) {
-      presentedMessageRef.current = null;
+    if (!feedback) {
+      presentedFeedbackRef.current = null;
       const session = dialogSessionRef.current;
       dialogSessionRef.current = null;
       void session?.dismiss().catch(() => undefined);
       return;
     }
-    if (presentedMessageRef.current === message) return;
-    presentedMessageRef.current = message;
+    if (presentedFeedbackRef.current === feedback) return;
+    presentedFeedbackRef.current = feedback;
     let active = true;
     const session =
       dialogSessionRef.current ??
@@ -54,16 +72,16 @@ export function useProjectOperationFailureDialog({
       );
     dialogSessionRef.current = session;
     void session
-      .present({ kind: "projectOperationFailure", message })
+      .present(feedback)
       .catch(() => {
         if (
           !active ||
-          messageRef.current !== message ||
+          feedbackRef.current !== feedback ||
           dialogSessionRef.current !== session
         ) {
           return;
         }
-        presentedMessageRef.current = null;
+        presentedFeedbackRef.current = null;
         dialogSessionRef.current = null;
         void session.dismiss().catch(() => undefined);
         onDismissRef.current();
@@ -71,7 +89,7 @@ export function useProjectOperationFailureDialog({
     return () => {
       active = false;
     };
-  }, [message, projectDialogPort]);
+  }, [feedback, projectDialogPort]);
 
   useEffect(
     () => () => {

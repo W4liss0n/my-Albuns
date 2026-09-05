@@ -35,6 +35,7 @@ test.each<{
     expected: "dismissProjectCloseFailure",
     state: { kind: "projectCloseFailure", message: "Falhou" },
   },
+  { expected: "dismissPhotoImportProblems", state: { kind: "photoImportProblems", importedCount: 0, problems: [] } },
   {
     expected: "dismissProjectOperationFailure",
     state: { kind: "projectOperationFailure", message: "Falhou" },

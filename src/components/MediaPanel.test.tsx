@@ -64,7 +64,7 @@ test("matches the reference toolbar and marks only unavailable import actions as
   await user.click(screen.getByRole("button", { name: "Importar" }));
   const importMenu = screen.getByRole("menu", { name: "Importar" });
   expect(
-    within(importMenu).getByRole("menuitem", { name: "Arquivo JPEG…" }),
+    within(importMenu).getByRole("menuitem", { name: "Arquivos JPEG…" }),
   ).toBeEnabled();
   const folderItem = within(importMenu).getByRole("menuitem", {
     name: "Pasta…",

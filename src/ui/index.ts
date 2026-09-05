@@ -19,6 +19,7 @@ export type {
 export { InlineNotice } from "./InlineNotice";
 export { MessageDialog } from "./MessageDialog";
 export { OwnedWindowShell } from "./OwnedWindowShell";
+export { ProblemsDialog } from "./ProblemsDialog";
 export { ProgressDialog } from "./ProgressDialog";
 export { TextInput } from "./TextInput";
 export type { TextInputProps } from "./TextInput";

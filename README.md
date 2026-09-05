@@ -56,6 +56,8 @@ Contratos detalhados por área. Os de interface descrevem superfícies e intera�
 
 ## Pesquisas
 
+- [Importação de várias Fotos JPEG](docs/research/2026-09-05-importacao-multipla-jpeg.md) — primeiro recorte do #19, com resultado parcial e uma ação de Histórico; aceitação do seletor nativo pendente.
+
 Material técnico não normativo, conservado como histórico das avaliações.
 
 - [0001 — Plataforma e arquitetura](docs/research/0001-plataforma-e-arquitetura.md) · substituída

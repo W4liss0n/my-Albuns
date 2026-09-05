@@ -66,6 +66,8 @@ interface MediaPanelProps {
   mediaUsage: readonly MediaUsage[];
   onFillPhoto(mediaId: string): void;
   selectedMediaId: string | null;
+  importPending?: boolean;
+  importStatus?: string;
   onImportPhoto(): void;
   onSelectMedia(mediaId: string): void;
   onPhotoDragStart(mediaId: string): void;
@@ -87,6 +89,8 @@ export function MediaPanel({
   mediaUsage,
   onFillPhoto,
   selectedMediaId,
+  importPending = false,
+  importStatus,
   onImportPhoto,
   onSelectMedia,
   onPhotoDragStart,
@@ -403,7 +407,9 @@ export function MediaPanel({
         itemCount={activeMediaItems.length}
         preferences={preferences}
         search={search}
-        importDisabled={relinkDisabled}
+        importDisabled={relinkDisabled || importPending}
+        importPending={importPending}
+        importStatus={importStatus}
         onImportPhoto={onImportPhoto}
         onActiveMediaKindChange={setActiveMediaKind}
         onPreferencesChange={updatePreferences}

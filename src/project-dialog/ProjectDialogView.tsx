@@ -8,6 +8,7 @@ import {
   ConfirmationDialog,
   MessageDialog,
   ProgressDialog,
+  ProblemsDialog,
 } from "../ui";
 import "./ProjectDialogView.css";
 
@@ -29,6 +30,16 @@ export function ProjectDialogView({
   }, [state.kind]);
 
   switch (state.kind) {
+    case "photoImportProblems": {
+      const imported = state.importedCount === 0 ? "Nenhuma Foto nova foi importada." :
+        state.importedCount === 1 ? "1 Foto importada." : `${state.importedCount} Fotos importadas.`;
+      const rejected = state.problems.length === 1 ? "1 arquivo não foi importado." :
+        `${state.problems.length} arquivos não foram importados.`;
+      return <ProblemsDialog title="Problemas na importação" description={`${imported} ${rejected}`}
+        columns={["Arquivo", "Motivo"]}
+        rows={state.problems.map(problem => [problem.fileName, problem.reason])}
+        onClose={() => onAction("dismissPhotoImportProblems")} />;
+    }
     case "albumInformationConfirmation":
       return (
         <ConfirmationDialog

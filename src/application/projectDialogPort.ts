@@ -1,3 +1,5 @@
+import type { PhotoImportProblem } from "./projectPorts";
+
 export type ProjectDialogProgress =
   | {
       kind: "indeterminate";
@@ -16,6 +18,11 @@ export interface ProjectDialogDetail {
 }
 
 export type ProjectDialogState =
+  | {
+      kind: "photoImportProblems";
+      importedCount: number;
+      problems: readonly PhotoImportProblem[];
+    }
   | {
       busy: boolean;
       details: readonly ProjectDialogDetail[];
@@ -64,6 +71,7 @@ export type ProjectDialogAction =
   | "dismissExport"
   | "dismissProjectCloseFailure"
   | "dismissProjectOperationFailure"
+  | "dismissPhotoImportProblems"
   | "retryExport"
   | "saveAndClose";
 

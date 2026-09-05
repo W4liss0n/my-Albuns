@@ -16,6 +16,7 @@ import {
 } from "./projectDialogContract";
 
 const states: readonly ProjectDialogState[] = [
+  { kind: "photoImportProblems", importedCount: 2, problems: [{ fileName: "ruim.jpg", reason: "JPEG corrompido" }] },
   {
     busy: false,
     details: [{ label: "DPI", value: "300 → 240" }],
@@ -55,6 +56,7 @@ const actions: readonly ProjectDialogAction[] = [
   "dismissExport",
   "dismissProjectCloseFailure",
   "dismissProjectOperationFailure",
+  "dismissPhotoImportProblems",
   "retryExport",
   "saveAndClose",
 ];

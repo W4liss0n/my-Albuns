@@ -300,3 +300,66 @@ test("preserves Redo when preceding History already materialized the Album Desig
   await waitFor(() => expect(redo).toHaveBeenCalledOnce());
   expect(onProjectionChange).toHaveBeenCalledWith(afterUndo);
 });
+
+
+test.each(["completed", "cancelled", "failed"] as const)(
+  "orders adjacent Save/Undo after a pending photo selection (%s)",
+  async (terminal) => {
+    type Result = Awaited<ReturnType<ProjectCorePort["importPhoto"]>>;
+    let resolve!: (value: Result) => void;
+    let reject!: (error: Error) => void;
+    const pending = new Promise<Result>((done, fail) => { resolve = done; reject = fail; });
+    const initial = structuredClone(representativeProjection);
+    initial.state.canUndo = false;
+    const imported = structuredClone(initial);
+    imported.state.revision += 1;
+    imported.state.canUndo = true;
+    imported.state.dirty = true;
+    const port = projectSessionPort(async () => initial, vi.fn(async () => initial));
+    port.importPhoto = vi.fn(() => pending);
+    port.save = vi.fn<ProjectCorePort["save"]>(async (revision) => ({
+      outcome: { kind: "saved", revision }, projection: revision === initial.state.revision ? initial : imported,
+    }));
+    const onProjectionChange = vi.fn();
+    const view = renderHook(() => useProjectMutations({
+      projection: initial,
+      runProjectMutation: useProjectMutationRunner(initial.state.projectId, port),
+      onProjectionChange,
+      onAffectedFrame: () => undefined,
+      onAffectedSheet: () => undefined,
+    }));
+    let completion!: Promise<string | null>;
+    act(() => {
+      completion = view.result.current.importPhoto();
+      void view.result.current.importPhoto();
+      view.result.current.save();
+      view.result.current.undo();
+    });
+    expect(view.result.current.importPending).toBe(true);
+    expect(port.importPhoto).toHaveBeenCalledOnce();
+    expect(port.save).not.toHaveBeenCalled();
+    expect(port.undo).not.toHaveBeenCalled();
+    await act(async () => {
+      if (terminal === "failed") reject(new Error("Falha de leitura"));
+      else if (terminal === "cancelled") resolve({ kind: "cancelled", projection: initial });
+      else resolve({ kind: "completed", projection: imported, mediaIds: ["photo-a", "photo-b"],
+        importedCount: 2, problems: [{ fileName: "quebrada.jpg", reason: "JPEG corrompido" }] });
+      await completion;
+    });
+    await waitFor(() => expect(view.result.current.importPending).toBe(false));
+    if (terminal === "completed") {
+      expect(port.save).toHaveBeenCalledWith(imported.state.revision);
+      await waitFor(() => expect(port.undo).toHaveBeenCalledOnce());
+      expect(view.result.current.photoImportResult?.problems).toEqual([
+        { fileName: "quebrada.jpg", reason: "JPEG corrompido" },
+      ]);
+    } else if (terminal === "failed") {
+      expect(port.save).not.toHaveBeenCalled();
+      expect(port.undo).not.toHaveBeenCalled();
+      expect(view.result.current.message).toBe("Falha de leitura");
+    } else {
+      expect(port.save).toHaveBeenCalledWith(initial.state.revision);
+      expect(view.result.current.photoImportResult).toBeNull();
+    }
+  },
+);

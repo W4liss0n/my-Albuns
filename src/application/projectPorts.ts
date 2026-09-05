@@ -208,6 +208,19 @@ export type ProjectRecoveryDecision =
   | "discardCheckpointAndOpenLastSaved"
   | "nowNot";
 
+export interface PhotoImportProblem {
+  fileName: string;
+  reason: string;
+}
+
+export interface PhotoImportCompletion {
+  kind: "completed";
+  projection: EditorProjection;
+  mediaIds: string[];
+  importedCount: number;
+  problems: PhotoImportProblem[];
+}
+
 export interface ProjectCorePort {
   load(operationId: string): Promise<EditorProjection>;
   validateAlbumInformation(
@@ -217,8 +230,7 @@ export interface ProjectCorePort {
   applyWithOutcome(intent: ProjectIntent): Promise<ProjectMutationOutcome>;
   importPhoto(): Promise<
     | { kind: "cancelled"; projection: EditorProjection }
-    | { kind: "imported"; projection: EditorProjection; mediaId: string }
-    | { kind: "selected"; projection: EditorProjection; mediaId: string }
+    | PhotoImportCompletion
   >;
   resolvePhotoDropTarget(
     sheetId: string,

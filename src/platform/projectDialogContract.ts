@@ -28,6 +28,7 @@ const projectDialogActionMap = {
   dismissExport: "dismissExport",
   dismissProjectCloseFailure: "dismissProjectCloseFailure",
   dismissProjectOperationFailure: "dismissProjectOperationFailure",
+  dismissPhotoImportProblems: "dismissPhotoImportProblems",
   retryExport: "retryExport",
   saveAndClose: "saveAndClose",
 } as const satisfies Record<IpcProjectDialogAction, ProjectDialogAction> &
@@ -120,6 +121,15 @@ const stateDecoders: Record<
   StateDecoder
 > &
   Record<ProjectDialogStateKind, StateDecoder> = {
+  photoImportProblems: (value) => {
+    if (!isWireU64(value.importedCount) || !Array.isArray(value.problems)) return null;
+    const problems: { fileName: string; reason: string }[] = [];
+    for (const problem of value.problems) {
+      if (!isRecord(problem) || typeof problem.fileName !== "string" || typeof problem.reason !== "string") return null;
+      problems.push({ fileName: problem.fileName, reason: problem.reason });
+    }
+    return { kind: "photoImportProblems", importedCount: value.importedCount, problems };
+  },
   albumInformationConfirmation: (value) => {
     const details = decodeDetails(value.details);
     return typeof value.busy === "boolean" && details
@@ -245,6 +255,8 @@ export function toIpcProjectDialogState(
   state: ProjectDialogState,
 ): IpcProjectDialogState {
   switch (state.kind) {
+    case "photoImportProblems":
+      return { kind: state.kind, importedCount: state.importedCount, problems: state.problems.map(problem => ({ ...problem })) };
     case "albumInformationConfirmation":
       return {
         busy: state.busy,
@@ -281,6 +293,8 @@ function fromIpcProjectDialogState(
   state: IpcProjectDialogState,
 ): ProjectDialogState {
   switch (state.kind) {
+    case "photoImportProblems":
+      return { kind: state.kind, importedCount: state.importedCount, problems: state.problems.map(problem => ({ ...problem })) };
     case "albumInformationConfirmation":
       return {
         busy: state.busy,

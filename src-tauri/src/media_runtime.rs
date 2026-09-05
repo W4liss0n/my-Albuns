@@ -1,14 +1,23 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     io::BufReader,
     path::PathBuf,
     sync::{Arc, Mutex},
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use image::{ImageDecoder, ImageFormat, ImageReader, metadata::Orientation};
+use image::{DynamicImage, ImageDecoder, ImageFormat, ImageReader, metadata::Orientation};
 use myalbuns_core::{ImportPhoto, MediaKind, PhotoSourceMetadata};
-use myalbuns_paths::{ExpectedObject, OperationPathContext, PhysicalFileIdentity, ResolveError};
+use myalbuns_paths::{
+    ExpectedObject, OperationPathContext, PhysicalFileIdentity, ResolveError, RootBindingPlan,
+};
+
+use crate::ipc_contract::PhotoImportProblem;
+
+pub(crate) struct PhotoImportsProposal {
+    pub(crate) commands: Vec<ImportPhoto>,
+    pub(crate) problems: Vec<PhotoImportProblem>,
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct MediaBinding {
@@ -49,18 +58,6 @@ pub(crate) struct MediaRelinkProposal {
     expected_logical_path: PathBuf,
     replacement_path: PathBuf,
     source_metadata: Option<PhotoSourceMetadata>,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct PhotoImportProposal {
-    path: PathBuf,
-    source_metadata: PhotoSourceMetadata,
-}
-
-impl PhotoImportProposal {
-    pub(crate) fn into_command(self) -> ImportPhoto {
-        ImportPhoto::new(self.path, self.source_metadata)
-    }
 }
 
 impl MediaRelinkProposal {
@@ -203,15 +200,54 @@ impl std::error::Error for MediaRetryError {}
 pub(crate) struct MediaResolver;
 
 impl MediaResolver {
-    pub(crate) fn propose_photo_import(
+    pub(crate) fn propose_photo_imports(
         &self,
-        path: PathBuf,
-    ) -> Result<PhotoImportProposal, String> {
-        let source_metadata = inspect_media_source(&path, true)?;
-        Ok(PhotoImportProposal {
-            path,
-            source_metadata,
-        })
+        paths: Vec<PathBuf>,
+        bindings: &[MediaBinding],
+    ) -> PhotoImportsProposal {
+        let existing = bindings
+            .iter()
+            .filter(|binding| binding.kind == MediaKind::Photo)
+            .map(|binding| binding.logical_path.as_path())
+            .collect::<HashSet<_>>();
+        let mut context = OperationPathContext::new();
+        let mut seen = HashSet::new();
+        let candidates = paths
+            .into_iter()
+            .filter(|path| seen.insert(path.clone()))
+            .map(|path| {
+                let capture = if existing.contains(path.as_path()) {
+                    Ok(())
+                } else {
+                    context
+                        .capture(&path)
+                        .map(|_| ())
+                        .map_err(|error| format!("O caminho escolhido é inválido: {error}"))
+                };
+                (path, capture)
+            })
+            .collect::<Vec<_>>();
+        let plan = context.freeze();
+        let mut commands = Vec::new();
+        let mut problems = Vec::new();
+        for (path, capture) in candidates {
+            if existing.contains(path.as_path()) {
+                commands.push(ImportPhoto::select_existing(path));
+                continue;
+            }
+            match capture.and_then(|()| inspect_media_source_in_plan(&plan, &path, true)) {
+                Ok(metadata) => commands.push(ImportPhoto::new(path, metadata)),
+                Err(reason) => problems.push(PhotoImportProblem {
+                    file_name: path
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .into_owned(),
+                    reason,
+                }),
+            }
+        }
+        PhotoImportsProposal { commands, problems }
     }
 
     pub(crate) fn inspect_photo_binding(
@@ -320,7 +356,14 @@ fn inspect_media_source(
     context
         .capture(path)
         .map_err(|error| format!("O caminho escolhido é inválido: {error}"))?;
-    let plan = context.freeze();
+    inspect_media_source_in_plan(&context.freeze(), path, require_jpeg)
+}
+
+fn inspect_media_source_in_plan(
+    plan: &RootBindingPlan,
+    path: &std::path::Path,
+    require_jpeg: bool,
+) -> Result<PhotoSourceMetadata, String> {
     let resolved = plan
         .resolve_existing(path, ExpectedObject::RegularFile)
         .map_err(|error| format!("O Arquivo escolhido não está disponível: {error}"))?;
@@ -360,6 +403,10 @@ fn inspect_media_source(
             | Orientation::Rotate270FlipH
     ) {
         std::mem::swap(&mut width, &mut height);
+    }
+    if require_jpeg {
+        DynamicImage::from_decoder(decoder)
+            .map_err(|_| "O JPEG está corrompido ou não pôde ser decodificado.".to_string())?;
     }
     PhotoSourceMetadata::new(
         width,
@@ -631,6 +678,67 @@ mod tests {
     };
 
     #[test]
+    fn multiple_photo_import_keeps_valid_files_and_reports_each_rejection() {
+        let root = tempfile::tempdir().unwrap();
+        let good = root.path().join("boa.JPG");
+        let second = root.path().join("segunda.jpeg");
+        let invalid = root.path().join("invalida.jpg");
+        let corrupt = root.path().join("corrompida.jpg");
+        let missing = root.path().join("ausente.jpg");
+        let existing = root.path().join("existente indisponivel.jpg");
+        let original = RgbImage::from_pixel(37, 23, Rgb([20, 80, 160]));
+        original.save_with_format(&good, ImageFormat::Jpeg).unwrap();
+        original
+            .save_with_format(&second, ImageFormat::Jpeg)
+            .unwrap();
+        original
+            .save_with_format(&invalid, ImageFormat::Png)
+            .unwrap();
+        let before = std::fs::read(&good).unwrap();
+        let scan = before
+            .windows(2)
+            .position(|bytes| bytes == [0xff, 0xda])
+            .unwrap();
+        std::fs::write(&corrupt, &before[..scan + 2]).unwrap();
+        let result = MediaResolver.propose_photo_imports(
+            vec![
+                good.clone(),
+                invalid,
+                existing.clone(),
+                good.clone(),
+                missing,
+                corrupt,
+                second,
+            ],
+            &[MediaBinding {
+                media_id: "existing".into(),
+                kind: MediaKind::Photo,
+                logical_path: existing,
+            }],
+        );
+        assert_eq!(
+            result.commands.len(),
+            3,
+            "two new Photos plus one existing selection"
+        );
+        assert_eq!(
+            result
+                .problems
+                .iter()
+                .map(|problem| problem.file_name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["invalida.jpg", "ausente.jpg", "corrompida.jpg"]
+        );
+        assert!(
+            result
+                .problems
+                .iter()
+                .all(|problem| !problem.reason.is_empty())
+        );
+        assert_eq!(std::fs::read(good).unwrap(), before);
+    }
+
+    #[test]
     fn photo_import_accepts_decodable_jpeg_bytes_and_never_rewrites_the_original() {
         let root = tempfile::tempdir().expect("temporary JPEG import fixture");
         let source = root.path().join("Foto externa.jpeg");
@@ -639,15 +747,11 @@ mod tests {
             .expect("the external JPEG is writable");
         let before = std::fs::read(&source).expect("the Original is readable before import");
 
-        let proposal = MediaResolver
-            .propose_photo_import(source.clone())
-            .expect("a decodable JPEG is accepted through the native import seam");
-
-        assert_eq!(proposal.path, source);
-        assert_eq!(proposal.source_metadata.source_width_px(), 37);
-        assert_eq!(proposal.source_metadata.source_height_px(), 23);
+        let proposal = MediaResolver.propose_photo_imports(vec![source.clone()], &[]);
+        assert_eq!(proposal.commands.len(), 1);
+        assert!(proposal.problems.is_empty());
         assert_eq!(
-            std::fs::read(&proposal.path).expect("the Original remains readable"),
+            std::fs::read(&source).expect("the Original remains readable"),
             before,
             "import inspection never modifies the linked Original"
         );
@@ -662,11 +766,9 @@ mod tests {
             .expect("the renamed PNG is writable");
         let before = std::fs::read(&source).expect("the renamed Original is readable");
 
-        let error = MediaResolver
-            .propose_photo_import(source.clone())
-            .expect_err("codec inspection, not the extension, defines JPEG acceptance");
-
-        assert!(error.contains("JPEG válido"));
+        let proposal = MediaResolver.propose_photo_imports(vec![source.clone()], &[]);
+        assert!(proposal.commands.is_empty());
+        assert!(proposal.problems[0].reason.contains("JPEG válido"));
         assert_eq!(
             std::fs::read(source).expect("the rejected file remains"),
             before

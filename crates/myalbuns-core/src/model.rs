@@ -614,16 +614,31 @@ fn is_canonical_rgb(value: &str) -> bool {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ImportPhoto {
     pub(crate) path: PathBuf,
-    pub(crate) source_metadata: PhotoSourceMetadata,
+    pub(crate) source_metadata: Option<PhotoSourceMetadata>,
 }
 
 impl ImportPhoto {
     pub fn new(path: PathBuf, source_metadata: PhotoSourceMetadata) -> Self {
         Self {
             path,
-            source_metadata,
+            source_metadata: Some(source_metadata),
         }
     }
+
+    /// Reselects a link without accessing its Original. Rejected if the link no longer exists.
+    pub fn select_existing(path: PathBuf) -> Self {
+        Self {
+            path,
+            source_metadata: None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ImportPhotosOutcome {
+    pub projection: EditorProjection,
+    pub media_ids: Vec<MediaId>,
+    pub imported_count: usize,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]

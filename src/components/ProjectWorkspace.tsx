@@ -37,7 +37,7 @@ import { useProjectCommandShortcuts } from "./useProjectCommandShortcuts";
 import { useProjectCloseController } from "./useProjectCloseController";
 import { useProjectEditorController } from "./useProjectEditorController";
 import { useProjectGraphicsFailureDialog } from "./useProjectGraphicsFailureDialog";
-import { useProjectOperationFailureDialog } from "./useProjectOperationFailureDialog";
+import { useProjectOperationResultDialog } from "./useProjectOperationResultDialog";
 import { useAlbumInformationApplyController } from "./useAlbumInformationApplyController";
 import { SheetContextMenu } from "./SheetContextMenu";
 import {
@@ -234,7 +234,8 @@ export function ProjectWorkspace({
     onApply: controller.applyAlbumInformation,
     onError: setCloseMessage,
   });
-  useProjectOperationFailureDialog({
+  useProjectOperationResultDialog({
+    importResult: controller.photoImportResult,
     message: closeMessage ?? controller.message,
     projectDialogPort,
     onDismiss: () => {
@@ -573,6 +574,7 @@ export function ProjectWorkspace({
           ref={exportControlRef}
           dialogPort={projectDialogPort}
           disabled={
+            controller.importPending ||
             projectClose.interactionBlocked ||
             saveAsBarrierActive ||
             graphicsFailure !== null
@@ -697,6 +699,12 @@ export function ProjectWorkspace({
           mediaUsage={projection.mediaUsage}
           onFillPhoto={controller.fillMedia}
           selectedMediaId={selectedMediaId}
+          importPending={controller.importPending}
+          importStatus={controller.photoImportResult && controller.photoImportResult.problems.length === 0
+            ? controller.photoImportResult.importedCount > 0
+              ? `${controller.photoImportResult.importedCount} ${controller.photoImportResult.importedCount === 1 ? "Foto importada." : "Fotos importadas."}`
+              : "As Fotos selecionadas já estão no Painel."
+            : undefined}
           onImportPhoto={() => {
             void controller.importPhoto().then((mediaId) => {
               if (mediaId) setSelectedMediaId(mediaId);

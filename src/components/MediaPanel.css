@@ -371,3 +371,11 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.media-import-status {
+  align-self: center;
+  padding-inline: 10px;
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-font-size-control);
+  white-space: nowrap;
+}

@@ -248,6 +248,8 @@ export function useProjectEditorController({
 
   return {
     message: mutations.message,
+    importPending: mutations.importPending,
+    photoImportResult: mutations.photoImportResult,
     selectedFrame,
     selectedComposedPhoto,
     displayedPhotoZoom: photoGestures.displayedPhotoZoom,

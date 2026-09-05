@@ -12,8 +12,8 @@ use uuid::Uuid;
 use crate::{
     model::{
         ComposedOutputUnit, CoreError, EditorProjection, ImportPhoto, ImportPhotoDisposition,
-        ImportPhotoOutcome, MediaId, PhotoDropTarget, PhotoSourceMetadata, ProjectIntent,
-        ProjectMutationOutcome, RelinkMedia, RenderSnapshot, RenderSnapshotMetadata,
+        ImportPhotoOutcome, ImportPhotosOutcome, MediaId, PhotoDropTarget, PhotoSourceMetadata,
+        ProjectIntent, ProjectMutationOutcome, RelinkMedia, RenderSnapshot, RenderSnapshotMetadata,
         RenderSnapshotRef,
     },
     persistent_projection,
@@ -525,40 +525,72 @@ impl EditableProject {
     }
 
     pub fn import_photo(&mut self, command: ImportPhoto) -> Result<ImportPhotoOutcome, CoreError> {
+        let outcome = self.import_photos(vec![command])?;
+        Ok(ImportPhotoOutcome {
+            projection: outcome.projection,
+            media_id: outcome.media_ids[0],
+            disposition: if outcome.imported_count == 0 {
+                ImportPhotoDisposition::Existing
+            } else {
+                ImportPhotoDisposition::Imported
+            },
+        })
+    }
+
+    /// Commits all new links in one History entry; reselections only refresh runtime metadata.
+    pub fn import_photos(
+        &mut self,
+        commands: Vec<ImportPhoto>,
+    ) -> Result<ImportPhotosOutcome, CoreError> {
         if !self.session_valid {
             return Err(CoreError::EditableSessionInvalidated);
         }
-        let existing_media_id = self
+        let mut known_paths = self
             .project()
             .media()
             .iter()
-            .find(|media| {
-                media.kind() == crate::MediaKind::Photo && media.path() == command.path.as_path()
-            })
-            .map(|media| MediaId::from_uuid(media.id()));
-        if let Some(media_id) = existing_media_id {
+            .filter(|media| media.kind() == crate::MediaKind::Photo)
+            .map(|media| (media.path().to_path_buf(), MediaId::from_uuid(media.id())))
+            .collect::<HashMap<_, _>>();
+        let mut new_links = Vec::new();
+        let mut observations = Vec::new();
+        let mut media_ids = Vec::new();
+        let mut selected = HashSet::new();
+        for command in commands {
+            let media_id = if let Some(media_id) = known_paths.get(&command.path) {
+                *media_id
+            } else {
+                if command.source_metadata.is_none() {
+                    return Err(CoreError::InvalidProject(
+                        "O vínculo da Foto selecionada não está mais no Projeto.".into(),
+                    ));
+                }
+                let media_id = MediaId::from_uuid(Uuid::new_v4());
+                known_paths.insert(command.path.clone(), media_id);
+                new_links.push((media_id.into_uuid(), command.path.clone()));
+                media_id
+            };
+            if selected.insert(media_id) {
+                media_ids.push(media_id);
+            }
+            if let Some(metadata) = command.source_metadata {
+                observations.push((media_id, command.path, metadata));
+            }
+        }
+        let imported_count = new_links.len();
+        if !new_links.is_empty() {
+            self.session.import_photos(new_links)?;
+        }
+        for (media_id, path, metadata) in observations {
             self.photo_sources
                 .entry(media_id)
                 .or_default()
-                .insert(command.path, command.source_metadata);
-            return Ok(ImportPhotoOutcome {
-                projection: self.projection(),
-                media_id,
-                disposition: ImportPhotoDisposition::Existing,
-            });
+                .insert(path, metadata);
         }
-        let media_id = MediaId::from_uuid(Uuid::new_v4());
-        let source_path = command.path.clone();
-        self.session
-            .import_photo(media_id.into_uuid(), command.path)?;
-        self.photo_sources
-            .entry(media_id)
-            .or_default()
-            .insert(source_path, command.source_metadata);
-        Ok(ImportPhotoOutcome {
+        Ok(ImportPhotosOutcome {
             projection: self.projection(),
-            media_id,
-            disposition: ImportPhotoDisposition::Imported,
+            media_ids,
+            imported_count,
         })
     }
 

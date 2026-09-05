@@ -23,6 +23,8 @@ interface MediaPanelToolbarProps {
   activeMediaKind: MediaKind;
   importDisabled?: boolean;
   itemCount: number;
+  importPending?: boolean;
+  importStatus?: string;
   onImportPhoto(): void;
   onActiveMediaKindChange(mediaKind: MediaKind): void;
   onPreferencesChange(preferences: Partial<MediaPanelViewPreferences>): void;
@@ -38,6 +40,8 @@ export function MediaPanelToolbar({
   activeMediaKind,
   importDisabled = false,
   itemCount,
+  importPending = false,
+  importStatus,
   onImportPhoto,
   onActiveMediaKindChange,
   onPreferencesChange,
@@ -114,7 +118,7 @@ export function MediaPanelToolbar({
             )
           }
         >
-          <span>Importar</span>
+          <span>{importPending ? "Importando…" : "Importar"}</span>
           <AppIcon icon={ChevronDown} size={12} />
         </button>
         {openPopup === "import" && (
@@ -132,7 +136,7 @@ export function MediaPanelToolbar({
                 onImportPhoto();
               }}
             >
-              Arquivo JPEG…
+              Arquivos JPEG…
             </button>
             <button
               data-placeholder-feature="import-media-folder"
@@ -147,6 +151,7 @@ export function MediaPanelToolbar({
         )}
       </div>
 
+      {importStatus ? <span className="media-import-status" role="status">{importStatus}</span> : null}
       <div className="media-folder-bar">
         <div className="media-folder-strip">
           <button

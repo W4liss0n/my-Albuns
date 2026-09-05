@@ -5,15 +5,15 @@ use std::{
 
 use myalbuns_core::{
     AlbumInformation, AlbumInformationValidation, ComposedOutputUnit, EditableProject,
-    EditorProjection, ImportPhotoDisposition, ImportPhotoOutcome, MediaId, PhotoDropTarget,
-    PhotoSourceMetadata, ProjectIdentityAuthority, ProjectIntent, ProjectMutationOutcome,
-    RecoveryCheckpoint, RelinkMedia, RenderSnapshot, SaveAsProjectError, SaveAsProjectOutcome,
-    SaveAsProjectRequest, SaveProjectError, SaveProjectOutcome,
+    EditorProjection, MediaId, PhotoDropTarget, PhotoSourceMetadata, ProjectIdentityAuthority,
+    ProjectIntent, ProjectMutationOutcome, RecoveryCheckpoint, RelinkMedia, RenderSnapshot,
+    SaveAsProjectError, SaveAsProjectOutcome, SaveAsProjectRequest, SaveProjectError,
+    SaveProjectOutcome,
 };
 use myalbuns_imaging_protocol::RenderSource;
 
 use crate::{
-    media_runtime::{MediaBinding, MediaRelinkProposal, PhotoImportProposal},
+    media_runtime::{MediaBinding, MediaRelinkProposal},
     project_recovery::RecoveryCoordinator,
 };
 
@@ -360,18 +360,36 @@ impl ProjectHost {
         Ok(outcome)
     }
 
-    pub(crate) fn import_photo(
+    /// Inspection is performed by the blocking command worker without holding the session lock.
+    pub(crate) fn import_photos(
         &self,
-        proposal: PhotoImportProposal,
-    ) -> Result<ImportPhotoOutcome, String> {
+        paths: Vec<std::path::PathBuf>,
+    ) -> Result<crate::ipc_contract::ImportPhotoResult, String> {
+        let catalog = self.authorized_media_catalog()?;
+        let proposal =
+            crate::media_runtime::MediaResolver.propose_photo_imports(paths, &catalog.bindings);
         let mut project = self.project()?;
+        if project.project_id().hyphenated().to_string() != catalog.project_id {
+            return Err(
+                "O Projeto mudou durante a importação. Selecione as Fotos novamente.".into(),
+            );
+        }
         let outcome = project
-            .import_photo(proposal.into_command())
+            .import_photos(proposal.commands)
             .map_err(|error| error.to_string())?;
-        if outcome.disposition == ImportPhotoDisposition::Imported {
+        if outcome.imported_count > 0 {
             self.schedule_recovery(&project);
         }
-        Ok(outcome)
+        Ok(crate::ipc_contract::ImportPhotoResult::Completed {
+            projection: outcome.projection,
+            media_ids: outcome
+                .media_ids
+                .into_iter()
+                .map(|id| id.to_string())
+                .collect(),
+            imported_count: outcome.imported_count as u32,
+            problems: proposal.problems,
+        })
     }
 
     pub(crate) fn relink_media(
@@ -806,12 +824,11 @@ mod tests {
 
     use image::{GenericImageView, ImageFormat, Rgb, RgbImage, Rgba, RgbaImage};
     use myalbuns_core::{
-        CreateAuthorization, CreateProjectRequest, DisplayUnit, EndSheetFormat,
-        ImportPhotoDisposition, InitialBackground, InitialBackgroundContent, InitialFrameBorder,
-        InitialOverlay, InitialProject, InitialProjectConfiguration, InitialProjectPersonalization,
-        MediaKind, OpenProjectRequest, PhotoPlacementMode, ProjectCore, ProjectIntent,
-        ProjectLocation, SaveAsAuthorization, SaveAsProjectRequest, SaveProjectError,
-        SaveProjectOutcome,
+        CreateAuthorization, CreateProjectRequest, DisplayUnit, EndSheetFormat, InitialBackground,
+        InitialBackgroundContent, InitialFrameBorder, InitialOverlay, InitialProject,
+        InitialProjectConfiguration, InitialProjectPersonalization, MediaKind, OpenProjectRequest,
+        PhotoPlacementMode, ProjectCore, ProjectIntent, ProjectLocation, SaveAsAuthorization,
+        SaveAsProjectRequest, SaveProjectError, SaveProjectOutcome,
     };
     use myalbuns_paths::{AppPaths, ExportWriteAuthorization, OperationPathContext};
 
@@ -1148,6 +1165,30 @@ mod tests {
     }
 
     #[test]
+    fn rejected_or_empty_photo_selection_does_not_change_the_project() {
+        let fixture = fixture();
+        let before = fixture.host.projection().unwrap();
+        let invalid = fixture._root.path().join("invalid.jpg");
+        std::fs::write(&invalid, b"not a JPEG").unwrap();
+        let missing = fixture._root.path().join("missing.jpeg");
+        for (paths, expected_problems) in [(vec![invalid, missing], 2), (vec![], 0)] {
+            let crate::ipc_contract::ImportPhotoResult::Completed {
+                projection,
+                imported_count,
+                media_ids,
+                problems,
+            } = fixture.host.import_photos(paths).unwrap()
+            else {
+                panic!("selection completes")
+            };
+            assert_eq!(projection, before);
+            assert_eq!(imported_count, 0);
+            assert!(media_ids.is_empty());
+            assert_eq!(problems.len(), expected_problems);
+        }
+    }
+
+    #[test]
     fn reimporting_an_existing_photo_does_not_create_a_checkpoint() {
         tauri::async_runtime::block_on(async {
             let fixture = recovery_fixture();
@@ -1155,31 +1196,39 @@ mod tests {
             RgbImage::from_pixel(48, 32, Rgb([20, 120, 220]))
                 .save_with_format(&photo_path, ImageFormat::Jpeg)
                 .expect("the Photo Original is written");
-            let imported = fixture
+            let crate::ipc_contract::ImportPhotoResult::Completed {
+                projection,
+                imported_count,
+                ..
+            } = fixture
                 .host
-                .import_photo(
-                    MediaResolver
-                        .propose_photo_import(photo_path.clone())
-                        .expect("the first import is inspected"),
-                )
-                .expect("the Photo is imported");
-            assert_eq!(imported.disposition, ImportPhotoDisposition::Imported);
-            fixture
-                .host
-                .save(imported.projection.state.revision)
-                .expect("the imported Photo is saved and its checkpoint is finished");
+                .import_photos(vec![photo_path.clone()])
+                .expect("the Photo is imported")
+            else {
+                panic!("selected files complete")
+            };
+            assert_eq!(imported_count, 1);
+            fixture.host.save(projection.state.revision).unwrap();
             assert!(fixture.store.load(&fixture.authority).unwrap().is_none());
-
-            let selected = fixture
+            std::fs::remove_file(&photo_path).unwrap();
+            let crate::ipc_contract::ImportPhotoResult::Completed {
+                projection,
+                imported_count,
+                problems,
+                ..
+            } = fixture
                 .host
-                .import_photo(
-                    MediaResolver
-                        .propose_photo_import(photo_path)
-                        .expect("the repeated import is inspected"),
-                )
-                .expect("the existing Photo is selected");
-            assert_eq!(selected.disposition, ImportPhotoDisposition::Existing);
-            assert!(!selected.projection.state.dirty);
+                .import_photos(vec![photo_path])
+                .expect("the missing existing Photo is selected")
+            else {
+                panic!("selected files complete")
+            };
+            assert_eq!(imported_count, 0);
+            assert!(
+                problems.is_empty(),
+                "existing paths never require reinspection"
+            );
+            assert!(!projection.state.dirty);
             tokio::time::sleep(Duration::from_millis(90)).await;
 
             assert!(
@@ -1780,17 +1829,24 @@ mod tests {
                 .sheets[1]
                 .sheet_id
                 .clone();
-            let imported = host
-                .import_photo(
-                    MediaResolver
-                        .propose_photo_import(photo_path.clone())
-                        .expect("the JPEG is inspected through the native import seam"),
-                )
-                .expect("the Photo link is imported into the Projeto");
+            let second_photo_path = media_root.path().join("second-photo.jpeg");
+            std::fs::copy(&photo_path, &second_photo_path).unwrap();
+            let crate::ipc_contract::ImportPhotoResult::Completed {
+                media_ids,
+                imported_count,
+                ..
+            } = host
+                .import_photos(vec![photo_path.clone(), second_photo_path])
+                .expect("the batch is imported")
+            else {
+                panic!("selected files complete")
+            };
+            assert_eq!(imported_count, 2);
+            let imported_media_id = media_ids[0].parse().unwrap();
             let placed = host
                 .apply_with_outcome(ProjectIntent::AddPhoto {
                     sheet_id: sheet_id.clone(),
-                    media_id: imported.media_id,
+                    media_id: imported_media_id,
                     mode: PhotoPlacementMode::Normal,
                 })
                 .expect("the imported Photo receives the first compatible Layout");
@@ -1827,7 +1883,7 @@ mod tests {
                 .photo
                 .as_ref()
                 .expect("the saved Frame still contains its linked Photo");
-            assert_eq!(reopened_photo.media_id, imported.media_id);
+            assert_eq!(reopened_photo.media_id, imported_media_id);
             assert!((reopened_photo.placement.current_pan.x - 0.4).abs() < 0.000_001);
             assert!((reopened_photo.placement.current_pan.y - 0.2).abs() < 0.000_001);
             assert!((reopened_photo.placement.current_zoom - 1.5).abs() < 0.000_001);

@@ -13,6 +13,8 @@ export function defaultProjectDialogCloseAction(
       return state.busy ? null : "cancelProjectClose";
     case "projectCloseFailure":
       return "dismissProjectCloseFailure";
+    case "photoImportProblems":
+      return "dismissPhotoImportProblems";
     case "projectOperationFailure":
       return "dismissProjectOperationFailure";
     case "graphicsFailure":

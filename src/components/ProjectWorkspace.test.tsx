@@ -4749,7 +4749,7 @@ test("makes Salvar como a terminal barrier after an accepted deferred import", a
   });
 
   fireEvent.click(screen.getByRole("button", { name: "Importar" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivo JPEG…" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos JPEG…" }));
   await waitFor(() => expect(importPhoto).toHaveBeenCalledOnce());
 
   fireEvent.click(
@@ -4763,7 +4763,7 @@ test("makes Salvar como a terminal barrier after an accepted deferred import", a
   await waitFor(() =>
     expect(screen.getByRole("menuitem", { name: "Arquivo" })).toBeDisabled(),
   );
-  expect(screen.getByRole("button", { name: "Importar" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Importando…" })).toBeDisabled();
 
   fireEvent.keyDown(document, { key: "Escape" });
   expect(
@@ -4781,9 +4781,9 @@ test("makes Salvar como a terminal barrier after an accepted deferred import", a
 
   await act(async () => {
     resolveImport({
-      kind: "imported",
+      kind: "completed",
       projection: importedProjection,
-      mediaId: "media-imported",
+      mediaIds: ["media-imported"], importedCount: 1, problems: [],
     });
     await pendingImport;
   });
@@ -6046,9 +6046,9 @@ test("imports a JPEG through the Host boundary without inserting it automaticall
   };
   const port = projectCorePortWithApply(async () => projection);
   const importPhoto = vi.fn(async () => ({
-    kind: "imported" as const,
+    kind: "completed" as const,
     projection: importedProjection,
-    mediaId: "media-imported",
+    mediaIds: ["media-imported"], importedCount: 1, problems: [],
   }));
   port.importPhoto = importPhoto;
   const applyWithOutcome = vi.fn(port.applyWithOutcome);
@@ -6065,7 +6065,7 @@ test("imports a JPEG through the Host boundary without inserting it automaticall
   );
 
   fireEvent.click(screen.getByRole("button", { name: "Importar" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivo JPEG…" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos JPEG…" }));
 
   await waitFor(() => expect(importPhoto).toHaveBeenCalledOnce());
   expect(onProjectionChange).toHaveBeenCalledWith(importedProjection);
@@ -6075,9 +6075,9 @@ test("imports a JPEG through the Host boundary without inserting it automaticall
 test("reimporting a JPEG selects its existing card without a creative mutation", async () => {
   const port = projectCorePortWithApply(async () => projection);
   const importPhoto = vi.fn(async () => ({
-    kind: "selected" as const,
+    kind: "completed" as const,
     projection,
-    mediaId: "media-002",
+    mediaIds: ["media-002"], importedCount: 0, problems: [],
   }));
   port.importPhoto = importPhoto;
   const applyWithOutcome = vi.fn(port.applyWithOutcome);
@@ -6094,7 +6094,7 @@ test("reimporting a JPEG selects its existing card without a creative mutation",
   );
 
   fireEvent.click(screen.getByRole("button", { name: "Importar" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivo JPEG…" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos JPEG…" }));
 
   await waitFor(() => expect(importPhoto).toHaveBeenCalledOnce());
   const existingPhoto = screen.getByRole("button", { name: "Campo.jpg" });
@@ -6322,4 +6322,27 @@ test("serializes Project mutations so projections cannot arrive out of order", a
   });
 
   expect(onProjectionChange).toHaveBeenLastCalledWith(secondProjection);
+});
+
+
+test.each([0, 2])("presents photo import rejections after committing %i valid files", async (importedCount) => {
+  const dialog = projectDialogHarness();
+  const port = projectCorePortWithApply(async () => projection);
+  const problems = [{ fileName: "corrompida.jpg", reason: "JPEG corrompido" }];
+  port.importPhoto = vi.fn(async () => ({
+    kind: "completed" as const, projection, mediaIds: importedCount ? ["media-002"] : [],
+    importedCount, problems,
+  }));
+  const onProjectionChange = vi.fn();
+  render(<ProjectWorkspace exportPipelinePort={exportPipelinePort} projection={projection}
+    projectCorePort={port} projectDialogPort={dialog.port} onProjectionChange={onProjectionChange} />);
+  fireEvent.click(screen.getByRole("button", { name: "Importar" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos JPEG…" }));
+  await waitFor(() => expect(dialog.present).toHaveBeenCalledWith({
+    kind: "photoImportProblems", importedCount, problems,
+  }));
+  expect(onProjectionChange).toHaveBeenCalledExactlyOnceWith(projection);
+  act(() => dialog.emit("dismissPhotoImportProblems"));
+  await waitFor(() => expect(dialog.dismiss).toHaveBeenCalled());
+  expect(onProjectionChange).toHaveBeenCalledOnce();
 });

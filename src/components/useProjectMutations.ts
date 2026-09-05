@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { PhotoImportCompletion } from "../application/projectPorts";
 
 import type {
   EditorProjection,
@@ -48,11 +49,17 @@ export function useProjectMutations({
   onSaveAsBarrierChange,
 }: ProjectMutationsInput) {
   const [message, setMessage] = useState<string | null>(null);
+  const [importPending, setImportPending] = useState(false);
+  const importAttemptRef = useRef({ pending: false });
+  const [photoImportResult, setPhotoImportResult] = useState<PhotoImportCompletion | null>(null);
   const feedbackTokenRef = useRef(0);
   const saveAsBarrierRef = useRef(false);
 
   useEffect(() => {
     setMessage(null);
+    importAttemptRef.current = { pending: false };
+    setImportPending(false);
+    setPhotoImportResult(null);
   }, [runProjectMutation, projection.state.projectId]);
 
   useEffect(() => {
@@ -304,6 +311,8 @@ export function useProjectMutations({
 
   return {
     message,
+    importPending,
+    photoImportResult,
     applyIntent,
     commitInteraction,
     applyAlbumInformation: commitAlbumInformation,
@@ -312,15 +321,28 @@ export function useProjectMutations({
     applyWithOutcome,
     applyPhotoWithStatus: applyWithOutcome,
     importPhoto: async () => {
-      let selectedMediaId: string | null = null;
-      const completed = await runWithErrorFeedback(
-        async (port) => {
-          const result = await port.importPhoto();
-          if (result.kind !== "cancelled") selectedMediaId = result.mediaId;
-          return result.projection;
-        },
-      );
-      return completed ? selectedMediaId : null;
+      if (importAttemptRef.current.pending || saveAsBarrierRef.current) return null;
+      const attempt = { pending: true };
+      importAttemptRef.current = attempt;
+      setImportPending(true);
+      setPhotoImportResult(null);
+      let result: PhotoImportCompletion | null = null;
+      try {
+        const completed = await runWithErrorFeedback(async (port) => {
+          const imported = await port.importPhoto();
+          if (imported.kind === "completed") result = imported;
+          return imported.projection;
+        });
+        if (!completed || importAttemptRef.current !== attempt) return null;
+        const completion = result as PhotoImportCompletion | null;
+        setPhotoImportResult(completion);
+        return completion?.mediaIds[completion.mediaIds.length - 1] ?? null;
+      } finally {
+        if (importAttemptRef.current === attempt) {
+          attempt.pending = false;
+          setImportPending(false);
+        }
+      }
     },
     dropPhoto: applyWithOutcome,
     applyDpi: async (dpi: number) => {
@@ -339,6 +361,7 @@ export function useProjectMutations({
     redo: () => void runHistoryCommand("canRedo", "redo"),
     dismissFeedback: () => {
       setMessage(null);
+      setPhotoImportResult(null);
     },
   };
 }
