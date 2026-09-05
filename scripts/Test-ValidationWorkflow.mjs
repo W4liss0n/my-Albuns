@@ -81,6 +81,42 @@ test("native build reuse rejects changed source, binary or commit", () => {
   }
 });
 
+test("native manifest rewrites remain clean after a Windows checkout", () => {
+  const repo = mkdtempSync(path.join(tmpdir(), "myalbuns-manifest-eol-"));
+  const git = (...args) => {
+    const result = spawnSync("git", ["-C", repo, ...args], { encoding: "utf8", windowsHide: true });
+    assert.equal(result.status, 0, result.stderr);
+    return result.stdout.trim();
+  };
+  try {
+    git("init", "--quiet");
+    git("config", "core.autocrlf", "true");
+    mkdirSync(path.join(repo, "src-tauri"));
+    writeFileSync(path.join(repo, ".gitattributes"), readFileSync(path.join(workspace, ".gitattributes")));
+    const manifest = path.join(repo, "src-tauri", "Cargo.toml");
+    const source = readFileSync(path.join(workspace, "src-tauri", "Cargo.toml"), "utf8").replaceAll("\r\n", "\n");
+    writeFileSync(manifest, source);
+    git("add", ".");
+    git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "-m", "fixture");
+    rmSync(manifest);
+    git("checkout", "--", "src-tauri/Cargo.toml");
+    assert.equal(git("status", "--porcelain=v1"), "");
+    writeFileSync(manifest, source);
+    const command = '. $env:MYALBUNS_TEST_PROVENANCE; Get-GateSourceSnapshot -WorkspaceRoot $env:MYALBUNS_TEST_REPO -EvidencePath (Join-Path $env:MYALBUNS_TEST_REPO "evidence.json") | ConvertTo-Json -Compress';
+    const env = { MYALBUNS_TEST_PROVENANCE: path.join(scripts, "Gate-SourceProvenance.ps1"), MYALBUNS_TEST_REPO: repo };
+    const snapshot = () => {
+      const result = powershell(command, env);
+      assert.equal(result.status, 0, result.stderr);
+      return JSON.parse(result.stdout);
+    };
+    assert.equal(snapshot().sourceInputsDirty, false, "a text-equivalent build rewrite must keep the checked-out source clean");
+    writeFileSync(manifest, source + "\n# actual source change\n");
+    assert.equal(snapshot().sourceInputsDirty, true, "real source changes must still reject the build");
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
+
 test("default validation calls only the declared headless checks", () => {
   const validation = readFileSync(path.join(scripts, "Validate-Headless.ps1"), "utf8");
   assert.doesNotMatch(validation, /Test-FocusedOwnedDialogGate|Test-ProductiveJourney|Run-RealCanvasGate|AllowVisibleWindows/);
