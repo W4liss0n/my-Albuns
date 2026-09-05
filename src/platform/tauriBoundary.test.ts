@@ -305,7 +305,7 @@ test("consumes the generated import result at the Tauri boundary", () => {
     'import type { ImportPhotoResult as IpcImportPhotoResult } from "./generated/ImportPhotoResult";',
   );
   expect(projectPortSource).toContain(
-    'invoke<IpcImportPhotoResult>("import_photo")',
+    'invoke<IpcImportPhotoResult>("import_photo", { onProgress: progressChannel })',
   );
 });
 
