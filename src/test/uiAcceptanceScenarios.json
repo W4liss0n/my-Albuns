@@ -1349,7 +1349,7 @@
       },
       "viewport": {
         "width": 440,
-        "height": 280
+        "height": 360
       },
       "readySelector": "[role=\"dialog\"]",
       "actions": []
@@ -1366,7 +1366,7 @@
       },
       "viewport": {
         "width": 440,
-        "height": 280
+        "height": 360
       },
       "readySelector": "[role=\"progressbar\"]",
       "actions": []
@@ -1383,7 +1383,7 @@
       },
       "viewport": {
         "width": 440,
-        "height": 280
+        "height": 360
       },
       "readySelector": "[role=\"dialog\"]",
       "actions": []
