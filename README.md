@@ -67,12 +67,14 @@ Material técnico não normativo, conservado como histórico das avaliações.
 
 - [AGENTS.md](AGENTS.md) — orientação para agentes que trabalham no repositório.
 - [Docs de domínio](docs/agents/domain.md) — propriedade normativa das fontes e regras de vocabulário.
-- [Issue tracker](docs/agents/issue-tracker.md) — convenções dos tickets em Markdown local.
+- [Issue tracker](docs/agents/issue-tracker.md) — convenções dos tickets no GitHub.
 - [Rótulos de triagem](docs/agents/triage-labels.md) — estados canônicos de um ticket.
 
 ## Entregas
 
-O mapa de implementação está em [`.scratch/programa-diagramacao/`](.scratch/programa-diagramacao/), com um ticket de fatia vertical por arquivo sob [`issues/`](.scratch/programa-diagramacao/issues/). As arestas de bloqueio definem a fronteira de trabalho.
+O mapa de implementação está no [GitHub, issue #1](https://github.com/W4liss0n/my-Albuns/issues/1), com tickets de entrega e seus bloqueadores. Os arquivos antigos em `.scratch/programa-diagramacao/` são históricos.
+
+A [revisão de 5 de setembro de 2026](docs/research/2026-09-05-estado-do-produto-e-proxima-entrega.md) separa o que está implementado, as pendências de liberação e a próxima entrega recomendada: importação múltipla de Fotos JPEG, como primeiro recorte da issue #19.
 
 ## Estado do repositório
 
