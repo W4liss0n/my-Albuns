@@ -7,8 +7,8 @@ use myalbuns_desktop_lib::ipc_contract::{
     LinkedMediaChanged, MediaPanelSettings, MediaPanelTabSettings, MediaPreferenceKind,
     MediaPreview, MediaPreviewCommandError, MediaPreviewDemand, MediaPreviewState,
     MediaSortDirection, MediaThumbnailSizes, MediaUsageFilter, OpeningExternalCopyDecision,
-    ProjectCloseChoice, ProjectCloseRequestOutcome, ProjectCloseResolution, ProjectDialogAction,
-    ProjectDialogActionEvent, ProjectDialogPresentation, ProjectDialogState,
+    PhotoImportProgress, ProjectCloseChoice, ProjectCloseRequestOutcome, ProjectCloseResolution,
+    ProjectDialogAction, ProjectDialogActionEvent, ProjectDialogPresentation, ProjectDialogState,
     ProjectRecoveryDecision, SaveAsProjectCommandError, SaveAsProjectOutcome, SaveAsProjectResult,
     SaveProjectCommandError, SaveProjectOutcome, SaveProjectResult, SettingsPreferenceChange,
     WorkspacePanelKind, WorkspacePanelPreference, WorkspacePanelPreferences,
@@ -51,6 +51,8 @@ fn main() {
     MediaPanelTabSettings::export_all(&config)
         .expect("media panel tab settings bindings should be generated");
     ImportPhotoResult::export_all(&config).expect("Photo import bindings should be generated");
+    PhotoImportProgress::export_all(&config)
+        .expect("Photo import progress bindings should be generated");
     MediaPreview::export_all(&config).expect("media preview bindings should be generated");
     MediaPreviewDemand::export_all(&config)
         .expect("media preview demand bindings should be generated");

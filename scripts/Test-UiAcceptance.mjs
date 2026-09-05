@@ -329,6 +329,8 @@ test("the manifest covers the integrated workspace and every critical Project di
       "exportSuccess",
       "graphicsFailure",
       "photoImportProblems",
+      "photoImportProgress",
+      "photoImportSuccess",
       "projectCloseConfirmation",
       "projectCloseFailure",
       "projectOperationFailure",
@@ -539,7 +541,7 @@ test("the manifest preserves Program 05 proofs and promotes Sheet reordering to 
     "sheet-reorder-invalid-target-preview",
   ]);
 
-  assert.equal(manifest.scenarios.length, 64 + Object.keys(expectedScenarios).length);
+  assert.equal(manifest.scenarios.length, 66 + Object.keys(expectedScenarios).length);
   for (const [id, actionTypes] of Object.entries(expectedScenarios)) {
     const scenario = scenariosById.get(id);
     assert.ok(scenario, `${id} is missing`);

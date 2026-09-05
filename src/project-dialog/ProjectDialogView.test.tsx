@@ -213,6 +213,28 @@ test("projects a fatal graphics diagnostic through the owned Project dialog", as
   expect(onAction).toHaveBeenCalledWith("closeProjectAfterGraphicsFailure");
 });
 
+test("shows photo import file progress without an unsafe cancel action", () => {
+  const onAction = vi.fn();
+  render(<ProjectDialogView onAction={onAction} state={{ kind: "photoImportProgress",
+    progress: { kind: "determinate", completed: 6, total: 12, status: "Arquivo 6 de 12" } }} />);
+  const dialog = screen.getByRole("dialog", { name: "Importando Fotos" });
+  expect(within(dialog).getByText("Arquivo 6 de 12")).toBeInTheDocument();
+  expect(within(dialog).getByRole("progressbar")).toHaveAttribute("aria-valuenow", "6");
+  expect(within(dialog).getByRole("progressbar")).toHaveAttribute("aria-valuemax", "12");
+  expect(within(dialog).getByText("50%")).toBeInTheDocument();
+  expect(within(dialog).queryByRole("button")).not.toBeInTheDocument();
+});
+
+test.each([0, 1, 12])("confirms %i new Photos through the standard message dialog", async (count) => {
+  const user = userEvent.setup();
+  const onAction = vi.fn();
+  render(<ProjectDialogView onAction={onAction} state={{ kind: "photoImportSuccess", importedCount: count }} />);
+  const dialog = screen.getByRole("dialog", { name: "Importação concluída" });
+  expect(within(dialog).getByText(count === 0 ? "As Fotos selecionadas já estão no Painel." : count === 1 ? "1 Foto importada." : "12 Fotos importadas.")).toBeInTheDocument();
+  await user.click(within(dialog).getByRole("button", { name: "Fechar" }));
+  expect(onAction).toHaveBeenCalledWith("dismissPhotoImportSuccess");
+});
+
 test("projects export success through the standard message dialog", async () => {
   const user = userEvent.setup();
   const onAction = vi.fn();

@@ -400,6 +400,25 @@ test("confirms Project UI readiness through its single startup seam", async () =
   expect(invoke).toHaveBeenCalledWith("project_ui_ready");
 });
 
+test.each(["completed", "failed"])("streams photo import progress per attempt and ignores late events after %s", async (outcome) => {
+  let finish!: () => void;
+  vi.mocked(invoke).mockImplementationOnce(() => new Promise<void>((resolve, reject) => {
+    finish = () => outcome === "completed" ? resolve() : reject(new Error("Falhou"));
+  }));
+  const onProgress = vi.fn();
+  const completion = tauriProjectCorePort.importPhoto(onProgress).catch(() => undefined);
+  const channel = tauriBoundary.channels[0];
+  expect(invoke).toHaveBeenCalledWith("import_photo", { onProgress: channel });
+  expect(onProgress).not.toHaveBeenCalled();
+  channel.onmessage({ completedFiles: 0, totalFiles: 12 });
+  channel.onmessage({ completedFiles: 5, totalFiles: 12 });
+  expect(onProgress.mock.calls).toEqual([[{ completedFiles: 0, totalFiles: 12 }], [{ completedFiles: 5, totalFiles: 12 }]]);
+  finish();
+  await completion;
+  channel.onmessage({ completedFiles: 12, totalFiles: 12 });
+  expect(onProgress).toHaveBeenCalledTimes(2);
+});
+
 test("maps Photo import, target resolution, and affected Frame outcomes", async () => {
   const mutationOutcome = {
     projection: representativeProjection,
@@ -427,7 +446,7 @@ test("maps Photo import, target resolution, and affected Frame outcomes", async 
   await expect(
     tauriProjectCorePort.applyWithOutcome(intent),
   ).resolves.toEqual(mutationOutcome);
-  await expect(tauriProjectCorePort.importPhoto()).resolves.toEqual(
+  await expect(tauriProjectCorePort.importPhoto(vi.fn())).resolves.toEqual(
     importOutcome,
   );
   await expect(
@@ -441,7 +460,7 @@ test("maps Photo import, target resolution, and affected Frame outcomes", async 
   expect(invoke).toHaveBeenNthCalledWith(1, "apply_project_intent", {
     intent,
   });
-  expect(invoke).toHaveBeenNthCalledWith(2, "import_photo");
+  expect(invoke).toHaveBeenNthCalledWith(2, "import_photo", { onProgress: tauriBoundary.channels[0] });
   expect(invoke).toHaveBeenNthCalledWith(3, "photo_drop_target", {
     sheetId: "sheet-001",
     xUm: 12_000,

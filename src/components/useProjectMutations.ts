@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { PhotoImportCompletion } from "../application/projectPorts";
+import type { PhotoImportCompletion, PhotoImportProgress } from "../application/projectPorts";
 
 import type {
   EditorProjection,
@@ -50,6 +50,7 @@ export function useProjectMutations({
 }: ProjectMutationsInput) {
   const [message, setMessage] = useState<string | null>(null);
   const [importPending, setImportPending] = useState(false);
+  const [photoImportProgress, setPhotoImportProgress] = useState<PhotoImportProgress | null>(null);
   const importAttemptRef = useRef({ pending: false });
   const [photoImportResult, setPhotoImportResult] = useState<PhotoImportCompletion | null>(null);
   const feedbackTokenRef = useRef(0);
@@ -59,7 +60,9 @@ export function useProjectMutations({
     setMessage(null);
     importAttemptRef.current = { pending: false };
     setImportPending(false);
+    setPhotoImportProgress(null);
     setPhotoImportResult(null);
+    return () => { importAttemptRef.current = { pending: false }; };
   }, [runProjectMutation, projection.state.projectId]);
 
   useEffect(() => {
@@ -312,6 +315,7 @@ export function useProjectMutations({
   return {
     message,
     importPending,
+    photoImportProgress,
     photoImportResult,
     applyIntent,
     commitInteraction,
@@ -329,7 +333,11 @@ export function useProjectMutations({
       let result: PhotoImportCompletion | null = null;
       try {
         const completed = await runWithErrorFeedback(async (port) => {
-          const imported = await port.importPhoto();
+          const imported = await port.importPhoto((progress) => {
+            if (importAttemptRef.current === attempt && attempt.pending) {
+              setPhotoImportProgress(progress);
+            }
+          });
           if (imported.kind === "completed") result = imported;
           return imported.projection;
         });
@@ -341,6 +349,7 @@ export function useProjectMutations({
         if (importAttemptRef.current === attempt) {
           attempt.pending = false;
           setImportPending(false);
+          setPhotoImportProgress(null);
         }
       }
     },

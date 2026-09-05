@@ -33,6 +33,12 @@ pub struct ProjectDialogDetail {
 )]
 #[ts(tag = "kind")]
 pub enum ProjectDialogState {
+    PhotoImportProgress {
+        progress: ProjectDialogProgress,
+    },
+    PhotoImportSuccess {
+        imported_count: u32,
+    },
     PhotoImportProblems {
         imported_count: u32,
         problems: Vec<PhotoImportProblem>,
@@ -88,6 +94,7 @@ pub enum ProjectDialogAction {
     DismissProjectCloseFailure,
     DismissProjectOperationFailure,
     DismissPhotoImportProblems,
+    DismissPhotoImportSuccess,
     RetryExport,
     SaveAndClose,
 }
@@ -131,6 +138,10 @@ mod project_dialog_contract_tests {
             ),
             (ProjectDialogAction::DismissExport, "dismissExport"),
             (
+                ProjectDialogAction::DismissPhotoImportSuccess,
+                "dismissPhotoImportSuccess",
+            ),
+            (
                 ProjectDialogAction::DismissProjectCloseFailure,
                 "dismissProjectCloseFailure",
             ),
@@ -156,6 +167,14 @@ mod project_dialog_contract_tests {
     #[test]
     fn every_project_dialog_state_round_trips_through_its_discriminated_union() {
         let states = [
+            ProjectDialogState::PhotoImportProgress {
+                progress: ProjectDialogProgress::Determinate {
+                    completed: 5,
+                    total: 12,
+                    status: "Arquivo 5 de 12".into(),
+                },
+            },
+            ProjectDialogState::PhotoImportSuccess { imported_count: 12 },
             ProjectDialogState::AlbumInformationConfirmation {
                 busy: false,
                 details: vec![ProjectDialogDetail {
@@ -192,6 +211,8 @@ mod project_dialog_contract_tests {
             },
         ];
         let expected_kinds = [
+            "photoImportProgress",
+            "photoImportSuccess",
             "albumInformationConfirmation",
             "projectCloseConfirmation",
             "projectCloseFailure",
@@ -509,6 +530,13 @@ pub struct MediaPreview {
 #[serde(rename_all = "camelCase")]
 pub struct LinkedMediaChanged {
     pub(crate) media_ids: Vec<String>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct PhotoImportProgress {
+    pub(crate) completed_files: u32,
+    pub(crate) total_files: u32,
 }
 
 #[derive(Serialize, TS)]

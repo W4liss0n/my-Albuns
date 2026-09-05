@@ -18,6 +18,8 @@ export interface ProjectDialogDetail {
 }
 
 export type ProjectDialogState =
+  | { kind: "photoImportProgress"; progress: ProjectDialogProgress }
+  | { kind: "photoImportSuccess"; importedCount: number }
   | {
       kind: "photoImportProblems";
       importedCount: number;
@@ -72,6 +74,7 @@ export type ProjectDialogAction =
   | "dismissProjectCloseFailure"
   | "dismissProjectOperationFailure"
   | "dismissPhotoImportProblems"
+  | "dismissPhotoImportSuccess"
   | "retryExport"
   | "saveAndClose";
 

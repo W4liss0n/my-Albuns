@@ -22,6 +22,12 @@ const MAX_DIALOG_SESSION_ID_CHARS: usize = 128;
 impl ProjectDialogState {
     fn sanitized(self) -> Self {
         match self {
+            Self::PhotoImportProgress { progress } => Self::PhotoImportProgress {
+                progress: progress.sanitized(),
+            },
+            Self::PhotoImportSuccess { imported_count } => {
+                Self::PhotoImportSuccess { imported_count }
+            }
             Self::PhotoImportProblems {
                 imported_count,
                 problems,
@@ -65,22 +71,7 @@ impl ProjectDialogState {
             } => Self::ExportProgress {
                 cancel_requested,
                 cancellable,
-                progress: match progress {
-                    ProjectDialogProgress::Indeterminate { status } => {
-                        ProjectDialogProgress::Indeterminate {
-                            status: bound_text(status),
-                        }
-                    }
-                    ProjectDialogProgress::Determinate {
-                        completed,
-                        status,
-                        total,
-                    } => ProjectDialogProgress::Determinate {
-                        completed,
-                        status: bound_text(status),
-                        total,
-                    },
-                },
+                progress: progress.sanitized(),
             },
             Self::ExportFailure {
                 cancelled,
@@ -112,6 +103,7 @@ impl ProjectDialogState {
                 214.0 + native_dialog_window::OWNED_WINDOW_TITLEBAR_HEIGHT,
             ),
             Self::ProjectCloseFailure { .. }
+            | Self::PhotoImportSuccess { .. }
             | Self::ProjectOperationFailure { .. }
             | Self::GraphicsFailure { .. }
             | Self::ExportFailure { .. }
@@ -119,10 +111,29 @@ impl ProjectDialogState {
                 440.0,
                 202.0 + native_dialog_window::OWNED_WINDOW_TITLEBAR_HEIGHT,
             ),
-            Self::ExportProgress { .. } => (
+            Self::ExportProgress { .. } | Self::PhotoImportProgress { .. } => (
                 440.0,
                 176.0 + native_dialog_window::OWNED_WINDOW_TITLEBAR_HEIGHT,
             ),
+        }
+    }
+}
+
+impl ProjectDialogProgress {
+    fn sanitized(self) -> Self {
+        match self {
+            Self::Indeterminate { status } => Self::Indeterminate {
+                status: bound_text(status),
+            },
+            Self::Determinate {
+                completed,
+                status,
+                total,
+            } => Self::Determinate {
+                completed,
+                status: bound_text(status),
+                total,
+            },
         }
     }
 }

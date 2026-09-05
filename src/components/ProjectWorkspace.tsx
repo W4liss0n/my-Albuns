@@ -38,6 +38,7 @@ import { useProjectCloseController } from "./useProjectCloseController";
 import { useProjectEditorController } from "./useProjectEditorController";
 import { useProjectGraphicsFailureDialog } from "./useProjectGraphicsFailureDialog";
 import { useProjectOperationResultDialog } from "./useProjectOperationResultDialog";
+import { usePhotoImportProgressDialog } from "./usePhotoImportProgressDialog";
 import { useAlbumInformationApplyController } from "./useAlbumInformationApplyController";
 import { SheetContextMenu } from "./SheetContextMenu";
 import {
@@ -234,12 +235,13 @@ export function ProjectWorkspace({
     onApply: controller.applyAlbumInformation,
     onError: setCloseMessage,
   });
+  usePhotoImportProgressDialog(controller.photoImportProgress, projectDialogPort);
   useProjectOperationResultDialog({
     importResult: controller.photoImportResult,
     message: closeMessage ?? controller.message,
     projectDialogPort,
     onDismiss: (kind) => {
-      if (kind === "photoImportProblems") {
+      if (kind === "photoImportProblems" || kind === "photoImportSuccess") {
         controller.dismissPhotoImportResult();
       } else {
         setCloseMessage(null);
@@ -704,11 +706,6 @@ export function ProjectWorkspace({
           onFillPhoto={controller.fillMedia}
           selectedMediaId={selectedMediaId}
           importPending={controller.importPending}
-          importStatus={controller.photoImportResult && controller.photoImportResult.problems.length === 0
-            ? controller.photoImportResult.importedCount > 0
-              ? `${controller.photoImportResult.importedCount} ${controller.photoImportResult.importedCount === 1 ? "Foto importada." : "Fotos importadas."}`
-              : "As Fotos selecionadas já estão no Painel."
-            : undefined}
           onImportPhoto={() => {
             void controller.importPhoto().then((mediaId) => {
               if (mediaId) setSelectedMediaId(mediaId);

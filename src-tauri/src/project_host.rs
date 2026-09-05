@@ -364,10 +364,14 @@ impl ProjectHost {
     pub(crate) fn import_photos(
         &self,
         paths: Vec<std::path::PathBuf>,
+        on_progress: impl FnMut(crate::ipc_contract::PhotoImportProgress),
     ) -> Result<crate::ipc_contract::ImportPhotoResult, String> {
         let catalog = self.authorized_media_catalog()?;
-        let proposal =
-            crate::media_runtime::MediaResolver.propose_photo_imports(paths, &catalog.bindings);
+        let proposal = crate::media_runtime::MediaResolver.propose_photo_imports(
+            paths,
+            &catalog.bindings,
+            on_progress,
+        );
         let mut project = self.project()?;
         if project.project_id().hyphenated().to_string() != catalog.project_id {
             return Err(
@@ -1177,7 +1181,7 @@ mod tests {
                 imported_count,
                 media_ids,
                 problems,
-            } = fixture.host.import_photos(paths).unwrap()
+            } = fixture.host.import_photos(paths, |_| {}).unwrap()
             else {
                 panic!("selection completes")
             };
@@ -1202,7 +1206,7 @@ mod tests {
                 ..
             } = fixture
                 .host
-                .import_photos(vec![photo_path.clone()])
+                .import_photos(vec![photo_path.clone()], |_| {})
                 .expect("the Photo is imported")
             else {
                 panic!("selected files complete")
@@ -1218,7 +1222,7 @@ mod tests {
                 ..
             } = fixture
                 .host
-                .import_photos(vec![photo_path])
+                .import_photos(vec![photo_path], |_| {})
                 .expect("the missing existing Photo is selected")
             else {
                 panic!("selected files complete")
@@ -1836,7 +1840,7 @@ mod tests {
                 imported_count,
                 ..
             } = host
-                .import_photos(vec![photo_path.clone(), second_photo_path])
+                .import_photos(vec![photo_path.clone(), second_photo_path], |_| {})
                 .expect("the batch is imported")
             else {
                 panic!("selected files complete")

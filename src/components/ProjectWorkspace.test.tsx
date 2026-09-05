@@ -6072,6 +6072,75 @@ test("imports a JPEG through the Host boundary without inserting it automaticall
   expect(applyWithOutcome).not.toHaveBeenCalled();
 });
 
+test.each(["completed", "cancelled", "failed"] as const)("shows photo import progress after selection and releases it on %s", async (outcome) => {
+  const port = projectCorePortWithApply(async () => projection);
+  let progress: Parameters<ProjectCorePort["importPhoto"]>[0] = () => undefined;
+  let resolve!: (result: Awaited<ReturnType<ProjectCorePort["importPhoto"]>>) => void;
+  let reject!: (error: Error) => void;
+  port.importPhoto = vi.fn<ProjectCorePort["importPhoto"]>((onProgress) => {
+    progress = onProgress;
+    return new Promise((yes, no) => { resolve = yes; reject = no; });
+  });
+  const dialogs = projectDialogHarness();
+  render(<ProjectWorkspace exportPipelinePort={exportPipelinePort}
+    projection={projection} projectCorePort={port} projectDialogPort={dialogs.port}
+    onProjectionChange={() => undefined} />);
+  fireEvent.click(screen.getByRole("button", { name: "Importar" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos JPEG…" }));
+  await waitFor(() => expect(port.importPhoto).toHaveBeenCalledOnce());
+  expect(dialogs.present).not.toHaveBeenCalled();
+  if (outcome !== "cancelled") {
+    act(() => progress?.({ completedFiles: 0, totalFiles: 12 }));
+    await waitFor(() => expect(dialogs.present).toHaveBeenCalledWith({
+      kind: "photoImportProgress",
+      progress: { kind: "determinate", completed: 0, total: 12, status: "Arquivo 0 de 12" },
+    }));
+    act(() => progress({ completedFiles: 5, totalFiles: 12 }));
+    await waitFor(() => expect(dialogs.present).toHaveBeenLastCalledWith({
+      kind: "photoImportProgress",
+      progress: { kind: "determinate", completed: 5, total: 12, status: "Arquivo 5 de 12" },
+    }));
+  }
+  await act(async () => {
+    if (outcome === "failed") reject(new Error("Falha na importação."));
+    else if (outcome === "cancelled") resolve({ kind: "cancelled", projection });
+    else resolve({ kind: "completed", projection, mediaIds: ["media-002"], importedCount: 12, problems: [] });
+  });
+  if (outcome === "cancelled") expect(dialogs.present).not.toHaveBeenCalled();
+  else {
+    await waitFor(() => expect(dialogs.dismiss).toHaveBeenCalled());
+    expect(dialogs.present).toHaveBeenLastCalledWith(outcome === "completed"
+      ? { kind: "photoImportSuccess", importedCount: 12 }
+      : { kind: "projectOperationFailure", message: "Falha na importação." });
+    expect(dialogs.dismiss.mock.invocationCallOrder[0]).toBeLessThan(dialogs.present.mock.invocationCallOrder[dialogs.present.mock.calls.length - 1]);
+  }
+});
+
+test("confirms successful photo import in an owned dialog without toolbar status text", async () => {
+  const port = projectCorePortWithApply(async () => projection);
+  port.importPhoto = vi.fn(async () => ({
+    kind: "completed" as const,
+    projection,
+    mediaIds: ["media-002"], importedCount: 12, problems: [],
+  }));
+  const dialogs = projectDialogHarness();
+  render(
+    <ProjectWorkspace
+      exportPipelinePort={exportPipelinePort}
+      projection={projection}
+      projectCorePort={port}
+      projectDialogPort={dialogs.port}
+      onProjectionChange={() => undefined}
+    />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Importar" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos JPEG…" }));
+  await waitFor(() => expect(dialogs.present).toHaveBeenCalledWith({
+    kind: "photoImportSuccess", importedCount: 12,
+  }));
+  expect(screen.queryByText("12 Fotos importadas.")).not.toBeInTheDocument();
+});
+
 test("reimporting a JPEG selects its existing card without a creative mutation", async () => {
   const port = projectCorePortWithApply(async () => projection);
   const importPhoto = vi.fn(async () => ({

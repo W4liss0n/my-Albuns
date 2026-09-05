@@ -213,6 +213,11 @@ export interface PhotoImportProblem {
   reason: string;
 }
 
+export interface PhotoImportProgress {
+  completedFiles: number;
+  totalFiles: number;
+}
+
 export interface PhotoImportCompletion {
   kind: "completed";
   projection: EditorProjection;
@@ -228,7 +233,7 @@ export interface ProjectCorePort {
   ): Promise<AlbumInformationValidation>;
   apply(intent: ProjectIntent): Promise<EditorProjection>;
   applyWithOutcome(intent: ProjectIntent): Promise<ProjectMutationOutcome>;
-  importPhoto(): Promise<
+  importPhoto(onProgress: (progress: PhotoImportProgress) => void): Promise<
     | { kind: "cancelled"; projection: EditorProjection }
     | PhotoImportCompletion
   >;

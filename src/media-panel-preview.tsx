@@ -27,7 +27,6 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
         selectedMediaId={null}
         onImportPhoto={() => undefined}
         importPending={new URLSearchParams(window.location.search).get("import") === "pending"}
-        importStatus={new URLSearchParams(window.location.search).get("import") === "completed" ? "10 Fotos importadas." : undefined}
         onSelectMedia={() => undefined}
         onPhotoDragStart={() => undefined}
         onPhotoDragEnd={() => undefined}

@@ -30,6 +30,13 @@ export function ProjectDialogView({
   }, [state.kind]);
 
   switch (state.kind) {
+    case "photoImportProgress":
+      return <ProgressDialog title="Importando Fotos" progress={state.progress} />;
+    case "photoImportSuccess":
+      return <MessageDialog title="Importação concluída" tone="success"
+        description={state.importedCount === 0 ? "As Fotos selecionadas já estão no Painel." :
+          state.importedCount === 1 ? "1 Foto importada." : `${state.importedCount} Fotos importadas.`}
+        secondaryAction={{ label: "Fechar", onClick: () => onAction("dismissPhotoImportSuccess") }} />;
     case "photoImportProblems": {
       const imported = state.importedCount === 0 ? "Nenhuma Foto nova foi importada." :
         state.importedCount === 1 ? "1 Foto importada." : `${state.importedCount} Fotos importadas.`;

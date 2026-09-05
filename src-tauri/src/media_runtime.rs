@@ -204,17 +204,26 @@ impl MediaResolver {
         &self,
         paths: Vec<PathBuf>,
         bindings: &[MediaBinding],
+        mut on_progress: impl FnMut(crate::ipc_contract::PhotoImportProgress),
     ) -> PhotoImportsProposal {
         let existing = bindings
             .iter()
             .filter(|binding| binding.kind == MediaKind::Photo)
             .map(|binding| binding.logical_path.as_path())
             .collect::<HashSet<_>>();
-        let mut context = OperationPathContext::new();
         let mut seen = HashSet::new();
-        let candidates = paths
+        let paths = paths
             .into_iter()
             .filter(|path| seen.insert(path.clone()))
+            .collect::<Vec<_>>();
+        let total_files = paths.len() as u32;
+        on_progress(crate::ipc_contract::PhotoImportProgress {
+            completed_files: 0,
+            total_files,
+        });
+        let mut context = OperationPathContext::new();
+        let candidates = paths
+            .into_iter()
             .map(|path| {
                 let capture = if existing.contains(path.as_path()) {
                     Ok(())
@@ -230,22 +239,26 @@ impl MediaResolver {
         let plan = context.freeze();
         let mut commands = Vec::new();
         let mut problems = Vec::new();
-        for (path, capture) in candidates {
+        for (index, (path, capture)) in candidates.into_iter().enumerate() {
             if existing.contains(path.as_path()) {
                 commands.push(ImportPhoto::select_existing(path));
-                continue;
+            } else {
+                match capture.and_then(|()| inspect_media_source_in_plan(&plan, &path, true)) {
+                    Ok(metadata) => commands.push(ImportPhoto::new(path, metadata)),
+                    Err(reason) => problems.push(PhotoImportProblem {
+                        file_name: path
+                            .file_name()
+                            .unwrap_or_default()
+                            .to_string_lossy()
+                            .into_owned(),
+                        reason,
+                    }),
+                }
             }
-            match capture.and_then(|()| inspect_media_source_in_plan(&plan, &path, true)) {
-                Ok(metadata) => commands.push(ImportPhoto::new(path, metadata)),
-                Err(reason) => problems.push(PhotoImportProblem {
-                    file_name: path
-                        .file_name()
-                        .unwrap_or_default()
-                        .to_string_lossy()
-                        .into_owned(),
-                    reason,
-                }),
-            }
+            on_progress(crate::ipc_contract::PhotoImportProgress {
+                completed_files: (index + 1) as u32,
+                total_files,
+            });
         }
         PhotoImportsProposal { commands, problems }
     }
@@ -700,6 +713,7 @@ mod tests {
             .position(|bytes| bytes == [0xff, 0xda])
             .unwrap();
         std::fs::write(&corrupt, &before[..scan + 2]).unwrap();
+        let mut progress = Vec::new();
         let result = MediaResolver.propose_photo_imports(
             vec![
                 good.clone(),
@@ -715,6 +729,15 @@ mod tests {
                 kind: MediaKind::Photo,
                 logical_path: existing,
             }],
+            |event| progress.push(event),
+        );
+        assert_eq!(
+            progress
+                .iter()
+                .map(|event| (event.completed_files, event.total_files))
+                .collect::<Vec<_>>(),
+            (0..=6).map(|completed| (completed, 6)).collect::<Vec<_>>(),
+            "progress counts unique files, including existing and rejected items"
         );
         assert_eq!(
             result.commands.len(),
@@ -747,7 +770,7 @@ mod tests {
             .expect("the external JPEG is writable");
         let before = std::fs::read(&source).expect("the Original is readable before import");
 
-        let proposal = MediaResolver.propose_photo_imports(vec![source.clone()], &[]);
+        let proposal = MediaResolver.propose_photo_imports(vec![source.clone()], &[], |_| {});
         assert_eq!(proposal.commands.len(), 1);
         assert!(proposal.problems.is_empty());
         assert_eq!(
@@ -766,7 +789,7 @@ mod tests {
             .expect("the renamed PNG is writable");
         let before = std::fs::read(&source).expect("the renamed Original is readable");
 
-        let proposal = MediaResolver.propose_photo_imports(vec![source.clone()], &[]);
+        let proposal = MediaResolver.propose_photo_imports(vec![source.clone()], &[], |_| {});
         assert!(proposal.commands.is_empty());
         assert!(proposal.problems[0].reason.contains("JPEG válido"));
         assert_eq!(

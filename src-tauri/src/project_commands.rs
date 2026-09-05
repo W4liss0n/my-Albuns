@@ -93,6 +93,7 @@ pub(crate) async fn import_photo(
     app: AppHandle,
     window: WebviewWindow,
     state: State<'_, ProjectHost>,
+    on_progress: tauri::ipc::Channel<crate::ipc_contract::PhotoImportProgress>,
 ) -> Result<ImportPhotoResult, String> {
     if window.label() != PROJECT_WINDOW_LABEL {
         return Err("A importação de Foto só está disponível na Janela do Projeto.".into());
@@ -126,9 +127,13 @@ pub(crate) async fn import_photo(
             }),
         }
     }
-    let mut result = tauri::async_runtime::spawn_blocking(move || host.import_photos(paths))
-        .await
-        .map_err(|_| "Não foi possível concluir a importação das Fotos.".to_string())??;
+    let mut result = tauri::async_runtime::spawn_blocking(move || {
+        host.import_photos(paths, |progress| {
+            let _ = on_progress.send(progress);
+        })
+    })
+    .await
+    .map_err(|_| "Não foi possível concluir a importação das Fotos.".to_string())??;
     if let ImportPhotoResult::Completed {
         projection,
         imported_count,

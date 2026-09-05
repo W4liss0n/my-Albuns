@@ -1338,20 +1338,54 @@
       "actions": []
     },
     {
-      "id": "media-panel-import-completed",
-      "title": "Painel de imagens — importação concluída",
-      "implementationPath": "/media-panel-preview.html?acceptance=editor&import=completed",
+      "id": "photo-import-success",
+      "title": "Importação — confirmação de sucesso",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22photoImportSuccess%22%2C%22importedCount%22%3A12%7D",
       "comparison": {
         "kind": "implementation-only",
-        "surface": "media-panel",
-        "implementationCaptureSelector": ".media-panel",
-        "reason": "A referência vigente não representa este estado da importação múltipla; comportamento definido no recorte aprovado e na especificação, seção Importação."
+        "surface": "owned-import-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "A referência vigente não contém esta variante da importação; composição conforme docs/design/0007-progresso-de-operacoes.md e os diálogos pertencentes da especificação."
       },
       "viewport": {
-        "width": 1440,
-        "height": 900
+        "width": 440,
+        "height": 280
       },
-      "readySelector": ".media-import-status",
+      "readySelector": "[role=\"dialog\"]",
+      "actions": []
+    },
+    {
+      "id": "photo-import-progress",
+      "title": "Importação — progresso dos arquivos",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22photoImportProgress%22%2C%22progress%22%3A%7B%22kind%22%3A%22determinate%22%2C%22completed%22%3A5%2C%22total%22%3A12%2C%22status%22%3A%22Arquivo%205%20de%2012%22%7D%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-import-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "A referência vigente não contém esta variante da importação; composição conforme docs/design/0007-progresso-de-operacoes.md e os diálogos pertencentes da especificação."
+      },
+      "viewport": {
+        "width": 440,
+        "height": 280
+      },
+      "readySelector": "[role=\"progressbar\"]",
+      "actions": []
+    },
+    {
+      "id": "photo-import-existing",
+      "title": "Importação — Fotos já vinculadas",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22photoImportSuccess%22%2C%22importedCount%22%3A0%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-import-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "A referência vigente não contém esta variante da importação; composição conforme docs/design/0007-progresso-de-operacoes.md e os diálogos pertencentes da especificação."
+      },
+      "viewport": {
+        "width": 440,
+        "height": 280
+      },
+      "readySelector": "[role=\"dialog\"]",
       "actions": []
     },
     {

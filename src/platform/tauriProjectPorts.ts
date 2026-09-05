@@ -35,6 +35,7 @@ import type { ExportCommandError as IpcExportCommandError } from "./generated/Ex
 import type { ExportEvent as IpcExportEvent } from "./generated/ExportEvent";
 import type { ExportResult as IpcExportResult } from "./generated/ExportResult";
 import type { ImportPhotoResult as IpcImportPhotoResult } from "./generated/ImportPhotoResult";
+import type { PhotoImportProgress as IpcPhotoImportProgress } from "./generated/PhotoImportProgress";
 import type { LinkedMediaChanged as IpcLinkedMediaChanged } from "./generated/LinkedMediaChanged";
 import type { MediaPreview as IpcMediaPreview } from "./generated/MediaPreview";
 import type { MediaPreviewCommandError as IpcMediaPreviewCommandError } from "./generated/MediaPreviewCommandError";
@@ -286,7 +287,16 @@ export const tauriProjectCorePort: ProjectCorePort = {
     ).projection,
   applyWithOutcome: (intent: ProjectIntent) =>
     invoke<ProjectMutationOutcome>("apply_project_intent", { intent }),
-  importPhoto: () => invoke<IpcImportPhotoResult>("import_photo"),
+  importPhoto: async (onProgress) => {
+    const progressChannel = new Channel<IpcPhotoImportProgress>();
+    let active = true;
+    progressChannel.onmessage = (progress) => { if (active) onProgress(progress); };
+    try {
+      return await invoke<IpcImportPhotoResult>("import_photo", { onProgress: progressChannel });
+    } finally {
+      active = false;
+    }
+  },
   resolvePhotoDropTarget: (
     sheetId: string,
     xUm: number,

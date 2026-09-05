@@ -7,6 +7,8 @@ test.each<{
   expected: ReturnType<typeof defaultProjectDialogCloseAction>;
   state: ProjectDialogState;
 }>([
+  { expected: null, state: { kind: "photoImportProgress", progress: { kind: "determinate", completed: 5, total: 12, status: "Arquivo 5 de 12" } } },
+  { expected: "dismissPhotoImportSuccess", state: { kind: "photoImportSuccess", importedCount: 12 } },
   {
     expected: "cancelAlbumInformation",
     state: {
