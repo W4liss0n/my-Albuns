@@ -1,5 +1,6 @@
 mod cache;
 mod jpeg_output;
+mod photo_import;
 mod process_tree;
 mod render;
 mod source;
@@ -145,6 +146,9 @@ fn run(app_paths: &AppPaths) -> Result<(), ProcessFailure> {
         ImagingCommand::Render(request) => run_render(request),
         ImagingCommand::BuildCache(request) => {
             cache::run_cache(request, app_paths).map_err(cache_failure)
+        }
+        ImagingCommand::PreparePhotoImport(request) => {
+            photo_import::run(request, app_paths).map_err(cache_failure)
         }
     }
 }

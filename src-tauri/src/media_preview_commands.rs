@@ -22,10 +22,9 @@ use crate::{
     },
     logging::LoggingState,
     media_runtime::{MediaAvailability, MediaMonitor, MediaRuntime},
-    path_io,
     product_runtime::{
         CACHE_PROCESSOR_WARNING_EVENT, LINKED_MEDIA_CHANGED_EVENT, PROJECT_WINDOW_LABEL,
-        refresh_project_photos_for_media_update,
+        refresh_project_photos_with_capacity,
     },
     project_host::ProjectHost,
 };
@@ -102,8 +101,7 @@ pub(crate) async fn retry_unavailable_media(
     let runtime = media_runtime.inner().clone();
     let retry_app = app.clone();
     let retry_registry = registry.inner().clone();
-    let retry_host = project_host.inner().clone();
-    let (inspection, refreshed_photo_ids) = tauri::async_runtime::spawn_blocking(move || {
+    let (inspection, roots) = tauri::async_runtime::spawn_blocking(move || {
         let inspection = monitor.retry_unavailable(&runtime, &binding, |update| {
             retry_app.state::<CacheEngine>().apply_monitor_media_update(
                 &retry_namespace,
@@ -111,16 +109,23 @@ pub(crate) async fn retry_unavailable_media(
                 update,
             );
         })?;
-        let refreshed_photo_ids = refresh_project_photos_for_media_update(
-            &retry_host,
-            std::slice::from_ref(&binding),
-            inspection.update(),
-        );
-        Ok::<_, crate::media_runtime::MediaRetryError>((inspection, refreshed_photo_ids))
+        let mut paths = myalbuns_paths::OperationPathContext::new();
+        let _ = paths.capture(&binding.logical_path);
+        Ok::<_, crate::media_runtime::MediaRetryError>((inspection, paths.freeze()))
     })
     .await
     .map_err(MediaPreviewCommandError::retry_failed)?
     .map_err(MediaPreviewCommandError::retry_failed)?;
+    drop(_causal_cache_permit);
+    let refreshed_photo_ids = refresh_project_photos_with_capacity(
+        &project_host,
+        &engine,
+        app.state::<ImagingProcessor>().inner(),
+        std::slice::from_ref(&retry_binding),
+        inspection.update(),
+        &roots,
+    )
+    .await;
     tracing::info!(
         target: "myalbuns.desktop",
         media_id,
@@ -136,7 +141,6 @@ pub(crate) async fn retry_unavailable_media(
             .map_err(|_| MediaPreviewCommandError::read_failed())?;
     }
     let state = preview_state(inspection.availability());
-    drop(_causal_cache_permit);
     if state == MediaPreviewState::Ready {
         processing.prepare(&app, &retry_binding).await;
     } else {
@@ -221,14 +225,19 @@ pub(crate) async fn prepare_media_previews(
     let monitor = media_monitor.inner().clone();
     let runtime = media_runtime.inner().clone();
     let bindings = catalog.bindings.clone();
-    let demand_host = project_host.inner().clone();
-    let (poll, refreshed_photo_ids) = tauri::async_runtime::spawn_blocking(move || {
-        let poll = monitor.poll(&runtime, &bindings);
-        let refreshed_photo_ids = poll
-            .update()
-            .map(|update| refresh_project_photos_for_media_update(&demand_host, &bindings, update))
-            .unwrap_or_default();
-        (poll, refreshed_photo_ids)
+    let cache_root = namespace.paths().root().to_path_buf();
+    let (poll, roots) = tauri::async_runtime::spawn_blocking(move || {
+        let mut paths = myalbuns_paths::OperationPathContext::new();
+        for path in std::iter::once(cache_root.as_path()).chain(
+            bindings
+                .iter()
+                .map(|binding| binding.logical_path.as_path()),
+        ) {
+            let _ = paths.capture(path);
+        }
+        let roots = paths.freeze();
+        let poll = monitor.poll_in_plan(&runtime, &bindings, &roots);
+        (poll, roots)
     })
     .await
     .map_err(|_| MediaPreviewCommandError::read_failed())?;
@@ -243,32 +252,98 @@ pub(crate) async fn prepare_media_previews(
                 .collect::<HashMap<_, _>>()
         })
         .unwrap_or_default();
-    if let Some(runtime_update) = runtime_update.as_ref()
+    let cache_update = if let Some(runtime_update) = runtime_update.as_ref()
         && (!runtime_update.changed_media_ids().is_empty()
             || !runtime_update.invalidated_media_ids().is_empty())
     {
-        let cache_update = engine.apply_demand_media_update(
+        Some(engine.apply_demand_media_update(
             &namespace,
             registry.inner(),
             &mut demand_revision,
             runtime_update,
-        );
+        ))
+    } else {
+        None
+    };
+    drop(causal_cache_permit);
+    if let Some(runtime_update) = runtime_update.as_ref() {
+        let refreshed_photo_ids = refresh_project_photos_with_capacity(
+            &project_host,
+            &engine,
+            &processor,
+            &catalog.bindings,
+            runtime_update,
+            &roots,
+        )
+        .await;
         if let Some(change) = linked_media_change_for_update(
             runtime_update,
             &refreshed_photo_ids,
-            cache_update.retry_required(),
+            cache_update
+                .as_ref()
+                .is_some_and(|update| update.retry_required()),
         ) {
             window
                 .emit(LINKED_MEDIA_CHANGED_EVENT, change)
                 .map_err(|_| MediaPreviewCommandError::read_failed())?;
         }
-        if !cache_update.demand_can_resume() {
-            return Ok(Some(Vec::new()));
-        }
     }
-    if !engine.demand_is_current(&demand_revision) {
+    if cache_update
+        .as_ref()
+        .is_some_and(|update| !update.demand_can_resume())
+        || !engine.demand_is_current(&demand_revision)
+    {
         return Ok(Some(Vec::new()));
     }
+    let causal_cache_permit = engine
+        .begin_cancellable_work(CacheCancellation::default())
+        .await;
+    let sources = ordered_demand
+        .iter()
+        .filter_map(|media_id| {
+            let binding = catalog_by_id[media_id.as_str()];
+            if projected_preview_state(observations.get(media_id.as_str()).copied())
+                != Some(MediaPreviewState::Ready)
+                || registry
+                    .retained_preview(media_id, &binding.logical_path, MediaPreviewState::Ready)
+                    .is_some()
+            {
+                return None;
+            }
+            Some(CacheMediaSource::new(
+                binding.media_id.clone(),
+                binding.kind,
+                binding.logical_path.clone(),
+            ))
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|_| MediaPreviewCommandError::read_failed())?;
+    let planning_app = app.clone();
+    let planning_namespace = namespace.clone();
+    let planning_demand = demand_revision.clone();
+    let (works, prepared) = tauri::async_runtime::spawn_blocking(move || {
+        let engine = planning_app.state::<CacheEngine>();
+        let app_paths = planning_app.state::<AppPaths>();
+        let works = engine
+            .plan_works(&app_paths, &planning_namespace, &roots, sources)
+            .unwrap_or_default();
+        let prepared = engine.publish_prepared_for_demand(
+            &app_paths,
+            &planning_namespace,
+            planning_app.state::<CachePreviewRegistry>().inner(),
+            &planning_demand,
+            &works,
+        );
+        (
+            works
+                .into_iter()
+                .map(|work| (work.source.media_id().to_owned(), work))
+                .collect::<HashMap<_, _>>(),
+            prepared,
+        )
+    })
+    .await
+    .map_err(|_| MediaPreviewCommandError::read_failed())?;
     drop(causal_cache_permit);
     let mut previews = Vec::with_capacity(ordered_demand.len());
     let mut publish_preview = |preview: MediaPreview| {
@@ -286,6 +361,8 @@ pub(crate) async fn prepare_media_previews(
         app_paths: &app_paths,
         namespace: &namespace,
         demand_revision: &demand_revision,
+        works: &works,
+        prepared: &prepared,
     };
     let pending = futures_util::stream::iter(ordered_demand)
         .map(|media_id| {
@@ -293,7 +370,7 @@ pub(crate) async fn prepare_media_previews(
             let state = projected_preview_state(observations.get(media_id.as_str()).copied());
             preparation.prepare(binding, state)
         })
-        .buffer_unordered(crate::imaging_processor::IMAGE_PROCESSING_CONCURRENCY);
+        .buffer_unordered(processor.cache_capacity());
     tokio::pin!(pending);
     let mut failure = None;
     // Drain active jobs even if the demand changes, so their cancellation and
@@ -328,6 +405,8 @@ struct DemandedPreviewPreparation<'a> {
     app_paths: &'a AppPaths,
     namespace: &'a AuthorizedCacheNamespace,
     demand_revision: &'a cache_engine::CacheDemandRevision,
+    works: &'a HashMap<String, CacheWork>,
+    prepared: &'a HashMap<String, MediaPreview>,
 }
 
 impl DemandedPreviewPreparation<'_> {
@@ -346,6 +425,8 @@ impl DemandedPreviewPreparation<'_> {
             app_paths,
             namespace,
             demand_revision,
+            works,
+            prepared,
         } = *self;
         if !engine.demand_is_current(demand_revision) {
             return Ok(None);
@@ -381,23 +462,12 @@ impl DemandedPreviewPreparation<'_> {
         {
             return Ok(Some(preview));
         }
-        if let Some(preview) = engine.publish_prepared_if_demanded(
-            app_paths,
-            namespace,
-            registry,
-            demand_revision,
-            &source,
-        ) {
-            return Ok(Some(preview));
+        if let Some(preview) = prepared.get(media_id) {
+            return Ok(Some(preview.clone()));
         }
-        let root_bindings = match path_io::capture_root_bindings(vec![
-            namespace.paths().root().to_path_buf(),
-            source.source_path().to_path_buf(),
-        ])
-        .await
-        {
-            Ok(root_bindings) => root_bindings,
-            Err(_) => {
+        let work = match works.get(media_id) {
+            Some(work) => work.clone(),
+            None => {
                 return Ok(Some(contextual_preview(
                     engine,
                     registry,
@@ -409,13 +479,6 @@ impl DemandedPreviewPreparation<'_> {
                 )));
             }
         };
-        let request_id = format!("cache-{}", uuid::Uuid::new_v4().simple());
-        let work = CacheWork::new(
-            request_id.clone(),
-            namespace.clone(),
-            source.clone(),
-            root_bindings,
-        );
         let Some(claim) = engine.claim_demanded(demand_revision, &work) else {
             return Ok(None);
         };

@@ -1,3 +1,7 @@
+mod resources;
+pub(crate) use resources::{ImageMemoryEstimate, ProcessorAdmissionFailure};
+use resources::{MemoryReservation, ResourceBudget, cancellable_reservation};
+
 use std::{
     fmt,
     future::Future,
@@ -37,13 +41,28 @@ pub(crate) const IMAGE_PROCESSING_CONCURRENCY: usize = CacheWriterSlot::ALL.len(
 pub(crate) struct ImagingProcessor {
     permits: Arc<Semaphore>,
     occupied: Arc<Mutex<[bool; IMAGE_PROCESSING_CONCURRENCY]>>,
+    capacity: usize,
+    resources: Arc<ResourceBudget>,
 }
 
 impl Default for ImagingProcessor {
     fn default() -> Self {
+        let capacity = std::thread::available_parallelism()
+            .map_or(1, usize::from)
+            .saturating_sub(1)
+            .clamp(1, IMAGE_PROCESSING_CONCURRENCY);
+        Self::with_capacity(capacity)
+    }
+}
+
+impl ImagingProcessor {
+    fn with_capacity(capacity: usize) -> Self {
+        assert!((1..=IMAGE_PROCESSING_CONCURRENCY).contains(&capacity));
         Self {
-            permits: Arc::new(Semaphore::new(IMAGE_PROCESSING_CONCURRENCY)),
+            permits: Arc::new(Semaphore::new(capacity)),
             occupied: Arc::new(Mutex::new([false; IMAGE_PROCESSING_CONCURRENCY])),
+            capacity,
+            resources: Arc::new(ResourceBudget::default()),
         }
     }
 }
@@ -54,6 +73,7 @@ pub(crate) struct ProcessorReservation {
     permits: Arc<Semaphore>,
     occupied: Arc<Mutex<[bool; IMAGE_PROCESSING_CONCURRENCY]>>,
     cache_slot: Option<CacheWriterSlot>,
+    _memory: Option<MemoryReservation>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -64,16 +84,49 @@ impl ImagingProcessor {
         self.acquire(false).await
     }
 
+    #[cfg(test)]
     pub(crate) async fn reserve_cache(&self) -> Result<ProcessorReservation, ProcessorUnavailable> {
         self.acquire(true).await
     }
 
+    pub(crate) fn cache_capacity(&self) -> usize {
+        self.capacity
+    }
+
+    pub(crate) async fn reserve_cache_for(
+        &self,
+        estimate: ImageMemoryEstimate,
+        cancellation: &AtomicBool,
+    ) -> Result<ProcessorReservation, ProcessorAdmissionFailure> {
+        self.acquire_with_memory(true, estimate, cancellation).await
+    }
+
+    pub(crate) async fn reserve_inspection(
+        &self,
+        estimate: ImageMemoryEstimate,
+        cancellation: &AtomicBool,
+    ) -> Result<ProcessorReservation, ProcessorAdmissionFailure> {
+        self.acquire_with_memory(false, estimate, cancellation)
+            .await
+    }
+
+    async fn acquire_with_memory(
+        &self,
+        cache: bool,
+        estimate: ImageMemoryEstimate,
+        cancellation: &AtomicBool,
+    ) -> Result<ProcessorReservation, ProcessorAdmissionFailure> {
+        let mut reservation = cancellable_reservation(self.acquire(cache), cancellation).await?;
+        reservation._memory = Some(
+            self.resources
+                .reserve(estimate, cancellation, &self.permits)
+                .await?,
+        );
+        Ok(reservation)
+    }
+
     async fn acquire(&self, cache: bool) -> Result<ProcessorReservation, ProcessorUnavailable> {
-        let count = if cache {
-            1
-        } else {
-            IMAGE_PROCESSING_CONCURRENCY as u32
-        };
+        let count = if cache { 1 } else { self.capacity as u32 };
         let permit = self
             .permits
             .clone()
@@ -100,6 +153,7 @@ impl ImagingProcessor {
             permits: Arc::clone(&self.permits),
             occupied: Arc::clone(&self.occupied),
             cache_slot,
+            _memory: None,
         })
     }
 }
@@ -527,10 +581,10 @@ async fn invoke_once(
             }
         }
     };
-    if let ImagingCommand::BuildCache(request) = command
+    if let Some(cache_paths) = command.cache_paths()
         && let Err(error) = processor_lifetime.publish_cache_writer_claim(
             &app.state::<AppPaths>(),
-            &request.cache_paths,
+            cache_paths,
             reservation
                 .cache_slot
                 .expect("Cache invocation owns a writer slot"),
@@ -839,7 +893,7 @@ mod tests {
     #[test]
     fn processor_reservation_serializes_callers_and_is_released_with_its_guard() {
         tauri::async_runtime::block_on(async {
-            let processor = ImagingProcessor::default();
+            let processor = ImagingProcessor::with_capacity(2);
             let first = processor
                 .reserve()
                 .await
@@ -865,7 +919,7 @@ mod tests {
     #[test]
     fn cache_workers_overlap_but_export_waits_for_both_and_blocks_new_cache_work() {
         tauri::async_runtime::block_on(async {
-            let processor = ImagingProcessor::default();
+            let processor = ImagingProcessor::with_capacity(2);
             let first = processor.reserve_cache().await.unwrap();
             let second = tokio::time::timeout(Duration::from_secs(1), processor.reserve_cache())
                 .await
@@ -905,9 +959,41 @@ mod tests {
     }
 
     #[test]
+    fn all_eight_writer_slots_are_unique_and_export_reserves_the_entire_capacity() {
+        tauri::async_runtime::block_on(async {
+            let processor = ImagingProcessor::with_capacity(8);
+            let mut reservations = Vec::new();
+            for _ in 0..processor.cache_capacity() {
+                reservations.push(processor.reserve_cache().await.unwrap());
+            }
+            assert_eq!(
+                reservations
+                    .iter()
+                    .map(|reservation| reservation.cache_slot.unwrap().index())
+                    .collect::<std::collections::HashSet<_>>()
+                    .len(),
+                8
+            );
+            let mut export = Box::pin(processor.reserve());
+            for reservation in reservations {
+                assert!(
+                    tokio::time::timeout(Duration::from_millis(10), &mut export)
+                        .await
+                        .is_err()
+                );
+                drop(reservation);
+            }
+            let exclusive = export.await.unwrap();
+            assert_eq!(processor.permits.available_permits(), 0);
+            drop(exclusive);
+            assert_eq!(processor.permits.available_permits(), 8);
+        });
+    }
+
+    #[test]
     fn cache_worker_limit_reuses_slots_and_quarantine_wakes_queued_work() {
         tauri::async_runtime::block_on(async {
-            let processor = ImagingProcessor::default();
+            let processor = ImagingProcessor::with_capacity(2);
             let first = processor.reserve_cache().await.unwrap();
             let second = processor.reserve_cache().await.unwrap();
             let third = processor.reserve_cache();
@@ -944,7 +1030,7 @@ mod tests {
     #[test]
     fn unconfirmed_termination_quarantines_the_processor_before_releasing_the_guard() {
         tauri::async_runtime::block_on(async {
-            let processor = ImagingProcessor::default();
+            let processor = ImagingProcessor::with_capacity(2);
             let reservation = processor
                 .reserve()
                 .await
@@ -963,7 +1049,7 @@ mod tests {
     #[test]
     fn transport_failure_marks_the_shared_processor_quarantine() {
         tauri::async_runtime::block_on(async {
-            let processor = ImagingProcessor::default();
+            let processor = ImagingProcessor::with_capacity(2);
             let reservation = processor
                 .reserve()
                 .await
@@ -986,7 +1072,7 @@ mod tests {
     #[test]
     fn quarantined_peer_blocks_recovery_dispatch_through_an_existing_reservation() {
         tauri::async_runtime::block_on(async {
-            let processor = ImagingProcessor::default();
+            let processor = ImagingProcessor::with_capacity(2);
             let first = processor.reserve_cache().await.unwrap();
             let second = processor.reserve_cache().await.unwrap();
             let mut dispatched = 0;

@@ -618,6 +618,10 @@ pub struct ImportPhoto {
 }
 
 impl ImportPhoto {
+    pub fn path(&self) -> &std::path::Path {
+        &self.path
+    }
+
     pub fn new(path: PathBuf, source_metadata: PhotoSourceMetadata) -> Self {
         Self {
             path,

@@ -32,6 +32,7 @@ mod opaque_image_protocol;
 mod operation_gate;
 mod operation_lease;
 mod path_io;
+mod photo_import;
 mod preference_store_io;
 mod processor_lifetime;
 mod product_runtime;

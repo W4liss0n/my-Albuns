@@ -10,7 +10,8 @@ use std::{
 };
 
 use image::{
-    ColorType, ImageDecoder, ImageError, Limits, RgbaImage,
+    ColorType, DynamicImage, ImageBuffer, ImageDecoder, ImageError, Limits, Pixel, RgbImage,
+    RgbaImage,
     codecs::{jpeg::JpegDecoder, png::PngDecoder, tiff::TiffDecoder},
     metadata::Orientation,
 };
@@ -116,6 +117,10 @@ struct TiffPreflight {
 }
 
 impl OpenRenderSource {
+    pub(crate) fn is_jpeg(&self) -> bool {
+        matches!(self.preflight, SourcePreflight::Jpeg(_))
+    }
+
     pub(crate) fn byte_count(&self) -> u64 {
         self.source_bytes
     }
@@ -141,6 +146,23 @@ impl OpenRenderSource {
             SourcePreflight::Jpeg(preflight) => decode_render_jpeg(self.reader, preflight),
             SourcePreflight::Png(preflight) => decode_render_png(self.reader, preflight),
             SourcePreflight::Tiff(preflight) => decode_render_tiff(self.reader, preflight),
+        }
+    }
+
+    pub(crate) fn decode_preview(self) -> Result<DynamicImage, SourceFailure> {
+        // Progressive JPEG keeps its bounded worker and RGBA transport. Other
+        // formats keep the canonical normalization, including alpha and 16-bit.
+        match self.preflight {
+            SourcePreflight::Jpeg(preflight)
+                if !preflight.is_progressive
+                    && preflight.color_model != JpegColorModel::Grayscale =>
+            {
+                let raw = decode_jpeg_raw(self.reader, &preflight)?;
+                let image = RgbImage::from_raw(preflight.width, preflight.height, raw)
+                    .ok_or_else(decoded_size_failure)?;
+                apply_orientation(image, preflight.orientation).map(DynamicImage::ImageRgb8)
+            }
+            _ => self.decode().map(DynamicImage::ImageRgba8),
         }
     }
 
@@ -1138,6 +1160,33 @@ fn decode_render_jpeg_in_process<R: BufRead + Seek>(
     reader: R,
     preflight: JpegPreflight,
 ) -> Result<RgbaImage, SourceFailure> {
+    let raw = decode_jpeg_raw(reader, &preflight)?;
+    let color_type = jpeg_color_type(&preflight);
+    let image = normalize_rgba(preflight.width, preflight.height, color_type, raw)?;
+    apply_orientation(image, preflight.orientation)
+}
+
+fn jpeg_color_type(preflight: &JpegPreflight) -> ColorType {
+    match preflight.color_model {
+        JpegColorModel::Grayscale => ColorType::L8,
+        JpegColorModel::YCbCr | JpegColorModel::Rgb => ColorType::Rgb8,
+    }
+}
+
+#[cfg(test)]
+std::thread_local! {
+    static JPEG_DECODES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+pub(crate) fn jpeg_decode_count() -> usize {
+    JPEG_DECODES.get()
+}
+
+fn decode_jpeg_raw<R: BufRead + Seek>(
+    reader: R,
+    preflight: &JpegPreflight,
+) -> Result<Vec<u8>, SourceFailure> {
     let reader = FallibleJpegReader::new(reader, preflight.compressed_bytes);
     let mut decoder = JpegDecoder::new(reader).map_err(|error| {
         image_failure(
@@ -1153,10 +1202,7 @@ fn decode_render_jpeg_in_process<R: BufRead + Seek>(
         ));
     }
     let color_type = decoder.color_type();
-    let expected_color_type = match preflight.color_model {
-        JpegColorModel::Grayscale => ColorType::L8,
-        JpegColorModel::YCbCr | JpegColorModel::Rgb => ColorType::Rgb8,
-    };
+    let expected_color_type = jpeg_color_type(preflight);
     if color_type != expected_color_type {
         return Err(SourceFailure::new(
             ImagingFailureCode::UnsupportedColorModel,
@@ -1172,9 +1218,9 @@ fn decode_render_jpeg_in_process<R: BufRead + Seek>(
                 "o decoder JPEG recusou os limites da fonte",
             )
         })?;
-    let raw = decode_raw(decoder)?;
-    let image = normalize_rgba(preflight.width, preflight.height, color_type, raw)?;
-    apply_orientation(image, preflight.orientation)
+    #[cfg(test)]
+    JPEG_DECODES.set(JPEG_DECODES.get() + 1);
+    decode_raw(decoder)
 }
 
 fn decode_render_png(
@@ -1417,10 +1463,10 @@ fn reduce_16(bytes: &[u8]) -> u8 {
     ((value + 128) / 257) as u8
 }
 
-fn apply_orientation(
-    image: RgbaImage,
+fn apply_orientation<P: Pixel<Subpixel = u8>>(
+    image: ImageBuffer<P, Vec<u8>>,
     orientation: Orientation,
-) -> Result<RgbaImage, SourceFailure> {
+) -> Result<ImageBuffer<P, Vec<u8>>, SourceFailure> {
     if orientation == Orientation::NoTransforms {
         return Ok(image);
     }
@@ -1434,7 +1480,7 @@ fn apply_orientation(
     };
     let byte_count = u64::from(width)
         .checked_mul(u64::from(height))
-        .and_then(|pixels| pixels.checked_mul(4))
+        .and_then(|pixels| pixels.checked_mul(u64::from(P::CHANNEL_COUNT)))
         .and_then(|bytes| usize::try_from(bytes).ok())
         .ok_or_else(|| {
             SourceFailure::new(
@@ -1450,7 +1496,7 @@ fn apply_orientation(
         )
     })?;
     pixels.resize(byte_count, 0);
-    let mut output = RgbaImage::from_raw(width, height, pixels).ok_or_else(|| {
+    let mut output = ImageBuffer::from_raw(width, height, pixels).ok_or_else(|| {
         SourceFailure::new(
             ImagingFailureCode::ResourceLimitExceeded,
             "não foi possível materializar o raster orientado",
@@ -1486,6 +1532,51 @@ mod render_source_tests {
     use sha2::{Digest, Sha256};
 
     use super::{FallibleJpegReader, image_failure, open_render_source};
+
+    #[test]
+    fn rgb_preview_preserves_oriented_pixels_and_encoded_bytes() {
+        let source = RgbImage::from_fn(97, 63, |x, y| {
+            Rgb([(x * 17) as u8, (y * 11) as u8, (x * 3 + y * 7) as u8])
+        });
+        let mut jpeg = Vec::new();
+        JpegEncoder::new_with_quality(&mut jpeg, 100)
+            .encode_image(&source)
+            .unwrap();
+        for orientation in 1..=8 {
+            let mut bytes = jpeg.clone();
+            insert_exif_orientation(&mut bytes, orientation);
+            let canonical = image::DynamicImage::ImageRgba8(decode_fixture(&bytes).unwrap());
+            let preview = open_fixture(&bytes).unwrap().decode_preview().unwrap();
+            assert!(preview.as_rgb8().is_some());
+            assert_eq!(preview.to_rgba8(), canonical.to_rgba8());
+            for edge in [1, 31, 1600] {
+                let canonical = if edge < 97 {
+                    canonical.thumbnail(edge, edge)
+                } else {
+                    canonical.clone()
+                };
+                let preview = if edge < 97 {
+                    preview.thumbnail(edge, edge)
+                } else {
+                    preview.clone()
+                };
+                assert_eq!(preview.to_rgba8(), canonical.to_rgba8());
+                let mut expected = Vec::new();
+                let mut actual = Vec::new();
+                JpegEncoder::new_with_quality(&mut expected, 84)
+                    .encode_image(canonical.as_rgba8().unwrap())
+                    .unwrap();
+                JpegEncoder::new_with_quality(&mut actual, 84)
+                    .encode_image(preview.as_rgb8().unwrap())
+                    .unwrap();
+                assert_eq!(actual, expected);
+            }
+        }
+        let gray = jpeg_fixture(None, ExtendedColorType::L8, &[73]);
+        let preview = open_fixture(&gray).unwrap().decode_preview().unwrap();
+        assert!(preview.as_rgba8().is_some());
+        assert_eq!(preview.into_rgba8(), decode_fixture(&gray).unwrap());
+    }
 
     #[test]
     fn decoder_io_errors_preserve_the_central_path_taxonomy() {

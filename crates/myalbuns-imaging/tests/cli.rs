@@ -74,6 +74,101 @@ fn cache_job(
     CacheJob::new(source, generation_id, reusable).expect("the Cache job is valid")
 }
 
+#[test]
+fn one_native_import_process_returns_typed_results_for_a_mixed_batch() {
+    use image::GenericImageView;
+    use myalbuns_imaging_protocol::{
+        ImportedPhotoDimensions, ImportedPhotoPreview, PhotoImportCandidate, PhotoImportOutcome,
+        PhotoImportRequest, PhotoImportSourceId,
+    };
+    let root = tempfile::tempdir().unwrap();
+    let logs = tempfile::tempdir().unwrap();
+    let cache = TestCache::new("photo-import");
+    let candidates = (0..3)
+        .map(|index| {
+            let path = root.path().join(format!("photo-{index}.jpg"));
+            RgbImage::from_pixel(71, 43, Rgb([20, 40, 80]))
+                .save_with_format(&path, ImageFormat::Jpeg)
+                .unwrap();
+            PhotoImportCandidate {
+                source_id: PhotoImportSourceId::new(format!("selected-{index}")).unwrap(),
+                source_path: path.into(),
+                generation_id: format!("prepared-{index}"),
+            }
+        })
+        .collect::<Vec<_>>();
+    std::fs::write(candidates[1].path(), b"not a JPEG").unwrap();
+    let originals = candidates
+        .iter()
+        .map(|candidate| std::fs::read(candidate.path()).unwrap())
+        .collect::<Vec<_>>();
+    let roots = root_bindings(&[cache.paths.root(), root.path()]);
+    let request = PhotoImportRequest {
+        protocol_version: IMAGING_PROTOCOL_VERSION,
+        request_id: "import-three".into(),
+        attempt_id: "attempt-three".into(),
+        project_id: cache.project_id.clone(),
+        cache_paths: cache.paths.clone(),
+        candidates,
+        policy: CacheRepresentationPolicy::measured_v1(),
+        root_bindings: roots,
+    };
+    request.validate().unwrap();
+    let output = invoke_imaging_command(
+        &ImagingCommand::PreparePhotoImport(request.clone()),
+        Some(logs.path()),
+    );
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let ImagingResponse::PhotoImportCompleted {
+        request_id,
+        completion,
+    } = processor_response(&output.stdout)
+    else {
+        panic!("typed import completion")
+    };
+    assert_eq!(request_id, request.request_id);
+    completion.validate_for(&request).unwrap();
+    for index in [0, 2] {
+        let PhotoImportOutcome::Validated {
+            dimensions,
+            preview: ImportedPhotoPreview::Prepared { generation },
+            ..
+        } = &completion.photos[index].outcome
+        else {
+            panic!("valid source prepared")
+        };
+        assert_eq!(
+            *dimensions,
+            ImportedPhotoDimensions {
+                width_px: 71,
+                height_px: 43
+            }
+        );
+        let path = cache
+            .paths
+            .import_preview_file(
+                &request.attempt_id,
+                request.candidates[index].source_id.as_str(),
+                &generation.generation_id,
+                generation.format,
+            )
+            .unwrap();
+        assert_eq!(image::open(path).unwrap().dimensions(), (71, 43));
+    }
+    assert!(matches!(
+        completion.photos[1].outcome,
+        PhotoImportOutcome::InspectionRequired { .. }
+    ));
+    assert!(!cache.paths.metadata_file().exists());
+    for (candidate, original) in request.candidates.iter().zip(originals) {
+        assert_eq!(std::fs::read(candidate.path()).unwrap(), original);
+    }
+}
+
 fn reusable_generation(artifact: &CacheArtifact) -> CacheReusableGeneration {
     CacheReusableGeneration::new(
         artifact.generation_id.clone(),

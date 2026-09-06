@@ -1,6 +1,13 @@
+mod import;
+mod index;
+mod publication;
+pub(crate) use import::CacheImportStage;
+use index::CacheIndex;
+pub(crate) use publication::PendingCachePublication;
+
 use std::{
     collections::{HashMap, HashSet},
-    io::Write,
+    io::{BufReader, Write},
     path::{Path, PathBuf},
     sync::{
         Arc, Mutex,
@@ -9,8 +16,8 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use image::{DynamicImage, ImageDecoder, ImageFormat, ImageReader};
 use myalbuns_core::{MediaKind, ProjectIdentityAuthority};
+use myalbuns_imaging::preview::{CachePreviewSpec, validate_cache_preview};
 use myalbuns_imaging_protocol::{
     CACHE_REPRESENTATION_VERSION, CacheArtifact, CacheArtifactFormat, CacheArtifactProperties,
     CacheBasicColorProfile, CacheCompletion, CacheFingerprint, CacheJob, CacheMediaSource,
@@ -37,7 +44,11 @@ use crate::{
 };
 
 const CACHE_METADATA_SCHEMA_VERSION: u32 = 6;
-const SRGB_PROFILE: &[u8] = include_bytes!("../../crates/myalbuns-imaging/assets/sRGB2014.icc");
+
+#[cfg(test)]
+thread_local! {
+    static INDEX_IO: std::cell::Cell<(usize, usize)> = const { std::cell::Cell::new((0, 0)) };
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -222,6 +233,7 @@ pub(crate) struct CacheWork {
     pub(crate) namespace: AuthorizedCacheNamespace,
     pub(crate) source: CacheMediaSource,
     pub(crate) root_bindings: RootBindingPlan,
+    planned_index: Option<Arc<CacheIndex>>,
 }
 
 impl CacheWork {
@@ -236,6 +248,7 @@ impl CacheWork {
             namespace,
             source,
             root_bindings,
+            planned_index: None,
         }
     }
 
@@ -313,6 +326,8 @@ pub(crate) const CACHE_PROCESSOR_SUSPENDED_MESSAGE: &str =
 
 #[derive(Debug, Default)]
 pub(crate) struct CacheEngine {
+    unconfirmed_writer: AtomicBool,
+    active_imports: Arc<AtomicUsize>,
     flights: Arc<Mutex<HashMap<CacheFlightKey, Arc<CacheFlight>>>>,
     demands: Mutex<HashMap<String, CacheDemandState>>,
     applied_observation_generations: Mutex<HashMap<(String, String), u64>>,
@@ -581,6 +596,7 @@ impl CacheEngine {
         registry.revoke_all();
     }
 
+    #[cfg(test)]
     pub(crate) async fn execute<T: ImagingTransport>(
         &self,
         transport: &mut T,
@@ -589,7 +605,47 @@ impl CacheEngine {
         context: &InvocationContext,
         cancellation: &CacheCancellation,
     ) -> Result<CacheExecution, CacheFailure> {
-        execute_cache(self, transport, app_paths, work, context, cancellation).await
+        let pending = self
+            .prepare(transport, app_paths, work, context, cancellation)
+            .await?;
+        self.publish_prepared_batch(vec![pending]).remove(0)
+    }
+
+    pub(crate) async fn prepare<T: ImagingTransport>(
+        &self,
+        transport: &mut T,
+        app_paths: &AppPaths,
+        work: CacheWork,
+        context: &InvocationContext,
+        cancellation: &CacheCancellation,
+    ) -> Result<PendingCachePublication, CacheFailure> {
+        prepare_cache(self, transport, app_paths, work, context, cancellation).await
+    }
+
+    pub(crate) async fn invoke_cache_command<T: ImagingTransport>(
+        &self,
+        transport: &mut T,
+        app_paths: &AppPaths,
+        command: &ImagingCommand,
+        context: &InvocationContext,
+        cancellation: &CacheCancellation,
+    ) -> Result<(ImagingResponse, Option<CacheRecovery>), CacheFailure> {
+        let paths = command.cache_paths().ok_or_else(|| {
+            CacheFailure::new(CacheFailureStage::Plan, "O comando não pertence ao Cache.")
+        })?;
+        let storage = app_paths
+            .prepare_cache_storage(paths)
+            .map_err(|error| CacheFailure::new(CacheFailureStage::Plan, error.to_string()))?;
+        invoke_with_recovery(
+            self,
+            transport,
+            app_paths,
+            &storage,
+            command,
+            context,
+            cancellation,
+        )
+        .await
     }
 
     pub(crate) fn reconcile_preview_demand<'a>(
@@ -856,6 +912,7 @@ impl CacheEngine {
         Some(claim)
     }
 
+    #[cfg(test)]
     pub(crate) fn publish_prepared_if_demanded(
         &self,
         app_paths: &AppPaths,
@@ -864,56 +921,100 @@ impl CacheEngine {
         demand: &CacheDemandRevision,
         source: &CacheMediaSource,
     ) -> Option<MediaPreview> {
+        let mut roots = myalbuns_paths::OperationPathContext::new();
+        let _ = roots.capture(namespace.paths().root());
+        let _ = roots.capture(source.source_path());
+        let work = CacheWork::new(
+            "prepared-handoff",
+            namespace.clone(),
+            source.clone(),
+            roots.freeze(),
+        );
+        self.publish_prepared_for_demand(app_paths, namespace, registry, demand, &[work])
+            .remove(source.media_id())
+    }
+
+    pub(crate) fn publish_prepared_for_demand(
+        &self,
+        app_paths: &AppPaths,
+        namespace: &AuthorizedCacheNamespace,
+        registry: &CachePreviewRegistry,
+        demand: &CacheDemandRevision,
+        works: &[CacheWork],
+    ) -> HashMap<String, MediaPreview> {
+        let mut previews = HashMap::new();
         let _transition_guard = self
             .transition_and_publication_gate
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         if demand.project_id != namespace.project_id() || !self.demand_is_current(demand) {
-            return None;
+            return previews;
         }
-        if !self
+        let demanded = self
             .demands
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .get(namespace.project_id())?
+            .get(namespace.project_id())
+            .expect("the demand was checked under the transition gate")
             .media_ids
-            .contains(source.media_id())
-        {
-            return None;
-        }
+            .clone();
         // Only the first demand consumes this small receipt. Offscreen preparation
         // retains metadata, never encoded previews or decoded Originals.
-        let prepared = self
+        let mut prepared = self
             .prepared
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .remove(&(
-                namespace.project_id().to_owned(),
-                source.media_id().to_owned(),
-            ))?;
-        if !prepared.source.same_source(&observe_cache_source(source)) {
-            return None;
-        }
-        let storage = app_paths.prepare_cache_storage(namespace.paths()).ok()?;
-        let metadata = load_metadata(&storage, namespace.paths())?;
-        if !metadata_is_current(&metadata, namespace.project_id(), namespace.paths())
-            || !metadata.entries.iter().any(|entry| {
-                entry.media_id == source.media_id()
-                    && entry.matches_source_path(source.source_path())
-                    && entry.artifact() == prepared.artifact
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let receipts = works
+            .iter()
+            .filter(|work| {
+                work.namespace.project_id() == namespace.project_id()
+                    && demanded.contains(work.source.media_id())
             })
-        {
-            return None;
+            .filter_map(|work| {
+                prepared
+                    .remove(&(
+                        namespace.project_id().to_owned(),
+                        work.source.media_id().to_owned(),
+                    ))
+                    .map(|receipt| (work, receipt))
+            })
+            .collect::<Vec<_>>();
+        drop(prepared);
+        if receipts.is_empty() {
+            return previews;
         }
-        registry
-            .publish_verified(
+        let Some(index) = app_paths
+            .prepare_cache_storage(namespace.paths())
+            .ok()
+            .and_then(|storage| {
+                CacheIndex::read(&storage, namespace.paths(), namespace.project_id())
+            })
+        else {
+            return previews;
+        };
+        for (work, prepared) in receipts {
+            let source = &work.source;
+            let current =
+                MediaResolver.observe_in_plan(&work.root_bindings, &cache_source_binding(source));
+            if !prepared.source.same_source(&current)
+                || !index.entry(source.media_id()).is_some_and(|entry| {
+                    entry.matches_source_path(source.source_path())
+                        && entry.artifact() == prepared.artifact
+                })
+            {
+                continue;
+            }
+            if let Ok(preview) = registry.publish_verified(
                 app_paths,
                 namespace,
                 &prepared.artifact,
                 source.source_path(),
                 &prepared.preview_sha256,
-            )
-            .ok()
+            ) {
+                previews.insert(source.media_id().to_owned(), preview);
+            }
+        }
+        previews
     }
 
     pub(crate) fn claim_for_processing(&self, work: &CacheWork) -> CacheFlightClaim {
@@ -1243,6 +1344,8 @@ impl CacheEngine {
 
     fn can_sweep_after_publication(&self) -> bool {
         self.active_owners.load(Ordering::Acquire) <= 1
+            && self.active_imports.load(Ordering::Acquire) == 0
+            && !self.unconfirmed_writer.load(Ordering::Acquire)
     }
 }
 
@@ -1316,14 +1419,14 @@ impl CacheFlightWaiter {
     }
 }
 
-async fn execute_cache<T: ImagingTransport>(
+async fn prepare_cache<T: ImagingTransport>(
     engine: &CacheEngine,
     transport: &mut T,
     app_paths: &AppPaths,
     work: CacheWork,
     context: &InvocationContext,
     cancellation: &CacheCancellation,
-) -> Result<CacheExecution, CacheFailure> {
+) -> Result<PendingCachePublication, CacheFailure> {
     if engine.processor_status() == CacheProcessorStatus::Suspended {
         return Err(CacheFailure::new(
             CacheFailureStage::ProcessorSuspended,
@@ -1358,7 +1461,7 @@ async fn execute_cache<T: ImagingTransport>(
         transport,
         app_paths,
         &storage,
-        &request,
+        &ImagingCommand::build_cache(request.clone()),
         context,
         cancellation,
     )
@@ -1398,61 +1501,19 @@ async fn execute_cache<T: ImagingTransport>(
         discard_candidate_generation(&storage, &request)?;
         return Err(cancelled_before_publication());
     }
-    let _transition_and_publication_guard = engine
-        .transition_and_publication_gate
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
-    if cancellation
-        .flag()
-        .load(std::sync::atomic::Ordering::Acquire)
-    {
-        discard_candidate_generation(&storage, &request)?;
-        return Err(cancelled_before_publication());
-    }
-    let metadata = publish_cache_metadata(&storage, &request, &completion.artifacts[0])?;
-    if engine.can_sweep_after_publication() {
-        sweep_unreferenced_generations(&storage, &request.cache_paths, &metadata)?;
-    }
-    let required_by_processing = engine
-        .flights
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .get(&work.flight_key())
-        .is_some_and(|flight| flight.required_by_processing.load(Ordering::Acquire));
-    if required_by_processing {
-        let current = MediaResolver.observe_in_plan(&work.root_bindings, &source_binding);
-        let artifact = &completion.artifacts[0];
-        if observed_source.same_source(&current)
-            && current.matches_fingerprint(&artifact.fingerprint)
-        {
-            engine
-                .prepared
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .insert(
-                    (
-                        work.namespace.project_id().to_owned(),
-                        work.source.media_id().to_owned(),
-                    ),
-                    PreparedCacheGeneration {
-                        source: current,
-                        artifact: artifact.clone(),
-                        preview_sha256,
-                    },
-                );
-        }
-    }
-    Ok(CacheExecution {
-        completion,
-        recovery,
+    Ok(PendingCachePublication {
+        storage,
+        request,
+        work,
+        execution: CacheExecution {
+            completion,
+            recovery,
+        },
+        observed_source,
+        preview_sha256,
+        cancellation: cancellation.clone(),
+        published: false,
     })
-}
-
-fn observe_cache_source(source: &CacheMediaSource) -> MediaObservation {
-    MediaResolver
-        .observe(0, &[cache_source_binding(source)])
-        .observations()[0]
-        .clone()
 }
 
 fn cache_source_binding(source: &CacheMediaSource) -> MediaBinding {
@@ -1495,29 +1556,24 @@ fn discard_candidate_generation(
 }
 
 fn plan_request(app_paths: &AppPaths, work: &CacheWork) -> Result<CacheRequest, CacheFailure> {
-    let storage = app_paths
-        .prepare_cache_storage(work.namespace.paths())
-        .map_err(|error| {
-            CacheFailure::new(
-                CacheFailureStage::Plan,
-                format!("Não foi possível ler o índice do Cache: {error}"),
-            )
-        })?;
-    let reusable = load_metadata(&storage, work.namespace.paths())
-        .filter(|metadata| {
-            metadata_is_current(
-                metadata,
-                work.namespace.project_id(),
-                work.namespace.paths(),
-            )
-        })
-        .and_then(|metadata| {
-            metadata.entries.into_iter().find(|entry| {
-                entry.media_id == work.source.media_id()
-                    && entry.matches_source_path(work.source.source_path())
-            })
-        })
-        .and_then(|entry| entry.reusable().ok());
+    let reusable = if let Some(index) = &work.planned_index {
+        index.reusable(&work.source)
+    } else {
+        let storage = app_paths
+            .prepare_cache_storage(work.namespace.paths())
+            .map_err(|error| {
+                CacheFailure::new(
+                    CacheFailureStage::Plan,
+                    format!("Não foi possível ler o índice do Cache: {error}"),
+                )
+            })?;
+        CacheIndex::read(
+            &storage,
+            work.namespace.paths(),
+            work.namespace.project_id(),
+        )
+        .and_then(|index| index.reusable(&work.source))
+    };
     let candidate_generation_id = format!("g-{}", uuid::Uuid::new_v4().simple());
     let job =
         CacheJob::new(work.source.clone(), candidate_generation_id, reusable).map_err(|error| {
@@ -1547,11 +1603,13 @@ async fn invoke_with_recovery<T: ImagingTransport>(
     transport: &mut T,
     app_paths: &AppPaths,
     storage: &PreparedCacheStorage,
-    request: &CacheRequest,
+    command: &ImagingCommand,
     context: &InvocationContext,
     cancellation: &CacheCancellation,
 ) -> Result<(ImagingResponse, Option<CacheRecovery>), CacheFailure> {
-    let command = ImagingCommand::build_cache(request.clone());
+    let cache_paths = command.cache_paths().ok_or_else(|| {
+        CacheFailure::new(CacheFailureStage::Plan, "O comando não pertence ao Cache.")
+    })?;
     let mut attempt = 1_u8;
     let mut recovery = None;
     let progress = |_| {};
@@ -1564,7 +1622,7 @@ async fn invoke_with_recovery<T: ImagingTransport>(
         }
         match transport
             .invoke(
-                &command,
+                command,
                 context,
                 ImagingOperation::Cache,
                 attempt,
@@ -1586,10 +1644,17 @@ async fn invoke_with_recovery<T: ImagingTransport>(
                 }
                 return Ok((response, recovery));
             }
+            Err(failure) if failure.is_termination_unconfirmed() => {
+                // Neither candidates nor unrelated generations can be collected
+                // while an exact writer may still mutate the namespace.
+                engine.unconfirmed_writer.store(true, Ordering::Release);
+                engine.suspend_processor();
+                return Err(cache_processor_failure(failure));
+            }
             Err(failure) if failure.is_cancelled() => {
                 if let Some(process_id) = failure.process_id {
                     app_paths
-                        .discard_project_cache_temporaries(&request.cache_paths, process_id)
+                        .discard_project_cache_temporaries(cache_paths, process_id)
                         .map_err(|error| CacheFailure {
                             stage: CacheFailureStage::RecoveryCleanup,
                             exit_code: failure.exit_code,
@@ -1598,7 +1663,7 @@ async fn invoke_with_recovery<T: ImagingTransport>(
                             ),
                         })?;
                 }
-                discard_candidate_generation(storage, request)?;
+                discard_command_candidates(storage, command)?;
                 return Err(cache_processor_failure(failure));
             }
             Err(failure) if failure.is_unexpected_termination() => {
@@ -1607,11 +1672,11 @@ async fn invoke_with_recovery<T: ImagingTransport>(
                     engine.suspend_processor();
                 }
                 let Some(failed_process_id) = failure.process_id else {
-                    discard_candidate_generation(storage, request)?;
+                    discard_command_candidates(storage, command)?;
                     return Err(cache_processor_failure(failure));
                 };
                 let removed_temporary_count = app_paths
-                    .discard_project_cache_temporaries(&request.cache_paths, failed_process_id)
+                    .discard_project_cache_temporaries(cache_paths, failed_process_id)
                     .map_err(|error| CacheFailure {
                         stage: CacheFailureStage::RecoveryCleanup,
                         exit_code: failure.exit_code,
@@ -1619,7 +1684,7 @@ async fn invoke_with_recovery<T: ImagingTransport>(
                             "Não foi possível descartar o item incompleto do Cache: {error}"
                         ),
                     })?;
-                discard_candidate_generation(storage, request)?;
+                discard_command_candidates(storage, command)?;
                 if cancellation
                     .flag()
                     .load(std::sync::atomic::Ordering::Acquire)
@@ -1637,7 +1702,7 @@ async fn invoke_with_recovery<T: ImagingTransport>(
                 }
             }
             Err(failure) => {
-                discard_candidate_generation(storage, request)?;
+                discard_command_candidates(storage, command)?;
                 return Err(cache_processor_failure(failure));
             }
         }
@@ -1646,6 +1711,42 @@ async fn invoke_with_recovery<T: ImagingTransport>(
 
 fn cache_processor_failure(failure: InvocationFailure) -> CacheFailure {
     CacheFailure::from_invocation(failure, CacheFailureStage::Processor)
+}
+
+fn discard_command_candidates(
+    storage: &PreparedCacheStorage,
+    command: &ImagingCommand,
+) -> Result<usize, CacheFailure> {
+    match command {
+        ImagingCommand::BuildCache(request) => discard_candidate_generation(storage, request),
+        ImagingCommand::PreparePhotoImport(request) => {
+            let mut removed = 0;
+            for candidate in &request.candidates {
+                for format in [CacheArtifactFormat::Jpeg, CacheArtifactFormat::Png] {
+                    let path = request
+                        .cache_paths
+                        .import_preview_file(
+                            &request.attempt_id,
+                            candidate.source_id.as_str(),
+                            &candidate.generation_id,
+                            format,
+                        )
+                        .map_err(|error| {
+                            CacheFailure::new(CacheFailureStage::RecoveryCleanup, error.to_string())
+                        })?;
+                    removed +=
+                        usize::from(storage.remove_existing_file(&path).map_err(|error| {
+                            CacheFailure::new(CacheFailureStage::RecoveryCleanup, error.to_string())
+                        })?);
+                }
+            }
+            Ok(removed)
+        }
+        _ => Err(CacheFailure::new(
+            CacheFailureStage::Plan,
+            "O comando não pertence ao Cache.",
+        )),
+    }
 }
 
 fn verify_completion(
@@ -1752,29 +1853,16 @@ fn verify_cached_artifact(
     {
         return Err(invalid_artifact("a prévia mudou durante a leitura".into()));
     }
-    let reader = ImageReader::new(std::io::Cursor::new(&payload.body))
-        .with_guessed_format()
-        .map_err(|error| invalid_artifact(error.to_string()))?;
-    if reader.format() != Some(image_format(artifact.format)) {
-        return Err(invalid_artifact(
-            "o formato detectado não corresponde ao índice".into(),
-        ));
-    }
-    let mut decoder = reader
-        .into_decoder()
-        .map_err(|error| invalid_artifact(error.to_string()))?;
-    if decoder.dimensions() != (artifact.width_px, artifact.height_px)
-        || decoder
-            .icc_profile()
-            .map_err(|error| invalid_artifact(error.to_string()))?
-            .as_deref()
-            != Some(SRGB_PROFILE)
-    {
-        return Err(invalid_artifact(
-            "dimensões ou perfil sRGB não correspondem à resposta".into(),
-        ));
-    }
-    DynamicImage::from_decoder(decoder).map_err(|error| invalid_artifact(error.to_string()))?;
+    validate_cache_preview(
+        std::io::Cursor::new(&payload.body),
+        CachePreviewSpec {
+            format: artifact.format,
+            width_px: artifact.width_px,
+            height_px: artifact.height_px,
+            bytes: artifact.preview_bytes,
+        },
+    )
+    .map_err(invalid_artifact)?;
     Ok(Sha256::digest(&payload.body).into())
 }
 
@@ -1785,13 +1873,12 @@ fn invalid_artifact(message: String) -> CacheFailure {
     )
 }
 
-fn publish_cache_metadata(
-    storage: &PreparedCacheStorage,
-    request: &CacheRequest,
+fn cache_metadata_entry(
+    cache_paths: &CachePathPlan,
+    source: &CacheMediaSource,
     artifact: &CacheArtifact,
-) -> Result<CacheMetadata, CacheFailure> {
-    let artifact_path = request
-        .cache_paths
+) -> Result<CacheMetadataEntry, CacheFailure> {
+    let artifact_path = cache_paths
         .preview_file(&artifact.media_id, &artifact.generation_id, artifact.format)
         .map_err(|error| {
             CacheFailure::new(
@@ -1809,27 +1896,9 @@ fn publish_cache_metadata(
             )
         })?
         .to_owned();
-    let mut entries = load_metadata(storage, &request.cache_paths)
-        .filter(|metadata| metadata_is_current(metadata, &request.project_id, &request.cache_paths))
-        .map(|metadata| metadata.entries)
-        .unwrap_or_default();
-    let superseded_artifact = entries
-        .iter()
-        .find(|entry| entry.media_id == artifact.media_id)
-        .filter(|entry| {
-            entry.generation_id != artifact.generation_id || entry.format != artifact.format
-        })
-        .and_then(|entry| {
-            request
-                .cache_paths
-                .preview_file(&entry.media_id, &entry.generation_id, entry.format)
-                .ok()
-        });
-    entries.retain(|entry| entry.media_id != artifact.media_id);
-    entries.push(CacheMetadataEntry {
+    Ok(CacheMetadataEntry {
         media_id: artifact.media_id.clone(),
-        source_binding_sha256: CacheSourceBinding::for_path(request.jobs[0].source.source_path())
-            .sha256,
+        source_binding_sha256: CacheSourceBinding::for_path(source.source_path()).sha256,
         generation_id: artifact.generation_id.clone(),
         artifact_name,
         width_px: artifact.width_px,
@@ -1840,21 +1909,7 @@ fn publish_cache_metadata(
         source_page_count: artifact.source_page_count,
         basic_color_profile: artifact.basic_color_profile,
         fingerprint: artifact.fingerprint.clone(),
-    });
-    let metadata = current_metadata(&request.project_id, entries)?;
-    publish_metadata(storage, &request.cache_paths, &metadata)?;
-    if let Some(superseded_artifact) = superseded_artifact
-        && let Err(error) = storage.remove_existing_file(&superseded_artifact)
-    {
-        tracing::warn!(
-            target: "myalbuns.desktop",
-            media_id = artifact.media_id.as_str(),
-            generation_id = artifact.generation_id.as_str(),
-            error = %error,
-            event = "cache_superseded_generation_cleanup_failed",
-        );
-    }
-    Ok(metadata)
+    })
 }
 
 fn current_metadata(
@@ -1883,6 +1938,8 @@ fn publish_metadata(
     cache_paths: &CachePathPlan,
     metadata: &CacheMetadata,
 ) -> Result<(), CacheFailure> {
+    #[cfg(test)]
+    INDEX_IO.set((INDEX_IO.get().0, INDEX_IO.get().1 + 1));
     let metadata_path = cache_paths.metadata_file();
     let temporary_path = cache_paths.metadata_temporary_file(std::process::id());
     let metadata_bytes = serde_json::to_vec_pretty(metadata).map_err(|error| {
@@ -1960,10 +2017,12 @@ fn load_metadata(
     storage: &PreparedCacheStorage,
     cache_paths: &CachePathPlan,
 ) -> Option<CacheMetadata> {
+    #[cfg(test)]
+    INDEX_IO.set((INDEX_IO.get().0 + 1, INDEX_IO.get().1));
     let file = storage
         .open_existing_file(&cache_paths.metadata_file())
         .ok()??;
-    serde_json::from_reader(file).ok()
+    serde_json::from_reader(BufReader::new(file)).ok()
 }
 
 fn metadata_is_current(
@@ -1994,13 +2053,6 @@ fn metadata_is_current(
                 .as_deref()
                 == Some(entry.artifact_name.as_str())
     })
-}
-
-const fn image_format(format: CacheArtifactFormat) -> ImageFormat {
-    match format {
-        CacheArtifactFormat::Jpeg => ImageFormat::Jpeg,
-        CacheArtifactFormat::Png => ImageFormat::Png,
-    }
 }
 
 fn unix_millis(time: SystemTime) -> Option<u64> {
@@ -2065,6 +2117,7 @@ mod tests {
         CrashAndObsolete(u32, CacheCancellation),
         Cancel(u32),
         Deterministic(u32),
+        Unconfirmed(u32),
     }
 
     struct ScriptedTransport {
@@ -2093,6 +2146,14 @@ mod tests {
                 });
             }
             let result = match script {
+                Script::Unconfirmed(process_id) => {
+                    let _ = complete(command, &self.app_paths, CacheArtifactFormat::Jpeg);
+                    write_partial(command, &self.app_paths, process_id);
+                    Err(InvocationFailure::termination_unconfirmed(
+                        process_id,
+                        "the exact writer may still be alive",
+                    ))
+                }
                 Script::Complete(format) => complete(command, &self.app_paths, format),
                 Script::CompleteTogether(_) => {
                     unreachable!("the concurrent completion returned above")
@@ -2259,6 +2320,307 @@ mod tests {
             work: CacheWork::new("cache-test", namespace, source, operation_context.freeze()),
             context: InvocationContext::new("cache-test", Some(project_id)),
         }
+    }
+
+    #[test]
+    fn a_processing_batch_commits_once_before_waking_waiters_and_hands_off_together() {
+        tauri::async_runtime::block_on(async {
+            let fixture = fixture();
+            let engine = CacheEngine::default();
+            let sources = (0..3).map(|id| {
+                CacheMediaSource::new(
+                    format!("photo-{id}"),
+                    MediaKind::Photo,
+                    fixture.work.source.source_path().to_path_buf(),
+                )
+                .unwrap()
+            });
+            super::INDEX_IO.set((0, 0));
+            let works = engine
+                .plan_works(
+                    &fixture.app_paths,
+                    &fixture.work.namespace,
+                    &fixture.work.root_bindings,
+                    sources,
+                )
+                .unwrap();
+            let mut owners = Vec::new();
+            let mut pending = Vec::new();
+            for work in &works {
+                let CacheFlightClaim::Owner(owner) = engine.claim_for_processing(work) else {
+                    panic!("new owner")
+                };
+                let mut transport = ScriptedTransport {
+                    app_paths: fixture.app_paths.clone(),
+                    scripts: VecDeque::from([Script::Complete(CacheArtifactFormat::Jpeg)]),
+                    attempts: Vec::new(),
+                };
+                pending.push(
+                    engine
+                        .prepare(
+                            &mut transport,
+                            &fixture.app_paths,
+                            work.clone(),
+                            &InvocationContext::new(
+                                &work.request_id,
+                                Some(work.namespace.project_id()),
+                            ),
+                            &owner.cancellation(),
+                        )
+                        .await
+                        .unwrap(),
+                );
+                owners.push(owner);
+            }
+            let CacheFlightClaim::Waiter(waiter) = engine.claim_for_processing(&works[0]) else {
+                panic!("same flight")
+            };
+            let mut waiting = std::pin::pin!(waiter.wait());
+            assert!(
+                std::future::Future::poll(
+                    waiting.as_mut(),
+                    &mut std::task::Context::from_waker(std::task::Waker::noop())
+                )
+                .is_pending()
+            );
+            assert_eq!(super::INDEX_IO.get(), (1, 0));
+            assert!(!fixture.work.namespace.paths().metadata_file().exists());
+            let results = engine.publish_prepared_batch(pending);
+            assert_eq!(super::INDEX_IO.get(), (2, 1));
+            for (owner, result) in owners.into_iter().zip(results) {
+                owner.complete(result).unwrap();
+            }
+            assert!(waiting.await.is_ok());
+            let registry = CachePreviewRegistry::new("project");
+            let demand = engine.reconcile_preview_demand(
+                &registry,
+                fixture.work.namespace.project_id(),
+                1,
+                works.iter().map(|work| work.source.media_id()),
+            );
+            let previews = engine.publish_prepared_for_demand(
+                &fixture.app_paths,
+                &fixture.work.namespace,
+                &registry,
+                &demand,
+                &works,
+            );
+            assert_eq!(previews.len(), 3);
+            assert_eq!(super::INDEX_IO.get(), (3, 1));
+        });
+    }
+
+    #[test]
+    fn batch_publication_reloads_the_index_and_rejects_changed_or_tampered_candidates() {
+        tauri::async_runtime::block_on(async {
+            let fixture = fixture();
+            let engine = CacheEngine::default();
+            let old = verified_preview_artifact_for_work(
+                &fixture,
+                &engine,
+                &fixture.work,
+                &fixture.context,
+            )
+            .await;
+            let sources = (0..3)
+                .map(|id| {
+                    let path = fixture._root.path().join(format!("batch-{id}.jpg"));
+                    std::fs::write(&path, format!("original-{id}")).unwrap();
+                    CacheMediaSource::new(format!("batch-{id}"), MediaKind::Photo, path).unwrap()
+                })
+                .collect::<Vec<_>>();
+            let works = engine
+                .plan_works(
+                    &fixture.app_paths,
+                    &fixture.work.namespace,
+                    &fixture.work.root_bindings,
+                    sources,
+                )
+                .unwrap();
+            let mut pending = Vec::new();
+            let mut owners = Vec::new();
+            for work in &works {
+                let CacheFlightClaim::Owner(owner) = engine.claim_for_processing(work) else {
+                    panic!("new owner")
+                };
+                let mut transport = ScriptedTransport {
+                    app_paths: fixture.app_paths.clone(),
+                    scripts: VecDeque::from([Script::Complete(CacheArtifactFormat::Jpeg)]),
+                    attempts: Vec::new(),
+                };
+                pending.push(
+                    engine
+                        .prepare(
+                            &mut transport,
+                            &fixture.app_paths,
+                            work.clone(),
+                            &InvocationContext::new(
+                                &work.request_id,
+                                Some(work.namespace.project_id()),
+                            ),
+                            &owner.cancellation(),
+                        )
+                        .await
+                        .unwrap(),
+                );
+                owners.push(owner);
+            }
+            let candidate_paths = pending
+                .iter()
+                .map(|item| {
+                    let artifact = item.execution.artifact();
+                    fixture
+                        .work
+                        .namespace
+                        .paths()
+                        .preview_file(&artifact.media_id, &artifact.generation_id, artifact.format)
+                        .unwrap()
+                })
+                .collect::<Vec<_>>();
+            std::fs::write(works[1].source.source_path(), b"changed-original").unwrap();
+            let mut bytes = std::fs::read(&candidate_paths[2]).unwrap();
+            bytes[0] ^= 1;
+            std::fs::write(&candidate_paths[2], bytes).unwrap();
+            // Same-sized external corruption cannot authorize the old entry via
+            // the planning snapshot retained by each work item.
+            let metadata_path = fixture.work.namespace.paths().metadata_file();
+            let original_index = std::fs::read(&metadata_path).unwrap();
+            std::fs::write(&metadata_path, vec![b'x'; original_index.len()]).unwrap();
+            let results = engine.publish_prepared_batch(pending);
+            assert!(results[0].is_ok());
+            assert!(results[1..].iter().all(Result::is_err));
+            for (owner, result) in owners.into_iter().zip(results) {
+                let _ = owner.complete(result);
+            }
+            let metadata: super::CacheMetadata =
+                serde_json::from_slice(&std::fs::read(metadata_path).unwrap()).unwrap();
+            assert_eq!(metadata.entries.len(), 1);
+            assert_eq!(metadata.entries[0].media_id, "batch-0");
+            assert!(candidate_paths[0].is_file());
+            assert!(candidate_paths[1..].iter().all(|path| !path.exists()));
+            assert!(
+                fixture
+                    .work
+                    .namespace
+                    .paths()
+                    .preview_file(&old.media_id, &old.generation_id, old.format)
+                    .unwrap()
+                    .is_file()
+            );
+        });
+    }
+
+    #[test]
+    fn an_unconfirmed_writer_keeps_candidates_and_blocks_every_sweep() {
+        tauri::async_runtime::block_on(async {
+            let fixture = fixture();
+            let engine = CacheEngine::default();
+            let mut transport = ScriptedTransport {
+                app_paths: fixture.app_paths.clone(),
+                scripts: VecDeque::from([Script::Unconfirmed(42)]),
+                attempts: Vec::new(),
+            };
+            let failure = engine
+                .execute(
+                    &mut transport,
+                    &fixture.app_paths,
+                    fixture.work.clone(),
+                    &fixture.context,
+                    &CacheCancellation::default(),
+                )
+                .await
+                .unwrap_err();
+            assert_eq!(
+                failure.stage,
+                CacheFailureStage::Processor(super::InvocationFailureStage::TerminationUnconfirmed)
+            );
+            assert!(!engine.can_sweep_after_publication());
+            assert_eq!(transport.attempts, [1]);
+            assert!(!fixture.work.namespace.paths().metadata_file().exists());
+            assert!(
+                std::fs::read_dir(fixture.work.namespace.paths().media_directory())
+                    .unwrap()
+                    .count()
+                    >= 2
+            );
+        });
+    }
+
+    #[test]
+    fn abandoned_or_failed_batch_publication_discards_only_its_candidates() {
+        tauri::async_runtime::block_on(async {
+            for fail_index in [false, true] {
+                let fixture = fixture();
+                let engine = CacheEngine::default();
+                let old = verified_preview_artifact_for_work(
+                    &fixture,
+                    &engine,
+                    &fixture.work,
+                    &fixture.context,
+                )
+                .await;
+                let mut work = fixture.work.clone();
+                work.source = CacheMediaSource::new(
+                    "new-photo",
+                    MediaKind::Photo,
+                    work.source.source_path().to_path_buf(),
+                )
+                .unwrap();
+                let CacheFlightClaim::Owner(owner) = engine.claim_for_processing(&work) else {
+                    panic!("new owner")
+                };
+                let mut transport = ScriptedTransport {
+                    app_paths: fixture.app_paths.clone(),
+                    scripts: VecDeque::from([Script::Complete(CacheArtifactFormat::Jpeg)]),
+                    attempts: Vec::new(),
+                };
+                let pending = engine
+                    .prepare(
+                        &mut transport,
+                        &fixture.app_paths,
+                        work,
+                        &fixture.context,
+                        &owner.cancellation(),
+                    )
+                    .await
+                    .unwrap();
+                let candidate = pending.execution.artifact();
+                let candidate_path = fixture
+                    .work
+                    .namespace
+                    .paths()
+                    .preview_file(
+                        &candidate.media_id,
+                        &candidate.generation_id,
+                        candidate.format,
+                    )
+                    .unwrap();
+                if fail_index {
+                    let metadata_path = fixture.work.namespace.paths().metadata_file();
+                    std::fs::remove_file(&metadata_path).unwrap();
+                    std::fs::create_dir(&metadata_path).unwrap();
+                    let failure = engine
+                        .publish_prepared_batch(vec![pending])
+                        .remove(0)
+                        .unwrap_err();
+                    assert_eq!(failure.stage, CacheFailureStage::PublishIndex);
+                    assert!(owner.complete(Err(failure)).is_err());
+                } else {
+                    drop(pending);
+                    drop(owner);
+                }
+                assert!(!candidate_path.exists());
+                assert!(
+                    fixture
+                        .work
+                        .namespace
+                        .paths()
+                        .preview_file(&old.media_id, &old.generation_id, old.format)
+                        .unwrap()
+                        .is_file()
+                );
+            }
+        });
     }
 
     #[test]
@@ -4985,5 +5347,192 @@ mod tests {
             );
             assert_eq!(transport.attempts, [1]);
         });
+    }
+
+    fn staged_import(
+        fixture: &Fixture,
+        engine: &CacheEngine,
+    ) -> (
+        super::CacheImportStage,
+        myalbuns_imaging_protocol::PhotoImportCandidate,
+        std::path::PathBuf,
+        crate::media_runtime::MediaBinding,
+    ) {
+        let request = super::plan_request(&fixture.app_paths, &fixture.work).unwrap();
+        let response = complete(
+            &ImagingCommand::BuildCache(request),
+            &fixture.app_paths,
+            CacheArtifactFormat::Jpeg,
+        )
+        .unwrap();
+        let ImagingResponse::CacheCompleted { completion, .. } = response else {
+            panic!("Cache fixture")
+        };
+        let artifact = &completion.artifacts[0];
+        let generation = myalbuns_imaging_protocol::CacheReusableGeneration::new(
+            &artifact.generation_id,
+            myalbuns_imaging_protocol::CacheArtifactProperties::new(
+                artifact.format,
+                artifact.width_px,
+                artifact.height_px,
+                artifact.preview_bytes,
+                artifact.exif_orientation,
+                artifact.source_page_count,
+                artifact.basic_color_profile,
+            ),
+            artifact.fingerprint.clone(),
+        )
+        .unwrap();
+        let candidate = myalbuns_imaging_protocol::PhotoImportCandidate {
+            source_id: myalbuns_imaging_protocol::PhotoImportSourceId::new("selected-source")
+                .unwrap(),
+            source_path: fixture.work.source.source_path().to_path_buf().into(),
+            generation_id: artifact.generation_id.clone(),
+        };
+        let mut stage = engine
+            .begin_import_stage(
+                &fixture.app_paths,
+                fixture.work.namespace.clone(),
+                "attempt-test".into(),
+                std::slice::from_ref(&candidate),
+            )
+            .unwrap();
+        let paths = fixture.work.namespace.paths();
+        let original = paths
+            .preview_file(&artifact.media_id, &artifact.generation_id, artifact.format)
+            .unwrap();
+        let path = paths
+            .import_preview_file(
+                "attempt-test",
+                candidate.source_id.as_str(),
+                &candidate.generation_id,
+                artifact.format,
+            )
+            .unwrap();
+        let storage = fixture.app_paths.prepare_cache_storage(paths).unwrap();
+        storage.relocate_generation(&original, &path).unwrap();
+        let binding = crate::media_runtime::MediaBinding {
+            media_id: "core-photo".into(),
+            kind: MediaKind::Photo,
+            logical_path: candidate.path().to_path_buf(),
+        };
+        let observation = crate::media_runtime::MediaResolver
+            .observe_in_plan(&fixture.work.root_bindings, &binding);
+        stage
+            .record(candidate.clone(), observation, generation)
+            .unwrap();
+        assert!(
+            !paths.metadata_file().exists(),
+            "candidate preparation cannot create an index entry"
+        );
+        (stage, candidate, path, binding)
+    }
+
+    #[test]
+    fn import_stage_publishes_for_the_core_binding_and_blocks_delayed_monitor_invalidation() {
+        let fixture = fixture();
+        let engine = CacheEngine::default();
+        let (mut stage, candidate, candidate_path, binding) = staged_import(&fixture, &engine);
+        assert!(!engine.can_sweep_after_publication());
+        assert!(
+            engine
+                .publish_import_stage(
+                    &mut stage,
+                    std::slice::from_ref(&binding),
+                    &fixture.work.root_bindings,
+                    7
+                )
+                .is_empty()
+        );
+        assert!(!candidate_path.exists());
+        let final_path = fixture
+            .work
+            .namespace
+            .paths()
+            .preview_file(
+                &binding.media_id,
+                &candidate.generation_id,
+                CacheArtifactFormat::Jpeg,
+            )
+            .unwrap();
+        assert!(final_path.is_file());
+        let storage = fixture
+            .app_paths
+            .prepare_cache_storage(fixture.work.namespace.paths())
+            .unwrap();
+        let metadata = super::load_metadata(&storage, fixture.work.namespace.paths()).unwrap();
+        assert_eq!(metadata.entries.len(), 1);
+        assert_eq!(metadata.entries[0].media_id, binding.media_id);
+        engine.apply_monitor_media_update(
+            &fixture.work.namespace,
+            &CachePreviewRegistry::new("project"),
+            &MediaRuntimeUpdate::for_test(
+                6,
+                vec![binding.media_id.clone()],
+                vec![binding.media_id.clone()],
+            ),
+        );
+        assert!(engine.prepared.lock().unwrap().contains_key(&(
+            fixture.work.namespace.project_id().to_owned(),
+            binding.media_id
+        )));
+        drop(stage);
+        assert!(engine.can_sweep_after_publication());
+        assert!(final_path.is_file());
+    }
+
+    #[test]
+    fn import_stage_discards_tampered_changed_unbound_and_unindexed_generations() {
+        for failure in [
+            "tampered",
+            "source-changed",
+            "unbound",
+            "index-blocked",
+            "abandoned",
+        ] {
+            let fixture = fixture();
+            let engine = CacheEngine::default();
+            let (mut stage, candidate, candidate_path, binding) = staged_import(&fixture, &engine);
+            let paths = fixture.work.namespace.paths();
+            let final_path = paths
+                .preview_file(
+                    &binding.media_id,
+                    &candidate.generation_id,
+                    CacheArtifactFormat::Jpeg,
+                )
+                .unwrap();
+            match failure {
+                "tampered" => {
+                    let mut bytes = std::fs::read(&candidate_path).unwrap();
+                    bytes[10] ^= 1;
+                    std::fs::write(&candidate_path, bytes).unwrap();
+                }
+                "source-changed" => {
+                    std::fs::write(candidate.path(), b"new Original bytes").unwrap()
+                }
+                "index-blocked" => std::fs::create_dir(paths.metadata_file()).unwrap(),
+                _ => {}
+            }
+            if failure != "abandoned" {
+                let bindings = if failure == "unbound" {
+                    vec![]
+                } else {
+                    vec![binding]
+                };
+                let problems = engine.publish_import_stage(
+                    &mut stage,
+                    &bindings,
+                    &fixture.work.root_bindings,
+                    1,
+                );
+                assert_eq!(problems.len(), 1, "{failure}");
+            }
+            drop(stage);
+            assert!(!candidate_path.exists(), "{failure}");
+            assert!(!final_path.exists(), "{failure}");
+            assert!(!paths.metadata_file().is_file(), "{failure}");
+            assert!(engine.prepared.lock().unwrap().is_empty());
+            assert!(candidate.path().is_file());
+        }
     }
 }

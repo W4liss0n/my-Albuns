@@ -5,19 +5,19 @@ use crate::{
     cache_activity_gate::{CacheCancellation, CacheCancellationReason},
     cache_engine::{
         self, CacheEngine, CacheFailure, CacheFailureStage, CacheFlightClaim, CacheWork,
+        PendingCachePublication,
     },
     cache_service::ActiveCacheNamespace,
     imaging_processor::{
-        IMAGE_PROCESSING_CONCURRENCY, ImagingProcessor, InvocationContext, InvocationFailureStage,
-        TauriImagingTransport,
+        ImageMemoryEstimate, ImagingProcessor, InvocationContext, InvocationFailureStage,
+        ProcessorAdmissionFailure, TauriImagingTransport,
     },
     logging::LoggingState,
     media_runtime::MediaBinding,
-    path_io,
     project_host::ProjectHost,
 };
 use myalbuns_imaging_protocol::CacheMediaSource;
-use myalbuns_paths::AppPaths;
+use myalbuns_paths::{AppPaths, OperationPathContext, RootBindingPlan};
 
 /// Before a Project identity exists, a selected decorative keeps its validated
 /// encoded preview only for the lifetime of the provisional selection.
@@ -77,7 +77,6 @@ pub(crate) struct ImageProcessingBatch<F: FnMut(crate::ipc_contract::ImageProces
     completed: u32,
     total: u32,
     publish: F,
-    sources_synchronized: bool,
 }
 
 impl<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> ImageProcessingBatch<F> {
@@ -91,7 +90,6 @@ impl<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> ImageProcessingBatc
             completed: 0,
             total,
             publish,
-            sources_synchronized: false,
         }
     }
 
@@ -100,25 +98,165 @@ impl<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> ImageProcessingBatc
     }
 
     pub(crate) async fn prepare_all(&mut self, app: &AppHandle, bindings: Vec<MediaBinding>) {
-        let synchronization = if !self.sources_synchronized {
-            self.sources_synchronized = true;
-            synchronize_processing_sources(app).await
-        } else {
-            Ok(())
-        };
-        self.prepare_all_with(bindings, |binding| {
-            let synchronization = synchronization.clone();
-            async move {
-                synchronization?;
-                prepare_project_image(app, &binding).await
-            }
-        })
-        .await;
+        self.prepare_all_with_plan(app, bindings, None).await;
     }
 
+    pub(crate) async fn prepare_all_in_plan(
+        &mut self,
+        app: &AppHandle,
+        bindings: Vec<MediaBinding>,
+        roots: RootBindingPlan,
+    ) {
+        self.prepare_all_with_plan(app, bindings, Some(roots)).await;
+    }
+
+    async fn prepare_all_with_plan(
+        &mut self,
+        app: &AppHandle,
+        bindings: Vec<MediaBinding>,
+        roots: Option<RootBindingPlan>,
+    ) {
+        if bindings.is_empty() {
+            return;
+        }
+        let attempt = synchronize_processing_sources(app, roots, bindings.clone()).await;
+        let engine = app.state::<CacheEngine>();
+        let mut owners = Vec::new();
+        let mut waiters = Vec::new();
+        let permit = engine
+            .begin_cancellable_work(CacheCancellation::default())
+            .await;
+        let mut claimed = std::collections::HashSet::new();
+        for binding in bindings {
+            let work = attempt.as_ref().map_err(Clone::clone).and_then(|attempt| {
+                if !app
+                    .state::<ProjectHost>()
+                    .is_current_project(&attempt.project_id)
+                {
+                    return Err("O Projeto mudou durante o processamento.".to_string());
+                }
+                attempt
+                    .works
+                    .get(&binding.media_id)
+                    .cloned()
+                    .ok_or_else(|| {
+                        "A referência da imagem mudou durante o processamento.".to_string()
+                    })
+            });
+            let work = match work {
+                Ok(work) => work,
+                Err(error) => {
+                    self.prepare_with(&binding, std::future::ready(Err(error)))
+                        .await;
+                    continue;
+                }
+            };
+            if !claimed.insert(binding.media_id.clone()) {
+                // Callers normally supply a unique catalog. A repeated occurrence
+                // must not occupy a waiter slot owned by this same batch.
+                self.prepare_with(&binding, std::future::ready(Ok(())))
+                    .await;
+                continue;
+            }
+            match engine.claim_for_processing(&work) {
+                CacheFlightClaim::Owner(owner) => owners.push((binding, work, owner)),
+                CacheFlightClaim::Waiter(waiter) => waiters.push((binding, waiter)),
+            }
+        }
+        drop(permit);
+        let preparation = stream::iter(owners)
+            .map(|(binding, work, owner)| async move {
+                let result = prepare_owned_cache(
+                    app,
+                    app.state::<LoggingState>().inner(),
+                    app.state::<AppPaths>().inner(),
+                    app.state::<CacheEngine>().inner(),
+                    app.state::<ImagingProcessor>().inner(),
+                    work,
+                    owner.cancellation(),
+                )
+                .await;
+                (binding, owner, result)
+            })
+            .buffer_unordered(app.state::<ImagingProcessor>().cache_capacity());
+        tokio::pin!(preparation);
+        let mut prepared = Vec::new();
+        let mut publications = Vec::new();
+        while let Some((binding, owner, result)) = preparation.next().await {
+            match result {
+                Ok(pending) => {
+                    prepared.push((binding, owner));
+                    publications.push(pending);
+                }
+                Err(failure) => {
+                    let result = owner.complete(Err(failure));
+                    self.prepare_with(&binding, std::future::ready(processing_result(result)))
+                        .await;
+                }
+            }
+        }
+        if !publications.is_empty() {
+            let _permit = engine
+                .begin_cancellable_work(CacheCancellation::default())
+                .await;
+            let publish_app = app.clone();
+            let project_id = attempt
+                .as_ref()
+                .expect("prepared work belongs to a captured attempt")
+                .project_id
+                .clone();
+            let results = tauri::async_runtime::spawn_blocking(move || {
+                if !publish_app
+                    .state::<ProjectHost>()
+                    .is_current_project(&project_id)
+                {
+                    return publications
+                        .iter()
+                        .map(|_| {
+                            Err(CacheFailure::new(
+                                CacheFailureStage::Cancelled,
+                                "O Projeto mudou antes da publicação do Cache.",
+                            ))
+                        })
+                        .collect();
+                }
+                publish_app
+                    .state::<CacheEngine>()
+                    .publish_prepared_batch(publications)
+            })
+            .await;
+            let results = results.unwrap_or_else(|_| {
+                prepared
+                    .iter()
+                    .map(|_| {
+                        Err(CacheFailure::new(
+                            CacheFailureStage::PublishIndex,
+                            "Não foi possível publicar o lote de Cache.",
+                        ))
+                    })
+                    .collect()
+            });
+            for ((binding, owner), result) in prepared.into_iter().zip(results) {
+                self.prepare_with(
+                    &binding,
+                    std::future::ready(processing_result(owner.complete(result))),
+                )
+                .await;
+            }
+        }
+        // Publish our owners before joining foreign flights, preventing cycles
+        // between overlapping foreground batches and viewport demands.
+        for (binding, waiter) in waiters {
+            self.prepare_with(&binding, async { processing_result(waiter.wait().await) })
+                .await;
+        }
+    }
+
+    #[cfg(test)]
     async fn prepare_all_with<Fut: std::future::Future<Output = Result<(), String>>>(
         &mut self,
         bindings: Vec<MediaBinding>,
+        concurrency: usize,
         preparation: impl Fn(MediaBinding) -> Fut,
     ) {
         let pending = stream::iter(bindings)
@@ -126,7 +264,7 @@ impl<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> ImageProcessingBatc
                 let future = preparation(binding.clone());
                 async move { (binding, future.await) }
             })
-            .buffer_unordered(IMAGE_PROCESSING_CONCURRENCY);
+            .buffer_unordered(concurrency);
         tokio::pin!(pending);
         while let Some((binding, result)) = pending.next().await {
             self.prepare_with(&binding, std::future::ready(result))
@@ -168,28 +306,47 @@ impl<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> ImageProcessingBatc
     }
 }
 
-async fn synchronize_processing_sources(app: &AppHandle) -> Result<(), String> {
+struct ProcessingAttempt {
+    project_id: String,
+    works: std::collections::HashMap<String, CacheWork>,
+}
+
+async fn synchronize_processing_sources(
+    app: &AppHandle,
+    roots: Option<RootBindingPlan>,
+    selected: Vec<MediaBinding>,
+) -> Result<ProcessingAttempt, String> {
     let engine = app.state::<CacheEngine>();
     let _permit = engine
         .begin_cancellable_work(CacheCancellation::default())
         .await;
     let processing_app = app.clone();
-    tauri::async_runtime::spawn_blocking(move || {
+    let (catalog, namespace, roots, updates) = tauri::async_runtime::spawn_blocking(move || {
         let host = processing_app.state::<ProjectHost>();
         let catalog = host.authorized_media_catalog()?;
         let namespace = processing_app.state::<ActiveCacheNamespace>().namespace();
         if namespace.project_id() != catalog.project_id {
             return Err("O Projeto mudou durante o processamento das imagens.".into());
         }
+        let roots = roots.unwrap_or_else(|| {
+            let mut context = OperationPathContext::new();
+            for path in std::iter::once(namespace.paths().root()).chain(
+                catalog
+                    .bindings
+                    .iter()
+                    .map(|binding| binding.logical_path.as_path()),
+            ) {
+                let _ = context.capture(path);
+            }
+            context.freeze()
+        });
         processing_app
             .state::<CacheEngine>()
             .retain_prepared_catalog(&catalog.project_id, &catalog.bindings);
         let monitor = processing_app.state::<crate::media_runtime::MediaMonitor>();
         let runtime = processing_app.state::<crate::media_runtime::MediaRuntime>();
-        // Two matching inspections adopt the selected bindings before the first
-        // foreground job can race their initial Monitor notification.
-        for _ in 0..2 {
-            let poll = monitor.poll(&runtime, &catalog.bindings);
+        let mut updates = Vec::new();
+        for poll in monitor.synchronize_processing(&runtime, &catalog.bindings, &roots) {
             if let Some(update) = poll.update() {
                 processing_app
                     .state::<CacheEngine>()
@@ -200,92 +357,83 @@ async fn synchronize_processing_sources(app: &AppHandle) -> Result<(), String> {
                             .inner(),
                         update,
                     );
-                crate::product_runtime::refresh_project_photos_for_media_update(
-                    &host,
-                    &catalog.bindings,
-                    update,
-                );
-                if !update.changed_media_ids().is_empty()
-                    && let Some(window) = processing_app
-                        .get_webview_window(crate::product_runtime::PROJECT_WINDOW_LABEL)
-                {
-                    window
-                        .emit(
-                            crate::product_runtime::LINKED_MEDIA_CHANGED_EVENT,
-                            crate::ipc_contract::LinkedMediaChanged {
-                                media_ids: update.changed_media_ids().to_vec(),
-                            },
-                        )
-                        .map_err(|_| {
-                            "Não foi possível atualizar as imagens do Projeto.".to_string()
-                        })?;
-                }
+                updates.push(update.clone());
             }
         }
-        Ok(())
+        Ok::<_, String>((catalog, namespace, roots, updates))
+    })
+    .await
+    .map_err(|_| "Não foi possível inspecionar as imagens do Projeto.".to_string())??;
+    drop(_permit);
+    for update in updates {
+        crate::product_runtime::refresh_project_photos_with_capacity(
+            app.state::<ProjectHost>().inner(),
+            &engine,
+            app.state::<ImagingProcessor>().inner(),
+            &catalog.bindings,
+            &update,
+            &roots,
+        )
+        .await;
+        if !update.changed_media_ids().is_empty()
+            && let Some(window) =
+                app.get_webview_window(crate::product_runtime::PROJECT_WINDOW_LABEL)
+        {
+            window
+                .emit(
+                    crate::product_runtime::LINKED_MEDIA_CHANGED_EVENT,
+                    crate::ipc_contract::LinkedMediaChanged {
+                        media_ids: update.changed_media_ids().to_vec(),
+                    },
+                )
+                .map_err(|_| "Não foi possível atualizar as imagens do Projeto.".to_string())?;
+        }
+    }
+    let _permit = engine
+        .begin_cancellable_work(CacheCancellation::default())
+        .await;
+    let processing_app = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let authorized = catalog
+            .bindings
+            .iter()
+            .map(|binding| (binding.media_id.clone(), binding.clone()))
+            .collect::<std::collections::HashMap<_, _>>();
+        let sources = selected
+            .iter()
+            .filter(|binding| authorized.get(&binding.media_id) == Some(*binding))
+            .map(|binding| {
+                CacheMediaSource::new(
+                    binding.media_id.clone(),
+                    binding.kind,
+                    binding.logical_path.clone(),
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let works = processing_app
+            .state::<CacheEngine>()
+            .plan_works(
+                processing_app.state::<AppPaths>().inner(),
+                &namespace,
+                &roots,
+                sources,
+            )
+            .map_err(|failure| failure.message)?
+            .into_iter()
+            .map(|work| (work.source.media_id().to_owned(), work))
+            .collect();
+        Ok(ProcessingAttempt {
+            project_id: catalog.project_id,
+            works,
+        })
     })
     .await
     .map_err(|_| "Não foi possível inspecionar as imagens do Projeto.".to_string())?
 }
 
-/// Prepares the same canonical Cache used by the Panel and Canvas. This work
-/// belongs to a user action, so viewport changes do not cancel it and offscreen
-/// results stay on disk instead of filling the resident preview registry.
-pub(crate) async fn prepare_project_image(
-    app: &AppHandle,
-    binding: &MediaBinding,
+fn processing_result(
+    execution: Result<cache_engine::CacheExecution, CacheFailure>,
 ) -> Result<(), String> {
-    let engine = app.state::<CacheEngine>();
-    let permit = engine
-        .begin_cancellable_work(CacheCancellation::default())
-        .await;
-    let namespace = app.state::<ActiveCacheNamespace>().namespace();
-    let catalog = app.state::<ProjectHost>().authorized_media_catalog()?;
-    if catalog.project_id != namespace.project_id()
-        || !catalog.bindings.iter().any(|current| {
-            current.media_id == binding.media_id
-                && current.logical_path == binding.logical_path
-                && current.kind == binding.kind
-        })
-    {
-        return Err("A referência da imagem mudou durante o processamento.".into());
-    }
-    let source = CacheMediaSource::new(
-        binding.media_id.clone(),
-        binding.kind,
-        binding.logical_path.clone(),
-    )
-    .map_err(|_| "Não foi possível preparar a imagem selecionada.".to_string())?;
-    let root_bindings = path_io::capture_root_bindings(vec![
-        namespace.paths().root().to_path_buf(),
-        source.source_path().to_path_buf(),
-    ])
-    .await
-    .map_err(|_| "Não foi possível acessar a origem da imagem ou o Cache.".to_string())?;
-    let work = CacheWork::new(
-        format!("cache-{}", uuid::Uuid::new_v4().simple()),
-        namespace,
-        source,
-        root_bindings,
-    );
-    let claim = engine.claim_for_processing(&work);
-    drop(permit);
-    let execution = match claim {
-        CacheFlightClaim::Waiter(waiter) => waiter.wait().await,
-        CacheFlightClaim::Owner(owner) => {
-            let result = execute_owned_cache(
-                app,
-                app.state::<LoggingState>().inner(),
-                app.state::<AppPaths>().inner(),
-                &engine,
-                app.state::<ImagingProcessor>().inner(),
-                work,
-                owner.cancellation(),
-            )
-            .await;
-            owner.complete(result)
-        }
-    };
     execution.map(|_| ()).map_err(|failure| {
         format!(
             "A imagem foi vinculada, mas não foi possível preparar sua miniatura: {}",
@@ -303,6 +451,60 @@ pub(crate) async fn execute_owned_cache(
     work: CacheWork,
     cancellation: CacheCancellation,
 ) -> Result<cache_engine::CacheExecution, CacheFailure> {
+    let pending = prepare_owned_cache(
+        app,
+        logging,
+        app_paths,
+        engine,
+        processor,
+        work,
+        cancellation.clone(),
+    )
+    .await?;
+    if cancellation.reason() == Some(CacheCancellationReason::Paused) {
+        cancellation.resume_after_pause();
+    }
+    let _permit = engine.begin_cancellable_work(cancellation).await;
+    let publish_app = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        publish_app
+            .state::<CacheEngine>()
+            .publish_prepared_batch(vec![pending])
+            .remove(0)
+    })
+    .await
+    .map_err(|_| {
+        CacheFailure::new(
+            CacheFailureStage::PublishIndex,
+            "Não foi possível publicar a prévia do Cache.",
+        )
+    })?
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn prepare_owned_cache(
+    app: &AppHandle,
+    logging: &LoggingState,
+    app_paths: &AppPaths,
+    engine: &CacheEngine,
+    processor: &ImagingProcessor,
+    work: CacheWork,
+    cancellation: CacheCancellation,
+) -> Result<PendingCachePublication, CacheFailure> {
+    let estimated_work = work.clone();
+    let estimate = tauri::async_runtime::spawn_blocking(move || {
+        ImageMemoryEstimate::in_plan(
+            &estimated_work.root_bindings,
+            [estimated_work.source.source_path()],
+        )
+    })
+    .await
+    .map_err(|_| {
+        CacheFailure::new(
+            CacheFailureStage::Plan,
+            "Não foi possível estimar os recursos da imagem.",
+        )
+    })?;
     loop {
         match cancellation.reason() {
             Some(CacheCancellationReason::Obsolete) => {
@@ -331,12 +533,22 @@ pub(crate) async fn execute_owned_cache(
                 "A demanda de Cache ficou obsoleta.",
             ));
         }
-        let reservation = processor.reserve_cache().await.map_err(|error| {
-            CacheFailure::new(
-                CacheFailureStage::Processor(InvocationFailureStage::ResolveSidecar),
-                error.to_string(),
-            )
-        })?;
+        let reservation = match processor
+            .reserve_cache_for(estimate, cancellation.flag())
+            .await
+        {
+            Ok(reservation) => reservation,
+            Err(ProcessorAdmissionFailure::Cancelled) => {
+                drop(permit);
+                continue;
+            }
+            Err(error) => {
+                return Err(CacheFailure::new(
+                    CacheFailureStage::Plan,
+                    error.to_string(),
+                ));
+            }
+        };
         if cancellation
             .flag()
             .load(std::sync::atomic::Ordering::Acquire)
@@ -351,7 +563,7 @@ pub(crate) async fn execute_owned_cache(
         );
         let mut transport = TauriImagingTransport::new(app, logging, &reservation);
         let result = engine
-            .execute(
+            .prepare(
                 &mut transport,
                 app_paths,
                 work.clone(),
@@ -401,7 +613,7 @@ mod tests {
             let receivers = RefCell::new(receivers.into_iter().map(Some).collect::<Vec<_>>());
             let mut batch =
                 ImageProcessingBatch::new(4, |progress| published.borrow_mut().push(progress));
-            let pending = batch.prepare_all_with(bindings, |binding| {
+            let pending = batch.prepare_all_with(bindings, 2, |binding| {
                 let index = binding.media_id.parse::<usize>().unwrap();
                 started.borrow_mut().push(index);
                 let receiver = receivers.borrow_mut()[index].take().unwrap();

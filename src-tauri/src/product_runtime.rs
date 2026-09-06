@@ -514,18 +514,32 @@ async fn project_ui_ready(
     }
 }
 
+#[cfg(test)]
 fn refresh_changed_photo_sources(
     host: &ProjectHost,
     changed_photos: Vec<MediaBinding>,
 ) -> Vec<String> {
-    let observed = MediaResolver.observe(0, &changed_photos);
+    let mut paths = myalbuns_paths::OperationPathContext::new();
+    for binding in &changed_photos {
+        let _ = paths.capture(&binding.logical_path);
+    }
+    refresh_changed_photo_sources_in_plan(host, changed_photos, &paths.freeze())
+}
+
+#[cfg(test)]
+fn refresh_changed_photo_sources_in_plan(
+    host: &ProjectHost,
+    changed_photos: Vec<MediaBinding>,
+    roots: &myalbuns_paths::RootBindingPlan,
+) -> Vec<String> {
     let mut refreshed = Vec::new();
-    for (binding, observation) in changed_photos.into_iter().zip(observed.observations()) {
-        if host.adopt_imported_photo_inspection(&binding, observation) {
+    for binding in changed_photos {
+        let observation = MediaResolver.observe_in_plan(roots, &binding);
+        if host.adopt_imported_photo_inspection(&binding, &observation) {
             refreshed.push(binding.media_id);
             continue;
         }
-        match MediaResolver.inspect_photo_binding(&binding) {
+        match MediaResolver.inspect_photo_binding_in_plan(&binding, roots) {
             Ok(metadata) => match host.observe_photo_source(&binding, metadata) {
                 Ok(()) => refreshed.push(binding.media_id.clone()),
                 Err(error) => tracing::warn!(
@@ -546,23 +560,125 @@ fn refresh_changed_photo_sources(
     refreshed
 }
 
+#[cfg(test)]
 pub(crate) fn refresh_project_photos_for_media_update(
     host: &ProjectHost,
     bindings: &[MediaBinding],
     update: &crate::media_runtime::MediaRuntimeUpdate,
 ) -> Vec<String> {
-    let changed_photos = bindings
+    refresh_changed_photo_sources(host, changed_photos_for_update(bindings, update))
+}
+
+pub(crate) async fn refresh_project_photos_with_capacity(
+    host: &ProjectHost,
+    engine: &CacheEngine,
+    processor: &ImagingProcessor,
+    bindings: &[MediaBinding],
+    update: &crate::media_runtime::MediaRuntimeUpdate,
+    roots: &myalbuns_paths::RootBindingPlan,
+) -> Vec<String> {
+    use crate::{
+        cache_activity_gate::CacheCancellationReason,
+        imaging_processor::{ImageMemoryEstimate, ProcessorAdmissionFailure},
+    };
+
+    let mut refreshed = Vec::new();
+    for binding in changed_photos_for_update(bindings, update) {
+        let cancellation = CacheCancellation::default();
+        let result = loop {
+            if cancellation.reason() == Some(CacheCancellationReason::Paused) {
+                cancellation.resume_after_pause();
+            }
+            let activity = engine.begin_cancellable_work(cancellation.clone()).await;
+            let observing_host = host.clone();
+            let observing_binding = binding.clone();
+            let observing_roots = roots.clone();
+            let observation = tauri::async_runtime::spawn_blocking(move || {
+                let observation =
+                    MediaResolver.observe_in_plan(&observing_roots, &observing_binding);
+                if observing_host.adopt_imported_photo_inspection(&observing_binding, &observation)
+                {
+                    return None;
+                }
+                let estimate = ImageMemoryEstimate::in_plan(
+                    &observing_roots,
+                    [observing_binding.logical_path.as_path()],
+                );
+                Some((observation, estimate))
+            })
+            .await;
+            let (observation, estimate) = match observation {
+                Ok(Some(value)) => value,
+                Ok(None) => break Ok(()),
+                Err(error) => break Err(error.to_string()),
+            };
+            let reservation = match processor
+                .reserve_inspection(estimate, cancellation.flag())
+                .await
+            {
+                Ok(reservation) => reservation,
+                Err(ProcessorAdmissionFailure::Cancelled) => {
+                    drop(activity);
+                    continue;
+                }
+                Err(error) => break Err(error.to_string()),
+            };
+            if cancellation.reason().is_some() {
+                drop(reservation);
+                drop(activity);
+                continue;
+            }
+            let inspecting_host = host.clone();
+            let inspecting_binding = binding.clone();
+            let inspecting_roots = roots.clone();
+            // Drain a started decoder before releasing either reservation. The
+            // caller has already released its observation permit, so Export can
+            // pause a resource wait without holding a nested activity alive.
+            let inspected = tauri::async_runtime::spawn_blocking(move || {
+                let metadata = MediaResolver
+                    .inspect_photo_binding_in_plan(&inspecting_binding, &inspecting_roots)?;
+                let current = MediaResolver.observe_in_plan(&inspecting_roots, &inspecting_binding);
+                if !observation.same_source(&current) {
+                    return Err("A origem mudou durante a inspeção da imagem.".to_owned());
+                }
+                inspecting_host.observe_photo_source(&inspecting_binding, metadata)
+            })
+            .await;
+            drop(reservation);
+            drop(activity);
+            break inspected
+                .map_err(|error| error.to_string())
+                .and_then(|value| value);
+        };
+        match result {
+            Ok(()) => refreshed.push(binding.media_id),
+            Err(error) => tracing::info!(
+                target: "myalbuns.desktop",
+                media_id = safe_log_identifier(&binding.media_id),
+                error = %error,
+                event = "photo_source_refresh_deferred",
+            ),
+        }
+    }
+    refreshed
+}
+
+fn changed_photos_for_update(
+    bindings: &[MediaBinding],
+    update: &crate::media_runtime::MediaRuntimeUpdate,
+) -> Vec<MediaBinding> {
+    let changed = update
+        .changed_media_ids()
+        .iter()
+        .map(String::as_str)
+        .collect::<std::collections::HashSet<_>>();
+    bindings
         .iter()
         .filter(|binding| {
-            binding.kind == MediaKind::Photo
-                && update
-                    .changed_media_ids()
-                    .iter()
-                    .any(|media_id| media_id == &binding.media_id)
+            binding.kind == MediaKind::Photo && changed.contains(binding.media_id.as_str())
         })
         .cloned()
-        .collect();
-    refresh_changed_photo_sources(host, changed_photos)
+        .collect()
 }
 
 pub(crate) fn start_linked_media_monitor_if_active(app: tauri::AppHandle) {
@@ -600,8 +716,7 @@ fn start_linked_media_monitor(app: tauri::AppHandle) {
             let monitor = app.state::<MediaMonitor>().inner().clone();
             let runtime = app.state::<MediaRuntime>().inner().clone();
             let bindings = catalog.bindings.clone();
-            let host = app.state::<ProjectHost>().inner().clone();
-            let poll = match poll_linked_media_once(monitor, runtime, host, bindings).await {
+            let (poll, roots) = match poll_linked_media_once(monitor, runtime, bindings).await {
                 Ok(poll) => poll,
                 Err(error) => {
                     tracing::warn!(
@@ -636,6 +751,16 @@ fn start_linked_media_monitor(app: tauri::AppHandle) {
                     event = "linked_media_cache_invalidated",
                 );
             }
+            drop(_causal_cache_permit);
+            refresh_project_photos_with_capacity(
+                app.state::<ProjectHost>().inner(),
+                app.state::<CacheEngine>().inner(),
+                app.state::<ImagingProcessor>().inner(),
+                &catalog.bindings,
+                update,
+                &roots,
+            )
+            .await;
             if !changed.is_empty()
                 && let Some(window) = app.get_webview_window(PROJECT_WINDOW_LABEL)
                 && let Err(error) = window.emit(
@@ -656,15 +781,15 @@ fn start_linked_media_monitor(app: tauri::AppHandle) {
 async fn poll_linked_media_once(
     monitor: MediaMonitor,
     runtime: MediaRuntime,
-    host: ProjectHost,
     bindings: Vec<MediaBinding>,
-) -> Result<MediaMonitorPoll, tauri::Error> {
+) -> Result<(MediaMonitorPoll, myalbuns_paths::RootBindingPlan), tauri::Error> {
     tauri::async_runtime::spawn_blocking(move || {
-        let poll = monitor.poll(&runtime, &bindings);
-        if let Some(update) = poll.update() {
-            refresh_project_photos_for_media_update(&host, &bindings, update);
+        let mut paths = myalbuns_paths::OperationPathContext::new();
+        for binding in &bindings {
+            let _ = paths.capture(&binding.logical_path);
         }
-        poll
+        let roots = paths.freeze();
+        (monitor.poll_in_plan(&runtime, &bindings, &roots), roots)
     })
     .await
 }
@@ -995,7 +1120,7 @@ mod tests {
         let caller = thread::spawn(move || {
             tauri::async_runtime::block_on(async move {
                 tokio::join!(
-                    super::poll_linked_media_once(monitor, runtime, host, bindings),
+                    super::poll_linked_media_once(monitor, runtime, bindings),
                     async move {
                         runtime_progress_tx
                             .send(())
@@ -1013,7 +1138,7 @@ mod tests {
         blocking_inspection
             .join()
             .expect("the blocking inspection thread does not panic");
-        let poll = caller
+        let (poll, _) = caller
             .join()
             .expect("the product runtime caller does not panic")
             .expect("the scheduled Monitor poll joins cleanly");
@@ -1022,6 +1147,86 @@ mod tests {
             "another operation on the same async task must progress before inspection is released",
         );
         assert!(poll.update().is_none());
+    }
+
+    #[test]
+    fn monitor_inspection_waits_for_capacity_and_resumes_after_an_export_pause() {
+        let root = tempfile::tempdir().unwrap();
+        let project_path = root.path().join("Projeto.myalbuns");
+        let photo_path = root.path().join("Foto.jpg");
+        RgbImage::from_pixel(17, 11, Rgb([50, 60, 70]))
+            .save_with_format(&photo_path, ImageFormat::Jpeg)
+            .unwrap();
+        let mut context = OperationPathContext::new();
+        context.capture(&project_path).unwrap();
+        context.capture(&photo_path).unwrap();
+        let roots = context.freeze();
+        let mut project = ProjectCore::new()
+            .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"))
+            .create_editable(CreateProjectRequest::new(
+                ProjectLocation::new(project_path, roots.clone()),
+                InitialProject::neutral(),
+                CreateAuthorization::CreateOnly,
+            ))
+            .unwrap();
+        project
+            .import_photo(ImportPhoto::new(
+                photo_path,
+                PhotoSourceMetadata::new(
+                    1,
+                    1,
+                    ["#102030".into(), "#405060".into(), "#708090".into()],
+                )
+                .unwrap(),
+            ))
+            .unwrap();
+        let host = ProjectHost::new(project);
+        let bindings = host.authorized_media_catalog().unwrap().bindings;
+        let runtime = MediaRuntime::default();
+        let update = runtime.apply(MediaResolver.observe(1, &bindings));
+        let engine = crate::cache_engine::CacheEngine::default();
+        let processor = crate::imaging_processor::ImagingProcessor::default();
+        tauri::async_runtime::block_on(async {
+            let occupied = processor.reserve().await.unwrap();
+            let refresh = super::refresh_project_photos_with_capacity(
+                &host, &engine, &processor, &bindings, &update, &roots,
+            );
+            tokio::pin!(refresh);
+            assert!(
+                tokio::time::timeout(Duration::from_millis(50), &mut refresh)
+                    .await
+                    .is_err()
+            );
+            assert_eq!(
+                host.projection().unwrap().state.album.media[0].source_width_px,
+                Some(1)
+            );
+            let pause = tokio::select! {
+                _ = &mut refresh => panic!("inspection cannot bypass occupied capacity"),
+                pause = tokio::time::timeout(Duration::from_secs(5), engine.pause()) =>
+                    pause.expect("Export pause must cancel the resource wait and drain activity"),
+            };
+            drop(occupied);
+            assert!(
+                tokio::time::timeout(Duration::from_millis(50), &mut refresh)
+                    .await
+                    .is_err()
+            );
+            assert_eq!(
+                host.projection().unwrap().state.album.media[0].source_width_px,
+                Some(1)
+            );
+            drop(pause);
+            assert_eq!(
+                tokio::time::timeout(Duration::from_secs(5), refresh)
+                    .await
+                    .unwrap(),
+                [bindings[0].media_id.clone()]
+            );
+        });
+        let projection = host.projection().unwrap();
+        assert_eq!(projection.state.album.media[0].source_width_px, Some(17));
+        assert_eq!(projection.state.album.media[0].source_height_px, Some(11));
     }
 
     #[test]

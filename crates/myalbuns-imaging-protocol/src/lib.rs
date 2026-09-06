@@ -1,6 +1,7 @@
 mod cache;
 mod command;
 mod event_stream;
+mod photo_import;
 mod processor_handshake;
 mod render;
 mod response;
@@ -20,6 +21,11 @@ pub use event_stream::{
     decode_event_stream, encode_event,
 };
 pub use myalbuns_paths::CacheArtifactFormat;
+pub use photo_import::{
+    ImportedPhotoDimensions, ImportedPhotoPreview, PHOTO_IMPORT_PROCESS_BATCH,
+    PhotoImportCandidate, PhotoImportCompletion, PhotoImportOutcome, PhotoImportRequest,
+    PhotoImportSourceId, PreparedPhotoImport,
+};
 pub use processor_handshake::{
     PROCESSOR_HANDSHAKE_CHALLENGE_ENV, PROCESSOR_HANDSHAKE_MAX_BYTES, decode_processor_handshake,
     encode_processor_handshake,
@@ -30,7 +36,7 @@ pub use render::{
 };
 pub use response::ImagingResponse;
 
-pub const IMAGING_PROTOCOL_VERSION: u32 = 17;
+pub const IMAGING_PROTOCOL_VERSION: u32 = 18;
 
 pub(crate) fn is_safe_identifier(value: &str) -> bool {
     !value.is_empty()

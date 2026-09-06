@@ -1,0 +1,386 @@
+//! Real-process verification of the production import seams, without WebView or
+//! native dialogs. Optional explicit inputs also produce repeatable measurements.
+use super::*;
+use crate::imaging_recovery_integration::RealProcessTransport;
+use image::{ImageEncoder, ImageFormat, Rgb, RgbImage, codecs::jpeg::JpegEncoder};
+use myalbuns_core::{
+    CreateAuthorization, CreateProjectRequest, InitialProject, ProjectCore, ProjectLocation,
+};
+use myalbuns_imaging_protocol::CacheMediaSource;
+use sha2::{Digest, Sha256};
+use std::{
+    sync::atomic::{AtomicUsize, Ordering},
+    time::Instant,
+};
+
+fn digest(path: &Path) -> String {
+    format!("{:x}", Sha256::digest(std::fs::read(path).unwrap()))
+}
+
+fn milliseconds(start: Instant) -> f64 {
+    start.elapsed().as_secs_f64() * 1000.0
+}
+
+struct InputSet {
+    paths: Vec<PathBuf>,
+    imported: usize,
+    previews: usize,
+    rejected: usize,
+    host_decodes: usize,
+}
+
+fn inputs(root: &Path) -> InputSet {
+    if let Some(path) = std::env::var_os("MYALBUNS_IMPORT_MEASUREMENT_INPUTS") {
+        let paths: Vec<PathBuf> = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+        assert!(!paths.is_empty());
+        return InputSet {
+            imported: paths.len(),
+            previews: paths.len(),
+            paths,
+            rejected: 0,
+            host_decodes: 0,
+        };
+    }
+    let mut paths = Vec::new();
+    for index in 0..40 {
+        let path = root.join(format!("photo-{index:03}.jpg"));
+        RgbImage::from_pixel(37, 23, Rgb([index, 80, 160]))
+            .save_with_format(&path, ImageFormat::Jpeg)
+            .unwrap();
+        paths.push(path);
+    }
+    let progressive = root.join("progressive.jpg");
+    std::fs::write(
+        &progressive,
+        include_bytes!("../../../crates/myalbuns-imaging/tests/fixtures/progressive-420-dri.jpg"),
+    )
+    .unwrap();
+    paths.push(progressive);
+    let profile = root.join("unknown-profile.jpg");
+    let mut encoded = Vec::new();
+    let mut encoder = JpegEncoder::new(&mut encoded);
+    encoder
+        .set_icc_profile(b"unrecognized ICC profile".to_vec())
+        .unwrap();
+    encoder
+        .encode_image(&RgbImage::from_pixel(37, 23, Rgb([40, 80, 160])))
+        .unwrap();
+    std::fs::write(&profile, encoded).unwrap();
+    paths.push(profile);
+    let bad = root.join("corrupted.jpg");
+    std::fs::write(&bad, b"invalid JPEG").unwrap();
+    paths.push(bad);
+    let png = root.join("png-with-jpeg-extension.jpg");
+    RgbImage::from_pixel(37, 23, Rgb([40, 80, 160]))
+        .save_with_format(&png, ImageFormat::Png)
+        .unwrap();
+    paths.push(png);
+    paths.push(paths[0].clone());
+    InputSet {
+        paths,
+        imported: 42,
+        previews: 41,
+        rejected: 2,
+        host_decodes: 1,
+    }
+}
+
+#[test]
+#[ignore = "executed by scripts/Test-Rust.ps1 with the real debug sidecar"]
+fn real_import_flow() {
+    let executable = PathBuf::from(
+        std::env::var_os("MYALBUNS_TEST_IMAGING_PROCESSOR").expect("real Processor path"),
+    );
+    let fixture = tempfile::tempdir().unwrap();
+    let inputs = inputs(fixture.path());
+    let original_hashes = inputs
+        .paths
+        .iter()
+        .map(|path| digest(path))
+        .collect::<Vec<_>>();
+    let rounds: usize = std::env::var("MYALBUNS_IMPORT_MEASUREMENT_ROUNDS")
+        .ok()
+        .map(|value| value.parse().unwrap())
+        .unwrap_or(1);
+    assert!((1..=10).contains(&rounds));
+    let mut measurements = Vec::new();
+    let mut previous_previews = None;
+    for round in 0..rounds {
+        let root = tempfile::tempdir_in(fixture.path()).unwrap();
+        let data_root = root.path().join("data");
+        for name in ["Roaming", "Local", "logs"] {
+            std::fs::create_dir_all(data_root.join(name)).unwrap();
+        }
+        let app_paths = AppPaths::from_roots(&data_root.join("Roaming"), &data_root.join("Local"));
+        let project_path = root.path().join("Project.myalbuns");
+        let mut context = OperationPathContext::new();
+        context.capture(&project_path).unwrap();
+        let project = ProjectCore::new()
+            .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"))
+            .create_editable(CreateProjectRequest::new(
+                ProjectLocation::new(project_path, context.freeze()),
+                InitialProject::neutral(),
+                CreateAuthorization::CreateOnly,
+            ))
+            .unwrap();
+        let namespace =
+            AuthorizedCacheNamespace::mount(&app_paths, project.identity_authority()).unwrap();
+        let host = ProjectHost::new(project);
+        let engine = CacheEngine::default();
+        let processor = ImagingProcessor::default();
+        let registry = CachePreviewRegistry::new("import-flow");
+        let monitor = MediaMonitor::default();
+        let runtime = MediaRuntime::default();
+        let total_started = Instant::now();
+        let attempt = PhotoImportAttempt::capture(
+            host.authorized_media_catalog().unwrap(),
+            namespace.clone(),
+            inputs.paths.clone(),
+        )
+        .unwrap();
+        let candidates = attempt
+            .sources
+            .iter()
+            .map(|source| source.candidate.clone())
+            .collect::<Vec<_>>();
+        let stage = engine
+            .begin_import_stage(
+                &app_paths,
+                namespace.clone(),
+                attempt.id.clone(),
+                &candidates,
+            )
+            .unwrap();
+        let requests = attempt.requests(processor.cache_capacity());
+        let process_count = requests.len();
+        let capture_ms = milliseconds(total_started);
+        let native_started = Instant::now();
+        let active = AtomicUsize::new(0);
+        let peak_active = AtomicUsize::new(0);
+        let completions = std::thread::scope(|scope| {
+            let tasks =
+                requests
+                    .into_iter()
+                    .map(|request| {
+                        let (
+                            engine,
+                            processor,
+                            app_paths,
+                            executable,
+                            data_root,
+                            active,
+                            peak_active,
+                        ) = (
+                            &engine,
+                            &processor,
+                            &app_paths,
+                            &executable,
+                            &data_root,
+                            &active,
+                            &peak_active,
+                        );
+                        scope.spawn(move || {
+                            let estimate = ImageMemoryEstimate::in_plan(
+                                &request.root_bindings,
+                                request.candidates.iter().map(PhotoImportCandidate::path),
+                            );
+                            tauri::async_runtime::block_on(async {
+                                let cancellation = CacheCancellation::default();
+                                let _permit =
+                                    engine.begin_cancellable_work(cancellation.clone()).await;
+                                let _reservation = processor
+                                    .reserve_cache_for(estimate, cancellation.flag())
+                                    .await
+                                    .unwrap();
+                                let running = active.fetch_add(1, Ordering::AcqRel) + 1;
+                                peak_active.fetch_max(running, Ordering::AcqRel);
+                                let mut transport = RealProcessTransport::in_data_root(
+                                    executable.clone(),
+                                    data_root.clone(),
+                                );
+                                let (response, recovery) = engine
+                                    .invoke_cache_command(
+                                        &mut transport,
+                                        app_paths,
+                                        &ImagingCommand::PreparePhotoImport(request.clone()),
+                                        &InvocationContext::new(
+                                            &request.request_id,
+                                            Some(&request.project_id),
+                                        ),
+                                        &cancellation,
+                                    )
+                                    .await
+                                    .unwrap();
+                                active.fetch_sub(1, Ordering::AcqRel);
+                                assert!(recovery.is_none());
+                                let ImagingResponse::PhotoImportCompleted {
+                                    request_id,
+                                    completion,
+                                } = response
+                                else {
+                                    panic!("typed completion")
+                                };
+                                assert_eq!(request_id, request.request_id);
+                                completion.validate_for(&request).unwrap();
+                                completion
+                            })
+                        })
+                    })
+                    .collect::<Vec<_>>();
+            tasks
+                .into_iter()
+                .map(|task| task.join().unwrap())
+                .collect::<Vec<_>>()
+        });
+        let native_ms = milliseconds(native_started);
+        assert_eq!(active.load(Ordering::Acquire), 0);
+        assert!(peak_active.load(Ordering::Acquire) <= processor.cache_capacity());
+        assert!(!namespace.paths().metadata_file().exists());
+        let outcomes = completions
+            .into_iter()
+            .flat_map(|completion| completion.photos)
+            .map(|photo| (photo.source_id, photo.outcome))
+            .collect();
+        let inspection_started = Instant::now();
+        let bindings = attempt.catalog.bindings.clone();
+        let roots = attempt.roots.clone();
+        let decoded_before = crate::media_runtime::photo_source_decode_count();
+        let prepared = prepare_proposal_with_inspection(
+            attempt,
+            Some(stage),
+            outcomes,
+            HashMap::new(),
+            None,
+            Vec::new(),
+            |path| inspect_with_capacity(&engine, &processor, path, &bindings, &roots),
+        )
+        .unwrap();
+        assert_eq!(
+            crate::media_runtime::photo_source_decode_count() - decoded_before,
+            inputs.host_decodes
+        );
+        let inspection_ms = milliseconds(inspection_started);
+        let commit_started = Instant::now();
+        let committed =
+            commit_prepared_import(&host, &engine, &monitor, &runtime, &registry, prepared)
+                .unwrap();
+        let commit_ms = milliseconds(commit_started);
+        assert!(committed.existing.is_empty());
+        assert_eq!(committed.new_paths.len(), inputs.imported);
+        assert_eq!(
+            committed.cache_problems.len(),
+            inputs.imported - inputs.previews
+        );
+        let ImportPhotoResult::Completed {
+            imported_count,
+            problems,
+            projection,
+            ..
+        } = committed.result
+        else {
+            panic!("completed import")
+        };
+        assert_eq!(imported_count as usize, inputs.imported);
+        assert_eq!(problems.len(), inputs.rejected);
+        assert_eq!(projection.state.revision, 1);
+        let catalog = host.authorized_media_catalog().unwrap();
+        assert!(
+            monitor
+                .poll_in_plan(&runtime, &catalog.bindings, &roots)
+                .update()
+                .is_none()
+        );
+        let handoff_started = Instant::now();
+        let sources = catalog.bindings.iter().map(|binding| {
+            CacheMediaSource::new(
+                binding.media_id.clone(),
+                binding.kind,
+                binding.logical_path.clone(),
+            )
+            .unwrap()
+        });
+        let works = engine
+            .plan_works(&app_paths, &namespace, &roots, sources)
+            .unwrap();
+        let demand = engine.reconcile_preview_demand(
+            &registry,
+            namespace.project_id(),
+            1,
+            works.iter().map(|work| work.source.media_id()),
+        );
+        let previews =
+            engine.publish_prepared_for_demand(&app_paths, &namespace, &registry, &demand, &works);
+        assert_eq!(previews.len(), inputs.previews);
+        let mut preview_hashes = Vec::new();
+        for path in &committed.new_paths {
+            let binding = catalog
+                .bindings
+                .iter()
+                .find(|binding| &binding.logical_path == path)
+                .unwrap();
+            let Some(preview) = previews.get(&binding.media_id) else {
+                continue;
+            };
+            let response = registry.serve(
+                "import-flow",
+                tauri::http::Request::builder()
+                    .uri(preview.url.as_ref().unwrap())
+                    .body(Vec::new())
+                    .unwrap(),
+            );
+            assert_eq!(response.status(), 200);
+            preview_hashes.push(format!("{:x}", Sha256::digest(response.body())));
+        }
+        let handoff_ms = milliseconds(handoff_started);
+        let total_ms = milliseconds(total_started);
+        if std::env::var_os("MYALBUNS_IMPORT_MEASUREMENT_OUTPUT").is_some() {
+            eprintln!(
+                "Import round {}/{}: {} photos, {:.2}s total, {:.2}s native, {} processes, peak {}",
+                round + 1,
+                rounds,
+                inputs.imported,
+                total_ms / 1000.0,
+                native_ms / 1000.0,
+                process_count,
+                peak_active.load(Ordering::Acquire),
+            );
+        }
+        if let Some(previous) = &previous_previews {
+            assert_eq!(&preview_hashes, previous);
+        }
+        previous_previews = Some(preview_hashes.clone());
+        assert_eq!(
+            std::fs::read_dir(namespace.paths().media_directory())
+                .unwrap()
+                .count(),
+            inputs.previews
+        );
+        assert_eq!(
+            crate::media_runtime::photo_source_decode_count() - decoded_before,
+            inputs.host_decodes
+        );
+        assert!(host.undo().unwrap().state.album.media.is_empty());
+        measurements.push(serde_json::json!({
+            "round": round, "imported": inputs.imported, "previews": inputs.previews, "rejected": inputs.rejected,
+            "capacity": processor.cache_capacity(), "peakActiveJobs": peak_active.load(Ordering::Acquire),
+            "processes": process_count, "hostOriginalDecodes": inputs.host_decodes,
+            "captureMs": capture_ms, "nativeMs": native_ms, "inspectionMs": inspection_ms,
+            "commitMs": commit_ms, "firstDemandMs": handoff_ms, "totalMs": total_ms,
+            "previewSha256": preview_hashes
+        }));
+    }
+    assert_eq!(
+        inputs
+            .paths
+            .iter()
+            .map(|path| digest(path))
+            .collect::<Vec<_>>(),
+        original_hashes
+    );
+    if let Some(output) = std::env::var_os("MYALBUNS_IMPORT_MEASUREMENT_OUTPUT") {
+        let report = serde_json::json!({ "schemaVersion": 1, "protocolVersion": IMAGING_PROTOCOL_VERSION,
+            "profile": "debug", "processorSha256": digest(&executable), "originalsUnchanged": true,
+            "sourceSha256": original_hashes, "runs": measurements });
+        std::fs::write(output, serde_json::to_vec_pretty(&report).unwrap()).unwrap();
+    }
+}

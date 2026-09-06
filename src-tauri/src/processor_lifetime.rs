@@ -435,7 +435,7 @@ mod tests {
     }
 
     #[test]
-    fn a_live_second_writer_blocks_cleanup_of_the_first_claim_and_temporaries() {
+    fn a_live_last_writer_blocks_cleanup_of_all_claims_and_temporaries() {
         use myalbuns_paths::CacheWriterSlot;
         let root = tempfile::tempdir().unwrap();
         let (app_paths, paths) = cache_fixture(root.path());
@@ -457,10 +457,12 @@ mod tests {
             .open_cache_writer_claim_storage(&paths)
             .unwrap()
             .unwrap();
-        for (slot, process) in [
-            (CacheWriterSlot::First, stale),
-            (CacheWriterSlot::Second, exact),
-        ] {
+        for slot in CacheWriterSlot::ALL {
+            let process = if slot == CacheWriterSlot::Eighth {
+                exact
+            } else {
+                stale
+            };
             let encoded = serde_json::to_vec(&CacheWriterClaim {
                 schema_version: CACHE_WRITER_CLAIM_SCHEMA_VERSION,
                 process,
@@ -604,7 +606,7 @@ mod tests {
             .lines()
             .map(|line| line.parse::<u32>().unwrap())
             .collect::<Vec<_>>();
-        assert_eq!(processor_ids.len(), 2);
+        let processor_count = processor_ids.len();
         let processors = processor_ids
             .into_iter()
             .map(|id| {
@@ -618,6 +620,7 @@ mod tests {
             .collect::<Vec<_>>();
         host.kill().expect("the Host is terminated abruptly");
         host.wait().expect("the terminated Host is reaped");
+        assert_eq!(processor_count, myalbuns_paths::CacheWriterSlot::ALL.len());
         for process in processors {
             // SAFETY: closing each Host-owned Job must signal its Processor handle.
             assert_eq!(

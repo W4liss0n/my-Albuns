@@ -365,6 +365,7 @@ impl ProjectHost {
     }
 
     /// Inspection is performed by the blocking command worker without holding the session lock.
+    #[cfg(test)]
     pub(crate) fn import_photos(
         &self,
         paths: Vec<std::path::PathBuf>,
@@ -376,8 +377,16 @@ impl ProjectHost {
             &catalog.bindings,
             on_progress,
         );
+        self.commit_photo_import_proposal(&catalog.project_id, proposal)
+    }
+
+    pub(crate) fn commit_photo_import_proposal(
+        &self,
+        expected_project_id: &str,
+        proposal: crate::media_runtime::PhotoImportsProposal,
+    ) -> Result<crate::ipc_contract::ImportPhotoResult, String> {
         let mut project = self.project()?;
-        if project.project_id().hyphenated().to_string() != catalog.project_id {
+        if project.project_id().hyphenated().to_string() != expected_project_id {
             return Err(
                 "O Projeto mudou durante a importação. Selecione as Fotos novamente.".into(),
             );
@@ -398,7 +407,7 @@ impl ProjectHost {
             .filter_map(|inspection| {
                 let media_id = photos_by_path.get(inspection.observation.logical_path())?;
                 Some((
-                    (catalog.project_id.clone(), media_id.to_string()),
+                    (expected_project_id.to_owned(), media_id.to_string()),
                     inspection.observation,
                 ))
             })
@@ -761,6 +770,11 @@ impl ProjectHost {
                 })
                 .collect(),
         })
+    }
+
+    pub(crate) fn is_current_project(&self, project_id: &str) -> bool {
+        self.project()
+            .is_ok_and(|project| project.project_id().to_string() == project_id)
     }
 
     #[cfg(test)]

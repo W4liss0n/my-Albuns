@@ -53,10 +53,12 @@ Contratos detalhados por área. Os de interface descrevem superfícies e intera�
 - [0016 — Contrato do Arquivo de Projeto v2](docs/design/0016-contrato-do-arquivo-de-projeto-v2.md) — DTO fechado legado, `MediaRef` de Foto/Decorativo e etapa de migração v1 → v2.
 - [0017 — Contrato da primeira composição com Foto](docs/design/0017-contrato-da-primeira-composicao-com-foto.md) — esquema v3, Frames, enquadramento, resolução do alvo de soltura e autoridade do Original na Exportação.
 - [0019 — Contrato do Renderizador final](docs/design/0019-contrato-do-renderizador-final.md) — composição canônica, JPEG/PNG/PDF, captura estável dos Originais, Publicação e corpus dourado.
+- [0020 — Importação com decode único e lotes](docs/design/0020-importacao-com-decode-unico-e-lotes.md) — tentativa com caminhos congelados, adoção pelo Monitor, transações de Cache e capacidade de CPU/RAM.
 
 ## Pesquisas
 
 - [Importação de várias Fotos JPEG](docs/research/2026-09-05-importacao-multipla-jpeg.md) — primeiro recorte do #19, com resultado parcial e uma ação de Histórico; aceitação do seletor nativo pendente.
+- [Integração das otimizações de importação](docs/research/2026-09-06-integracao-importacao-producao.md) — decode único, lotes, orçamento de recursos e evidência do percurso com o Processador real.
 
 Material técnico não normativo, conservado como histórico das avaliações.
 

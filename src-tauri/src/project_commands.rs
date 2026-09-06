@@ -143,49 +143,18 @@ pub(crate) async fn import_photo(
             }),
         }
     }
-    let selected_paths = paths
-        .iter()
-        .cloned()
-        .collect::<std::collections::HashSet<_>>();
-    let unique_count = selected_paths.len() + unsupported.len();
-    let mut processing = ImageProcessingBatch::new(unique_count as u32, |progress| {
-        let _ = on_progress.send(progress);
-    });
-    // Original validation uses two blocking inspectors under the same budget
-    // as the sidecars. Reserve the whole budget until their proposal is ready.
-    let validation_reservation = app
-        .state::<crate::imaging_processor::ImagingProcessor>()
-        .reserve()
-        .await
-        .map_err(|error| error.to_string())?;
-    let mut result =
-        tauri::async_runtime::spawn_blocking(move || host.import_photos(paths, |_| {}))
-            .await
-            .map_err(|_| "Não foi possível concluir a importação das Fotos.".to_string())??;
-    drop(validation_reservation);
+    let result =
+        crate::photo_import::import_selected_photos(&app, paths, unsupported, |progress| {
+            let _ = on_progress.send(progress);
+        })
+        .await?;
     if let ImportPhotoResult::Completed {
         projection,
         imported_count,
         media_ids,
         problems,
-    } = &mut result
+    } = &result
     {
-        problems.extend(unsupported);
-        let catalog = state.authorized_media_catalog()?;
-        let bindings = selected_paths
-            .iter()
-            .filter_map(|path| {
-                catalog.bindings.iter().find(|binding| {
-                    binding.kind == myalbuns_core::MediaKind::Photo && &binding.logical_path == path
-                })
-            })
-            .cloned()
-            .collect();
-        processing.prepare_all(&app, bindings).await;
-        for _ in problems.iter() {
-            processing.complete(None);
-        }
-        *projection = state.projection()?;
         tracing::info!(
             target: "myalbuns.desktop",
             process_role = ProcessRole::DesktopHost.as_str(),
@@ -272,6 +241,18 @@ pub(crate) async fn relink_media(
     let cache_pause = app.state::<CacheEngine>().pause().await;
     let relink_app = app.clone();
     let relinked = tauri::async_runtime::spawn_blocking(move || {
+        let mut inspection_paths = myalbuns_paths::OperationPathContext::new();
+        let _ = inspection_paths.capture(&path);
+        let estimate = crate::imaging_processor::ImageMemoryEstimate::in_plan(
+            &inspection_paths.freeze(), [path.as_path()],
+        );
+        // Religação already owns the exclusive Cache pause. Reserve the same
+        // CPU/RAM budget without trying to acquire nested Cache activity.
+        let cancellation = crate::cache_activity_gate::CacheCancellation::default();
+        let _inspection_reservation = tauri::async_runtime::block_on(
+            relink_app.state::<crate::imaging_processor::ImagingProcessor>()
+                .reserve_inspection(estimate, cancellation.flag()),
+        ).map_err(|error| error.to_string())?;
         if !occurrence_is_authoritatively_absent(&binding) {
             return Err(
                 "O Arquivo original reapareceu durante a Religação; nenhuma referência foi alterada."

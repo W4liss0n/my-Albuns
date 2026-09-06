@@ -23,15 +23,36 @@ use crate::{
 pub enum CacheWriterSlot {
     First,
     Second,
+    Third,
+    Fourth,
+    Fifth,
+    Sixth,
+    Seventh,
+    Eighth,
 }
 
 impl CacheWriterSlot {
-    pub const ALL: [Self; 2] = [Self::First, Self::Second];
+    pub const ALL: [Self; 8] = [
+        Self::First,
+        Self::Second,
+        Self::Third,
+        Self::Fourth,
+        Self::Fifth,
+        Self::Sixth,
+        Self::Seventh,
+        Self::Eighth,
+    ];
 
     pub const fn index(self) -> usize {
         match self {
             Self::First => 0,
             Self::Second => 1,
+            Self::Third => 2,
+            Self::Fourth => 3,
+            Self::Fifth => 4,
+            Self::Sixth => 5,
+            Self::Seventh => 6,
+            Self::Eighth => 7,
         }
     }
 
@@ -39,6 +60,12 @@ impl CacheWriterSlot {
         match self {
             Self::First => ".processor-writer.v1.json",
             Self::Second => ".processor-writer-2.v1.json",
+            Self::Third => ".processor-writer-3.v1.json",
+            Self::Fourth => ".processor-writer-4.v1.json",
+            Self::Fifth => ".processor-writer-5.v1.json",
+            Self::Sixth => ".processor-writer-6.v1.json",
+            Self::Seventh => ".processor-writer-7.v1.json",
+            Self::Eighth => ".processor-writer-8.v1.json",
         }
     }
 }
@@ -394,6 +421,42 @@ impl CachePathPlan {
         self.root.join("metadata.json")
     }
 
+    /// A preparation source belongs to an attempt, not a creative MediaId.
+    /// Its opaque candidate name is never entered in the canonical media index.
+    pub fn import_preview_file(
+        &self,
+        attempt_id: &str,
+        source_id: &str,
+        generation_id: &str,
+        format: CacheArtifactFormat,
+    ) -> Result<PathBuf, AppPathsError> {
+        if !valid_cache_component(attempt_id) || !valid_cache_component(source_id) {
+            return Err(AppPathsError::InvalidCacheArtifact);
+        }
+        self.preview_file(
+            &format!("import:{attempt_id}:{source_id}"),
+            generation_id,
+            format,
+        )
+    }
+
+    pub fn import_preview_temporary_file(
+        &self,
+        attempt_id: &str,
+        source_id: &str,
+        generation_id: &str,
+        format: CacheArtifactFormat,
+        process_id: u32,
+    ) -> Result<PathBuf, AppPathsError> {
+        let path = self.import_preview_file(attempt_id, source_id, generation_id, format)?;
+        let name = path
+            .file_name()
+            .ok_or(AppPathsError::InvalidCacheArtifact)?;
+        let mut temporary_name = name.to_os_string();
+        temporary_name.push(format!(".tmp-{process_id}"));
+        Ok(path.with_file_name(temporary_name))
+    }
+
     pub fn metadata_temporary_file(&self, process_id: u32) -> PathBuf {
         self.root.join(format!("metadata.json.tmp-{process_id}"))
     }
@@ -454,6 +517,30 @@ impl PreparedCacheStorage {
         };
         delete_open_file(parent, path, &file)?;
         Ok(true)
+    }
+
+    /// Reassigns one immutable candidate inside the same guarded media directory.
+    /// The destination must be new; neither path can address Original data.
+    pub fn relocate_generation(&self, source: &Path, target: &Path) -> Result<(), AppPathsError> {
+        if !source.file_name().is_some_and(is_final_generation_name)
+            || !target.file_name().is_some_and(is_final_generation_name)
+        {
+            return Err(AppPathsError::CacheStorageOutsideRoot);
+        }
+        let (parent, _) = self.validate_publication_paths(source, target)?;
+        if self.open_existing_file(target)?.is_some() {
+            return Err(AppPathsError::CacheStorageUnavailable);
+        }
+        let file = open_deletable_file(parent, source)?;
+        rename_open_file(
+            parent,
+            source,
+            &file,
+            target
+                .file_name()
+                .ok_or(AppPathsError::CacheStorageOutsideRoot)?,
+        )?;
+        Ok(())
     }
 
     pub fn remove_unreferenced_generations(
@@ -957,14 +1044,26 @@ fn discard_matching_files<F>(
 where
     F: Fn(&std::ffi::OsStr) -> bool,
 {
+    let entries = fs::read_dir(&directory.logical_path)
+        .map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+    discard_matching_entries(directory, entries, is_temporary)
+}
+
+fn discard_matching_entries(
+    directory: &DirectoryGuard,
+    entries: impl IntoIterator<Item = io::Result<fs::DirEntry>>,
+    is_temporary: impl Fn(&std::ffi::OsStr) -> bool,
+) -> Result<usize, AppPathsError> {
     let mut removed = 0;
-    for entry in
-        fs::read_dir(&directory.logical_path).map_err(|_| AppPathsError::CacheStorageUnavailable)?
-    {
+    for entry in entries {
         let entry = entry.map_err(|_| AppPathsError::CacheStorageUnavailable)?;
         let path = entry.path();
-        let metadata =
-            fs::symlink_metadata(&path).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+        let metadata = match fs::symlink_metadata(&path) {
+            Ok(metadata) => metadata,
+            // Another Processor's cleanup can remove an entry after enumeration.
+            Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
+            Err(_) => return Err(AppPathsError::CacheStorageUnavailable),
+        };
         if is_reparse_point(&metadata) {
             return Err(AppPathsError::CacheStorageOutsideRoot);
         }
@@ -1034,9 +1133,48 @@ mod windows_mutation_tests {
     use std::{path::Path, process::Command};
 
     use super::{
-        AppPaths, clear_cache_files, open_existing_direct_child, open_existing_project_cache,
-        remove_empty_directory,
+        AppPaths, clear_cache_files, discard_matching_entries, is_preview_temporary_name_for,
+        open_existing_direct_child, open_existing_project_cache, remove_empty_directory,
     };
+
+    #[test]
+    fn a_peer_removing_an_enumerated_temporary_does_not_abort_our_cleanup() {
+        let root = tempfile::tempdir().unwrap();
+        let paths = AppPaths::from_roots(root.path(), root.path());
+        let plan = paths.project_cache("concurrent-cleanup").unwrap();
+        let storage = paths.prepare_cache_storage(&plan).unwrap();
+        let temporary = |generation, pid| {
+            plan.preview_temporary_file("photo", generation, crate::CacheArtifactFormat::Jpeg, pid)
+                .unwrap()
+        };
+        let vanished = temporary("peer-finished", 100);
+        let own = temporary("our-work", 200);
+        let live_peer = temporary("peer-active", 300);
+        for path in [&vanished, &own, &live_peer] {
+            std::fs::write(path, b"partial").unwrap();
+        }
+        let mut entries = std::fs::read_dir(plan.media_directory())
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        entries.sort_by_key(|entry| entry.path() != vanished);
+        // Pin the real race: enumeration saw this peer's entry, but its cleanup
+        // removes it before our scan can inspect its metadata.
+        storage.remove_existing_file(&vanished).unwrap();
+        let project_cache = open_existing_project_cache(&paths, &plan).unwrap().unwrap();
+        let media = open_existing_direct_child(project_cache.project(), &plan.media_directory())
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            discard_matching_entries(&media, entries.into_iter().map(Ok), |name| {
+                is_preview_temporary_name_for(name, 200)
+            })
+            .unwrap(),
+            1
+        );
+        assert!(!own.exists());
+        assert_eq!(std::fs::read(live_peer).unwrap(), b"partial");
+    }
 
     #[test]
     fn recursive_cleanup_mutates_only_the_held_directory_after_a_junction_swap() {
