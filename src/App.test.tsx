@@ -1227,6 +1227,9 @@ test("keeps the newest media projection when equal-revision refreshes resolve ou
   await screen.findByRole("button", { name: /Serra ao amanhecer\.jpg/i });
   act(() => {
     notifyMediaChanged?.(["media-001"]);
+  });
+  await waitFor(() => expect(load).toHaveBeenCalledTimes(2));
+  act(() => {
     notifyMediaChanged?.(["media-001"]);
   });
   await waitFor(() => expect(load).toHaveBeenCalledTimes(3));
@@ -1955,4 +1958,151 @@ test("keeps a created Project usable while reporting initial image cache problem
   expect(screen.getByTestId("album-canvas")).toBeInTheDocument();
   act(() => dialog.emit("dismissImageProcessingProblems"));
   await waitFor(() => expect(dialog.dismiss).toHaveBeenCalled());
+});
+
+test.each([
+  { outcome: "success", alreadyReading: false },
+  { outcome: "failure", alreadyReading: false },
+  { outcome: "success", alreadyReading: true },
+])("reveals an import batch after $outcome when the monitor is already reading: $alreadyReading", async ({ outcome, alreadyReading }) => {
+  let notify: Parameters<MediaPreviewPort["onMediaChanged"]>[0] = () => undefined;
+  let progress: Parameters<ProjectCorePort["importPhoto"]>[0] = () => undefined;
+  let finish!: (result: Awaited<ReturnType<ProjectCorePort["importPhoto"]>>) => void;
+  let fail!: (reason: Error) => void;
+  let finishEarlyRead!: (projection: typeof representativeProjection) => void;
+  const newPhotos = [1, 2].map((number) => ({
+    ...representativeProjection.state.album.media.find((media) => media.kind === "photo")!,
+    id: `new-photo-${number}`,
+    name: `Nova ${number}.jpg`,
+  }));
+  const imported = {
+    ...representativeProjection,
+    state: {
+      ...representativeProjection.state,
+      revision: representativeProjection.state.revision + 1,
+      album: {
+        ...representativeProjection.state.album,
+        media: [...representativeProjection.state.album.media, ...newPhotos],
+      },
+    },
+  };
+  const load = vi.fn().mockResolvedValueOnce(representativeProjection);
+  if (alreadyReading) {
+    load.mockImplementationOnce(() => new Promise((resolve) => {
+      finishEarlyRead = resolve;
+    }));
+  }
+  load.mockResolvedValue(imported);
+  const importPhoto = vi.fn<ProjectCorePort["importPhoto"]>((onProgress) => {
+    progress = onProgress;
+    return new Promise((resolve, reject) => {
+      finish = resolve;
+      fail = reject;
+    });
+  });
+  render(
+    <App
+      projectStartupPort={projectStartupPort}
+      projectWindowPort={projectWindowPort}
+      projectCorePort={{ ...projectCorePort, load, importPhoto }}
+      mediaPreviewPort={{
+        ...mediaPreviewPort,
+        onMediaChanged: async (listener) => {
+          notify = listener;
+          return () => undefined;
+        },
+      }}
+      graphicsProbe={canvasGraphicsDiagnosticProbe}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      logger={silentLogger}
+    />,
+  );
+  await screen.findByRole("button", { name: /Serra ao amanhecer\.jpg/i });
+  if (alreadyReading) {
+    act(() => notify(["media-001"]));
+    await waitFor(() => expect(load).toHaveBeenCalledTimes(2));
+  }
+  fireEvent.click(screen.getByRole("button", { name: "Importar" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos JPEG…" }));
+  await waitFor(() => expect(importPhoto).toHaveBeenCalledOnce());
+  if (alreadyReading) {
+    await act(async () => finishEarlyRead(imported));
+    expect(screen.queryByRole("button", { name: "Nova 1.jpg" })).not.toBeInTheDocument();
+  }
+  await act(async () => {
+    progress?.({ completedFiles: 0, totalFiles: 2 });
+    notify(newPhotos.map(({ id }) => id));
+  });
+  await act(async () => {
+    progress?.({ completedFiles: 1, totalFiles: 2 });
+    notify([newPhotos[0].id]);
+    notify([newPhotos[1].id]);
+  });
+  expect(load).toHaveBeenCalledTimes(alreadyReading ? 2 : 1);
+  expect(screen.getByRole("button", { name: /Serra ao amanhecer\.jpg/i })).toBeVisible();
+  expect(screen.queryByRole("button", { name: "Nova 1.jpg" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Nova 2.jpg" })).not.toBeInTheDocument();
+  await act(async () => {
+    if (outcome === "failure") {
+      fail(new Error("O processamento falhou após vincular as imagens."));
+    } else {
+      finish({
+        kind: "completed",
+        projection: imported,
+        mediaIds: newPhotos.map(({ id }) => id),
+        importedCount: 2,
+        problems: [],
+      });
+    }
+  });
+  expect(await screen.findByRole("button", { name: "Nova 1.jpg" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Nova 2.jpg" })).toBeVisible();
+  await waitFor(() => expect(load).toHaveBeenCalledTimes(alreadyReading ? 3 : 2));
+});
+
+test("keeps a completed Save authoritative when a monitor read finishes during saving", async () => {
+  let notify: Parameters<MediaPreviewPort["onMediaChanged"]>[0] = () => undefined;
+  let finishRead!: (projection: typeof representativeProjection) => void;
+  let finishSave!: (result: Awaited<ReturnType<ProjectCorePort["save"]>>) => void;
+  const dirty = {
+    ...representativeProjection,
+    state: { ...representativeProjection.state, dirty: true },
+  };
+  const saved = {
+    ...dirty,
+    state: { ...dirty.state, dirty: false, savedRevision: dirty.state.revision },
+  };
+  const load = vi.fn()
+    .mockResolvedValueOnce(dirty)
+    .mockImplementationOnce(() => new Promise((resolve) => { finishRead = resolve; }))
+    .mockResolvedValue(saved);
+  const save = vi.fn<ProjectCorePort["save"]>(() => new Promise((resolve) => {
+    finishSave = resolve;
+  }));
+  render(
+    <App
+      projectStartupPort={projectStartupPort}
+      projectWindowPort={projectWindowPort}
+      projectCorePort={{ ...projectCorePort, load, save }}
+      mediaPreviewPort={{ ...mediaPreviewPort, onMediaChanged: async (listener) => {
+        notify = listener;
+        return () => undefined;
+      } }}
+      graphicsProbe={canvasGraphicsDiagnosticProbe}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      logger={silentLogger}
+    />,
+  );
+  await screen.findByText("alterações não salvas");
+  act(() => notify(["media-001"]));
+  await waitFor(() => expect(load).toHaveBeenCalledTimes(2));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivo" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Salvar" }));
+  await waitFor(() => expect(save).toHaveBeenCalledOnce());
+  await act(async () => finishRead(dirty));
+  await act(async () => finishSave({
+    outcome: { kind: "saved", revision: saved.state.revision },
+    projection: saved,
+  }));
+  await waitFor(() => expect(screen.queryByText("alterações não salvas")).not.toBeInTheDocument());
 });

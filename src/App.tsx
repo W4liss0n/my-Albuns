@@ -267,12 +267,28 @@ function App({
     void mediaPreviewPort
       .onMediaChanged(() => {
         if (!active) return;
-        setMediaRefreshRevision((revision) => revision + 1);
         const refresh = ++latestProjectionRefresh;
         const operationId = createLogInstanceId("media-refresh");
-        void projectCorePort.load(operationId).then(
-          (refreshed) => {
+        // The monitor can observe the committed catalog before its Cache batch
+        // finishes. Publish it only when the mutation queue has settled.
+        void runProjectMutation.waitForIdle().then(async () => {
+          if (!active || refresh !== latestProjectionRefresh) return null;
+          setMediaRefreshRevision((revision) => revision + 1);
+          return projectCorePort.load(operationId);
+        }).then(
+          async (refreshed) => {
+            // A subsequent mutation may have started while the read was in flight.
+            // Its result owns equal-revision changes too, such as Save clearing dirty.
+            const settled = await runProjectMutation.waitForIdle();
             if (
+              refreshed &&
+              settled?.status === "completed" &&
+              settled.projection.state.revision >= refreshed.state.revision
+            ) {
+              refreshed = settled.projection;
+            }
+            if (
+              !refreshed ||
               !active ||
               refresh !== latestProjectionRefresh ||
               refreshed.state.projectId !== projectId
@@ -329,7 +345,7 @@ function App({
           : current,
       );
     };
-  }, [logger, mediaPreviewPort, projectCorePort, projectId]);
+  }, [logger, mediaPreviewPort, projectCorePort, projectId, runProjectMutation]);
 
   useEffect(() => {
     setCacheProcessorWarning(null);

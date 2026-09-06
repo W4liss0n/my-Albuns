@@ -43,6 +43,11 @@ problema; leitura e Cache não reiniciam a barra em fases separadas. Mudanças d
 área visível não cancelam o trabalho necessário à ação. Atualizações automáticas
 da origem continuam em segundo plano e preservam a prévia anterior até a troca.
 
+Na importação, o Painel de imagens mantém o conjunto anterior durante todo o
+lote. Novos cartões e sua contagem aparecem juntos quando o processamento
+termina, inclusive quando há problemas a apresentar. Notificações do Monitor de
+Arquivos durante a ação não antecipam espaços vazios na grade.
+
 ## Progresso em lote
 
 O lote reutiliza a mesma barra geral e acrescenta somente um resumo compacto do

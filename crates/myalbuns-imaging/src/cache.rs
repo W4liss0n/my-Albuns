@@ -224,7 +224,7 @@ fn generate_preview(
     let preview = if width > request.policy.max_edge_px || height > request.policy.max_edge_px {
         DynamicImage::ImageRgba8(decoded)
             .thumbnail(request.policy.max_edge_px, request.policy.max_edge_px)
-            .to_rgba8()
+            .into_rgba8()
     } else {
         decoded
     };
@@ -258,11 +258,9 @@ fn generate_preview(
                 encoder
                     .set_icc_profile(SRGB_PROFILE.to_vec())
                     .map_err(|error| format!("não foi possível incluir o perfil sRGB: {error}"))?;
-                encoder
-                    .encode_image(&DynamicImage::ImageRgba8(preview.clone()).to_rgb8())
-                    .map_err(|error| {
-                        format!("não foi possível codificar a prévia JPEG: {error}")
-                    })?;
+                encoder.encode_image(&preview).map_err(|error| {
+                    format!("não foi possível codificar a prévia JPEG: {error}")
+                })?;
             }
             CacheArtifactFormat::Png => {
                 let mut encoder = PngEncoder::new(&mut writer);
