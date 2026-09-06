@@ -204,6 +204,7 @@ pub(crate) async fn prepare_media_previews(
     if catalog.project_id != namespace.project_id() {
         return Err(MediaPreviewCommandError::read_failed());
     }
+    engine.retain_prepared_catalog(&catalog.project_id, &catalog.bindings);
     let mut demand_revision = engine.reconcile_preview_demand(
         registry.inner(),
         namespace.project_id(),
@@ -378,6 +379,15 @@ impl DemandedPreviewPreparation<'_> {
             })
             .flatten()
         {
+            return Ok(Some(preview));
+        }
+        if let Some(preview) = engine.publish_prepared_if_demanded(
+            app_paths,
+            namespace,
+            registry,
+            demand_revision,
+            &source,
+        ) {
             return Ok(Some(preview));
         }
         let root_bindings = match path_io::capture_root_bindings(vec![

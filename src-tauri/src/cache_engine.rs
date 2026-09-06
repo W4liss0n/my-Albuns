@@ -33,7 +33,7 @@ use crate::{
         InvocationFailure, InvocationFailureStage, OperationFailure,
     },
     ipc_contract::{MediaPreview, MediaPreviewState},
-    media_runtime::MediaRuntimeUpdate,
+    media_runtime::{MediaBinding, MediaObservation, MediaResolver, MediaRuntimeUpdate},
 };
 
 const CACHE_METADATA_SCHEMA_VERSION: u32 = 6;
@@ -316,6 +316,7 @@ pub(crate) struct CacheEngine {
     flights: Arc<Mutex<HashMap<CacheFlightKey, Arc<CacheFlight>>>>,
     demands: Mutex<HashMap<String, CacheDemandState>>,
     applied_observation_generations: Mutex<HashMap<(String, String), u64>>,
+    prepared: Mutex<HashMap<(String, String), PreparedCacheGeneration>>,
     active_owners: Arc<AtomicUsize>,
     activity: CacheActivityGate,
     processor_status: Mutex<CacheProcessorStatus>,
@@ -327,6 +328,13 @@ pub(crate) struct CacheEngine {
     /// `flights`, the preview registry, or Cache metadata I/O. Code holding
     /// any of those inner resources must never attempt to enter this gate.
     transition_and_publication_gate: Mutex<()>,
+}
+
+#[derive(Debug)]
+struct PreparedCacheGeneration {
+    source: MediaObservation,
+    artifact: CacheArtifact,
+    preview_sha256: [u8; 32],
 }
 
 #[derive(Debug, Default)]
@@ -555,6 +563,10 @@ impl CacheEngine {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .retain(|(observed_project_id, _), _| observed_project_id != project_id);
+        self.prepared
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .retain(|(prepared_project_id, _), _| prepared_project_id != project_id);
         self.flights
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -844,6 +856,66 @@ impl CacheEngine {
         Some(claim)
     }
 
+    pub(crate) fn publish_prepared_if_demanded(
+        &self,
+        app_paths: &AppPaths,
+        namespace: &AuthorizedCacheNamespace,
+        registry: &CachePreviewRegistry,
+        demand: &CacheDemandRevision,
+        source: &CacheMediaSource,
+    ) -> Option<MediaPreview> {
+        let _transition_guard = self
+            .transition_and_publication_gate
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if demand.project_id != namespace.project_id() || !self.demand_is_current(demand) {
+            return None;
+        }
+        if !self
+            .demands
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get(namespace.project_id())?
+            .media_ids
+            .contains(source.media_id())
+        {
+            return None;
+        }
+        // Only the first demand consumes this small receipt. Offscreen preparation
+        // retains metadata, never encoded previews or decoded Originals.
+        let prepared = self
+            .prepared
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .remove(&(
+                namespace.project_id().to_owned(),
+                source.media_id().to_owned(),
+            ))?;
+        if !prepared.source.same_source(&observe_cache_source(source)) {
+            return None;
+        }
+        let storage = app_paths.prepare_cache_storage(namespace.paths()).ok()?;
+        let metadata = load_metadata(&storage, namespace.paths())?;
+        if !metadata_is_current(&metadata, namespace.project_id(), namespace.paths())
+            || !metadata.entries.iter().any(|entry| {
+                entry.media_id == source.media_id()
+                    && entry.matches_source_path(source.source_path())
+                    && entry.artifact() == prepared.artifact
+            })
+        {
+            return None;
+        }
+        registry
+            .publish_verified(
+                app_paths,
+                namespace,
+                &prepared.artifact,
+                source.source_path(),
+                &prepared.preview_sha256,
+            )
+            .ok()
+    }
+
     pub(crate) fn claim_for_processing(&self, work: &CacheWork) -> CacheFlightClaim {
         let _transition_guard = self
             .transition_and_publication_gate
@@ -864,6 +936,27 @@ impl CacheEngine {
         claim
     }
 
+    pub(crate) fn retain_prepared_catalog(&self, project_id: &str, bindings: &[MediaBinding]) {
+        let current = bindings
+            .iter()
+            .map(|binding| (binding.media_id.as_str(), binding))
+            .collect::<HashMap<_, _>>();
+        let _transition_guard = self
+            .transition_and_publication_gate
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        self.prepared
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .retain(|(prepared_project, media_id), prepared| {
+                prepared_project != project_id
+                    || current.get(media_id.as_str()).is_some_and(|binding| {
+                        binding.kind == prepared.source.kind
+                            && binding.logical_path == prepared.source.logical_path()
+                    })
+            });
+    }
+
     fn claim_locked(
         &self,
         work: &CacheWork,
@@ -876,6 +969,13 @@ impl CacheEngine {
                 flight: Arc::clone(flight),
             });
         }
+        self.prepared
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .remove(&(
+                work.namespace.project_id().to_owned(),
+                work.source.media_id().to_owned(),
+            ));
         flights.retain(|_, flight| {
             if flight.project_id == work.namespace.project_id()
                 && flight.media_id == work.source.media_id()
@@ -1122,6 +1222,12 @@ impl CacheEngine {
     }
 
     fn cancel_flights(&self, project_id: &str, media_ids: &HashSet<String>) {
+        self.prepared
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .retain(|(prepared_project_id, media_id), _| {
+                prepared_project_id != project_id || !media_ids.contains(media_id)
+            });
         let mut flights = self
             .flights
             .lock()
@@ -1230,6 +1336,8 @@ async fn execute_cache<T: ImagingTransport>(
     {
         return Err(cancelled_before_publication());
     }
+    let source_binding = cache_source_binding(&work.source);
+    let observed_source = MediaResolver.observe_in_plan(&work.root_bindings, &source_binding);
     let request = {
         let _transition_and_publication_guard = engine
             .transition_and_publication_gate
@@ -1276,10 +1384,13 @@ async fn execute_cache<T: ImagingTransport>(
         discard_candidate_generation(&storage, &request)?;
         return Err(cancelled_before_publication());
     }
-    if let Err(failure) = verify_completion(&storage, &request, &completion) {
-        discard_candidate_generation(&storage, &request)?;
-        return Err(failure);
-    }
+    let preview_sha256 = match verify_completion(&storage, &request, &completion) {
+        Ok(digest) => digest,
+        Err(failure) => {
+            discard_candidate_generation(&storage, &request)?;
+            return Err(failure);
+        }
+    };
     if cancellation
         .flag()
         .load(std::sync::atomic::Ordering::Acquire)
@@ -1302,10 +1413,54 @@ async fn execute_cache<T: ImagingTransport>(
     if engine.can_sweep_after_publication() {
         sweep_unreferenced_generations(&storage, &request.cache_paths, &metadata)?;
     }
+    let required_by_processing = engine
+        .flights
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .get(&work.flight_key())
+        .is_some_and(|flight| flight.required_by_processing.load(Ordering::Acquire));
+    if required_by_processing {
+        let current = MediaResolver.observe_in_plan(&work.root_bindings, &source_binding);
+        let artifact = &completion.artifacts[0];
+        if observed_source.same_source(&current)
+            && current.matches_fingerprint(&artifact.fingerprint)
+        {
+            engine
+                .prepared
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .insert(
+                    (
+                        work.namespace.project_id().to_owned(),
+                        work.source.media_id().to_owned(),
+                    ),
+                    PreparedCacheGeneration {
+                        source: current,
+                        artifact: artifact.clone(),
+                        preview_sha256,
+                    },
+                );
+        }
+    }
     Ok(CacheExecution {
         completion,
         recovery,
     })
+}
+
+fn observe_cache_source(source: &CacheMediaSource) -> MediaObservation {
+    MediaResolver
+        .observe(0, &[cache_source_binding(source)])
+        .observations()[0]
+        .clone()
+}
+
+fn cache_source_binding(source: &CacheMediaSource) -> MediaBinding {
+    MediaBinding {
+        media_id: source.media_id().to_owned(),
+        kind: source.kind(),
+        logical_path: source.source_path().to_path_buf(),
+    }
 }
 
 fn cancelled_before_publication() -> CacheFailure {
@@ -1497,7 +1652,7 @@ fn verify_completion(
     storage: &PreparedCacheStorage,
     request: &CacheRequest,
     completion: &CacheCompletion,
-) -> Result<(), CacheFailure> {
+) -> Result<[u8; 32], CacheFailure> {
     if completion.artifacts.len() != 1
         || completion.preview_bytes != completion.artifacts[0].preview_bytes
         || completion.source_bytes != completion.artifacts[0].fingerprint.source_bytes
@@ -1550,7 +1705,7 @@ fn verify_cached_artifact(
     storage: &PreparedCacheStorage,
     cache_paths: &CachePathPlan,
     artifact: &CacheArtifact,
-) -> Result<(), CacheFailure> {
+) -> Result<[u8; 32], CacheFailure> {
     let preview_path = cache_paths
         .preview_file(&artifact.media_id, &artifact.generation_id, artifact.format)
         .map_err(|error| {
@@ -1589,7 +1744,15 @@ fn verify_cached_artifact(
             "A prévia concluída não corresponde à resposta recebida.",
         ));
     }
-    let reader = ImageReader::new(std::io::BufReader::new(file))
+    let payload = crate::opaque_image_protocol::read_image(file, true).map_err(|_| {
+        invalid_artifact("não foi possível ler os bytes completos da prévia".into())
+    })?;
+    if payload.source_bytes != artifact.preview_bytes
+        || payload.body.len() as u64 != artifact.preview_bytes
+    {
+        return Err(invalid_artifact("a prévia mudou durante a leitura".into()));
+    }
+    let reader = ImageReader::new(std::io::Cursor::new(&payload.body))
         .with_guessed_format()
         .map_err(|error| invalid_artifact(error.to_string()))?;
     if reader.format() != Some(image_format(artifact.format)) {
@@ -1612,7 +1775,7 @@ fn verify_cached_artifact(
         ));
     }
     DynamicImage::from_decoder(decoder).map_err(|error| invalid_artifact(error.to_string()))?;
-    Ok(())
+    Ok(Sha256::digest(&payload.body).into())
 }
 
 fn invalid_artifact(message: String) -> CacheFailure {
@@ -2130,6 +2293,120 @@ mod tests {
     }
 
     #[test]
+    fn completed_processing_hands_off_only_current_intact_cache_to_demand() {
+        tauri::async_runtime::block_on(async {
+            for change in [
+                "none", "source", "artifact", "index", "retire", "demand", "monitor", "removed",
+                "relink",
+            ] {
+                let fixture = fixture();
+                let engine = CacheEngine::default();
+                let registry = CachePreviewRegistry::new("test");
+                let CacheFlightClaim::Owner(owner) = engine.claim_for_processing(&fixture.work)
+                else {
+                    panic!("the preparation owns its work");
+                };
+                let mut transport = ScriptedTransport {
+                    app_paths: fixture.app_paths.clone(),
+                    scripts: VecDeque::from([Script::Complete(CacheArtifactFormat::Jpeg)]),
+                    attempts: Vec::new(),
+                };
+                let cancellation = owner.cancellation();
+                let execution = owner
+                    .complete(
+                        engine
+                            .execute(
+                                &mut transport,
+                                &fixture.app_paths,
+                                fixture.work.clone(),
+                                &fixture.context,
+                                &cancellation,
+                            )
+                            .await,
+                    )
+                    .unwrap();
+                let source = &fixture.work.source;
+                let namespace = &fixture.work.namespace;
+                let demand = engine.reconcile_preview_demand(
+                    &registry,
+                    namespace.project_id(),
+                    1,
+                    [source.media_id()],
+                );
+                match change {
+                    "source" => std::fs::write(
+                        source.source_path(),
+                        b"a changed original with another length",
+                    )
+                    .unwrap(),
+                    "artifact" => {
+                        let artifact = execution.artifact();
+                        let path = namespace
+                            .paths()
+                            .preview_file(
+                                &artifact.media_id,
+                                &artifact.generation_id,
+                                artifact.format,
+                            )
+                            .unwrap();
+                        let mut bytes = std::fs::read(&path).unwrap();
+                        let middle = bytes.len() / 2;
+                        bytes[middle] ^= 1;
+                        std::fs::write(path, bytes).unwrap();
+                    }
+                    "index" => {
+                        std::fs::write(namespace.paths().metadata_file(), b"invalid index")
+                            .unwrap();
+                    }
+                    "removed" => engine.retain_prepared_catalog(namespace.project_id(), &[]),
+                    "monitor" => engine.apply_monitor_media_update(
+                        namespace,
+                        &registry,
+                        &MediaRuntimeUpdate::for_test(
+                            1,
+                            vec![source.media_id().to_owned()],
+                            vec![source.media_id().to_owned()],
+                        ),
+                    ),
+                    "relink" => {
+                        let pause = engine.pause().await;
+                        engine
+                            .invalidate_relinked_media(
+                                &pause,
+                                &fixture.app_paths,
+                                namespace,
+                                &registry,
+                                source.media_id(),
+                            )
+                            .unwrap();
+                    }
+                    "retire" => {
+                        let pause = engine.pause().await;
+                        engine.retire_project_identity(&pause, &registry, namespace.project_id());
+                    }
+                    "demand" => {
+                        engine.reconcile_preview_demand(&registry, namespace.project_id(), 2, []);
+                    }
+                    _ => {}
+                }
+                let preview = engine.publish_prepared_if_demanded(
+                    &fixture.app_paths,
+                    namespace,
+                    &registry,
+                    &demand,
+                    source,
+                );
+                assert_eq!(
+                    preview.is_some(),
+                    change == "none",
+                    "{change}: prepared Cache must survive the handoff only while valid"
+                );
+                assert_eq!(transport.attempts, [1]);
+            }
+        });
+    }
+
+    #[test]
     fn concurrent_cache_completions_preserve_both_candidates_and_merge_the_index() {
         tauri::async_runtime::block_on(async {
             let fixture = fixture();
@@ -2229,10 +2506,13 @@ mod tests {
             panic!("the scripted transport accepts Cache only");
         };
         let job = &request.jobs[0];
+        let source_path = request
+            .root_bindings
+            .resolve(job.source.source_path())
+            .expect("the adapter follows the captured binding");
         let source_metadata =
-            std::fs::metadata(job.source.source_path()).expect("the adapter inspects the Original");
-        let source =
-            std::fs::read(job.source.source_path()).expect("the adapter opens the Original");
+            std::fs::metadata(&source_path).expect("the adapter inspects the Original");
+        let source = std::fs::read(&source_path).expect("the adapter opens the Original");
         let fingerprint = CacheFingerprint::sha256_full_file_with_timestamps(
             source.len() as u64,
             source_metadata.created().ok().and_then(super::unix_millis),
@@ -2600,6 +2880,91 @@ mod tests {
 
             drop(owner_a);
             drop(owner_b);
+        });
+    }
+
+    #[test]
+    fn prepared_generation_keeps_the_processors_captured_source_binding() {
+        tauri::async_runtime::block_on(async {
+            let mut fixture = fixture();
+            let mut roots = OperationPathContext::new();
+            roots
+                .capture_with_binding(
+                    fixture.work.source.source_path(),
+                    &fixture._root.path().join("captured-root"),
+                )
+                .unwrap();
+            fixture.work.root_bindings = roots.freeze();
+            let captured_path = fixture
+                .work
+                .root_bindings
+                .resolve(fixture.work.source.source_path())
+                .unwrap();
+            std::fs::create_dir_all(captured_path.parent().unwrap()).unwrap();
+            std::fs::write(&captured_path, b"the original in the captured root").unwrap();
+
+            let engine = CacheEngine::default();
+            let registry = CachePreviewRegistry::new("test");
+            let CacheFlightClaim::Owner(owner) = engine.claim_for_processing(&fixture.work) else {
+                panic!("preparation owns its work");
+            };
+            let mut transport = ScriptedTransport {
+                app_paths: fixture.app_paths.clone(),
+                scripts: VecDeque::from([Script::Complete(CacheArtifactFormat::Jpeg)]),
+                attempts: Vec::new(),
+            };
+            let cancellation = owner.cancellation();
+            owner
+                .complete(
+                    engine
+                        .execute(
+                            &mut transport,
+                            &fixture.app_paths,
+                            fixture.work.clone(),
+                            &fixture.context,
+                            &cancellation,
+                        )
+                        .await,
+                )
+                .unwrap();
+            let binding = crate::media_runtime::MediaBinding {
+                media_id: fixture.work.source.media_id().to_owned(),
+                kind: MediaKind::Photo,
+                logical_path: fixture.work.source.source_path().to_path_buf(),
+            };
+            let expected = crate::media_runtime::MediaResolver
+                .observe_in_plan(&fixture.work.root_bindings, &binding);
+            {
+                let prepared = engine.prepared.lock().unwrap();
+                let receipt = prepared
+                    .get(&(
+                        fixture.work.namespace.project_id().to_owned(),
+                        binding.media_id.clone(),
+                    ))
+                    .expect("the completed processing retains evidence for its captured Original");
+                assert!(
+                    receipt.source.same_source(&expected),
+                    "the Host and Processor must observe the same captured root"
+                );
+            }
+            let demand = engine.reconcile_preview_demand(
+                &registry,
+                fixture.work.namespace.project_id(),
+                1,
+                [binding.media_id.as_str()],
+            );
+            assert!(
+                engine
+                    .publish_prepared_if_demanded(
+                        &fixture.app_paths,
+                        &fixture.work.namespace,
+                        &registry,
+                        &demand,
+                        &fixture.work.source
+                    )
+                    .is_none(),
+                "a later demand resolving another root cannot consume the captured generation"
+            );
         });
     }
 

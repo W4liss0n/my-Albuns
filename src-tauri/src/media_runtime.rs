@@ -14,9 +14,25 @@ use myalbuns_paths::{
 
 use crate::ipc_contract::ImageProcessingProblem;
 
+#[cfg(test)]
+std::thread_local! {
+    static PHOTO_SOURCE_DECODES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+pub(crate) fn photo_source_decode_count() -> usize {
+    PHOTO_SOURCE_DECODES.get()
+}
+
 pub(crate) struct PhotoImportsProposal {
     pub(crate) commands: Vec<ImportPhoto>,
     pub(crate) problems: Vec<ImageProcessingProblem>,
+    pub(crate) inspections: Vec<ImportedPhotoInspection>,
+}
+
+/// A completed decode can be adopted once if the same source is still observed.
+pub(crate) struct ImportedPhotoInspection {
+    pub(crate) observation: MediaObservation,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -43,6 +59,35 @@ pub(crate) struct MediaObservation {
     source_bytes: Option<u64>,
     source_created_unix_ms: Option<u64>,
     source_modified_unix_ms: Option<u64>,
+}
+
+impl MediaObservation {
+    pub(crate) fn same_source(&self, current: &Self) -> bool {
+        self.availability == MediaAvailability::Candidate
+            && current.availability == MediaAvailability::Candidate
+            && self.physical_identity.is_some()
+            && self.source_modified_unix_ms.is_some()
+            && self.kind == current.kind
+            && self.logical_path == current.logical_path
+            && self.physical_identity == current.physical_identity
+            && self.source_bytes == current.source_bytes
+            && self.source_created_unix_ms == current.source_created_unix_ms
+            && self.source_modified_unix_ms == current.source_modified_unix_ms
+    }
+
+    pub(crate) fn matches_fingerprint(
+        &self,
+        fingerprint: &myalbuns_imaging_protocol::CacheFingerprint,
+    ) -> bool {
+        self.availability == MediaAvailability::Candidate
+            && self.source_bytes == Some(fingerprint.source_bytes)
+            && self.source_created_unix_ms == fingerprint.source_created_unix_ms
+            && self.source_modified_unix_ms == fingerprint.source_modified_unix_ms
+    }
+
+    pub(crate) fn logical_path(&self) -> &std::path::Path {
+        &self.logical_path
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -242,11 +287,23 @@ impl MediaResolver {
             candidates,
             |(path, capture)| {
                 if existing.contains(path.as_path()) {
-                    return Ok(ImportPhoto::select_existing(path));
+                    return Ok((ImportPhoto::select_existing(path), None));
                 }
                 capture
-                    .and_then(|()| inspect_media_source_in_plan(&plan, &path, true))
-                    .map(|metadata| ImportPhoto::new(path.clone(), metadata))
+                    .and_then(|()| {
+                        let binding = MediaBinding {
+                            media_id: String::new(),
+                            kind: MediaKind::Photo,
+                            logical_path: path.clone(),
+                        };
+                        let before = self.observe_in_plan(&plan, &binding);
+                        let metadata = inspect_media_source_in_plan(&plan, &path, true)?;
+                        let after = self.observe_in_plan(&plan, &binding);
+                        let inspection = before
+                            .same_source(&after)
+                            .then_some(ImportedPhotoInspection { observation: after });
+                        Ok((ImportPhoto::new(path.clone(), metadata), inspection))
+                    })
                     .map_err(|reason| ImageProcessingProblem {
                         file_name: path
                             .file_name()
@@ -266,13 +323,21 @@ impl MediaResolver {
         );
         let mut commands = Vec::new();
         let mut problems = Vec::new();
+        let mut inspections = Vec::new();
         for result in inspected {
             match result {
-                Ok(command) => commands.push(command),
+                Ok((command, inspection)) => {
+                    commands.push(command);
+                    inspections.extend(inspection);
+                }
                 Err(problem) => problems.push(problem),
             }
         }
-        PhotoImportsProposal { commands, problems }
+        PhotoImportsProposal {
+            commands,
+            problems,
+            inspections,
+        }
     }
 
     pub(crate) fn inspect_photo_binding(
@@ -317,59 +382,73 @@ impl MediaResolver {
         let observations = bindings
             .iter()
             .map(|binding| {
-                let (
-                    availability,
-                    physical_identity,
-                    source_bytes,
-                    source_created_unix_ms,
-                    source_modified_unix_ms,
-                ) = if let Some(availability) =
-                    capture_failures.get(binding.media_id.as_str()).copied()
-                {
-                    (availability, None, None, None, None)
+                let resolved = if capture_failures.contains_key(binding.media_id.as_str()) {
+                    Err(ResolveError::Unavailable)
                 } else {
-                    match plan.resolve_existing(&binding.logical_path, ExpectedObject::RegularFile)
-                    {
-                        Ok(resolved) => match resolved.file().metadata() {
-                            Ok(metadata) => (
-                                MediaAvailability::Candidate,
-                                resolved.physical_identity(),
-                                Some(metadata.len()),
-                                file_time_millis(metadata.created()),
-                                file_time_millis(metadata.modified()),
-                            ),
-                            Err(_) => (MediaAvailability::Unavailable, None, None, None, None),
-                        },
-                        Err(ResolveError::NotFound) => {
-                            (MediaAvailability::Absent, None, None, None, None)
-                        }
-                        Err(
-                            ResolveError::InvalidPath
-                            | ResolveError::UnsupportedNamespace
-                            | ResolveError::UnboundRoot
-                            | ResolveError::AccessDenied
-                            | ResolveError::Unavailable
-                            | ResolveError::UnexpectedObjectType { .. }
-                            | ResolveError::IoFailure,
-                        ) => (MediaAvailability::Unavailable, None, None, None, None),
-                    }
+                    plan.resolve_existing(&binding.logical_path, ExpectedObject::RegularFile)
                 };
-                MediaObservation {
-                    media_id: binding.media_id.clone(),
-                    kind: binding.kind,
-                    logical_path: binding.logical_path.clone(),
-                    availability,
-                    physical_identity,
-                    source_bytes,
-                    source_created_unix_ms,
-                    source_modified_unix_ms,
-                }
+                observe_resolved_source(binding, resolved)
             })
             .collect();
         MediaResolutionProposal {
             generation,
             observations,
         }
+    }
+
+    pub(crate) fn observe_in_plan(
+        &self,
+        plan: &RootBindingPlan,
+        binding: &MediaBinding,
+    ) -> MediaObservation {
+        observe_resolved_source(
+            binding,
+            plan.resolve_existing(&binding.logical_path, ExpectedObject::RegularFile),
+        )
+    }
+}
+
+fn observe_resolved_source(
+    binding: &MediaBinding,
+    resolved: Result<myalbuns_paths::ResolvedObject, ResolveError>,
+) -> MediaObservation {
+    let (
+        availability,
+        physical_identity,
+        source_bytes,
+        source_created_unix_ms,
+        source_modified_unix_ms,
+    ) = match resolved {
+        Ok(resolved) => match resolved.file().metadata() {
+            Ok(metadata) => (
+                MediaAvailability::Candidate,
+                resolved.physical_identity(),
+                Some(metadata.len()),
+                file_time_millis(metadata.created()),
+                file_time_millis(metadata.modified()),
+            ),
+            Err(_) => (MediaAvailability::Unavailable, None, None, None, None),
+        },
+        Err(ResolveError::NotFound) => (MediaAvailability::Absent, None, None, None, None),
+        Err(
+            ResolveError::InvalidPath
+            | ResolveError::UnsupportedNamespace
+            | ResolveError::UnboundRoot
+            | ResolveError::AccessDenied
+            | ResolveError::Unavailable
+            | ResolveError::UnexpectedObjectType { .. }
+            | ResolveError::IoFailure,
+        ) => (MediaAvailability::Unavailable, None, None, None, None),
+    };
+    MediaObservation {
+        media_id: binding.media_id.clone(),
+        kind: binding.kind,
+        logical_path: binding.logical_path.clone(),
+        availability,
+        physical_identity,
+        source_bytes,
+        source_created_unix_ms,
+        source_modified_unix_ms,
     }
 }
 
@@ -470,6 +549,8 @@ fn inspect_media_source_in_plan(
     ) {
         std::mem::swap(&mut width, &mut height);
     }
+    #[cfg(test)]
+    PHOTO_SOURCE_DECODES.set(PHOTO_SOURCE_DECODES.get() + 1);
     DynamicImage::from_decoder(decoder).map_err(|_| {
         if require_jpeg {
             "O JPEG está corrompido ou não pôde ser decodificado.".to_string()

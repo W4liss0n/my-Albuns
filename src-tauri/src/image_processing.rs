@@ -181,6 +181,9 @@ async fn synchronize_processing_sources(app: &AppHandle) -> Result<(), String> {
         if namespace.project_id() != catalog.project_id {
             return Err("O Projeto mudou durante o processamento das imagens.".into());
         }
+        processing_app
+            .state::<CacheEngine>()
+            .retain_prepared_catalog(&catalog.project_id, &catalog.bindings);
         let monitor = processing_app.state::<crate::media_runtime::MediaMonitor>();
         let runtime = processing_app.state::<crate::media_runtime::MediaRuntime>();
         // Two matching inspections adopt the selected bindings before the first

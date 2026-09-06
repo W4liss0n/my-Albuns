@@ -6,6 +6,7 @@ use std::{
 
 use myalbuns_imaging_protocol::{CacheArtifact, CacheArtifactFormat};
 use myalbuns_paths::AppPaths;
+use sha2::{Digest, Sha256};
 
 use crate::{
     cache_engine::{AuthorizedCacheNamespace, CacheSourceBinding},
@@ -74,6 +75,34 @@ impl CachePreviewRegistry {
         artifact: &CacheArtifact,
         source_path: &Path,
     ) -> Result<MediaPreview, CachePreviewError> {
+        self.publish_with_digest(app_paths, namespace, artifact, source_path, None)
+    }
+
+    pub(crate) fn publish_verified(
+        &self,
+        app_paths: &AppPaths,
+        namespace: &AuthorizedCacheNamespace,
+        artifact: &CacheArtifact,
+        source_path: &Path,
+        preview_sha256: &[u8; 32],
+    ) -> Result<MediaPreview, CachePreviewError> {
+        self.publish_with_digest(
+            app_paths,
+            namespace,
+            artifact,
+            source_path,
+            Some(preview_sha256),
+        )
+    }
+
+    fn publish_with_digest(
+        &self,
+        app_paths: &AppPaths,
+        namespace: &AuthorizedCacheNamespace,
+        artifact: &CacheArtifact,
+        source_path: &Path,
+        expected_digest: Option<&[u8; 32]>,
+    ) -> Result<MediaPreview, CachePreviewError> {
         let storage = app_paths
             .prepare_cache_storage(namespace.paths())
             .map_err(|_| CachePreviewError::Unavailable)?;
@@ -96,6 +125,12 @@ impl CachePreviewRegistry {
             || payload.body.len() as u64 != artifact.preview_bytes
         {
             return Err(CachePreviewError::InvalidDerivedArtifact);
+        }
+        if let Some(expected) = expected_digest {
+            let actual: [u8; 32] = Sha256::digest(&payload.body).into();
+            if actual != *expected {
+                return Err(CachePreviewError::InvalidDerivedArtifact);
+            }
         }
 
         let mut publication = self

@@ -205,6 +205,29 @@ mudança de área visível, mas continuam sujeitos à obsolescência da origem e
 Identidade. Artefatos de imagens fora da área visível ficam no disco; a preparação
 do lote não torna todas as prévias residentes em memória.
 
+A importação conserva temporariamente a evidência da inspeção de cada Foto
+validada. A primeira atualização do Monitor pode adotá-la sem decodificar o
+Original outra vez quando caminho, tipo, identidade física, tamanho e datas
+observadas ainda correspondem. A evidência é consumida nessa adoção; alteração
+da origem ou impossibilidade de comprovar essa correspondência exige a inspeção
+normal. Essa adoção não cria Histórico nem altera o estado salvo do Projeto.
+
+Ao concluir uma preparação solicitada por ação, `CacheEngine` conserva um
+resultado pequeno em memória: a observação da origem, o artefato publicado e o
+SHA-256 dos mesmos bytes reduzidos que o Host decodificou e validou. A primeira
+demanda pode consumir esse resultado sem iniciar outro Processador. Ela confere
+a demanda atual, a observação da origem, a entrada do índice e o hash dos bytes
+que serão publicados no registro de prévias. Corrupção, mudança de origem ou
+vínculo, retirada da Identidade e ausência do índice impedem esse reuso.
+
+O resultado não contém pixels do Original nem bytes de prévias fora da área
+visível. A reconciliação do catálogo descarta resultados de mídias removidas;
+invalidações e novos trabalhos retiram os resultados anteriores. O resultado é
+consumido pela primeira demanda válida, e as demandas seguintes usam a política
+de residência existente. Essa passagem dentro da Sessão aproveita uma geração
+já verificada pelo fingerprint integral; não autoriza reuso de um índice apenas
+por tamanho ou data e não acrescenta campos ao índice persistido.
+
 Em Novo Projeto, a identidade ainda não existe durante a escolha de uma imagem
 decorativa. A seleção só retorna depois da leitura e decodificação completas; o
 registro provisório guarda os bytes codificados dessa prévia em memória,

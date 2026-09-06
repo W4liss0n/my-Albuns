@@ -518,8 +518,13 @@ fn refresh_changed_photo_sources(
     host: &ProjectHost,
     changed_photos: Vec<MediaBinding>,
 ) -> Vec<String> {
+    let observed = MediaResolver.observe(0, &changed_photos);
     let mut refreshed = Vec::new();
-    for binding in changed_photos {
+    for (binding, observation) in changed_photos.into_iter().zip(observed.observations()) {
+        if host.adopt_imported_photo_inspection(&binding, observation) {
+            refreshed.push(binding.media_id);
+            continue;
+        }
         match MediaResolver.inspect_photo_binding(&binding) {
             Ok(metadata) => match host.observe_photo_source(&binding, metadata) {
                 Ok(()) => refreshed.push(binding.media_id.clone()),
@@ -1090,6 +1095,87 @@ mod tests {
         assert_eq!(first_projection.source_height_px, Some(1));
         assert_eq!(second_projection.source_width_px, Some(17));
         assert_eq!(second_projection.source_height_px, Some(11));
+    }
+
+    #[test]
+    fn imported_photo_inspection_is_reused_only_while_the_source_remains_current() {
+        for change_before_confirmation in [false, true] {
+            let root = tempfile::tempdir().unwrap();
+            let project_path = root.path().join("Projeto.myalbuns");
+            let photo_path = root.path().join("Foto.jpg");
+            let write_photo = |width, height| {
+                RgbImage::from_pixel(width, height, Rgb([20, 30, 40]))
+                    .save_with_format(&photo_path, ImageFormat::Jpeg)
+                    .unwrap();
+            };
+            write_photo(19, 7);
+            let mut context = OperationPathContext::new();
+            context.capture(&project_path).unwrap();
+            let project = ProjectCore::new()
+                .with_identity_storage_roots(
+                    root.path().join("leases"),
+                    root.path().join("identities"),
+                )
+                .create_editable(CreateProjectRequest::new(
+                    ProjectLocation::new(project_path, context.freeze()),
+                    InitialProject::neutral(),
+                    CreateAuthorization::CreateOnly,
+                ))
+                .unwrap();
+            let host = ProjectHost::new(project);
+            host.import_photos(vec![photo_path.clone()], |_| {})
+                .unwrap();
+            let catalog = host.authorized_media_catalog().unwrap();
+            let monitor = MediaMonitor::default();
+            let runtime = MediaRuntime::default();
+            let before = host.projection().unwrap();
+            if change_before_confirmation {
+                write_photo(31, 9);
+            }
+            assert!(monitor.poll(&runtime, &catalog.bindings).update().is_none());
+            let confirmation = monitor.poll(&runtime, &catalog.bindings);
+            let decodes = crate::media_runtime::photo_source_decode_count();
+            assert_eq!(
+                refresh_project_photos_for_media_update(
+                    &host,
+                    &catalog.bindings,
+                    confirmation.update().unwrap()
+                ),
+                [catalog.bindings[0].media_id.clone()],
+            );
+            assert_eq!(
+                crate::media_runtime::photo_source_decode_count() - decodes,
+                usize::from(change_before_confirmation),
+                "initial adoption must reuse the completed import inspection"
+            );
+            let after = host.projection().unwrap();
+            let photo = after.state.album.media.first().unwrap();
+            assert_eq!(
+                photo.source_width_px,
+                Some(if change_before_confirmation { 31 } else { 19 })
+            );
+            assert_eq!(after.state.revision, before.state.revision);
+            assert_eq!(after.state.dirty, before.state.dirty);
+            assert_eq!(after.state.can_undo, before.state.can_undo);
+
+            write_photo(43, 11);
+            assert!(monitor.poll(&runtime, &catalog.bindings).update().is_none());
+            let confirmation = monitor.poll(&runtime, &catalog.bindings);
+            let decodes = crate::media_runtime::photo_source_decode_count();
+            refresh_project_photos_for_media_update(
+                &host,
+                &catalog.bindings,
+                confirmation.update().unwrap(),
+            );
+            assert_eq!(
+                crate::media_runtime::photo_source_decode_count() - decodes,
+                1
+            );
+            assert_eq!(
+                host.projection().unwrap().state.album.media[0].source_width_px,
+                Some(43)
+            );
+        }
     }
 
     #[test]

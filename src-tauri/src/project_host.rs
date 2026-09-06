@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     io,
     sync::{Arc, Mutex, MutexGuard},
 };
@@ -13,7 +14,7 @@ use myalbuns_core::{
 use myalbuns_imaging_protocol::RenderSource;
 
 use crate::{
-    media_runtime::{MediaBinding, MediaRelinkProposal},
+    media_runtime::{MediaBinding, MediaObservation, MediaRelinkProposal},
     project_recovery::RecoveryCoordinator,
 };
 
@@ -36,6 +37,7 @@ struct ProjectHostState {
 struct ProjectHostSession {
     project: EditableProject,
     phase: ProjectHostPhase,
+    imported_photo_inspections: HashMap<(String, String), MediaObservation>,
 }
 
 enum ProjectHostPhase {
@@ -96,6 +98,7 @@ impl ProjectHostSession {
         Self {
             project,
             phase: ProjectHostPhase::Active,
+            imported_photo_inspections: HashMap::new(),
         }
     }
 
@@ -103,6 +106,7 @@ impl ProjectHostSession {
         Self {
             project,
             phase: ProjectHostPhase::RecoveryPending(Box::new(checkpoint)),
+            imported_photo_inspections: HashMap::new(),
         }
     }
 
@@ -381,6 +385,25 @@ impl ProjectHost {
         let outcome = project
             .import_photos(proposal.commands)
             .map_err(|error| error.to_string())?;
+        let photos_by_path = project
+            .project()
+            .media()
+            .iter()
+            .filter(|media| media.kind() == myalbuns_core::MediaKind::Photo)
+            .map(|media| (media.path(), media.id()))
+            .collect::<HashMap<_, _>>();
+        let inspections = proposal
+            .inspections
+            .into_iter()
+            .filter_map(|inspection| {
+                let media_id = photos_by_path.get(inspection.observation.logical_path())?;
+                Some((
+                    (catalog.project_id.clone(), media_id.to_string()),
+                    inspection.observation,
+                ))
+            })
+            .collect();
+        project.guard.session_mut()?.imported_photo_inspections = inspections;
         if outcome.imported_count > 0 {
             self.schedule_recovery(&project);
         }
@@ -394,6 +417,30 @@ impl ProjectHost {
             imported_count: outcome.imported_count as u32,
             problems: proposal.problems,
         })
+    }
+
+    pub(crate) fn adopt_imported_photo_inspection(
+        &self,
+        binding: &MediaBinding,
+        observation: &MediaObservation,
+    ) -> bool {
+        let Ok(mut project) = self.project() else {
+            return false;
+        };
+        if !project.project().media().iter().any(|media| {
+            media.id().to_string() == binding.media_id
+                && media.kind() == binding.kind
+                && media.path() == binding.logical_path
+        }) {
+            return false;
+        }
+        let key = (project.project_id().to_string(), binding.media_id.clone());
+        project
+            .guard
+            .session_mut()
+            .ok()
+            .and_then(|session| session.imported_photo_inspections.remove(&key))
+            .is_some_and(|inspection| inspection.same_source(observation))
     }
 
     pub(crate) fn relink_media(
