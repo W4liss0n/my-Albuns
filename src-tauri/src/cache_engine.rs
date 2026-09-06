@@ -628,7 +628,7 @@ impl CacheEngine {
         app_paths: &AppPaths,
         command: &ImagingCommand,
         context: &InvocationContext,
-        cancellation: &CacheCancellation,
+        control: InvocationControl<'_>,
     ) -> Result<(ImagingResponse, Option<CacheRecovery>), CacheFailure> {
         let paths = command.cache_paths().ok_or_else(|| {
             CacheFailure::new(CacheFailureStage::Plan, "O comando não pertence ao Cache.")
@@ -637,13 +637,7 @@ impl CacheEngine {
             .prepare_cache_storage(paths)
             .map_err(|error| CacheFailure::new(CacheFailureStage::Plan, error.to_string()))?;
         invoke_with_recovery(
-            self,
-            transport,
-            app_paths,
-            &storage,
-            command,
-            context,
-            cancellation,
+            self, transport, app_paths, &storage, command, context, control,
         )
         .await
     }
@@ -1463,7 +1457,7 @@ async fn prepare_cache<T: ImagingTransport>(
         &storage,
         &ImagingCommand::build_cache(request.clone()),
         context,
-        cancellation,
+        InvocationControl::controlled(cancellation.flag(), &|_| {}),
     )
     .await?;
     if let Some(failure) = response.failure_for(&work.request_id) {
@@ -1605,14 +1599,13 @@ async fn invoke_with_recovery<T: ImagingTransport>(
     storage: &PreparedCacheStorage,
     command: &ImagingCommand,
     context: &InvocationContext,
-    cancellation: &CacheCancellation,
+    control: InvocationControl<'_>,
 ) -> Result<(ImagingResponse, Option<CacheRecovery>), CacheFailure> {
     let cache_paths = command.cache_paths().ok_or_else(|| {
         CacheFailure::new(CacheFailureStage::Plan, "O comando não pertence ao Cache.")
     })?;
     let mut attempt = 1_u8;
     let mut recovery = None;
-    let progress = |_| {};
     loop {
         if engine.processor_status() == CacheProcessorStatus::Suspended {
             return Err(CacheFailure::new(
@@ -1621,13 +1614,7 @@ async fn invoke_with_recovery<T: ImagingTransport>(
             ));
         }
         match transport
-            .invoke(
-                command,
-                context,
-                ImagingOperation::Cache,
-                attempt,
-                InvocationControl::controlled(cancellation.flag(), &progress),
-            )
+            .invoke(command, context, ImagingOperation::Cache, attempt, control)
             .await
         {
             Ok(response) => {
@@ -1685,10 +1672,7 @@ async fn invoke_with_recovery<T: ImagingTransport>(
                         ),
                     })?;
                 discard_command_candidates(storage, command)?;
-                if cancellation
-                    .flag()
-                    .load(std::sync::atomic::Ordering::Acquire)
-                {
+                if control.is_cancelled() {
                     return Err(cancelled_before_publication());
                 }
                 if !repeated_failure {

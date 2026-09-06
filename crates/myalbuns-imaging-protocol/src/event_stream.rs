@@ -6,6 +6,7 @@ use crate::response::ImagingResponse;
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ImagingProgressStage {
+    PreparingPhotos,
     LoadingSources,
     Composing,
     EncodingOutput,
@@ -95,6 +96,7 @@ struct ProgressCursor {
 impl ImagingProgressStage {
     const fn next(self) -> Option<Self> {
         match self {
+            Self::PreparingPhotos => None,
             Self::LoadingSources => Some(Self::Composing),
             Self::Composing => Some(Self::EncodingOutput),
             Self::EncodingOutput => None,
@@ -169,8 +171,7 @@ impl ImagingEventStreamDecoder {
                 self.correlate(response.request_id())?;
                 if !response.is_failure()
                     && let Some(progress) = self.progress
-                    && (progress.stage != ImagingProgressStage::EncodingOutput
-                        || progress.completed_units != progress.total_units)
+                    && !progress.matches_completion(&response)
                 {
                     return Err("a resposta final chegou antes da conclusão do progresso".into());
                 }
@@ -195,8 +196,12 @@ impl ImagingEventStreamDecoder {
 
     fn advance_progress(&mut self, progress: &ImagingProgress) -> Result<(), String> {
         match self.progress {
-            None if progress.stage != ImagingProgressStage::LoadingSources => {
-                return Err("o progresso não começou pelo carregamento das fontes".into());
+            None if !matches!(
+                progress.stage,
+                ImagingProgressStage::LoadingSources | ImagingProgressStage::PreparingPhotos
+            ) =>
+            {
+                return Err("o progresso não começou por uma etapa inicial".into());
             }
             None => {}
             Some(previous) if progress.stage == previous.stage => {
@@ -219,6 +224,28 @@ impl ImagingEventStreamDecoder {
             total_units: progress.total_units,
         });
         Ok(())
+    }
+}
+
+impl ProgressCursor {
+    fn matches_completion(self, response: &ImagingResponse) -> bool {
+        if let ImagingResponse::PhotoImportCompleted { completion, .. } = response {
+            // Sources requiring Host inspection are still pending. They must not
+            // be counted as prepared merely because their native batch drained.
+            let validated = completion
+                .photos
+                .iter()
+                .filter(|photo| {
+                    matches!(photo.outcome, crate::PhotoImportOutcome::Validated { .. })
+                })
+                .count() as u32;
+            self.stage == ImagingProgressStage::PreparingPhotos
+                && self.total_units == completion.photos.len() as u32
+                && self.completed_units == validated
+        } else {
+            self.stage == ImagingProgressStage::EncodingOutput
+                && self.completed_units == self.total_units
+        }
     }
 }
 

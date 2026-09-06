@@ -1,8 +1,8 @@
 use image::GenericImageView;
 use myalbuns_imaging_protocol::{
-    CacheArtifactProperties, CacheReusableGeneration, ImagingResponse, ImportedPhotoDimensions,
-    ImportedPhotoPreview, PhotoImportCandidate, PhotoImportCompletion, PhotoImportOutcome,
-    PhotoImportRequest, PreparedPhotoImport,
+    CacheArtifactProperties, CacheReusableGeneration, ImagingProgressStage, ImagingResponse,
+    ImportedPhotoDimensions, ImportedPhotoPreview, PhotoImportCandidate, PhotoImportCompletion,
+    PhotoImportOutcome, PhotoImportRequest, PreparedPhotoImport,
 };
 use myalbuns_paths::{AppPaths, ExpectedObject};
 
@@ -13,26 +13,44 @@ use crate::{
 
 pub(crate) fn run(request: PhotoImportRequest, app_paths: &AppPaths) -> Result<(), String> {
     request.validate()?;
-    let completion = prepare(&request, app_paths);
+    let completion = prepare(&request, app_paths, |completed, total| {
+        crate::write_progress(
+            &request.request_id,
+            ImagingProgressStage::PreparingPhotos,
+            completed,
+            total,
+        )
+    })?;
     crate::write_response(&ImagingResponse::PhotoImportCompleted {
         request_id: request.request_id,
         completion,
     })
 }
 
-fn prepare(request: &PhotoImportRequest, app_paths: &AppPaths) -> PhotoImportCompletion {
+fn prepare(
+    request: &PhotoImportRequest,
+    app_paths: &AppPaths,
+    mut progress: impl FnMut(u32, u32) -> Result<(), String>,
+) -> Result<PhotoImportCompletion, String> {
     // One contained writer handles this bounded batch, releasing each Original
     // raster before the next candidate is decoded. Failures are per source.
-    let photos = request
-        .candidates
-        .iter()
-        .map(|candidate| PreparedPhotoImport {
+    let total = request.candidates.len() as u32;
+    let mut completed = 0;
+    progress(completed, total)?;
+    let mut photos = Vec::with_capacity(request.candidates.len());
+    for candidate in &request.candidates {
+        let photo = PreparedPhotoImport {
             source_id: candidate.source_id.clone(),
             outcome: prepare_photo(request, candidate, app_paths)
                 .unwrap_or_else(|reason| PhotoImportOutcome::InspectionRequired { reason }),
-        })
-        .collect();
-    PhotoImportCompletion { photos }
+        };
+        if matches!(photo.outcome, PhotoImportOutcome::Validated { .. }) {
+            completed += 1;
+            progress(completed, total)?;
+        }
+        photos.push(photo);
+    }
+    Ok(PhotoImportCompletion { photos })
 }
 
 fn prepare_photo(
@@ -186,7 +204,7 @@ mod tests {
         let before = std::fs::read(request.candidates[0].path()).unwrap();
         std::fs::write(request.candidates[1].path(), b"not a JPEG").unwrap();
         let decode_count = crate::source::jpeg_decode_count();
-        let completion = prepare(&request, &paths);
+        let completion = prepare(&request, &paths, |_, _| Ok(())).unwrap();
         completion.validate_for(&request).unwrap();
         assert_eq!(crate::source::jpeg_decode_count() - decode_count, 2);
         assert!(matches!(
@@ -233,7 +251,7 @@ mod tests {
         jpeg[frame + 7..frame + 9].copy_from_slice(&15_000_u16.to_be_bytes());
         std::fs::write(path, jpeg).unwrap();
         let before = crate::source::jpeg_decode_count();
-        let completion = prepare(&request, &paths);
+        let completion = prepare(&request, &paths, |_, _| Ok(())).unwrap();
         completion.validate_for(&request).unwrap();
         assert_eq!(crate::source::jpeg_decode_count(), before);
         let PhotoImportOutcome::InspectionRequired { reason } = &completion.photos[0].outcome
@@ -263,7 +281,7 @@ mod tests {
         // Original decode, without simulating or suppressing a codec error.
         std::fs::create_dir(&preview_path).unwrap();
         let decode_count = crate::source::jpeg_decode_count();
-        let completion = prepare(&request, &paths);
+        let completion = prepare(&request, &paths, |_, _| Ok(())).unwrap();
         completion.validate_for(&request).unwrap();
         assert_eq!(crate::source::jpeg_decode_count() - decode_count, 1);
         assert!(matches!(

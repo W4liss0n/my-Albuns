@@ -2,6 +2,8 @@
 //! accepted by Core. Native batches own no creative identifiers or UI state.
 #[cfg(test)]
 mod native_flow_tests;
+mod progress;
+use progress::NativeImportProgress;
 use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
@@ -10,9 +12,9 @@ use std::{
 use futures_util::{StreamExt, stream};
 use myalbuns_core::{ImportPhoto, MediaKind, PhotoSourceMetadata};
 use myalbuns_imaging_protocol::{
-    CacheRepresentationPolicy, IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingResponse,
-    ImportedPhotoPreview, PHOTO_IMPORT_PROCESS_BATCH, PhotoImportCandidate, PhotoImportCompletion,
-    PhotoImportOutcome, PhotoImportRequest, PhotoImportSourceId,
+    CacheRepresentationPolicy, IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingProgress,
+    ImagingResponse, ImportedPhotoPreview, PHOTO_IMPORT_PROCESS_BATCH, PhotoImportCandidate,
+    PhotoImportCompletion, PhotoImportOutcome, PhotoImportRequest, PhotoImportSourceId,
 };
 use myalbuns_paths::{AppPaths, NativePathDto, OperationPathContext, RootBindingPlan};
 use tauri::{AppHandle, Manager};
@@ -27,8 +29,8 @@ use crate::{
     cache_service::ActiveCacheNamespace,
     image_processing::ImageProcessingBatch,
     imaging_processor::{
-        ImageMemoryEstimate, ImagingProcessor, InvocationContext, InvocationFailureStage,
-        ProcessorAdmissionFailure, TauriImagingTransport,
+        ImageMemoryEstimate, ImagingProcessor, InvocationContext, InvocationControl,
+        InvocationFailureStage, ProcessorAdmissionFailure, TauriImagingTransport,
     },
     ipc_contract::{ImageProcessingProblem, ImageProcessingProgress, ImportPhotoResult},
     logging::LoggingState,
@@ -146,13 +148,14 @@ pub(crate) async fn import_selected_photos(
     app: &AppHandle,
     paths: Vec<PathBuf>,
     unsupported: Vec<ImageProcessingProblem>,
-    publish: impl FnMut(ImageProcessingProgress),
+    publish: impl FnMut(ImageProcessingProgress) + Send,
 ) -> Result<ImportPhotoResult, String> {
     let host = app.state::<ProjectHost>();
     let catalog = host.authorized_media_catalog()?;
     let namespace = app.state::<ActiveCacheNamespace>().namespace();
     let total = paths.iter().collect::<HashSet<_>>().len() + unsupported.len();
-    let mut progress = ImageProcessingBatch::new(total as u32, publish);
+    let progress = ImageProcessingBatch::new(total as u32, publish);
+    let unsupported_count = unsupported.len();
     let capture_app = app.clone();
     let (attempt, mut stage, stage_error) = tauri::async_runtime::spawn_blocking(move || {
         let attempt = PhotoImportAttempt::capture(catalog, namespace, paths)?;
@@ -181,10 +184,16 @@ pub(crate) async fn import_selected_photos(
     } else {
         Vec::new()
     };
+    let new_source_count = attempt.sources.len();
+    let native_progress = NativeImportProgress::new(progress, &requests);
     let batches = stream::iter(requests)
-        .map(|request| async move {
-            let result = execute_import_batch(app, &request).await;
-            (request, result)
+        .map(|request| {
+            let progress = &native_progress;
+            async move {
+                let result =
+                    execute_import_batch(app, &request, &|event| progress.report(event)).await;
+                (request, result)
+            }
         })
         .buffer_unordered(app.state::<ImagingProcessor>().cache_capacity())
         .collect::<Vec<_>>()
@@ -266,23 +275,14 @@ pub(crate) async fn import_selected_photos(
     .await
     .map_err(|_| "Não foi possível concluir a importação das Fotos.".to_string())??;
     drop(_commit_permit);
+    let mut progress = native_progress.finish((new_source_count + unsupported_count) as u32);
     for path in new_paths {
-        progress.complete(
-            cache_problems
-                .get(&path)
-                .map(|reason| cache_problem(&path, reason.clone())),
-        );
+        if let Some(reason) = cache_problems.get(&path) {
+            progress.report_problem(cache_problem(&path, reason.clone()));
+        }
     }
     progress.prepare_all_in_plan(app, existing, roots).await;
-    if let ImportPhotoResult::Completed {
-        projection,
-        problems,
-        ..
-    } = &mut result
-    {
-        for _ in problems.iter() {
-            progress.complete(None);
-        }
+    if let ImportPhotoResult::Completed { projection, .. } = &mut result {
         *projection = host.projection()?;
     }
     Ok(result)
@@ -549,6 +549,7 @@ struct BatchFailure {
 async fn execute_import_batch(
     app: &AppHandle,
     request: &PhotoImportRequest,
+    progress: &(dyn Fn(ImagingProgress) + Send + Sync),
 ) -> Result<PhotoImportCompletion, BatchFailure> {
     let engine = app.state::<CacheEngine>();
     let processor = app.state::<ImagingProcessor>();
@@ -624,7 +625,7 @@ async fn execute_import_batch(
                 &app_paths,
                 &command,
                 &context,
-                &cancellation,
+                InvocationControl::controlled(cancellation.flag(), progress),
             )
             .await;
         drop(reservation);

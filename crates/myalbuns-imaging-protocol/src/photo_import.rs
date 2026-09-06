@@ -323,4 +323,45 @@ mod tests {
         }
         assert!(generation.validate_for(&request).is_err());
     }
+
+    #[test]
+    fn import_progress_counts_validated_sources_and_keeps_inspection_pending() {
+        use crate::{
+            ImagingEvent, ImagingProgress, ImagingProgressStage, ImagingResponse,
+            decode_event_stream, encode_event,
+        };
+        let mut completion = completion();
+        completion.photos.push(PreparedPhotoImport {
+            source_id: PhotoImportSourceId::new("source-2").unwrap(),
+            outcome: PhotoImportOutcome::InspectionRequired {
+                reason: "Host inspection required".into(),
+            },
+        });
+        for (completed, total, accepted) in
+            [(1, 2, true), (2, 2, false), (0, 2, false), (1, 3, false)]
+        {
+            let progress = ImagingProgress::new(
+                "import-stream",
+                ImagingProgressStage::PreparingPhotos,
+                completed,
+                total,
+            )
+            .unwrap();
+            let mut stream = encode_event(&ImagingEvent::Progress(progress.clone())).unwrap();
+            stream.extend(
+                encode_event(&ImagingEvent::Response(
+                    ImagingResponse::PhotoImportCompleted {
+                        request_id: "import-stream".into(),
+                        completion: completion.clone(),
+                    },
+                ))
+                .unwrap(),
+            );
+            let decoded = decode_event_stream(&stream);
+            assert_eq!(decoded.is_ok(), accepted);
+            if accepted {
+                assert_eq!(decoded.unwrap().0, [progress]);
+            }
+        }
+    }
 }

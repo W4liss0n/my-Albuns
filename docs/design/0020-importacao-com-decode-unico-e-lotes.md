@@ -105,6 +105,26 @@ Host e Processador compartilham a política de validação das representações
 reduzidas. Cada um conserva sua própria abertura autorizada e decisão local:
 reconstrução no Processador, rejeição e digest no Host.
 
+## Progresso durante os lotes
+
+O protocolo 19 acrescenta a etapa `preparingPhotos` ao fluxo de eventos do
+Processador. Cada lote informa seu total e avança assim que um Original tem sua
+validação e preparação de Cache concluídas, inclusive quando a prévia termina
+indisponível. Fontes que ainda exigem inspeção alternativa não entram nessa
+contagem antecipadamente.
+
+O Host encaminha os eventos enquanto os processos estão ativos. Um contador
+local à tentativa combina os lotes, valida sua correlação e conserva o maior
+avanço de cada solicitação quando a recuperação a executa novamente. A mesma
+foto não avança duas vezes por causa da repetição. Inspeções alternativas e
+seleções rejeitadas são concluídas pelo Host; problemas tardios de publicação
+são notificados sem acrescentar outra unidade ao contador.
+
+Esses eventos não publicam mídias nem encerram a ação. O Histórico, o commit
+conjunto e a espera pelas miniaturas visíveis permanecem sob os mesmos donos.
+A barra pode alcançar 100% durante essa entrega final e a janela só fecha
+quando o Painel estiver pronto.
+
 ## Verificação
 
 - Equivalência de pixels, bytes, dimensões e orientação para prévias RGB/RGBA.
@@ -114,12 +134,17 @@ reconstrução no Processador, rejeição e digest no Host.
 - Registros de todos os escritores, retomada e exclusividade da Exportação.
 - Índice ausente/corrompido/substituído, publicação concorrente e lotes grandes.
 - Importação pela UI, Monitor concorrente, Salvar/Fechar pendentes e cartões juntos.
+- Progresso intermediário com uma foto seguinte ainda no decoder, soma de lotes
+  simultâneos e repetição após recuperação sem contagem duplicada.
 
 `scripts/Test-Rust.ps1` inclui um ensaio com o executável real, desde os lotes
 nativos até o commit no Core, a adoção no Monitor e o atendimento das prévias.
 Ele cobre JPEG progressivo, corrupção, formato incompatível e perfil de cor
 que exige inspeção alternativa. Esse ensaio não abre WebView nem seletor
 nativo; a validação dessas superfícies permanece separada.
+O transporte do ensaio encaminha eventos durante a execução e registra a
+contagem enquanto ainda existem trabalhos nativos ativos. A regressão mínima
+mantém o segundo JPEG no decoder real e exige receber `1 de 2` antes de liberá-lo.
 
 ## Contratos externos consultados
 
@@ -139,3 +164,13 @@ no código de `windows-sys` 0.61.2. A semântica de
 [Notify](https://docs.rs/tokio/1.53.1/tokio/sync/struct.Notify.html) e a reserva
 de semáforos foram consultadas por `find-docs` e confirmadas no código local
 de Tokio 1.53.1 para não perder notificações ao liberar memória.
+
+Para o progresso dos lotes, a documentação de
+[sidecars do Tauri 2](https://v2.tauri.app/develop/sidecar/) confirma a recepção
+de stdout durante a execução do filho. O transporte existente já encaminhava
+esses eventos; a importação passou a conservar o callback nesse percurso.
+O contador usa exclusão mútua com guarda curta, sem espera assíncrona dentro
+da seção protegida, conforme o contrato de
+[Mutex](https://doc.rust-lang.org/std/sync/struct.Mutex.html). Essa página
+documentava Rust 1.98.1 na consulta; as APIs usadas são estáveis e também
+foram verificadas pela compilação com a versão 1.98.0 fixada no projeto.

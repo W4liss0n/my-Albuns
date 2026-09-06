@@ -169,6 +169,84 @@ fn one_native_import_process_returns_typed_results_for_a_mixed_batch() {
     }
 }
 
+#[cfg(windows)]
+#[test]
+fn native_import_reports_progress_while_a_later_photo_is_still_processing() {
+    use myalbuns_imaging_protocol::{
+        ImagingEvent, PhotoImportCandidate, PhotoImportRequest, PhotoImportSourceId, decode_event,
+    };
+    use std::io::{BufRead, BufReader};
+
+    let root = tempfile::tempdir().unwrap();
+    let cache = TestCache::new("import-progress");
+    let first = root.path().join("first.jpg");
+    RgbImage::from_pixel(71, 43, Rgb([20, 40, 80]))
+        .save_with_format(&first, ImageFormat::Jpeg)
+        .unwrap();
+    let second = root.path().join("second.jpg");
+    std::fs::write(&second, include_bytes!("fixtures/progressive-420-dri.jpg")).unwrap();
+    let candidates = [first, second]
+        .into_iter()
+        .enumerate()
+        .map(|(index, path)| PhotoImportCandidate {
+            source_id: PhotoImportSourceId::new(format!("progress-{index}")).unwrap(),
+            source_path: path.into(),
+            generation_id: format!("progress-generation-{index}"),
+        })
+        .collect();
+    let request = PhotoImportRequest {
+        protocol_version: IMAGING_PROTOCOL_VERSION,
+        request_id: "import-progress".into(),
+        attempt_id: "attempt-progress".into(),
+        project_id: cache.project_id.clone(),
+        cache_paths: cache.paths.clone(),
+        candidates,
+        policy: CacheRepresentationPolicy::measured_v1(),
+        root_bindings: root_bindings(&[cache.paths.root(), root.path()]),
+    };
+    let barrier = root.path().join("second-photo-pending");
+    let mut child =
+        spawn_imaging_command_with_barrier(&ImagingCommand::PreparePhotoImport(request), &barrier);
+    let stdout = child.stdout.take().unwrap();
+    let (sender, receiver) = std::sync::mpsc::channel();
+    let reader = std::thread::spawn(move || {
+        for line in BufReader::new(stdout).lines() {
+            let _ = sender.send(line.unwrap());
+        }
+    });
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !barrier.exists() && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let later_photo_pending = barrier.exists();
+    let mut incremental_progress = false;
+    while let Ok(line) = receiver.recv_timeout(Duration::from_millis(100)) {
+        if let ImagingEvent::Progress(progress) = decode_event(line.as_bytes()).unwrap() {
+            incremental_progress |= progress.completed_units == 1 && progress.total_units == 2;
+        }
+    }
+    if later_photo_pending {
+        std::fs::remove_file(&barrier).unwrap();
+    } else {
+        child.kill().unwrap();
+    }
+    let output = child.wait_with_output().unwrap();
+    reader.join().unwrap();
+    assert!(
+        later_photo_pending,
+        "the second photo must be held in its real decoder"
+    );
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        incremental_progress,
+        "expected progress 1 of 2 before the second photo finished; no intermediate progress was emitted"
+    );
+}
+
 fn reusable_generation(artifact: &CacheArtifact) -> CacheReusableGeneration {
     CacheReusableGeneration::new(
         artifact.generation_id.clone(),

@@ -157,76 +157,93 @@ fn real_import_flow() {
         let native_started = Instant::now();
         let active = AtomicUsize::new(0);
         let peak_active = AtomicUsize::new(0);
+        let progress_samples = std::sync::Mutex::new(Vec::new());
+        let unique_count = attempt.paths.len() as u32;
+        let new_source_count = attempt.sources.len() as u32;
+        let import_progress = NativeImportProgress::new(
+            ImageProcessingBatch::new(unique_count, |event| {
+                progress_samples.lock().unwrap().push(serde_json::json!({
+                    "completed": event.completed_files,
+                    "total": event.total_files,
+                    "elapsedMs": milliseconds(total_started),
+                    "activeJobs": active.load(Ordering::Acquire),
+                    "problem": event.problem,
+                }));
+            }),
+            &requests,
+        );
         let completions = std::thread::scope(|scope| {
-            let tasks =
-                requests
-                    .into_iter()
-                    .map(|request| {
-                        let (
-                            engine,
-                            processor,
-                            app_paths,
-                            executable,
-                            data_root,
-                            active,
-                            peak_active,
-                        ) = (
-                            &engine,
-                            &processor,
-                            &app_paths,
-                            &executable,
-                            &data_root,
-                            &active,
-                            &peak_active,
+            let tasks = requests
+                .into_iter()
+                .map(|request| {
+                    let (
+                        engine,
+                        processor,
+                        app_paths,
+                        executable,
+                        data_root,
+                        active,
+                        peak_active,
+                        import_progress,
+                    ) = (
+                        &engine,
+                        &processor,
+                        &app_paths,
+                        &executable,
+                        &data_root,
+                        &active,
+                        &peak_active,
+                        &import_progress,
+                    );
+                    scope.spawn(move || {
+                        let estimate = ImageMemoryEstimate::in_plan(
+                            &request.root_bindings,
+                            request.candidates.iter().map(PhotoImportCandidate::path),
                         );
-                        scope.spawn(move || {
-                            let estimate = ImageMemoryEstimate::in_plan(
-                                &request.root_bindings,
-                                request.candidates.iter().map(PhotoImportCandidate::path),
+                        tauri::async_runtime::block_on(async {
+                            let cancellation = CacheCancellation::default();
+                            let _permit = engine.begin_cancellable_work(cancellation.clone()).await;
+                            let _reservation = processor
+                                .reserve_cache_for(estimate, cancellation.flag())
+                                .await
+                                .unwrap();
+                            let running = active.fetch_add(1, Ordering::AcqRel) + 1;
+                            peak_active.fetch_max(running, Ordering::AcqRel);
+                            let mut transport = RealProcessTransport::in_data_root(
+                                executable.clone(),
+                                data_root.clone(),
                             );
-                            tauri::async_runtime::block_on(async {
-                                let cancellation = CacheCancellation::default();
-                                let _permit =
-                                    engine.begin_cancellable_work(cancellation.clone()).await;
-                                let _reservation = processor
-                                    .reserve_cache_for(estimate, cancellation.flag())
-                                    .await
-                                    .unwrap();
-                                let running = active.fetch_add(1, Ordering::AcqRel) + 1;
-                                peak_active.fetch_max(running, Ordering::AcqRel);
-                                let mut transport = RealProcessTransport::in_data_root(
-                                    executable.clone(),
-                                    data_root.clone(),
-                                );
-                                let (response, recovery) = engine
-                                    .invoke_cache_command(
-                                        &mut transport,
-                                        app_paths,
-                                        &ImagingCommand::PreparePhotoImport(request.clone()),
-                                        &InvocationContext::new(
-                                            &request.request_id,
-                                            Some(&request.project_id),
-                                        ),
-                                        &cancellation,
-                                    )
-                                    .await
-                                    .unwrap();
-                                active.fetch_sub(1, Ordering::AcqRel);
-                                assert!(recovery.is_none());
-                                let ImagingResponse::PhotoImportCompleted {
-                                    request_id,
-                                    completion,
-                                } = response
-                                else {
-                                    panic!("typed completion")
-                                };
-                                assert_eq!(request_id, request.request_id);
-                                completion.validate_for(&request).unwrap();
-                                completion
-                            })
+                            let (response, recovery) = engine
+                                .invoke_cache_command(
+                                    &mut transport,
+                                    app_paths,
+                                    &ImagingCommand::PreparePhotoImport(request.clone()),
+                                    &InvocationContext::new(
+                                        &request.request_id,
+                                        Some(&request.project_id),
+                                    ),
+                                    InvocationControl::controlled(cancellation.flag(), &|event| {
+                                        import_progress.report(event)
+                                    }),
+                                )
+                                .await
+                                .unwrap();
+                            active.fetch_sub(1, Ordering::AcqRel);
+                            assert!(recovery.is_none());
+                            let ImagingResponse::PhotoImportCompleted {
+                                request_id,
+                                completion,
+                            } = response
+                            else {
+                                panic!("typed completion")
+                            };
+                            assert_eq!(request_id, request.request_id);
+                            completion.validate_for(&request).unwrap();
+                            completion
                         })
                     })
-                    .collect::<Vec<_>>();
+                })
+                .collect::<Vec<_>>();
             tasks
                 .into_iter()
                 .map(|task| task.join().unwrap())
@@ -265,6 +282,42 @@ fn real_import_flow() {
             commit_prepared_import(&host, &engine, &monitor, &runtime, &registry, prepared)
                 .unwrap();
         let commit_ms = milliseconds(commit_started);
+        let mut progress = import_progress.finish(new_source_count);
+        for (path, reason) in &committed.cache_problems {
+            progress.report_problem(cache_problem(path, reason.clone()));
+        }
+        let progress_samples = progress_samples.into_inner().unwrap();
+        assert_eq!(
+            progress_samples
+                .iter()
+                .filter(|sample| sample["problem"].is_null())
+                .map(|sample| sample["completed"].as_u64().unwrap())
+                .collect::<Vec<_>>(),
+            (0..=u64::from(unique_count)).collect::<Vec<_>>(),
+            "the real import must advance once per selected source"
+        );
+        assert_eq!(
+            progress_samples
+                .iter()
+                .filter(|sample| !sample["problem"].is_null())
+                .count(),
+            inputs.imported - inputs.previews,
+            "late Cache problems must be reported without counting a source twice: {:?}",
+            committed
+                .cache_problems
+                .values()
+                .take(3)
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            progress_samples.iter().any(|sample| {
+                let completed = sample["completed"].as_u64().unwrap();
+                completed > 0
+                    && completed < u64::from(unique_count)
+                    && sample["activeJobs"].as_u64().unwrap() > 0
+            }),
+            "intermediate progress must arrive while native jobs are still active"
+        );
         assert!(committed.existing.is_empty());
         assert_eq!(committed.new_paths.len(), inputs.imported);
         assert_eq!(
@@ -366,7 +419,7 @@ fn real_import_flow() {
             "processes": process_count, "hostOriginalDecodes": inputs.host_decodes,
             "captureMs": capture_ms, "nativeMs": native_ms, "inspectionMs": inspection_ms,
             "commitMs": commit_ms, "firstDemandMs": handoff_ms, "totalMs": total_ms,
-            "previewSha256": preview_hashes
+            "previewSha256": preview_hashes, "progress": progress_samples
         }));
     }
     assert_eq!(

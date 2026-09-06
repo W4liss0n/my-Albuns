@@ -298,6 +298,14 @@ impl<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> ImageProcessingBatc
         problem: Option<crate::ipc_contract::ImageProcessingProblem>,
     ) {
         self.completed += 1;
+        self.publish_progress(problem);
+    }
+
+    pub(crate) fn report_problem(&mut self, problem: crate::ipc_contract::ImageProcessingProblem) {
+        self.publish_progress(Some(problem));
+    }
+
+    fn publish_progress(&mut self, problem: Option<crate::ipc_contract::ImageProcessingProblem>) {
         (self.publish)(crate::ipc_contract::ImageProcessingProgress {
             completed_files: self.completed,
             total_files: self.total,

@@ -540,6 +540,7 @@ async fn prepare_export<T: ImagingTransport>(
     ensure_not_cancelled(control)?;
     let processor_progress = |event: ImagingProgress| {
         let stage = match event.stage {
+            ImagingProgressStage::PreparingPhotos => return,
             ImagingProgressStage::LoadingSources => ExportProgressStage::LoadingSources,
             ImagingProgressStage::Composing => ExportProgressStage::Composing,
             ImagingProgressStage::EncodingOutput => ExportProgressStage::EncodingOutput,

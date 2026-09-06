@@ -20,7 +20,7 @@ use myalbuns_core::{
 };
 use myalbuns_imaging_protocol::{
     CacheArtifactFormat, CacheMediaSource, IMAGING_PROTOCOL_VERSION, ImagingCommand,
-    ImagingResponse, RenderSource, encode_command,
+    ImagingEventStreamDecoder, ImagingResponse, RenderSource, encode_command,
 };
 use myalbuns_paths::{
     AppPaths, ExportPathPlan, ExportWriteAuthorization, OperationPathContext, RootBindingPlan,
@@ -180,9 +180,18 @@ impl RealProcessTransport {
         // while the child runs, just as the production transport does.
         let mut stdout = child.stdout.take().expect("captured stdout");
         let mut stderr = child.stderr.take().expect("captured stderr");
+        let (progress_sender, progress_chunks) = std::sync::mpsc::channel();
         let stdout = thread::spawn(move || {
             let mut bytes = Vec::new();
-            stdout.read_to_end(&mut bytes).unwrap();
+            let mut chunk = [0_u8; 8192];
+            loop {
+                let count = stdout.read(&mut chunk).unwrap();
+                if count == 0 {
+                    break;
+                }
+                bytes.extend_from_slice(&chunk[..count]);
+                let _ = progress_sender.send(chunk[..count].to_vec());
+            }
             bytes
         });
         let stderr = thread::spawn(move || {
@@ -241,7 +250,18 @@ impl RealProcessTransport {
             return complete_invocation(process_id, status.code(), &output);
         }
 
+        let mut decoder = ImagingEventStreamDecoder::new();
+        let mut report_progress = || {
+            for chunk in progress_chunks.try_iter() {
+                if let Ok(events) = decoder.push(&chunk) {
+                    for event in events {
+                        control.report(event);
+                    }
+                }
+            }
+        };
         loop {
+            report_progress();
             if control.is_cancelled() {
                 let _ = child.kill();
                 let _ = child
@@ -260,6 +280,7 @@ impl RealProcessTransport {
                 let status = child.wait().expect("the real imaging process exits");
                 let output = stdout.join().expect("the output reader completes");
                 let _ = stderr.join().expect("the error reader completes");
+                report_progress();
                 return complete_invocation(process_id, status.code(), &output);
             }
             thread::sleep(Duration::from_millis(5));
