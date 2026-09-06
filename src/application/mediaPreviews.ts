@@ -1,4 +1,21 @@
-import type { MediaPreview } from "./projectPorts";
+import type { ImageProcessingProblem, MediaPreview, MediaPreviewDemand, PhotoImportCompletion } from "./projectPorts";
+
+export type PrepareImportedMedia = (imported: PhotoImportCompletion) => Promise<readonly ImageProcessingProblem[]>;
+
+export function mergeMediaPreviewDemands(...demands: readonly MediaPreviewDemand[]): MediaPreviewDemand {
+  const visible = new Set(demands.flatMap((demand) => [...demand.visibleMediaIds]));
+  const preload = new Set(demands.flatMap((demand) => [...demand.preloadMediaIds]));
+  return {
+    visibleMediaIds: [...visible],
+    preloadMediaIds: [...preload].filter((id) => !visible.has(id)),
+  };
+}
+
+export async function decodeMediaPreview(url: string): Promise<void> {
+  const image = new Image();
+  image.src = url;
+  await image.decode();
+}
 
 interface MediaPreviewRenderingCandidate {
   state: "pending" | MediaPreview["state"];

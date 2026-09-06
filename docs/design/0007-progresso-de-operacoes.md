@@ -48,6 +48,16 @@ lote. Novos cartões e sua contagem aparecem juntos quando o processamento
 termina, inclusive quando há problemas a apresentar. Notificações do Monitor de
 Arquivos durante a ação não antecipam espaços vazios na grade.
 
+A conclusão da importação inclui a entrega conjunta das prévias ao Painel.
+O progresso permanece aberto enquanto a interface carrega as miniaturas que
+ficarão visíveis, usando os filtros, a ordem, a rolagem e o tamanho atuais.
+Ao inserir o lote ordenado, a grade conserva a posição de rolagem em pixels,
+sem deslocamento automático do navegador para acompanhar um cartão anterior.
+Resultados parciais de prévias não liberam cartões individualmente. Falhas
+aparecem como prévias indisponíveis e seguem para o resultado da operação.
+As demais miniaturas continuam sob demanda; essa entrega não exige manter
+todo o catálogo decodificado na memória.
+
 ## Progresso em lote
 
 O lote reutiliza a mesma barra geral e acrescenta somente um resumo compacto do

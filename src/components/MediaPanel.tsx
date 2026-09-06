@@ -1,11 +1,13 @@
 import {
   useEffect,
+  useImperativeHandle,
   useMemo,
   useRef,
   useState,
   type CSSProperties,
   type KeyboardEvent,
   type MouseEvent,
+  type Ref,
 } from "react";
 import type {
   MediaPreview,
@@ -29,6 +31,14 @@ import { MediaPanelToolbar } from "./MediaPanelToolbar";
 import { MediaPreviewCard } from "./MediaPreviewCard";
 import { isTextEntryTarget } from "./isTextEntryTarget";
 import "./MediaPanel.css";
+import { MEDIA_PANEL_PRELOAD_MARGIN, mediaPanelViewportDemand } from "./mediaPanelViewport";
+
+export interface MediaPanelHandle {
+  planCatalog(mediaItems: readonly MediaCatalogItem[], mediaUsage: readonly MediaUsage[]): {
+    demand: MediaPreviewDemand;
+    commit(): void;
+  };
+}
 
 type MediaPanelPreferenceMode =
   | {
@@ -62,6 +72,7 @@ type MediaPanelPreviewSource =
     };
 
 interface MediaPanelProps {
+  ref?: Ref<MediaPanelHandle>;
   mediaItems: readonly MediaCatalogItem[];
   mediaUsage: readonly MediaUsage[];
   onFillPhoto(mediaId: string): void;
@@ -84,6 +95,7 @@ const naturalNameCollator = new Intl.Collator("pt-BR", {
 });
 
 export function MediaPanel({
+  ref,
   mediaItems,
   mediaUsage,
   onFillPhoto,
@@ -143,22 +155,9 @@ export function MediaPanel({
   const search = searchByKind[activeMediaKind];
   const preferences = preferencesByKind[activeMediaKind];
   const { sortDirection, thumbnailSize, usageFilter } = preferences;
-  const visibleMediaItems = useMemo(() => {
-    const normalizedSearch = normalizeSearchText(search);
-    const direction = sortDirection === "ascending" ? 1 : -1;
-    return activeMediaItems
-      .filter((media) => {
-        const usageCount = mediaUsageById.get(media.id) ?? 0;
-        return (
-          passesUsageFilter(usageCount, usageFilter) &&
-          normalizeSearchText(media.name).includes(normalizedSearch)
-        );
-      })
-      .sort(
-        (left, right) =>
-          direction * naturalNameCollator.compare(left.name, right.name),
-      );
-  }, [activeMediaItems, mediaUsageById, search, sortDirection, usageFilter]);
+  const visibleMediaItems = useMemo(() => filterMediaItems(
+    activeMediaItems, mediaUsageById, search, sortDirection, usageFilter,
+  ), [activeMediaItems, mediaUsageById, search, sortDirection, usageFilter]);
   const visibleMediaIds = useMemo(
     () => visibleMediaItems.map(({ id }) => id),
     [visibleMediaItems],
@@ -179,6 +178,24 @@ export function MediaPanel({
     photo: { visibleMediaIds: [], preloadMediaIds: [] },
     decorative: { visibleMediaIds: [], preloadMediaIds: [] },
   });
+
+  useImperativeHandle(ref, () => ({
+    planCatalog(nextItems, nextUsage) {
+      const ordered = filterMediaItems(
+        nextItems.filter((media) => media.kind === activeMediaKind),
+        new Map(nextUsage.map((usage) => [usage.mediaId, usage.count])),
+        search, sortDirection, usageFilter,
+      );
+      const demand = mediaPanelViewportDemand(gridRef.current, ordered.map(({ id }) => id), thumbnailSize);
+      const inactive = observedDemandByKind.current[activeMediaKind === "photo" ? "decorative" : "photo"];
+      return {
+        demand: { ...demand, preloadMediaIds: [
+          ...demand.preloadMediaIds, ...inactive.visibleMediaIds, ...inactive.preloadMediaIds,
+        ] },
+        commit() { observedDemandByKind.current[activeMediaKind] = demand; },
+      };
+    },
+  }));
 
   useEffect(() => {
     if (!controlledThumbnailSizes) return;
@@ -294,7 +311,7 @@ export function MediaPanel({
     );
     const preloadObserver = new IntersectionObserver(
       (entries) => update(entries, resident),
-      { root, rootMargin: "122px 0px", threshold: 0.01 },
+      { root, rootMargin: `${MEDIA_PANEL_PRELOAD_MARGIN}px 0px`, threshold: 0.01 },
     );
     targets.forEach((target) => {
       visibleObserver.observe(target);
@@ -603,6 +620,21 @@ function normalizeSearchText(value: string) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLocaleLowerCase("pt-BR");
+}
+
+function filterMediaItems(
+  items: readonly MediaCatalogItem[],
+  usage: ReadonlyMap<string, number>,
+  search: string,
+  sortDirection: MediaPanelViewPreferences["sortDirection"],
+  usageFilter: MediaUsageFilter,
+) {
+  const normalizedSearch = normalizeSearchText(search);
+  const direction = sortDirection === "ascending" ? 1 : -1;
+  return items.filter((media) =>
+    passesUsageFilter(usage.get(media.id) ?? 0, usageFilter) &&
+    normalizeSearchText(media.name).includes(normalizedSearch),
+  ).sort((left, right) => direction * naturalNameCollator.compare(left.name, right.name));
 }
 
 function passesUsageFilter(

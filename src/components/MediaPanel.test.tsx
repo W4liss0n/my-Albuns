@@ -1,9 +1,10 @@
+import { createRef } from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 
 import type { MediaCatalogItem, MediaUsage } from "../domain/project";
-import { MediaPanel } from "./MediaPanel";
+import { MediaPanel, type MediaPanelHandle } from "./MediaPanel";
 
 const mediaItems: readonly MediaCatalogItem[] = [
   media("photo-album-10", "photo", "Álbum 10"),
@@ -28,6 +29,37 @@ const mediaPanelInteractions = {
   onRelinkMedia: () => undefined,
   onRetryUnavailableMedia: async () => undefined,
 };
+
+test("prepares only the future viewport with the panel's active ordering and filters", () => {
+  const ref = createRef<MediaPanelHandle>();
+  const demand = vi.fn();
+  const photos = Array.from({ length: 100 }, (_, i) => media(`photo-${i}`, "photo", `Álbum ${i}`));
+  const props = {
+    ...mediaPanelInteractions, mediaUsage: [], onFillPhoto: vi.fn(),
+    previewSource: { kind: "connected" as const, onDemandChange: demand, previews: {} },
+    preferences: { kind: "local" as const, initial: { photo: {
+      thumbnailSize: 84, sortDirection: "descending" as const, usageFilter: "all" as const,
+    } } },
+  };
+  const view = render(<MediaPanel {...props} ref={ref} mediaItems={mediaItems} />);
+  const grid = screen.getByRole("group", { name: "Grade de Fotos" });
+  Object.defineProperties(grid, { clientWidth: { value: 202 }, clientHeight: { value: 114 } });
+  Object.assign(grid.style, { padding: "10px 12px", rowGap: "10px", columnGap: "10px" });
+  grid.scrollTop = 188;
+  const plan = ref.current!.planCatalog(photos, []);
+  expect(plan.demand.visibleMediaIds).toEqual(["photo-95", "photo-94", "photo-93", "photo-92"]);
+  expect(plan.demand.preloadMediaIds).not.toContain("photo-80");
+  plan.commit();
+  view.rerender(<MediaPanel {...props} ref={ref} mediaItems={photos} />);
+  expect(demand).toHaveBeenLastCalledWith(plan.demand);
+  fireEvent.change(screen.getByRole("searchbox", { name: "Buscar Fotos" }), { target: { value: "album 99" } });
+  // A shorter filtered catalog clamps scroll just as the browser does.
+  expect(ref.current!.planCatalog(photos, []).demand).toEqual({
+    visibleMediaIds: ["photo-99"], preloadMediaIds: [],
+  });
+  fireEvent.change(screen.getByRole("searchbox", { name: "Buscar Fotos" }), { target: { value: "nenhuma" } });
+  expect(ref.current!.planCatalog(photos, []).demand).toEqual({ visibleMediaIds: [], preloadMediaIds: [] });
+});
 
 test("matches the reference toolbar and marks only unavailable import actions as placeholders", async () => {
   const user = userEvent.setup();

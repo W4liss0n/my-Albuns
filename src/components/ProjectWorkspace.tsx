@@ -4,6 +4,8 @@ import type {
   ExportPipelinePort,
   MediaPreview,
   ImageProcessingProgress,
+  ImageProcessingProblem,
+  PhotoImportCompletion,
   MediaPreviewDemand,
   ProjectCorePort,
   ProjectWindowPort,
@@ -19,7 +21,7 @@ import {
 import { sheetStructureAvailability } from "../application/sheetStructure";
 import type { ProjectDialogPort } from "../application/projectDialogPort";
 import type { GraphicsDiagnostic } from "../application/graphics";
-import { renderableMediaPreviewUrls } from "../application/mediaPreviews";
+import { mergeMediaPreviewDemands, renderableMediaPreviewUrls } from "../application/mediaPreviews";
 import type { DisplayUnit, EditorProjection } from "../domain/project";
 import { ApplicationHeader } from "../ui";
 import { AlbumCanvas } from "./AlbumCanvas";
@@ -32,7 +34,7 @@ import {
   InspectorPanel,
   type InspectorContext,
 } from "./InspectorPanel";
-import { MediaPanel } from "./MediaPanel";
+import { MediaPanel, type MediaPanelHandle } from "./MediaPanel";
 import { createProjectApplicationMenus } from "./projectApplicationMenus";
 import { useProjectCommandShortcuts } from "./useProjectCommandShortcuts";
 import { useProjectCloseController } from "./useProjectCloseController";
@@ -65,6 +67,7 @@ interface ProjectWorkspaceProps {
   projectCorePort: ProjectCorePort;
   mediaPreviews: Readonly<Record<string, MediaPreview>>;
   onMediaDemandChange(demand: MediaPreviewDemand): void;
+  prepareMediaPresentation?(imported: PhotoImportCompletion, demand: MediaPreviewDemand): Promise<readonly ImageProcessingProblem[]>;
   onRetryUnavailableMedia(mediaId: string, onProgress: (progress: ImageProcessingProgress) => void): Promise<void>;
   onProjectionChange(projection: EditorProjection): void;
   onGraphicsUnavailable(diagnostic: GraphicsDiagnostic): void;
@@ -86,6 +89,7 @@ export function ProjectWorkspace({
   projectCorePort,
   mediaPreviews,
   onMediaDemandChange,
+  prepareMediaPresentation,
   onRetryUnavailableMedia,
   onProjectionChange,
   onGraphicsUnavailable,
@@ -139,6 +143,7 @@ export function ProjectWorkspace({
     unit: DisplayUnit;
   } | null>(null);
   const exportControlRef = useRef<ExportPreviewControlHandle>(null);
+  const mediaPanelRef = useRef<MediaPanelHandle>(null);
   const [canvasMediaDemand, setCanvasMediaDemand] =
     useState<MediaPreviewDemand>({
       visibleMediaIds: [],
@@ -161,26 +166,10 @@ export function ProjectWorkspace({
     [projection.state.album.media],
   );
   useEffect(() => {
-    const visible = Array.from(
-      new Set([
-        ...canvasMediaDemand.visibleMediaIds,
-        ...panelMediaDemand.visibleMediaIds,
-      ]),
-    );
-    const visibleSet = new Set(visible);
-    const preload = Array.from(
-      new Set(
-        [
-          ...canvasMediaDemand.preloadMediaIds,
-          ...panelMediaDemand.preloadMediaIds,
-          ...albumDesignPreloadMediaIds,
-        ].filter((mediaId) => !visibleSet.has(mediaId)),
-      ),
-    );
-    onMediaDemandChange({
-      visibleMediaIds: visible,
-      preloadMediaIds: preload,
-    });
+    onMediaDemandChange(mergeMediaPreviewDemands(
+      canvasMediaDemand, panelMediaDemand,
+      { visibleMediaIds: [], preloadMediaIds: albumDesignPreloadMediaIds },
+    ));
   }, [
     albumDesignPreloadMediaIds,
     canvasMediaDemand,
@@ -230,6 +219,17 @@ export function ProjectWorkspace({
     projectCorePort,
     onProjectionChange,
     onSaveAsBarrierChange: changeSaveAsBarrier,
+    prepareImportedMedia: prepareMediaPresentation ? async (imported) => {
+      const plan = mediaPanelRef.current?.planCatalog(imported.projection.state.album.media, imported.projection.mediaUsage);
+      const demand = mergeMediaPreviewDemands(
+        canvasMediaDemand,
+        plan?.demand ?? { visibleMediaIds: [], preloadMediaIds: [] },
+        { visibleMediaIds: [], preloadMediaIds: albumDesignPreloadMediaIds },
+      );
+      const problems = await prepareMediaPresentation(imported, demand);
+      plan?.commit();
+      return problems;
+    } : undefined,
   });
   const albumInformationApply = useAlbumInformationApplyController({
     projectDialogPort,
@@ -704,6 +704,7 @@ export function ProjectWorkspace({
         />}
 
         {workspacePanels.panels.media.visible && <MediaPanel
+          ref={mediaPanelRef}
           mediaItems={projection.state.album.media}
           mediaUsage={projection.mediaUsage}
           onFillPhoto={controller.fillMedia}

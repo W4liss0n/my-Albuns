@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { PhotoImportCompletion, ImageProcessingProgress } from "../application/projectPorts";
 import { createLogInstanceId } from "../application/logging";
 import { useImageProcessing } from "./useImageProcessing";
+import type { PrepareImportedMedia } from "../application/mediaPreviews";
 
 import type {
   EditorProjection,
@@ -36,6 +37,7 @@ interface ProjectMutationsInput {
   onAffectedFrame(frameId: string): void;
   onAffectedSheet(sheetId: string): void;
   onSaveAsBarrierChange?(active: boolean): void;
+  prepareImportedMedia?: PrepareImportedMedia;
 }
 
 function messageFromError(error: unknown) {
@@ -49,6 +51,7 @@ export function useProjectMutations({
   onAffectedFrame,
   onAffectedSheet,
   onSaveAsBarrierChange,
+  prepareImportedMedia,
 }: ProjectMutationsInput) {
   const [message, setMessage] = useState<string | null>(null);
   const [importPending, setImportPending] = useState(false);
@@ -338,7 +341,12 @@ export function useProjectMutations({
       let result: PhotoImportCompletion | null = null;
       try {
         const completed = await runWithErrorFeedback(async (port) => {
-          const imported = await imageProcessing.run((publish) => port.importPhoto(publish));
+          const imported = await imageProcessing.run(async (publish) => {
+            const imported = await port.importPhoto(publish);
+            if (imported.kind !== "completed" || imported.mediaIds.length === 0 || !prepareImportedMedia) return imported;
+            const problems = await prepareImportedMedia(imported);
+            return { ...imported, problems: [...imported.problems, ...problems] };
+          });
           if (imported.kind === "completed") result = imported;
           return imported.projection;
         });

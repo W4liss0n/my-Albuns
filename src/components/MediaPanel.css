@@ -299,6 +299,8 @@
   padding: 10px 12px;
   overflow-x: hidden;
   overflow-y: auto;
+  /* Keep the pixel viewport used to prepare a newly imported catalog. */
+  overflow-anchor: none;
   align-content: start;
   grid-template-columns: repeat(auto-fill, var(--media-thumbnail-size, 84px));
   justify-content: space-between;

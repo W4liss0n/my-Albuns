@@ -2106,3 +2106,112 @@ test("keeps a completed Save authoritative when a monitor read finishes during s
   }));
   await waitFor(() => expect(screen.queryByText("alterações não salvas")).not.toBeInTheDocument());
 });
+
+test.each(["ready", "decode_failed", "native_unavailable"] as const)("delivers imported cards together after visible preview preparation: %s", async (outcome) => {
+  const dialog = projectDialogHarness();
+  const photos = [1, 2].map((number) => ({
+    ...representativeProjection.state.album.media[0],
+    kind: "photo" as const, id: `batch-${number}`, name: `Batch ${number}.jpg`,
+  }));
+  const imported = {
+    ...representativeProjection,
+    state: { ...representativeProjection.state,
+      revision: representativeProjection.state.revision + 1,
+      album: { ...representativeProjection.state.album,
+        media: [...representativeProjection.state.album.media, ...photos] },
+    },
+  };
+  let finishPreviews!: (previews: readonly MediaPreview[]) => void;
+  let finishImport!: () => void;
+  const close = vi.fn(projectWindowPort.requestClose);
+  let publishPreview: ((preview: MediaPreview) => void) | undefined;
+  const decodeReady = new Map<string, () => void>();
+  vi.stubGlobal("Image", class {
+    src = "";
+    decode() {
+      if (!this.src.includes("batch-")) return Promise.resolve();
+      return new Promise<void>((resolve, reject) => decodeReady.set(this.src,
+        outcome === "decode_failed" && this.src.includes("batch-2")
+          ? () => reject(new Error("Image decode failed")) : resolve,
+      ));
+    }
+  });
+  const prepare = vi.fn<MediaPreviewPort["prepareMediaPreviews"]>(async (demand, publish) => {
+    if (!demand.visibleMediaIds.includes("batch-1")) return [];
+    publishPreview = publish;
+    return new Promise((resolve) => { finishPreviews = resolve; });
+  });
+  try {
+    render(<App
+      projectStartupPort={projectStartupPort} projectWindowPort={{ ...projectWindowPort,
+        requestClose: close,
+      }}
+      projectDialogPort={dialog.port}
+      projectCorePort={{ ...projectCorePort,
+        load: async () => representativeProjection,
+        importPhoto: async (publish) => {
+          publish?.({ completedFiles: 2, totalFiles: 2 });
+          await new Promise<void>((resolve) => { finishImport = resolve; });
+          return { kind: "completed", projection: imported,
+            mediaIds: photos.map(({ id }) => id), importedCount: 2, problems: [] };
+        },
+      }}
+      mediaPreviewPort={{ ...mediaPreviewPort, prepareMediaPreviews: prepare }}
+      graphicsProbe={canvasGraphicsDiagnosticProbe}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe} logger={silentLogger}
+    />);
+    const grid = await screen.findByRole("group", { name: "Grade de Fotos" });
+    Object.defineProperties(grid, {
+      clientWidth: { value: 600 }, clientHeight: { value: 200 },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Importar" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos JPEG…" }));
+    await waitFor(() => expect(dialog.present).toHaveBeenCalledWith({
+      kind: "imageProcessingProgress",
+      progress: { kind: "determinate", completed: 2, total: 2, status: "2 de 2" },
+    }));
+    await act(async () => finishImport());
+    expect(screen.queryByRole("button", { name: "Batch 1.jpg" })).not.toBeInTheDocument();
+    await waitFor(() => expect(finishPreviews).toBeTypeOf("function"));
+    const previews: MediaPreview[] = photos.map(({ id }) => ({
+      mediaId: id, state: "ready", url: `https://preview.test/${id}.jpg`,
+    }));
+    if (outcome === "native_unavailable") previews[1] = { mediaId: "batch-2", state: "unavailable", url: null };
+    await act(async () => publishPreview?.(previews[0]));
+    expect(screen.queryByRole("button", { name: "Batch 1.jpg" })).not.toBeInTheDocument();
+    await act(async () => finishPreviews(previews));
+    await waitFor(() => expect(decodeReady.size).toBe(outcome === "native_unavailable" ? 1 : 2));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Arquivo" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Fechar Projeto" }));
+    expect(close).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Batch 1.jpg" })).not.toBeInTheDocument();
+    expect(dialog.dismiss).not.toHaveBeenCalled();
+    await act(async () => decodeReady.get(previews[0].url!)!());
+    if (outcome !== "native_unavailable") {
+      expect(screen.queryByRole("button", { name: "Batch 1.jpg" })).not.toBeInTheDocument();
+      expect(dialog.dismiss).not.toHaveBeenCalled();
+      await act(async () => decodeReady.get(previews[1].url!)!());
+    }
+    for (const photo of photos) {
+      if (outcome !== "ready" && photo.id === "batch-2") {
+        const status = outcome === "native_unavailable" ? "Indisponível" : "Prévia indisponível";
+        expect((await screen.findByRole("button", { name: `${photo.name}. ${status}` }))
+          .querySelector("img")).toBeNull();
+      } else {
+        expect(await screen.findByRole("button", { name: photo.name }))
+          .toContainHTML(`src="https://preview.test/${photo.id}.jpg"`);
+      }
+    }
+    await waitFor(() => expect(dialog.dismiss).toHaveBeenCalled());
+    await waitFor(() => expect(close).toHaveBeenCalledOnce());
+    expect(prepare.mock.calls.filter(([demand]) => demand.visibleMediaIds.includes("batch-1")))
+      .toHaveLength(1);
+    if (outcome !== "ready") {
+      expect(dialog.present).toHaveBeenCalledWith(expect.objectContaining({
+        kind: "imageProcessingProblems", problems: [expect.objectContaining({ fileName: "Batch 2.jpg" })],
+      }));
+    }
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
