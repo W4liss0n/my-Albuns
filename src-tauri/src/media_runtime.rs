@@ -743,10 +743,11 @@ struct MediaMonitorTransition {
 }
 
 impl MediaMonitor {
-    /// An import already owns completed inspections. Adopt only evidence whose
+    /// Image preparation or startup cache recovery already owns source evidence.
+    /// Adopt only evidence whose
     /// exact binding and current source still match, without stabilizing the
     /// entire catalog again or decoding the Original in the Monitor.
-    pub(crate) fn adopt_import_inspections(
+    pub(crate) fn adopt_prepared_inspections(
         &self,
         runtime: &MediaRuntime,
         bindings: &[MediaBinding],
@@ -1003,7 +1004,7 @@ mod tests {
             .collect::<Vec<_>>();
         std::fs::write(&paths[2], b"changed after decode").unwrap();
         let before = super::photo_source_decode_count();
-        let poll = monitor.adopt_import_inspections(&runtime, &bindings, &roots, &observations);
+        let poll = monitor.adopt_prepared_inspections(&runtime, &bindings, &roots, &observations);
         assert_eq!(super::photo_source_decode_count(), before);
         assert_eq!(poll.update().unwrap().changed_media_ids(), &["photo-1"]);
         let current = poll.confirmed_observation().unwrap();

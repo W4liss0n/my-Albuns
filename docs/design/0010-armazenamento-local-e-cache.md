@@ -169,8 +169,11 @@ O baseline contém uma única representação visual reduzida por Foto ou Decora
 
 Cada representação preparada é entregue à interface imediatamente, sem esperar
 as demais mídias da demanda. O Painel mantém em pré-carga o último trecho
-observado de cada aba, incluindo a margem de `122 px` acima e abaixo da área
-visível. Alternar Fotos e Decorativos não descarta esse trecho. Rolar, filtrar
+observado de cada aba, incluindo uma margem de três alturas do viewport
+(mínimo de `122 px`) acima e abaixo da área visível. A geometria medida ao
+montar o Painel estabelece a primeira demanda, mesmo antes de a Janela nativa
+aparecer; rolagem e redimensionamento atualizam a mesma medição. Alternar Fotos
+e Decorativos não descarta esse trecho. Rolar, filtrar
 ou fechar o Painel atualiza a demanda e cancela trabalhos obsoletos, mas conserva
 as representações já publicadas em um conjunto limitado de uso recente. Voltar
 a um trecho ainda residente reutiliza a mesma URL e o mesmo elemento de imagem,
@@ -243,6 +246,18 @@ consumido pela primeira demanda válida, e as demandas seguintes usam a polític
 de residência existente. Essa passagem dentro da Sessão aproveita uma geração
 já verificada pelo fingerprint integral; não autoriza reuso de um índice apenas
 por tamanho ou data e não acrescenta campos ao índice persistido.
+
+Na reabertura, a recuperação exclusiva do namespace já valida e decodifica
+as representações indexadas. Ela conserva o hash desses bytes reduzidos para
+reaproveitar essa validação na primeira demanda, sem iniciar outro Processador.
+Somente vínculos cujo caminho, tamanho e datas correspondem ao artefato
+recuperado podem ser adotados. O Host captura a identidade física atual e o
+Monitor adota essa mesma observação; mudanças posteriores revogam o resultado.
+A publicação ainda confere a origem atual, o índice e o hash dos bytes
+reduzidos. Essa regra de reabertura segue a concessão do MVP para uma alteração
+com o aplicativo fechado que preserve tamanho e datas, descrita abaixo; não
+se aplica à validação de originais para processamento ou Exportação. Nenhum
+pixel ou arquivo original é mantido em memória por esse resultado.
 
 Em Novo Projeto, a identidade ainda não existe durante a escolha de uma imagem
 decorativa. A seleção só retorna depois da leitura e decodificação completas; o

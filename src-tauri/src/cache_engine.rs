@@ -173,6 +173,7 @@ impl CacheSourceBinding {
 pub(crate) struct RecoveredCacheArtifact {
     artifact: CacheArtifact,
     source_binding: CacheSourceBinding,
+    preview_sha256: Option<[u8; 32]>,
 }
 
 impl RecoveredCacheArtifact {
@@ -180,6 +181,7 @@ impl RecoveredCacheArtifact {
         Self {
             artifact,
             source_binding,
+            preview_sha256: None,
         }
     }
 
@@ -448,6 +450,51 @@ impl CacheFlightClaim {
 }
 
 impl CacheEngine {
+    /// Startup only: the Host owns the recovered namespace and has not exposed
+    /// this Engine to jobs or Monitor updates yet. Keep validation receipts,
+    /// never preview bytes, until the corresponding viewport first requests them.
+    pub(crate) fn adopt_recovered_previews(
+        &self,
+        namespace: &AuthorizedCacheNamespace,
+        artifacts: &[RecoveredCacheArtifact],
+        bindings: &[MediaBinding],
+        roots: &RootBindingPlan,
+    ) -> Vec<MediaObservation> {
+        let bindings = bindings
+            .iter()
+            .map(|binding| (binding.media_id.as_str(), binding))
+            .collect::<HashMap<_, _>>();
+        let mut prepared = self
+            .prepared
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        artifacts
+            .iter()
+            .filter_map(|recovered| {
+                let binding = bindings.get(recovered.artifact.media_id.as_str())?;
+                let preview_sha256 = recovered.preview_sha256?;
+                if !recovered.matches_source_path(&binding.logical_path) {
+                    return None;
+                }
+                let source = MediaResolver.observe_in_plan(roots, binding);
+                if !source.matches_fingerprint(&recovered.artifact.fingerprint)
+                    || !source.same_source(&source)
+                {
+                    return None;
+                }
+                prepared.insert(
+                    (namespace.project_id().to_owned(), binding.media_id.clone()),
+                    PreparedCacheGeneration {
+                        source: source.clone(),
+                        artifact: recovered.artifact.clone(),
+                        preview_sha256,
+                    },
+                );
+                Some(source)
+            })
+            .collect()
+    }
+
     /// Recovers a namespace after its new Host acquired the exclusive
     /// reservation and before that Host can start a Processor.
     pub(crate) fn recover_reserved_namespace(
@@ -488,15 +535,20 @@ impl CacheEngine {
                 let artifacts = metadata
                     .entries
                     .iter()
-                    .map(CacheMetadataEntry::recovered_artifact)
-                    .collect::<Option<Vec<_>>>()?;
-                artifacts
-                    .iter()
-                    .all(|recovered| {
-                        verify_cached_artifact(&storage, namespace.paths(), recovered.artifact())
-                            .is_ok()
+                    .map(|entry| {
+                        let mut recovered = entry.recovered_artifact()?;
+                        recovered.preview_sha256 = Some(
+                            verify_cached_artifact(
+                                &storage,
+                                namespace.paths(),
+                                recovered.artifact(),
+                            )
+                            .ok()?,
+                        );
+                        Some(recovered)
                     })
-                    .then_some((metadata, artifacts))
+                    .collect::<Option<Vec<_>>>()?;
+                Some((metadata, artifacts))
             });
         let removed_generation_count = match recovered_metadata.as_ref() {
             Some((metadata, _)) => {
@@ -2395,6 +2447,104 @@ mod tests {
     }
 
     #[test]
+    fn reopening_hands_recovered_previews_to_first_demand_without_processing_originals() {
+        tauri::async_runtime::block_on(async {
+            let fixture = fixture();
+            let original = CacheEngine::default();
+            verified_preview_artifact(&fixture, &original).await;
+            let recovered = CacheEngine::recover_reserved_namespace(
+                &fixture.app_paths,
+                &fixture.work.namespace,
+            )
+            .unwrap();
+            let reopened = CacheEngine::default();
+            let binding = super::cache_source_binding(&fixture.work.source);
+            let adopted = reopened.adopt_recovered_previews(
+                &fixture.work.namespace,
+                &recovered.verified_artifacts,
+                std::slice::from_ref(&binding),
+                &fixture.work.root_bindings,
+            );
+            assert_eq!(
+                adopted.len(),
+                1,
+                "reopening adopts the validated cache source"
+            );
+            let monitor = crate::media_runtime::MediaMonitor::default();
+            let runtime = crate::media_runtime::MediaRuntime::default();
+            monitor.adopt_prepared_inspections(
+                &runtime,
+                std::slice::from_ref(&binding),
+                &fixture.work.root_bindings,
+                &adopted,
+            );
+            assert!(
+                monitor
+                    .poll_in_plan(&runtime, &[binding], &fixture.work.root_bindings)
+                    .update()
+                    .is_none(),
+                "the first poll must not invalidate the adopted cache"
+            );
+            let registry = CachePreviewRegistry::new("project");
+            let demand = reopened.reconcile_preview_demand(
+                &registry,
+                fixture.work.namespace.project_id(),
+                1,
+                [fixture.work.source.media_id()],
+            );
+            assert!(
+                reopened
+                    .publish_prepared_if_demanded(
+                        &fixture.app_paths,
+                        &fixture.work.namespace,
+                        &registry,
+                        &demand,
+                        &fixture.work.source,
+                    )
+                    .is_some(),
+                "the first viewport must not require another Processor"
+            );
+        });
+    }
+
+    #[test]
+    fn reopening_cannot_adopt_changed_missing_or_relinked_sources() {
+        tauri::async_runtime::block_on(async {
+            for change in ["source", "missing", "relink"] {
+                let fixture = fixture();
+                verified_preview_artifact(&fixture, &CacheEngine::default()).await;
+                let recovered = CacheEngine::recover_reserved_namespace(
+                    &fixture.app_paths,
+                    &fixture.work.namespace,
+                )
+                .unwrap();
+                let mut binding = super::cache_source_binding(&fixture.work.source);
+                match change {
+                    "source" => std::fs::write(&binding.logical_path, b"changed original").unwrap(),
+                    "missing" => std::fs::remove_file(&binding.logical_path).unwrap(),
+                    "relink" => {
+                        let other = fixture._root.path().join("other.jpg");
+                        std::fs::copy(&binding.logical_path, &other).unwrap();
+                        binding.logical_path = other;
+                    }
+                    _ => unreachable!(),
+                }
+                assert!(
+                    CacheEngine::default()
+                        .adopt_recovered_previews(
+                            &fixture.work.namespace,
+                            &recovered.verified_artifacts,
+                            &[binding],
+                            &fixture.work.root_bindings,
+                        )
+                        .is_empty(),
+                    "{change} cannot adopt a previous cache source"
+                );
+            }
+        });
+    }
+
+    #[test]
     fn batch_publication_reloads_the_index_and_rejects_changed_or_tampered_candidates() {
         tauri::async_runtime::block_on(async {
             let fixture = fixture();
@@ -2639,115 +2789,146 @@ mod tests {
     }
 
     #[test]
-    fn completed_processing_hands_off_only_current_intact_cache_to_demand() {
+    fn processing_and_reopening_hand_off_only_current_intact_cache_to_demand() {
         tauri::async_runtime::block_on(async {
-            for change in [
-                "none", "source", "artifact", "index", "retire", "demand", "monitor", "removed",
-                "relink",
-            ] {
-                let fixture = fixture();
-                let engine = CacheEngine::default();
-                let registry = CachePreviewRegistry::new("test");
-                let CacheFlightClaim::Owner(owner) = engine.claim_for_processing(&fixture.work)
-                else {
-                    panic!("the preparation owns its work");
-                };
-                let mut transport = ScriptedTransport {
-                    app_paths: fixture.app_paths.clone(),
-                    scripts: VecDeque::from([Script::Complete(CacheArtifactFormat::Jpeg)]),
-                    attempts: Vec::new(),
-                };
-                let cancellation = owner.cancellation();
-                let execution = owner
-                    .complete(
+            for reopening in [false, true] {
+                for change in [
+                    "none", "source", "artifact", "index", "retire", "demand", "monitor",
+                    "removed", "relink",
+                ] {
+                    let fixture = fixture();
+                    let engine = CacheEngine::default();
+                    let registry = CachePreviewRegistry::new("test");
+                    let CacheFlightClaim::Owner(owner) = engine.claim_for_processing(&fixture.work)
+                    else {
+                        panic!("the preparation owns its work");
+                    };
+                    let mut transport = ScriptedTransport {
+                        app_paths: fixture.app_paths.clone(),
+                        scripts: VecDeque::from([Script::Complete(CacheArtifactFormat::Jpeg)]),
+                        attempts: Vec::new(),
+                    };
+                    let cancellation = owner.cancellation();
+                    let execution = owner
+                        .complete(
+                            engine
+                                .execute(
+                                    &mut transport,
+                                    &fixture.app_paths,
+                                    fixture.work.clone(),
+                                    &fixture.context,
+                                    &cancellation,
+                                )
+                                .await,
+                        )
+                        .unwrap();
+                    let source = &fixture.work.source;
+                    let namespace = &fixture.work.namespace;
+                    let engine = if reopening {
+                        let recovered =
+                            CacheEngine::recover_reserved_namespace(&fixture.app_paths, namespace)
+                                .unwrap();
+                        let reopened = CacheEngine::default();
+                        assert_eq!(
+                            reopened
+                                .adopt_recovered_previews(
+                                    namespace,
+                                    &recovered.verified_artifacts,
+                                    &[super::cache_source_binding(source)],
+                                    &fixture.work.root_bindings,
+                                )
+                                .len(),
+                            1
+                        );
+                        reopened
+                    } else {
                         engine
-                            .execute(
-                                &mut transport,
-                                &fixture.app_paths,
-                                fixture.work.clone(),
-                                &fixture.context,
-                                &cancellation,
-                            )
-                            .await,
-                    )
-                    .unwrap();
-                let source = &fixture.work.source;
-                let namespace = &fixture.work.namespace;
-                let demand = engine.reconcile_preview_demand(
-                    &registry,
-                    namespace.project_id(),
-                    1,
-                    [source.media_id()],
-                );
-                match change {
-                    "source" => std::fs::write(
-                        source.source_path(),
-                        b"a changed original with another length",
-                    )
-                    .unwrap(),
-                    "artifact" => {
-                        let artifact = execution.artifact();
-                        let path = namespace
-                            .paths()
-                            .preview_file(
-                                &artifact.media_id,
-                                &artifact.generation_id,
-                                artifact.format,
-                            )
-                            .unwrap();
-                        let mut bytes = std::fs::read(&path).unwrap();
-                        let middle = bytes.len() / 2;
-                        bytes[middle] ^= 1;
-                        std::fs::write(path, bytes).unwrap();
+                    };
+                    let demand = engine.reconcile_preview_demand(
+                        &registry,
+                        namespace.project_id(),
+                        1,
+                        [source.media_id()],
+                    );
+                    match change {
+                        "source" => std::fs::write(
+                            source.source_path(),
+                            b"a changed original with another length",
+                        )
+                        .unwrap(),
+                        "artifact" => {
+                            let artifact = execution.artifact();
+                            let path = namespace
+                                .paths()
+                                .preview_file(
+                                    &artifact.media_id,
+                                    &artifact.generation_id,
+                                    artifact.format,
+                                )
+                                .unwrap();
+                            let mut bytes = std::fs::read(&path).unwrap();
+                            let middle = bytes.len() / 2;
+                            bytes[middle] ^= 1;
+                            std::fs::write(path, bytes).unwrap();
+                        }
+                        "index" => {
+                            std::fs::write(namespace.paths().metadata_file(), b"invalid index")
+                                .unwrap();
+                        }
+                        "removed" => engine.retain_prepared_catalog(namespace.project_id(), &[]),
+                        "monitor" => engine.apply_monitor_media_update(
+                            namespace,
+                            &registry,
+                            &MediaRuntimeUpdate::for_test(
+                                1,
+                                vec![source.media_id().to_owned()],
+                                vec![source.media_id().to_owned()],
+                            ),
+                        ),
+                        "relink" => {
+                            let pause = engine.pause().await;
+                            engine
+                                .invalidate_relinked_media(
+                                    &pause,
+                                    &fixture.app_paths,
+                                    namespace,
+                                    &registry,
+                                    source.media_id(),
+                                )
+                                .unwrap();
+                        }
+                        "retire" => {
+                            let pause = engine.pause().await;
+                            engine.retire_project_identity(
+                                &pause,
+                                &registry,
+                                namespace.project_id(),
+                            );
+                        }
+                        "demand" => {
+                            engine.reconcile_preview_demand(
+                                &registry,
+                                namespace.project_id(),
+                                2,
+                                [],
+                            );
+                        }
+                        _ => {}
                     }
-                    "index" => {
-                        std::fs::write(namespace.paths().metadata_file(), b"invalid index")
-                            .unwrap();
-                    }
-                    "removed" => engine.retain_prepared_catalog(namespace.project_id(), &[]),
-                    "monitor" => engine.apply_monitor_media_update(
+                    let preview = engine.publish_prepared_if_demanded(
+                        &fixture.app_paths,
                         namespace,
                         &registry,
-                        &MediaRuntimeUpdate::for_test(
-                            1,
-                            vec![source.media_id().to_owned()],
-                            vec![source.media_id().to_owned()],
-                        ),
-                    ),
-                    "relink" => {
-                        let pause = engine.pause().await;
-                        engine
-                            .invalidate_relinked_media(
-                                &pause,
-                                &fixture.app_paths,
-                                namespace,
-                                &registry,
-                                source.media_id(),
-                            )
-                            .unwrap();
-                    }
-                    "retire" => {
-                        let pause = engine.pause().await;
-                        engine.retire_project_identity(&pause, &registry, namespace.project_id());
-                    }
-                    "demand" => {
-                        engine.reconcile_preview_demand(&registry, namespace.project_id(), 2, []);
-                    }
-                    _ => {}
+                        &demand,
+                        source,
+                    );
+                    assert_eq!(
+                        preview.is_some(),
+                        change == "none",
+                        "{change} (reopening={reopening}): prepared Cache must survive the handoff only while valid"
+                    );
+                    assert_eq!(transport.attempts, [1]);
                 }
-                let preview = engine.publish_prepared_if_demanded(
-                    &fixture.app_paths,
-                    namespace,
-                    &registry,
-                    &demand,
-                    source,
-                );
-                assert_eq!(
-                    preview.is_some(),
-                    change == "none",
-                    "{change}: prepared Cache must survive the handoff only while valid"
-                );
-                assert_eq!(transport.attempts, [1]);
             }
         });
     }

@@ -495,8 +495,12 @@ fn commit_prepared_import(
             Some(observation)
         })
         .collect::<Vec<_>>();
-    let poll =
-        monitor.adopt_import_inspections(runtime, &catalog.bindings, &attempt.roots, &inspections);
+    let poll = monitor.adopt_prepared_inspections(
+        runtime,
+        &catalog.bindings,
+        &attempt.roots,
+        &inspections,
+    );
     if let Some(update) = poll.update() {
         engine.apply_monitor_media_update(&attempt.namespace, registry, update);
     }

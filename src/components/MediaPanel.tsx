@@ -266,6 +266,11 @@ export function MediaPanel({
         preloadMediaIds: snapshots[kind].preloadMediaIds.filter((id) => allowed.has(id)),
       };
     }
+    // The native window is initially hidden. Its first intersection notification
+    // can precede the first paint; geometry must establish demand independently.
+    if (root?.clientWidth && root.clientHeight) {
+      snapshots[activeMediaKind] = mediaPanelViewportDemand(root, visibleMediaIds, thumbnailSize);
+    }
     const visible = new Set(snapshots[activeMediaKind].visibleMediaIds);
     const resident = new Set([
       ...visible,
@@ -297,12 +302,25 @@ export function MediaPanel({
 
     const update = (entries: IntersectionObserverEntry[], set: Set<string>) => {
       if (!active) return;
+      if (root.clientWidth && root.clientHeight) {
+        measureDemand();
+        return;
+      }
       for (const entry of entries) {
         const mediaId = (entry.target as HTMLElement).dataset.mediaId;
         if (!mediaId) continue;
         if (entry.isIntersecting) set.add(mediaId);
         else set.delete(mediaId);
       }
+      emitDemand();
+    };
+    const measureDemand = () => {
+      if (!active) return;
+      const measured = mediaPanelViewportDemand(root, visibleMediaIds, thumbnailSize);
+      visible.clear();
+      resident.clear();
+      measured.visibleMediaIds.forEach((id) => visible.add(id));
+      [...measured.visibleMediaIds, ...measured.preloadMediaIds].forEach((id) => resident.add(id));
       emitDemand();
     };
     const visibleObserver = new IntersectionObserver(
@@ -317,12 +335,17 @@ export function MediaPanel({
       visibleObserver.observe(target);
       preloadObserver.observe(target);
     });
+    root.addEventListener("scroll", measureDemand, { passive: true });
+    const resizeObserver = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(measureDemand);
+    resizeObserver?.observe(root);
     return () => {
       active = false;
+      root.removeEventListener("scroll", measureDemand);
+      resizeObserver?.disconnect();
       visibleObserver.disconnect();
       preloadObserver.disconnect();
     };
-  }, [activeMediaKind, mediaItems, onMediaDemandChange, visibleMediaIds]);
+  }, [activeMediaKind, mediaItems, onMediaDemandChange, thumbnailSize, visibleMediaIds]);
 
   function updatePreferences(
     nextPreferences: Partial<MediaPanelViewPreferences>,

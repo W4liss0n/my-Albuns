@@ -30,6 +30,58 @@ const mediaPanelInteractions = {
   onRetryUnavailableMedia: async () => undefined,
 };
 
+test("requests the initial measured viewport without waiting for a scroll or observer paint", () => {
+  vi.stubGlobal("IntersectionObserver", class {
+    observe() {}
+    disconnect() {}
+  });
+  const width = vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(202);
+  const height = vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(114);
+  const onDemandChange = vi.fn();
+  const view = render(<MediaPanel {...mediaPanelInteractions}
+    mediaItems={mediaItems} mediaUsage={mediaUsage} onFillPhoto={() => undefined}
+    preferences={{kind: "local"}}
+    previewSource={{kind: "connected", previews: {}, onDemandChange}}
+  />);
+  try {
+    expect(onDemandChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      visibleMediaIds: expect.arrayContaining(["photo-album-2"]),
+    }));
+    const grid = screen.getByRole("group", { name: "Grade de Fotos" });
+    grid.scrollTop = 190;
+    fireEvent.scroll(grid);
+    expect(onDemandChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      visibleMediaIds: expect.arrayContaining(["photo-retrato"]),
+    }));
+  } finally {
+    view.unmount();
+    width.mockRestore();
+    height.mockRestore();
+    vi.unstubAllGlobals();
+  }
+});
+
+test("preloads upcoming viewports before the user scrolls, within a bounded window", () => {
+  const width = vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(84);
+  const height = vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(168);
+  const onDemandChange = vi.fn();
+  const view = render(<MediaPanel {...mediaPanelInteractions}
+    mediaItems={Array.from({length: 100}, (_, i) => media(`photo-${i}`, "photo", `Foto ${i}`))}
+    mediaUsage={[]} onFillPhoto={() => undefined} preferences={{kind: "local"}}
+    previewSource={{kind: "connected", previews: {}, onDemandChange}}
+  />);
+  try {
+    expect(onDemandChange).toHaveBeenLastCalledWith({
+      visibleMediaIds: ["photo-0", "photo-1"],
+      preloadMediaIds: ["photo-2", "photo-3", "photo-4", "photo-5", "photo-6", "photo-7"],
+    });
+  } finally {
+    view.unmount();
+    width.mockRestore();
+    height.mockRestore();
+  }
+});
+
 test("prepares only the future viewport with the panel's active ordering and filters", () => {
   const ref = createRef<MediaPanelHandle>();
   const demand = vi.fn();

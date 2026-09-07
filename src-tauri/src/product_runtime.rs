@@ -77,6 +77,31 @@ pub(crate) fn run(
     if !resolve_startup_recovery(&request, &project_host)? {
         return Ok(());
     }
+    let engine = CacheEngine::default();
+    let media_runtime = MediaRuntime::default();
+    let media_monitor = MediaMonitor::default();
+    let catalog = project_host
+        .authorized_media_catalog()
+        .map_err(io::Error::other)?;
+    let mut paths = myalbuns_paths::OperationPathContext::new();
+    for binding in &catalog.bindings {
+        let _ = paths.capture(&binding.logical_path);
+    }
+    let roots = paths.freeze();
+    let recovered_sources = engine.adopt_recovered_previews(
+        cache_namespace_owner.namespace(),
+        cache_namespace_owner.recovered_artifacts(),
+        &catalog.bindings,
+        &roots,
+    );
+    // Cache recovery validated the derived bytes; adopt the same source evidence
+    // before the first poll so it is not mistaken for a new source change.
+    media_monitor.adopt_prepared_inspections(
+        &media_runtime,
+        &catalog.bindings,
+        &roots,
+        &recovered_sources,
+    );
     let cache_previews = CachePreviewRegistry::new(PROJECT_WINDOW_LABEL);
     let media_protocol_registry = cache_previews.clone();
     let setup_paths = app_paths.clone();
@@ -123,9 +148,9 @@ pub(crate) fn run(
         .manage(cache_service)
         .manage(recovery)
         .manage(webview_authority)
-        .manage(CacheEngine::default())
-        .manage(MediaRuntime::default())
-        .manage(MediaMonitor::default())
+        .manage(engine)
+        .manage(media_runtime)
+        .manage(media_monitor)
         .manage(ExportAttempts::default())
         .manage(crate::project_dialog_window::ProjectDialogPresentationStore::default())
         .manage(crate::settings_preferences::SettingsStore::new(&app_paths))

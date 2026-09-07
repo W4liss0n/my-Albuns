@@ -25,12 +25,13 @@ export function mediaPanelViewportDemand(
   const height = top + rows * (thumbnailSize + rowGap) - rowGap + pixels(style.paddingBottom);
   const scrollTop = Math.min(grid.scrollTop, Math.max(0, height - grid.clientHeight));
   const bottom = scrollTop + grid.clientHeight;
+  const preloadMargin = Math.max(MEDIA_PANEL_PRELOAD_MARGIN, grid.clientHeight * 3);
   orderedIds.forEach((id, index) => {
     const cardTop = top + Math.floor(index / columns) * (thumbnailSize + rowGap);
     const cardBottom = cardTop + thumbnailSize;
     if (cardBottom > scrollTop && cardTop < bottom) visibleMediaIds.push(id);
-    else if (cardBottom > scrollTop - MEDIA_PANEL_PRELOAD_MARGIN &&
-      cardTop < bottom + MEDIA_PANEL_PRELOAD_MARGIN) preloadMediaIds.push(id);
+    else if (cardBottom > scrollTop - preloadMargin &&
+      cardTop < bottom + preloadMargin) preloadMediaIds.push(id);
   });
   return { visibleMediaIds, preloadMediaIds };
 }

@@ -62,7 +62,6 @@ enum CacheNamespaceRemovalReservation {
 }
 
 impl CacheNamespaceOwner {
-    #[cfg(test)]
     pub(crate) fn namespace(&self) -> &AuthorizedCacheNamespace {
         &self.namespace
     }
