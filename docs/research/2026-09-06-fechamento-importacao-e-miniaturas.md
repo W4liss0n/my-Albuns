@@ -83,6 +83,15 @@ A integração passou pela validação completa do repositório. As correções
 posteriores tiveram testes de regressão e novas verificações dos módulos
 afetados; os números e comandos de cada rodada estão nos relatórios acima.
 
+A validação completa foi executada novamente no commit `242c4ce`, após o ajuste
+do teste de redimensionamento descrito ao final. O relatório de 7 de setembro
+de 2026, às `02:20:55 UTC`, registra `passed: true` e
+`sourceInputsDirty: false`: as seis etapas passaram, incluindo 785 testes de
+interface, 119 testes de automação executados (três ignorados), contratos,
+build, qualidade Rust e toda a suíte Rust prevista no script, com os percursos
+reais de importação e reabertura/exportação. A revisão complementar de
+`8262c93..242c4ce` também terminou sem achados nos dois eixos.
+
 Na correção final passaram 374 testes nativos do Host, com 15 casos dependentes
 de ambiente ignorados, e 99 testes de interface/adaptador. Os sete casos
 selecionados de reabertura passaram novamente após o ajuste final. Contratos,
@@ -111,6 +120,7 @@ Para testar, feche a versão anterior e execute `myalbuns-desktop.exe`, mantendo
 - [Executável do aplicativo](D:/CodexBuilds/myalbuns-initial-previews/release/myalbuns-desktop.exe).
 - [Manifesto com commit, perfil, tamanhos e hashes dos dois executáveis](D:/CodexBuilds/myalbuns-initial-previews/release-manifest.json).
 - [Revisão visual](D:/CodexBuilds/myalbuns-initial-previews/ui/review-report.html) e [evidências das capturas](D:/CodexBuilds/myalbuns-initial-previews/ui/evidence.json).
+- [Validação completa da versão publicada](D:/CodexBuilds/myalbuns-initial-previews/publication/validated-242c4ce/report.json), com os logs das seis etapas na mesma pasta.
 - [Medição da abertura e do salto de rolagem](D:/CodexBuilds/myalbuns-initial-previews/fixed-measure.json) e [percurso com eventos de roda](D:/CodexBuilds/myalbuns-initial-previews/fixed-gradual-measure.json).
 
 Esses artefatos pertencem à máquina de validação e ficam fora do Git. Os
