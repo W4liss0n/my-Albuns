@@ -17,6 +17,8 @@ cópia/colagem continuam no escopo restante da issue.
 ## Comportamento
 
 Entre na edição da Lâmina com `Enter` no Canvas ou com clique duplo na Lâmina.
+O enquadramento considera largura e altura disponíveis e centraliza a Lâmina,
+mantendo suas bordas e alças acessíveis também em um Canvas mais estreito.
 Arraste o corpo de um Frame para movê-lo. As oito alças redimensionam a seleção:
 as laterais afetam um eixo; os cantos afetam os dois. `Shift` nos cantos mantém
 a proporção; `Alt` mantém o centro; ambos respondem durante o gesto.

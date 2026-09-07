@@ -162,9 +162,14 @@ export class AlbumCanvasScene {
         : navigationLayout;
 
     const sheetHeight = firstSheet.heightUm * MICROMETER_TO_CANVAS_PIXEL;
-    const scale = continuousCanvasScale(
+    const heightScale = continuousCanvasScale(
       hostHeight || this.app.screen.height,
       sheetHeight,
+    );
+    const scale = modePolicy.enablesContinuousNavigation ? heightScale : Math.min(
+      heightScale,
+      Math.max(1, this.app.screen.width - 2 * CANVAS_VERTICAL_MARGIN_PX) /
+        layout.entriesAtScale(1)[0].width,
     );
     this.canvasScale = scale;
     this.frameInteractions.synchronize(input, scale);
@@ -220,7 +225,8 @@ export class AlbumCanvasScene {
     this.reportCanvasMetrics(scale);
     this.world.position.set(
       boundedOffsetX,
-      CANVAS_VERTICAL_MARGIN_PX,
+      modePolicy.enablesContinuousNavigation ? CANVAS_VERTICAL_MARGIN_PX
+        : ((hostHeight || this.app.screen.height) - sheetHeight * scale) / 2,
     );
     this.world.scale.set(scale);
     this.app.stage.hitArea = new Rectangle(

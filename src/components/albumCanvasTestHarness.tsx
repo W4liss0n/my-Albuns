@@ -516,7 +516,7 @@ export function renderCanvas({
         onGraphicsUnavailable={onGraphicsUnavailable}
         {...overrides}
       />
-    </LoggingProvider>,
+    </LoggingProvider>
   );
   const view = render(canvasElement());
 

@@ -243,6 +243,20 @@ test("shows the complete active surface and technical guides only in Sheet Edit 
   expect(displayWithLabel("sheet-bar-sheet-001").visible).toBe(false);
 });
 
+test("fits the complete edited Sheet in a narrow Canvas so its edge handles remain reachable", async () => {
+  renderCanvas({
+    mode: { kind: "sheet-editing", sheetId: "sheet-001" },
+    compositionPlan: interactiveComposition,
+    selectedFrameId: "frame-001",
+  });
+  getPixiLifecycle().instances[0].screen.width = 600;
+  await finishPixiInitialization();
+  const world = displayWithLabel("album-world");
+  expect(world.scale.x).toBeCloseTo((600 - 2 * 28) / 600);
+  expect(world.position.x).toBeCloseTo(28);
+  expect(world.position.y).toBeCloseTo((500 - 300 * world.scale.y) / 2);
+});
+
 test("shows the selected Frame boundary and eight interactive resize handles in Sheet Edit Mode", async () => {
   renderCanvas({
     mode: { kind: "sheet-editing", sheetId: "sheet-001" },
