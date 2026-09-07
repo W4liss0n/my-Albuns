@@ -115,8 +115,9 @@ environment before a separate diagnostic run's cleanup.
 Headless checks for this preparation:
 `node --test scripts/Test-ProjectCloseGate.mjs scripts/Test-ValidationWorkflow.mjs`.
 These exercise evidence rejection and the local launch guard; they do not start
-MyAlbuns or validate native behavior. The native failure remains unresolved
-until this scenario actually runs and supplies the required evidence.
+MyAlbuns or validate native behavior. Automated native acceptance remains
+incomplete until this scenario supplies the required evidence. The dated
+integration exception below does not change the scenario's assertions.
 
 ## Full journey and existing evidence
 
@@ -126,8 +127,22 @@ The session-recovery and Save As aliases still invoke that same full legacy
 journey; never run all three as if they were independent suites. Further
 migration of its segments must preserve each public assertion and proof layer.
 
-The unresolved clean-close failure found in PR #64 remains unvalidated.
-Passing the headless command or the CI pilot does not close that finding or
-approve the full productive journey. Historical evidence retains its original
-commit attribution. A PR with this pending failure must not be declared fully
-validated or merged on the strength of the pilot alone.
+The automated clean-close investigation from PR #64 remains inconclusive about
+a product defect. Passing the headless command or the CI pilot does not approve
+the full productive journey. Historical evidence retains its original commit
+attribution and must not be relabeled as passing native acceptance.
+
+## User-approved integration exception: 2026-09-07
+
+The user confirmed that File → Close Project works when clicked manually and
+explicitly authorized merging PRs #64 and #65 using passing headless CI and that
+manual confirmation. For these two PRs only, the automated `saved-original-close`
+acceptance requirement is waived. This is not approval of the full native
+journey or proof that the automation failure has been fixed. Headless CI remains
+required for the submitted source.
+
+Visible native automation for this investigation is suspended. Do not resume it
+or dispatch a native pilot for this integration without a new explicit user
+request. Preserve the retained diagnostics and the focused scenario's evidence
+requirements. Temporary diagnostic instrumentation has been removed; no product
+change was made from the unconfirmed failure hypothesis.

@@ -12,8 +12,8 @@ O ciclo de melhorias da importação múltipla de Fotos JPEG e das miniaturas es
 concluído localmente. O usuário confirmou a correção final de abertura e
 rolagem. A implementação está na branch `codex/import-multiple-jpeg`, com
 `13820b855104fa5864028b568eee580356ec3ca8` como commit do código entregue.
-A branch está publicada na [PR #65](https://github.com/W4liss0n/my-Albuns/pull/65),
-com base na [PR #64](https://github.com/W4liss0n/my-Albuns/pull/64).
+A [PR #65](https://github.com/W4liss0n/my-Albuns/pull/65) reúne esta entrega sobre
+`main`, após a integração da [PR #64](https://github.com/W4liss0n/my-Albuns/pull/64).
 Este registro consolida a entrega e suas evidências; os contratos de produto
 continuam nas fontes normativas abaixo.
 
@@ -131,10 +131,12 @@ Pastas e executáveis intermediários não substituem o build identificado aqui.
 
 A implementação, os testes locais e a confirmação do usuário estão concluídos
 para este recorte. O README e este registro consolidam o fechamento documental.
-A branch e a PR #65 estão publicadas. A base é
-`codex/interaction-and-native-gates-followups`, da PR #64, cuja aceitação nativa
-de fechamento ainda está pendente. A publicação não conclui esse aceite nem a
-integração em `main`; a issue #19 continua aberta para o restante de seu escopo.
+A PR #64 foi integrada em `main` em 7 de setembro de 2026; a PR #65 passa a
+apresentar esta entrega sobre essa base. O usuário confirmou o fechamento
+manual de Projeto e autorizou a integração das duas PRs com a CI aprovada,
+mantendo a automação em janela suspensa. A [exceção registrada](../agents/native-ui-gates.md#user-approved-integration-exception-2026-09-07)
+não representa aprovação da jornada nativa completa. A issue #19 continua
+aberta para o restante de seu escopo.
 
 A revisão final do intervalo `ec47139..8262c93` não encontrou achados pendentes
 nos eixos de aderência aos padrões e à especificação. A validação completa

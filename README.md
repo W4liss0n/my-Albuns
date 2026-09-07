@@ -84,7 +84,7 @@ Material técnico não normativo, conservado como histórico das avaliações.
 
 O mapa de implementação está no [GitHub, issue #1](https://github.com/W4liss0n/my-Albuns/issues/1), com tickets de entrega e seus bloqueadores. Os arquivos antigos em `.scratch/programa-diagramacao/` são históricos.
 
-A entrega mais recente é o [fechamento da importação e das miniaturas, de 6 de setembro de 2026](docs/research/2026-09-06-fechamento-importacao-e-miniaturas.md): importação múltipla de JPEGs, processamento em lotes, progresso contínuo e carregamento/retenção das prévias. O código foi validado localmente e o usuário confirmou a correção final. A branch está publicada na [PR #65](https://github.com/W4liss0n/my-Albuns/pull/65), baseada na [PR #64](https://github.com/W4liss0n/my-Albuns/pull/64), que ainda tem aceitação nativa de fechamento pendente. Este fechamento cobre o recorte implementado, não todo o escopo da issue #19.
+A entrega mais recente é o [fechamento da importação e das miniaturas, de 6 de setembro de 2026](docs/research/2026-09-06-fechamento-importacao-e-miniaturas.md): importação múltipla de JPEGs, processamento em lotes, progresso contínuo e carregamento/retenção das prévias. O código foi validado localmente e o usuário confirmou a correção final. A [PR #65](https://github.com/W4liss0n/my-Albuns/pull/65) reúne essa entrega sobre `main`, após a integração da [PR #64](https://github.com/W4liss0n/my-Albuns/pull/64). O aceite usa a CI e a validação manual, conforme a exceção registrada na política de validação. Este fechamento cobre o recorte implementado, não todo o escopo da issue #19.
 
 A [revisão de 5 de setembro de 2026](docs/research/2026-09-05-estado-do-produto-e-proxima-entrega.md) conserva o diagnóstico anterior a essa entrega e as demais pendências do produto.
 
@@ -140,3 +140,9 @@ build verificado e a mesma autorização dos demais gates. Em caso de falha,
 conserva a etapa interrompida, os registros, o estado das janelas e as capturas
 possíveis em `.scratch/project-close-evidence/`. Sua preparação e os testes da
 automação não constituem aprovação do fechamento nativo.
+
+Em 7 de setembro de 2026, o usuário confirmou o fechamento manual e autorizou a
+integração das PRs #64 e #65 com a CI aprovada. A investigação automatizada desse
+fechamento está suspensa e só deve voltar a abrir janelas mediante nova
+solicitação explícita. A [exceção de integração](docs/agents/native-ui-gates.md#user-approved-integration-exception-2026-09-07)
+registra esse aceite sem apresentar os ensaios inconclusivos como aprovados.
