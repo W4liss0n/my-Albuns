@@ -57,8 +57,14 @@ Contratos detalhados por área. Os de interface descrevem superfícies e intera�
 
 ## Pesquisas
 
-- [Importação de várias Fotos JPEG](docs/research/2026-09-05-importacao-multipla-jpeg.md) — primeiro recorte do #19, com resultado parcial e uma ação de Histórico; aceitação do seletor nativo pendente.
+O [fechamento da importação e das miniaturas](docs/research/2026-09-06-fechamento-importacao-e-miniaturas.md) reúne o resultado final, a organização do código, as validações e o executável local de referência. Os relatórios abaixo conservam as medições e pendências observadas em cada etapa; o fechamento registra o estado consolidado deste ciclo.
+
+- [Importação de várias Fotos JPEG](docs/research/2026-09-05-importacao-multipla-jpeg.md) — registro da implementação inicial do recorte do #19, com resultado parcial e uma ação de Histórico.
+- [Reuso da inspeção e do Cache](docs/research/2026-09-06-reuso-da-inspecao-e-do-cache-na-importacao.md) — reaproveitamento da validação entre importação, Monitor e primeira demanda de prévias.
 - [Integração das otimizações de importação](docs/research/2026-09-06-integracao-importacao-producao.md) — decode único, lotes, orçamento de recursos e evidência do percurso com o Processador real.
+- [Progresso durante a importação](docs/research/2026-09-06-progresso-importacao.md) — avanço por imagem enquanto os lotes estão ativos, incluindo recuperação e falhas parciais.
+- [Retenção de prévias ao rolar](docs/research/2026-09-06-retencao-previas-painel.md) — cache recente com limites de memória e reutilização das miniaturas já visitadas.
+- [Abertura e primeira rolagem do Painel](docs/research/2026-09-06-abertura-e-primeira-rolagem-do-painel.md) — demanda inicial pela geometria, recuperação de prévias e antecipação das próximas linhas.
 
 Material técnico não normativo, conservado como histórico das avaliações.
 
@@ -78,7 +84,9 @@ Material técnico não normativo, conservado como histórico das avaliações.
 
 O mapa de implementação está no [GitHub, issue #1](https://github.com/W4liss0n/my-Albuns/issues/1), com tickets de entrega e seus bloqueadores. Os arquivos antigos em `.scratch/programa-diagramacao/` são históricos.
 
-A [revisão de 5 de setembro de 2026](docs/research/2026-09-05-estado-do-produto-e-proxima-entrega.md) separa o que está implementado, as pendências de liberação e a próxima entrega recomendada: importação múltipla de Fotos JPEG, como primeiro recorte da issue #19.
+A entrega local mais recente é o [fechamento da importação e das miniaturas, de 6 de setembro de 2026](docs/research/2026-09-06-fechamento-importacao-e-miniaturas.md): importação múltipla de JPEGs, processamento em lotes, progresso contínuo e carregamento/retenção das prévias. O código foi validado localmente e o usuário confirmou a correção final. Push e PR desta entrega permanecem pendentes; este fechamento cobre o recorte implementado, não todo o escopo da issue #19.
+
+A [revisão de 5 de setembro de 2026](docs/research/2026-09-05-estado-do-produto-e-proxima-entrega.md) conserva o diagnóstico anterior a essa entrega e as demais pendências do produto.
 
 ## Estado do repositório
 
