@@ -8,8 +8,12 @@ import type {
   ProjectIntent,
   ProjectMutationOutcome,
 } from "../domain/project";
-import type { PointerDragThreshold } from "../platform/generated/PointerDragThreshold";
-export type { PointerDragThreshold } from "../platform/generated/PointerDragThreshold";
+
+/** Distance from the pressed point, in CSS pixels, before a Frame drag starts. */
+export interface PointerDragThreshold {
+  x: number;
+  y: number;
+}
 
 export type MediaPreviewState =
   | "ready"

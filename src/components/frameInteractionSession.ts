@@ -143,6 +143,7 @@ export class FrameInteractionSession {
     const gesture = this.gesture;
     this.gesture = null;
     if (gesture) this.release(gesture);
+    if (this.suppressTap) this.deferTapReset();
   }
 
   destroy() {
@@ -254,7 +255,6 @@ export class FrameInteractionSession {
     if (!this.gesture || this.gesture.phase === "committing") return;
     this.suppressTap = true;
     this.reset();
-    this.deferTapReset();
     this.refresh();
   }
 

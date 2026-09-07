@@ -20,7 +20,6 @@ import {
   type ImageProcessingProblem,
   type ProjectStartupPort,
   type ProjectCorePort,
-  type PointerDragThreshold,
   type SaveAsProjectOutcome as ApplicationSaveAsProjectOutcome,
   type SaveAsProjectResult as ApplicationSaveAsProjectResult,
   type SaveProjectOutcome as ApplicationSaveProjectOutcome,
@@ -43,6 +42,7 @@ import type { ImageProcessingProgress as IpcImageProcessingProgress } from "./ge
 import type { LinkedMediaChanged as IpcLinkedMediaChanged } from "./generated/LinkedMediaChanged";
 import type { MediaPreview as IpcMediaPreview } from "./generated/MediaPreview";
 import type { MediaPreviewCommandError as IpcMediaPreviewCommandError } from "./generated/MediaPreviewCommandError";
+import type { PointerDragThreshold } from "./generated/PointerDragThreshold";
 import type { SaveProjectOutcome as IpcSaveProjectOutcome } from "./generated/SaveProjectOutcome";
 import type { SaveProjectResult as IpcSaveProjectResult } from "./generated/SaveProjectResult";
 import type { SaveAsProjectOutcome as IpcSaveAsProjectOutcome } from "./generated/SaveAsProjectOutcome";

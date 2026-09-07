@@ -75,6 +75,11 @@ test("previews a Frame drag only beyond the platform threshold and commits the r
   expect(latestFrame().position).toMatchObject({ x: 40, y: 20 });
 
   fireEvent.pointerUp(window, { pointerId: 7, clientX: 145, clientY: 123 });
+  vi.mocked(view.onSelectFrame).mockClear();
+  act(() => latestFrame().emit("pointertap", {
+    button: 0, altKey: false, stopPropagation: vi.fn(), nativeEvent: { detail: 1 },
+  }));
+  expect(view.onSelectFrame).not.toHaveBeenCalled();
   expect(frameGeometry.commit).toHaveBeenCalledOnce();
   const edit = frameGeometry.commit.mock.calls[0][0];
   expect(edit).toMatchObject({ frameId: "frame-001", expectedRect: original.clipRect, gesture: { kind: "move" } });
@@ -208,6 +213,15 @@ test.each(["project", "mode", "blocking-operation", "confirmed-geometry"])(
     expect(frameGeometry.commit).not.toHaveBeenCalled();
     expect(frameGeometry.onError).not.toHaveBeenCalled();
     expect(latestFrame().position.x).toBe(change === "confirmed-geometry" ? 10 : 0);
+    // A cancelled drag must not keep normal Canvas selection disabled.
+    view.rerenderCanvas({ mode: { kind: "normal" } });
+    vi.mocked(view.onSelectFrame).mockClear();
+    await waitFor(() => {
+      act(() => latestFrame().emit("pointertap", {
+        button: 0, altKey: false, stopPropagation: vi.fn(), nativeEvent: { detail: 1 },
+      }));
+      expect(view.onSelectFrame).toHaveBeenCalledWith("frame-001");
+    });
   },
 );
 

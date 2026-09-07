@@ -70,7 +70,10 @@ Salvamento e reabertura. O corpus `tests/fixtures/frame-geometry-cases.json`
 Canvas: seleção, movimento, redimensionamento, proporção com centro e mínimo.
 
 Os testes do Canvas exercitam a captura do ponteiro, cancelamento, respostas
-atrasadas e a posição final da soltura. O controlador usa a fila de mutações
+atrasadas, a posição final da soltura e a retomada dos cliques após cancelamento
+por mudança de Projeto, modo, bloqueio ou geometria confirmada. O clique residual
+do arraste continua suprimido somente durante o término do gesto. O controlador
+usa a fila de mutações
 real para verificar edição seguida de Salvamento, tanto no sucesso quanto na
 falha. O teste do Host com o Processador real redimensiona, desfaz, refaz, salva,
 reabre e publica JPEG; confere a geometria reaberta, os pixels dentro e fora do
