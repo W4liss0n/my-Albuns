@@ -35,6 +35,7 @@ pub(crate) enum ImageReadError {
     ReadFailed,
 }
 
+#[derive(Clone, Debug)]
 pub(crate) struct ImagePayload {
     pub(crate) format: ImageFormat,
     pub(crate) source_bytes: u64,
@@ -44,12 +45,6 @@ pub(crate) struct ImagePayload {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ImageRequestError {
     NotFound,
-    UnsupportedImage,
-}
-
-pub(crate) fn sniff_image(file: &File) -> Result<ImageFormat, ImageReadError> {
-    let mut readable = file.try_clone().map_err(|_| ImageReadError::ReadFailed)?;
-    sniff_reader(&mut readable)
 }
 
 pub(crate) fn read_image(
@@ -138,9 +133,6 @@ pub(crate) fn serve_opaque_image(
     let include_body = request.method() == Method::GET;
     match read_source(token, include_body) {
         Ok(payload) => success_response(payload, cors_origin),
-        Err(ImageRequestError::UnsupportedImage) => {
-            empty_response(StatusCode::UNSUPPORTED_MEDIA_TYPE, None, cors_origin)
-        }
         Err(ImageRequestError::NotFound) => {
             empty_response(StatusCode::NOT_FOUND, None, cors_origin)
         }

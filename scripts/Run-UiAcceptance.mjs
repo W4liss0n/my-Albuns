@@ -52,7 +52,7 @@ const manifestPath = path.join(
   "uiAcceptanceScenarios.json",
 );
 const screenshotsDirectory = path.join(outputDirectory, "screenshots");
-const frontendPort = 1437;
+const frontendPort = await freePort();
 const frontendOrigin = `http://127.0.0.1:${frontendPort}`;
 const MAX_SCALED_VIEWPORT_ROUNDING = 4;
 const uiTimeoutMilliseconds = Number(

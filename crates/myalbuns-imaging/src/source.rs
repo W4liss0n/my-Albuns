@@ -10,7 +10,8 @@ use std::{
 };
 
 use image::{
-    ColorType, ImageDecoder, ImageError, Limits, RgbaImage,
+    ColorType, DynamicImage, ImageBuffer, ImageDecoder, ImageError, Limits, Pixel, RgbImage,
+    RgbaImage,
     codecs::{jpeg::JpegDecoder, png::PngDecoder, tiff::TiffDecoder},
     metadata::Orientation,
 };
@@ -18,6 +19,7 @@ use myalbuns_imaging_protocol::{
     CACHE_MAX_DECODER_ALLOC_BYTES, CacheBasicColorProfile, ImagingFailureCode, ImagingPathCode,
 };
 use myalbuns_paths::ResolvedObject;
+use sha2::{Digest, Sha256};
 
 pub(crate) const MAX_DECODED_SOURCE_PIXELS_TOTAL: u64 = 134_217_728;
 const MAX_ALLOWED_ICC_PROFILE_BYTES: usize = 60_988;
@@ -33,6 +35,13 @@ const SRGB_V4_PREFERENCE_DISPLAY: &[u8] =
     include_bytes!("../assets/sRGB_v4_ICC_preference_displayclass.icc");
 const ALLOWED_SRGB_PROFILES: &[&[u8]] =
     &[SRGB_2014, SRGB_V4_PREFERENCE, SRGB_V4_PREFERENCE_DISPLAY];
+// The legacy HP/Microsoft sRGB profile is recognized by its complete digest;
+// the application neither redistributes it nor trusts the installed OS profile.
+const SRGB_WINDOWS_PROFILE_BYTES: usize = 3_144;
+const SRGB_WINDOWS_PROFILE_SHA256: [u8; 32] = [
+    0x2b, 0x3a, 0xa1, 0x64, 0x57, 0x79, 0xa9, 0xe6, 0x34, 0x74, 0x4f, 0xaf, 0x9b, 0x01, 0xe9, 0x10,
+    0x2b, 0x0c, 0x9b, 0x88, 0xfd, 0x6d, 0xec, 0xed, 0x79, 0x34, 0xdf, 0x86, 0xb9, 0x49, 0xaf, 0x7e,
+];
 
 #[derive(Debug)]
 pub(crate) struct SourceFailure {
@@ -108,6 +117,10 @@ struct TiffPreflight {
 }
 
 impl OpenRenderSource {
+    pub(crate) fn is_jpeg(&self) -> bool {
+        matches!(self.preflight, SourcePreflight::Jpeg(_))
+    }
+
     pub(crate) fn byte_count(&self) -> u64 {
         self.source_bytes
     }
@@ -133,6 +146,23 @@ impl OpenRenderSource {
             SourcePreflight::Jpeg(preflight) => decode_render_jpeg(self.reader, preflight),
             SourcePreflight::Png(preflight) => decode_render_png(self.reader, preflight),
             SourcePreflight::Tiff(preflight) => decode_render_tiff(self.reader, preflight),
+        }
+    }
+
+    pub(crate) fn decode_preview(self) -> Result<DynamicImage, SourceFailure> {
+        // Progressive JPEG keeps its bounded worker and RGBA transport. Other
+        // formats keep the canonical normalization, including alpha and 16-bit.
+        match self.preflight {
+            SourcePreflight::Jpeg(preflight)
+                if !preflight.is_progressive
+                    && preflight.color_model != JpegColorModel::Grayscale =>
+            {
+                let raw = decode_jpeg_raw(self.reader, &preflight)?;
+                let image = RgbImage::from_raw(preflight.width, preflight.height, raw)
+                    .ok_or_else(decoded_size_failure)?;
+                apply_orientation(image, preflight.orientation).map(DynamicImage::ImageRgb8)
+            }
+            _ => self.decode().map(DynamicImage::ImageRgba8),
         }
     }
 
@@ -411,8 +441,10 @@ fn preflight_jpeg(
             }
         } else if marker == 0xee {
             let payload = read_segment(reader, payload_length)?;
+            // Adobe defines the color header in the first 12 bytes. Exporters may
+            // append application data; those bytes do not change the transform.
             if payload.starts_with(b"Adobe")
-                && (payload.len() != 12 || adobe_transform.replace(payload[11]).is_some())
+                && (payload.len() < 12 || adobe_transform.replace(payload[11]).is_some())
             {
                 return Err(SourceFailure::new(
                     ImagingFailureCode::UnsupportedColorModel,
@@ -869,7 +901,10 @@ fn validate_png_iccp_chunk(payload: &[u8]) -> Result<(), SourceFailure> {
 }
 
 fn validate_icc_profile(profile: &[u8]) -> Result<(), SourceFailure> {
-    if ALLOWED_SRGB_PROFILES.contains(&profile) {
+    if ALLOWED_SRGB_PROFILES.contains(&profile)
+        || (profile.len() == SRGB_WINDOWS_PROFILE_BYTES
+            && Sha256::digest(profile)[..] == SRGB_WINDOWS_PROFILE_SHA256)
+    {
         Ok(())
     } else {
         Err(unsupported_profile(
@@ -1125,6 +1160,33 @@ fn decode_render_jpeg_in_process<R: BufRead + Seek>(
     reader: R,
     preflight: JpegPreflight,
 ) -> Result<RgbaImage, SourceFailure> {
+    let raw = decode_jpeg_raw(reader, &preflight)?;
+    let color_type = jpeg_color_type(&preflight);
+    let image = normalize_rgba(preflight.width, preflight.height, color_type, raw)?;
+    apply_orientation(image, preflight.orientation)
+}
+
+fn jpeg_color_type(preflight: &JpegPreflight) -> ColorType {
+    match preflight.color_model {
+        JpegColorModel::Grayscale => ColorType::L8,
+        JpegColorModel::YCbCr | JpegColorModel::Rgb => ColorType::Rgb8,
+    }
+}
+
+#[cfg(test)]
+std::thread_local! {
+    static JPEG_DECODES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+pub(crate) fn jpeg_decode_count() -> usize {
+    JPEG_DECODES.get()
+}
+
+fn decode_jpeg_raw<R: BufRead + Seek>(
+    reader: R,
+    preflight: &JpegPreflight,
+) -> Result<Vec<u8>, SourceFailure> {
     let reader = FallibleJpegReader::new(reader, preflight.compressed_bytes);
     let mut decoder = JpegDecoder::new(reader).map_err(|error| {
         image_failure(
@@ -1140,10 +1202,7 @@ fn decode_render_jpeg_in_process<R: BufRead + Seek>(
         ));
     }
     let color_type = decoder.color_type();
-    let expected_color_type = match preflight.color_model {
-        JpegColorModel::Grayscale => ColorType::L8,
-        JpegColorModel::YCbCr | JpegColorModel::Rgb => ColorType::Rgb8,
-    };
+    let expected_color_type = jpeg_color_type(preflight);
     if color_type != expected_color_type {
         return Err(SourceFailure::new(
             ImagingFailureCode::UnsupportedColorModel,
@@ -1159,9 +1218,9 @@ fn decode_render_jpeg_in_process<R: BufRead + Seek>(
                 "o decoder JPEG recusou os limites da fonte",
             )
         })?;
-    let raw = decode_raw(decoder)?;
-    let image = normalize_rgba(preflight.width, preflight.height, color_type, raw)?;
-    apply_orientation(image, preflight.orientation)
+    #[cfg(test)]
+    JPEG_DECODES.set(JPEG_DECODES.get() + 1);
+    decode_raw(decoder)
 }
 
 fn decode_render_png(
@@ -1404,10 +1463,10 @@ fn reduce_16(bytes: &[u8]) -> u8 {
     ((value + 128) / 257) as u8
 }
 
-fn apply_orientation(
-    image: RgbaImage,
+fn apply_orientation<P: Pixel<Subpixel = u8>>(
+    image: ImageBuffer<P, Vec<u8>>,
     orientation: Orientation,
-) -> Result<RgbaImage, SourceFailure> {
+) -> Result<ImageBuffer<P, Vec<u8>>, SourceFailure> {
     if orientation == Orientation::NoTransforms {
         return Ok(image);
     }
@@ -1421,7 +1480,7 @@ fn apply_orientation(
     };
     let byte_count = u64::from(width)
         .checked_mul(u64::from(height))
-        .and_then(|pixels| pixels.checked_mul(4))
+        .and_then(|pixels| pixels.checked_mul(u64::from(P::CHANNEL_COUNT)))
         .and_then(|bytes| usize::try_from(bytes).ok())
         .ok_or_else(|| {
             SourceFailure::new(
@@ -1437,7 +1496,7 @@ fn apply_orientation(
         )
     })?;
     pixels.resize(byte_count, 0);
-    let mut output = RgbaImage::from_raw(width, height, pixels).ok_or_else(|| {
+    let mut output = ImageBuffer::from_raw(width, height, pixels).ok_or_else(|| {
         SourceFailure::new(
             ImagingFailureCode::ResourceLimitExceeded,
             "não foi possível materializar o raster orientado",
@@ -1473,6 +1532,51 @@ mod render_source_tests {
     use sha2::{Digest, Sha256};
 
     use super::{FallibleJpegReader, image_failure, open_render_source};
+
+    #[test]
+    fn rgb_preview_preserves_oriented_pixels_and_encoded_bytes() {
+        let source = RgbImage::from_fn(97, 63, |x, y| {
+            Rgb([(x * 17) as u8, (y * 11) as u8, (x * 3 + y * 7) as u8])
+        });
+        let mut jpeg = Vec::new();
+        JpegEncoder::new_with_quality(&mut jpeg, 100)
+            .encode_image(&source)
+            .unwrap();
+        for orientation in 1..=8 {
+            let mut bytes = jpeg.clone();
+            insert_exif_orientation(&mut bytes, orientation);
+            let canonical = image::DynamicImage::ImageRgba8(decode_fixture(&bytes).unwrap());
+            let preview = open_fixture(&bytes).unwrap().decode_preview().unwrap();
+            assert!(preview.as_rgb8().is_some());
+            assert_eq!(preview.to_rgba8(), canonical.to_rgba8());
+            for edge in [1, 31, 1600] {
+                let canonical = if edge < 97 {
+                    canonical.thumbnail(edge, edge)
+                } else {
+                    canonical.clone()
+                };
+                let preview = if edge < 97 {
+                    preview.thumbnail(edge, edge)
+                } else {
+                    preview.clone()
+                };
+                assert_eq!(preview.to_rgba8(), canonical.to_rgba8());
+                let mut expected = Vec::new();
+                let mut actual = Vec::new();
+                JpegEncoder::new_with_quality(&mut expected, 84)
+                    .encode_image(canonical.as_rgba8().unwrap())
+                    .unwrap();
+                JpegEncoder::new_with_quality(&mut actual, 84)
+                    .encode_image(preview.as_rgb8().unwrap())
+                    .unwrap();
+                assert_eq!(actual, expected);
+            }
+        }
+        let gray = jpeg_fixture(None, ExtendedColorType::L8, &[73]);
+        let preview = open_fixture(&gray).unwrap().decode_preview().unwrap();
+        assert!(preview.as_rgba8().is_some());
+        assert_eq!(preview.into_rgba8(), decode_fixture(&gray).unwrap());
+    }
 
     #[test]
     fn decoder_io_errors_preserve_the_central_path_taxonomy() {
@@ -1623,6 +1727,43 @@ mod render_source_tests {
         assert_eq!(
             decode_fixture(&unknown_jpeg)
                 .expect_err("an unknown ICC profile is rejected")
+                .code,
+            ImagingFailureCode::UnsupportedColorProfile
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_srgb_jpeg_and_png_decode_without_accepting_modified_profiles() {
+        mod windows_srgb {
+            include!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/support/windows_srgb.rs"
+            ));
+        }
+        let profile = windows_srgb::standard_profile();
+        let without_profile = jpeg_fixture(None, ExtendedColorType::Rgb8, &[10, 20, 30]);
+        let with_profile = jpeg_fixture(Some(&profile), ExtendedColorType::Rgb8, &[10, 20, 30]);
+        assert_eq!(
+            decode_fixture(&with_profile).expect("the standard Windows sRGB JPEG decodes"),
+            decode_fixture(&without_profile).unwrap()
+        );
+
+        let mut iccp = b"sRGB\0\0".to_vec();
+        iccp.extend_from_slice(&zlib_stored(&profile));
+        let png = png_fixture(8, 2, &[0, 10, 20, 30], &[(b"iCCP", &iccp)]);
+        assert_eq!(
+            decode_fixture(&png).unwrap().get_pixel(0, 0).0,
+            [10, 20, 30, 255]
+        );
+
+        let mut changed = profile;
+        let last = changed.len() - 1;
+        changed[last] ^= 1;
+        let jpeg = jpeg_fixture(Some(&changed), ExtendedColorType::Rgb8, &[10, 20, 30]);
+        assert_eq!(
+            decode_fixture(&jpeg)
+                .expect_err("the profile name alone never authorizes it")
                 .code,
             ImagingFailureCode::UnsupportedColorProfile
         );
@@ -1820,6 +1961,49 @@ mod render_source_tests {
                 .code,
             ImagingFailureCode::UnsupportedColorModel
         );
+    }
+
+    #[test]
+    fn jpeg_adobe_app14_extension_preserves_supported_pixels() {
+        let jpeg = jpeg_fixture(None, ExtendedColorType::Rgb8, &[10, 20, 30]);
+        let expected = decode_fixture(&jpeg).expect("the JPEG without APP14 decodes");
+        let mut extended = jpeg;
+        // The Adobe color header occupies 12 bytes; exporters can append data.
+        let segment = [
+            0xff, 0xee, 0, 19, b'A', b'd', b'o', b'b', b'e', 0, 100, 0x80, 0, 0, 0, 1, 5, 0, 2,
+            0x49, 0x44,
+        ];
+        extended.splice(2..2, segment);
+        let actual = decode_fixture(&extended)
+            .expect("a complete Adobe header with extension bytes remains a supported JPEG");
+        assert_eq!(
+            actual, expected,
+            "extension bytes do not alter color interpretation"
+        );
+    }
+
+    #[test]
+    fn jpeg_adobe_app14_still_rejects_incomplete_duplicate_and_ycck_headers() {
+        let header = b"Adobe\0\x64\x80\0\0\0\x01";
+        for (payload, copies) in [
+            (&header[..11], 1),
+            (&header[..], 2),
+            (&b"Adobe\0\x64\x80\0\0\0\x02extension"[..], 1),
+        ] {
+            let mut jpeg = jpeg_fixture(None, ExtendedColorType::Rgb8, &[10, 20, 30]);
+            let mut segment = vec![0xff, 0xee];
+            segment.extend_from_slice(&((payload.len() + 2) as u16).to_be_bytes());
+            segment.extend_from_slice(payload);
+            for _ in 0..copies {
+                jpeg.splice(2..2, segment.iter().copied());
+            }
+            assert_eq!(
+                decode_fixture(&jpeg)
+                    .expect_err("unsupported Adobe color metadata is refused")
+                    .code,
+                ImagingFailureCode::UnsupportedColorModel
+            );
+        }
     }
 
     #[test]

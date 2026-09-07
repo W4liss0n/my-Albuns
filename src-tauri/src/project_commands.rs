@@ -1,8 +1,8 @@
 use myalbuns_core::{
-    AlbumInformation, AlbumInformationValidation, EditorProjection, ImportPhotoDisposition,
-    PathFailure, PhotoDropTarget, ProjectIntent, ProjectLocation, ProjectMutationOutcome,
-    SaveAsProjectError, SaveAsProjectOutcome as CoreSaveAsProjectOutcome, SaveAsProjectRequest,
-    SaveProjectError, SaveProjectOutcome as CoreSaveProjectOutcome,
+    AlbumInformation, AlbumInformationValidation, EditorProjection, PathFailure, PhotoDropTarget,
+    ProjectIntent, ProjectLocation, ProjectMutationOutcome, SaveAsProjectError,
+    SaveAsProjectOutcome as CoreSaveAsProjectOutcome, SaveAsProjectRequest, SaveProjectError,
+    SaveProjectOutcome as CoreSaveProjectOutcome,
 };
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
 use myalbuns_paths::{AppPaths, AppPathsError, OperationPathContext};
@@ -13,6 +13,7 @@ use crate::{
     cache_engine::CacheEngine,
     cache_previews::CachePreviewRegistry,
     cache_service::{ActiveCacheNamespace, CacheService},
+    image_processing::{ImageProcessingBatch, prepare_changed_images},
     ipc_contract::{
         ImportPhotoResult, SaveAsProjectCommandError, SaveAsProjectOutcome, SaveAsProjectResult,
         SaveProjectCommandError, SaveProjectOutcome, SaveProjectResult,
@@ -47,11 +48,15 @@ pub(crate) fn project_state(
 }
 
 #[tauri::command]
-pub(crate) fn apply_project_intent(
+pub(crate) async fn apply_project_intent(
     intent: ProjectIntent,
+    app: AppHandle,
     window: WebviewWindow,
     state: State<'_, ProjectHost>,
+    on_progress: tauri::ipc::Channel<crate::ipc_contract::ImageProcessingProgress>,
 ) -> Result<ProjectMutationOutcome, String> {
+    let previous_bindings = state.authorized_media_catalog()?.bindings;
+    let previous = state.projection()?;
     let intent_kind = match &intent {
         ProjectIntent::SetAlbumInformation { .. } => "set_album_information",
         ProjectIntent::SetVisualDefaults { .. } => "set_visual_defaults",
@@ -65,7 +70,7 @@ pub(crate) fn apply_project_intent(
         ProjectIntent::DropPhoto { .. } => "drop_photo",
     };
     let process_id = std::process::id();
-    let outcome = state.apply_with_outcome(intent).inspect_err(|_| {
+    let mut outcome = state.apply_with_outcome(intent).inspect_err(|_| {
         tracing::warn!(
             target: "myalbuns.desktop",
             process_role = ProcessRole::DesktopHost.as_str(),
@@ -85,6 +90,17 @@ pub(crate) fn apply_project_intent(
         intent = intent_kind,
         event = "project_intent_applied",
     );
+    prepare_changed_images(
+        &app,
+        &previous_bindings,
+        &previous,
+        &outcome.projection,
+        |progress| {
+            let _ = on_progress.send(progress);
+        },
+    )
+    .await?;
+    outcome.projection = state.projection()?;
     Ok(outcome)
 }
 
@@ -93,6 +109,7 @@ pub(crate) async fn import_photo(
     app: AppHandle,
     window: WebviewWindow,
     state: State<'_, ProjectHost>,
+    on_progress: tauri::ipc::Channel<crate::ipc_contract::ImageProcessingProgress>,
 ) -> Result<ImportPhotoResult, String> {
     if window.label() != PROJECT_WINDOW_LABEL {
         return Err("A importação de Foto só está disponível na Janela do Projeto.".into());
@@ -102,9 +119,9 @@ pub(crate) async fn import_photo(
     app.dialog()
         .file()
         .set_parent(&window)
-        .set_title("Importar Foto JPEG")
+        .set_title("Importar Fotos JPEG")
         .add_filter("Imagem JPEG", &["jpg", "jpeg"])
-        .pick_file(move |selection| {
+        .pick_files(move |selection| {
             let _ = sender.send(selection);
         });
     let selection = receiver
@@ -115,47 +132,40 @@ pub(crate) async fn import_photo(
             projection: host.projection()?,
         });
     };
-    let FilePath::Path(path) = selection else {
-        return Err("O local escolhido não é um Arquivo do Windows válido.".into());
-    };
-    let imported = tauri::async_runtime::spawn_blocking(move || {
-        let proposal = MediaResolver.propose_photo_import(path)?;
-        host.import_photo(proposal)
-    })
-    .await
-    .map_err(|_| "Não foi possível concluir a importação da Foto.".to_string())??;
-    let (event, result) = match imported.disposition {
-        ImportPhotoDisposition::Imported => (
-            "photo_imported",
-            ImportPhotoResult::Imported {
-                projection: imported.projection,
-                media_id: imported.media_id.to_string(),
-            },
-        ),
-        ImportPhotoDisposition::Existing => (
-            "photo_import_existing_selected",
-            ImportPhotoResult::Selected {
-                projection: imported.projection,
-                media_id: imported.media_id.to_string(),
-            },
-        ),
-    };
-    tracing::info!(
-        target: "myalbuns.desktop",
-        process_role = ProcessRole::DesktopHost.as_str(),
-        window_label = window.label(),
-        media_id = safe_log_identifier(match &result {
-            ImportPhotoResult::Imported { media_id, .. }
-            | ImportPhotoResult::Selected { media_id, .. } => media_id,
-            ImportPhotoResult::Cancelled { .. } => unreachable!("the native selection exists"),
-        }),
-        revision = match &result {
-            ImportPhotoResult::Imported { projection, .. }
-            | ImportPhotoResult::Selected { projection, .. }
-            | ImportPhotoResult::Cancelled { projection } => projection.state.revision,
-        },
-        event,
-    );
+    let mut paths = Vec::new();
+    let mut unsupported = Vec::new();
+    for selected in selection {
+        match selected {
+            FilePath::Path(path) => paths.push(path),
+            FilePath::Url(_) => unsupported.push(crate::ipc_contract::ImageProcessingProblem {
+                file_name: "Local selecionado".into(),
+                reason: "O local escolhido não é um Arquivo do Windows válido.".into(),
+            }),
+        }
+    }
+    let result =
+        crate::photo_import::import_selected_photos(&app, paths, unsupported, |progress| {
+            let _ = on_progress.send(progress);
+        })
+        .await?;
+    if let ImportPhotoResult::Completed {
+        projection,
+        imported_count,
+        media_ids,
+        problems,
+    } = &result
+    {
+        tracing::info!(
+            target: "myalbuns.desktop",
+            process_role = ProcessRole::DesktopHost.as_str(),
+            window_label = window.label(),
+            imported_count,
+            media_id = safe_log_identifier(media_ids.last().map(String::as_str).unwrap_or("")),
+            rejected_count = problems.len(),
+            revision = projection.state.revision,
+            event = "photos_imported",
+        );
+    }
     Ok(result)
 }
 
@@ -179,6 +189,7 @@ pub(crate) async fn relink_media(
     app: AppHandle,
     window: WebviewWindow,
     state: State<'_, ProjectHost>,
+    on_progress: tauri::ipc::Channel<crate::ipc_contract::ImageProcessingProgress>,
 ) -> Result<EditorProjection, String> {
     if window.label() != PROJECT_WINDOW_LABEL {
         return Err("A Religação só está disponível na Janela do Projeto.".into());
@@ -224,9 +235,24 @@ pub(crate) async fn relink_media(
     };
 
     let selected_media_id = binding.media_id.clone();
+    let mut processing = ImageProcessingBatch::new(1, |progress| {
+        let _ = on_progress.send(progress);
+    });
     let cache_pause = app.state::<CacheEngine>().pause().await;
     let relink_app = app.clone();
     let relinked = tauri::async_runtime::spawn_blocking(move || {
+        let mut inspection_paths = myalbuns_paths::OperationPathContext::new();
+        let _ = inspection_paths.capture(&path);
+        let estimate = crate::imaging_processor::ImageMemoryEstimate::in_plan(
+            &inspection_paths.freeze(), [path.as_path()],
+        );
+        // Religação already owns the exclusive Cache pause. Reserve the same
+        // CPU/RAM budget without trying to acquire nested Cache activity.
+        let cancellation = crate::cache_activity_gate::CacheCancellation::default();
+        let _inspection_reservation = tauri::async_runtime::block_on(
+            relink_app.state::<crate::imaging_processor::ImagingProcessor>()
+                .reserve_inspection(estimate, cancellation.flag()),
+        ).map_err(|error| error.to_string())?;
         if !occurrence_is_authoritatively_absent(&binding) {
             return Err(
                 "O Arquivo original reapareceu durante a Religação; nenhuma referência foi alterada."
@@ -254,6 +280,13 @@ pub(crate) async fn relink_media(
     })
     .await;
     let relinked = relinked.map_err(|_| "Não foi possível concluir a Religação.".to_string())??;
+    let relinked_binding = state
+        .authorized_media_catalog()?
+        .bindings
+        .into_iter()
+        .find(|binding| binding.media_id == selected_media_id)
+        .ok_or_else(|| "A imagem religada não pertence mais ao Projeto.".to_string())?;
+    processing.prepare(&app, &relinked_binding).await;
     tracing::info!(
         target: "myalbuns.desktop",
         process_role = ProcessRole::DesktopHost.as_str(),
@@ -262,7 +295,7 @@ pub(crate) async fn relink_media(
         revision = relinked.state.revision,
         event = "linked_media_relinked",
     );
-    Ok(relinked)
+    state.projection()
 }
 
 fn occurrence_is_authoritatively_absent(binding: &MediaBinding) -> bool {
@@ -291,11 +324,25 @@ pub(crate) fn validate_album_information(
 }
 
 #[tauri::command]
-pub(crate) fn undo_project(
+pub(crate) async fn undo_project(
+    app: AppHandle,
     window: WebviewWindow,
     state: State<'_, ProjectHost>,
+    on_progress: tauri::ipc::Channel<crate::ipc_contract::ImageProcessingProgress>,
 ) -> Result<EditorProjection, String> {
+    let previous_bindings = state.authorized_media_catalog()?.bindings;
+    let previous = state.projection()?;
     let projection = state.undo()?;
+    prepare_changed_images(
+        &app,
+        &previous_bindings,
+        &previous,
+        &projection,
+        |progress| {
+            let _ = on_progress.send(progress);
+        },
+    )
+    .await?;
     tracing::info!(
         target: "myalbuns.desktop",
         process_role = ProcessRole::DesktopHost.as_str(),
@@ -304,15 +351,29 @@ pub(crate) fn undo_project(
         revision = projection.state.revision,
         event = "project_undo_completed",
     );
-    Ok(projection)
+    state.projection()
 }
 
 #[tauri::command]
-pub(crate) fn redo_project(
+pub(crate) async fn redo_project(
+    app: AppHandle,
     window: WebviewWindow,
     state: State<'_, ProjectHost>,
+    on_progress: tauri::ipc::Channel<crate::ipc_contract::ImageProcessingProgress>,
 ) -> Result<EditorProjection, String> {
+    let previous_bindings = state.authorized_media_catalog()?.bindings;
+    let previous = state.projection()?;
     let projection = state.redo()?;
+    prepare_changed_images(
+        &app,
+        &previous_bindings,
+        &previous,
+        &projection,
+        |progress| {
+            let _ = on_progress.send(progress);
+        },
+    )
+    .await?;
     tracing::info!(
         target: "myalbuns.desktop",
         process_role = ProcessRole::DesktopHost.as_str(),
@@ -321,7 +382,7 @@ pub(crate) fn redo_project(
         revision = projection.state.revision,
         event = "project_redo_completed",
     );
-    Ok(projection)
+    state.projection()
 }
 
 #[tauri::command]

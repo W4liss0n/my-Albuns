@@ -2,6 +2,7 @@ use myalbuns_paths::{ResolveError, RootBindingPlan};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use crate::PhotoImportRequest;
 use crate::cache::CacheRequest;
 use crate::render::ImagingRequest;
 
@@ -183,6 +184,7 @@ impl ImagingFailureStage {
 pub enum ImagingCommand {
     Render(ImagingRequest),
     BuildCache(CacheRequest),
+    PreparePhotoImport(PhotoImportRequest),
 }
 
 impl ImagingCommand {
@@ -200,6 +202,15 @@ impl ImagingCommand {
         match self {
             Self::Render(request) => &request.root_bindings,
             Self::BuildCache(request) => &request.root_bindings,
+            Self::PreparePhotoImport(request) => &request.root_bindings,
+        }
+    }
+
+    pub fn cache_paths(&self) -> Option<&myalbuns_paths::CachePathPlan> {
+        match self {
+            Self::BuildCache(request) => Some(&request.cache_paths),
+            Self::PreparePhotoImport(request) => Some(&request.cache_paths),
+            Self::Render(_) => None,
         }
     }
 }

@@ -28,6 +28,7 @@ const projectDialogActionMap = {
   dismissExport: "dismissExport",
   dismissProjectCloseFailure: "dismissProjectCloseFailure",
   dismissProjectOperationFailure: "dismissProjectOperationFailure",
+  dismissImageProcessingProblems: "dismissImageProcessingProblems",
   retryExport: "retryExport",
   saveAndClose: "saveAndClose",
 } as const satisfies Record<IpcProjectDialogAction, ProjectDialogAction> &
@@ -120,6 +121,19 @@ const stateDecoders: Record<
   StateDecoder
 > &
   Record<ProjectDialogStateKind, StateDecoder> = {
+  imageProcessingProgress: (value) => {
+    const progress = decodeProgress(value.progress);
+    return progress ? { kind: "imageProcessingProgress", progress } : null;
+  },
+  imageProcessingProblems: (value) => {
+    if ((value.importedCount !== null && !isWireU64(value.importedCount)) || !Array.isArray(value.problems)) return null;
+    const problems: { fileName: string; reason: string }[] = [];
+    for (const problem of value.problems) {
+      if (!isRecord(problem) || typeof problem.fileName !== "string" || typeof problem.reason !== "string") return null;
+      problems.push({ fileName: problem.fileName, reason: problem.reason });
+    }
+    return { kind: "imageProcessingProblems", importedCount: value.importedCount, problems };
+  },
   albumInformationConfirmation: (value) => {
     const details = decodeDetails(value.details);
     return typeof value.busy === "boolean" && details
@@ -245,6 +259,10 @@ export function toIpcProjectDialogState(
   state: ProjectDialogState,
 ): IpcProjectDialogState {
   switch (state.kind) {
+    case "imageProcessingProgress":
+      return { kind: state.kind, progress: toIpcProjectDialogProgress(state.progress) };
+    case "imageProcessingProblems":
+      return { kind: state.kind, importedCount: state.importedCount, problems: state.problems.map(problem => ({ ...problem })) };
     case "albumInformationConfirmation":
       return {
         busy: state.busy,
@@ -281,6 +299,10 @@ function fromIpcProjectDialogState(
   state: IpcProjectDialogState,
 ): ProjectDialogState {
   switch (state.kind) {
+    case "imageProcessingProgress":
+      return { kind: state.kind, progress: fromIpcProjectDialogProgress(state.progress) };
+    case "imageProcessingProblems":
+      return { kind: state.kind, importedCount: state.importedCount, problems: state.problems.map(problem => ({ ...problem })) };
     case "albumInformationConfirmation":
       return {
         busy: state.busy,

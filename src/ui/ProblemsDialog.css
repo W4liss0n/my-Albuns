@@ -1,0 +1,41 @@
+.ui-dialog-window--problems .ui-dialog-window__body {
+  padding: 0 18px 18px;
+}
+
+.ui-problems-description {
+  margin: 0 0 14px;
+}
+
+.ui-problems-scroll {
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+}
+
+.ui-problems-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  text-align: left;
+}
+
+.ui-problems-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  font-weight: 600;
+}
+
+.ui-problems-table th,
+.ui-problems-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--ui-border);
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.ui-problems-table th:first-child { width: 36%; }
+.ui-problems-table tr:last-child td { border-bottom: 0; }

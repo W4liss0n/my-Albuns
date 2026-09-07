@@ -62,7 +62,6 @@ enum CacheNamespaceRemovalReservation {
 }
 
 impl CacheNamespaceOwner {
-    #[cfg(test)]
     pub(crate) fn namespace(&self) -> &AuthorizedCacheNamespace {
         &self.namespace
     }
@@ -1566,7 +1565,11 @@ mod tests {
         let mut lifetime = ProcessorChildLifetime::attach(worker_identity)
             .expect("the Host contains the Processor before dispatch");
         lifetime
-            .publish_cache_writer_claim(&service.app_paths, owner.namespace().paths())
+            .publish_cache_writer_claim(
+                &service.app_paths,
+                owner.namespace().paths(),
+                myalbuns_paths::CacheWriterSlot::First,
+            )
             .expect("the Host publishes the contained Processor claim before dispatch");
         worker
             .stdin

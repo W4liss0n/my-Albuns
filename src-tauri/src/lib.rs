@@ -17,6 +17,7 @@ mod export_pipeline;
 mod global_activation;
 mod global_runtime;
 mod graphics_launch_gate;
+mod image_processing;
 mod imaging_processor;
 #[cfg(test)]
 mod imaging_recovery_integration;
@@ -31,6 +32,7 @@ mod opaque_image_protocol;
 mod operation_gate;
 mod operation_lease;
 mod path_io;
+mod photo_import;
 mod preference_store_io;
 mod processor_lifetime;
 mod product_runtime;

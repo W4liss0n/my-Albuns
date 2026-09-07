@@ -1,9 +1,13 @@
+mod resources;
+pub(crate) use resources::{ImageMemoryEstimate, ProcessorAdmissionFailure};
+use resources::{MemoryReservation, ResourceBudget, cancellable_reservation};
+
 use std::{
     fmt,
     future::Future,
     pin::Pin,
     sync::{
-        Arc,
+        Arc, Mutex,
         atomic::{AtomicBool, Ordering},
     },
     time::Duration,
@@ -18,29 +22,58 @@ use myalbuns_imaging_protocol::{
     root_binding_plan_sha256 as digest_root_binding_plan,
 };
 use myalbuns_logging::{LOG_DIRECTORY_ENV, ProcessRole};
-use myalbuns_paths::AppPaths;
+use myalbuns_paths::{AppPaths, CacheWriterSlot};
 use tauri::{AppHandle, Manager};
 use tauri_plugin_shell::{
     ShellExt,
     process::{CommandChild, CommandEvent},
 };
-use tokio::sync::{Mutex as AsyncMutex, OwnedMutexGuard};
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 use crate::{logging::LoggingState, processor_lifetime::ProcessorChildLifetime};
 
 const PROCESS_TERMINATION_TIMEOUT: Duration = Duration::from_secs(5);
 const PROCESS_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
 
-#[derive(Debug, Default)]
+pub(crate) const IMAGE_PROCESSING_CONCURRENCY: usize = CacheWriterSlot::ALL.len();
+
+#[derive(Debug)]
 pub(crate) struct ImagingProcessor {
-    reservation: Arc<AsyncMutex<()>>,
-    quarantined: Arc<AtomicBool>,
+    permits: Arc<Semaphore>,
+    occupied: Arc<Mutex<[bool; IMAGE_PROCESSING_CONCURRENCY]>>,
+    capacity: usize,
+    resources: Arc<ResourceBudget>,
+}
+
+impl Default for ImagingProcessor {
+    fn default() -> Self {
+        let capacity = std::thread::available_parallelism()
+            .map_or(1, usize::from)
+            .saturating_sub(1)
+            .clamp(1, IMAGE_PROCESSING_CONCURRENCY);
+        Self::with_capacity(capacity)
+    }
+}
+
+impl ImagingProcessor {
+    fn with_capacity(capacity: usize) -> Self {
+        assert!((1..=IMAGE_PROCESSING_CONCURRENCY).contains(&capacity));
+        Self {
+            permits: Arc::new(Semaphore::new(capacity)),
+            occupied: Arc::new(Mutex::new([false; IMAGE_PROCESSING_CONCURRENCY])),
+            capacity,
+            resources: Arc::new(ResourceBudget::default()),
+        }
+    }
 }
 
 #[derive(Debug)]
 pub(crate) struct ProcessorReservation {
-    _guard: OwnedMutexGuard<()>,
-    quarantined: Arc<AtomicBool>,
+    _permit: OwnedSemaphorePermit,
+    permits: Arc<Semaphore>,
+    occupied: Arc<Mutex<[bool; IMAGE_PROCESSING_CONCURRENCY]>>,
+    cache_slot: Option<CacheWriterSlot>,
+    _memory: Option<MemoryReservation>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -48,23 +81,98 @@ pub(crate) struct ProcessorUnavailable;
 
 impl ImagingProcessor {
     pub(crate) async fn reserve(&self) -> Result<ProcessorReservation, ProcessorUnavailable> {
-        if self.quarantined.load(Ordering::Acquire) {
+        self.acquire(false).await
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn reserve_cache(&self) -> Result<ProcessorReservation, ProcessorUnavailable> {
+        self.acquire(true).await
+    }
+
+    pub(crate) fn cache_capacity(&self) -> usize {
+        self.capacity
+    }
+
+    pub(crate) async fn reserve_cache_for(
+        &self,
+        estimate: ImageMemoryEstimate,
+        cancellation: &AtomicBool,
+    ) -> Result<ProcessorReservation, ProcessorAdmissionFailure> {
+        self.acquire_with_memory(true, estimate, cancellation).await
+    }
+
+    pub(crate) async fn reserve_inspection(
+        &self,
+        estimate: ImageMemoryEstimate,
+        cancellation: &AtomicBool,
+    ) -> Result<ProcessorReservation, ProcessorAdmissionFailure> {
+        self.acquire_with_memory(false, estimate, cancellation)
+            .await
+    }
+
+    async fn acquire_with_memory(
+        &self,
+        cache: bool,
+        estimate: ImageMemoryEstimate,
+        cancellation: &AtomicBool,
+    ) -> Result<ProcessorReservation, ProcessorAdmissionFailure> {
+        let mut reservation = cancellable_reservation(self.acquire(cache), cancellation).await?;
+        reservation._memory = Some(
+            self.resources
+                .reserve(estimate, cancellation, &self.permits)
+                .await?,
+        );
+        Ok(reservation)
+    }
+
+    async fn acquire(&self, cache: bool) -> Result<ProcessorReservation, ProcessorUnavailable> {
+        let count = if cache { 1 } else { self.capacity as u32 };
+        let permit = self
+            .permits
+            .clone()
+            .acquire_many_owned(count)
+            .await
+            .map_err(|_| ProcessorUnavailable)?;
+        if self.permits.is_closed() {
             return Err(ProcessorUnavailable);
         }
-        let guard = self.reservation.clone().lock_owned().await;
-        if self.quarantined.load(Ordering::Acquire) {
-            return Err(ProcessorUnavailable);
-        }
+        let cache_slot = cache.then(|| {
+            let mut occupied = self
+                .occupied
+                .lock()
+                .expect("the Processor slot lock is healthy");
+            let slot = CacheWriterSlot::ALL
+                .into_iter()
+                .find(|slot| !occupied[slot.index()])
+                .expect("a Cache permit owns an available writer slot");
+            occupied[slot.index()] = true;
+            slot
+        });
         Ok(ProcessorReservation {
-            _guard: guard,
-            quarantined: Arc::clone(&self.quarantined),
+            _permit: permit,
+            permits: Arc::clone(&self.permits),
+            occupied: Arc::clone(&self.occupied),
+            cache_slot,
+            _memory: None,
         })
     }
 }
 
 impl ProcessorReservation {
     pub(crate) fn quarantine(&self) {
-        self.quarantined.store(true, Ordering::Release);
+        // Closing wakes every waiter and prevents either operation from starting.
+        self.permits.close();
+    }
+}
+
+impl Drop for ProcessorReservation {
+    fn drop(&mut self) {
+        if let Some(slot) = self.cache_slot {
+            self.occupied
+                .lock()
+                .expect("the Processor slot lock is healthy")[slot.index()] = false;
+        }
+        // The permit is released only after its durable writer slot is available.
     }
 }
 
@@ -331,27 +439,38 @@ impl ImagingTransport for TauriImagingTransport<'_> {
         control: InvocationControl<'a>,
     ) -> InvocationFuture<'a> {
         Box::pin(async move {
-            protect_processor_after_invocation(
+            invoke_reserved(
                 self._reservation,
                 invoke_once(
                     self.app,
                     self.logging,
+                    self._reservation,
                     command,
                     context,
                     operation,
                     attempt,
                     control,
-                )
-                .await,
+                ),
             )
+            .await
         })
     }
 }
 
-fn protect_processor_after_invocation(
+async fn invoke_reserved(
     reservation: &ProcessorReservation,
-    result: Result<ImagingResponse, InvocationFailure>,
+    invocation: impl Future<Output = Result<ImagingResponse, InvocationFailure>>,
 ) -> Result<ImagingResponse, InvocationFailure> {
+    // A peer can quarantine the pool while this reservation is already held.
+    // Every attempt, including automatic recovery, must check before dispatch.
+    if reservation.permits.is_closed() {
+        return Err(InvocationFailure::at_stage(
+            InvocationFailureStage::ResolveSidecar,
+            None,
+            ProcessorUnavailable.to_string(),
+        ));
+    }
+    let result = invocation.await;
     if result
         .as_ref()
         .is_err_and(InvocationFailure::is_termination_unconfirmed)
@@ -361,9 +480,11 @@ fn protect_processor_after_invocation(
     result
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn invoke_once(
     app: &AppHandle,
     logging: &LoggingState,
+    reservation: &ProcessorReservation,
     command: &ImagingCommand,
     context: &InvocationContext,
     operation: ImagingOperation,
@@ -460,9 +581,14 @@ async fn invoke_once(
             }
         }
     };
-    if let ImagingCommand::BuildCache(request) = command
-        && let Err(error) = processor_lifetime
-            .publish_cache_writer_claim(&app.state::<AppPaths>(), &request.cache_paths)
+    if let Some(cache_paths) = command.cache_paths()
+        && let Err(error) = processor_lifetime.publish_cache_writer_claim(
+            &app.state::<AppPaths>(),
+            cache_paths,
+            reservation
+                .cache_slot
+                .expect("Cache invocation owns a writer slot"),
+        )
     {
         let claim_message =
             format!("Não foi possível publicar a autoridade do Processador sobre o Cache: {error}");
@@ -760,14 +886,14 @@ mod tests {
 
     use super::{
         ImagingProcessor, InvocationControl, InvocationFailure, InvocationFailureStage,
-        complete_invocation, decode_and_report_event_chunk, protect_processor_after_invocation,
+        complete_invocation, decode_and_report_event_chunk, invoke_reserved,
         receive_processor_handshake, wait_for_termination_for,
     };
 
     #[test]
     fn processor_reservation_serializes_callers_and_is_released_with_its_guard() {
         tauri::async_runtime::block_on(async {
-            let processor = ImagingProcessor::default();
+            let processor = ImagingProcessor::with_capacity(2);
             let first = processor
                 .reserve()
                 .await
@@ -791,9 +917,120 @@ mod tests {
     }
 
     #[test]
+    fn cache_workers_overlap_but_export_waits_for_both_and_blocks_new_cache_work() {
+        tauri::async_runtime::block_on(async {
+            let processor = ImagingProcessor::with_capacity(2);
+            let first = processor.reserve_cache().await.unwrap();
+            let second = tokio::time::timeout(Duration::from_secs(1), processor.reserve_cache())
+                .await
+                .unwrap()
+                .unwrap();
+            assert_ne!(first.cache_slot, second.cache_slot);
+            let export = processor.reserve();
+            tokio::pin!(export);
+            assert!(
+                tokio::time::timeout(Duration::from_millis(20), &mut export)
+                    .await
+                    .is_err()
+            );
+            drop(first);
+            assert!(
+                tokio::time::timeout(Duration::from_millis(20), &mut export)
+                    .await
+                    .is_err()
+            );
+            let next = processor.reserve_cache();
+            tokio::pin!(next);
+            assert!(
+                tokio::time::timeout(Duration::from_millis(20), &mut next)
+                    .await
+                    .is_err()
+            );
+            drop(second);
+            let export = export.await.unwrap();
+            assert!(
+                tokio::time::timeout(Duration::from_millis(20), &mut next)
+                    .await
+                    .is_err()
+            );
+            drop(export);
+            assert!(next.await.is_ok());
+        });
+    }
+
+    #[test]
+    fn all_eight_writer_slots_are_unique_and_export_reserves_the_entire_capacity() {
+        tauri::async_runtime::block_on(async {
+            let processor = ImagingProcessor::with_capacity(8);
+            let mut reservations = Vec::new();
+            for _ in 0..processor.cache_capacity() {
+                reservations.push(processor.reserve_cache().await.unwrap());
+            }
+            assert_eq!(
+                reservations
+                    .iter()
+                    .map(|reservation| reservation.cache_slot.unwrap().index())
+                    .collect::<std::collections::HashSet<_>>()
+                    .len(),
+                8
+            );
+            let mut export = Box::pin(processor.reserve());
+            for reservation in reservations {
+                assert!(
+                    tokio::time::timeout(Duration::from_millis(10), &mut export)
+                        .await
+                        .is_err()
+                );
+                drop(reservation);
+            }
+            let exclusive = export.await.unwrap();
+            assert_eq!(processor.permits.available_permits(), 0);
+            drop(exclusive);
+            assert_eq!(processor.permits.available_permits(), 8);
+        });
+    }
+
+    #[test]
+    fn cache_worker_limit_reuses_slots_and_quarantine_wakes_queued_work() {
+        tauri::async_runtime::block_on(async {
+            let processor = ImagingProcessor::with_capacity(2);
+            let first = processor.reserve_cache().await.unwrap();
+            let second = processor.reserve_cache().await.unwrap();
+            let third = processor.reserve_cache();
+            tokio::pin!(third);
+            assert!(
+                tokio::time::timeout(Duration::from_millis(20), &mut third)
+                    .await
+                    .is_err()
+            );
+            let released_slot = first.cache_slot;
+            drop(first);
+            let third = third.await.unwrap();
+            assert_eq!(third.cache_slot, released_slot);
+            let queued = processor.reserve_cache();
+            tokio::pin!(queued);
+            assert!(
+                tokio::time::timeout(Duration::from_millis(20), &mut queued)
+                    .await
+                    .is_err()
+            );
+            third.quarantine();
+            assert!(
+                tokio::time::timeout(Duration::from_secs(1), queued)
+                    .await
+                    .unwrap()
+                    .is_err()
+            );
+            assert!(processor.reserve_cache().await.is_err());
+            assert!(processor.reserve().await.is_err());
+            drop((second, third));
+        });
+    }
+
+    #[test]
     fn unconfirmed_termination_quarantines_the_processor_before_releasing_the_guard() {
         tauri::async_runtime::block_on(async {
-            let processor = ImagingProcessor::default();
+            let processor = ImagingProcessor::with_capacity(2);
             let reservation = processor
                 .reserve()
                 .await
@@ -812,7 +1049,7 @@ mod tests {
     #[test]
     fn transport_failure_marks_the_shared_processor_quarantine() {
         tauri::async_runtime::block_on(async {
-            let processor = ImagingProcessor::default();
+            let processor = ImagingProcessor::with_capacity(2);
             let reservation = processor
                 .reserve()
                 .await
@@ -823,11 +1060,48 @@ mod tests {
                     "injected unconfirmed termination",
                 ));
 
-            let failure = protect_processor_after_invocation(&reservation, result)
+            let failure = invoke_reserved(&reservation, std::future::ready(result))
+                .await
                 .expect_err("the transport failure remains visible");
             assert!(failure.is_termination_unconfirmed());
             drop(reservation);
             assert!(processor.reserve().await.is_err());
+        });
+    }
+
+    #[test]
+    fn quarantined_peer_blocks_recovery_dispatch_through_an_existing_reservation() {
+        tauri::async_runtime::block_on(async {
+            let processor = ImagingProcessor::with_capacity(2);
+            let first = processor.reserve_cache().await.unwrap();
+            let second = processor.reserve_cache().await.unwrap();
+            let mut dispatched = 0;
+            let failure = invoke_reserved(&second, async {
+                dispatched += 1;
+                Err(InvocationFailure::unexpected_termination(42))
+            })
+            .await
+            .unwrap_err();
+            assert!(failure.is_unexpected_termination());
+            invoke_reserved(&first, async {
+                Err(InvocationFailure::termination_unconfirmed(
+                    43,
+                    "injected peer failure",
+                ))
+            })
+            .await
+            .unwrap_err();
+            let retry = invoke_reserved(&second, async {
+                dispatched += 1;
+                Err(InvocationFailure::unexpected_termination(44))
+            })
+            .await
+            .unwrap_err();
+            assert_eq!(retry.stage, InvocationFailureStage::ResolveSidecar);
+            assert_eq!(
+                dispatched, 1,
+                "an existing reservation cannot dispatch a recovery process after peer quarantine"
+            );
         });
     }
 

@@ -15,6 +15,8 @@ import {
   type ExportPipelinePort,
   type ExportProgressEvent,
   type MediaPreviewPort,
+  type ImageProcessingProgress,
+  type ImageProcessingProblem,
   type ProjectStartupPort,
   type ProjectCorePort,
   type SaveAsProjectOutcome as ApplicationSaveAsProjectOutcome,
@@ -35,6 +37,7 @@ import type { ExportCommandError as IpcExportCommandError } from "./generated/Ex
 import type { ExportEvent as IpcExportEvent } from "./generated/ExportEvent";
 import type { ExportResult as IpcExportResult } from "./generated/ExportResult";
 import type { ImportPhotoResult as IpcImportPhotoResult } from "./generated/ImportPhotoResult";
+import type { ImageProcessingProgress as IpcImageProcessingProgress } from "./generated/ImageProcessingProgress";
 import type { LinkedMediaChanged as IpcLinkedMediaChanged } from "./generated/LinkedMediaChanged";
 import type { MediaPreview as IpcMediaPreview } from "./generated/MediaPreview";
 import type { MediaPreviewCommandError as IpcMediaPreviewCommandError } from "./generated/MediaPreviewCommandError";
@@ -271,6 +274,21 @@ function toSaveProjectResult(value: unknown): ApplicationSaveProjectResult {
   };
 }
 
+async function invokeImageProcessing<T>(
+  command: string,
+  args: Record<string, unknown>,
+  onProgress?: (progress: ImageProcessingProgress) => void,
+): Promise<T> {
+  const progressChannel = new Channel<IpcImageProcessingProgress>();
+  let active = true;
+  progressChannel.onmessage = (progress) => { if (active) onProgress?.(progress); };
+  try {
+    return await invoke<T>(command, { ...args, onProgress: progressChannel });
+  } finally {
+    active = false;
+  }
+}
+
 export const tauriProjectCorePort: ProjectCorePort = {
   load: (operationId) =>
     invoke<EditorProjection>("project_state", { operationId }),
@@ -278,15 +296,15 @@ export const tauriProjectCorePort: ProjectCorePort = {
     invoke<AlbumInformationValidation>("validate_album_information", {
       information,
     }),
-  apply: async (intent: ProjectIntent) =>
+  apply: async (intent: ProjectIntent, onProgress) =>
     (
-      await invoke<ProjectMutationOutcome>("apply_project_intent", {
+      await invokeImageProcessing<ProjectMutationOutcome>("apply_project_intent", {
         intent,
-      })
+      }, onProgress)
     ).projection,
-  applyWithOutcome: (intent: ProjectIntent) =>
-    invoke<ProjectMutationOutcome>("apply_project_intent", { intent }),
-  importPhoto: () => invoke<IpcImportPhotoResult>("import_photo"),
+  applyWithOutcome: (intent: ProjectIntent, onProgress) =>
+    invokeImageProcessing<ProjectMutationOutcome>("apply_project_intent", { intent }, onProgress),
+  importPhoto: (onProgress) => invokeImageProcessing<IpcImportPhotoResult>("import_photo", {}, onProgress),
   resolvePhotoDropTarget: (
     sheetId: string,
     xUm: number,
@@ -297,10 +315,10 @@ export const tauriProjectCorePort: ProjectCorePort = {
       xUm,
       yUm,
     }),
-  relink: (mediaId) =>
-    invoke<EditorProjection>("relink_media", { mediaId }),
-  undo: () => invoke<EditorProjection>("undo_project"),
-  redo: () => invoke<EditorProjection>("redo_project"),
+  relink: (mediaId, onProgress) =>
+    invokeImageProcessing<EditorProjection>("relink_media", { mediaId }, onProgress),
+  undo: (onProgress) => invokeImageProcessing<EditorProjection>("undo_project", {}, onProgress),
+  redo: (onProgress) => invokeImageProcessing<EditorProjection>("redo_project", {}, onProgress),
   save: async (expectedRevision) => {
     try {
       return toSaveProjectResult(
@@ -327,7 +345,7 @@ export const tauriProjectCorePort: ProjectCorePort = {
 };
 
 export const tauriProjectStartupPort: ProjectStartupPort = {
-  confirmUiReady: () => invoke<void>("project_ui_ready"),
+  confirmUiReady: () => invoke<readonly ImageProcessingProblem[]>("project_ui_ready"),
 };
 
 async function loadWorkspacePreferences(): Promise<WorkspacePreferences> {
@@ -363,20 +381,29 @@ export const tauriWorkspacePreferencesPort: WorkspacePreferencesPort = {
 };
 
 export const tauriMediaPreviewPort: MediaPreviewPort = {
-  prepareMediaPreviews: (demand) =>
-    invoke<IpcMediaPreview[] | null>("prepare_media_previews", {
-      demand: {
-        revision: demand.revision,
-        visibleMediaIds: [...demand.visibleMediaIds],
-        preloadMediaIds: [...demand.preloadMediaIds],
-      },
-    }).catch(
-      (error: unknown) => {
-        throw normalizeMediaPreviewError(error);
-      },
-    ),
-  retryUnavailableMedia: (mediaId) =>
-    invoke<IpcMediaPreview>("retry_unavailable_media", { mediaId }).catch(
+  prepareMediaPreviews: async (demand, publish) => {
+    const onPreview = new Channel<IpcMediaPreview>();
+    let active = true;
+    onPreview.onmessage = (preview) => {
+      if (active) publish(preview);
+    };
+    try {
+      return await invoke<IpcMediaPreview[] | null>("prepare_media_previews", {
+        demand: {
+          revision: demand.revision,
+          visibleMediaIds: [...demand.visibleMediaIds],
+          preloadMediaIds: [...demand.preloadMediaIds],
+        },
+        onPreview,
+      });
+    } catch (error: unknown) {
+      throw normalizeMediaPreviewError(error);
+    } finally {
+      active = false;
+    }
+  },
+  retryUnavailableMedia: (mediaId, onProgress) =>
+    invokeImageProcessing<IpcMediaPreview>("retry_unavailable_media", { mediaId }, onProgress).catch(
       (error: unknown) => {
         throw normalizeMediaPreviewError(error);
       },

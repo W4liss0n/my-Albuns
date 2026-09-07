@@ -316,7 +316,7 @@ test("maps the Project and media ports to the desktop commands", async () => {
   await tauriProjectCorePort.load("project-load-1");
   await tauriProjectCorePort.validateAlbumInformation(information);
   await tauriProjectCorePort.apply(intent);
-  await tauriProjectCorePort.relink("media-a-001");
+  await tauriProjectCorePort.relink("media-a-001", vi.fn());
   await tauriProjectCorePort.undo();
   await tauriProjectCorePort.redo();
   const retriedPreview = {
@@ -327,6 +327,7 @@ test("maps the Project and media ports to the desktop commands", async () => {
   vi.mocked(invoke).mockResolvedValueOnce(retriedPreview);
   const retry = await tauriMediaPreviewPort.retryUnavailableMedia(
     "media-a-001",
+    vi.fn(),
   );
   vi.mocked(invoke).mockResolvedValueOnce([
     {
@@ -340,7 +341,7 @@ test("maps the Project and media ports to the desktop commands", async () => {
     visibleMediaIds: ["media-a-001"],
     preloadMediaIds: ["media-b-001"],
   };
-  const previews = await tauriMediaPreviewPort.prepareMediaPreviews(demand);
+  const previews = await tauriMediaPreviewPort.prepareMediaPreviews(demand, vi.fn());
 
   expect(invoke).toHaveBeenNthCalledWith(1, "project_state", {
     operationId: "project-load-1",
@@ -350,17 +351,21 @@ test("maps the Project and media ports to the desktop commands", async () => {
   });
   expect(invoke).toHaveBeenNthCalledWith(3, "apply_project_intent", {
     intent,
+    onProgress: tauriBoundary.channels[0],
   });
   expect(invoke).toHaveBeenNthCalledWith(4, "relink_media", {
     mediaId: "media-a-001",
+    onProgress: tauriBoundary.channels[1],
   });
-  expect(invoke).toHaveBeenNthCalledWith(5, "undo_project");
-  expect(invoke).toHaveBeenNthCalledWith(6, "redo_project");
+  expect(invoke).toHaveBeenNthCalledWith(5, "undo_project", { onProgress: tauriBoundary.channels[2] });
+  expect(invoke).toHaveBeenNthCalledWith(6, "redo_project", { onProgress: tauriBoundary.channels[3] });
   expect(invoke).toHaveBeenNthCalledWith(7, "retry_unavailable_media", {
     mediaId: "media-a-001",
+    onProgress: tauriBoundary.channels[4],
   });
   expect(invoke).toHaveBeenNthCalledWith(8, "prepare_media_previews", {
     demand,
+    onPreview: tauriBoundary.channels[5],
   });
   expect(retry).toEqual(retriedPreview);
   expect(previews?.[0].url).toBe("http://asset.localhost/cache-preview");
@@ -375,7 +380,7 @@ test("materializes an owned media-demand DTO at the native seam", async () => {
     preloadMediaIds,
     revision: 7,
     visibleMediaIds,
-  });
+  }, vi.fn());
 
   const request = vi.mocked(invoke).mock.calls[0][1] as {
     demand: {
@@ -394,10 +399,48 @@ test("materializes an owned media-demand DTO at the native seam", async () => {
 });
 
 
+test.each(["completed", "failed"])("streams each media preview before the batch finishes and ignores late events after %s", async (outcome) => {
+  let finish!: () => void;
+  vi.mocked(invoke).mockImplementationOnce(() => new Promise((resolve, reject) => {
+    finish = () => outcome === "completed" ? resolve([]) : reject(new Error("Falhou"));
+  }));
+  const publish = vi.fn();
+  const demand = { revision: 1, visibleMediaIds: ["photo-a", "photo-b"], preloadMediaIds: [] };
+  const completion = tauriMediaPreviewPort.prepareMediaPreviews(demand, publish).catch(() => undefined);
+  const channel = tauriBoundary.channels[0];
+  expect(invoke).toHaveBeenCalledWith("prepare_media_previews", { demand, onPreview: channel });
+  const preview = { mediaId: "photo-a", state: "ready", url: "http://myalbuns-cache.localhost/a" };
+  channel.onmessage(preview);
+  expect(publish).toHaveBeenCalledExactlyOnceWith(preview);
+  finish();
+  await completion;
+  channel.onmessage({ ...preview, mediaId: "photo-b" });
+  expect(publish).toHaveBeenCalledOnce();
+});
+
 test("confirms Project UI readiness through its single startup seam", async () => {
   await tauriProjectStartupPort.confirmUiReady();
 
   expect(invoke).toHaveBeenCalledWith("project_ui_ready");
+});
+
+test.each(["completed", "failed"])("streams photo import progress per attempt and ignores late events after %s", async (outcome) => {
+  let finish!: () => void;
+  vi.mocked(invoke).mockImplementationOnce(() => new Promise<void>((resolve, reject) => {
+    finish = () => outcome === "completed" ? resolve() : reject(new Error("Falhou"));
+  }));
+  const onProgress = vi.fn();
+  const completion = tauriProjectCorePort.importPhoto(onProgress).catch(() => undefined);
+  const channel = tauriBoundary.channels[0];
+  expect(invoke).toHaveBeenCalledWith("import_photo", { onProgress: channel });
+  expect(onProgress).not.toHaveBeenCalled();
+  channel.onmessage({ completedFiles: 0, totalFiles: 12 });
+  channel.onmessage({ completedFiles: 5, totalFiles: 12 });
+  expect(onProgress.mock.calls).toEqual([[{ completedFiles: 0, totalFiles: 12 }], [{ completedFiles: 5, totalFiles: 12 }]]);
+  finish();
+  await completion;
+  channel.onmessage({ completedFiles: 12, totalFiles: 12 });
+  expect(onProgress).toHaveBeenCalledTimes(2);
 });
 
 test("maps Photo import, target resolution, and affected Frame outcomes", async () => {
@@ -407,9 +450,11 @@ test("maps Photo import, target resolution, and affected Frame outcomes", async 
     affectedSheetId: null,
   };
   const importOutcome = {
-    kind: "imported" as const,
+    kind: "completed" as const,
     projection: representativeProjection,
-    mediaId: "media-imported",
+    mediaIds: ["media-imported"],
+    importedCount: 1,
+    problems: [],
   };
   vi.mocked(invoke)
     .mockResolvedValueOnce(mutationOutcome)
@@ -425,7 +470,7 @@ test("maps Photo import, target resolution, and affected Frame outcomes", async 
   await expect(
     tauriProjectCorePort.applyWithOutcome(intent),
   ).resolves.toEqual(mutationOutcome);
-  await expect(tauriProjectCorePort.importPhoto()).resolves.toEqual(
+  await expect(tauriProjectCorePort.importPhoto(vi.fn())).resolves.toEqual(
     importOutcome,
   );
   await expect(
@@ -438,8 +483,9 @@ test("maps Photo import, target resolution, and affected Frame outcomes", async 
 
   expect(invoke).toHaveBeenNthCalledWith(1, "apply_project_intent", {
     intent,
+    onProgress: tauriBoundary.channels[0],
   });
-  expect(invoke).toHaveBeenNthCalledWith(2, "import_photo");
+  expect(invoke).toHaveBeenNthCalledWith(2, "import_photo", { onProgress: tauriBoundary.channels[1] });
   expect(invoke).toHaveBeenNthCalledWith(3, "photo_drop_target", {
     sheetId: "sheet-001",
     xUm: 12_000,
@@ -780,7 +826,7 @@ test("normalizes typed media preview failures without losing their code or messa
     revision: 1,
     visibleMediaIds: ["media-a-001"],
     preloadMediaIds: [],
-  });
+  }, vi.fn());
 
   await expect(failure).rejects.toBeInstanceOf(MediaPreviewError);
   await expect(failure).rejects.toMatchObject({
@@ -795,7 +841,7 @@ test("normalizes typed unavailable-media retry failures at the IPC adapter", asy
     message: "A nova inspeção não pôde ser concluída.",
   });
 
-  const failure = tauriMediaPreviewPort.retryUnavailableMedia("media-a-001");
+  const failure = tauriMediaPreviewPort.retryUnavailableMedia("media-a-001", vi.fn());
 
   await expect(failure).rejects.toBeInstanceOf(MediaPreviewError);
   await expect(failure).rejects.toMatchObject({

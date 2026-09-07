@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::PhotoImportCompletion;
 use crate::cache::CacheCompletion;
 use crate::command::{ImagingFailure, ImagingFailureCode, ImagingPathCode};
 use crate::render::RenderCompletion;
@@ -18,6 +19,10 @@ pub enum ImagingResponse {
     CacheCompleted {
         request_id: String,
         completion: CacheCompletion,
+    },
+    PhotoImportCompleted {
+        request_id: String,
+        completion: PhotoImportCompletion,
     },
     Failed {
         request_id: String,
@@ -95,6 +100,7 @@ impl ImagingResponse {
         match self {
             Self::Completed { request_id, .. }
             | Self::CacheCompleted { request_id, .. }
+            | Self::PhotoImportCompleted { request_id, .. }
             | Self::Failed { request_id, .. } => request_id,
         }
     }

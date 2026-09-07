@@ -113,4 +113,4 @@ A geração permanece pendente até que cada conflito tenha uma decisão. Mesmo 
 
 A mesma Tela de Problemas apresenta resultados que exigem atenção após uma operação. Nesse contexto, a tabela identifica no mínimo `Projeto`, `Resultado` e as ações disponíveis, incluindo o motivo de itens ignorados ou com falha.
 
-Ela só é aberta quando há algo a tratar. Sucesso integral usa uma confirmação curta e não abre uma tabela vazia.
+Ela só é aberta quando há algo a tratar. Sucesso integral não abre uma tabela vazia: na importação de Fotos, o progresso fecha diretamente; nas demais operações, usa uma confirmação curta.

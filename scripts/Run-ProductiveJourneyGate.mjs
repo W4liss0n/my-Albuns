@@ -501,7 +501,7 @@ async function openPhotoImportDialog(driver, label) {
   await clickWhenEnabled(
     driver,
     "xpath",
-    "//*[@role='menu' and @aria-label='Importar']//button[normalize-space()='Arquivo JPEG…']",
+    "//*[@role='menu' and @aria-label='Importar']//button[normalize-space()='Arquivos JPEG…']",
     label,
   );
 }
@@ -1155,19 +1155,19 @@ try {
   const selectedPhoto = driveNativeDialog(
     firstHost,
     "select",
-    "Importar Foto JPEG",
+    "Importar Fotos JPEG",
     photoPath,
   );
   if (selectedPhoto.action !== "select") {
     throw new Error("The native JPEG Photo selection was not confirmed");
   }
-  await waitForLogEvent("photo_imported", 1, "Photo import terminal");
-  const firstImport = recordsFor("photo_imported").at(-1);
+  await waitForLogEvent("photos_imported", 1, "Photo import terminal");
+  const firstImport = recordsFor("photos_imported").at(-1);
   await openPhotoImportDialog(hostDriver, "Reimport existing Photo action");
   const reselectedPhoto = driveNativeDialog(
     firstHost,
     "select",
-    "Importar Foto JPEG",
+    "Importar Fotos JPEG",
     photoPath,
   );
   if (reselectedPhoto.action !== "select") {
@@ -1176,11 +1176,11 @@ try {
     );
   }
   await waitForLogEvent(
-    "photo_import_existing_selected",
-    1,
+    "photos_imported",
+    2,
     "existing Photo selection terminal",
   );
-  const existingSelection = recordsFor("photo_import_existing_selected").at(-1);
+  const existingSelection = recordsFor("photos_imported").at(-1);
   const selectedMediaCard = await findElement(
     hostDriver,
     "css selector",
@@ -1195,6 +1195,8 @@ try {
   const reimportedExistingPhotoWithoutRevision =
     firstImport &&
     existingSelection &&
+    firstImport.imported_count === 1 &&
+    existingSelection.imported_count === 0 &&
     Number(existingSelection.revision) === Number(firstImport.revision) &&
     existingSelection.media_id === firstImport.media_id &&
     selectedMediaId === firstImport.media_id;

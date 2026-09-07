@@ -74,6 +74,179 @@ fn cache_job(
     CacheJob::new(source, generation_id, reusable).expect("the Cache job is valid")
 }
 
+#[test]
+fn one_native_import_process_returns_typed_results_for_a_mixed_batch() {
+    use image::GenericImageView;
+    use myalbuns_imaging_protocol::{
+        ImportedPhotoDimensions, ImportedPhotoPreview, PhotoImportCandidate, PhotoImportOutcome,
+        PhotoImportRequest, PhotoImportSourceId,
+    };
+    let root = tempfile::tempdir().unwrap();
+    let logs = tempfile::tempdir().unwrap();
+    let cache = TestCache::new("photo-import");
+    let candidates = (0..3)
+        .map(|index| {
+            let path = root.path().join(format!("photo-{index}.jpg"));
+            RgbImage::from_pixel(71, 43, Rgb([20, 40, 80]))
+                .save_with_format(&path, ImageFormat::Jpeg)
+                .unwrap();
+            PhotoImportCandidate {
+                source_id: PhotoImportSourceId::new(format!("selected-{index}")).unwrap(),
+                source_path: path.into(),
+                generation_id: format!("prepared-{index}"),
+            }
+        })
+        .collect::<Vec<_>>();
+    std::fs::write(candidates[1].path(), b"not a JPEG").unwrap();
+    let originals = candidates
+        .iter()
+        .map(|candidate| std::fs::read(candidate.path()).unwrap())
+        .collect::<Vec<_>>();
+    let roots = root_bindings(&[cache.paths.root(), root.path()]);
+    let request = PhotoImportRequest {
+        protocol_version: IMAGING_PROTOCOL_VERSION,
+        request_id: "import-three".into(),
+        attempt_id: "attempt-three".into(),
+        project_id: cache.project_id.clone(),
+        cache_paths: cache.paths.clone(),
+        candidates,
+        policy: CacheRepresentationPolicy::measured_v1(),
+        root_bindings: roots,
+    };
+    request.validate().unwrap();
+    let output = invoke_imaging_command(
+        &ImagingCommand::PreparePhotoImport(request.clone()),
+        Some(logs.path()),
+    );
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let ImagingResponse::PhotoImportCompleted {
+        request_id,
+        completion,
+    } = processor_response(&output.stdout)
+    else {
+        panic!("typed import completion")
+    };
+    assert_eq!(request_id, request.request_id);
+    completion.validate_for(&request).unwrap();
+    for index in [0, 2] {
+        let PhotoImportOutcome::Validated {
+            dimensions,
+            preview: ImportedPhotoPreview::Prepared { generation },
+            ..
+        } = &completion.photos[index].outcome
+        else {
+            panic!("valid source prepared")
+        };
+        assert_eq!(
+            *dimensions,
+            ImportedPhotoDimensions {
+                width_px: 71,
+                height_px: 43
+            }
+        );
+        let path = cache
+            .paths
+            .import_preview_file(
+                &request.attempt_id,
+                request.candidates[index].source_id.as_str(),
+                &generation.generation_id,
+                generation.format,
+            )
+            .unwrap();
+        assert_eq!(image::open(path).unwrap().dimensions(), (71, 43));
+    }
+    assert!(matches!(
+        completion.photos[1].outcome,
+        PhotoImportOutcome::InspectionRequired { .. }
+    ));
+    assert!(!cache.paths.metadata_file().exists());
+    for (candidate, original) in request.candidates.iter().zip(originals) {
+        assert_eq!(std::fs::read(candidate.path()).unwrap(), original);
+    }
+}
+
+#[cfg(windows)]
+#[test]
+fn native_import_reports_progress_while_a_later_photo_is_still_processing() {
+    use myalbuns_imaging_protocol::{
+        ImagingEvent, PhotoImportCandidate, PhotoImportRequest, PhotoImportSourceId, decode_event,
+    };
+    use std::io::{BufRead, BufReader};
+
+    let root = tempfile::tempdir().unwrap();
+    let cache = TestCache::new("import-progress");
+    let first = root.path().join("first.jpg");
+    RgbImage::from_pixel(71, 43, Rgb([20, 40, 80]))
+        .save_with_format(&first, ImageFormat::Jpeg)
+        .unwrap();
+    let second = root.path().join("second.jpg");
+    std::fs::write(&second, include_bytes!("fixtures/progressive-420-dri.jpg")).unwrap();
+    let candidates = [first, second]
+        .into_iter()
+        .enumerate()
+        .map(|(index, path)| PhotoImportCandidate {
+            source_id: PhotoImportSourceId::new(format!("progress-{index}")).unwrap(),
+            source_path: path.into(),
+            generation_id: format!("progress-generation-{index}"),
+        })
+        .collect();
+    let request = PhotoImportRequest {
+        protocol_version: IMAGING_PROTOCOL_VERSION,
+        request_id: "import-progress".into(),
+        attempt_id: "attempt-progress".into(),
+        project_id: cache.project_id.clone(),
+        cache_paths: cache.paths.clone(),
+        candidates,
+        policy: CacheRepresentationPolicy::measured_v1(),
+        root_bindings: root_bindings(&[cache.paths.root(), root.path()]),
+    };
+    let barrier = root.path().join("second-photo-pending");
+    let mut child =
+        spawn_imaging_command_with_barrier(&ImagingCommand::PreparePhotoImport(request), &barrier);
+    let stdout = child.stdout.take().unwrap();
+    let (sender, receiver) = std::sync::mpsc::channel();
+    let reader = std::thread::spawn(move || {
+        for line in BufReader::new(stdout).lines() {
+            let _ = sender.send(line.unwrap());
+        }
+    });
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !barrier.exists() && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let later_photo_pending = barrier.exists();
+    let mut incremental_progress = false;
+    while let Ok(line) = receiver.recv_timeout(Duration::from_millis(100)) {
+        if let ImagingEvent::Progress(progress) = decode_event(line.as_bytes()).unwrap() {
+            incremental_progress |= progress.completed_units == 1 && progress.total_units == 2;
+        }
+    }
+    if later_photo_pending {
+        std::fs::remove_file(&barrier).unwrap();
+    } else {
+        child.kill().unwrap();
+    }
+    let output = child.wait_with_output().unwrap();
+    reader.join().unwrap();
+    assert!(
+        later_photo_pending,
+        "the second photo must be held in its real decoder"
+    );
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        incremental_progress,
+        "expected progress 1 of 2 before the second photo finished; no intermediate progress was emitted"
+    );
+}
+
 fn reusable_generation(artifact: &CacheArtifact) -> CacheReusableGeneration {
     CacheReusableGeneration::new(
         artifact.generation_id.clone(),
@@ -497,6 +670,29 @@ fn processor_never_replaces_an_existing_preparation() {
 
 #[test]
 fn processor_builds_one_reduced_representation_per_real_photo() {
+    assert_reduced_photo_cache_round_trip(&[]);
+}
+
+#[cfg(windows)]
+#[test]
+fn processor_builds_preview_for_adobe_jpeg_with_standard_windows_srgb() {
+    mod windows_srgb {
+        include!("support/windows_srgb.rs");
+    }
+    let profile = windows_srgb::standard_profile();
+    let mut metadata = vec![
+        0xff, 0xee, 0, 19, b'A', b'd', b'o', b'b', b'e', 0, 100, 0x80, 0, 0, 0, 1, 5, 0, 2, 0x49,
+        0x44,
+    ];
+    metadata.extend_from_slice(&[0xff, 0xe2]);
+    metadata.extend_from_slice(&((profile.len() + 16) as u16).to_be_bytes());
+    metadata.extend_from_slice(b"ICC_PROFILE\0\x01\x01");
+    metadata.extend_from_slice(&profile);
+
+    assert_reduced_photo_cache_round_trip(&metadata);
+}
+
+fn assert_reduced_photo_cache_round_trip(jpeg_metadata: &[u8]) {
     let source_dir = tempfile::tempdir().expect("temporary source directory");
     let cache = TestCache::new("build");
     let log_dir = tempfile::tempdir().expect("temporary log directory");
@@ -508,6 +704,11 @@ fn processor_builds_one_reduced_representation_per_real_photo() {
     source
         .save_with_format(&source_path, ImageFormat::Jpeg)
         .expect("the real JPEG fixture is written");
+    if !jpeg_metadata.is_empty() {
+        let mut bytes = std::fs::read(&source_path).expect("the generated JPEG is readable");
+        bytes.splice(2..2, jpeg_metadata.iter().copied());
+        std::fs::write(&source_path, bytes).expect("the fixture receives exporter metadata");
+    }
     let original_source = std::fs::read(&source_path).expect("the source is readable");
     let source_sha256 = format!("{:x}", Sha256::digest(&original_source));
     let cache_paths = cache.paths.clone();

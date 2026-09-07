@@ -44,7 +44,7 @@ impl CacheRepresentationPolicy {
         }
     }
 
-    fn validate(&self) -> Result<(), String> {
+    pub(crate) fn validate(&self) -> Result<(), String> {
         if *self != Self::measured_v1() {
             return Err("a política de representação reduzida não é suportada".into());
         }
@@ -218,7 +218,7 @@ impl CacheReusableGeneration {
         Ok(generation)
     }
 
-    fn validate(&self) -> Result<(), String> {
+    pub(crate) fn validate(&self) -> Result<(), String> {
         if !is_safe_identifier(&self.generation_id)
             || self.width_px == 0
             || self.height_px == 0

@@ -610,22 +610,34 @@ fn guarded_writer_claim_storage_publishes_reads_and_conditionally_removes_by_han
         .expect("the physical Cache chain is valid")
         .expect("the Cache namespace exists");
     let expected = br#"{"schemaVersion":1,"process":{"processId":42,"creationTime":99}}"#;
+    let slot = myalbuns_paths::CacheWriterSlot::First;
+    let second = myalbuns_paths::CacheWriterSlot::Second;
 
     storage
-        .publish_claim(expected)
+        .publish_claim(slot, expected)
         .expect("the create-only claim is renamed relative to the guarded directory handle");
     assert_eq!(
-        storage.read_claim().unwrap().as_deref(),
+        storage.read_claim(slot).unwrap().as_deref(),
         Some(expected.as_slice())
     );
-    assert!(storage.publish_claim(b"other").is_err());
-    assert!(!storage.remove_claim_if_matches(b"other").unwrap());
+    assert!(storage.publish_claim(slot, b"other").is_err());
+    storage.publish_claim(second, b"second writer").unwrap();
+    assert!(!storage.remove_claim_if_matches(slot, b"other").unwrap());
     assert_eq!(
-        storage.read_claim().unwrap().as_deref(),
+        storage.read_claim(slot).unwrap().as_deref(),
         Some(expected.as_slice())
     );
-    assert!(storage.remove_claim_if_matches(expected).unwrap());
-    assert_eq!(storage.read_claim().unwrap(), None);
+    assert!(storage.remove_claim_if_matches(slot, expected).unwrap());
+    assert_eq!(storage.read_claim(slot).unwrap(), None);
+    assert_eq!(
+        storage.read_claim(second).unwrap().as_deref(),
+        Some(b"second writer".as_slice())
+    );
+    assert!(
+        storage
+            .remove_claim_if_matches(second, b"second writer")
+            .unwrap()
+    );
 }
 
 #[test]

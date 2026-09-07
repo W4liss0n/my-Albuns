@@ -13,16 +13,20 @@ import type {
   ExportPipelinePort,
   CacheProcessorWarning,
   MediaPreview,
+  ImageProcessingProgress,
+  ImageProcessingProblem,
   MediaPreviewDemand,
   MediaPreviewPort,
   ProjectStartupPort,
   ProjectCorePort,
+  PhotoImportCompletion,
   ProjectWindowPort,
 } from "./application/projectPorts";
 import type { ProjectDialogPort } from "./application/projectDialogPort";
 import type { WorkspacePreferencesPort } from "./application/workspacePreferences";
 import type { EditorProjection } from "./domain/project";
 import { projectSaveAsStartupFailure } from "./application/projectSaveAsStartup";
+import { decodeMediaPreview } from "./application/mediaPreviews";
 import { LoggingProvider } from "./components/loggingContext";
 import {
   CanvasGraphicsDiagnosticProbeProvider,
@@ -31,7 +35,7 @@ import {
 import { ProjectWorkspace } from "./components/ProjectWorkspace";
 import { useProjectCloseController } from "./components/useProjectCloseController";
 import { useProjectMutationRunner } from "./components/useProjectMutationRunner";
-import { useProjectOperationFailureDialog } from "./components/useProjectOperationFailureDialog";
+import { useProjectOperationResultDialog } from "./components/useProjectOperationResultDialog";
 import { useProjectGraphicsFailureDialog } from "./components/useProjectGraphicsFailureDialog";
 import { BrandWordmark, InlineNotice } from "./ui";
 import "./ui/theme.css";
@@ -65,6 +69,13 @@ interface MediaPreviewSubscription {
   port: MediaPreviewPort;
 }
 
+interface ImportPresentation {
+  projectId: string;
+  revision: number;
+  ready: boolean;
+  cancel(): void;
+}
+
 function App({
   exportPipelinePort,
   mediaPreviewPort,
@@ -89,6 +100,7 @@ function App({
       : null;
   const [projection, setProjection] = useState<EditorProjection | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [initialImageProblems, setInitialImageProblems] = useState<readonly ImageProcessingProblem[]>([]);
   const [mediaPreviews, setMediaPreviews] = useState<
     Readonly<Record<string, MediaPreview>>
   >({});
@@ -111,6 +123,15 @@ function App({
   const [cacheWarningSubscription, setCacheWarningSubscription] =
     useState<MediaPreviewSubscription | null>(null);
   const mediaDemandSequence = useRef({ projectId: "", revision: 0 });
+  const importPresentation = useRef<ImportPresentation | null>(null);
+  const preparedPresentation = useRef<{
+    projectId: string;
+    demand: MediaPreviewDemand;
+    refreshRevision: number;
+    previews: Readonly<Record<string, MediaPreview>>;
+  } | null>(null);
+  const projectionRef = useRef(projection);
+  projectionRef.current = projection;
   const uiReadyProject = useRef("");
   const loggerRef = useRef(logger);
 
@@ -118,14 +139,19 @@ function App({
     loggerRef.current = logger;
   }, [logger]);
 
-  useProjectOperationFailureDialog({
+  useProjectOperationResultDialog({
+    processingProblems: initialImageProblems,
     message:
       initialGraphicsCloseError ??
       saveAsStartupFailure ??
       cacheProcessorWarning?.message ??
       null,
     projectDialogPort,
-    onDismiss: () => {
+    onDismiss: (kind) => {
+      if (kind === "imageProcessingProblems") {
+        setInitialImageProblems([]);
+        return;
+      }
       setInitialGraphicsCloseError(null);
       const dismissedSaveAsFailure = saveAsStartupFailure !== null;
       setSaveAsStartupFailure(null);
@@ -205,7 +231,7 @@ function App({
     setPreferencesReadyProject(readyProjectId);
   }, []);
   const retryUnavailableMedia = useCallback(
-    async (mediaId: string) => {
+    async (mediaId: string, onProgress: (progress: ImageProcessingProgress) => void) => {
       const operationId = createLogInstanceId("media-retry");
       logger.write({
         level: "info",
@@ -215,7 +241,7 @@ function App({
         projectId,
       });
       try {
-        const preview = await mediaPreviewPort.retryUnavailableMedia(mediaId);
+        const preview = await mediaPreviewPort.retryUnavailableMedia(mediaId, onProgress);
         if (preview.state !== "ready") {
           setMediaPreviews((current) => ({
             ...current,
@@ -243,10 +269,93 @@ function App({
     [logger, mediaPreviewPort, projectId],
   );
   const updateMediaDemand = useCallback((next: MediaPreviewDemand) => {
+    const batch = importPresentation.current;
+    const currentProjection = projectionRef.current;
+    // Keep the prepared URLs resident until the committed panel reports demand.
+    if (batch?.ready && currentProjection?.state.projectId === batch.projectId &&
+      currentProjection.state.revision >= batch.revision) {
+      importPresentation.current = null;
+      const prepared = preparedPresentation.current;
+      if (prepared?.projectId === batch.projectId) setMediaPreviews(prepared.previews);
+    }
     setMediaDemand((current) =>
       sameMediaDemand(current, next) ? current : next,
     );
   }, []);
+
+  useEffect(() => () => {
+    importPresentation.current?.cancel();
+    importPresentation.current = null;
+    preparedPresentation.current = null;
+  }, [projectId, mediaPreviewPort]);
+
+  const prepareMediaPresentation = useCallback(async (
+    completion: PhotoImportCompletion,
+    demand: MediaPreviewDemand,
+  ): Promise<readonly ImageProcessingProblem[]> => {
+    const imported = completion.projection;
+    if (imported.state.projectId !== projectId || projectionRef.current?.state.projectId !== projectId) {
+      throw new Error("O Projeto mudou antes da entrega das miniaturas.");
+    }
+    let cancel!: () => void;
+    const cancelled = new Promise<never>((_resolve, reject) => {
+      cancel = () => reject(new Error("A preparação das miniaturas foi interrompida pela troca de Projeto."));
+    });
+    const batch: ImportPresentation = {
+      projectId, revision: imported.state.revision, ready: false, cancel,
+    };
+    importPresentation.current = batch;
+    if (mediaDemandSequence.current.projectId !== projectId) {
+      mediaDemandSequence.current = { projectId, revision: 0 };
+    }
+    const request = { ...demand, revision: ++mediaDemandSequence.current.revision };
+    const problems: ImageProcessingProblem[] = [];
+    const importedMediaIds = new Set(completion.mediaIds);
+    const mediaById = new Map(imported.state.album.media.map((media) => [media.id, media]));
+    const reportUnavailablePreview = (mediaId: string) => {
+      const media = mediaById.get(mediaId);
+      if (media && importedMediaIds.has(mediaId) &&
+        !completion.problems.some((problem) => problem.fileName === media.name)) {
+        problems.push({ fileName: media.name,
+          reason: "Não foi possível carregar a miniatura na interface." });
+      }
+    };
+    const prepare = async () => {
+      let previews: readonly MediaPreview[] = [];
+      try {
+        // Import owns a single publication; partial channel events stay private.
+        previews = await mediaPreviewPort.prepareMediaPreviews(request, () => undefined) ?? [];
+      } catch (error: unknown) {
+        logger.write({ level: "warn", component: "media-preview",
+          event: "media_preview_failed", projectId, reason: logReasonFromError(error) });
+      }
+      if (importPresentation.current !== batch) return problems;
+      const prepared = new Map(previews.map((preview) => [preview.mediaId, preview]));
+      await Promise.all(demand.visibleMediaIds.map(async (mediaId) => {
+        const preview = prepared.get(mediaId);
+        if (preview && preview.state !== "ready") {
+          reportUnavailablePreview(mediaId);
+          return;
+        }
+        try {
+          if (!preview?.url) throw new Error("Prévia não recebida.");
+          await decodeMediaPreview(preview.url);
+        } catch {
+          prepared.set(mediaId, { mediaId, state: "cache_unavailable", url: null });
+          reportUnavailablePreview(mediaId);
+        }
+      }));
+      if (importPresentation.current !== batch) return problems;
+      const nextPreviews = Object.fromEntries(prepared);
+      setMediaPreviews((current) => ({ ...current, ...nextPreviews }));
+      preparedPresentation.current = {
+        projectId, demand, refreshRevision: mediaRefreshRevision, previews: nextPreviews,
+      };
+      batch.ready = true;
+      return problems;
+    };
+    return Promise.race([prepare(), cancelled]);
+  }, [logger, mediaPreviewPort, mediaRefreshRevision, projectId]);
   const runProjectMutation = useProjectMutationRunner(
     projectId,
     projectCorePort,
@@ -259,12 +368,28 @@ function App({
     void mediaPreviewPort
       .onMediaChanged(() => {
         if (!active) return;
-        setMediaRefreshRevision((revision) => revision + 1);
         const refresh = ++latestProjectionRefresh;
         const operationId = createLogInstanceId("media-refresh");
-        void projectCorePort.load(operationId).then(
-          (refreshed) => {
+        // The monitor can observe the committed catalog before its Cache batch
+        // finishes. Publish it only when the mutation queue has settled.
+        void runProjectMutation.waitForIdle().then(async () => {
+          if (!active || refresh !== latestProjectionRefresh) return null;
+          setMediaRefreshRevision((revision) => revision + 1);
+          return projectCorePort.load(operationId);
+        }).then(
+          async (refreshed) => {
+            // A subsequent mutation may have started while the read was in flight.
+            // Its result owns equal-revision changes too, such as Save clearing dirty.
+            const settled = await runProjectMutation.waitForIdle();
             if (
+              refreshed &&
+              settled?.status === "completed" &&
+              settled.projection.state.revision >= refreshed.state.revision
+            ) {
+              refreshed = settled.projection;
+            }
+            if (
+              !refreshed ||
               !active ||
               refresh !== latestProjectionRefresh ||
               refreshed.state.projectId !== projectId
@@ -321,7 +446,7 @@ function App({
           : current,
       );
     };
-  }, [logger, mediaPreviewPort, projectCorePort, projectId]);
+  }, [logger, mediaPreviewPort, projectCorePort, projectId, runProjectMutation]);
 
   useEffect(() => {
     setCacheProcessorWarning(null);
@@ -385,7 +510,9 @@ function App({
       return;
     }
     uiReadyProject.current = projectId;
-    projectStartupPort.confirmUiReady().catch((error: unknown) => {
+    projectStartupPort.confirmUiReady().then((problems) => {
+      if (uiReadyProject.current === projectId && problems) setInitialImageProblems(problems);
+    }).catch((error: unknown) => {
       if (uiReadyProject.current === projectId) {
         uiReadyProject.current = "";
       }
@@ -410,7 +537,8 @@ function App({
     if (
       !projectId ||
       !cacheWarningListenerReady ||
-      !mediaChangeListenerReady
+      !mediaChangeListenerReady ||
+      importPresentation.current
     ) {
       return;
     }
@@ -420,6 +548,11 @@ function App({
     const effectiveDemand = editorGraphics.supported
       ? mediaDemand
       : { visibleMediaIds: [], preloadMediaIds: [] };
+    const prepared = preparedPresentation.current;
+    if (prepared?.projectId === projectId &&
+      prepared.refreshRevision === mediaRefreshRevision &&
+      sameMediaDemand(prepared.demand, effectiveDemand)) return;
+    preparedPresentation.current = null;
     const demandIsEmpty =
       effectiveDemand.visibleMediaIds.length === 0 &&
       effectiveDemand.preloadMediaIds.length === 0;
@@ -432,6 +565,7 @@ function App({
     };
 
     let active = true;
+    let completed = false;
     const operationId = createLogInstanceId("media-preview");
     logger.write({
       level: "info",
@@ -441,9 +575,15 @@ function App({
       projectId,
     });
     mediaPreviewPort
-      .prepareMediaPreviews(demand)
+      .prepareMediaPreviews(demand, (preview) => {
+        if (!active || completed || demand.revision !== mediaDemandSequence.current.revision) return;
+        setMediaPreviews((current) =>
+          active ? { ...current, [preview.mediaId]: preview } : current,
+        );
+      })
       .then((previews) => {
-        if (!active) return;
+        if (!active || demand.revision !== mediaDemandSequence.current.revision) return;
+        completed = true;
         setMediaPreviews(
           Object.fromEntries(
             (previews ?? []).map((preview) => [preview.mediaId, preview]),
@@ -459,6 +599,7 @@ function App({
       })
       .catch((error: unknown) => {
         if (!active) return;
+        completed = true;
         logger.write({
           level: "warn",
           component: "media-preview",
@@ -533,6 +674,7 @@ function App({
           projectCorePort={projectCorePort}
           mediaPreviews={mediaPreviews}
           onMediaDemandChange={updateMediaDemand}
+          prepareMediaPresentation={prepareMediaPresentation}
           onRetryUnavailableMedia={retryUnavailableMedia}
           onProjectionChange={setProjection}
           onGraphicsUnavailable={setRuntimeGraphicsDiagnostic}

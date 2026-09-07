@@ -102,6 +102,18 @@ A segunda etapa contém:
 
 Background e Overlay oferecem `Escolher imagem...`, que abre o seletor nativo do Windows. A imagem escolhida permanece provisória e já pode ser exibida na etapa, mas só é vinculada à aba `Decorativos` quando a criação do Projeto for concluída. Cancelar qualquer parte do fluxo não importa nem copia o arquivo.
 
+A seleção aguarda a leitura e decodificação completas sob o progresso
+`Processando Imagens — X de Y`. A prévia fica disponível em memória até a
+liberação da seleção, sem arquivo temporário ou identidade antecipada de
+Projeto. Criar revalida o Original; o Host prepara o Cache canônico dessas
+imagens antes de liberar o editor. Uma falha de Cache preserva o Projeto criado
+e é apresentada como problema de processamento.
+
+A inicialização de um Projeto novo tem prazo de até cinco minutos para incluir
+essa preparação; a abertura de um Projeto existente mantém o prazo de trinta
+segundos. Os problemas iniciais são apresentados uma única vez, sem reaparecer
+quando `Salvar como` substitui a janela do Projeto.
+
 ### Prévia viva
 
 A etapa `Personalização` contém uma reprodução de Lâmina com Frames de demonstração. Ela mostra em conjunto:

@@ -22,6 +22,22 @@ const MAX_DIALOG_SESSION_ID_CHARS: usize = 128;
 impl ProjectDialogState {
     fn sanitized(self) -> Self {
         match self {
+            Self::ImageProcessingProgress { progress } => Self::ImageProcessingProgress {
+                progress: progress.sanitized(),
+            },
+            Self::ImageProcessingProblems {
+                imported_count,
+                problems,
+            } => Self::ImageProcessingProblems {
+                imported_count,
+                problems: problems
+                    .into_iter()
+                    .map(|problem| crate::ipc_contract::ImageProcessingProblem {
+                        file_name: bound_text(problem.file_name),
+                        reason: bound_text(problem.reason),
+                    })
+                    .collect(),
+            },
             Self::AlbumInformationConfirmation { busy, details } => {
                 Self::AlbumInformationConfirmation {
                     busy,
@@ -52,22 +68,7 @@ impl ProjectDialogState {
             } => Self::ExportProgress {
                 cancel_requested,
                 cancellable,
-                progress: match progress {
-                    ProjectDialogProgress::Indeterminate { status } => {
-                        ProjectDialogProgress::Indeterminate {
-                            status: bound_text(status),
-                        }
-                    }
-                    ProjectDialogProgress::Determinate {
-                        completed,
-                        status,
-                        total,
-                    } => ProjectDialogProgress::Determinate {
-                        completed,
-                        status: bound_text(status),
-                        total,
-                    },
-                },
+                progress: progress.sanitized(),
             },
             Self::ExportFailure {
                 cancelled,
@@ -86,6 +87,10 @@ impl ProjectDialogState {
 
     fn initial_dimensions(&self) -> (f64, f64) {
         match self {
+            Self::ImageProcessingProblems { .. } => (
+                640.0,
+                400.0 + native_dialog_window::OWNED_WINDOW_TITLEBAR_HEIGHT,
+            ),
             Self::AlbumInformationConfirmation { .. } => (
                 520.0,
                 280.0 + native_dialog_window::OWNED_WINDOW_TITLEBAR_HEIGHT,
@@ -102,10 +107,29 @@ impl ProjectDialogState {
                 440.0,
                 202.0 + native_dialog_window::OWNED_WINDOW_TITLEBAR_HEIGHT,
             ),
-            Self::ExportProgress { .. } => (
+            Self::ExportProgress { .. } | Self::ImageProcessingProgress { .. } => (
                 440.0,
                 176.0 + native_dialog_window::OWNED_WINDOW_TITLEBAR_HEIGHT,
             ),
+        }
+    }
+}
+
+impl ProjectDialogProgress {
+    fn sanitized(self) -> Self {
+        match self {
+            Self::Indeterminate { status } => Self::Indeterminate {
+                status: bound_text(status),
+            },
+            Self::Determinate {
+                completed,
+                status,
+                total,
+            } => Self::Determinate {
+                completed,
+                status: bound_text(status),
+                total,
+            },
         }
     }
 }

@@ -1891,8 +1891,10 @@ dependencies = [
 name = "myalbuns-desktop"
 version = "0.1.0"
 dependencies = [
+ "futures-util",
  "image",
  "myalbuns-core",
+ "myalbuns-imaging",
  "myalbuns-imaging-protocol",
  "myalbuns-logging",
  "myalbuns-paths",

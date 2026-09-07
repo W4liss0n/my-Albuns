@@ -1,7 +1,7 @@
 ---
 status: accepted
 document: design
-updated: 2026-08-21
+updated: 2026-09-06
 ---
 
 # Armazenamento local e Cache
@@ -167,6 +167,35 @@ somente a chave opaca participa do nome do artefato.
 
 O baseline contém uma única representação visual reduzida por Foto ou Decorativo. A mesma representação atende ao Painel e ao Canvas; miniaturas de Lâmina podem ser montadas em memória. A [medição reproduzível do Programa 03A](../research/0032-representacao-reduzida-e-politica-de-decode.md) confirmou a representação única e rejeitou tiles, pirâmides e previews persistidos de Lâmina no MVP.
 
+Cada representação preparada é entregue à interface imediatamente, sem esperar
+as demais mídias da demanda. O Painel mantém em pré-carga o último trecho
+observado de cada aba, incluindo uma margem de três alturas do viewport
+(mínimo de `122 px`) acima e abaixo da área visível. A geometria medida ao
+montar o Painel estabelece a primeira demanda, mesmo antes de a Janela nativa
+aparecer; rolagem e redimensionamento atualizam a mesma medição. Alternar Fotos
+e Decorativos não descarta esse trecho. Rolar, filtrar
+ou fechar o Painel atualiza a demanda e cancela trabalhos obsoletos, mas conserva
+as representações já publicadas em um conjunto limitado de uso recente. Voltar
+a um trecho ainda residente reutiliza a mesma URL e o mesmo elemento de imagem,
+sem aguardar outro job ou nova resposta do Host para mostrar a miniatura.
+
+O registro nativo possui essa retenção e devolve à interface um snapshot das
+representações residentes, junto com os estados explícitos da demanda atual.
+Fora da demanda ativa, os limites são `64 MiB` de bytes codificados, `512`
+representações e `2 GiB` na estimativa `bytes codificados + largura × altura × 4`.
+Ultrapassar qualquer limite descarta primeiro as representações menos usadas;
+as mídias da demanda ativa permanecem protegidas. A estimativa não representa
+uma alocação antecipada nem um teto global de RAM ou GPU: navegador e Canvas
+continuam responsáveis pelas suas próprias alocações. O Canvas mantém somente
+as texturas exigidas por sua área visível e margem.
+
+Depois da observação do Monitor, uma representação ainda residente e vinculada
+à mesma origem pode ser entregue novamente sem executar outro job. Mudanças
+confirmadas retiram sua autorização de reuso como atual; remoção, Religação ou
+troca de Identidade revogam a residência correspondente. Fechar o Projeto
+libera todas as representações. A [verificação com 134 fotos](../research/2026-09-06-retencao-previas-painel.md)
+registra a causa do descarte precoce, os limites e as evidências de retorno.
+
 O maior lado mede no máximo `1.600 px`. Conteúdo opaco usa JPEG qualidade `84`; conteúdo que precisa preservar transparência usa PNG RGBA.
 O formato é propriedade do artefato derivado e integra seu caminho e o índice
 do Cache. Essa escolha não altera o original nem permite que a Exportação use a
@@ -183,6 +212,61 @@ spike; não são inferidos novamente por cada chamador.
 O `RootBindingPlan` e os contextos locais que reutilizam uma raiz durante Importação, Cache ou Exportação existem somente em memória e não criam outra pasta, índice ou categoria sob `Cache`.
 
 `CacheEngine` possui os jobs, o índice e as gerações. Cada job grava um temporário próprio, verifica se o pedido e o original ainda são atuais e promove o artefato imutável antes de publicar a entrada correspondente em `metadata.json`. Uma queda pode deixar temporários ou gerações não referenciadas, que são descartados no próximo uso, sem fazer o índice apontar para um arquivo incompleto.
+
+A preparação de imagens do Projeto é compartilhada por importação, Religação,
+nova tentativa de leitura e mudanças de edição ou Histórico que introduzam ou
+passem a usar outra imagem. Essas ações aguardam a origem validada e o Cache
+completo antes de terminar, reutilizando uma geração válida. O progresso
+`Processando Imagens — X de Y` conta a conclusão conjunta de cada imagem; uma
+falha de Cache gera um problema sem remover um vínculo válido. Salvar e Fechar
+aguardam a mesma fila de ações. Jobs necessários a essas ações sobrevivem à
+mudança de área visível, mas continuam sujeitos à obsolescência da origem e da
+Identidade. Artefatos de imagens fora da área visível ficam no disco; a preparação
+do lote não torna todas as prévias residentes em memória.
+
+A importação conserva temporariamente a evidência da inspeção de cada Foto
+validada. A primeira atualização do Monitor pode adotá-la sem decodificar o
+Original outra vez quando caminho, tipo, identidade física, tamanho e datas
+observadas ainda correspondem. A evidência é consumida nessa adoção; alteração
+da origem ou impossibilidade de comprovar essa correspondência exige a inspeção
+normal. Essa adoção não cria Histórico nem altera o estado salvo do Projeto.
+
+Ao concluir uma preparação solicitada por ação, `CacheEngine` conserva um
+resultado pequeno em memória: a observação da origem, o artefato publicado e o
+SHA-256 dos mesmos bytes reduzidos que o Host decodificou e validou. A primeira
+demanda pode consumir esse resultado sem iniciar outro Processador. Ela confere
+a demanda atual, a observação da origem, a entrada do índice e o hash dos bytes
+que serão publicados no registro de prévias. Corrupção, mudança de origem ou
+vínculo, retirada da Identidade e ausência do índice impedem esse reuso.
+
+O resultado não contém pixels do Original nem bytes de prévias fora da área
+visível. A reconciliação do catálogo descarta resultados de mídias removidas;
+invalidações e novos trabalhos retiram os resultados anteriores. O resultado é
+consumido pela primeira demanda válida, e as demandas seguintes usam a política
+de residência existente. Essa passagem dentro da Sessão aproveita uma geração
+já verificada pelo fingerprint integral; não autoriza reuso de um índice apenas
+por tamanho ou data e não acrescenta campos ao índice persistido.
+
+Na reabertura, a recuperação exclusiva do namespace já valida e decodifica
+as representações indexadas. Ela conserva o hash desses bytes reduzidos para
+reaproveitar essa validação na primeira demanda, sem iniciar outro Processador.
+Somente vínculos cujo caminho, tamanho e datas correspondem ao artefato
+recuperado podem ser adotados. O Host captura a identidade física atual e o
+Monitor adota essa mesma observação; mudanças posteriores revogam o resultado.
+A publicação ainda confere a origem atual, o índice e o hash dos bytes
+reduzidos. Essa regra de reabertura segue a concessão do MVP para uma alteração
+com o aplicativo fechado que preserve tamanho e datas, descrita abaixo; não
+se aplica à validação de originais para processamento ou Exportação. Nenhum
+pixel ou arquivo original é mantido em memória por esse resultado.
+
+Em Novo Projeto, a identidade ainda não existe durante a escolha de uma imagem
+decorativa. A seleção só retorna depois da leitura e decodificação completas; o
+registro provisório guarda os bytes codificados dessa prévia em memória,
+preservando orientação e perfil de cor. Sua liberação descarta os bytes, sem
+criar um arquivo ou namespace de Projeto. A criação revalida o Original e o
+Host prepara o Cache canônico após assumir a identidade, antes de liberar a
+Janela do Projeto. Problemas nessa preparação preservam o Projeto criado e
+aparecem como avisos na janela.
 
 ## Metadados
 
@@ -209,9 +293,17 @@ finais.
 
 O Monitor apenas sinaliza uma possível mudança e agrupa eventos. Depois de uma nova inspeção confirmar alteração estável, divergência de tamanho ou data, reaparecimento, Religação, versão incompatível ou artefato inválido, o `CacheEngine` invalida somente a mídia afetada. Pan, Zoom, Frame e Layout não invalidam a representação da fonte.
 
+Ao confirmar uma atualização automática da mesma origem, o Monitor invalida o
+reuso da prévia anterior, preservando seus bytes apenas para apresentação até a
+publicação verificada da sucessora. Não há diálogo de progresso nesse fluxo.
+Essa retenção não transfere pixels entre vínculos, Projetos ou Identidades e
+permanece sujeita aos limites de residência do Painel e do Canvas.
+
 É aceito no MVP o caso raro de uma alteração feita com o aplicativo fechado conservar exatamente tamanho e data. A Exportação reabre o original e não depende dessa concessão.
 
-Fora de manutenção, o `CacheEngine` de cada Projeto é o proprietário lógico de seu namespace. O Processador de Imagens isolado daquela Sessão atua como único adaptador escritor dos arquivos. Jobs equivalentes podem ser agrupados e obsoletos cancelados. Cache não participa de Salvamento, Undo/Redo ou Recuperação.
+Fora de manutenção, o `CacheEngine` de cada Projeto é o proprietário lógico de seu namespace. Até oito Processadores de Imagens podem preparar mídias simultaneamente, com o mesmo limite para ações do usuário e miniaturas em segundo plano. Cada processo escreve uma geração própria; a atualização do índice permanece serializada pelo `CacheEngine`, e a coleta de gerações não remove candidatos de outros trabalhos ativos. Jobs equivalentes compartilham o resultado e obsoletos são cancelados. Cada escritor publica sua instância exata em um dos oito registros duráveis do namespace antes de receber trabalho; a recuperação espera a saída de todos eles antes de qualquer limpeza. O primeiro registro conserva o nome usado pela implementação anterior.
+
+A importação combina a validação inicial dos JPEGs e o preparo da prévia no mesmo decode, em lotes limitados por processo. Uma inspeção alternativa de Original reserva toda a capacidade e a memória estimada, usando o mesmo plano de caminhos da tentativa. O teto de oito trabalhadores é reduzido pela capacidade de CPU e pelo orçamento de RAM/commit definido no [contrato de importação](0020-importacao-com-decode-unico-e-lotes.md). Os resultados são aplicados na ordem da seleção, em uma única ação do Histórico. A preparação do Cache informa conclusão por imagem, mesmo quando os resultados chegam fora de ordem, e uma falha individual não interrompe o lote. A Exportação aguarda a pausa do Cache e reserva toda a capacidade do Processador. Cache não participa de Salvamento, Undo/Redo ou Recuperação.
 
 ## Liberação de espaço
 

@@ -7,12 +7,16 @@ export function defaultProjectDialogCloseAction(
   state: ProjectDialogState,
 ): ProjectDialogAction | null {
   switch (state.kind) {
+    case "imageProcessingProgress":
+      return null;
     case "albumInformationConfirmation":
       return state.busy ? null : "cancelAlbumInformation";
     case "projectCloseConfirmation":
       return state.busy ? null : "cancelProjectClose";
     case "projectCloseFailure":
       return "dismissProjectCloseFailure";
+    case "imageProcessingProblems":
+      return "dismissImageProcessingProblems";
     case "projectOperationFailure":
       return "dismissProjectOperationFailure";
     case "graphicsFailure":

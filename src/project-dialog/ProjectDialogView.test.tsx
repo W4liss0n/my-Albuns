@@ -213,6 +213,18 @@ test("projects a fatal graphics diagnostic through the owned Project dialog", as
   expect(onAction).toHaveBeenCalledWith("closeProjectAfterGraphicsFailure");
 });
 
+test("shows photo import file progress without an unsafe cancel action", () => {
+  const onAction = vi.fn();
+  render(<ProjectDialogView onAction={onAction} state={{ kind: "imageProcessingProgress",
+    progress: { kind: "determinate", completed: 6, total: 12, status: "6 de 12" } }} />);
+  const dialog = screen.getByRole("dialog", { name: "Processando Imagens" });
+  expect(within(dialog).getByText("6 de 12")).toBeInTheDocument();
+  expect(within(dialog).getByRole("progressbar")).toHaveAttribute("aria-valuenow", "6");
+  expect(within(dialog).getByRole("progressbar")).toHaveAttribute("aria-valuemax", "12");
+  expect(within(dialog).getByText("50%")).toBeInTheDocument();
+  expect(within(dialog).queryByRole("button")).not.toBeInTheDocument();
+});
+
 test("projects export success through the standard message dialog", async () => {
   const user = userEvent.setup();
   const onAction = vi.fn();
@@ -235,4 +247,25 @@ test("projects export success through the standard message dialog", async () => 
   );
   await user.click(within(dialog).getByRole("button", { name: "Fechar" }));
   expect(onAction).toHaveBeenCalledWith("dismissExport");
+});
+
+
+test("shows rejected photo files in Problems and closes without a creative action", async () => {
+  const user = userEvent.setup();
+  const onAction = vi.fn();
+  render(<ProjectDialogView onAction={onAction} state={{
+    kind: "imageProcessingProblems", importedCount: 2,
+    problems: [
+      { fileName: "quebrada.jpg", reason: "JPEG corrompido" },
+      { fileName: "ausente.jpg", reason: "Arquivo indisponível" },
+    ],
+  }} />);
+  const dialog = screen.getByRole("dialog", { name: "Problemas no processamento" });
+  expect(within(dialog).getByRole("columnheader", { name: "Arquivo" })).toBeInTheDocument();
+  expect(within(dialog).getByRole("columnheader", { name: "Motivo" })).toBeInTheDocument();
+  expect(within(dialog).getByRole("row", { name: "quebrada.jpg JPEG corrompido" })).toBeInTheDocument();
+  expect(within(dialog).getByText("2 Fotos importadas. Confira os arquivos que não puderam ser processados por completo.")).toBeInTheDocument();
+  expect(within(dialog).getByRole("button", { name: "Fechar" })).toHaveFocus();
+  await user.keyboard("{Escape}");
+  expect(onAction).toHaveBeenCalledExactlyOnceWith("dismissImageProcessingProblems");
 });

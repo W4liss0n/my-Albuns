@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 
-import type { ProjectCorePort } from "../application/projectPorts";
+import type { ProjectCorePort, ImageProcessingProgress } from "../application/projectPorts";
 import { createAlbumDesignProjectDraft } from "../application/projectSettingsDraft";
 import type { EditorProjection } from "../domain/project";
 import {
@@ -35,8 +35,8 @@ function projectSessionPort(
       impact: { sheetWidthPx: 7_087, pageWidthPx: 3_543, heightPx: 3_543 },
     }),
     apply,
-    applyWithOutcome: async (intent) => ({
-      projection: await apply(intent),
+    applyWithOutcome: async (intent, publish) => ({
+      projection: await apply(intent, publish),
       affectedFrameId: null,
       affectedSheetId: null,
     }),
@@ -111,7 +111,7 @@ test("applies a structural intent with outcome, returns its status, and forwards
   });
 
   expect(completed).toBe(true);
-  expect(applyWithOutcome).toHaveBeenCalledWith(intent);
+  expect(applyWithOutcome).toHaveBeenCalledWith(intent, expect.any(Function));
   expect(onProjectionChange).toHaveBeenCalledWith(updatedProjection);
   expect(onAffectedSheet).toHaveBeenCalledWith("sheet-001");
 });
@@ -178,7 +178,7 @@ test("materializes a queued reorder beside its intended Sheet after History rest
     kind: "reorderSheet",
     sheetId: "sheet-003",
     targetIndex: 2,
-  });
+  }, expect.any(Function));
 });
 
 test("keeps a queued reorder valid when the preceding History command fails", async () => {
@@ -228,7 +228,7 @@ test("keeps a queued reorder valid when the preceding History command fails", as
     kind: "reorderSheet",
     sheetId: "sheet-003",
     targetIndex: 1,
-  });
+  }, expect.any(Function));
 });
 
 test("preserves Redo when preceding History already materialized the Album Design target", async () => {
@@ -299,4 +299,114 @@ test("preserves Redo when preceding History already materialized the Album Desig
   expect(apply).not.toHaveBeenCalled();
   await waitFor(() => expect(redo).toHaveBeenCalledOnce());
   expect(onProjectionChange).toHaveBeenCalledWith(afterUndo);
+});
+
+
+test.each(["completed", "cancelled", "failed"] as const)(
+  "orders adjacent Save/Undo after a pending photo selection (%s)",
+  async (terminal) => {
+    type Result = Awaited<ReturnType<ProjectCorePort["importPhoto"]>>;
+    let resolve!: (value: Result) => void;
+    let reject!: (error: Error) => void;
+    const pending = new Promise<Result>((done, fail) => { resolve = done; reject = fail; });
+    const initial = structuredClone(representativeProjection);
+    initial.state.canUndo = false;
+    const imported = structuredClone(initial);
+    imported.state.revision += 1;
+    imported.state.canUndo = true;
+    imported.state.dirty = true;
+    const port = projectSessionPort(async () => initial, vi.fn(async () => initial));
+    port.importPhoto = vi.fn(() => pending);
+    port.save = vi.fn<ProjectCorePort["save"]>(async (revision) => ({
+      outcome: { kind: "saved", revision }, projection: revision === initial.state.revision ? initial : imported,
+    }));
+    const onProjectionChange = vi.fn();
+    const view = renderHook(() => useProjectMutations({
+      projection: initial,
+      runProjectMutation: useProjectMutationRunner(initial.state.projectId, port),
+      onProjectionChange,
+      onAffectedFrame: () => undefined,
+      onAffectedSheet: () => undefined,
+    }));
+    let completion!: Promise<string | null>;
+    act(() => {
+      completion = view.result.current.importPhoto();
+      void view.result.current.importPhoto();
+      view.result.current.save();
+      view.result.current.undo();
+    });
+    expect(view.result.current.importPending).toBe(true);
+    expect(port.importPhoto).toHaveBeenCalledOnce();
+    expect(port.save).not.toHaveBeenCalled();
+    expect(port.undo).not.toHaveBeenCalled();
+    await act(async () => {
+      if (terminal === "failed") reject(new Error("Falha de leitura"));
+      else if (terminal === "cancelled") resolve({ kind: "cancelled", projection: initial });
+      else resolve({ kind: "completed", projection: imported, mediaIds: ["photo-a", "photo-b"],
+        importedCount: 2, problems: [{ fileName: "quebrada.jpg", reason: "JPEG corrompido" }] });
+      await completion;
+    });
+    await waitFor(() => expect(view.result.current.importPending).toBe(false));
+    if (terminal === "completed") {
+      expect(port.save).toHaveBeenCalledWith(imported.state.revision);
+      await waitFor(() => expect(port.undo).toHaveBeenCalledOnce());
+      expect(view.result.current.photoImportResult?.problems).toEqual([
+        { fileName: "quebrada.jpg", reason: "JPEG corrompido" },
+      ]);
+    } else if (terminal === "failed") {
+      expect(port.save).not.toHaveBeenCalled();
+      expect(port.undo).not.toHaveBeenCalled();
+      expect(view.result.current.message).toBe("Falha de leitura");
+    } else {
+      expect(port.save).toHaveBeenCalledWith(initial.state.revision);
+      expect(view.result.current.photoImportResult).toBeNull();
+    }
+  },
+);
+
+test("waits for image cache before Save and keeps its warning through a queued edit", async () => {
+  let finish!: (result: Awaited<ReturnType<ProjectCorePort["importPhoto"]>>) => void;
+  let publish!: (progress: ImageProcessingProgress) => void;
+  const imported = structuredClone(representativeProjection);
+  imported.state.revision += 1;
+  imported.state.dirty = true;
+  const port = projectSessionPort(vi.fn(async () => imported), async () => imported);
+  port.importPhoto = vi.fn<ProjectCorePort["importPhoto"]>((onProgress) => {
+    publish = onProgress;
+    publish({ completedFiles: 0, totalFiles: 1 });
+    return new Promise((resolve) => { finish = resolve; });
+  });
+  port.save = vi.fn<ProjectCorePort["save"]>(async (revision) => ({
+    projection: imported, outcome: { kind: "saved", revision },
+  }));
+  const view = renderHook(() => useProjectMutations({
+    projection: representativeProjection,
+    runProjectMutation: useProjectMutationRunner(representativeProjection.state.projectId, port),
+    onProjectionChange: () => undefined,
+    onAffectedFrame: () => undefined,
+    onAffectedSheet: () => undefined,
+  }));
+  let importing!: Promise<string | null>;
+  let editing!: Promise<boolean>;
+  act(() => {
+    importing = view.result.current.importPhoto();
+    view.result.current.save();
+    editing = view.result.current.applyIntent({ kind: "setDpi", dpi: 200 });
+  });
+  expect(view.result.current.imageProcessingProgress).toEqual({ completedFiles: 0, totalFiles: 1 });
+  expect(port.save).not.toHaveBeenCalled();
+  expect(port.apply).not.toHaveBeenCalled();
+  const problem = { fileName: "Foto.jpg", reason: "A Foto foi vinculada, mas seu Cache não pôde ser preparado." };
+  await act(async () => {
+    publish({ completedFiles: 1, totalFiles: 1, problem });
+    finish({ kind: "completed", projection: imported, importedCount: 1, mediaIds: ["media-001"], problems: [] });
+    await importing;
+    await editing;
+  });
+  expect(port.save).toHaveBeenCalledWith(imported.state.revision);
+  expect(view.result.current.photoImportResult?.importedCount).toBe(1);
+  expect(view.result.current.imageProcessingProgress).toBeNull();
+  expect(view.result.current.imageProcessingProblems).toEqual([problem]);
+  act(() => view.result.current.dismissImageProcessingProblems());
+  expect(view.result.current.imageProcessingProblems).toEqual([]);
 });

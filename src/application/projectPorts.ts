@@ -200,7 +200,7 @@ export interface ProjectWindowPort {
 }
 
 export interface ProjectStartupPort {
-  confirmUiReady(): Promise<void>;
+  confirmUiReady(): Promise<readonly ImageProcessingProblem[] | void>;
 }
 
 export type ProjectRecoveryDecision =
@@ -208,35 +208,56 @@ export type ProjectRecoveryDecision =
   | "discardCheckpointAndOpenLastSaved"
   | "nowNot";
 
+export interface ImageProcessingProblem {
+  fileName: string;
+  reason: string;
+}
+
+export interface ImageProcessingProgress {
+  completedFiles: number;
+  totalFiles: number;
+  problem?: ImageProcessingProblem | null;
+}
+
+export interface PhotoImportCompletion {
+  kind: "completed";
+  projection: EditorProjection;
+  mediaIds: string[];
+  importedCount: number;
+  problems: ImageProcessingProblem[];
+}
+
 export interface ProjectCorePort {
   load(operationId: string): Promise<EditorProjection>;
   validateAlbumInformation(
     information: AlbumInformation,
   ): Promise<AlbumInformationValidation>;
-  apply(intent: ProjectIntent): Promise<EditorProjection>;
-  applyWithOutcome(intent: ProjectIntent): Promise<ProjectMutationOutcome>;
-  importPhoto(): Promise<
+  apply(intent: ProjectIntent, onProgress?: (progress: ImageProcessingProgress) => void): Promise<EditorProjection>;
+  applyWithOutcome(intent: ProjectIntent, onProgress?: (progress: ImageProcessingProgress) => void): Promise<ProjectMutationOutcome>;
+  importPhoto(onProgress: (progress: ImageProcessingProgress) => void): Promise<
     | { kind: "cancelled"; projection: EditorProjection }
-    | { kind: "imported"; projection: EditorProjection; mediaId: string }
-    | { kind: "selected"; projection: EditorProjection; mediaId: string }
+    | PhotoImportCompletion
   >;
   resolvePhotoDropTarget(
     sheetId: string,
     xUm: number,
     yUm: number,
   ): Promise<PhotoDropTarget>;
-  relink(mediaId: string): Promise<EditorProjection>;
-  undo(): Promise<EditorProjection>;
-  redo(): Promise<EditorProjection>;
+  relink(mediaId: string, onProgress: (progress: ImageProcessingProgress) => void): Promise<EditorProjection>;
+  undo(onProgress?: (progress: ImageProcessingProgress) => void): Promise<EditorProjection>;
+  redo(onProgress?: (progress: ImageProcessingProgress) => void): Promise<EditorProjection>;
   save(expectedRevision: number): Promise<SaveProjectResult>;
   saveAs(expectedRevision: number): Promise<SaveAsProjectResult>;
 }
 
 export interface MediaPreviewPort {
+  // Completion replaces the presentation snapshot: demanded outcomes plus the
+  // native registry's bounded recent residents. Omission revokes a prior URL.
   prepareMediaPreviews(
     demand: MediaPreviewRequest,
+    onPreview: (preview: MediaPreview) => void,
   ): Promise<readonly MediaPreview[] | null>;
-  retryUnavailableMedia(mediaId: string): Promise<MediaPreview>;
+  retryUnavailableMedia(mediaId: string, onProgress: (progress: ImageProcessingProgress) => void): Promise<MediaPreview>;
   onMediaChanged(
     listener: (mediaIds: readonly string[]) => void,
   ): Promise<() => void>;

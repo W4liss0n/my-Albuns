@@ -14,6 +14,7 @@ import type {
   ExportProgressEvent,
   MediaPreview,
   MediaPreviewPort,
+  MediaPreviewRequest,
   ProjectStartupPort,
   ProjectCorePort,
   ProjectWindowPort,
@@ -662,6 +663,184 @@ test("prepares real media previews after opening without blocking the Workspace"
   );
 });
 
+test("shows a ready preview while the remaining previews are still being prepared", async () => {
+  let publish: ((preview: MediaPreview) => void) | undefined;
+  let finish!: (previews: readonly MediaPreview[]) => void;
+  const prepareMediaPreviews = vi.fn((_demand: MediaPreviewRequest, onPreview: (preview: MediaPreview) => void) => {
+    publish = onPreview;
+    return new Promise<readonly MediaPreview[]>((resolve) => { finish = resolve; });
+  });
+  const preview: MediaPreview = {
+    mediaId: "media-001",
+    state: "ready",
+    url: "http://myalbuns-cache.localhost/first-ready",
+  };
+  render(
+    <App
+      mediaPreviewPort={{ ...mediaPreviewPort, prepareMediaPreviews }}
+      projectCorePort={{ ...projectCorePort, load: async () => representativeProjection }}
+      projectStartupPort={projectStartupPort}
+      projectWindowPort={projectWindowPort}
+      logger={silentLogger}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      graphicsProbe={canvasGraphicsDiagnosticProbe}
+    />,
+  );
+  await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalled());
+
+  act(() => publish?.(preview));
+
+  expect(document.querySelector('[data-media-id="media-001"] img')).toHaveAttribute("src", preview.url);
+  expect(screen.getByTestId("album-canvas")).toHaveAttribute("data-media-preview", preview.url);
+  await act(async () => finish([preview]));
+});
+
+test("shows warm Fotos immediately after returning from Decorativos while the next demand is pending", async () => {
+  vi.stubGlobal("IntersectionObserver", class {
+    constructor(private callback: IntersectionObserverCallback) {}
+    observe(target: HTMLElement) {
+      this.callback([{ target, isIntersecting: true } as unknown as IntersectionObserverEntry], this as unknown as IntersectionObserver);
+    }
+    disconnect() {}
+  });
+  const requests: {
+    demand: MediaPreviewRequest;
+    publish: (preview: MediaPreview) => void;
+    finish: (previews: readonly MediaPreview[]) => void;
+  }[] = [];
+  const prepareMediaPreviews: MediaPreviewPort["prepareMediaPreviews"] = (demand, publish) =>
+    new Promise((finish) => { requests.push({ demand, publish, finish }); });
+  const preview: MediaPreview = { mediaId: "media-002", state: "ready", url: "http://myalbuns-cache.localhost/warm-photo" };
+  const view = render(
+    <App
+      mediaPreviewPort={{ ...mediaPreviewPort, prepareMediaPreviews }}
+      projectCorePort={{ ...projectCorePort, load: async () => representativeProjection }}
+      projectStartupPort={projectStartupPort}
+      projectWindowPort={projectWindowPort}
+      logger={silentLogger}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      graphicsProbe={canvasGraphicsDiagnosticProbe}
+    />,
+  );
+  try {
+    await waitFor(() => expect(requests[requests.length - 1]?.demand.visibleMediaIds).toContain("media-002"));
+    act(() => requests[requests.length - 1].publish(preview));
+    expect(document.querySelector('[data-media-id="media-002"] img')).toHaveAttribute("src", preview.url);
+    fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
+    await waitFor(() => expect(requests[requests.length - 1]?.demand.preloadMediaIds).toContain("media-002"));
+    await act(async () => requests[requests.length - 1].finish([preview]));
+    fireEvent.click(screen.getByRole("button", { name: "Fotos" }));
+    expect(document.querySelector('[data-media-id="media-002"] img')).toHaveAttribute("src", preview.url);
+  } finally {
+    view.unmount();
+    vi.unstubAllGlobals();
+  }
+});
+
+test("shows previously loaded Panel photos immediately after scrolling away and back", async () => {
+  const observers: { callback: IntersectionObserverCallback; targets: HTMLElement[] }[] = [];
+  vi.stubGlobal("IntersectionObserver", class {
+    targets: HTMLElement[] = [];
+    constructor(public callback: IntersectionObserverCallback) { observers.push(this); }
+    observe(target: HTMLElement) { this.targets.push(target); }
+    disconnect() {}
+  });
+  const requests: {
+    demand: MediaPreviewRequest;
+    finish: (previews: readonly MediaPreview[]) => void;
+  }[] = [];
+  const prepareMediaPreviews: MediaPreviewPort["prepareMediaPreviews"] = (demand) =>
+    new Promise((finish) => { requests.push({ demand, finish }); });
+  const top: MediaPreview = {
+    mediaId: "media-002", state: "ready", url: "http://myalbuns-cache.localhost/top-photo",
+  };
+  const bottom: MediaPreview = {
+    mediaId: "media-003", state: "ready", url: "http://myalbuns-cache.localhost/bottom-photo",
+  };
+  const view = render(
+    <App
+      mediaPreviewPort={{ ...mediaPreviewPort, prepareMediaPreviews }}
+      projectCorePort={{ ...projectCorePort, load: async () => representativeProjection }}
+      projectStartupPort={projectStartupPort}
+      projectWindowPort={projectWindowPort}
+      logger={silentLogger}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      graphicsProbe={canvasGraphicsDiagnosticProbe}
+    />,
+  );
+  const scrollTo = (mediaId: string) => act(() => {
+    for (const observer of observers) {
+      observer.callback(observer.targets.map((target) => ({
+        target, isIntersecting: target.dataset.mediaId === mediaId,
+      }) as unknown as IntersectionObserverEntry), observer as unknown as IntersectionObserver);
+    }
+  });
+  try {
+    await screen.findByRole("group", { name: "Grade de Fotos" });
+    scrollTo(top.mediaId);
+    await waitFor(() => expect(requests[requests.length - 1]?.demand.visibleMediaIds).toContain(top.mediaId));
+    await act(async () => requests[requests.length - 1].finish([top]));
+    expect(document.querySelector('[data-media-id="media-002"] img')).toHaveAttribute("src", top.url);
+    const loadedImage = document.querySelector('[data-media-id="media-002"] img');
+
+    scrollTo(bottom.mediaId);
+    await waitFor(() => expect(requests[requests.length - 1]?.demand.visibleMediaIds).toContain(bottom.mediaId));
+    // The native completion includes its bounded set of recent residents.
+    await act(async () => requests[requests.length - 1].finish([top, bottom]));
+    scrollTo(top.mediaId);
+
+    // No new native response has arrived: a previously shown thumbnail must
+    // already be drawable on returning to its row.
+    expect(document.querySelector('[data-media-id="media-002"] img')).toHaveAttribute("src", top.url);
+    expect(document.querySelector('[data-media-id="media-002"] img')).toBe(loadedImage);
+  } finally {
+    view.unmount();
+    vi.unstubAllGlobals();
+  }
+});
+
+test("ignores preview events and completion from a demand superseded by a Monitor refresh", async () => {
+  const requests: {
+    publish: (preview: MediaPreview) => void;
+    finish: (previews: readonly MediaPreview[]) => void;
+  }[] = [];
+  let notifyMediaChanged!: (mediaIds: readonly string[]) => void;
+  const prepareMediaPreviews: MediaPreviewPort["prepareMediaPreviews"] = (_demand, publish) =>
+    new Promise((finish) => { requests.push({ publish, finish }); });
+  const preview: MediaPreview = { mediaId: "media-001", state: "ready", url: "http://myalbuns-cache.localhost/new" };
+  render(
+    <App
+      mediaPreviewPort={{
+        ...mediaPreviewPort,
+        prepareMediaPreviews,
+        onMediaChanged: async (listener) => {
+          notifyMediaChanged = listener;
+          return () => undefined;
+        },
+      }}
+      projectCorePort={{ ...projectCorePort, load: async () => representativeProjection }}
+      projectStartupPort={projectStartupPort}
+      projectWindowPort={projectWindowPort}
+      logger={silentLogger}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      graphicsProbe={canvasGraphicsDiagnosticProbe}
+    />,
+  );
+  await waitFor(() => expect(requests).toHaveLength(1));
+  act(() => notifyMediaChanged(["media-001"]));
+  await waitFor(() => expect(requests).toHaveLength(2));
+  act(() => requests[1].publish(preview));
+  const stale = { ...preview, url: "http://myalbuns-cache.localhost/old" };
+  await act(async () => {
+    requests[0].publish(stale);
+    requests[0].finish([stale]);
+  });
+  expect(document.querySelector('[data-media-id="media-001"] img')).toHaveAttribute("src", preview.url);
+  await act(async () => requests[1].finish([preview]));
+  act(() => requests[1].publish(stale));
+  expect(document.querySelector('[data-media-id="media-001"] img')).toHaveAttribute("src", preview.url);
+});
+
 test("reprepares demanded media when the stable Monitor reports a change", async () => {
   let notifyMediaChanged: ((mediaIds: readonly string[]) => void) | undefined;
   const prepareMediaPreviews = vi
@@ -1110,6 +1289,9 @@ test("keeps the newest media projection when equal-revision refreshes resolve ou
   await screen.findByRole("button", { name: /Serra ao amanhecer\.jpg/i });
   act(() => {
     notifyMediaChanged?.(["media-001"]);
+  });
+  await waitFor(() => expect(load).toHaveBeenCalledTimes(2));
+  act(() => {
     notifyMediaChanged?.(["media-001"]);
   });
   await waitFor(() => expect(load).toHaveBeenCalledTimes(3));
@@ -1292,10 +1474,10 @@ test("retries an unavailable occurrence explicitly and refreshes it without Reli
   fireEvent.click(retry);
 
   await waitFor(() =>
-    expect(retryUnavailableMedia).toHaveBeenCalledWith("media-001"),
+    expect(retryUnavailableMedia).toHaveBeenCalledWith("media-001", expect.any(Function)),
   );
   await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledTimes(2));
-  await waitFor(() => expect(load).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(load).toHaveBeenCalledTimes(3));
   expect(screen.getByTestId("album-canvas")).toHaveAttribute(
     "data-media-preview",
     recoveredUrl,
@@ -1518,7 +1700,7 @@ test("keeps one Monitor subscription while demand revisions change", async () =>
     revision: 2,
     visibleMediaIds: [],
     preloadMediaIds: [],
-  });
+  }, expect.any(Function));
 });
 
 test("cancels resident media demand when runtime graphics become unavailable", async () => {
@@ -1590,7 +1772,7 @@ test("cancels resident media demand when runtime graphics become unavailable", a
     revision: 2,
     visibleMediaIds: [],
     preloadMediaIds: [],
-  });
+  }, expect.any(Function));
 
   act(() => resolveGraphicsDialogPresentation?.());
   act(() => dialog.emit("closeProjectAfterGraphicsFailure"));
@@ -1803,4 +1985,295 @@ test("logs the typed media preview failure code without replacing it with unknow
       ]),
     ),
   );
+});
+
+test("keeps a created Project usable while reporting initial image cache problems", async () => {
+  const dialog = projectDialogHarness();
+  const problem = { fileName: "Fundo.png", reason: "A imagem foi vinculada, mas sua prévia não pôde ser preparada." };
+  let warn: Parameters<MediaPreviewPort["onCacheProcessorWarning"]>[0] | undefined;
+  const confirmUiReady = vi.fn(async () => {
+    warn?.({ state: "suspended", message: "O Cache foi suspenso." });
+    return [problem];
+  });
+  render(<App
+    exportPipelinePort={exportPipelinePort}
+    mediaPreviewPort={{ ...mediaPreviewPort, onCacheProcessorWarning: async (listener) => {
+      warn = listener;
+      return () => undefined;
+    } }}
+    projectStartupPort={{ confirmUiReady }}
+    projectCorePort={projectCorePort}
+    projectWindowPort={projectWindowPort}
+    projectDialogPort={dialog.port}
+    graphicsProbe={canvasGraphicsDiagnosticProbe}
+    canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+    logger={silentLogger}
+  />);
+  await waitFor(() => expect(dialog.present).toHaveBeenCalledWith({
+    kind: "projectOperationFailure", message: "O Cache foi suspenso.",
+  }));
+  act(() => dialog.emit("dismissProjectOperationFailure"));
+  await waitFor(() => expect(dialog.present).toHaveBeenCalledWith({
+    kind: "imageProcessingProblems", importedCount: null, problems: [problem],
+  }));
+  expect(confirmUiReady).toHaveBeenCalledOnce();
+  expect(screen.getByTestId("album-canvas")).toBeInTheDocument();
+  act(() => dialog.emit("dismissImageProcessingProblems"));
+  await waitFor(() => expect(dialog.dismiss).toHaveBeenCalled());
+});
+
+test.each([
+  { outcome: "success", alreadyReading: false },
+  { outcome: "failure", alreadyReading: false },
+  { outcome: "success", alreadyReading: true },
+])("reveals an import batch after $outcome when the monitor is already reading: $alreadyReading", async ({ outcome, alreadyReading }) => {
+  let notify: Parameters<MediaPreviewPort["onMediaChanged"]>[0] = () => undefined;
+  let progress: Parameters<ProjectCorePort["importPhoto"]>[0] = () => undefined;
+  let finish!: (result: Awaited<ReturnType<ProjectCorePort["importPhoto"]>>) => void;
+  let fail!: (reason: Error) => void;
+  let finishEarlyRead!: (projection: typeof representativeProjection) => void;
+  const newPhotos = [1, 2].map((number) => ({
+    ...representativeProjection.state.album.media.find((media) => media.kind === "photo")!,
+    id: `new-photo-${number}`,
+    name: `Nova ${number}.jpg`,
+  }));
+  const imported = {
+    ...representativeProjection,
+    state: {
+      ...representativeProjection.state,
+      revision: representativeProjection.state.revision + 1,
+      album: {
+        ...representativeProjection.state.album,
+        media: [...representativeProjection.state.album.media, ...newPhotos],
+      },
+    },
+  };
+  const load = vi.fn().mockResolvedValueOnce(representativeProjection);
+  if (alreadyReading) {
+    load.mockImplementationOnce(() => new Promise((resolve) => {
+      finishEarlyRead = resolve;
+    }));
+  }
+  load.mockResolvedValue(imported);
+  const importPhoto = vi.fn<ProjectCorePort["importPhoto"]>((onProgress) => {
+    progress = onProgress;
+    return new Promise((resolve, reject) => {
+      finish = resolve;
+      fail = reject;
+    });
+  });
+  render(
+    <App
+      projectStartupPort={projectStartupPort}
+      projectWindowPort={projectWindowPort}
+      projectCorePort={{ ...projectCorePort, load, importPhoto }}
+      mediaPreviewPort={{
+        ...mediaPreviewPort,
+        onMediaChanged: async (listener) => {
+          notify = listener;
+          return () => undefined;
+        },
+      }}
+      graphicsProbe={canvasGraphicsDiagnosticProbe}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      logger={silentLogger}
+    />,
+  );
+  await screen.findByRole("button", { name: /Serra ao amanhecer\.jpg/i });
+  if (alreadyReading) {
+    act(() => notify(["media-001"]));
+    await waitFor(() => expect(load).toHaveBeenCalledTimes(2));
+  }
+  fireEvent.click(screen.getByRole("button", { name: "Importar" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos JPEG…" }));
+  await waitFor(() => expect(importPhoto).toHaveBeenCalledOnce());
+  if (alreadyReading) {
+    await act(async () => finishEarlyRead(imported));
+    expect(screen.queryByRole("button", { name: "Nova 1.jpg" })).not.toBeInTheDocument();
+  }
+  await act(async () => {
+    progress?.({ completedFiles: 0, totalFiles: 2 });
+    notify(newPhotos.map(({ id }) => id));
+  });
+  await act(async () => {
+    progress?.({ completedFiles: 1, totalFiles: 2 });
+    notify([newPhotos[0].id]);
+    notify([newPhotos[1].id]);
+  });
+  expect(load).toHaveBeenCalledTimes(alreadyReading ? 2 : 1);
+  expect(screen.getByRole("button", { name: /Serra ao amanhecer\.jpg/i })).toBeVisible();
+  expect(screen.queryByRole("button", { name: "Nova 1.jpg" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Nova 2.jpg" })).not.toBeInTheDocument();
+  await act(async () => {
+    if (outcome === "failure") {
+      fail(new Error("O processamento falhou após vincular as imagens."));
+    } else {
+      finish({
+        kind: "completed",
+        projection: imported,
+        mediaIds: newPhotos.map(({ id }) => id),
+        importedCount: 2,
+        problems: [],
+      });
+    }
+  });
+  expect(await screen.findByRole("button", { name: "Nova 1.jpg" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Nova 2.jpg" })).toBeVisible();
+  await waitFor(() => expect(load).toHaveBeenCalledTimes(alreadyReading ? 3 : 2));
+});
+
+test("keeps a completed Save authoritative when a monitor read finishes during saving", async () => {
+  let notify: Parameters<MediaPreviewPort["onMediaChanged"]>[0] = () => undefined;
+  let finishRead!: (projection: typeof representativeProjection) => void;
+  let finishSave!: (result: Awaited<ReturnType<ProjectCorePort["save"]>>) => void;
+  const dirty = {
+    ...representativeProjection,
+    state: { ...representativeProjection.state, dirty: true },
+  };
+  const saved = {
+    ...dirty,
+    state: { ...dirty.state, dirty: false, savedRevision: dirty.state.revision },
+  };
+  const load = vi.fn()
+    .mockResolvedValueOnce(dirty)
+    .mockImplementationOnce(() => new Promise((resolve) => { finishRead = resolve; }))
+    .mockResolvedValue(saved);
+  const save = vi.fn<ProjectCorePort["save"]>(() => new Promise((resolve) => {
+    finishSave = resolve;
+  }));
+  render(
+    <App
+      projectStartupPort={projectStartupPort}
+      projectWindowPort={projectWindowPort}
+      projectCorePort={{ ...projectCorePort, load, save }}
+      mediaPreviewPort={{ ...mediaPreviewPort, onMediaChanged: async (listener) => {
+        notify = listener;
+        return () => undefined;
+      } }}
+      graphicsProbe={canvasGraphicsDiagnosticProbe}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      logger={silentLogger}
+    />,
+  );
+  await screen.findByText("alterações não salvas");
+  act(() => notify(["media-001"]));
+  await waitFor(() => expect(load).toHaveBeenCalledTimes(2));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivo" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Salvar" }));
+  await waitFor(() => expect(save).toHaveBeenCalledOnce());
+  await act(async () => finishRead(dirty));
+  await act(async () => finishSave({
+    outcome: { kind: "saved", revision: saved.state.revision },
+    projection: saved,
+  }));
+  await waitFor(() => expect(screen.queryByText("alterações não salvas")).not.toBeInTheDocument());
+});
+
+test.each(["ready", "decode_failed", "native_unavailable"] as const)("delivers imported cards together after visible preview preparation: %s", async (outcome) => {
+  const dialog = projectDialogHarness();
+  const photos = [1, 2].map((number) => ({
+    ...representativeProjection.state.album.media[0],
+    kind: "photo" as const, id: `batch-${number}`, name: `Batch ${number}.jpg`,
+  }));
+  const imported = {
+    ...representativeProjection,
+    state: { ...representativeProjection.state,
+      revision: representativeProjection.state.revision + 1,
+      album: { ...representativeProjection.state.album,
+        media: [...representativeProjection.state.album.media, ...photos] },
+    },
+  };
+  let finishPreviews!: (previews: readonly MediaPreview[]) => void;
+  let finishImport!: () => void;
+  const close = vi.fn(projectWindowPort.requestClose);
+  let publishPreview: ((preview: MediaPreview) => void) | undefined;
+  const decodeReady = new Map<string, () => void>();
+  vi.stubGlobal("Image", class {
+    src = "";
+    decode() {
+      if (!this.src.includes("batch-")) return Promise.resolve();
+      return new Promise<void>((resolve, reject) => decodeReady.set(this.src,
+        outcome === "decode_failed" && this.src.includes("batch-2")
+          ? () => reject(new Error("Image decode failed")) : resolve,
+      ));
+    }
+  });
+  const prepare = vi.fn<MediaPreviewPort["prepareMediaPreviews"]>(async (demand, publish) => {
+    if (!demand.visibleMediaIds.includes("batch-1")) return [];
+    publishPreview = publish;
+    return new Promise((resolve) => { finishPreviews = resolve; });
+  });
+  try {
+    render(<App
+      projectStartupPort={projectStartupPort} projectWindowPort={{ ...projectWindowPort,
+        requestClose: close,
+      }}
+      projectDialogPort={dialog.port}
+      projectCorePort={{ ...projectCorePort,
+        load: async () => representativeProjection,
+        importPhoto: async (publish) => {
+          publish?.({ completedFiles: 2, totalFiles: 2 });
+          await new Promise<void>((resolve) => { finishImport = resolve; });
+          return { kind: "completed", projection: imported,
+            mediaIds: photos.map(({ id }) => id), importedCount: 2, problems: [] };
+        },
+      }}
+      mediaPreviewPort={{ ...mediaPreviewPort, prepareMediaPreviews: prepare }}
+      graphicsProbe={canvasGraphicsDiagnosticProbe}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe} logger={silentLogger}
+    />);
+    const grid = await screen.findByRole("group", { name: "Grade de Fotos" });
+    Object.defineProperties(grid, {
+      clientWidth: { value: 600 }, clientHeight: { value: 200 },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Importar" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos JPEG…" }));
+    await waitFor(() => expect(dialog.present).toHaveBeenCalledWith({
+      kind: "imageProcessingProgress",
+      progress: { kind: "determinate", completed: 2, total: 2, status: "2 de 2" },
+    }));
+    await act(async () => finishImport());
+    expect(screen.queryByRole("button", { name: "Batch 1.jpg" })).not.toBeInTheDocument();
+    await waitFor(() => expect(finishPreviews).toBeTypeOf("function"));
+    const previews: MediaPreview[] = photos.map(({ id }) => ({
+      mediaId: id, state: "ready", url: `https://preview.test/${id}.jpg`,
+    }));
+    if (outcome === "native_unavailable") previews[1] = { mediaId: "batch-2", state: "unavailable", url: null };
+    await act(async () => publishPreview?.(previews[0]));
+    expect(screen.queryByRole("button", { name: "Batch 1.jpg" })).not.toBeInTheDocument();
+    await act(async () => finishPreviews(previews));
+    await waitFor(() => expect(decodeReady.size).toBe(outcome === "native_unavailable" ? 1 : 2));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Arquivo" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Fechar Projeto" }));
+    expect(close).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Batch 1.jpg" })).not.toBeInTheDocument();
+    expect(dialog.dismiss).not.toHaveBeenCalled();
+    await act(async () => decodeReady.get(previews[0].url!)!());
+    if (outcome !== "native_unavailable") {
+      expect(screen.queryByRole("button", { name: "Batch 1.jpg" })).not.toBeInTheDocument();
+      expect(dialog.dismiss).not.toHaveBeenCalled();
+      await act(async () => decodeReady.get(previews[1].url!)!());
+    }
+    for (const photo of photos) {
+      if (outcome !== "ready" && photo.id === "batch-2") {
+        const status = outcome === "native_unavailable" ? "Indisponível" : "Prévia indisponível";
+        expect((await screen.findByRole("button", { name: `${photo.name}. ${status}` }))
+          .querySelector("img")).toBeNull();
+      } else {
+        expect(await screen.findByRole("button", { name: photo.name }))
+          .toContainHTML(`src="https://preview.test/${photo.id}.jpg"`);
+      }
+    }
+    await waitFor(() => expect(dialog.dismiss).toHaveBeenCalled());
+    await waitFor(() => expect(close).toHaveBeenCalledOnce());
+    expect(prepare.mock.calls.filter(([demand]) => demand.visibleMediaIds.includes("batch-1")))
+      .toHaveLength(1);
+    if (outcome !== "ready") {
+      expect(dialog.present).toHaveBeenCalledWith(expect.objectContaining({
+        kind: "imageProcessingProblems", problems: [expect.objectContaining({ fileName: "Batch 2.jpg" })],
+      }));
+    }
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });

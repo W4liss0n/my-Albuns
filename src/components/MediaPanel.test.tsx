@@ -1,9 +1,10 @@
+import { createRef } from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 
 import type { MediaCatalogItem, MediaUsage } from "../domain/project";
-import { MediaPanel } from "./MediaPanel";
+import { MediaPanel, type MediaPanelHandle } from "./MediaPanel";
 
 const mediaItems: readonly MediaCatalogItem[] = [
   media("photo-album-10", "photo", "Álbum 10"),
@@ -28,6 +29,89 @@ const mediaPanelInteractions = {
   onRelinkMedia: () => undefined,
   onRetryUnavailableMedia: async () => undefined,
 };
+
+test("requests the initial measured viewport without waiting for a scroll or observer paint", () => {
+  vi.stubGlobal("IntersectionObserver", class {
+    observe() {}
+    disconnect() {}
+  });
+  const width = vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(202);
+  const height = vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(114);
+  const onDemandChange = vi.fn();
+  const view = render(<MediaPanel {...mediaPanelInteractions}
+    mediaItems={mediaItems} mediaUsage={mediaUsage} onFillPhoto={() => undefined}
+    preferences={{kind: "local"}}
+    previewSource={{kind: "connected", previews: {}, onDemandChange}}
+  />);
+  try {
+    expect(onDemandChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      visibleMediaIds: expect.arrayContaining(["photo-album-2"]),
+    }));
+    const grid = screen.getByRole("group", { name: "Grade de Fotos" });
+    grid.scrollTop = 190;
+    fireEvent.scroll(grid);
+    expect(onDemandChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      visibleMediaIds: expect.arrayContaining(["photo-retrato"]),
+    }));
+  } finally {
+    view.unmount();
+    width.mockRestore();
+    height.mockRestore();
+    vi.unstubAllGlobals();
+  }
+});
+
+test("preloads upcoming viewports before the user scrolls, within a bounded window", () => {
+  const width = vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(84);
+  const height = vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(168);
+  const onDemandChange = vi.fn();
+  const view = render(<MediaPanel {...mediaPanelInteractions}
+    mediaItems={Array.from({length: 100}, (_, i) => media(`photo-${i}`, "photo", `Foto ${i}`))}
+    mediaUsage={[]} onFillPhoto={() => undefined} preferences={{kind: "local"}}
+    previewSource={{kind: "connected", previews: {}, onDemandChange}}
+  />);
+  try {
+    expect(onDemandChange).toHaveBeenLastCalledWith({
+      visibleMediaIds: ["photo-0", "photo-1"],
+      preloadMediaIds: ["photo-2", "photo-3", "photo-4", "photo-5", "photo-6", "photo-7"],
+    });
+  } finally {
+    view.unmount();
+    width.mockRestore();
+    height.mockRestore();
+  }
+});
+
+test("prepares only the future viewport with the panel's active ordering and filters", () => {
+  const ref = createRef<MediaPanelHandle>();
+  const demand = vi.fn();
+  const photos = Array.from({ length: 100 }, (_, i) => media(`photo-${i}`, "photo", `Álbum ${i}`));
+  const props = {
+    ...mediaPanelInteractions, mediaUsage: [], onFillPhoto: vi.fn(),
+    previewSource: { kind: "connected" as const, onDemandChange: demand, previews: {} },
+    preferences: { kind: "local" as const, initial: { photo: {
+      thumbnailSize: 84, sortDirection: "descending" as const, usageFilter: "all" as const,
+    } } },
+  };
+  const view = render(<MediaPanel {...props} ref={ref} mediaItems={mediaItems} />);
+  const grid = screen.getByRole("group", { name: "Grade de Fotos" });
+  Object.defineProperties(grid, { clientWidth: { value: 202 }, clientHeight: { value: 114 } });
+  Object.assign(grid.style, { padding: "10px 12px", rowGap: "10px", columnGap: "10px" });
+  grid.scrollTop = 188;
+  const plan = ref.current!.planCatalog(photos, []);
+  expect(plan.demand.visibleMediaIds).toEqual(["photo-95", "photo-94", "photo-93", "photo-92"]);
+  expect(plan.demand.preloadMediaIds).not.toContain("photo-80");
+  plan.commit();
+  view.rerender(<MediaPanel {...props} ref={ref} mediaItems={photos} />);
+  expect(demand).toHaveBeenLastCalledWith(plan.demand);
+  fireEvent.change(screen.getByRole("searchbox", { name: "Buscar Fotos" }), { target: { value: "album 99" } });
+  // A shorter filtered catalog clamps scroll just as the browser does.
+  expect(ref.current!.planCatalog(photos, []).demand).toEqual({
+    visibleMediaIds: ["photo-99"], preloadMediaIds: [],
+  });
+  fireEvent.change(screen.getByRole("searchbox", { name: "Buscar Fotos" }), { target: { value: "nenhuma" } });
+  expect(ref.current!.planCatalog(photos, []).demand).toEqual({ visibleMediaIds: [], preloadMediaIds: [] });
+});
 
 test("matches the reference toolbar and marks only unavailable import actions as placeholders", async () => {
   const user = userEvent.setup();
@@ -64,7 +148,7 @@ test("matches the reference toolbar and marks only unavailable import actions as
   await user.click(screen.getByRole("button", { name: "Importar" }));
   const importMenu = screen.getByRole("menu", { name: "Importar" });
   expect(
-    within(importMenu).getByRole("menuitem", { name: "Arquivo JPEG…" }),
+    within(importMenu).getByRole("menuitem", { name: "Arquivos JPEG…" }),
   ).toBeEnabled();
   const folderItem = within(importMenu).getByRole("menuitem", {
     name: "Pasta…",
@@ -340,6 +424,91 @@ test("hydrates authoritative per-tab settings and publishes only the changed fie
   expect(screen.getByRole("combobox", { name: "Filtro de uso" })).toHaveValue(
     "all",
   );
+});
+
+test("keeps the last observed viewport warm across Fotos and Decorativos", () => {
+  vi.stubGlobal("IntersectionObserver", class {
+    constructor(private callback: IntersectionObserverCallback) {}
+    observe(target: HTMLElement) {
+      this.callback([{ target, isIntersecting: target.dataset.mediaId !== "photo-retrato" } as unknown as IntersectionObserverEntry], this as unknown as IntersectionObserver);
+    }
+    disconnect() {}
+  });
+  const onDemandChange = vi.fn();
+  const view = render(
+    <MediaPanel
+      {...mediaPanelInteractions}
+      mediaItems={mediaItems}
+      mediaUsage={mediaUsage}
+      onFillPhoto={vi.fn()}
+      previewSource={{ kind: "connected", previews: {}, onDemandChange }}
+      preferences={{ kind: "local" }}
+    />,
+  );
+  try {
+    onDemandChange.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
+    expect(onDemandChange).toHaveBeenLastCalledWith({
+      visibleMediaIds: ["decorative-overlay"],
+      preloadMediaIds: ["photo-album-2", "photo-album-10"],
+    });
+    expect(onDemandChange.mock.calls.every(([demand]) =>
+      [...demand.visibleMediaIds, ...demand.preloadMediaIds].includes("photo-album-2"),
+    )).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Fotos" }));
+    expect(onDemandChange).toHaveBeenLastCalledWith({
+      visibleMediaIds: ["photo-album-2", "photo-album-10"],
+      preloadMediaIds: ["decorative-overlay"],
+    });
+  } finally {
+    view.unmount();
+    vi.unstubAllGlobals();
+  }
+});
+
+test("retires scrolled and removed media and ignores disconnected observers", () => {
+  const observers: { callback: IntersectionObserverCallback; targets: HTMLElement[] }[] = [];
+  vi.stubGlobal("IntersectionObserver", class {
+    targets: HTMLElement[] = [];
+    constructor(public callback: IntersectionObserverCallback) { observers.push(this); }
+    observe(target: HTMLElement) { this.targets.push(target); }
+    disconnect() {}
+  });
+  const onDemandChange = vi.fn();
+  const props = {
+    ...mediaPanelInteractions,
+    mediaItems,
+    mediaUsage,
+    onFillPhoto: vi.fn(),
+    previewSource: { kind: "connected" as const, previews: {}, onDemandChange },
+    preferences: { kind: "local" as const },
+  };
+  const view = render(<MediaPanel {...props} />);
+  const observeOnly = (index: number, mediaId: string) => {
+    const observer = observers[index];
+    observer.callback(observer.targets.map((target) => ({
+      target, isIntersecting: target.dataset.mediaId === mediaId,
+    }) as unknown as IntersectionObserverEntry), observer as unknown as IntersectionObserver);
+  };
+  try {
+    observeOnly(0, "photo-album-2");
+    observeOnly(1, "photo-album-2");
+    observeOnly(0, "photo-retrato");
+    observeOnly(1, "photo-retrato");
+    expect(onDemandChange).toHaveBeenLastCalledWith({ visibleMediaIds: ["photo-retrato"], preloadMediaIds: [] });
+    fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
+    observeOnly(2, "decorative-overlay");
+    observeOnly(3, "decorative-overlay");
+    expect(onDemandChange).toHaveBeenLastCalledWith({ visibleMediaIds: ["decorative-overlay"], preloadMediaIds: ["photo-retrato"] });
+    onDemandChange.mockClear();
+    observeOnly(0, "photo-album-2");
+    expect(onDemandChange).not.toHaveBeenCalled();
+    view.rerender(<MediaPanel {...props} mediaItems={mediaItems.filter(({ id }) => id !== "photo-retrato")} />);
+    expect(onDemandChange).toHaveBeenLastCalledWith({ visibleMediaIds: ["decorative-overlay"], preloadMediaIds: [] });
+  } finally {
+    view.unmount();
+    vi.unstubAllGlobals();
+  }
 });
 
 test("clears preview demand when the panel unmounts", () => {

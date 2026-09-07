@@ -1,3 +1,5 @@
+import type { ImageProcessingProblem } from "./projectPorts";
+
 export type ProjectDialogProgress =
   | {
       kind: "indeterminate";
@@ -16,6 +18,12 @@ export interface ProjectDialogDetail {
 }
 
 export type ProjectDialogState =
+  | { kind: "imageProcessingProgress"; progress: ProjectDialogProgress }
+  | {
+      kind: "imageProcessingProblems";
+      importedCount: number | null;
+      problems: readonly ImageProcessingProblem[];
+    }
   | {
       busy: boolean;
       details: readonly ProjectDialogDetail[];
@@ -64,6 +72,7 @@ export type ProjectDialogAction =
   | "dismissExport"
   | "dismissProjectCloseFailure"
   | "dismissProjectOperationFailure"
+  | "dismissImageProcessingProblems"
   | "retryExport"
   | "saveAndClose";
 

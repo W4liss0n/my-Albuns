@@ -336,8 +336,8 @@ function projectCorePortWithApply(
       impact: { sheetWidthPx: 7_087, pageWidthPx: 3_543, heightPx: 3_543 },
     }),
     apply,
-    applyWithOutcome: async (intent) => ({
-      projection: await apply(intent),
+    applyWithOutcome: async (intent, publish) => ({
+      projection: await apply(intent, publish),
       affectedFrameId: "frame-001",
       affectedSheetId: null,
     }),
@@ -704,7 +704,7 @@ test("routes implicit menu and explicit context actions to their intended Sheets
       kind: "addSheet",
       anchorSheetId: "sheet-002",
       position: "after",
-    }),
+    }, expect.any(Function)),
   );
 
   act(() =>
@@ -725,7 +725,7 @@ test("routes implicit menu and explicit context actions to their intended Sheets
     expect(applyWithOutcome).toHaveBeenLastCalledWith({
       kind: "deleteSheet",
       sheetId: "sheet-003",
-    }),
+    }, expect.any(Function)),
   );
   expect(
     screen.queryByRole("menu", { name: "Ações da Lâmina 03" }),
@@ -874,7 +874,7 @@ test("routes Delete to the centered Sheet and guards text entry, Edit Mode, and 
     expect(applyWithOutcome).toHaveBeenCalledWith({
       kind: "deleteSheet",
       sheetId: "sheet-002",
-    }),
+    }, expect.any(Function)),
   );
 
   const media = screen.getByRole("button", { name: /Campo\.jpg/ });
@@ -1097,7 +1097,7 @@ test.each(queuedHistoryStructuralCases)(
       expect(applyWithOutcome).not.toHaveBeenCalled();
     } else {
       expect(applyWithOutcome).toHaveBeenCalledOnce();
-      expect(applyWithOutcome).toHaveBeenCalledWith(intent);
+      expect(applyWithOutcome).toHaveBeenCalledWith(intent, expect.any(Function));
     }
     expect(dialog.present).not.toHaveBeenCalledWith(
       expect.objectContaining({ kind: "projectOperationFailure" }),
@@ -1135,7 +1135,7 @@ test("routes implicit and explicit empty-edge conversions to their intended Shee
     expect(applyWithOutcome).toHaveBeenCalledWith({
       kind: "convertEdgeSheet",
       sheetId: "sheet-003",
-    }),
+    }, expect.any(Function)),
   );
 
   act(() =>
@@ -1156,7 +1156,7 @@ test("routes implicit and explicit empty-edge conversions to their intended Shee
   expect(applyWithOutcome).toHaveBeenLastCalledWith({
     kind: "convertEdgeSheet",
     sheetId: "sheet-003",
-  });
+  }, expect.any(Function));
 });
 
 test("commits one valid Grade reorder and keeps structural controls inert in Sheet Edit Mode", async () => {
@@ -1189,7 +1189,7 @@ test("commits one valid Grade reorder and keeps structural controls inert in She
       kind: "reorderSheet",
       sheetId: "sheet-001",
       targetIndex: 1,
-    }),
+    }, expect.any(Function)),
   );
   expect(applyWithOutcome).toHaveBeenCalledOnce();
 
@@ -1255,7 +1255,7 @@ test("previews a Bar reorder locally while the Grade stays confirmed, then commi
       kind: "reorderSheet",
       sheetId: "sheet-001",
       targetIndex: 1,
-    }),
+    }, expect.any(Function)),
   );
   expect(applyWithOutcome).toHaveBeenCalledOnce();
 });
@@ -2603,7 +2603,7 @@ test("edits and applies the complete Album design draft as one intent", async ()
           widthUm: 1_250,
         },
       },
-    }),
+    }, expect.any(Function)),
   );
 });
 
@@ -3220,7 +3220,7 @@ test("maps Borda zero to none and a positive value back to solid", async () => {
         ...projectionWithBorder.state.album.visualDefaults,
         frameBorder: { kind: "none" },
       },
-    }),
+    }, expect.any(Function)),
   );
 
   view.rerender(
@@ -3248,7 +3248,7 @@ test("maps Borda zero to none and a positive value back to solid", async () => {
           widthUm: 1_250,
         },
       },
-    }),
+    }, expect.any(Function)),
   );
 });
 
@@ -3515,7 +3515,7 @@ test("confirms and applies Album information as one authoritative Project change
       firstSheet: "double",
       lastSheet: "double",
     },
-  });
+  }, expect.any(Function));
   expect(onProjectionChange).toHaveBeenCalledWith(changedProjection);
 
   view.rerender(
@@ -4229,7 +4229,7 @@ test("materializes an Album Design draft over the projection produced by a pendi
         overlay: afterUndo.state.album.visualDefaults.overlay,
         frameBorder: afterUndo.state.album.visualDefaults.frameBorder,
       },
-    }),
+    }, expect.any(Function)),
   );
 });
 
@@ -4275,7 +4275,7 @@ test("applies an Album Design draft over its captured baseline when pending Undo
         overlay: projection.state.album.visualDefaults.overlay,
         frameBorder: projection.state.album.visualDefaults.frameBorder,
       },
-    }),
+    }, expect.any(Function)),
   );
 });
 
@@ -4368,7 +4368,7 @@ test("materializes an Album Information draft over the projection produced by a 
         firstSheet: "double",
         lastSheet: "double",
       },
-    }),
+    }, expect.any(Function)),
   );
 });
 
@@ -4436,7 +4436,7 @@ test("applies an Album Information draft over its captured baseline when pending
         firstSheet: "double",
         lastSheet: "double",
       },
-    }),
+    }, expect.any(Function)),
   );
 });
 
@@ -4639,7 +4639,7 @@ test("updates a stale Album Information summary and requires reconfirmation afte
         firstSheet: "double",
         lastSheet: "double",
       },
-    }),
+    }, expect.any(Function)),
   );
 });
 
@@ -4749,7 +4749,7 @@ test("makes Salvar como a terminal barrier after an accepted deferred import", a
   });
 
   fireEvent.click(screen.getByRole("button", { name: "Importar" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivo JPEG…" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos JPEG…" }));
   await waitFor(() => expect(importPhoto).toHaveBeenCalledOnce());
 
   fireEvent.click(
@@ -4763,7 +4763,7 @@ test("makes Salvar como a terminal barrier after an accepted deferred import", a
   await waitFor(() =>
     expect(screen.getByRole("menuitem", { name: "Arquivo" })).toBeDisabled(),
   );
-  expect(screen.getByRole("button", { name: "Importar" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Processando…" })).toBeDisabled();
 
   fireEvent.keyDown(document, { key: "Escape" });
   expect(
@@ -4781,9 +4781,9 @@ test("makes Salvar como a terminal barrier after an accepted deferred import", a
 
   await act(async () => {
     resolveImport({
-      kind: "imported",
+      kind: "completed",
       projection: importedProjection,
-      mediaId: "media-imported",
+      mediaIds: ["media-imported"], importedCount: 1, problems: [],
     });
     await pendingImport;
   });
@@ -5271,6 +5271,7 @@ test("offers retry only for an unavailable occurrence and keeps Relink exclusive
   const projectCorePort: ProjectCorePort = {
     ...projectCorePortWithApply(async () => projection),
     relink,
+    load: async () => relinkedProjection,
   };
   const onProjectionChange = vi.fn();
   const onRetryUnavailableMedia = vi.fn(async () => undefined);
@@ -5328,8 +5329,8 @@ test("offers retry only for an unavailable occurrence and keeps Relink exclusive
     screen.getByRole("button", { name: /Tentar novamente o arquivo de/i }),
   );
 
-  await waitFor(() => expect(relink).toHaveBeenCalledWith("media-001"));
-  expect(onRetryUnavailableMedia).toHaveBeenCalledWith("media-002");
+  await waitFor(() => expect(relink).toHaveBeenCalledWith("media-001", expect.any(Function)));
+  expect(onRetryUnavailableMedia).toHaveBeenCalledWith("media-002", expect.any(Function));
   expect(onProjectionChange).toHaveBeenLastCalledWith(relinkedProjection);
 });
 
@@ -5413,27 +5414,61 @@ test("preloads imported Decoratives for Album design before they are used", asyn
   );
 });
 
-test("resizes media cards without restarting Panel demand observers", () => {
+test("remeasures Panel demand on card resize and retires obsolete observers", () => {
+  const onMediaDemandChange = vi.fn();
   render(
     <ProjectWorkspace
       exportPort={exportPort}
       projection={projection}
       projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      onMediaDemandChange={onMediaDemandChange}
       onProjectionChange={() => undefined}
     />,
   );
 
+  const grid = screen.getByRole("group", { name: "Grade de Fotos" });
+  Object.defineProperties(grid, {
+    clientWidth: { value: 202 },
+    clientHeight: { value: 84 },
+  });
+  Object.assign(grid.style, { padding: "0px", rowGap: "0px", columnGap: "0px" });
+  fireEvent.scroll(grid);
+  expect(onMediaDemandChange).toHaveBeenLastCalledWith({
+    visibleMediaIds: ["media-002", "media-003"],
+    preloadMediaIds: ["media-001"],
+  });
+
+  const previousObservers = [...observedViewports];
   const observerCount = observedViewports.length;
   fireEvent.click(
     screen.getByRole("button", { name: "Filtro, ordem e tamanho" }),
   );
+  expect(observerCount).toBe(2);
+  expect(observedViewports).toHaveLength(observerCount);
   fireEvent.change(
     screen.getByRole("slider", { name: "Tamanho das miniaturas" }),
     { target: { value: "124" } },
   );
 
-  expect(observerCount).toBe(2);
-  expect(observedViewports).toHaveLength(observerCount);
+  expect(onMediaDemandChange).toHaveBeenLastCalledWith({
+    visibleMediaIds: ["media-002"],
+    preloadMediaIds: ["media-003", "media-001"],
+  });
+  expect(previousObservers.every(({ targets }) => targets.size === 0)).toBe(true);
+  expect(observedViewports.filter(({ targets }) => targets.size > 0)).toHaveLength(2);
+
+  onMediaDemandChange.mockClear();
+  act(() => {
+    previousObservers.forEach(({ callback }) => callback([], {} as IntersectionObserver));
+  });
+  expect(onMediaDemandChange).not.toHaveBeenCalled();
+
+  grid.scrollTop = 124;
+  fireEvent.scroll(grid);
+  expect(onMediaDemandChange).toHaveBeenLastCalledWith({
+    visibleMediaIds: ["media-003"],
+    preloadMediaIds: ["media-002", "media-001"],
+  });
 });
 
 test("shares one Decorative Cache preview across Panel, Canvas, and Grade", () => {
@@ -5827,7 +5862,7 @@ test("commits a slider zoom once without flashing a global busy state", async ()
     deltaPanX: 0,
     deltaPanY: 0,
     deltaZoom: 0.25,
-  });
+  }, expect.any(Function));
   expect(screen.queryByText("Aplicando alteração")).not.toBeInTheDocument();
   expect(exportButton).toBeEnabled();
 
@@ -5992,7 +6027,7 @@ test("does not let an old Project completion clear a new slider draft", async ()
     deltaPanX: 0,
     deltaPanY: 0,
     deltaZoom: 0.3,
-  });
+  }, expect.any(Function));
 });
 
 test("uses the Canvas-centered sheet for a media double click", () => {
@@ -6019,7 +6054,7 @@ test("uses the Canvas-centered sheet for a media double click", () => {
     sheetId: "sheet-002",
     mediaId: "media-002",
     mode: "normal",
-  });
+  }, expect.any(Function));
 });
 
 test("imports a JPEG through the Host boundary without inserting it automatically", async () => {
@@ -6046,9 +6081,9 @@ test("imports a JPEG through the Host boundary without inserting it automaticall
   };
   const port = projectCorePortWithApply(async () => projection);
   const importPhoto = vi.fn(async () => ({
-    kind: "imported" as const,
+    kind: "completed" as const,
     projection: importedProjection,
-    mediaId: "media-imported",
+    mediaIds: ["media-imported"], importedCount: 1, problems: [],
   }));
   port.importPhoto = importPhoto;
   const applyWithOutcome = vi.fn(port.applyWithOutcome);
@@ -6065,19 +6100,91 @@ test("imports a JPEG through the Host boundary without inserting it automaticall
   );
 
   fireEvent.click(screen.getByRole("button", { name: "Importar" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivo JPEG…" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos JPEG…" }));
 
   await waitFor(() => expect(importPhoto).toHaveBeenCalledOnce());
   expect(onProjectionChange).toHaveBeenCalledWith(importedProjection);
   expect(applyWithOutcome).not.toHaveBeenCalled();
 });
 
+test.each(["completed", "cancelled", "failed"] as const)("shows photo import progress after selection and releases it on %s", async (outcome) => {
+  const port = projectCorePortWithApply(async () => projection);
+  let progress: Parameters<ProjectCorePort["importPhoto"]>[0] = () => undefined;
+  let resolve!: (result: Awaited<ReturnType<ProjectCorePort["importPhoto"]>>) => void;
+  let reject!: (error: Error) => void;
+  port.importPhoto = vi.fn<ProjectCorePort["importPhoto"]>((onProgress) => {
+    progress = onProgress;
+    return new Promise((yes, no) => { resolve = yes; reject = no; });
+  });
+  const dialogs = projectDialogHarness();
+  render(<ProjectWorkspace exportPipelinePort={exportPipelinePort}
+    projection={projection} projectCorePort={port} projectDialogPort={dialogs.port}
+    onProjectionChange={() => undefined} />);
+  fireEvent.click(screen.getByRole("button", { name: "Importar" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos JPEG…" }));
+  await waitFor(() => expect(port.importPhoto).toHaveBeenCalledOnce());
+  expect(dialogs.present).not.toHaveBeenCalled();
+  if (outcome !== "cancelled") {
+    act(() => progress?.({ completedFiles: 0, totalFiles: 12 }));
+    await waitFor(() => expect(dialogs.present).toHaveBeenCalledWith({
+      kind: "imageProcessingProgress",
+      progress: { kind: "determinate", completed: 0, total: 12, status: "0 de 12" },
+    }));
+    act(() => progress({ completedFiles: 5, totalFiles: 12 }));
+    await waitFor(() => expect(dialogs.present).toHaveBeenLastCalledWith({
+      kind: "imageProcessingProgress",
+      progress: { kind: "determinate", completed: 5, total: 12, status: "5 de 12" },
+    }));
+  }
+  await act(async () => {
+    if (outcome === "failed") reject(new Error("Falha na importação."));
+    else if (outcome === "cancelled") resolve({ kind: "cancelled", projection });
+    else resolve({ kind: "completed", projection, mediaIds: ["media-002"], importedCount: 12, problems: [] });
+  });
+  if (outcome === "cancelled") expect(dialogs.present).not.toHaveBeenCalled();
+  else {
+    await waitFor(() => expect(dialogs.dismiss).toHaveBeenCalled());
+    if (outcome === "completed") {
+      expect(dialogs.present).toHaveBeenCalledTimes(2);
+      expect(screen.queryByText("12 Fotos importadas.")).not.toBeInTheDocument();
+    } else {
+      expect(dialogs.present).toHaveBeenLastCalledWith({ kind: "projectOperationFailure", message: "Falha na importação." });
+      expect(dialogs.dismiss.mock.invocationCallOrder[0]).toBeLessThan(dialogs.present.mock.invocationCallOrder[dialogs.present.mock.calls.length - 1]);
+    }
+  }
+});
+
+test.each([0, 12])("completes import with %i new Photos without a success dialog or toolbar status text", async (importedCount) => {
+  const port = projectCorePortWithApply(async () => projection);
+  port.importPhoto = vi.fn(async () => ({
+    kind: "completed" as const,
+    projection,
+    mediaIds: ["media-002"], importedCount, problems: [],
+  }));
+  const dialogs = projectDialogHarness();
+  render(
+    <ProjectWorkspace
+      exportPipelinePort={exportPipelinePort}
+      projection={projection}
+      projectCorePort={port}
+      projectDialogPort={dialogs.port}
+      onProjectionChange={() => undefined}
+    />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Importar" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos JPEG…" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Importar" })).toBeEnabled());
+  expect(port.importPhoto).toHaveBeenCalledOnce();
+  expect(dialogs.present).not.toHaveBeenCalled();
+  expect(screen.queryByText("12 Fotos importadas.")).not.toBeInTheDocument();
+});
+
 test("reimporting a JPEG selects its existing card without a creative mutation", async () => {
   const port = projectCorePortWithApply(async () => projection);
   const importPhoto = vi.fn(async () => ({
-    kind: "selected" as const,
+    kind: "completed" as const,
     projection,
-    mediaId: "media-002",
+    mediaIds: ["media-002"], importedCount: 0, problems: [],
   }));
   port.importPhoto = importPhoto;
   const applyWithOutcome = vi.fn(port.applyWithOutcome);
@@ -6094,7 +6201,7 @@ test("reimporting a JPEG selects its existing card without a creative mutation",
   );
 
   fireEvent.click(screen.getByRole("button", { name: "Importar" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivo JPEG…" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos JPEG…" }));
 
   await waitFor(() => expect(importPhoto).toHaveBeenCalledOnce());
   const existingPhoto = screen.getByRole("button", { name: "Campo.jpg" });
@@ -6148,7 +6255,7 @@ test("resolves a mode-free target while dropping a Photo in the current Canvas m
     xUm: 25_000,
     yUm: 30_000,
     mode: "normal",
-  });
+  }, expect.any(Function));
   expect(useEditorView.getState().selectedFrameId).toBe("frame-001");
 
   act(() => canvasHarness.props?.onEditSheet?.("sheet-001"));
@@ -6261,7 +6368,7 @@ test("forwards simultaneous Canvas Pan and Zoom as one intent", () => {
     deltaPanX: 0.35,
     deltaPanY: -0.2,
     deltaZoom: 0.12,
-  });
+  }, expect.any(Function));
 });
 
 test("serializes Project mutations so projections cannot arrive out of order", async () => {
@@ -6322,4 +6429,58 @@ test("serializes Project mutations so projections cannot arrive out of order", a
   });
 
   expect(onProjectionChange).toHaveBeenLastCalledWith(secondProjection);
+});
+
+
+test.each([0, 2])("presents photo import rejections after committing %i valid files", async (importedCount) => {
+  const dialog = projectDialogHarness();
+  const port = projectCorePortWithApply(async () => projection);
+  const problems = [{ fileName: "corrompida.jpg", reason: "JPEG corrompido" }];
+  port.importPhoto = vi.fn(async () => ({
+    kind: "completed" as const, projection, mediaIds: importedCount ? ["media-002"] : [],
+    importedCount, problems,
+  }));
+  const onProjectionChange = vi.fn();
+  render(<ProjectWorkspace exportPipelinePort={exportPipelinePort} projection={projection}
+    projectCorePort={port} projectDialogPort={dialog.port} onProjectionChange={onProjectionChange} />);
+  fireEvent.click(screen.getByRole("button", { name: "Importar" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos JPEG…" }));
+  await waitFor(() => expect(dialog.present).toHaveBeenCalledWith({
+    kind: "imageProcessingProblems", importedCount, problems,
+  }));
+  expect(onProjectionChange).toHaveBeenCalledExactlyOnceWith(projection);
+  act(() => dialog.emit("dismissImageProcessingProblems"));
+  await waitFor(() => expect(dialog.dismiss).toHaveBeenCalled());
+  expect(onProjectionChange).toHaveBeenCalledOnce();
+});
+
+
+test("preserves partial import problems after dismissing a queued Save failure", async () => {
+  type ImportResult = Awaited<ReturnType<ProjectCorePort["importPhoto"]>>;
+  let resolveImport!: (value: ImportResult) => void;
+  const pendingImport = new Promise<ImportResult>((resolve) => { resolveImport = resolve; });
+  const dialog = projectDialogHarness();
+  const port = projectCorePortWithApply(async () => projection);
+  port.importPhoto = vi.fn(() => pendingImport);
+  port.save = vi.fn(async () => { throw new Error("Não foi possível salvar"); });
+  const problems = [{ fileName: "corrompida.jpg", reason: "JPEG corrompido" }];
+  render(<ProjectWorkspace exportPipelinePort={exportPipelinePort} projection={projection}
+    projectCorePort={port} projectDialogPort={dialog.port} onProjectionChange={vi.fn()} />);
+  fireEvent.click(screen.getByRole("button", { name: "Importar" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos JPEG…" }));
+  fireEvent.keyDown(window, { ctrlKey: true, key: "s" });
+  expect(port.save).not.toHaveBeenCalled();
+  await act(async () => {
+    resolveImport({ kind: "completed", projection, mediaIds: ["media-002"], importedCount: 1, problems });
+    await pendingImport;
+  });
+  await waitFor(() => expect(dialog.present).toHaveBeenLastCalledWith({
+    kind: "projectOperationFailure", message: "Não foi possível salvar",
+  }));
+  act(() => dialog.emit("dismissProjectOperationFailure"));
+  await waitFor(() => expect(dialog.present).toHaveBeenLastCalledWith({
+    kind: "imageProcessingProblems", importedCount: 1, problems,
+  }));
+  act(() => dialog.emit("dismissImageProcessingProblems"));
+  expect(port.save).toHaveBeenCalledOnce();
 });

@@ -2,7 +2,7 @@
 status: ready-for-agent
 document: product-spec
 implementation-readiness: decision-tickets-required
-updated: 2026-09-01
+updated: 2026-09-05
 ---
 
 # Programa de Diagramação de Álbuns
@@ -549,6 +549,11 @@ validação das superfícies descritas nesta seção.
 - `Cancelar` é a única ação opcional e só aparece quando a operação suporta interrupção segura; operações não canceláveis não mostram esse botão.
 - A janela não apresenta tabela por Projeto, múltiplas barras, lista de trabalhos simultâneos ou histórico item a item.
 - A janela de progresso nunca se transforma em resumo: sucesso integral a fecha e mostra uma confirmação curta; ignorados ou falhas abrem a Tela de Problemas com Projeto, Resultado e ações.
+- O processamento de imagens é compartilhado por importação, Religação, nova tentativa de leitura e ações de edição ou Histórico que introduzam ou passem a usar outra imagem. Cada ação aguarda a validação da origem e a preparação completa de sua representação no Cache; uma representação válida é reutilizada. O progresso usa o título `Processando Imagens` e a contagem `X de Y`, sem separar leitura e Cache em etapas visíveis. O contador avança apenas quando o processamento de cada imagem termina, com sucesso ou problema reportado.
+- Sucesso integral no processamento de imagens fecha diretamente o progresso, sem diálogo de finalização nem mensagem ao lado de Importar. Isso também vale quando todas as Fotos selecionadas já estão vinculadas. Arquivos rejeitados e falhas na preparação das prévias abrem a Tela de Problemas com Arquivo e Motivo. Uma falha de Cache não desfaz o vínculo de uma imagem válida. Ações pendentes, inclusive Salvar e Fechar, aguardam o término do processamento.
+- Na importação, novos cartões e contagens do Painel de imagens aparecem juntos somente ao terminar o lote inteiro. O conjunto anterior permanece visível durante a ação, e notificações do Monitor de Arquivos não antecipam espaços vazios na grade.
+- Alterações automáticas de uma origem em segundo plano não abrem esse diálogo. A última prévia permanece visível enquanto a nova representação é preparada, sem autorizar o reuso dos pixels antigos como imagem atual; a troca ocorre quando a sucessora está pronta.
+- A escolha de imagens decorativas em Novo Projeto também aguarda a validação completa e a prévia provisória em memória. Como ainda não há identidade de Projeto nessa etapa, o Cache definitivo é preparado pelo Host durante a criação, antes de liberar o editor; a prévia provisória não substitui a revalidação do Original.
 - A Janela do Projeto possui uma barra de menus superior com os grupos iniciais `Arquivo`, `Editar`, `Lâmina`, `Exibir`, `Ferramentas` e `Ajuda`.
 - `Lâmina` oferece `Adicionar antes`, `Adicionar depois`, `Duplicar Lâmina`, `Excluir` e `Converter extremidade`, usando a Lâmina mais centralizada como alvo.
 - Os mesmos comandos aparecem no menu de contexto da superfície ou Barra de uma Lâmina e usam o item clicado como alvo explícito. Abrir, fechar, cancelar com `Esc` ou dispensar o menu preserva a Lâmina centralizada, a seleção e a Transformação da visualização; somente o sucesso de um comando cuja regra própria determine centralização pode navegar. A conversão só é habilitada em uma extremidade válida.
@@ -955,7 +960,7 @@ validação das superfícies descritas nesta seção.
 - O baseline do spike para a pasta é `metadata.json` e `Media`, com uma representação reduzida por mídia e sem tiles ou previews de Lâmina persistidas em disco. Se as cenas e o Zoom representativos demonstrarem insuficiência, o relatório do spike revisa esse contrato antes da implementação ampla.
 - `metadata.json` é descartável e registra versão do schema, Identidade do Projeto, último uso e, por mídia, dimensões, formato, orientação EXIF, tamanho, datas, quantidade de páginas quando aplicável, perfil de cor básico e fingerprint.
 - Cada representação registra também uma versão de suas regras e uma geração única. Versão incompatível invalida a entrada.
-- Um único componente é o proprietário lógico dos jobs, índice, gerações, invalidação, pausa e manutenção do Cache. Fora de manutenção, um único Processador de Imagens atua como adaptador escritor de cada namespace. Cada job usa `.tmp` próprio, revalida que pedido, fingerprint e variante continuam atuais e descarta resultados obsoletos.
+- Um único componente é o proprietário lógico dos jobs, índice, gerações, invalidação, pausa e manutenção do Cache. Fora de manutenção, até dois Processadores de Imagens preparam mídias simultaneamente por Projeto, compartilhando o limite entre ações do usuário e miniaturas em segundo plano. Cada job usa `.tmp` e geração próprios, revalida que pedido, fingerprint e variante continuam atuais e descarta resultados obsoletos. A publicação do índice é serializada; a recuperação aguarda todos os escritores anteriores. A Exportação conserva acesso exclusivo à capacidade de processamento.
 - O artefato imutável é publicado antes de `metadata.json`; o índice serializado referencia a mesma geração e é substituído por último. Temporários e gerações não referenciadas ou antigas sem consumidores são descartados depois de reinício ou novo acesso.
 - Ao abrir ou acessar uma mídia, diferenças de tamanho ou data de alteração invalidam somente sua entrada. Evento do watcher, retorno de Arquivo ausente ou indisponível, Religação, schema incompatível ou artefato inválido também provocam regeneração localizada.
 - A abertura comum não recalcula o hash completo de todos os originais. É aceito o risco raro de uma alteração realizada enquanto o aplicativo está fechado conservar exatamente tamanho e data e não ser percebida.

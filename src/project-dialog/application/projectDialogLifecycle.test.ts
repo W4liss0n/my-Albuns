@@ -7,6 +7,7 @@ test.each<{
   expected: ReturnType<typeof defaultProjectDialogCloseAction>;
   state: ProjectDialogState;
 }>([
+  { expected: null, state: { kind: "imageProcessingProgress", progress: { kind: "determinate", completed: 5, total: 12, status: "5 de 12" } } },
   {
     expected: "cancelAlbumInformation",
     state: {
@@ -35,6 +36,7 @@ test.each<{
     expected: "dismissProjectCloseFailure",
     state: { kind: "projectCloseFailure", message: "Falhou" },
   },
+  { expected: "dismissImageProcessingProblems", state: { kind: "imageProcessingProblems", importedCount: 0, problems: [] } },
   {
     expected: "dismissProjectOperationFailure",
     state: { kind: "projectOperationFailure", message: "Falhou" },

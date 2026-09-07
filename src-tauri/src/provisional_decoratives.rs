@@ -8,14 +8,16 @@ use myalbuns_paths::{
     ExpectedObject, NativePathDto, OperationPathContext, ResolveError, RootBindingPlan,
 };
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Runtime, State, UriSchemeContext, UriSchemeResponder, WebviewWindow};
+use tauri::{
+    AppHandle, Manager, Runtime, State, UriSchemeContext, UriSchemeResponder, WebviewWindow,
+};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 
 use crate::{
     global_runtime::GLOBAL_WINDOW_LABEL,
     opaque_image_protocol::{
-        ImagePayload, ImageReadError, ImageRequestError, opaque_image_url, read_image,
-        respond_to_opaque_image_request, serve_opaque_image, sniff_image,
+        ImagePayload, ImageReadError, ImageRequestError, opaque_image_url,
+        respond_to_opaque_image_request, serve_opaque_image,
     },
     project_bootstrap::{
         InitialBackground, InitialBackgroundContent, InitialDocumentConfiguration,
@@ -30,6 +32,7 @@ pub(crate) const PREVIEW_PROTOCOL_SCHEME: &str = "myalbuns-preview";
 struct ProvisionalDecorativeSource {
     native_path: NativePathDto,
     root_bindings: RootBindingPlan,
+    preview: Arc<ImagePayload>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -206,7 +209,8 @@ impl ProvisionalDecorativeRegistry {
         let readable = resolved
             .reopen_for_read()
             .map_err(|_| ProvisionalDecorativeError::ReadFailed)?;
-        sniff_image(&readable).map_err(map_image_read_error)?;
+        let preview = crate::image_processing::prepare_provisional_image(readable)
+            .map_err(map_image_read_error)?;
         let display_name = path
             .file_name()
             .map(|name| name.to_string_lossy().into_owned())
@@ -221,6 +225,7 @@ impl ProvisionalDecorativeRegistry {
                 ProvisionalDecorativeSource {
                     native_path: NativePathDto::from(path),
                     root_bindings: path_context.freeze(),
+                    preview: Arc::new(preview),
                 },
             );
         Ok(Some(ProvisionalDecorativeSelection {
@@ -313,7 +318,7 @@ impl ProvisionalDecorativeRegistry {
             .get(selection_id)
             .cloned()
             .ok_or(ProvisionalDecorativeError::UnknownSelection)?;
-        read_source(&source, false)?;
+        validate_source(&source)?;
         let native_path = source.native_path;
         resolved_paths.insert(selection_id.to_owned(), native_path.clone());
         Ok(native_path)
@@ -354,14 +359,14 @@ impl ProvisionalDecorativeRegistry {
                     .get(selection_id)
                     .cloned()
                     .ok_or(ImageRequestError::NotFound)?;
-                read_source(&source, include_body).map_err(|error| match error {
-                    ProvisionalDecorativeError::UnsupportedImage => {
-                        ImageRequestError::UnsupportedImage
-                    }
-                    ProvisionalDecorativeError::UnknownSelection
-                    | ProvisionalDecorativeError::InvalidPath
-                    | ProvisionalDecorativeError::Unavailable
-                    | ProvisionalDecorativeError::ReadFailed => ImageRequestError::NotFound,
+                Ok(ImagePayload {
+                    format: source.preview.format,
+                    source_bytes: source.preview.source_bytes,
+                    body: if include_body {
+                        source.preview.body.clone()
+                    } else {
+                        Vec::new()
+                    },
                 })
             },
         )
@@ -410,11 +415,27 @@ pub(crate) async fn choose_provisional_decorative(
     let FilePath::Path(path) = selection else {
         return Err(ProvisionalDecorativeFailure::invalid_selection());
     };
+    let profile = app
+        .state::<myalbuns_paths::AppPaths>()
+        .webview_data_directory(crate::global_runtime::GLOBAL_WEBVIEW_NAMESPACE)
+        .map_err(|_| ProvisionalDecorativeFailure::dialog_unavailable())?;
+    let progress = crate::native_dialog_window::show_native_progress(
+        &app,
+        GLOBAL_WINDOW_LABEL,
+        crate::native_dialog_window::NativeProgressKind::ProcessingImages,
+        &profile,
+    )
+    .await
+    .map_err(|_| ProvisionalDecorativeFailure::dialog_unavailable())?;
     let registry = registry.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || registry.register_dialog_selection(Some(path)))
-        .await
-        .map_err(|_| ProvisionalDecorativeFailure::dialog_unavailable())?
-        .map_err(ProvisionalDecorativeFailure::from_registration)
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        registry.register_dialog_selection(Some(path))
+    })
+    .await
+    .map_err(|_| ProvisionalDecorativeFailure::dialog_unavailable())?
+    .map_err(ProvisionalDecorativeFailure::from_registration);
+    progress.finish(true);
+    result
 }
 
 #[tauri::command]
@@ -450,10 +471,7 @@ pub(crate) fn respond_to_preview_request<R: Runtime>(
     );
 }
 
-fn read_source(
-    source: &ProvisionalDecorativeSource,
-    include_body: bool,
-) -> Result<ImagePayload, ProvisionalDecorativeError> {
+fn validate_source(source: &ProvisionalDecorativeSource) -> Result<(), ProvisionalDecorativeError> {
     let resolved = source
         .root_bindings
         .resolve_existing(source.native_path.as_path(), ExpectedObject::RegularFile)
@@ -461,7 +479,9 @@ fn read_source(
     let readable = resolved
         .reopen_for_read()
         .map_err(|_| ProvisionalDecorativeError::ReadFailed)?;
-    read_image(readable, include_body).map_err(map_image_read_error)
+    crate::image_processing::prepare_provisional_image(readable)
+        .map(|_| ())
+        .map_err(map_image_read_error)
 }
 
 fn map_image_read_error(error: ImageReadError) -> ProvisionalDecorativeError {
@@ -498,8 +518,25 @@ mod tests {
 
     use super::*;
 
-    const PNG_BYTES: &[u8] = b"\x89PNG\r\n\x1a\npreview";
-    const JPEG_BYTES: &[u8] = b"\xff\xd8\xffpreview\xff\xd9";
+    fn encoded_fixture(format: image::ImageFormat) -> Vec<u8> {
+        let mut bytes = std::io::Cursor::new(Vec::new());
+        image::RgbImage::from_pixel(3, 2, image::Rgb([20, 60, 120]))
+            .write_to(&mut bytes, format)
+            .unwrap();
+        bytes.into_inner()
+    }
+
+    fn png_bytes() -> &'static [u8] {
+        static BYTES: std::sync::LazyLock<Vec<u8>> =
+            std::sync::LazyLock::new(|| encoded_fixture(image::ImageFormat::Png));
+        &BYTES
+    }
+
+    fn jpeg_bytes() -> &'static [u8] {
+        static BYTES: std::sync::LazyLock<Vec<u8>> =
+            std::sync::LazyLock::new(|| encoded_fixture(image::ImageFormat::Jpeg));
+        &BYTES
+    }
 
     fn write_source(directory: &Path, name: &str, bytes: &[u8]) -> std::path::PathBuf {
         let path = directory.join(name);
@@ -523,7 +560,7 @@ mod tests {
             .register_dialog_selection(Some(write_source(
                 directory.path(),
                 "Background.png",
-                PNG_BYTES,
+                png_bytes(),
             )))
             .expect("a selected image is registered")
             .expect("the picker returned one image");
@@ -542,7 +579,7 @@ mod tests {
     #[test]
     fn creation_resolution_replaces_tokens_with_reversible_paths_without_consuming_them() {
         let directory = tempfile::tempdir().expect("temporary linked image directory");
-        let source_path = write_source(directory.path(), "Background.png", PNG_BYTES);
+        let source_path = write_source(directory.path(), "Background.png", png_bytes());
         let registry = ProvisionalDecorativeRegistry::default();
         let selected = registry
             .register_dialog_selection(Some(source_path.clone()))
@@ -640,7 +677,7 @@ mod tests {
             .register_dialog_selection(Some(write_source(
                 directory.path(),
                 "Árvore.png",
-                PNG_BYTES,
+                png_bytes(),
             )))
             .expect("a selected image is registered")
             .expect("the picker returned one image");
@@ -670,7 +707,7 @@ mod tests {
             .register_dialog_selection(Some(write_source(
                 directory.path(),
                 "Overlay.png",
-                PNG_BYTES,
+                png_bytes(),
             )))
             .expect("PNG selection is accepted")
             .expect("PNG was selected");
@@ -678,7 +715,7 @@ mod tests {
             .register_dialog_selection(Some(write_source(
                 directory.path(),
                 "Background.jpg",
-                JPEG_BYTES,
+                jpeg_bytes(),
             )))
             .expect("JPEG selection is accepted")
             .expect("JPEG was selected");
@@ -690,7 +727,7 @@ mod tests {
             registry.serve(GLOBAL_WINDOW_LABEL, request(Method::GET, &png.preview_url));
         assert_eq!(png_response.status(), StatusCode::OK);
         assert_eq!(png_response.headers()["content-type"], "image/png");
-        assert_eq!(png_response.body(), PNG_BYTES);
+        assert_eq!(png_response.body(), png_bytes());
 
         let jpeg_response = registry.serve(
             GLOBAL_WINDOW_LABEL,
@@ -702,7 +739,7 @@ mod tests {
             jpeg_response.headers()["content-length"]
                 .to_str()
                 .expect("content length is textual"),
-            JPEG_BYTES.len().to_string()
+            jpeg_bytes().len().to_string()
         );
         assert!(jpeg_response.body().is_empty());
         assert_eq!(
@@ -722,7 +759,7 @@ mod tests {
             .register_dialog_selection(Some(write_source(
                 directory.path(),
                 "Background.png",
-                PNG_BYTES,
+                png_bytes(),
             )))
             .expect("selection is accepted")
             .expect("an image was selected");
@@ -772,14 +809,18 @@ mod tests {
         let directory = tempfile::tempdir().expect("temporary linked image directory");
         let registry = ProvisionalDecorativeRegistry::default();
         let first = registry
-            .register_dialog_selection(Some(write_source(directory.path(), "First.png", PNG_BYTES)))
+            .register_dialog_selection(Some(write_source(
+                directory.path(),
+                "First.png",
+                png_bytes(),
+            )))
             .expect("first selection is accepted")
             .expect("first image was selected");
         let second = registry
             .register_dialog_selection(Some(write_source(
                 directory.path(),
                 "Second.jpg",
-                JPEG_BYTES,
+                jpeg_bytes(),
             )))
             .expect("second selection is accepted")
             .expect("second image was selected");
@@ -811,6 +852,47 @@ mod tests {
 
         assert_eq!(error, ProvisionalDecorativeError::UnsupportedImage);
         assert_eq!(registry.len(), 0);
+    }
+
+    #[test]
+    fn incomplete_pixels_never_authorize_a_provisional_selection() {
+        let directory = tempfile::tempdir().unwrap();
+        let registry = ProvisionalDecorativeRegistry::default();
+        let selected = write_source(directory.path(), "Incomplete.png", &png_bytes()[..33]);
+        assert_eq!(
+            registry.register_dialog_selection(Some(selected)),
+            Err(ProvisionalDecorativeError::UnsupportedImage)
+        );
+        assert_eq!(registry.len(), 0);
+    }
+
+    #[test]
+    fn prepared_preview_survives_source_changes_but_creation_revalidates_the_original() {
+        let directory = tempfile::tempdir().unwrap();
+        let registry = ProvisionalDecorativeRegistry::default();
+        let path = write_source(directory.path(), "Selected.png", png_bytes());
+        let selection = registry
+            .register_dialog_selection(Some(path.clone()))
+            .unwrap()
+            .unwrap();
+        fs::write(path, b"corrupted after selection").unwrap();
+        let preview = registry.serve(
+            GLOBAL_WINDOW_LABEL,
+            request(Method::GET, &selection.preview_url),
+        );
+        assert_eq!(preview.status(), StatusCode::OK);
+        assert_eq!(preview.body(), png_bytes());
+        let source = registry
+            .selections
+            .lock()
+            .unwrap()
+            .get(&selection.selection_id)
+            .unwrap()
+            .clone();
+        assert_eq!(
+            validate_source(&source),
+            Err(ProvisionalDecorativeError::UnsupportedImage)
+        );
     }
 
     #[test]

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ProjectCorePort } from "../application/projectPorts";
+import type { PrepareImportedMedia } from "../application/mediaPreviews";
 import type { SheetStructureIntent } from "../application/sheetStructure";
 import type { EditorProjection } from "../domain/project";
 import type {
@@ -20,6 +21,7 @@ interface ProjectEditorControllerInput {
   projectCorePort: ProjectCorePort;
   onProjectionChange(projection: EditorProjection): void;
   onSaveAsBarrierChange?(active: boolean): void;
+  prepareImportedMedia?: PrepareImportedMedia;
 }
 
 export function useProjectEditorController({
@@ -29,6 +31,7 @@ export function useProjectEditorController({
   projectCorePort,
   onProjectionChange,
   onSaveAsBarrierChange,
+  prepareImportedMedia,
 }: ProjectEditorControllerInput) {
   const navigation = useProjectNavigation(projection);
   const canvasMode = useMemo<AlbumCanvasMode>(
@@ -82,6 +85,7 @@ export function useProjectEditorController({
     onAffectedFrame: navigation.selectFrame,
     onAffectedSheet: setPendingAffectedSheetId,
     onSaveAsBarrierChange,
+    prepareImportedMedia,
   });
   const selectedFrame = useMemo(
     () =>
@@ -248,6 +252,13 @@ export function useProjectEditorController({
 
   return {
     message: mutations.message,
+    importPending: mutations.importPending,
+    imageProcessingProgress: mutations.imageProcessingProgress,
+    imageProcessingProblems: mutations.imageProcessingProblems,
+    dismissImageProcessingProblems: mutations.dismissImageProcessingProblems,
+    retryUnavailableMedia: mutations.retryUnavailableMedia,
+    photoImportResult: mutations.photoImportResult,
+    dismissPhotoImportResult: mutations.dismissPhotoImportResult,
     selectedFrame,
     selectedComposedPhoto,
     displayedPhotoZoom: photoGestures.displayedPhotoZoom,

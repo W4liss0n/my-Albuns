@@ -20,7 +20,7 @@ use myalbuns_core::{
 };
 use myalbuns_imaging_protocol::{
     CacheArtifactFormat, CacheMediaSource, IMAGING_PROTOCOL_VERSION, ImagingCommand,
-    ImagingResponse, RenderSource, encode_command,
+    ImagingEventStreamDecoder, ImagingResponse, RenderSource, encode_command,
 };
 use myalbuns_paths::{
     AppPaths, ExportPathPlan, ExportWriteAuthorization, OperationPathContext, RootBindingPlan,
@@ -90,6 +90,7 @@ fn export_plan(
 pub(crate) struct RealProcessTransport {
     executable: PathBuf,
     log_directory: PathBuf,
+    data_root: Option<PathBuf>,
     crash_next: CrashNext,
     process_ids: Vec<u32>,
     partial_preparation_observed: bool,
@@ -104,6 +105,7 @@ impl RealProcessTransport {
         Self {
             executable,
             log_directory,
+            data_root: None,
             crash_next,
             process_ids: Vec::new(),
             partial_preparation_observed: false,
@@ -116,6 +118,12 @@ impl RealProcessTransport {
 
     pub(crate) fn stable(executable: PathBuf, log_directory: PathBuf) -> Self {
         Self::new(executable, log_directory, CrashNext::Never)
+    }
+
+    pub(crate) fn in_data_root(executable: PathBuf, root: PathBuf) -> Self {
+        let mut transport = Self::stable(executable, root.join("logs"));
+        transport.data_root = Some(root);
+        transport
     }
 
     fn stable_with_barrier_and_probe(
@@ -152,6 +160,14 @@ impl RealProcessTransport {
         if let Some(barrier) = &self.progressive_decode_barrier {
             process.env("MYALBUNS_TEST_PROGRESSIVE_DECODE_BARRIER", barrier);
         }
+        if let Some(root) = &self.data_root {
+            process.env("MYALBUNS_PROCESS_GATE_DATA_ROOT", root);
+        }
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            process.creation_flags(windows_sys::Win32::System::Threading::CREATE_NO_WINDOW);
+        }
         let mut child = process.spawn().map_err(|error| {
             InvocationFailure::at_stage(
                 InvocationFailureStage::SpawnSidecar,
@@ -160,6 +176,29 @@ impl RealProcessTransport {
             )
         })?;
         let process_id = child.id();
+        // A typed import completion can exceed a pipe buffer. Drain both streams
+        // while the child runs, just as the production transport does.
+        let mut stdout = child.stdout.take().expect("captured stdout");
+        let mut stderr = child.stderr.take().expect("captured stderr");
+        let (progress_sender, progress_chunks) = std::sync::mpsc::channel();
+        let stdout = thread::spawn(move || {
+            let mut bytes = Vec::new();
+            let mut chunk = [0_u8; 8192];
+            loop {
+                let count = stdout.read(&mut chunk).unwrap();
+                if count == 0 {
+                    break;
+                }
+                bytes.extend_from_slice(&chunk[..count]);
+                let _ = progress_sender.send(chunk[..count].to_vec());
+            }
+            bytes
+        });
+        let stderr = thread::spawn(move || {
+            let mut bytes = Vec::new();
+            stderr.read_to_end(&mut bytes).unwrap();
+            bytes
+        });
         self.process_ids.push(process_id);
         if let Some(started_process_id) = &self.started_process_id {
             started_process_id.store(process_id, Ordering::Release);
@@ -201,22 +240,35 @@ impl RealProcessTransport {
             child
                 .kill()
                 .expect("the real imaging process can be terminated");
-            let output = child
-                .wait_with_output()
-                .expect("the terminated real process is reaped");
+            let status = child.wait().expect("the terminated real process is reaped");
+            let output = stdout.join().expect("the output reader completes");
+            let _ = stderr.join().expect("the error reader completes");
             if let ImagingCommand::BuildCache(request) = command {
                 self.cache_metadata_existed_after_failure =
                     request.cache_paths.metadata_file().exists();
             }
-            return complete_invocation(process_id, output.status.code(), &output.stdout);
+            return complete_invocation(process_id, status.code(), &output);
         }
 
+        let mut decoder = ImagingEventStreamDecoder::new();
+        let mut report_progress = || {
+            for chunk in progress_chunks.try_iter() {
+                if let Ok(events) = decoder.push(&chunk) {
+                    for event in events {
+                        control.report(event);
+                    }
+                }
+            }
+        };
         loop {
+            report_progress();
             if control.is_cancelled() {
                 let _ = child.kill();
-                let _output = child
-                    .wait_with_output()
+                let _ = child
+                    .wait()
                     .expect("the cancelled real imaging process is reaped");
+                let _ = stdout.join().expect("the output reader completes");
+                let _ = stderr.join().expect("the error reader completes");
                 self.cancelled_process_reaped = true;
                 return Err(InvocationFailure::cancelled(process_id));
             }
@@ -225,10 +277,11 @@ impl RealProcessTransport {
                 .expect("the real imaging process remains observable")
                 .is_some()
             {
-                let output = child
-                    .wait_with_output()
-                    .expect("the real imaging process exits");
-                return complete_invocation(process_id, output.status.code(), &output.stdout);
+                let status = child.wait().expect("the real imaging process exits");
+                let output = stdout.join().expect("the output reader completes");
+                let _ = stderr.join().expect("the error reader completes");
+                report_progress();
+                return complete_invocation(process_id, status.code(), &output);
             }
             thread::sleep(Duration::from_millis(5));
         }
@@ -264,6 +317,19 @@ fn partial_path(command: &ImagingCommand, process_id: u32) -> Option<PathBuf> {
                 .ok()
         }
         ImagingCommand::Render(request) => Some(request.prepared_output_path().to_path_buf()),
+        ImagingCommand::PreparePhotoImport(request) => {
+            let candidate = request.candidates.first()?;
+            request
+                .cache_paths
+                .import_preview_temporary_file(
+                    &request.attempt_id,
+                    candidate.source_id.as_str(),
+                    &candidate.generation_id,
+                    CacheArtifactFormat::Jpeg,
+                    process_id,
+                )
+                .ok()
+        }
     }
 }
 

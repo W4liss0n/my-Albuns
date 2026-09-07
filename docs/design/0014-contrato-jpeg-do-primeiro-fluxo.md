@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-08-03
-updated: 2026-09-01
+updated: 2026-09-05
 ---
 
 # Contrato JPEG do primeiro fluxo
@@ -109,16 +109,23 @@ A matriz de entrada é:
 
 Na redução de 16 para 8 bits, cada canal inteiro usa `floor((valor16 + 128) / 257)`. Isso fixa a entrada do compositor, mas não promete um pipeline interno profissional de 16 bits. A orientação EXIF de um JPEG é aplicada fisicamente uma única vez durante a decodificação, e a saída não recebe tag Orientation.
 
+O marcador Adobe APP14 usa os primeiros 12 bytes para declarar a transformação
+de cor; dados adicionais depois desse cabeçalho são aceitos e ignorados. Cabeçalho
+incompleto, marcador Adobe duplicado e transformações incompatíveis continuam
+recusados. Isso permite as extensões emitidas por exportadores Adobe sem alterar
+a interpretação dos pixels.
+
 A política temporária de cor é estrita:
 
 - qualquer modelo aceito sem perfil ICC é assumido como sRGB após a normalização definida acima;
 - fonte com perfil ICC só é aceita quando os bytes correspondem a uma entrada da allowlist controlada;
 - a allowlist inicial contém exatamente os três perfis sRGB atuais distribuídos pelo ICC: `sRGB2014.icc` v2 (`3.024` bytes, SHA-256 `384b832de3412066743b52a75ee906b6fb9fb8d9e09e936fc2c43223815c6e0a`), `sRGB_v4_ICC_preference.icc` (`60.960` bytes, SHA-256 `83174717332326ddc198d9df188a4daec27b8979ba152cebbfc470c793d0bb11`) e `sRGB_v4_ICC_preference_displayclass.icc` (`60.988` bytes, SHA-256 `f54b145a18e4b12112750e672f1c79cac9347dc8403da3955e7f74a352816a21`);
+- desde 2026-09-05, a allowlist também reconhece o perfil HP/Microsoft `sRGB IEC61966-2.1` distribuído no Windows como `sRGB Color Space Profile.icm`: exatamente `3.144` bytes e SHA-256 `2b3aa1645779a9e634744faf9b01e9102b0c9b88fd6deced7934df86b949af7e`. O reconhecimento compara tamanho e digest do perfil inteiro, sem confiar no nome ou no perfil instalado na máquina;
 - Adobe RGB, Display P3, perfil desconhecido, perfil malformado ou combinação contraditória de declarações de cor recebem `UnsupportedColorProfile`;
 - CMYK, YCCK e demais modelos recusados permanecem `UnsupportedColorModel`, tenham ou não ICC;
 - acrescentar outra entrada comprovadamente sRGB exige fixture e digest explícitos, mas não altera o Arquivo de Projeto.
 
-Os três perfis da allowlist são incorporados ao aplicativo sem alteração, conforme os [termos e a distribuição publicados pelo ICC](https://registry.color.org/rgb-registry/srgbprofiles). A saída sempre incorpora `sRGB2014.icc` v2; os dois perfis v4 servem apenas para reconhecer entradas sRGB. Esta fase não executa transformação ICC: os pixels aceitos já são tratados como sRGB. O raster mantém alfa durante a composição de Overlay e termina obrigatoriamente em sRGB RGBA8 com alfa `255` em todos os pixels; alfa residual recebe `CompositionFailed` antes do encoder.
+Os três perfis distribuídos pelo ICC são incorporados ao aplicativo sem alteração, conforme os [termos e a distribuição publicados pelo ICC](https://registry.color.org/rgb-registry/srgbprofiles). O perfil HP/Microsoft é reconhecido somente pelo tamanho e digest fixados acima, sem redistribuí-lo. A fixture dos testes Windows lê a cópia fornecida pelo sistema e exige essa mesma identidade; uma versão diferente falha explicitamente. A Microsoft documenta esse arquivo como [perfil padrão para dispositivos que produzem sRGB](https://learn.microsoft.com/en-us/windows-hardware/drivers/image/color-management-for-still-image-devices). A saída sempre incorpora `sRGB2014.icc` v2; as demais entradas servem apenas para reconhecer fontes sRGB. Esta fase não executa transformação ICC: os pixels aceitos já são tratados como sRGB. O raster mantém alfa durante a composição de Overlay e termina obrigatoriamente em sRGB RGBA8 com alfa `255` em todos os pixels; alfa residual recebe `CompositionFailed` antes do encoder.
 
 ## Arquivo JPEG
 

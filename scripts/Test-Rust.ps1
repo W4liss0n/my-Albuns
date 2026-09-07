@@ -36,12 +36,33 @@ try {
         exit $LASTEXITCODE
     }
 
-    $env:MYALBUNS_TEST_IMAGING_PROCESSOR = Join-Path `
+    # Desktop builds copy the packaged sidecar into debug/. Preserve the debug
+    # Processor before a later desktop build can replace it with a release one,
+    # which intentionally ignores the integration tests' isolated data root.
+    $testProcessorDirectory = Join-Path $cargoTargetDirectory 'integration-test-processor'
+    New-Item -ItemType Directory -Force -Path $testProcessorDirectory | Out-Null
+    $testProcessorSource = Join-Path `
         $cargoTargetDirectory `
         'debug\myalbuns-imaging.exe'
+    $env:MYALBUNS_TEST_IMAGING_PROCESSOR = Join-Path `
+        $testProcessorDirectory `
+        'myalbuns-imaging.exe'
+    Copy-Item -LiteralPath $testProcessorSource `
+        -Destination $env:MYALBUNS_TEST_IMAGING_PROCESSOR -Force
     & $script:CargoExecutable test `
         -p myalbuns-desktop `
         'project_host::tests::reopened_project_exports_the_frozen_visible_sheet_through_the_real_processor' `
+        -- `
+        --ignored `
+        --exact `
+        --test-threads=1
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+
+    & $script:CargoExecutable test `
+        -p myalbuns-desktop `
+        'photo_import::native_flow_tests::real_import_flow' `
         -- `
         --ignored `
         --exact `

@@ -1,14 +1,39 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     io::BufReader,
     path::PathBuf,
     sync::{Arc, Mutex},
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use image::{ImageDecoder, ImageFormat, ImageReader, metadata::Orientation};
+use image::{DynamicImage, ImageDecoder, ImageFormat, ImageReader, metadata::Orientation};
 use myalbuns_core::{ImportPhoto, MediaKind, PhotoSourceMetadata};
-use myalbuns_paths::{ExpectedObject, OperationPathContext, PhysicalFileIdentity, ResolveError};
+use myalbuns_paths::{
+    ExpectedObject, OperationPathContext, PhysicalFileIdentity, ResolveError, RootBindingPlan,
+};
+
+use crate::ipc_contract::ImageProcessingProblem;
+
+#[cfg(test)]
+std::thread_local! {
+    static PHOTO_SOURCE_DECODES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+pub(crate) fn photo_source_decode_count() -> usize {
+    PHOTO_SOURCE_DECODES.get()
+}
+
+pub(crate) struct PhotoImportsProposal {
+    pub(crate) commands: Vec<ImportPhoto>,
+    pub(crate) problems: Vec<ImageProcessingProblem>,
+    pub(crate) inspections: Vec<ImportedPhotoInspection>,
+}
+
+/// A completed decode can be adopted once if the same source is still observed.
+pub(crate) struct ImportedPhotoInspection {
+    pub(crate) observation: MediaObservation,
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct MediaBinding {
@@ -36,6 +61,35 @@ pub(crate) struct MediaObservation {
     source_modified_unix_ms: Option<u64>,
 }
 
+impl MediaObservation {
+    pub(crate) fn same_source(&self, current: &Self) -> bool {
+        self.availability == MediaAvailability::Candidate
+            && current.availability == MediaAvailability::Candidate
+            && self.physical_identity.is_some()
+            && self.source_modified_unix_ms.is_some()
+            && self.kind == current.kind
+            && self.logical_path == current.logical_path
+            && self.physical_identity == current.physical_identity
+            && self.source_bytes == current.source_bytes
+            && self.source_created_unix_ms == current.source_created_unix_ms
+            && self.source_modified_unix_ms == current.source_modified_unix_ms
+    }
+
+    pub(crate) fn matches_fingerprint(
+        &self,
+        fingerprint: &myalbuns_imaging_protocol::CacheFingerprint,
+    ) -> bool {
+        self.availability == MediaAvailability::Candidate
+            && self.source_bytes == Some(fingerprint.source_bytes)
+            && self.source_created_unix_ms == fingerprint.source_created_unix_ms
+            && self.source_modified_unix_ms == fingerprint.source_modified_unix_ms
+    }
+
+    pub(crate) fn logical_path(&self) -> &std::path::Path {
+        &self.logical_path
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct MediaResolutionProposal {
     generation: u64,
@@ -49,18 +103,6 @@ pub(crate) struct MediaRelinkProposal {
     expected_logical_path: PathBuf,
     replacement_path: PathBuf,
     source_metadata: Option<PhotoSourceMetadata>,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct PhotoImportProposal {
-    path: PathBuf,
-    source_metadata: PhotoSourceMetadata,
-}
-
-impl PhotoImportProposal {
-    pub(crate) fn into_command(self) -> ImportPhoto {
-        ImportPhoto::new(self.path, self.source_metadata)
-    }
 }
 
 impl MediaRelinkProposal {
@@ -86,6 +128,10 @@ impl MediaRelinkProposal {
 }
 
 impl MediaResolutionProposal {
+    pub(crate) fn generation(&self) -> u64 {
+        self.generation
+    }
+
     pub(crate) fn observations(&self) -> &[MediaObservation] {
         &self.observations
     }
@@ -203,17 +249,124 @@ impl std::error::Error for MediaRetryError {}
 pub(crate) struct MediaResolver;
 
 impl MediaResolver {
-    pub(crate) fn propose_photo_import(
+    #[cfg(test)]
+    pub(crate) fn propose_photo_imports(
         &self,
-        path: PathBuf,
-    ) -> Result<PhotoImportProposal, String> {
-        let source_metadata = inspect_media_source(&path, true)?;
-        Ok(PhotoImportProposal {
-            path,
-            source_metadata,
-        })
+        paths: Vec<PathBuf>,
+        bindings: &[MediaBinding],
+        on_progress: impl FnMut(crate::ipc_contract::ImageProcessingProgress),
+    ) -> PhotoImportsProposal {
+        let existing = bindings
+            .iter()
+            .filter(|binding| binding.kind == MediaKind::Photo)
+            .map(|binding| binding.logical_path.as_path())
+            .collect::<HashSet<_>>();
+        let mut context = OperationPathContext::new();
+        for path in &paths {
+            if !existing.contains(path.as_path()) {
+                // An unbound or invalid candidate is reported by the shared inspector;
+                // one failed root must not discard other valid selections.
+                let _ = context.capture(path);
+            }
+        }
+        self.propose_photo_imports_in_plan(paths, bindings, &context.freeze(), on_progress)
     }
 
+    pub(crate) fn propose_photo_imports_in_plan(
+        &self,
+        paths: Vec<PathBuf>,
+        bindings: &[MediaBinding],
+        plan: &RootBindingPlan,
+        mut on_progress: impl FnMut(crate::ipc_contract::ImageProcessingProgress),
+    ) -> PhotoImportsProposal {
+        let existing = bindings
+            .iter()
+            .filter(|binding| binding.kind == MediaKind::Photo)
+            .map(|binding| binding.logical_path.as_path())
+            .collect::<HashSet<_>>();
+        let mut seen = HashSet::new();
+        let paths = paths
+            .into_iter()
+            .filter(|path| seen.insert(path.clone()))
+            .collect::<Vec<_>>();
+        let total_files = paths.len() as u32;
+        on_progress(crate::ipc_contract::ImageProcessingProgress {
+            completed_files: 0,
+            total_files,
+            problem: None,
+        });
+        let candidates = paths
+            .into_iter()
+            .map(|path| {
+                let capture = if existing.contains(path.as_path()) || plan.covers(&path) {
+                    Ok(())
+                } else {
+                    Err("O caminho escolhido não está disponível no plano da tentativa.".into())
+                };
+                (path, capture)
+            })
+            .collect::<Vec<_>>();
+        let inspected = inspect_photo_candidates(
+            candidates,
+            |(path, capture)| {
+                if existing.contains(path.as_path()) {
+                    return Ok((ImportPhoto::select_existing(path), None));
+                }
+                capture
+                    .and_then(|()| {
+                        let binding = MediaBinding {
+                            media_id: String::new(),
+                            kind: MediaKind::Photo,
+                            logical_path: path.clone(),
+                        };
+                        let before = self.observe_in_plan(plan, &binding);
+                        let metadata = inspect_media_source_in_plan(plan, &path, true)?;
+                        let after = self.observe_in_plan(plan, &binding);
+                        if !before.same_source(&after) {
+                            return Err("O Original mudou durante a inspeção.".into());
+                        }
+                        Ok((
+                            ImportPhoto::new(path.clone(), metadata),
+                            Some(ImportedPhotoInspection { observation: after }),
+                        ))
+                    })
+                    .map_err(|reason| ImageProcessingProblem {
+                        file_name: path
+                            .file_name()
+                            .unwrap_or_default()
+                            .to_string_lossy()
+                            .into_owned(),
+                        reason,
+                    })
+            },
+            |completed_files| {
+                on_progress(crate::ipc_contract::ImageProcessingProgress {
+                    completed_files,
+                    total_files,
+                    problem: None,
+                })
+            },
+        );
+        let mut commands = Vec::new();
+        let mut problems = Vec::new();
+        let mut inspections = Vec::new();
+        for result in inspected {
+            match result {
+                Ok((command, inspection)) => {
+                    commands.push(command);
+                    inspections.extend(inspection);
+                }
+                Err(problem) => problems.push(problem),
+            }
+        }
+        PhotoImportsProposal {
+            commands,
+            problems,
+            inspections,
+        }
+    }
+
+    #[cfg(test)]
     pub(crate) fn inspect_photo_binding(
         &self,
         binding: &MediaBinding,
@@ -222,6 +375,17 @@ impl MediaResolver {
             return Err("A ocorrência escolhida não é uma Foto.".into());
         }
         inspect_media_source(&binding.logical_path, false)
+    }
+
+    pub(crate) fn inspect_photo_binding_in_plan(
+        &self,
+        binding: &MediaBinding,
+        plan: &RootBindingPlan,
+    ) -> Result<PhotoSourceMetadata, String> {
+        if binding.kind != MediaKind::Photo {
+            return Err("A ocorrência escolhida não é uma Foto.".into());
+        }
+        inspect_media_source_in_plan(plan, &binding.logical_path, false)
     }
 
     pub(crate) fn propose_relink(
@@ -256,53 +420,12 @@ impl MediaResolver {
         let observations = bindings
             .iter()
             .map(|binding| {
-                let (
-                    availability,
-                    physical_identity,
-                    source_bytes,
-                    source_created_unix_ms,
-                    source_modified_unix_ms,
-                ) = if let Some(availability) =
-                    capture_failures.get(binding.media_id.as_str()).copied()
-                {
-                    (availability, None, None, None, None)
+                let resolved = if capture_failures.contains_key(binding.media_id.as_str()) {
+                    Err(ResolveError::Unavailable)
                 } else {
-                    match plan.resolve_existing(&binding.logical_path, ExpectedObject::RegularFile)
-                    {
-                        Ok(resolved) => match resolved.file().metadata() {
-                            Ok(metadata) => (
-                                MediaAvailability::Candidate,
-                                resolved.physical_identity(),
-                                Some(metadata.len()),
-                                file_time_millis(metadata.created()),
-                                file_time_millis(metadata.modified()),
-                            ),
-                            Err(_) => (MediaAvailability::Unavailable, None, None, None, None),
-                        },
-                        Err(ResolveError::NotFound) => {
-                            (MediaAvailability::Absent, None, None, None, None)
-                        }
-                        Err(
-                            ResolveError::InvalidPath
-                            | ResolveError::UnsupportedNamespace
-                            | ResolveError::UnboundRoot
-                            | ResolveError::AccessDenied
-                            | ResolveError::Unavailable
-                            | ResolveError::UnexpectedObjectType { .. }
-                            | ResolveError::IoFailure,
-                        ) => (MediaAvailability::Unavailable, None, None, None, None),
-                    }
+                    plan.resolve_existing(&binding.logical_path, ExpectedObject::RegularFile)
                 };
-                MediaObservation {
-                    media_id: binding.media_id.clone(),
-                    kind: binding.kind,
-                    logical_path: binding.logical_path.clone(),
-                    availability,
-                    physical_identity,
-                    source_bytes,
-                    source_created_unix_ms,
-                    source_modified_unix_ms,
-                }
+                observe_resolved_source(binding, resolved)
             })
             .collect();
         MediaResolutionProposal {
@@ -310,6 +433,112 @@ impl MediaResolver {
             observations,
         }
     }
+
+    pub(crate) fn observe_in_plan(
+        &self,
+        plan: &RootBindingPlan,
+        binding: &MediaBinding,
+    ) -> MediaObservation {
+        observe_resolved_source(
+            binding,
+            plan.resolve_existing(&binding.logical_path, ExpectedObject::RegularFile),
+        )
+    }
+}
+
+fn observe_resolved_source(
+    binding: &MediaBinding,
+    resolved: Result<myalbuns_paths::ResolvedObject, ResolveError>,
+) -> MediaObservation {
+    let (
+        availability,
+        physical_identity,
+        source_bytes,
+        source_created_unix_ms,
+        source_modified_unix_ms,
+    ) = match resolved {
+        Ok(resolved) => match resolved.file().metadata() {
+            Ok(metadata) => (
+                MediaAvailability::Candidate,
+                resolved.physical_identity(),
+                Some(metadata.len()),
+                file_time_millis(metadata.created()),
+                file_time_millis(metadata.modified()),
+            ),
+            Err(_) => (MediaAvailability::Unavailable, None, None, None, None),
+        },
+        Err(ResolveError::NotFound) => (MediaAvailability::Absent, None, None, None, None),
+        Err(
+            ResolveError::InvalidPath
+            | ResolveError::UnsupportedNamespace
+            | ResolveError::UnboundRoot
+            | ResolveError::AccessDenied
+            | ResolveError::Unavailable
+            | ResolveError::UnexpectedObjectType { .. }
+            | ResolveError::IoFailure,
+        ) => (MediaAvailability::Unavailable, None, None, None, None),
+    };
+    MediaObservation {
+        media_id: binding.media_id.clone(),
+        kind: binding.kind,
+        logical_path: binding.logical_path.clone(),
+        availability,
+        physical_identity,
+        source_bytes,
+        source_created_unix_ms,
+        source_modified_unix_ms,
+    }
+}
+
+/// Inspection can finish out of order; the proposal preserves the user's
+/// selection order so the eventual single creative command stays deterministic.
+fn inspect_photo_candidates<T: Send, R: Send>(
+    candidates: Vec<T>,
+    inspect: impl Fn(T) -> R + Sync,
+    mut completed: impl FnMut(u32),
+) -> Vec<R> {
+    let total = candidates.len();
+    if total <= 1 {
+        return candidates
+            .into_iter()
+            .map(|candidate| {
+                let result = inspect(candidate);
+                completed(1);
+                result
+            })
+            .collect();
+    }
+    let candidates = Mutex::new(candidates.into_iter().enumerate());
+    let (sender, receiver) = std::sync::mpsc::channel();
+    std::thread::scope(|scope| {
+        for _ in 0..total.min(crate::imaging_processor::IMAGE_PROCESSING_CONCURRENCY) {
+            let candidates = &candidates;
+            let inspect = &inspect;
+            let sender = sender.clone();
+            scope.spawn(move || {
+                loop {
+                    let Some((index, candidate)) = candidates
+                        .lock()
+                        .expect("the photo inspection queue is healthy")
+                        .next()
+                    else {
+                        break;
+                    };
+                    if sender.send((index, inspect(candidate))).is_err() {
+                        break;
+                    }
+                }
+            });
+        }
+        drop(sender);
+        let mut results = Vec::with_capacity(total);
+        for result in receiver {
+            results.push(result);
+            completed(results.len() as u32);
+        }
+        results.sort_unstable_by_key(|(index, _)| *index);
+        results.into_iter().map(|(_, result)| result).collect()
+    })
 }
 
 fn inspect_media_source(
@@ -320,7 +549,14 @@ fn inspect_media_source(
     context
         .capture(path)
         .map_err(|error| format!("O caminho escolhido é inválido: {error}"))?;
-    let plan = context.freeze();
+    inspect_media_source_in_plan(&context.freeze(), path, require_jpeg)
+}
+
+fn inspect_media_source_in_plan(
+    plan: &RootBindingPlan,
+    path: &std::path::Path,
+    require_jpeg: bool,
+) -> Result<PhotoSourceMetadata, String> {
     let resolved = plan
         .resolve_existing(path, ExpectedObject::RegularFile)
         .map_err(|error| format!("O Arquivo escolhido não está disponível: {error}"))?;
@@ -361,6 +597,15 @@ fn inspect_media_source(
     ) {
         std::mem::swap(&mut width, &mut height);
     }
+    #[cfg(test)]
+    PHOTO_SOURCE_DECODES.set(PHOTO_SOURCE_DECODES.get() + 1);
+    DynamicImage::from_decoder(decoder).map_err(|_| {
+        if require_jpeg {
+            "O JPEG está corrompido ou não pôde ser decodificado.".to_string()
+        } else {
+            "A imagem está corrompida ou não pôde ser decodificada.".to_string()
+        }
+    })?;
     PhotoSourceMetadata::new(
         width,
         height,
@@ -498,6 +743,99 @@ struct MediaMonitorTransition {
 }
 
 impl MediaMonitor {
+    /// Image preparation or startup cache recovery already owns source evidence.
+    /// Adopt only evidence whose
+    /// exact binding and current source still match, without stabilizing the
+    /// entire catalog again or decoding the Original in the Monitor.
+    pub(crate) fn adopt_prepared_inspections(
+        &self,
+        runtime: &MediaRuntime,
+        bindings: &[MediaBinding],
+        plan: &RootBindingPlan,
+        inspections: &[MediaObservation],
+    ) -> MediaMonitorPoll {
+        let mut transition = self
+            .transition
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let current = runtime.snapshot();
+        let evidence = inspections
+            .iter()
+            .map(|observation| (observation.media_id.as_str(), observation))
+            .collect::<HashMap<_, _>>();
+        let mut merged = current
+            .as_ref()
+            .map(|current| {
+                current
+                    .observations
+                    .iter()
+                    .map(|observation| (observation.media_id.clone(), observation.clone()))
+                    .collect::<HashMap<_, _>>()
+            })
+            .unwrap_or_default();
+        let mut adopted = false;
+        for binding in bindings {
+            let Some(expected) = evidence.get(binding.media_id.as_str()) else {
+                continue;
+            };
+            if binding.kind != expected.kind || binding.logical_path != expected.logical_path {
+                continue;
+            }
+            let observed = self.resolver.observe_in_plan(plan, binding);
+            if expected.same_source(&observed) {
+                adopted = true;
+                merged.insert(binding.media_id.clone(), observed);
+            }
+        }
+        let update = adopted.then(|| {
+            let generation = next_observation_generation(
+                &mut transition,
+                current.as_ref().map(|current| current.generation),
+            );
+            let observations = bindings
+                .iter()
+                .filter_map(|binding| merged.remove(&binding.media_id))
+                .collect();
+            transition.pending = None;
+            runtime.apply(MediaResolutionProposal {
+                generation,
+                observations,
+            })
+        });
+        MediaMonitorPoll {
+            confirmed_observation: runtime.snapshot(),
+            update,
+        }
+    }
+
+    /// Stabilization is owned here; foreground callers only supply the frozen
+    /// path plan and consume updates. Import evidence uses the explicit path above.
+    pub(crate) fn synchronize_processing(
+        &self,
+        runtime: &MediaRuntime,
+        bindings: &[MediaBinding],
+        plan: &RootBindingPlan,
+    ) -> Vec<MediaMonitorPoll> {
+        (0..2)
+            .map(|_| self.poll_in_plan(runtime, bindings, plan))
+            .collect()
+    }
+
+    pub(crate) fn poll_in_plan(
+        &self,
+        runtime: &MediaRuntime,
+        bindings: &[MediaBinding],
+        plan: &RootBindingPlan,
+    ) -> MediaMonitorPoll {
+        self.poll_with_observation(runtime, |generation| MediaResolutionProposal {
+            generation,
+            observations: bindings
+                .iter()
+                .map(|binding| self.resolver.observe_in_plan(plan, binding))
+                .collect(),
+        })
+    }
+
     pub(crate) fn retry_unavailable(
         &self,
         runtime: &MediaRuntime,
@@ -546,10 +884,21 @@ impl MediaMonitor {
         })
     }
 
+    #[cfg(test)]
     pub(crate) fn poll(
         &self,
         runtime: &MediaRuntime,
         bindings: &[MediaBinding],
+    ) -> MediaMonitorPoll {
+        self.poll_with_observation(runtime, |generation| {
+            self.resolver.observe(generation, bindings)
+        })
+    }
+
+    fn poll_with_observation(
+        &self,
+        runtime: &MediaRuntime,
+        observe: impl FnOnce(u64) -> MediaResolutionProposal,
     ) -> MediaMonitorPoll {
         // A poll owns observation, stability classification and Runtime adoption as
         // one transition. The background loop and demand commands cannot reorder
@@ -563,7 +912,7 @@ impl MediaMonitor {
             &mut transition,
             current.as_ref().map(|current| current.generation),
         );
-        let proposal = self.resolver.observe(generation, bindings);
+        let proposal = observe(generation);
         let update = match current {
             Some(current) if current.observations == proposal.observations => {
                 transition.pending = None;
@@ -620,6 +969,83 @@ fn file_time_millis(time: std::io::Result<SystemTime>) -> Option<u64> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn import_adoption_requires_current_evidence_and_leaves_other_bindings_untouched() {
+        use myalbuns_paths::OperationPathContext;
+        let root = tempfile::tempdir().unwrap();
+        let paths = [
+            root.path().join("existing.jpg"),
+            root.path().join("imported.jpg"),
+            root.path().join("changed.jpg"),
+        ];
+        let bindings = paths
+            .iter()
+            .enumerate()
+            .map(|(index, path)| {
+                std::fs::write(path, b"original").unwrap();
+                MediaBinding {
+                    media_id: format!("photo-{index}"),
+                    kind: MediaKind::Photo,
+                    logical_path: path.clone(),
+                }
+            })
+            .collect::<Vec<_>>();
+        let mut context = OperationPathContext::new();
+        for path in &paths {
+            context.capture(path).unwrap();
+        }
+        let roots = context.freeze();
+        let runtime = MediaRuntime::default();
+        let monitor = MediaMonitor::default();
+        runtime.apply(MediaResolver.observe(1, &bindings[..1]));
+        let observations = bindings[1..]
+            .iter()
+            .map(|binding| MediaResolver.observe_in_plan(&roots, binding))
+            .collect::<Vec<_>>();
+        std::fs::write(&paths[2], b"changed after decode").unwrap();
+        let before = super::photo_source_decode_count();
+        let poll = monitor.adopt_prepared_inspections(&runtime, &bindings, &roots, &observations);
+        assert_eq!(super::photo_source_decode_count(), before);
+        assert_eq!(poll.update().unwrap().changed_media_ids(), &["photo-1"]);
+        let current = poll.confirmed_observation().unwrap();
+        assert_eq!(
+            current
+                .observations()
+                .iter()
+                .map(|value| value.media_id.as_str())
+                .collect::<Vec<_>>(),
+            ["photo-0", "photo-1"]
+        );
+        assert!(
+            monitor.poll(&runtime, &bindings).update().is_none(),
+            "unproven changes still need ordinary stabilization"
+        );
+    }
+
+    #[test]
+    fn photo_inspections_overlap_with_two_workers_and_preserve_selection_order() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let active = AtomicUsize::new(0);
+        let peak = AtomicUsize::new(0);
+        let first_pair = std::sync::Barrier::new(2);
+        let mut progress = Vec::new();
+        let results = super::inspect_photo_candidates(
+            vec![0, 1, 2, 3, 4],
+            |index| {
+                let count = active.fetch_add(1, Ordering::AcqRel) + 1;
+                peak.fetch_max(count, Ordering::AcqRel);
+                if index < 2 {
+                    first_pair.wait();
+                }
+                active.fetch_sub(1, Ordering::AcqRel);
+                if index == 1 { Err(index) } else { Ok(index) }
+            },
+            |completed| progress.push(completed),
+        );
+        assert_eq!(peak.load(Ordering::Acquire), 2);
+        assert_eq!(results, [Ok(0), Err(1), Ok(2), Ok(3), Ok(4)]);
+        assert_eq!(progress, [1, 2, 3, 4, 5]);
+    }
     use std::{sync::mpsc, time::Duration};
 
     use image::{ImageFormat, Rgb, RgbImage};
@@ -631,6 +1057,77 @@ mod tests {
     };
 
     #[test]
+    fn multiple_photo_import_keeps_valid_files_and_reports_each_rejection() {
+        let root = tempfile::tempdir().unwrap();
+        let good = root.path().join("boa.JPG");
+        let second = root.path().join("segunda.jpeg");
+        let invalid = root.path().join("invalida.jpg");
+        let corrupt = root.path().join("corrompida.jpg");
+        let missing = root.path().join("ausente.jpg");
+        let existing = root.path().join("existente indisponivel.jpg");
+        let original = RgbImage::from_pixel(37, 23, Rgb([20, 80, 160]));
+        original.save_with_format(&good, ImageFormat::Jpeg).unwrap();
+        original
+            .save_with_format(&second, ImageFormat::Jpeg)
+            .unwrap();
+        original
+            .save_with_format(&invalid, ImageFormat::Png)
+            .unwrap();
+        let before = std::fs::read(&good).unwrap();
+        let scan = before
+            .windows(2)
+            .position(|bytes| bytes == [0xff, 0xda])
+            .unwrap();
+        std::fs::write(&corrupt, &before[..scan + 2]).unwrap();
+        let mut progress = Vec::new();
+        let result = MediaResolver.propose_photo_imports(
+            vec![
+                good.clone(),
+                invalid,
+                existing.clone(),
+                good.clone(),
+                missing,
+                corrupt,
+                second,
+            ],
+            &[MediaBinding {
+                media_id: "existing".into(),
+                kind: MediaKind::Photo,
+                logical_path: existing,
+            }],
+            |event| progress.push(event),
+        );
+        assert_eq!(
+            progress
+                .iter()
+                .map(|event| (event.completed_files, event.total_files))
+                .collect::<Vec<_>>(),
+            (0..=6).map(|completed| (completed, 6)).collect::<Vec<_>>(),
+            "progress counts unique files, including existing and rejected items"
+        );
+        assert_eq!(
+            result.commands.len(),
+            3,
+            "two new Photos plus one existing selection"
+        );
+        assert_eq!(
+            result
+                .problems
+                .iter()
+                .map(|problem| problem.file_name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["invalida.jpg", "ausente.jpg", "corrompida.jpg"]
+        );
+        assert!(
+            result
+                .problems
+                .iter()
+                .all(|problem| !problem.reason.is_empty())
+        );
+        assert_eq!(std::fs::read(good).unwrap(), before);
+    }
+
+    #[test]
     fn photo_import_accepts_decodable_jpeg_bytes_and_never_rewrites_the_original() {
         let root = tempfile::tempdir().expect("temporary JPEG import fixture");
         let source = root.path().join("Foto externa.jpeg");
@@ -639,15 +1136,11 @@ mod tests {
             .expect("the external JPEG is writable");
         let before = std::fs::read(&source).expect("the Original is readable before import");
 
-        let proposal = MediaResolver
-            .propose_photo_import(source.clone())
-            .expect("a decodable JPEG is accepted through the native import seam");
-
-        assert_eq!(proposal.path, source);
-        assert_eq!(proposal.source_metadata.source_width_px(), 37);
-        assert_eq!(proposal.source_metadata.source_height_px(), 23);
+        let proposal = MediaResolver.propose_photo_imports(vec![source.clone()], &[], |_| {});
+        assert_eq!(proposal.commands.len(), 1);
+        assert!(proposal.problems.is_empty());
         assert_eq!(
-            std::fs::read(&proposal.path).expect("the Original remains readable"),
+            std::fs::read(&source).expect("the Original remains readable"),
             before,
             "import inspection never modifies the linked Original"
         );
@@ -662,11 +1155,9 @@ mod tests {
             .expect("the renamed PNG is writable");
         let before = std::fs::read(&source).expect("the renamed Original is readable");
 
-        let error = MediaResolver
-            .propose_photo_import(source.clone())
-            .expect_err("codec inspection, not the extension, defines JPEG acceptance");
-
-        assert!(error.contains("JPEG válido"));
+        let proposal = MediaResolver.propose_photo_imports(vec![source.clone()], &[], |_| {});
+        assert!(proposal.commands.is_empty());
+        assert!(proposal.problems[0].reason.contains("JPEG válido"));
         assert_eq!(
             std::fs::read(source).expect("the rejected file remains"),
             before

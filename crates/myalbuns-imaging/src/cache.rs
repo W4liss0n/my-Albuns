@@ -1,10 +1,10 @@
 use std::io::{BufReader, BufWriter, Write};
 
 use image::{
-    DynamicImage, ExtendedColorType, GenericImageView, ImageDecoder, ImageEncoder, ImageFormat,
-    ImageReader,
+    DynamicImage, ExtendedColorType, GenericImageView, ImageEncoder,
     codecs::{jpeg::JpegEncoder, png::PngEncoder},
 };
+use myalbuns_imaging::preview::{CachePreviewSpec, SRGB_PROFILE, validate_cache_preview};
 use myalbuns_imaging_protocol::{
     CacheArtifact, CacheArtifactFormat, CacheCompletion, CacheFingerprint, CacheJob, CacheRequest,
     CacheReusableGeneration, ImagingResponse, root_binding_plan_sha256,
@@ -19,8 +19,6 @@ use crate::{
     },
     write_response,
 };
-
-const SRGB_PROFILE: &[u8] = include_bytes!("../assets/sRGB2014.icc");
 
 pub(crate) fn run_cache(request: CacheRequest, app_paths: &AppPaths) -> Result<(), String> {
     let operation_id = safe_log_identifier(&request.request_id);
@@ -169,35 +167,16 @@ fn validate_existing_preview(
     else {
         return Ok(false);
     };
-    if file
-        .metadata()
-        .map_err(|error| format!("representação reduzida inválida: {error}"))?
-        .len()
-        != reusable.preview_bytes
-    {
-        return Ok(false);
-    }
-    let reader = ImageReader::new(BufReader::new(file))
-        .with_guessed_format()
-        .map_err(|error| format!("representação reduzida inválida: {error}"))?;
-    if reader.format() != Some(image_format(reusable.format)) {
-        return Ok(false);
-    }
-    let mut decoder = reader
-        .into_decoder()
-        .map_err(|error| format!("representação reduzida inválida: {error}"))?;
-    if decoder.dimensions() != (reusable.width_px, reusable.height_px)
-        || decoder
-            .icc_profile()
-            .map_err(|error| format!("perfil da representação reduzida inválido: {error}"))?
-            .as_deref()
-            != Some(SRGB_PROFILE)
-    {
-        return Ok(false);
-    }
-    DynamicImage::from_decoder(decoder)
-        .map(|decoded| decoded.dimensions() == (reusable.width_px, reusable.height_px))
-        .map_err(|error| format!("representação reduzida inválida: {error}"))
+    validate_cache_preview(
+        BufReader::new(file),
+        CachePreviewSpec {
+            format: reusable.format,
+            width_px: reusable.width_px,
+            height_px: reusable.height_px,
+            bytes: reusable.preview_bytes,
+        },
+    )
+    .map(|()| true)
 }
 
 fn generate_preview(
@@ -219,33 +198,82 @@ fn generate_preview(
     let exif_orientation = opened.exif_orientation();
     let source_page_count = opened.source_page_count();
     let basic_color_profile = opened.basic_color_profile();
-    let decoded = opened.decode().map_err(|failure| failure.message)?;
+    let decoded = opened.decode_preview().map_err(|failure| failure.message)?;
+    let output = write_preview(
+        storage,
+        request.policy,
+        decoded,
+        |format| {
+            Ok((
+                request
+                    .cache_paths
+                    .preview_temporary_file(
+                        source.media_id(),
+                        &job.candidate_generation_id,
+                        format,
+                        std::process::id(),
+                    )
+                    .map_err(|error| error.to_string())?,
+                request
+                    .cache_paths
+                    .preview_file(source.media_id(), &job.candidate_generation_id, format)
+                    .map_err(|error| error.to_string())?,
+            ))
+        },
+        || {
+            verify_source_fingerprint(
+                source.media_id(),
+                &request.root_bindings,
+                source.source_path(),
+                &fingerprint,
+            )
+        },
+    )?;
+    Ok(CacheArtifact {
+        media_id: source.media_id().to_owned(),
+        generation_id: job.candidate_generation_id.clone(),
+        width_px: output.width_px,
+        height_px: output.height_px,
+        preview_bytes: output.bytes,
+        format: output.format,
+        exif_orientation,
+        source_page_count,
+        basic_color_profile,
+        fingerprint,
+    })
+}
+
+pub(crate) struct PreviewOutput {
+    pub(crate) width_px: u32,
+    pub(crate) height_px: u32,
+    pub(crate) bytes: u64,
+    pub(crate) format: CacheArtifactFormat,
+}
+
+/// Both bound media and not-yet-imported sources use this exact representation
+/// policy. The owner supplies guarded candidate names and source verification.
+pub(crate) fn write_preview(
+    storage: &PreparedCacheStorage,
+    policy: myalbuns_imaging_protocol::CacheRepresentationPolicy,
+    decoded: DynamicImage,
+    paths: impl FnOnce(CacheArtifactFormat) -> Result<(std::path::PathBuf, std::path::PathBuf), String>,
+    verify_source: impl FnOnce() -> Result<(), String>,
+) -> Result<PreviewOutput, String> {
     let (width, height) = decoded.dimensions();
-    let preview = if width > request.policy.max_edge_px || height > request.policy.max_edge_px {
-        DynamicImage::ImageRgba8(decoded)
-            .thumbnail(request.policy.max_edge_px, request.policy.max_edge_px)
-            .to_rgba8()
+    let preview = if width > policy.max_edge_px || height > policy.max_edge_px {
+        decoded.thumbnail(policy.max_edge_px, policy.max_edge_px)
     } else {
         decoded
     };
-    let format = if preview.pixels().any(|pixel| pixel[3] != u8::MAX) {
+    let format = if preview
+        .as_rgba8()
+        .is_some_and(|rgba| rgba.pixels().any(|pixel| pixel[3] != u8::MAX))
+    {
         CacheArtifactFormat::Png
     } else {
         CacheArtifactFormat::Jpeg
     };
-    let preview_path = request
-        .cache_paths
-        .preview_file(source.media_id(), &job.candidate_generation_id, format)
-        .map_err(|error| error.to_string())?;
-    let temporary_path = request
-        .cache_paths
-        .preview_temporary_file(
-            source.media_id(),
-            &job.candidate_generation_id,
-            format,
-            std::process::id(),
-        )
-        .map_err(|error| error.to_string())?;
+    let (temporary_path, preview_path) = paths(format)?;
     let mut publication = storage
         .begin_file_publication(&temporary_path, &preview_path)
         .map_err(|error| format!("não foi possível criar o Cache temporário: {error}"))?;
@@ -253,16 +281,17 @@ fn generate_preview(
         let mut writer = BufWriter::new(&mut publication);
         match format {
             CacheArtifactFormat::Jpeg => {
-                let mut encoder =
-                    JpegEncoder::new_with_quality(&mut writer, request.policy.jpeg_quality);
+                let mut encoder = JpegEncoder::new_with_quality(&mut writer, policy.jpeg_quality);
                 encoder
                     .set_icc_profile(SRGB_PROFILE.to_vec())
                     .map_err(|error| format!("não foi possível incluir o perfil sRGB: {error}"))?;
-                encoder
-                    .encode_image(&DynamicImage::ImageRgba8(preview.clone()).to_rgb8())
-                    .map_err(|error| {
-                        format!("não foi possível codificar a prévia JPEG: {error}")
-                    })?;
+                let result = match &preview {
+                    DynamicImage::ImageRgb8(rgb) => encoder.encode_image(rgb),
+                    _ => encoder.encode_image(&preview),
+                };
+                result.map_err(|error| {
+                    format!("não foi possível codificar a prévia JPEG: {error}")
+                })?;
             }
             CacheArtifactFormat::Png => {
                 let mut encoder = PngEncoder::new(&mut writer);
@@ -271,7 +300,7 @@ fn generate_preview(
                     .map_err(|error| format!("não foi possível incluir o perfil sRGB: {error}"))?;
                 encoder
                     .write_image(
-                        preview.as_raw(),
+                        preview.as_bytes(),
                         preview.width(),
                         preview.height(),
                         ExtendedColorType::Rgba8,
@@ -286,12 +315,7 @@ fn generate_preview(
     let publication = publication
         .sync()
         .map_err(|error| format!("não foi possível sincronizar a prévia: {error}"))?;
-    verify_source_fingerprint(
-        source.media_id(),
-        &request.root_bindings,
-        source.source_path(),
-        &fingerprint,
-    )?;
+    verify_source()?;
     publication
         .publish()
         .map_err(|error| format!("não foi possível publicar a prévia: {error}"))?;
@@ -303,23 +327,10 @@ fn generate_preview(
         .map_err(|error| format!("representação reduzida indisponível: {error}"))?
         .len();
 
-    Ok(CacheArtifact {
-        media_id: source.media_id().to_owned(),
-        generation_id: job.candidate_generation_id.clone(),
+    Ok(PreviewOutput {
         width_px: preview.width(),
         height_px: preview.height(),
-        preview_bytes,
+        bytes: preview_bytes,
         format,
-        exif_orientation,
-        source_page_count,
-        basic_color_profile,
-        fingerprint,
     })
-}
-
-const fn image_format(format: CacheArtifactFormat) -> ImageFormat {
-    match format {
-        CacheArtifactFormat::Jpeg => ImageFormat::Jpeg,
-        CacheArtifactFormat::Png => ImageFormat::Png,
-    }
 }

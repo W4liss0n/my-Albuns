@@ -9,6 +9,20 @@ members = [
 ]
 resolver = "2"
 
+# Pixel loops and codecs must stay responsive in the local desktop build too.
+# Include the Processor because generic image operations are instantiated there.
+[profile.dev.package.myalbuns-imaging]
+opt-level = 3
+
+[profile.dev.package.image]
+opt-level = 3
+
+[profile.dev.package.zune-jpeg]
+opt-level = 3
+
+[profile.dev.package.sha2]
+opt-level = 3
+
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
@@ -42,6 +56,7 @@ windows-sys = { version = "0.61", features = [
     "Win32_System_Ioctl",
     "Win32_System_JobObjects",
     "Win32_System_Pipes",
+    "Win32_System_ProcessStatus",
     "Win32_System_Threading",
     "Win32_UI_WindowsAndMessaging",
 ] }

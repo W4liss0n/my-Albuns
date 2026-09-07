@@ -1,4 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import type { PhotoImportCompletion, ImageProcessingProgress } from "../application/projectPorts";
+import { createLogInstanceId } from "../application/logging";
+import { useImageProcessing } from "./useImageProcessing";
+import type { PrepareImportedMedia } from "../application/mediaPreviews";
 
 import type {
   EditorProjection,
@@ -33,6 +37,7 @@ interface ProjectMutationsInput {
   onAffectedFrame(frameId: string): void;
   onAffectedSheet(sheetId: string): void;
   onSaveAsBarrierChange?(active: boolean): void;
+  prepareImportedMedia?: PrepareImportedMedia;
 }
 
 function messageFromError(error: unknown) {
@@ -46,13 +51,22 @@ export function useProjectMutations({
   onAffectedFrame,
   onAffectedSheet,
   onSaveAsBarrierChange,
+  prepareImportedMedia,
 }: ProjectMutationsInput) {
   const [message, setMessage] = useState<string | null>(null);
+  const [importPending, setImportPending] = useState(false);
+  const imageProcessing = useImageProcessing(projection.state.projectId, runProjectMutation);
+  const importAttemptRef = useRef({ pending: false });
+  const [photoImportResult, setPhotoImportResult] = useState<PhotoImportCompletion | null>(null);
   const feedbackTokenRef = useRef(0);
   const saveAsBarrierRef = useRef(false);
 
   useEffect(() => {
     setMessage(null);
+    importAttemptRef.current = { pending: false };
+    setImportPending(false);
+    setPhotoImportResult(null);
+    return () => { importAttemptRef.current = { pending: false }; };
   }, [runProjectMutation, projection.state.projectId]);
 
   useEffect(() => {
@@ -90,13 +104,14 @@ export function useProjectMutations({
   function applyIntent(intent: ProjectIntent) {
     const capturedProjection = projection;
     return runWithErrorFeedback((port, latestProjection) =>
-      port.apply(
+      imageProcessing.run((publish) => port.apply(
         materializeProjectIntent(
           intent,
           capturedProjection,
           latestProjection ?? capturedProjection,
         ),
-      ),
+        publish,
+      )),
     );
   }
 
@@ -124,7 +139,7 @@ export function useProjectMutations({
           }
           materializedIntent = materializedStructure;
         }
-        const result = await port.applyWithOutcome(materializedIntent);
+        const result = await imageProcessing.run((publish) => port.applyWithOutcome(materializedIntent, publish));
         affectedFrameId = result.affectedFrameId;
         affectedSheetId = result.affectedSheetId;
         return result.projection;
@@ -159,7 +174,7 @@ export function useProjectMutations({
         if (!effectiveProjection.state[availability]) {
           return Promise.resolve(effectiveProjection);
         }
-        return port[operation]();
+        return imageProcessing.run((publish) => port[operation](publish));
       },
       true,
     );
@@ -204,13 +219,14 @@ export function useProjectMutations({
   async function commitInteraction(intent: ProjectIntent) {
     const capturedProjection = projection;
     return commitMutation((port, latestProjection) =>
-      port.apply(
+      imageProcessing.run((publish) => port.apply(
         materializeProjectIntent(
           intent,
           capturedProjection,
           latestProjection ?? capturedProjection,
         ),
-      ),
+        publish,
+      )),
     );
   }
 
@@ -221,7 +237,7 @@ export function useProjectMutations({
       const effectiveProjection = latestProjection ?? projection;
       const materialized = draft.materializeAgainst(effectiveProjection);
       return materialized.changed
-        ? port.apply(materialized.intent)
+        ? imageProcessing.run((publish) => port.apply(materialized.intent, publish))
         : Promise.resolve(effectiveProjection);
     });
   }
@@ -262,7 +278,7 @@ export function useProjectMutations({
           return effectiveProjection;
         }
         applyRequested = true;
-        return port.apply(materialized.intent);
+        return imageProcessing.run((publish) => port.apply(materialized.intent, publish));
       },
     );
 
@@ -304,6 +320,11 @@ export function useProjectMutations({
 
   return {
     message,
+    importPending,
+    imageProcessingProgress: imageProcessing.progress,
+    imageProcessingProblems: imageProcessing.problems,
+    dismissImageProcessingProblems: imageProcessing.dismissProblems,
+    photoImportResult,
     applyIntent,
     commitInteraction,
     applyAlbumInformation: commitAlbumInformation,
@@ -312,15 +333,33 @@ export function useProjectMutations({
     applyWithOutcome,
     applyPhotoWithStatus: applyWithOutcome,
     importPhoto: async () => {
-      let selectedMediaId: string | null = null;
-      const completed = await runWithErrorFeedback(
-        async (port) => {
-          const result = await port.importPhoto();
-          if (result.kind !== "cancelled") selectedMediaId = result.mediaId;
-          return result.projection;
-        },
-      );
-      return completed ? selectedMediaId : null;
+      if (importAttemptRef.current.pending || saveAsBarrierRef.current) return null;
+      const attempt = { pending: true };
+      importAttemptRef.current = attempt;
+      setImportPending(true);
+      setPhotoImportResult(null);
+      let result: PhotoImportCompletion | null = null;
+      try {
+        const completed = await runWithErrorFeedback(async (port) => {
+          const imported = await imageProcessing.run(async (publish) => {
+            const imported = await port.importPhoto(publish);
+            if (imported.kind !== "completed" || imported.mediaIds.length === 0 || !prepareImportedMedia) return imported;
+            const problems = await prepareImportedMedia(imported);
+            return { ...imported, problems: [...imported.problems, ...problems] };
+          });
+          if (imported.kind === "completed") result = imported;
+          return imported.projection;
+        });
+        if (!completed || importAttemptRef.current !== attempt) return null;
+        const completion = result as PhotoImportCompletion | null;
+        setPhotoImportResult(completion);
+        return completion?.mediaIds[completion.mediaIds.length - 1] ?? null;
+      } finally {
+        if (importAttemptRef.current === attempt) {
+          attempt.pending = false;
+          setImportPending(false);
+        }
+      }
     },
     dropPhoto: applyWithOutcome,
     applyDpi: async (dpi: number) => {
@@ -331,14 +370,19 @@ export function useProjectMutations({
     },
     relinkMedia: (mediaId: string) =>
       void runWithErrorFeedback((port) =>
-        port.relink(mediaId),
+        imageProcessing.run((publish) => port.relink(mediaId, publish)),
       ),
+    retryUnavailableMedia: async (retry: (publish: (progress: ImageProcessingProgress) => void) => Promise<void>) => {
+      await runWithErrorFeedback(async (port) => {
+        await imageProcessing.run(retry);
+        return port.load(createLogInstanceId("media-retry"));
+      });
+    },
     save: () => void saveVisibleRevision(),
     saveAs: () => void saveVisibleRevisionAs(),
     undo: () => void runHistoryCommand("canUndo", "undo"),
     redo: () => void runHistoryCommand("canRedo", "redo"),
-    dismissFeedback: () => {
-      setMessage(null);
-    },
+    dismissFeedback: () => setMessage(null),
+    dismissPhotoImportResult: () => setPhotoImportResult(null),
   };
 }

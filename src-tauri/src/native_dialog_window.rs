@@ -205,23 +205,25 @@ pub(crate) fn resolve_opening_external_copy(
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum LaunchProgressKind {
+pub(crate) enum NativeProgressKind {
     Creating,
     Opening,
+    ProcessingImages,
 }
 
-impl LaunchProgressKind {
+impl NativeProgressKind {
     fn url(self) -> &'static str {
         match self {
             Self::Creating => "dialog.html?kind=creating-project",
             Self::Opening => "dialog.html?kind=opening-project",
+            Self::ProcessingImages => "dialog.html?kind=processing-images",
         }
     }
 
     fn owner_presentation(self) -> OwnerPresentation {
         match self {
             Self::Opening => OwnerPresentation::Replace,
-            Self::Creating => OwnerPresentation::BlockedBehindDialog,
+            Self::Creating | Self::ProcessingImages => OwnerPresentation::BlockedBehindDialog,
         }
     }
 }
@@ -256,7 +258,7 @@ impl ProjectFailureDialogContext {
     }
 }
 
-pub(crate) struct LaunchProgressDialog {
+pub(crate) struct NativeProgressDialog {
     closed: bool,
     decision_attempt: Option<OpeningDecisionAttempt>,
     owner: WebviewWindow,
@@ -264,7 +266,7 @@ pub(crate) struct LaunchProgressDialog {
     window: WebviewWindow,
 }
 
-impl LaunchProgressDialog {
+impl NativeProgressDialog {
     pub(crate) async fn request_external_copy_decision(
         &mut self,
         attempt_id: &str,
@@ -413,7 +415,7 @@ fn resize_owned_window_width(window: &WebviewWindow, width: f64) -> io::Result<(
     window.center().map_err(io::Error::other)
 }
 
-impl Drop for LaunchProgressDialog {
+impl Drop for NativeProgressDialog {
     fn drop(&mut self) {
         self.cancel_opening_decision();
         if !self.closed {
@@ -430,12 +432,12 @@ impl Drop for LaunchProgressDialog {
     }
 }
 
-pub(crate) async fn show_launch_progress(
+pub(crate) async fn show_native_progress(
     app: &AppHandle,
     owner_label: &str,
-    kind: LaunchProgressKind,
+    kind: NativeProgressKind,
     owner_webview_data_directory: &Path,
-) -> io::Result<LaunchProgressDialog> {
+) -> io::Result<NativeProgressDialog> {
     let owner = owned_window(app, owner_label)?;
     let window = build_hidden_owned_window(
         app,
@@ -456,7 +458,7 @@ pub(crate) async fn show_launch_progress(
         OwnerPresentation::Replace => display_transition_dialog(&owner, &window)?,
         OwnerPresentation::BlockedBehindDialog => display_owned_dialog(&owner, &window)?,
     }
-    Ok(LaunchProgressDialog {
+    Ok(NativeProgressDialog {
         closed: false,
         decision_attempt: None,
         owner,
@@ -999,11 +1001,15 @@ mod tests {
     #[test]
     fn only_opening_a_project_replaces_the_owner_window() {
         assert_eq!(
-            LaunchProgressKind::Opening.owner_presentation(),
+            NativeProgressKind::Opening.owner_presentation(),
             OwnerPresentation::Replace
         );
         assert_eq!(
-            LaunchProgressKind::Creating.owner_presentation(),
+            NativeProgressKind::Creating.owner_presentation(),
+            OwnerPresentation::BlockedBehindDialog
+        );
+        assert_eq!(
+            NativeProgressKind::ProcessingImages.owner_presentation(),
             OwnerPresentation::BlockedBehindDialog
         );
     }

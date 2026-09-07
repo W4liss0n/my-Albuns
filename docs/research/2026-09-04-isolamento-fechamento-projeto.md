@@ -2,13 +2,17 @@
 status: current
 document: research
 date: 2026-09-04
+updated: 2026-09-07
 ---
 
 # Isolamento do fechamento de Projeto salvo
 
-O travamento nativo de **Arquivo → Fechar Projeto** continua sem causa
-confirmada. Esta rodada acrescenta provas sem janelas e observabilidade; não
-constitui uma correção do defeito nem aprovação da jornada produtiva da PR #64.
+A falha automatizada de **Arquivo → Fechar Projeto** continua sem causa
+confirmada. O usuário confirmou o funcionamento por clique manual e autorizou,
+em 7 de setembro de 2026, a integração das PRs #64 e #65 com a CI aprovada e essa
+validação manual. A automação em janela está suspensa. A decisão ao final deste
+registro prevalece sobre as pendências históricas descritas nas etapas abaixo;
+ela não constitui aprovação integral da jornada nativa.
 
 ## Evidência de partida
 
@@ -181,3 +185,25 @@ ativa o caminho especial mesmo quando seu texto é `false`; o cenário precisa
 da substituição normal do WebView após Salvar como. As 19 verificações focadas
 finais também rejeitam uma Global sem vínculo com o Host encerrado. As revisões
 de padrões e especificação não deixaram achados pendentes na preparação.
+
+## Decisão de integração em 7 de setembro de 2026
+
+Os ensaios focados posteriores reproduziram o timeout da automação após salvar
+original e cópia. A observação temporária do transporte mostrou que a interface
+terminava a espera pela fila e iniciava os pedidos de IPC; isso não identificou
+a causa da ausência de resposta. Nenhuma alteração produtiva foi feita a partir
+dessa hipótese, e toda a instrumentação temporária foi removida antes da
+integração.
+
+O usuário informou que o fechamento funciona ao clicar manualmente. O último
+ensaio reteve um fechamento limpo do Host da cópia, com retorno do IPC e criação
+da Global sucessora; isso não fornece a prova completa exigida para fechar o
+original e conservar a cópia. Esse resultado permanece inconclusivo para o
+cenário automatizado e não é registrado como teste aprovado.
+
+Após essa confirmação manual, o usuário autorizou expressamente integrar as
+PRs #64 e #65 com a CI aprovada, mantendo os testes em janela suspensos. A
+exceção vale para essas duas entregas e substitui seu bloqueio pelo cenário
+automatizado de fechamento. A jornada nativa completa continua sem aprovação.
+Novas execuções em janela dependem de nova solicitação explícita, conforme a
+[política de validação](../agents/native-ui-gates.md).
