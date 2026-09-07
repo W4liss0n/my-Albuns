@@ -84,7 +84,7 @@ Material técnico não normativo, conservado como histórico das avaliações.
 
 O mapa de implementação está no [GitHub, issue #1](https://github.com/W4liss0n/my-Albuns/issues/1), com tickets de entrega e seus bloqueadores. Os arquivos antigos em `.scratch/programa-diagramacao/` são históricos.
 
-A entrega local mais recente é o [fechamento da importação e das miniaturas, de 6 de setembro de 2026](docs/research/2026-09-06-fechamento-importacao-e-miniaturas.md): importação múltipla de JPEGs, processamento em lotes, progresso contínuo e carregamento/retenção das prévias. O código foi validado localmente e o usuário confirmou a correção final. Push e PR desta entrega permanecem pendentes; este fechamento cobre o recorte implementado, não todo o escopo da issue #19.
+A entrega mais recente é o [fechamento da importação e das miniaturas, de 6 de setembro de 2026](docs/research/2026-09-06-fechamento-importacao-e-miniaturas.md): importação múltipla de JPEGs, processamento em lotes, progresso contínuo e carregamento/retenção das prévias. O código foi validado localmente e o usuário confirmou a correção final. A branch está publicada na [PR #65](https://github.com/W4liss0n/my-Albuns/pull/65), baseada na [PR #64](https://github.com/W4liss0n/my-Albuns/pull/64), que ainda tem aceitação nativa de fechamento pendente. Este fechamento cobre o recorte implementado, não todo o escopo da issue #19.
 
 A [revisão de 5 de setembro de 2026](docs/research/2026-09-05-estado-do-produto-e-proxima-entrega.md) conserva o diagnóstico anterior a essa entrega e as demais pendências do produto.
 

@@ -5414,27 +5414,61 @@ test("preloads imported Decoratives for Album design before they are used", asyn
   );
 });
 
-test("resizes media cards without restarting Panel demand observers", () => {
+test("remeasures Panel demand on card resize and retires obsolete observers", () => {
+  const onMediaDemandChange = vi.fn();
   render(
     <ProjectWorkspace
       exportPort={exportPort}
       projection={projection}
       projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      onMediaDemandChange={onMediaDemandChange}
       onProjectionChange={() => undefined}
     />,
   );
 
+  const grid = screen.getByRole("group", { name: "Grade de Fotos" });
+  Object.defineProperties(grid, {
+    clientWidth: { value: 202 },
+    clientHeight: { value: 84 },
+  });
+  Object.assign(grid.style, { padding: "0px", rowGap: "0px", columnGap: "0px" });
+  fireEvent.scroll(grid);
+  expect(onMediaDemandChange).toHaveBeenLastCalledWith({
+    visibleMediaIds: ["media-002", "media-003"],
+    preloadMediaIds: ["media-001"],
+  });
+
+  const previousObservers = [...observedViewports];
   const observerCount = observedViewports.length;
   fireEvent.click(
     screen.getByRole("button", { name: "Filtro, ordem e tamanho" }),
   );
+  expect(observerCount).toBe(2);
+  expect(observedViewports).toHaveLength(observerCount);
   fireEvent.change(
     screen.getByRole("slider", { name: "Tamanho das miniaturas" }),
     { target: { value: "124" } },
   );
 
-  expect(observerCount).toBe(2);
-  expect(observedViewports).toHaveLength(observerCount);
+  expect(onMediaDemandChange).toHaveBeenLastCalledWith({
+    visibleMediaIds: ["media-002"],
+    preloadMediaIds: ["media-003", "media-001"],
+  });
+  expect(previousObservers.every(({ targets }) => targets.size === 0)).toBe(true);
+  expect(observedViewports.filter(({ targets }) => targets.size > 0)).toHaveLength(2);
+
+  onMediaDemandChange.mockClear();
+  act(() => {
+    previousObservers.forEach(({ callback }) => callback([], {} as IntersectionObserver));
+  });
+  expect(onMediaDemandChange).not.toHaveBeenCalled();
+
+  grid.scrollTop = 124;
+  fireEvent.scroll(grid);
+  expect(onMediaDemandChange).toHaveBeenLastCalledWith({
+    visibleMediaIds: ["media-003"],
+    preloadMediaIds: ["media-002", "media-001"],
+  });
 });
 
 test("shares one Decorative Cache preview across Panel, Canvas, and Grade", () => {

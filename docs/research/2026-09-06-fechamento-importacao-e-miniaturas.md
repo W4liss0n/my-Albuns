@@ -12,8 +12,10 @@ O ciclo de melhorias da importação múltipla de Fotos JPEG e das miniaturas es
 concluído localmente. O usuário confirmou a correção final de abertura e
 rolagem. A implementação está na branch `codex/import-multiple-jpeg`, com
 `13820b855104fa5864028b568eee580356ec3ca8` como commit do código entregue.
-Push e PR permanecem pendentes. Este registro consolida a entrega e suas
-evidências; os contratos de produto continuam nas fontes normativas abaixo.
+A branch está publicada na [PR #65](https://github.com/W4liss0n/my-Albuns/pull/65),
+com base na [PR #64](https://github.com/W4liss0n/my-Albuns/pull/64).
+Este registro consolida a entrega e suas evidências; os contratos de produto
+continuam nas fontes normativas abaixo.
 
 ## Resultado entregue
 
@@ -119,6 +121,18 @@ Pastas e executáveis intermediários não substituem o build identificado aqui.
 
 A implementação, os testes locais e a confirmação do usuário estão concluídos
 para este recorte. O README e este registro consolidam o fechamento documental.
-A publicação da branch e a abertura da PR são a etapa de entrega remota ainda
-pendente; não houve alteração dos commits anteriores nem do escopo dos demais
-fluxos do produto.
+A branch e a PR #65 estão publicadas. A base é
+`codex/interaction-and-native-gates-followups`, da PR #64, cuja aceitação nativa
+de fechamento ainda está pendente. A publicação não conclui esse aceite nem a
+integração em `main`; a issue #19 continua aberta para o restante de seu escopo.
+
+A revisão final do intervalo `ec47139..8262c93` não encontrou achados pendentes
+nos eixos de aderência aos padrões e à especificação. A validação completa
+adicional em `8262c93` identificou uma expectativa antiga no teste de
+redimensionamento do Painel: conservar os observadores mesmo quando o tamanho
+dos cards mudava. O contrato atual requer recalcular a geometria. O teste foi
+atualizado para conferir a demanda antes e depois do redimensionamento, a
+desconexão dos observadores antigos, a rejeição de callbacks obsoletos e a
+rolagem posterior. Abrir somente o popup continua sem reiniciar os
+observadores. Esse ajuste modifica apenas o teste; o código do executável de
+referência permanece `13820b8`.
