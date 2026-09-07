@@ -251,6 +251,8 @@ export interface ProjectCorePort {
 }
 
 export interface MediaPreviewPort {
+  // Completion replaces the presentation snapshot: demanded outcomes plus the
+  // native registry's bounded recent residents. Omission revokes a prior URL.
   prepareMediaPreviews(
     demand: MediaPreviewRequest,
     onPreview: (preview: MediaPreview) => void,

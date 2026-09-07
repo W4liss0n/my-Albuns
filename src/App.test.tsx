@@ -737,6 +737,68 @@ test("shows warm Fotos immediately after returning from Decorativos while the ne
   }
 });
 
+test("shows previously loaded Panel photos immediately after scrolling away and back", async () => {
+  const observers: { callback: IntersectionObserverCallback; targets: HTMLElement[] }[] = [];
+  vi.stubGlobal("IntersectionObserver", class {
+    targets: HTMLElement[] = [];
+    constructor(public callback: IntersectionObserverCallback) { observers.push(this); }
+    observe(target: HTMLElement) { this.targets.push(target); }
+    disconnect() {}
+  });
+  const requests: {
+    demand: MediaPreviewRequest;
+    finish: (previews: readonly MediaPreview[]) => void;
+  }[] = [];
+  const prepareMediaPreviews: MediaPreviewPort["prepareMediaPreviews"] = (demand) =>
+    new Promise((finish) => { requests.push({ demand, finish }); });
+  const top: MediaPreview = {
+    mediaId: "media-002", state: "ready", url: "http://myalbuns-cache.localhost/top-photo",
+  };
+  const bottom: MediaPreview = {
+    mediaId: "media-003", state: "ready", url: "http://myalbuns-cache.localhost/bottom-photo",
+  };
+  const view = render(
+    <App
+      mediaPreviewPort={{ ...mediaPreviewPort, prepareMediaPreviews }}
+      projectCorePort={{ ...projectCorePort, load: async () => representativeProjection }}
+      projectStartupPort={projectStartupPort}
+      projectWindowPort={projectWindowPort}
+      logger={silentLogger}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      graphicsProbe={canvasGraphicsDiagnosticProbe}
+    />,
+  );
+  const scrollTo = (mediaId: string) => act(() => {
+    for (const observer of observers) {
+      observer.callback(observer.targets.map((target) => ({
+        target, isIntersecting: target.dataset.mediaId === mediaId,
+      }) as unknown as IntersectionObserverEntry), observer as unknown as IntersectionObserver);
+    }
+  });
+  try {
+    await screen.findByRole("group", { name: "Grade de Fotos" });
+    scrollTo(top.mediaId);
+    await waitFor(() => expect(requests[requests.length - 1]?.demand.visibleMediaIds).toContain(top.mediaId));
+    await act(async () => requests[requests.length - 1].finish([top]));
+    expect(document.querySelector('[data-media-id="media-002"] img')).toHaveAttribute("src", top.url);
+    const loadedImage = document.querySelector('[data-media-id="media-002"] img');
+
+    scrollTo(bottom.mediaId);
+    await waitFor(() => expect(requests[requests.length - 1]?.demand.visibleMediaIds).toContain(bottom.mediaId));
+    // The native completion includes its bounded set of recent residents.
+    await act(async () => requests[requests.length - 1].finish([top, bottom]));
+    scrollTo(top.mediaId);
+
+    // No new native response has arrived: a previously shown thumbnail must
+    // already be drawable on returning to its row.
+    expect(document.querySelector('[data-media-id="media-002"] img')).toHaveAttribute("src", top.url);
+    expect(document.querySelector('[data-media-id="media-002"] img')).toBe(loadedImage);
+  } finally {
+    view.unmount();
+    vi.unstubAllGlobals();
+  }
+});
+
 test("ignores preview events and completion from a demand superseded by a Monitor refresh", async () => {
   const requests: {
     publish: (preview: MediaPreview) => void;

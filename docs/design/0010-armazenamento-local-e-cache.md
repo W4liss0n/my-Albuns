@@ -1,7 +1,7 @@
 ---
 status: accepted
 document: design
-updated: 2026-09-05
+updated: 2026-09-06
 ---
 
 # Armazenamento local e Cache
@@ -170,12 +170,28 @@ O baseline contém uma única representação visual reduzida por Foto ou Decora
 Cada representação preparada é entregue à interface imediatamente, sem esperar
 as demais mídias da demanda. O Painel mantém em pré-carga o último trecho
 observado de cada aba, incluindo a margem de `122 px` acima e abaixo da área
-visível. Alternar Fotos e Decorativos não descarta esse trecho; rolar, filtrar,
-remover mídias ou fechar o Painel atualiza a demanda e libera o que saiu dela.
-Essa retenção não abrange todo o catálogo nem acumula trechos de rolagens
-anteriores. Depois da observação do Monitor, uma representação ainda residente
-e vinculada à mesma origem pode ser entregue novamente sem executar outro job;
-mudanças confirmadas continuam revogando a representação anterior.
+visível. Alternar Fotos e Decorativos não descarta esse trecho. Rolar, filtrar
+ou fechar o Painel atualiza a demanda e cancela trabalhos obsoletos, mas conserva
+as representações já publicadas em um conjunto limitado de uso recente. Voltar
+a um trecho ainda residente reutiliza a mesma URL e o mesmo elemento de imagem,
+sem aguardar outro job ou nova resposta do Host para mostrar a miniatura.
+
+O registro nativo possui essa retenção e devolve à interface um snapshot das
+representações residentes, junto com os estados explícitos da demanda atual.
+Fora da demanda ativa, os limites são `64 MiB` de bytes codificados, `512`
+representações e `2 GiB` na estimativa `bytes codificados + largura × altura × 4`.
+Ultrapassar qualquer limite descarta primeiro as representações menos usadas;
+as mídias da demanda ativa permanecem protegidas. A estimativa não representa
+uma alocação antecipada nem um teto global de RAM ou GPU: navegador e Canvas
+continuam responsáveis pelas suas próprias alocações. O Canvas mantém somente
+as texturas exigidas por sua área visível e margem.
+
+Depois da observação do Monitor, uma representação ainda residente e vinculada
+à mesma origem pode ser entregue novamente sem executar outro job. Mudanças
+confirmadas retiram sua autorização de reuso como atual; remoção, Religação ou
+troca de Identidade revogam a residência correspondente. Fechar o Projeto
+libera todas as representações. A [verificação com 134 fotos](../research/2026-09-06-retencao-previas-painel.md)
+registra a causa do descarte precoce, os limites e as evidências de retorno.
 
 O maior lado mede no máximo `1.600 px`. Conteúdo opaco usa JPEG qualidade `84`; conteúdo que precisa preservar transparência usa PNG RGBA.
 O formato é propriedade do artefato derivado e integra seu caminho e o índice
@@ -266,7 +282,7 @@ Ao confirmar uma atualização automática da mesma origem, o Monitor invalida o
 reuso da prévia anterior, preservando seus bytes apenas para apresentação até a
 publicação verificada da sucessora. Não há diálogo de progresso nesse fluxo.
 Essa retenção não transfere pixels entre vínculos, Projetos ou Identidades e
-permanece limitada à demanda residente do Painel e do Canvas.
+permanece sujeita aos limites de residência do Painel e do Canvas.
 
 É aceito no MVP o caso raro de uma alteração feita com o aplicativo fechado conservar exatamente tamanho e data. A Exportação reabre o original e não depende dessa concessão.
 

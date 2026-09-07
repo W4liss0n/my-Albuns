@@ -653,8 +653,8 @@ impl CacheEngine {
             project_id,
             revision,
             demanded_media_ids,
-            |retired_media_ids| {
-                registry.invalidate_media(retired_media_ids.iter().map(String::as_str));
+            |demanded_media_ids| {
+                registry.retain_demand(demanded_media_ids);
             },
         )
     }
@@ -674,7 +674,7 @@ impl CacheEngine {
         project_id: &str,
         revision: u64,
         demanded_media_ids: impl IntoIterator<Item = &'a str>,
-        revoke_retired_previews: impl FnOnce(&[String]),
+        retain_preview_demand: impl FnOnce(&HashSet<String>),
     ) -> CacheDemandRevision {
         let demanded = demanded_media_ids
             .into_iter()
@@ -733,7 +733,7 @@ impl CacheEngine {
                 }
                 true
             });
-            revoke_retired_previews(&retired_media_ids);
+            retain_preview_demand(&demanded);
         }
         CacheDemandRevision {
             project_id: project_id.to_owned(),
@@ -3412,7 +3412,7 @@ mod tests {
     }
 
     #[test]
-    fn a_newer_demand_revokes_a_preview_committed_by_an_inflight_old_revision() {
+    fn a_newer_demand_retains_a_preview_committed_before_the_serialized_transition() {
         tauri::async_runtime::block_on(async {
             let fixture = fixture();
             let engine = Arc::new(CacheEngine::default());
@@ -3488,7 +3488,7 @@ mod tests {
                 .expect("the newer reconciliation thread joins");
             reconciled_rx
                 .recv_timeout(Duration::from_secs(1))
-                .expect("the newer demand completes after revocation");
+                .expect("the newer demand completes after the previous publication");
 
             let token = preview
                 .url
@@ -3501,11 +3501,11 @@ mod tests {
                 .method(Method::GET)
                 .uri(format!("/{token}"))
                 .body(Vec::new())
-                .expect("the revoked opaque request is valid");
+                .expect("the retained opaque request is valid");
             assert_eq!(
                 registry.serve("project", request).status(),
-                StatusCode::NOT_FOUND,
-                "the newer demand leaves no bytes or token resident"
+                StatusCode::OK,
+                "a completed publication remains in the bounded recent cache"
             );
         });
     }
@@ -3772,6 +3772,46 @@ mod tests {
                 .flag()
                 .load(std::sync::atomic::Ordering::Acquire)
         );
+    }
+
+    #[test]
+    fn a_previously_displayed_preview_survives_scrolling_away_and_back() {
+        tauri::async_runtime::block_on(async {
+            let fixture = fixture();
+            let engine = CacheEngine::default();
+            let registry = CachePreviewRegistry::new("project");
+            let project_id = fixture.work.namespace.project_id();
+            let source = &fixture.work.source;
+            engine.reconcile_preview_demand(&registry, project_id, 1, [source.media_id()]);
+            let artifact = verified_preview_artifact(&fixture, &engine).await;
+            let ready = registry
+                .publish(
+                    &fixture.app_paths,
+                    &fixture.work.namespace,
+                    &artifact,
+                    source.source_path(),
+                )
+                .unwrap();
+
+            engine.reconcile_preview_demand(&registry, project_id, 2, ["another-visible-photo"]);
+            let returned =
+                engine.reconcile_preview_demand(&registry, project_id, 3, [source.media_id()]);
+            let reused = engine
+                .commit_preview_if_demanded(&returned, source.media_id(), || {
+                    registry.retained_preview(
+                        source.media_id(),
+                        source.source_path(),
+                        crate::ipc_contract::MediaPreviewState::Ready,
+                    )
+                })
+                .flatten();
+
+            assert_eq!(
+                reused.and_then(|preview| preview.url),
+                ready.url,
+                "returning to a viewed row must reuse its live preview without another Processor job"
+            );
+        });
     }
 
     #[test]

@@ -386,6 +386,56 @@ fn real_import_flow() {
         }
         let handoff_ms = milliseconds(handoff_started);
         let total_ms = milliseconds(total_started);
+        let revisit_started = Instant::now();
+        // Scroll through individual rows, including an empty observation between
+        // distant rows. Returning must reuse the live URL without a cache job.
+        for (index, binding) in catalog.bindings.iter().enumerate() {
+            engine.reconcile_preview_demand(
+                &registry,
+                namespace.project_id(),
+                index as u64 + 2,
+                [binding.media_id.as_str()],
+            );
+        }
+        engine.reconcile_preview_demand(
+            &registry,
+            namespace.project_id(),
+            catalog.bindings.len() as u64 + 2,
+            std::iter::empty(),
+        );
+        let returned = engine.reconcile_preview_demand(
+            &registry,
+            namespace.project_id(),
+            catalog.bindings.len() as u64 + 3,
+            catalog
+                .bindings
+                .iter()
+                .map(|binding| binding.media_id.as_str()),
+        );
+        let mut reused_previews = 0;
+        for binding in &catalog.bindings {
+            let Some(previous) = previews.get(&binding.media_id) else {
+                continue;
+            };
+            let reused = engine
+                .commit_preview_if_demanded(&returned, &binding.media_id, || {
+                    registry.retained_preview(
+                        &binding.media_id,
+                        &binding.logical_path,
+                        crate::ipc_contract::MediaPreviewState::Ready,
+                    )
+                })
+                .flatten()
+                .unwrap();
+            assert_eq!(reused.url, previous.url);
+            reused_previews += 1;
+        }
+        assert_eq!(reused_previews, inputs.previews);
+        assert_eq!(
+            registry.presentation_snapshot(Vec::new()).len(),
+            inputs.previews
+        );
+        let revisit_ms = milliseconds(revisit_started);
         if std::env::var_os("MYALBUNS_IMPORT_MEASUREMENT_OUTPUT").is_some() {
             eprintln!(
                 "Import round {}/{}: {} photos, {:.2}s total, {:.2}s native, {} processes, peak {}",
@@ -419,6 +469,7 @@ fn real_import_flow() {
             "processes": process_count, "hostOriginalDecodes": inputs.host_decodes,
             "captureMs": capture_ms, "nativeMs": native_ms, "inspectionMs": inspection_ms,
             "commitMs": commit_ms, "firstDemandMs": handoff_ms, "totalMs": total_ms,
+            "scrollRevisitMs": revisit_ms, "reusedPreviews": reused_previews,
             "previewSha256": preview_hashes, "progress": progress_samples
         }));
     }

@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::Path,
     sync::{Arc, Mutex},
 };
@@ -11,6 +11,7 @@ use sha2::{Digest, Sha256};
 use crate::{
     cache_engine::{AuthorizedCacheNamespace, CacheSourceBinding},
     ipc_contract::{MediaPreview, MediaPreviewState},
+    media_runtime::MediaBinding,
     opaque_image_protocol::{
         ImageFormat, ImagePayload, ImageRequestError, opaque_image_url, read_image,
         respond_to_opaque_image_request, serve_opaque_image,
@@ -18,6 +19,13 @@ use crate::{
 };
 
 pub(crate) const CACHE_MEDIA_PROTOCOL_SCHEME: &str = "myalbuns-cache";
+
+// Budget for recent previews, excluding the currently demanded set. The decoded
+// estimate keeps large previews from making a byte-only LRU too generous; the
+// browser and Canvas still own their actual decoded/GPU allocations.
+const RECENT_PREVIEW_BYTES: u64 = 64 * 1024 * 1024;
+const RECENT_PREVIEW_DISPLAY_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+const RECENT_PREVIEW_COUNT: usize = 512;
 
 #[derive(Clone)]
 pub(crate) struct CachePreviewRegistry {
@@ -29,6 +37,8 @@ pub(crate) struct CachePreviewRegistry {
 struct CachePreviewPublication {
     tokens_by_media: HashMap<String, PublishedCachePreview>,
     previews_by_token: HashMap<String, Arc<PreparedCachePreview>>,
+    demanded_media: HashSet<String>,
+    access_sequence: u64,
 }
 
 struct PublishedCachePreview {
@@ -36,6 +46,10 @@ struct PublishedCachePreview {
     source_binding: CacheSourceBinding,
     token: String,
     source_verified: bool,
+    state: MediaPreviewState,
+    last_used: u64,
+    encoded_bytes: u64,
+    display_bytes: u64,
 }
 
 struct PreparedCachePreview {
@@ -138,11 +152,15 @@ impl CachePreviewRegistry {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let source_binding = CacheSourceBinding::for_path(source_path);
+        publication.access_sequence += 1;
+        let last_used = publication.access_sequence;
         if let Some(published) = publication.tokens_by_media.get_mut(&artifact.media_id)
             && published.generation_id == artifact.generation_id
             && published.source_binding == source_binding
         {
             published.source_verified = true;
+            published.state = MediaPreviewState::Ready;
+            published.last_used = last_used;
             return Ok(MediaPreview {
                 media_id: artifact.media_id.clone(),
                 state: MediaPreviewState::Ready,
@@ -167,6 +185,12 @@ impl CachePreviewRegistry {
                 source_binding,
                 token: token.clone(),
                 source_verified: true,
+                state: MediaPreviewState::Ready,
+                last_used,
+                encoded_bytes: artifact.preview_bytes,
+                display_bytes: artifact.preview_bytes.saturating_add(
+                    u64::from(artifact.width_px) * u64::from(artifact.height_px) * 4,
+                ),
             },
         );
         publication.previews_by_token.insert(
@@ -176,11 +200,89 @@ impl CachePreviewRegistry {
                 bytes: payload.body,
             }),
         );
+        publication.trim_recent();
         Ok(MediaPreview {
             media_id: artifact.media_id.clone(),
             state: MediaPreviewState::Ready,
             url: Some(opaque_image_url(CACHE_MEDIA_PROTOCOL_SCHEME, &token)),
         })
+    }
+
+    pub(crate) fn retain_catalog(&self, bindings: &[MediaBinding]) {
+        let mut publication = self
+            .publication
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let bindings = bindings
+            .iter()
+            .map(|binding| (binding.media_id.as_str(), binding))
+            .collect::<HashMap<_, _>>();
+        let removed = publication
+            .tokens_by_media
+            .iter()
+            .filter(|(id, preview)| {
+                !bindings.get(id.as_str()).is_some_and(|binding| {
+                    preview
+                        .source_binding
+                        .matches_source_path(&binding.logical_path)
+                })
+            })
+            .map(|(id, _)| id.clone())
+            .collect::<Vec<_>>();
+        for id in removed {
+            publication.remove(&id);
+        }
+    }
+
+    pub(crate) fn retain_demand(&self, media_ids: &HashSet<String>) {
+        let mut publication = self
+            .publication
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        publication.demanded_media.clone_from(media_ids);
+        publication.access_sequence += 1;
+        let last_used = publication.access_sequence;
+        for id in media_ids {
+            if let Some(preview) = publication.tokens_by_media.get_mut(id) {
+                preview.last_used = last_used;
+            }
+        }
+        publication.trim_recent();
+    }
+
+    // Completion replaces the frontend's snapshot, so include warm residents as
+    // well as demanded outcomes. An explicit failure always wins over old bytes.
+    pub(crate) fn presentation_snapshot(&self, outcomes: Vec<MediaPreview>) -> Vec<MediaPreview> {
+        let publication = self
+            .publication
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut previews = publication
+            .tokens_by_media
+            .iter()
+            .filter(|(_, preview)| {
+                preview.source_verified || preview.state != MediaPreviewState::Ready
+            })
+            .map(|(id, preview)| {
+                (
+                    id.clone(),
+                    MediaPreview {
+                        media_id: id.clone(),
+                        state: preview.state,
+                        url: Some(opaque_image_url(
+                            CACHE_MEDIA_PROTOCOL_SCHEME,
+                            &preview.token,
+                        )),
+                    },
+                )
+            })
+            .collect::<HashMap<_, _>>();
+        for preview in outcomes {
+            previews.insert(preview.media_id.clone(), preview);
+        }
+        let mut previews = previews.into_values().collect::<Vec<_>>();
+        previews.sort_unstable_by(|left, right| left.media_id.cmp(&right.media_id));
+        previews
     }
 
     pub(crate) fn mark_sources_changed<I, S>(&self, media_ids: I)
@@ -210,8 +312,7 @@ impl CachePreviewRegistry {
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut removed = 0;
         for media_id in media_ids {
-            if let Some(published) = publication.tokens_by_media.remove(media_id.as_ref()) {
-                publication.previews_by_token.remove(&published.token);
+            if publication.remove(media_id.as_ref()) {
                 removed += 1;
             }
         }
@@ -224,8 +325,7 @@ impl CachePreviewRegistry {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let removed = publication.previews_by_token.len();
-        publication.tokens_by_media.clear();
-        publication.previews_by_token.clear();
+        *publication = CachePreviewPublication::default();
         removed
     }
 
@@ -239,6 +339,8 @@ impl CachePreviewRegistry {
             .publication
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
+        publication.access_sequence += 1;
+        let last_used = publication.access_sequence;
         let published = publication.tokens_by_media.get_mut(media_id)?;
         if !published.source_binding.matches_source_path(source_path)
             || (state == MediaPreviewState::Ready && !published.source_verified)
@@ -250,6 +352,8 @@ impl CachePreviewRegistry {
         if state != MediaPreviewState::Ready {
             published.source_verified = false;
         }
+        published.state = state;
+        published.last_used = last_used;
         Some(MediaPreview {
             media_id: media_id.to_owned(),
             state,
@@ -292,6 +396,49 @@ impl CachePreviewRegistry {
     }
 }
 
+impl CachePreviewPublication {
+    fn remove(&mut self, media_id: &str) -> bool {
+        if let Some(preview) = self.tokens_by_media.remove(media_id) {
+            self.previews_by_token.remove(&preview.token);
+            true
+        } else {
+            false
+        }
+    }
+
+    fn trim_recent(&mut self) {
+        let mut recent = self
+            .tokens_by_media
+            .iter()
+            .filter(|(id, _)| !self.demanded_media.contains(*id))
+            .map(|(id, preview)| {
+                (
+                    id.clone(),
+                    preview.last_used,
+                    preview.encoded_bytes,
+                    preview.display_bytes,
+                )
+            })
+            .collect::<Vec<_>>();
+        let mut encoded = recent.iter().map(|entry| entry.2).sum::<u64>();
+        let mut display = recent.iter().map(|entry| entry.3).sum::<u64>();
+        let mut count = recent.len();
+        recent.sort_unstable_by(|left, right| (left.1, &left.0).cmp(&(right.1, &right.0)));
+        for (id, _, bytes, display_bytes) in recent {
+            if encoded <= RECENT_PREVIEW_BYTES
+                && display <= RECENT_PREVIEW_DISPLAY_BYTES
+                && count <= RECENT_PREVIEW_COUNT
+            {
+                break;
+            }
+            self.remove(&id);
+            encoded -= bytes;
+            display -= display_bytes;
+            count -= 1;
+        }
+    }
+}
+
 pub(crate) fn respond_to_cache_media_request<R: tauri::Runtime>(
     registry: CachePreviewRegistry,
     context: tauri::UriSchemeContext<'_, R>,
@@ -319,6 +466,154 @@ mod tests {
     use crate::cache_engine::AuthorizedCacheNamespace;
 
     use super::CachePreviewRegistry;
+
+    fn resident_registry(
+        count: usize,
+        encoded_bytes: u64,
+        display_bytes: u64,
+    ) -> CachePreviewRegistry {
+        let registry = CachePreviewRegistry::new("project");
+        let mut publication = registry.publication.lock().unwrap();
+        for index in 0..count {
+            let id = format!("photo-{index:03}");
+            let token = format!("{id}.jpg");
+            publication.tokens_by_media.insert(
+                id,
+                super::PublishedCachePreview {
+                    generation_id: "verified-generation".into(),
+                    source_binding: crate::cache_engine::CacheSourceBinding::for_path(
+                        std::path::Path::new("original.jpg"),
+                    ),
+                    token: token.clone(),
+                    source_verified: true,
+                    state: crate::ipc_contract::MediaPreviewState::Ready,
+                    last_used: index as u64,
+                    encoded_bytes,
+                    display_bytes,
+                },
+            );
+            publication.previews_by_token.insert(
+                token,
+                std::sync::Arc::new(super::PreparedCachePreview {
+                    format: crate::opaque_image_protocol::ImageFormat::Jpeg,
+                    bytes: vec![0; 4],
+                }),
+            );
+        }
+        publication.access_sequence = count as u64;
+        drop(publication);
+        registry
+    }
+
+    #[test]
+    fn scrolling_134_previews_keeps_the_same_urls_in_the_presentation_snapshot() {
+        let registry = resident_registry(134, 90_000, 1600 * 1067 * 4 + 90_000);
+        let original = registry.presentation_snapshot(Vec::new());
+        for index in 0..134 {
+            registry.retain_demand(&[format!("photo-{index:03}")].into());
+        }
+        registry.retain_demand(&Default::default());
+        let returned = registry.presentation_snapshot(Vec::new());
+        assert_eq!(returned.len(), 134);
+        assert_eq!(
+            returned
+                .iter()
+                .map(|preview| &preview.url)
+                .collect::<Vec<_>>(),
+            original
+                .iter()
+                .map(|preview| &preview.url)
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn recent_residency_evicts_the_least_used_for_each_budget_and_pins_active_demand() {
+        for (count, encoded, display) in [
+            (3, super::RECENT_PREVIEW_BYTES / 2, 1),
+            (3, 1, super::RECENT_PREVIEW_DISPLAY_BYTES / 2),
+            (super::RECENT_PREVIEW_COUNT + 1, 1, 1),
+        ] {
+            let registry = resident_registry(count, encoded, display);
+            registry.retain_demand(&["photo-000".to_owned()].into());
+            assert_eq!(registry.presentation_snapshot(Vec::new()).len(), count);
+            registry.retain_demand(&Default::default());
+            let snapshot = registry.presentation_snapshot(Vec::new());
+            assert_eq!(snapshot.len(), count - 1);
+            assert!(
+                snapshot
+                    .iter()
+                    .any(|preview| preview.media_id == "photo-000")
+            );
+            assert!(
+                !snapshot
+                    .iter()
+                    .any(|preview| preview.media_id == "photo-001")
+            );
+            let revoked = registry.serve(
+                "project",
+                Request::builder()
+                    .uri("/photo-001.jpg")
+                    .body(Vec::new())
+                    .unwrap(),
+            );
+            assert_eq!(revoked.status(), StatusCode::NOT_FOUND);
+        }
+        let registry = resident_registry(
+            2,
+            super::RECENT_PREVIEW_BYTES + 1,
+            super::RECENT_PREVIEW_DISPLAY_BYTES + 1,
+        );
+        registry.retain_demand(&["photo-000".to_owned()].into());
+        assert_eq!(registry.presentation_snapshot(Vec::new()).len(), 1);
+        registry.retain_demand(&Default::default());
+        assert!(registry.presentation_snapshot(Vec::new()).is_empty());
+    }
+
+    #[test]
+    fn snapshots_do_not_restore_invalidated_relinked_removed_or_failed_previews() {
+        use crate::ipc_contract::{MediaPreview, MediaPreviewState};
+        let registry = resident_registry(4, 1, 1);
+        registry.mark_sources_changed(["photo-000"]);
+        assert!(
+            registry
+                .presentation_snapshot(Vec::new())
+                .iter()
+                .all(|preview| preview.media_id != "photo-000")
+        );
+        registry
+            .retained_preview(
+                "photo-000",
+                std::path::Path::new("original.jpg"),
+                MediaPreviewState::Absent,
+            )
+            .unwrap();
+        let snapshot = registry.presentation_snapshot(vec![MediaPreview {
+            media_id: "photo-001".into(),
+            state: MediaPreviewState::CacheUnavailable,
+            url: None,
+        }]);
+        assert_eq!(snapshot[0].state, MediaPreviewState::Absent);
+        assert_eq!(snapshot[1].state, MediaPreviewState::CacheUnavailable);
+        assert!(snapshot[1].url.is_none());
+        registry.retain_catalog(&[
+            crate::media_runtime::MediaBinding {
+                media_id: "photo-000".into(),
+                kind: myalbuns_core::MediaKind::Photo,
+                logical_path: "original.jpg".into(),
+            },
+            crate::media_runtime::MediaBinding {
+                media_id: "photo-001".into(),
+                kind: myalbuns_core::MediaKind::Photo,
+                logical_path: "relinked.jpg".into(),
+            },
+        ]);
+        let snapshot = registry.presentation_snapshot(Vec::new());
+        assert_eq!(snapshot.len(), 1);
+        assert_eq!(snapshot[0].media_id, "photo-000");
+        assert_eq!(registry.revoke_all(), 1);
+        assert!(registry.presentation_snapshot(Vec::new()).is_empty());
+    }
 
     #[test]
     fn webview_receives_only_the_published_derived_bytes_behind_an_opaque_token() {

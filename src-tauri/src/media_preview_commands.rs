@@ -209,6 +209,7 @@ pub(crate) async fn prepare_media_previews(
         return Err(MediaPreviewCommandError::read_failed());
     }
     engine.retain_prepared_catalog(&catalog.project_id, &catalog.bindings);
+    registry.retain_catalog(&catalog.bindings);
     let mut demand_revision = engine.reconcile_preview_demand(
         registry.inner(),
         namespace.project_id(),
@@ -216,7 +217,7 @@ pub(crate) async fn prepare_media_previews(
         ordered_demand.iter().map(String::as_str),
     );
     if ordered_demand.is_empty() {
-        return Ok(Some(Vec::new()));
+        return Ok(Some(registry.presentation_snapshot(Vec::new())));
     }
     if !engine.demand_is_current(&demand_revision) {
         return Ok(Some(Vec::new()));
@@ -392,7 +393,7 @@ pub(crate) async fn prepare_media_previews(
     if !engine.demand_is_current(&demand_revision) {
         return Ok(Some(Vec::new()));
     }
-    Ok(Some(previews))
+    Ok(Some(registry.presentation_snapshot(previews)))
 }
 
 struct DemandedPreviewPreparation<'a> {
