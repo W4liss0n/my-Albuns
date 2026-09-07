@@ -51,7 +51,6 @@ export function parseProjectLaunchOutcome(
   if (
     (value.status === "opened" ||
       value.status === "focused" ||
-      value.status === "externalCopyNotWritable" ||
       value.status === "cancelled") &&
     hasOnlyIpcKeys(value, ["status"])
   ) {

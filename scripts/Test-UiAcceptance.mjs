@@ -17,6 +17,82 @@ const workspace = path.resolve(scriptsDirectory, "..");
 const manifestPath = path.join(workspace, "src", "test", "uiAcceptanceScenarios.json");
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 
+test("captured pointer gestures have one neutral W3C policy", async () => {
+  const {
+    buildCapturedPointerGestureActions,
+    measureVisiblePointerGeometryScript,
+    scrollIntoPointerViewportScript,
+  } = await import("./WebDriverPointerGestures.mjs");
+
+  assert.match(scrollIntoPointerViewportScript, /scrollIntoView/u);
+  assert.match(measureVisiblePointerGeometryScript, /getBoundingClientRect/u);
+  assert.match(measureVisiblePointerGeometryScript, /window\.innerWidth/u);
+  assert.match(measureVisiblePointerGeometryScript, /sourceXRatio/u);
+  assert.deepEqual(
+    buildCapturedPointerGestureActions({
+      phase: "preview",
+      source: { x: 100, y: 200 },
+      target: { x: 300, y: 220 },
+    }),
+    [
+      {
+        type: "pointerMove",
+        duration: 0,
+        origin: "viewport",
+        x: 100,
+        y: 200,
+      },
+      { type: "pointerDown", button: 0 },
+      { type: "pause", duration: 80 },
+      {
+        type: "pointerMove",
+        duration: 120,
+        origin: "viewport",
+        x: 110,
+        y: 201,
+      },
+      {
+        type: "pointerMove",
+        duration: 450,
+        origin: "viewport",
+        x: 300,
+        y: 220,
+      },
+      { type: "pause", duration: 100 },
+    ],
+  );
+
+  const dropActions = buildCapturedPointerGestureActions({
+    dropTarget: { x: 400, y: 240 },
+    phase: "drop",
+    source: { x: 100, y: 200 },
+    target: { x: 300, y: 220 },
+  });
+  assert.deepEqual(
+    dropActions.slice(-3),
+    [
+      {
+        type: "pointerMove",
+        duration: 450,
+        origin: "viewport",
+        x: 400,
+        y: 240,
+      },
+      { type: "pause", duration: 100 },
+      { type: "pointerUp", button: 0 },
+    ],
+  );
+
+  for (const runnerName of [
+    "Run-ProductiveJourneyGate.mjs",
+    "UiAcceptanceRunner.mjs",
+  ]) {
+    const runner = readFileSync(path.join(scriptsDirectory, runnerName), "utf8");
+    assert.match(runner, /from "\.\/WebDriverPointerGestures\.mjs"/u);
+    assert.doesNotMatch(runner, /const visibleCenter =/u);
+  }
+});
+
 test("the canonical UI acceptance manifest is valid and points to served files", () => {
   validateUiAcceptanceManifest(manifest);
   for (const scenario of manifest.scenarios) {
@@ -25,6 +101,41 @@ test("the canonical UI acceptance manifest is valid and points to served files",
       assert.equal(existsSync(servedFilePath(workspace, scenario.referencePath)), true, `${scenario.id} reference is missing`);
     }
   }
+});
+
+test("the welcome preview declares a stable empty-recent-Projects scenario", () => {
+  const scenario = manifest.scenarios.find(
+    (candidate) => candidate.id === "welcome-empty",
+  );
+
+  assert.ok(scenario, "welcome-empty is missing");
+  assert.equal(
+    scenario.implementationPath,
+    "/welcome-preview.html?recents=empty",
+  );
+  assert.equal(scenario.comparison.kind, "implementation-only");
+  assert.equal(scenario.comparison.surface, "welcome-empty-state");
+  assert.match(scenario.comparison.reason, /referência visual vigente/iu);
+  assert.equal("referencePath" in scenario, false);
+  assert.deepEqual(scenario.viewport, { width: 1280, height: 720 });
+  assert.match(scenario.readySelector, /Nenhum Projeto recente/u);
+  assert.match(scenario.readySelector, /not\(:has\(\.global-recent-list\)\)/u);
+  assert.match(
+    scenario.readySelector,
+    /not\(:has\(\.ui-empty-state__icon\)\)/u,
+  );
+  assert.deepEqual(scenario.actions, [
+    {
+      type: "assert",
+      selector:
+        '.global-empty-state[role="status"][aria-label="Nenhum Projeto recente"]',
+    },
+    {
+      type: "assert",
+      selector:
+        ".global-shell:not(:has(.global-recent-list)):not(:has(.global-project-thumbnail)):not(:has(.ui-empty-state__icon))",
+    },
+  ]);
 });
 
 test("editor scenarios declare honest, surface-matched comparisons", () => {
@@ -130,6 +241,7 @@ test("the manifest covers the integrated workspace and every critical Project di
       kind: "projectCloseConfirmation",
     },
     "project-close-failure": { kind: "projectCloseFailure" },
+    "project-graphics-failure": { kind: "graphicsFailure" },
     "export-progress-determinate": {
       cancelRequested: false,
       cancellable: true,
@@ -215,6 +327,7 @@ test("the manifest covers the integrated workspace and every critical Project di
       "exportFailure",
       "exportProgress",
       "exportSuccess",
+      "graphicsFailure",
       "projectCloseConfirmation",
       "projectCloseFailure",
       "projectOperationFailure",
@@ -260,8 +373,8 @@ test("the manifest covers critical integrated workspace, panel, menu, and graphi
       ready: /not\(:has/u,
     },
     "project-graphics-failure": {
-      path: "/workspace-preview.html?graphics=unsupported",
-      ready: /startup-card/u,
+      path: /^\/project-dialog\.html\?state=/u,
+      ready: /ui-owned-window-shell/u,
     },
     "safe-application-shell": {
       path: "/welcome-preview.html?graphics=unsupported",
@@ -272,7 +385,11 @@ test("the manifest covers critical integrated workspace, panel, menu, and graphi
   for (const [id, expected] of Object.entries(expectedStates)) {
     const scenario = scenariosById.get(id);
     assert.ok(scenario, `${id} is missing`);
-    assert.equal(scenario.implementationPath, expected.path);
+    if (expected.path instanceof RegExp) {
+      assert.match(scenario.implementationPath, expected.path);
+    } else {
+      assert.equal(scenario.implementationPath, expected.path);
+    }
     assert.match(scenario.readySelector, expected.ready);
     if (expected.actions) {
       assert.deepEqual(
@@ -325,6 +442,8 @@ test("the manifest captures rendered structural command surfaces at the physical
     },
   ]);
   assert.match(contextMenu.readySelector, /Ações da Lâmina 01/u);
+  assert.match(contextMenu.readySelector, /data-centered-sheet-id="sheet-001"/u);
+  assert.match(contextMenu.readySelector, /data-viewport-offset-x="0"/u);
   assert.match(contextMenu.readySelector, /nth-of-type\(1\)/u);
   assert.match(contextMenu.readySelector, /nth-of-type\(4\)/u);
 });
@@ -386,12 +505,17 @@ test("the manifest preserves Program 05 proofs and promotes Sheet reordering to 
       "focus",
       ...Array.from({ length: 12 }, () => "key"),
     ],
-    "sheet-reorder-bar-preview": ["click", "drag"],
-    "sheet-reorder-bar-commit": ["click", "drag"],
+    "sheet-reorder-bar-preview": ["focus", "key", "assert", "drag"],
+    "sheet-reorder-bar-commit": ["focus", "key", "assert", "drag"],
     "sheet-reorder-grid-preview": ["drag"],
     "sheet-reorder-grid-commit": ["drag"],
-    "sheet-reorder-cancelled": ["click", "drag"],
-    "sheet-reorder-cross-surface-cancelled": ["click", "drag"],
+    "sheet-reorder-cancelled": ["focus", "key", "assert", "drag"],
+    "sheet-reorder-cross-surface-cancelled": [
+      "focus",
+      "key",
+      "assert",
+      "drag",
+    ],
     "sheet-reorder-invalid-drop": ["drag"],
     "sheet-reorder-invalid-target-preview": ["drag"],
     "frame-multi-selection-mixed": ["click", "click"],
@@ -414,7 +538,7 @@ test("the manifest preserves Program 05 proofs and promotes Sheet reordering to 
     "sheet-reorder-invalid-target-preview",
   ]);
 
-  assert.equal(manifest.scenarios.length, 43 + Object.keys(expectedScenarios).length);
+  assert.equal(manifest.scenarios.length, 59 + Object.keys(expectedScenarios).length);
   for (const [id, actionTypes] of Object.entries(expectedScenarios)) {
     const scenario = scenariosById.get(id);
     assert.ok(scenario, `${id} is missing`);
@@ -461,8 +585,19 @@ test("the manifest preserves Program 05 proofs and promotes Sheet reordering to 
     const drag = scenariosById
       .get(id)
       .actions.find((action) => action.type === "drag");
-    assert.equal(drag.gesture, "html-dnd", `${id} must use native HTML DnD`);
+    assert.equal(drag.gesture, "pointer", `${id} must use pointer capture`);
   }
+  assert.deepEqual(
+    [
+      "sheet-reorder-bar-preview",
+      "sheet-reorder-bar-commit",
+    ].map((id) =>
+      scenariosById
+        .get(id)
+        .actions.find((action) => action.type === "drag").sourceXRatio,
+    ),
+    [0.25, 0.75],
+  );
   for (const id of [
     "sheet-reorder-bar-preview",
     "sheet-reorder-grid-preview",
@@ -508,6 +643,14 @@ test("the manifest preserves Program 05 proofs and promotes Sheet reordering to 
   ]) {
     assert.match(scenariosById.get(id).readySelector, /^\.app-shell:has/u);
   }
+  assert.match(
+    scenariosById.get("sheet-reorder-bar-preview").readySelector,
+    /reorder-ghost.*data-active-sides.*sheet-preview/u,
+  );
+  assert.match(
+    scenariosById.get("sheet-reorder-grid-preview").readySelector,
+    /reorder-ghost.*data-active-sides.*sheet-preview/u,
+  );
 
   const cancelled = scenariosById.get("sheet-reorder-cancelled");
   assert.match(cancelled.readySelector, /data-reorder-state="cancelled"/u);
@@ -527,7 +670,7 @@ test("the manifest preserves Program 05 proofs and promotes Sheet reordering to 
       },
       {
         type: "drag",
-        gesture: "html-dnd",
+        gesture: "pointer",
         selector:
           '[data-reorder-surface="grid"] [data-sheet-id="sheet-003"]',
         targetSelector:
@@ -560,11 +703,151 @@ test("the manifest preserves Program 05 proofs and promotes Sheet reordering to 
   assert.match(invalidTargetPreview.readySelector, /data-preview-order=/u);
 });
 
-test("manifest schema 3 accepts real context click, modifier, wheel, and drag actions", () => {
+test("the manifest exercises this UI correction batch in the real renderer", () => {
+  const scenariosById = new Map(
+    manifest.scenarios.map((scenario) => [scenario.id, scenario]),
+  );
+  for (const id of [
+    "project-recovery-modal",
+    "external-copy-opening-dialog",
+    "project-graphics-failure",
+    "project-text-selection-policy",
+    "canvas-keyboard-next-sheet",
+    "canvas-keyboard-previous-sheet",
+    "canvas-context-menu-surface-preserves-viewport",
+    "sheet-bar-selection-preserves-navigation",
+    "sheet-context-menu-outside-bar-click-preserves-navigation",
+    "sheet-context-menu-outside-grid-click-preserves-navigation",
+    "canvas-wheel-sheet-bar-forward",
+    "canvas-wheel-sheet-bar-backward",
+    "project-splitters-normal-100",
+    "project-splitter-horizontal-hover-125",
+    "project-splitter-vertical-focus-150",
+    "project-splitters-resized",
+  ]) {
+    assert.ok(scenariosById.has(id), `${id} is missing`);
+  }
+  assert.match(
+    scenariosById.get("project-recovery-modal").readySelector,
+    /aria-modal/u,
+  );
+  assert.match(
+    scenariosById.get("project-recovery-modal").readySelector,
+    /ui-owned-window-shell/u,
+  );
+  assert.match(
+    scenariosById.get("project-recovery-modal").readySelector,
+    /ui-application-header__status/u,
+  );
+  assert.match(
+    scenariosById.get("project-recovery-modal").implementationPath,
+    /^\/dialog\.html\?kind=project-recovery/u,
+  );
+  assert.deepEqual(
+    scenariosById.get("project-recovery-modal").viewport,
+    { width: 492, height: 320 },
+  );
+  assert.deepEqual(
+    scenariosById
+      .get("project-recovery-modal")
+      .actions.map((action) => action.type),
+    ["assert-single-line", "assert-single-line", "assert-single-line"],
+  );
+  assert.match(
+    scenariosById.get("external-copy-opening-dialog").implementationPath,
+    /^\/dialog\.html\?kind=external-copy/u,
+  );
+  assert.deepEqual(
+    scenariosById.get("external-copy-opening-dialog").viewport,
+    { width: 440, height: 320 },
+  );
+  assert.deepEqual(
+    scenariosById
+      .get("external-copy-opening-dialog")
+      .actions.map((action) => action.type),
+    ["assert-single-line", "assert-single-line"],
+  );
+  assert.match(
+    scenariosById.get("project-graphics-failure").implementationPath,
+    /^\/project-dialog\.html\?state=/u,
+  );
+  assert.match(
+    scenariosById.get("project-graphics-failure").readySelector,
+    /aria-modal/u,
+  );
+  assert.deepEqual(
+    scenariosById
+      .get("sheet-bar-selection-preserves-navigation")
+      .actions.map((action) => action.type),
+    ["assert", "focus", "key", "assert", "pointer-click", "assert", "assert"],
+  );
+  assert.equal(
+    scenariosById
+      .get("sheet-bar-selection-preserves-navigation")
+      .actions[2].key,
+    "ArrowRight",
+  );
+  assert.match(
+    scenariosById.get("sheet-bar-selection-preserves-navigation").readySelector,
+    /aria-current/u,
+  );
+  for (const id of [
+    "canvas-keyboard-next-sheet",
+    "canvas-keyboard-previous-sheet",
+  ]) {
+    assert.match(scenariosById.get(id).readySelector, /canvas-sheet-navigation/u);
+  }
+  for (const id of [
+    "canvas-wheel-sheet-bar-forward",
+    "canvas-wheel-sheet-bar-backward",
+  ]) {
+    assert.equal(scenariosById.get(id).actions.at(-1).type, "wheel");
+    assert.match(
+      scenariosById.get(id).actions.at(-1).selector,
+      /data-reorder-surface=.*bar/su,
+    );
+  }
+  assert.deepEqual(
+    [
+      scenariosById.get("project-splitters-normal-100").implementationPath,
+      scenariosById.get("project-splitter-horizontal-hover-125")
+        .implementationPath,
+      scenariosById.get("project-splitter-vertical-focus-150")
+        .implementationPath,
+    ],
+    [
+      "/workspace-preview.html?scale=1",
+      "/workspace-preview.html?scale=1.25",
+      "/workspace-preview.html?scale=1.5",
+    ],
+  );
+  assert.deepEqual(
+    scenariosById.get("project-text-selection-policy").actions.map(
+      ({ expect, type }) => ({ expect, type }),
+    ),
+    [
+      { expect: "none", type: "selection-drag" },
+      { expect: "control", type: "selection-drag" },
+    ],
+  );
+  assert.deepEqual(
+    scenariosById.get("new-project-operational-failure-dialog").actions,
+    [
+      {
+        expect: "text",
+        selector: ".ui-standard-message__description.ui-copyable-text",
+        type: "selection-drag",
+      },
+    ],
+  );
+});
+
+test("manifest schema 3 accepts real context click, hit-tested click, modifier, wheel, and drag actions", () => {
   const interactive = structuredClone(manifest);
   interactive.schemaVersion = 3;
   interactive.scenarios[0].actions = [
     { type: "context-click", selector: "#sheet" },
+    { type: "pointer-click", selector: "#sheet" },
     { type: "key", key: "Plus", modifiers: ["Control"] },
     { type: "click", selector: "#frame", modifiers: ["Control"] },
     {
@@ -575,32 +858,35 @@ test("manifest schema 3 accepts real context click, modifier, wheel, and drag ac
     },
     {
       type: "drag",
-      gesture: "html-dnd",
+      gesture: "pointer",
       selector: "#source",
+      sourceXRatio: 0.25,
       targetSelector: "#target",
       dropTargetSelector: "#opposite-surface",
       phase: "drop",
     },
     {
       type: "drag",
-      gesture: "html-dnd",
+      gesture: "pointer",
       selector: "#source",
       targetSelector: "#target",
       phase: "escape",
     },
+    { type: "selection-drag", selector: "#label", expect: "none" },
+    { type: "assert-single-line", selector: "#dialog-action" },
   ];
 
   assert.equal(validateUiAcceptanceManifest(interactive), interactive);
 
   const unknownModifier = structuredClone(interactive);
-  unknownModifier.scenarios[0].actions[1].modifiers = ["Alt"];
+  unknownModifier.scenarios[0].actions[2].modifiers = ["Alt"];
   assert.throws(
     () => validateUiAcceptanceManifest(unknownModifier),
     /modifier.*not supported/u,
   );
 
   const duplicateModifier = structuredClone(interactive);
-  duplicateModifier.scenarios[0].actions[1].modifiers = [
+  duplicateModifier.scenarios[0].actions[2].modifiers = [
     "Control",
     "Control",
   ];
@@ -610,38 +896,59 @@ test("manifest schema 3 accepts real context click, modifier, wheel, and drag ac
   );
 
   const zeroWheel = structuredClone(interactive);
-  zeroWheel.scenarios[0].actions[3].deltaY = 0;
+  zeroWheel.scenarios[0].actions[4].deltaY = 0;
   assert.throws(
     () => validateUiAcceptanceManifest(zeroWheel),
     /deltaY.*non-zero integer/u,
   );
 
   const invalidDrag = structuredClone(interactive);
-  invalidDrag.scenarios[0].actions[4].phase = "hover";
+  invalidDrag.scenarios[0].actions[5].phase = "hover";
   assert.throws(
     () => validateUiAcceptanceManifest(invalidDrag),
     /phase.*preview, drop, or escape/u,
   );
 
   const invalidDropTarget = structuredClone(interactive);
-  invalidDropTarget.scenarios[0].actions[4].dropTargetSelector = "";
+  invalidDropTarget.scenarios[0].actions[5].dropTargetSelector = "";
   assert.throws(
     () => validateUiAcceptanceManifest(invalidDropTarget),
     /dropTargetSelector.*non-empty string/u,
   );
 
   const invalidGesture = structuredClone(interactive);
-  invalidGesture.scenarios[0].actions[4].gesture = "native";
+  invalidGesture.scenarios[0].actions[5].gesture = "native";
   assert.throws(
     () => validateUiAcceptanceManifest(invalidGesture),
-    /gesture.*html-dnd/u,
+    /gesture.*pointer/u,
   );
 
-  const escapeWithoutHtmlDragAndDrop = structuredClone(interactive);
-  delete escapeWithoutHtmlDragAndDrop.scenarios[0].actions[5].gesture;
+  const invalidSourceRatio = structuredClone(interactive);
+  invalidSourceRatio.scenarios[0].actions[5].sourceXRatio = 1;
   assert.throws(
-    () => validateUiAcceptanceManifest(escapeWithoutHtmlDragAndDrop),
-    /phase escape.*html-dnd/u,
+    () => validateUiAcceptanceManifest(invalidSourceRatio),
+    /sourceXRatio.*between 0 and 1/u,
+  );
+
+  const ratioWithoutPointerCapture = structuredClone(interactive);
+  delete ratioWithoutPointerCapture.scenarios[0].actions[5].gesture;
+  assert.throws(
+    () => validateUiAcceptanceManifest(ratioWithoutPointerCapture),
+    /sourceXRatio.*gesture pointer/u,
+  );
+
+  const escapeWithoutPointerCapture = structuredClone(interactive);
+  delete escapeWithoutPointerCapture.scenarios[0].actions[6].gesture;
+  assert.throws(
+    () => validateUiAcceptanceManifest(escapeWithoutPointerCapture),
+    /phase escape.*pointer/u,
+  );
+
+  const invalidSelectionExpectation = structuredClone(interactive);
+  invalidSelectionExpectation.scenarios[0].actions[7].expect = "native";
+  assert.throws(
+    () => validateUiAcceptanceManifest(invalidSelectionExpectation),
+    /expect must be control, none, or text/u,
   );
 });
 
@@ -657,7 +964,9 @@ test("runner executes focus, hover, keyboard and input actions through WebDriver
   const locateText = async (text) => `text:${text}`;
   const execute = async (script, args) => {
     executions.push({ args, script });
-    return true;
+    return script.includes("document.activeElement")
+      ? { "element-6066-11e4-a52e-4f735466cecf": "element:#target" }
+      : true;
   };
   const common = {
     execute,
@@ -709,27 +1018,63 @@ test("runner executes focus, hover, keyboard and input actions through WebDriver
     ...common,
     action: { type: "key", key: "Enter" },
   });
-  assert.deepEqual(requests.at(-1).body.actions[0].actions, [
-    { type: "keyDown", value: "\uE007" },
-    { type: "keyUp", value: "\uE007" },
-  ]);
+  assert.deepEqual(requests.at(-1), {
+    method: "POST",
+    endpoint: "/session/session-1/element/element%3A%23target/value",
+    body: { text: "\uE007", value: ["\uE007"] },
+  });
 
   await performUiAcceptanceAction({
     ...common,
     action: { type: "key", key: "Space" },
   });
-  assert.deepEqual(requests.at(-1).body.actions[0].actions, [
-    { type: "keyDown", value: "\uE00D" },
-    { type: "keyUp", value: "\uE00D" },
-  ]);
+  assert.deepEqual(requests.at(-1).body, {
+    text: "\uE00D",
+    value: ["\uE00D"],
+  });
 
   await performUiAcceptanceAction({
     ...common,
     action: { type: "key", key: "Escape" },
   });
-  assert.deepEqual(requests.at(-1).body.actions[0].actions, [
-    { type: "keyDown", value: "\uE00C" },
-    { type: "keyUp", value: "\uE00C" },
+  assert.deepEqual(requests.at(-1).body, {
+    text: "\uE00C",
+    value: ["\uE00C"],
+  });
+
+  await performUiAcceptanceAction({
+    ...common,
+    action: { type: "key", key: "ArrowRight" },
+  });
+  assert.deepEqual(requests.slice(-2), [
+    {
+      method: "POST",
+      endpoint: "/session/session-1/ms/cdp/execute",
+      body: {
+        cmd: "Input.dispatchKeyEvent",
+        params: {
+          code: "ArrowRight",
+          key: "ArrowRight",
+          nativeVirtualKeyCode: 39,
+          type: "rawKeyDown",
+          windowsVirtualKeyCode: 39,
+        },
+      },
+    },
+    {
+      method: "POST",
+      endpoint: "/session/session-1/ms/cdp/execute",
+      body: {
+        cmd: "Input.dispatchKeyEvent",
+        params: {
+          code: "ArrowRight",
+          key: "ArrowRight",
+          nativeVirtualKeyCode: 39,
+          type: "keyUp",
+          windowsVirtualKeyCode: 39,
+        },
+      },
+    },
   ]);
 
   await performUiAcceptanceAction({
@@ -750,7 +1095,7 @@ test("runner executes focus, hover, keyboard and input actions through WebDriver
   ]);
 });
 
-test("runner emits a real W3C secondary-button click for context menus", async () => {
+test("runner emits real W3C secondary-button and hit-tested primary clicks", async () => {
   const { performUiAcceptanceAction } = await import(
     "./UiAcceptanceRunner.mjs"
   );
@@ -758,6 +1103,18 @@ test("runner emits a real W3C secondary-button click for context menus", async (
 
   await performUiAcceptanceAction({
     action: { type: "context-click", selector: "#sheet" },
+    execute: async () => true,
+    locateSelector: async (selector) => `element:${selector}`,
+    locateText: async (text) => `text:${text}`,
+    request: async (method, endpoint, body) => {
+      requests.push({ body, endpoint, method });
+      return null;
+    },
+    sessionId: "session-context-click",
+  });
+
+  await performUiAcceptanceAction({
+    action: { type: "pointer-click", selector: "#underlay" },
     execute: async () => true,
     locateSelector: async (selector) => `element:${selector}`,
     locateText: async (text) => `text:${text}`,
@@ -790,6 +1147,32 @@ test("runner emits a real W3C secondary-button click for context menus", async (
               },
               { type: "pointerDown", button: 2 },
               { type: "pointerUp", button: 2 },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      method: "POST",
+      endpoint: "/session/session-context-click/actions",
+      body: {
+        actions: [
+          {
+            type: "pointer",
+            id: "acceptance-pointer",
+            parameters: { pointerType: "mouse" },
+            actions: [
+              {
+                type: "pointerMove",
+                duration: 0,
+                origin: {
+                  "element-6066-11e4-a52e-4f735466cecf": "element:#underlay",
+                },
+                x: 0,
+                y: 0,
+              },
+              { type: "pointerDown", button: 0 },
+              { type: "pointerUp", button: 0 },
             ],
           },
         ],
@@ -958,7 +1341,7 @@ test("runner emits W3C actions for Ctrl gestures, wheel, and preview or committe
   });
 });
 
-test("runner initiates declared HTML drag-and-drop through the proven WebDriver sequence", async () => {
+test("runner initiates declared pointer capture through the proven WebDriver sequence", async () => {
   const { performUiAcceptanceAction } = await import(
     "./UiAcceptanceRunner.mjs"
   );
@@ -967,23 +1350,30 @@ test("runner initiates declared HTML drag-and-drop through the proven WebDriver 
   await performUiAcceptanceAction({
     action: {
       type: "drag",
-      gesture: "html-dnd",
+      gesture: "pointer",
       selector: "#source",
+      sourceXRatio: 0.25,
       targetSelector: "#target",
       phase: "preview",
     },
     execute: async (script, args) => {
       executions.push({ args, script });
+      if (script.includes("getBoundingClientRect")) {
+        return {
+          source: { x: 100, y: 200 },
+          target: { x: 300, y: 220 },
+          dropTarget: null,
+        };
+      }
       return true;
     },
     locateSelector: async (selector) => `element:${selector}`,
     locateText: async (text) => `text:${text}`,
     request: async (method, endpoint, body) => {
       requests.push({ body, endpoint, method });
-      if (endpoint.endsWith("/attribute/draggable")) return "true";
       return null;
     },
-    sessionId: "session-html-dnd",
+    sessionId: "session-pointer",
   });
 
   assert.match(executions[0].script, /scrollIntoView/u);
@@ -992,50 +1382,120 @@ test("runner initiates declared HTML drag-and-drop through the proven WebDriver 
       "element-6066-11e4-a52e-4f735466cecf": "element:#source",
     },
   ]);
-  assert.deepEqual(requests[0], {
-    method: "GET",
-    endpoint:
-      "/session/session-html-dnd/element/element%3A%23source/attribute/draggable",
-    body: undefined,
-  });
+  assert.match(executions[1].script, /getBoundingClientRect/u);
+  assert.equal(executions[1].args[3], 0.25);
   assert.deepEqual(
     requests.at(-1).body.actions[0].actions,
     [
       {
         type: "pointerMove",
         duration: 0,
-        origin: {
-          "element-6066-11e4-a52e-4f735466cecf": "element:#source",
-        },
-        x: 0,
-        y: 0,
+        origin: "viewport",
+        x: 100,
+        y: 200,
       },
       { type: "pointerDown", button: 0 },
-      { type: "pause", duration: 200 },
+      { type: "pause", duration: 80 },
       {
         type: "pointerMove",
-        duration: 200,
-        origin: {
-          "element-6066-11e4-a52e-4f735466cecf": "element:#source",
-        },
-        x: 10,
-        y: 10,
+        duration: 120,
+        origin: "viewport",
+        x: 110,
+        y: 201,
       },
       {
         type: "pointerMove",
-        duration: 600,
-        origin: {
-          "element-6066-11e4-a52e-4f735466cecf": "element:#target",
-        },
-        x: 0,
-        y: 0,
+        duration: 450,
+        origin: "viewport",
+        x: 300,
+        y: 220,
       },
-      { type: "pause", duration: 250 },
+      { type: "pause", duration: 100 },
     ],
   );
 });
 
-test("runner limits Escape cancellation and its deterministic fallback to HTML drag-and-drop", async () => {
+test("runner verifies native selection policy through real pointer motion", async () => {
+  const { performUiAcceptanceAction } = await import(
+    "./UiAcceptanceRunner.mjs"
+  );
+  const requests = [];
+  let executionCount = 0;
+  await performUiAcceptanceAction({
+    action: {
+      type: "selection-drag",
+      selector: "#chrome-label",
+      expect: "none",
+    },
+    execute: async () => {
+      executionCount += 1;
+      return executionCount === 1
+        ? { startX: -40, startY: -5, endX: 40, endY: 5 }
+        : { controlSelection: 0, documentSelection: 0 };
+    },
+    locateSelector: async (selector) => `element:${selector}`,
+    locateText: async (text) => `text:${text}`,
+    request: async (method, endpoint, body) => {
+      requests.push({ body, endpoint, method });
+      return null;
+    },
+    sessionId: "session-selection",
+  });
+
+  assert.deepEqual(
+    requests[0].body.actions[0].actions.map((action) => action.type),
+    ["pointerMove", "pointerDown", "pointerMove", "pointerUp"],
+  );
+  assert.deepEqual(
+    requests[0].body.actions[0].actions
+      .filter((action) => action.type === "pointerMove")
+      .map(({ x, y }) => ({ x, y })),
+    [
+      { x: -40, y: -5 },
+      { x: 40, y: 5 },
+    ],
+  );
+  assert.equal(executionCount, 2);
+});
+
+test("runner rejects a dialog action whose rendered label occupies more than one line", async () => {
+  const { performUiAcceptanceAction } = await import(
+    "./UiAcceptanceRunner.mjs"
+  );
+  const common = {
+    action: {
+      type: "assert-single-line",
+      selector: "#dialog-action",
+    },
+    locateSelector: async (selector) => `element:${selector}`,
+    locateText: async (text) => `text:${text}`,
+    request: async () => null,
+    sessionId: "session-dialog-geometry",
+  };
+
+  await assert.rejects(
+    performUiAcceptanceAction({
+      ...common,
+      execute: async () => ({
+        clientWidth: 112,
+        lineCount: 2,
+        scrollWidth: 112,
+      }),
+    }),
+    /expected one rendered line/u,
+  );
+
+  await performUiAcceptanceAction({
+    ...common,
+    execute: async () => ({
+      clientWidth: 168,
+      lineCount: 1,
+      scrollWidth: 168,
+    }),
+  });
+});
+
+test("runner limits Escape cancellation and its deterministic fallback to captured pointer reordering", async () => {
   const { performUiAcceptanceAction } = await import(
     "./UiAcceptanceRunner.mjs"
   );
@@ -1045,13 +1505,20 @@ test("runner limits Escape cancellation and its deterministic fallback to HTML d
   await performUiAcceptanceAction({
     action: {
       type: "drag",
-      gesture: "html-dnd",
+      gesture: "pointer",
       selector: "#source",
       targetSelector: "#target",
       phase: "escape",
     },
     execute: async (script, args) => {
       executions.push({ args, script });
+      if (script.includes("getBoundingClientRect")) {
+        return {
+          source: { x: 100, y: 100 },
+          target: { x: 200, y: 100 },
+          dropTarget: null,
+        };
+      }
       if (script.includes("document.querySelector")) {
         activeStateChecks += 1;
         return activeStateChecks === 1;
@@ -1062,22 +1529,21 @@ test("runner limits Escape cancellation and its deterministic fallback to HTML d
     locateText: async (text) => `text:${text}`,
     request: async (method, endpoint, body) => {
       requests.push({ body, endpoint, method });
-      if (endpoint.endsWith("/attribute/draggable")) return "true";
       return null;
     },
-    sessionId: "session-html-dnd-escape",
+    sessionId: "session-pointer-escape",
   });
 
   assert.deepEqual(requests.slice(-2), [
     {
       method: "POST",
       endpoint:
-        "/session/session-html-dnd-escape/element/element%3Abody/value",
+        "/session/session-pointer-escape/element/element%3Abody/value",
       body: { text: "\uE00C", value: ["\uE00C"] },
     },
     {
       method: "DELETE",
-      endpoint: "/session/session-html-dnd-escape/actions",
+      endpoint: "/session/session-pointer-escape/actions",
       body: undefined,
     },
   ]);
@@ -1219,7 +1685,7 @@ test("runner snapshots HEAD and dirty state before and after capture", () => {
   const initialSnapshot = runner.indexOf(
     "const initialSourceInputs = captureSourceInputs();",
   );
-  const captureLoop = runner.indexOf("for (const scenario of manifest.scenarios)");
+  const captureLoop = runner.indexOf("for (const scenario of scenariosToCapture)");
   const finalSnapshot = runner.indexOf(
     "const sourceInputsResult = finalizeUiAcceptanceSourceEvidence(",
   );
@@ -1245,6 +1711,93 @@ test("runner snapshots HEAD and dirty state before and after capture", () => {
     /sourceInputsResult\.changedDuringCapture[\s\S]*process\.exitCode = 1/u,
     "source mutation must fail the capture gate",
   );
+});
+
+test("runner reloads every captured surface with a scenario-isolated URL", () => {
+  const runner = readFileSync(
+    path.join(workspace, "scripts", "Run-UiAcceptance.mjs"),
+    "utf8",
+  );
+
+  assert.match(
+    runner,
+    /targetUrl\.searchParams\.set\("ui-acceptance-scenario", label\)/u,
+    "a repeated implementationPath must still perform a document navigation",
+  );
+  assert.match(
+    runner,
+    /url: targetUrl\.href/u,
+    "WebDriver must receive the isolated URL",
+  );
+  assert.match(runner, /MYALBUNS_UI_DEVICE_SCALE_FACTOR/u);
+  assert.match(runner, /MYALBUNS_UI_SCENARIO_IDS/u);
+  assert.match(runner, /for \(const scenario of scenariosToCapture\)/u);
+  assert.match(
+    runner,
+    /`--force-device-scale-factor=\$\{deviceScaleFactor\}`/u,
+    "the real renderer scale must be selectable without changing scenario geometry",
+  );
+  assert.match(
+    runner,
+    /const MAX_SCALED_VIEWPORT_ROUNDING = 4;[\s\S]*const viewportRoundingTolerance =\s*deviceScaleFactor === 1 \? 0 : MAX_SCALED_VIEWPORT_ROUNDING/u,
+    "scaled viewport setup may admit only bounded browser-chrome rounding",
+  );
+});
+
+test("runner can capture a viewport narrower than the Edge window minimum", () => {
+  const runner = readFileSync(
+    path.join(workspace, "scripts", "Run-UiAcceptance.mjs"),
+    "utf8",
+  );
+
+  assert.match(runner, /Emulation\.clearDeviceMetricsOverride/u);
+  assert.match(runner, /Emulation\.setDeviceMetricsOverride/u);
+  assert.match(
+    runner,
+    /setDeviceMetricsOverride[\s\S]*deviceScaleFactor[\s\S]*mobile:\s*false/u,
+  );
+});
+
+test("runner scrolls an opposite drop surface into the pointer viewport", async () => {
+  const { performUiAcceptanceAction } = await import(
+    "./UiAcceptanceRunner.mjs"
+  );
+  const executions = [];
+
+  await performUiAcceptanceAction({
+    action: {
+      type: "drag",
+      gesture: "pointer",
+      selector: "#source",
+      targetSelector: "#target",
+      dropTargetSelector: "#opposite-surface",
+      phase: "drop",
+    },
+    execute: async (script, args) => {
+      executions.push({ args, script });
+      if (script.includes("getBoundingClientRect")) {
+        return {
+          source: { x: 100, y: 200 },
+          target: { x: 300, y: 220 },
+          dropTarget: { x: 1_200, y: 420 },
+        };
+      }
+      return true;
+    },
+    locateSelector: async (selector) => `element:${selector}`,
+    locateText: async (text) => `text:${text}`,
+    request: async () => null,
+    sessionId: "session-cross-surface",
+  });
+
+  assert.match(executions[1].script, /scrollIntoView/u);
+  assert.deepEqual(executions[1].args, [
+    {
+      "element-6066-11e4-a52e-4f735466cecf":
+        "element:#opposite-surface",
+    },
+  ]);
+  assert.match(executions[2].script, /getBoundingClientRect/u);
 });
 
 test("the report labels captures as unreviewed and includes every scenario", () => {

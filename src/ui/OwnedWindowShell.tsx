@@ -42,7 +42,10 @@ export function OwnedWindowShell({
   }, [windowControls]);
 
   return (
-    <div className="ui-owned-window-shell" ref={shellRef}>
+    <div
+      className="ui-owned-window-shell ui-chrome-selection-scope"
+      ref={shellRef}
+    >
       <ApplicationHeader controls={controls} status={status} />
       {children}
     </div>

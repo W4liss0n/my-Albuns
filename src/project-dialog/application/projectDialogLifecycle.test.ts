@@ -40,6 +40,10 @@ test.each<{
     state: { kind: "projectOperationFailure", message: "Falhou" },
   },
   {
+    expected: "closeProjectAfterGraphicsFailure",
+    state: { kind: "graphicsFailure", reason: "WebGL2 indisponível" },
+  },
+  {
     expected: "cancelExport",
     state: {
       cancelRequested: false,

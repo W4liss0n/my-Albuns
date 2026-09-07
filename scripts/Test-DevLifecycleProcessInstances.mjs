@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -65,12 +65,10 @@ test("an isolated launch returns the exact process instance without a PID handof
   const standardOutputPath = path.join(root, "fixture.out.log");
   const standardErrorPath = path.join(root, "fixture.err.log");
   const authorityPath = path.join(root, "fixture.instance.json");
+  writeFileSync(path.join(root, "fixture.cjs"), "setInterval(() => {}, 1000);\n");
   const instance = startProcessInstanceInOwnConsole({
-    executablePath: path.join(
-      process.env.SystemRoot,
-      "System32",
-      "notepad.exe",
-    ),
+    executablePath: process.execPath,
+    arguments: ["fixture.cjs"],
     workingDirectory: root,
     standardOutputPath,
     standardErrorPath,
@@ -164,7 +162,7 @@ descendant.unref();`,
   assert.match(output, /OUTPUT_DRAINED/);
 });
 
-test("an unresponsive exact window makes bounded close fail without hanging cleanup", async () => {
+test("an unresponsive exact window makes bounded close fail without hanging cleanup", { skip: process.env.MYALBUNS_NATIVE_PROBE_TESTS !== "1" }, async () => {
   const child = spawn(
     "powershell.exe",
     [
@@ -199,7 +197,7 @@ test("an unresponsive exact window makes bounded close fail without hanging clea
   }
 });
 
-test("an exact responsive window receives bounded native close", async () => {
+test("an exact responsive window receives bounded native close", { skip: process.env.MYALBUNS_NATIVE_PROBE_TESTS !== "1" }, async () => {
   const child = spawn(
     "powershell.exe",
     [

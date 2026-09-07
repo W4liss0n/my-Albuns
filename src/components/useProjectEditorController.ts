@@ -258,6 +258,7 @@ export function useProjectEditorController({
     structuralMutationPending,
     canvasProps,
     navigateToSheet: navigation.navigateToSheet,
+    navigateToAdjacentSheet: navigation.navigateToAdjacentSheet,
     beginZoomGesture: photoGestures.beginZoomGesture,
     updateZoomGesture: photoGestures.updateZoomGesture,
     finishZoomGesture: photoGestures.finishZoomGesture,

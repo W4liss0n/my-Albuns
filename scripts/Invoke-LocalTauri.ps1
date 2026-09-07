@@ -10,6 +10,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Local-Toolchain.ps1')
+. (Join-Path $PSScriptRoot 'Local-TauriBuild.ps1')
 Initialize-MyAlbunsToolchain
 
 Push-Location $script:WorkspaceRoot
@@ -47,21 +48,7 @@ try {
     if ($ProjectPath) {
         throw '-ProjectPath is available only for the development launcher.'
     }
-    $sidecarProfile = if ($TauriArguments -contains '--debug') {
-        'debug'
-    }
-    else {
-        'release'
-    }
-    & (Join-Path $PSScriptRoot 'Prepare-Sidecar.ps1') -Profile $sidecarProfile
-    if ($LASTEXITCODE -ne 0) {
-        exit $LASTEXITCODE
-    }
-    $tauriCommand = Join-Path $script:WorkspaceRoot 'node_modules\.bin\tauri.cmd'
-    if (-not (Test-Path -LiteralPath $tauriCommand)) {
-        throw 'The local Tauri CLI does not exist. Run npm run setup:local.'
-    }
-    & $tauriCommand build @TauriArguments
+    Invoke-MyAlbunsTauriBuild -TauriArguments $TauriArguments
     exit $LASTEXITCODE
 }
 finally {

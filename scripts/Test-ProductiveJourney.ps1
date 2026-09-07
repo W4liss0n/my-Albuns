@@ -1,9 +1,12 @@
 param(
     [string] $OutputPath,
-    [string] $ArtifactDirectory
+    [string] $ArtifactDirectory,
+    [switch] $AllowVisibleWindows
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Native-GatePolicy.ps1')
+Assert-NativeGateExecutionAllowed -AllowVisibleWindows:$AllowVisibleWindows
 
 . (Join-Path $PSScriptRoot 'Local-Toolchain.ps1')
 . (Join-Path $PSScriptRoot 'Gate-SourceProvenance.ps1')
@@ -296,9 +299,22 @@ try {
     }
     $gate = $gateOutput | Select-Object -Last 1 | ConvertFrom-Json
     $expectedRecoveryChoices = @(
-        'Reabrir e recuperar',
+        "Agora n$([char]0x00E3)o",
         "Abrir $([char]0x00FA)ltima vers$([char]0x00E3)o salva",
-        "Agora n$([char]0x00E3)o"
+        'Reabrir e recuperar'
+    )
+    $expectedExternalCopyChoices = @(
+        'Cancelar',
+        "Salvar c$([char]0x00F3)pia como$([char]0x2026)"
+    )
+    $recoveryActionGeometry = @(
+        $gate.sessionRecovery.presentation.actionGeometry
+    )
+    $invalidRecoveryActionGeometry = @(
+        $recoveryActionGeometry | Where-Object {
+            $_.lineCount -ne 1 -or
+            $_.scrollWidth -gt ($_.clientWidth + 1)
+        }
     )
     $contractViolations = @()
     if (
@@ -342,9 +358,80 @@ try {
         -not $gate.sessionRecovery.postRecoveryActionsCheckpointed -or
         -not $gate.sessionRecovery.checkpointPreservedByCancelledSaveAs -or
         -not $gate.sessionRecovery.checkpointFinishedBySuccessfulSaveAs -or
-        -not $gate.sessionRecovery.lockReleasedToDistinctHost
+        -not $gate.sessionRecovery.lockReleasedToDistinctHost -or
+        $gate.sessionRecovery.presentation.dialogCount -ne 1 -or
+        $gate.sessionRecovery.presentation.modalLayerCount -ne 0 -or
+        $gate.sessionRecovery.presentation.ownerSurfaceCount -ne 0 -or
+        $gate.sessionRecovery.presentation.ownedShellCount -ne 1 -or
+        $gate.sessionRecovery.presentation.fullPageRecoveryCount -ne 0 -or
+        $gate.sessionRecovery.presentation.ariaModal -cne 'true' -or
+        $gate.sessionRecovery.presentation.owner -cne 'global-opening' -or
+        $gate.sessionRecovery.presentation.title -cne "Recuperar trabalho n$([char]0x00E3)o salvo?" -or
+        $gate.sessionRecovery.presentation.initialFocus -cne 'Reabrir e recuperar' -or
+        -not $gate.sessionRecovery.presentation.contentFitted -or
+        $gate.sessionRecovery.presentation.viewportWidth -ne 492 -or
+        $recoveryActionGeometry.Count -ne 3 -or
+        $invalidRecoveryActionGeometry.Count -ne 0 -or
+        -not $gate.sessionRecovery.presentation.externalDialog -or
+        -not $gate.sessionRecovery.presentation.openedFromLoadingOwner -or
+        -not $gate.sessionRecovery.presentation.globalRoutePreserved -or
+        $gate.sessionRecovery.presentation.recoveryDialogTargetCount -ne 1 -or
+        $gate.sessionRecovery.presentation.hostWebViewBeforeDecision -or
+        $gate.sessionRecovery.presentation.projectVisibleBeforeDecision -or
+        -not $gate.sessionRecovery.presentation.projectRouteNormal -or
+        -not $gate.sessionRecovery.presentation.sameOpeningWindow -or
+        -not $gate.sessionRecovery.presentation.stableOpeningOwner -or
+        -not $gate.sessionRecovery.presentation.queuedActivationPreservedOwner -or
+        -not $gate.sessionRecovery.presentation.singleHostDuringQueuedActivation
     ) {
         $contractViolations += 'sessionRecovery'
+    }
+    if (
+        $gate.externalCopyOpening.choices.Count -ne 2 -or
+        $gate.externalCopyOpening.choices[0] -cne $expectedExternalCopyChoices[0] -or
+        $gate.externalCopyOpening.choices[1] -cne $expectedExternalCopyChoices[1] -or
+        $gate.externalCopyOpening.dialogCount -ne 1 -or
+        $gate.externalCopyOpening.modalLayerCount -ne 0 -or
+        $gate.externalCopyOpening.ownedShellCount -ne 1 -or
+        $gate.externalCopyOpening.ariaModal -cne 'true' -or
+        $gate.externalCopyOpening.title -cne "C$([char]0x00F3)pia externa somente leitura" -or
+        $gate.externalCopyOpening.initialFocus -cne $expectedExternalCopyChoices[1] -or
+        $gate.externalCopyOpening.viewportWidth -ne 440 -or
+        -not $gate.externalCopyOpening.externalDialog -or
+        -not $gate.externalCopyOpening.openedFromLoadingOwner -or
+        -not $gate.externalCopyOpening.globalRoutePreserved -or
+        $gate.externalCopyOpening.decisionDialogTargetCount -ne 1 -or
+        $gate.externalCopyOpening.hostWebViewBeforeDecision -or
+        $gate.externalCopyOpening.projectVisibleBeforeDecision -or
+        -not $gate.externalCopyOpening.cancelRestoredGlobalAndCleanedHost -or
+        -not $gate.externalCopyOpening.emptyActivationDidNotResurrectGlobal -or
+        -not $gate.externalCopyOpening.emptyActivationPreservedPendingOwner -or
+        -not $gate.externalCopyOpening.nativeOwnerReplaced -or
+        -not $gate.externalCopyOpening.pickerCancellationPreservedAttempt -or
+        -not $gate.externalCopyOpening.realPathActivationsCompletedSerially -or
+        -not $gate.externalCopyOpening.queuedActivationPreservedOwner -or
+        -not $gate.externalCopyOpening.samePendingHostCompletedHandoff -or
+        -not $gate.externalCopyOpening.sourcePreserved -or
+        -not $gate.externalCopyOpening.revisionPreserved -or
+        -not $gate.externalCopyOpening.identityIsolated -or
+        -not $gate.externalCopyOpening.pickerOwnedByOpeningProcess
+    ) {
+        $contractViolations += 'externalCopyOpening'
+    }
+    if (
+        -not $gate.graphicsFailure.cancelledCloseRearmedSingleDialog -or
+        -not $gate.graphicsFailure.dialogOwnedByProject -or
+        -not $gate.graphicsFailure.hostCleanedAfterTerminal -or
+        $gate.graphicsFailure.inlineFailureCount -ne 0 -or
+        $gate.graphicsFailure.ownerEnabledWhileOpen -ne $false -or
+        $gate.graphicsFailure.ownerVisibleWhileOpen -ne $true -or
+        -not $gate.graphicsFailure.projectCanvasRemainedMounted -or
+        $gate.graphicsFailure.projectDialogTargetCount -ne 1 -or
+        -not $gate.graphicsFailure.workspaceBusyBeforeDialogTerminal -or
+        -not $gate.graphicsFailure.workspaceInertBeforeDialogTerminal -or
+        -not $gate.graphicsFailure.exportDisabledBeforeDialogTerminal
+    ) {
+        $contractViolations += 'graphicsFailure'
     }
     if (
         -not $gate.saveAs.cancelledBeforeCore -or
@@ -645,6 +732,13 @@ try {
                 -SourcePath $processLog.FullName `
                 -RelativePath $relativeLogPath
         }
+        foreach ($driverLog in @(
+                Get-ChildItem -LiteralPath $runRoot -File -Filter 'webdriver-*.log'
+            )) {
+            $retainedFiles += Copy-RetainedArtifact `
+                -SourcePath $driverLog.FullName `
+                -RelativePath $driverLog.Name
+        }
         foreach ($projectFile in @(
                 Get-ChildItem -LiteralPath $runRoot -Recurse -File |
                     Where-Object {
@@ -699,6 +793,11 @@ try {
         'create-only-causal-handoff',
         'project-core-save-history',
         'crash-recovery-distinct-host',
+        'external-copy-opening-owner-and-host',
+        'external-copy-cancel-picker-retry-and-queued-activations',
+        'external-copy-native-picker-owned-handoff',
+        'late-graphics-failure-project-owned-dialog',
+        'late-graphics-failure-cancel-rearm-cleanup',
         'interrupted-gesture-keeps-previous-checkpoint',
         'recovered-project-unsaved-empty-history',
         'native-save-as-cancel-before-core',
@@ -820,6 +919,8 @@ try {
             reimportedExistingPhotoWithoutRevision = [bool] $gate.reimportedExistingPhotoWithoutRevision
             physicalAlbumStructure = $gate.physicalAlbumStructure
             sessionRecovery = $gate.sessionRecovery
+            externalCopyOpening = $gate.externalCopyOpening
+            graphicsFailure = $gate.graphicsFailure
             saveAs = $gate.saveAs
             originalUnchanged = [bool] $gate.originalUnchanged
             missingOriginalBlocked = [bool] $gate.missingOriginalBlocked
@@ -864,6 +965,41 @@ try {
     )
     Write-Output "Productive journey report: $OutputPath"
     Write-Output $json
+}
+catch {
+    $gateFailure = $_
+    if ($null -ne $retainedArtifactDirectory -and
+        (Test-Path -LiteralPath $runRoot -PathType Container)) {
+        try {
+            New-Item -ItemType Directory -Force -Path $retainedArtifactDirectory |
+                Out-Null
+            foreach ($diagnostic in @(
+                    Get-ChildItem -LiteralPath $runRoot -Recurse -File |
+                        Where-Object {
+                            $_.Extension -in @('.jsonl', '.log') -or
+                            $_.Name -eq 'failure.json' -or
+                            $_.Name -like 'failure-*.png'
+                        }
+                )) {
+                $relativePath = Get-ContainedRelativePath `
+                    -ParentPath $runRoot -ChildPath $diagnostic.FullName
+                Copy-RetainedArtifact `
+                    -SourcePath $diagnostic.FullName `
+                    -RelativePath $relativePath | Out-Null
+            }
+            [System.IO.File]::WriteAllText(
+                (Join-Path $retainedArtifactDirectory 'failure-wrapper.txt'),
+                $gateFailure.ToString() + [Environment]::NewLine +
+                    $gateFailure.ScriptStackTrace,
+                [System.Text.UTF8Encoding]::new($false)
+            )
+            Write-Warning "Productive journey failure diagnostics: $retainedArtifactDirectory"
+        }
+        catch {
+            Write-Warning "Could not retain productive journey failure diagnostics: $_"
+        }
+    }
+    throw $gateFailure
 }
 finally {
     if (-not $runRootCleaned -and (Test-Path -LiteralPath $runRoot)) {

@@ -18,7 +18,7 @@ export function SafeApplicationShell({
   const [surface, setSurface] = useState<SafeSurface>("welcome");
 
   return (
-    <main className="safe-application-shell">
+    <main className="safe-application-shell ui-chrome-selection-scope">
       <ApplicationHeader status="modo seguro" />
       <div className="safe-application-shell__body">
         <section className="startup-card safe-shell">
@@ -104,7 +104,9 @@ function WelcomeSurface({
         A criação e a abertura de Projetos permanecem bloqueadas porque este
         computador não confirmou a aceleração gráfica exigida pelo editor.
       </p>
-      <p role="status">{diagnostic.reason}</p>
+      <p className="ui-copyable-text" role="status">
+        {diagnostic.reason}
+      </p>
       <div className="safe-shell-actions">
         <ActionButton onClick={onOpenSettings}>
           Abrir Configurações
@@ -221,8 +223,8 @@ function DiagnosticSurface({
     <div className="safe-shell-content">
       <p className="eyebrow">Editor bloqueado</p>
       <h1>Diagnóstico gráfico</h1>
-      <p>{diagnostic.reason}</p>
-      <dl className="diagnostic-list">
+      <p className="ui-copyable-text">{diagnostic.reason}</p>
+      <dl className="diagnostic-list ui-copyable-text">
         <div>
           <dt>Backend detectado</dt>
           <dd>{diagnostic.renderer}</dd>

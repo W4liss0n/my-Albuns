@@ -6,7 +6,6 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-Import-Module Microsoft.PowerShell.Utility
 . (Join-Path $PSScriptRoot 'Local-Toolchain.ps1')
 . (Join-Path $PSScriptRoot 'Gate-SourceProvenance.ps1')
 . (Join-Path $PSScriptRoot 'Gate-ScratchDirectory.ps1')

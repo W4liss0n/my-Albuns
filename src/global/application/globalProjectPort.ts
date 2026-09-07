@@ -8,12 +8,13 @@ export interface ProjectLaunchFailure {
 export type ProjectLaunchOutcome =
   | { status: "opened" }
   | { status: "focused" }
-  | { status: "externalCopyNotWritable" }
   | { status: "cancelled" }
   | { status: "failed"; error: ProjectLaunchFailure };
 
 export type OpenProjectFailure = ProjectLaunchFailure;
 export type OpenProjectOutcome = ProjectLaunchOutcome;
+
+export type OpeningExternalCopyDecision = "saveCopyAs" | "cancel";
 
 export type NewProjectOperationalFailureContext =
   | "configurationValidation"
@@ -137,7 +138,6 @@ export interface GlobalProjectPort {
     supported: boolean,
   ): Promise<ProjectLaunchOutcome | null>;
   openProject(): Promise<OpenProjectOutcome>;
-  saveExternalCopyAs(): Promise<ProjectLaunchOutcome>;
   listRecentProjects(): Promise<readonly RecentProjectSummary[]>;
   openRecentProject(id: string): Promise<OpenProjectOutcome>;
   startupOpenFailure(): Promise<OpenProjectFailure | null>;

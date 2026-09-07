@@ -116,7 +116,6 @@ pub(crate) fn register_from_environment(launch_nonce: &str) -> io::Result<()> {
             "the supervisor rejected the Host registration",
         ));
     }
-    eprintln!(r#"{{"event":"dev_host_registered","processId":{process_id}}}"#);
     Ok(())
 }
 

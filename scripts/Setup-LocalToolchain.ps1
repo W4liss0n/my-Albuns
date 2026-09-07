@@ -1,3 +1,5 @@
+param([switch] $SkipNodeInstall)
+
 $ErrorActionPreference = 'Stop'
 
 $workspaceRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
@@ -39,6 +41,8 @@ if ($LASTEXITCODE -ne 0) {
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
+
+if ($SkipNodeInstall) { return }
 
 Push-Location $workspaceRoot
 try {

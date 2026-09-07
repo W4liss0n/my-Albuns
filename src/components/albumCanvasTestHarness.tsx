@@ -411,6 +411,7 @@ export function renderCanvas({
   technicalGuides,
   sheetReorder,
   onCanvasMetricsChange = vi.fn<(metrics: CanvasMetrics) => void>(),
+  onSelectFrame = vi.fn<(frameId: string | null) => void>(),
   onEditSheet = vi.fn<(sheetId: string) => void>(),
   onFocusSheet = vi.fn<(sheetId: string) => void>(),
   onCenteredSheetChange = vi.fn<(sheetId: string) => void>(),
@@ -440,6 +441,7 @@ export function renderCanvas({
   technicalGuides?: CanvasTechnicalGuides;
   sheetReorder?: CanvasSheetReorder;
   onCanvasMetricsChange?: (metrics: CanvasMetrics) => void;
+  onSelectFrame?: (frameId: string | null) => void;
   onEditSheet?: (sheetId: string) => void;
   onFocusSheet?: (sheetId: string) => void;
   onCenteredSheetChange?: (sheetId: string) => void;
@@ -495,7 +497,7 @@ export function renderCanvas({
         centeredSheetId="sheet-001"
         viewport={{ offsetX: 42 }}
         draggedPhotoId={draggedPhotoId}
-        onSelectFrame={() => undefined}
+        onSelectFrame={onSelectFrame}
         onEditSheet={onEditSheet}
         onFocusSheet={onFocusSheet}
         onCenteredSheetChange={onCenteredSheetChange}
@@ -516,6 +518,7 @@ export function renderCanvas({
   return {
     ...view,
     onCanvasMetricsChange,
+    onSelectFrame,
     onEditSheet,
     onFocusSheet,
     onCenteredSheetChange,

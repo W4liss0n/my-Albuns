@@ -119,62 +119,91 @@ export function SheetContextMenu({
   }
 
   return (
-    <div
-      ref={rootRef}
-      aria-label={`Ações da Lâmina ${String(sheetNumber).padStart(2, "0")}`}
-      className="ui-floating-surface sheet-context-menu"
-      role="menu"
-      style={{ left: visiblePosition.x, top: visiblePosition.y }}
-      tabIndex={-1}
-      onContextMenu={(event) => event.preventDefault()}
-      onKeyDown={handleKeyDown}
-    >
-      <button
-        disabled={!availability.canAddBefore}
-        role="menuitem"
-        type="button"
-        onClick={() => invoke(onAddBefore)}
+    <>
+      <div
+        aria-hidden="true"
+        className="sheet-context-menu__dismiss-layer"
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onDismiss();
+        }}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onDismiss();
+        }}
+        onPointerCancel={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onDismiss();
+        }}
+        onPointerDown={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+        }}
+        onPointerUp={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+        }}
+      />
+      <div
+        ref={rootRef}
+        aria-label={`Ações da Lâmina ${String(sheetNumber).padStart(2, "0")}`}
+        className="ui-floating-surface sheet-context-menu"
+        role="menu"
+        style={{ left: visiblePosition.x, top: visiblePosition.y }}
+        tabIndex={-1}
+        onContextMenu={(event) => event.preventDefault()}
+        onKeyDown={handleKeyDown}
       >
-        {sheetCommandLabels.addBefore}
-      </button>
-      <button
-        disabled={!availability.canAddAfter}
-        role="menuitem"
-        type="button"
-        onClick={() => invoke(onAddAfter)}
-      >
-        {sheetCommandLabels.addAfter}
-      </button>
-      <button
-        disabled
-        role="menuitem"
-        title="Ainda não disponível nesta versão"
-        type="button"
-      >
-        {sheetCommandLabels.duplicateSheet}
-      </button>
-      <button
-        disabled={!availability.canDelete}
-        role="menuitem"
-        type="button"
-        onClick={() => invoke(onDelete)}
-      >
-        {sheetCommandLabels.deleteSheet}
-      </button>
-      <span className="sheet-context-menu__separator" role="separator" />
-      <button
-        disabled={!availability.canConvertEdge}
-        role="menuitem"
-        title={
-          availability.canConvertEdge
-            ? undefined
-            : "Disponível somente para uma extremidade vazia"
-        }
-        type="button"
-        onClick={() => invoke(onConvertEdge)}
-      >
-        {sheetCommandLabels.convertEdge}
-      </button>
-    </div>
+        <button
+          disabled={!availability.canAddBefore}
+          role="menuitem"
+          type="button"
+          onClick={() => invoke(onAddBefore)}
+        >
+          {sheetCommandLabels.addBefore}
+        </button>
+        <button
+          disabled={!availability.canAddAfter}
+          role="menuitem"
+          type="button"
+          onClick={() => invoke(onAddAfter)}
+        >
+          {sheetCommandLabels.addAfter}
+        </button>
+        <button
+          disabled
+          role="menuitem"
+          title="Ainda não disponível nesta versão"
+          type="button"
+        >
+          {sheetCommandLabels.duplicateSheet}
+        </button>
+        <button
+          disabled={!availability.canDelete}
+          role="menuitem"
+          type="button"
+          onClick={() => invoke(onDelete)}
+        >
+          {sheetCommandLabels.deleteSheet}
+        </button>
+        <span className="sheet-context-menu__separator" role="separator" />
+        <button
+          disabled={!availability.canConvertEdge}
+          role="menuitem"
+          title={
+            availability.canConvertEdge
+              ? undefined
+              : "Disponível somente para uma extremidade vazia"
+          }
+          type="button"
+          onClick={() => invoke(onConvertEdge)}
+        >
+          {sheetCommandLabels.convertEdge}
+        </button>
+      </div>
+    </>
   );
 }

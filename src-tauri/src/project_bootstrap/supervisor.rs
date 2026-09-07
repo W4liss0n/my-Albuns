@@ -9,10 +9,12 @@ use std::{
 
 use myalbuns_paths::ProcessInstanceId;
 
+use crate::ipc_contract::ProjectRecoveryDecision;
+
 use super::{
     BootstrapIntent, BootstrapRequest, CreateWriteAuthorization, HostTerminal,
-    InitialProjectCreationConfiguration, SaveExternalCopyRequest, TargetAuthority,
-    TerminalValidationError, ValidatedTerminal, validate_terminal,
+    InitialProjectCreationConfiguration, ProjectRecoveryRequest, SaveExternalCopyRequest,
+    TargetAuthority, TerminalValidationError, ValidatedTerminal, validate_terminal,
 };
 
 const MAX_TERMINAL_BYTES: usize = 32 * 1024;
@@ -40,6 +42,7 @@ pub(crate) enum BootstrapOutcome {
         owner_process: ProcessInstanceId,
     },
     ExternalCopyNotWritable(PendingExternalCopyProcess),
+    RecoveryAvailable(PendingRecoveryProcess),
 }
 
 #[derive(Debug)]
@@ -49,6 +52,44 @@ pub(crate) struct PendingExternalCopyProcess {
     terminal_receiver: mpsc::Receiver<Result<HostTerminal, BootstrapFailure>>,
     request: BootstrapRequest,
     terminal_timeout: Duration,
+}
+
+#[derive(Debug)]
+pub(crate) struct PendingRecoveryProcess {
+    child: PendingChild,
+    stdin: ChildStdin,
+    terminal_receiver: mpsc::Receiver<Result<HostTerminal, BootstrapFailure>>,
+    request: BootstrapRequest,
+    terminal_timeout: Duration,
+}
+
+#[derive(Debug)]
+pub(crate) enum RecoveryContinuationOutcome {
+    Ready(ReadyHost),
+    Deferred,
+}
+
+impl PendingExternalCopyProcess {
+    pub(crate) fn attempt_id(&self) -> &str {
+        &self.request.attempt_id
+    }
+
+    pub(crate) fn host_process_id(&mut self) -> u32 {
+        self.child.child_mut().id()
+    }
+}
+
+impl PendingRecoveryProcess {
+    pub(crate) fn attempt_id(&self) -> &str {
+        &self.request.attempt_id
+    }
+
+    pub(crate) fn resolve(
+        self,
+        decision: ProjectRecoveryDecision,
+    ) -> Result<RecoveryContinuationOutcome, BootstrapFailure> {
+        continue_project_recovery(self, decision)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -225,7 +266,11 @@ fn supervise_child(
     thread::spawn(move || {
         let mut reader = BufReader::new(stdout);
         let first = read_terminal(&mut reader);
-        let awaits_continuation = matches!(first, Ok(HostTerminal::ExternalCopyNotWritable { .. }));
+        let awaits_continuation = matches!(
+            first,
+            Ok(HostTerminal::ExternalCopyNotWritable { .. }
+                | HostTerminal::RecoveryAvailable { .. })
+        );
         if terminal_sender.send(first).is_ok() && awaits_continuation {
             let _ = terminal_sender.send(read_terminal(&mut reader));
         }
@@ -263,6 +308,20 @@ fn supervise_child(
                 terminal_timeout,
             }),
         ),
+        Ok(ValidatedTerminal::RecoveryAvailable { .. }) => Ok(BootstrapOutcome::RecoveryAvailable(
+            PendingRecoveryProcess {
+                child: pending,
+                stdin,
+                terminal_receiver,
+                request,
+                terminal_timeout,
+            },
+        )),
+        Ok(ValidatedTerminal::RecoveryDeferred { .. }) => Err(BootstrapFailure {
+            kind: BootstrapFailureKind::InvalidTerminal,
+            stage: Some(super::FailureStage::Protocol),
+            code: Some(super::FailureCode::InvalidRequest),
+        }),
         Ok(ValidatedTerminal::Failed { stage, code, .. }) => Err(BootstrapFailure {
             kind: BootstrapFailureKind::HostFailed,
             stage: Some(stage),
@@ -323,7 +382,11 @@ fn continue_external_copy(
             project_id,
             owner_process,
         }),
-        Ok(ValidatedTerminal::ExternalCopyNotWritable { .. }) => Err(BootstrapFailure {
+        Ok(
+            ValidatedTerminal::ExternalCopyNotWritable { .. }
+            | ValidatedTerminal::RecoveryAvailable { .. }
+            | ValidatedTerminal::RecoveryDeferred { .. },
+        ) => Err(BootstrapFailure {
             kind: BootstrapFailureKind::InvalidTerminal,
             stage: Some(super::FailureStage::Protocol),
             code: Some(super::FailureCode::InvalidRequest),
@@ -332,6 +395,60 @@ fn continue_external_copy(
             kind: BootstrapFailureKind::HostFailed,
             stage: Some(stage),
             code: Some(code),
+        }),
+        Err(TerminalValidationError::CorrelationMismatch) => Err(BootstrapFailure {
+            kind: BootstrapFailureKind::CorrelationMismatch,
+            stage: Some(super::FailureStage::Protocol),
+            code: Some(super::FailureCode::CorrelationMismatch),
+        }),
+    }
+}
+
+fn continue_project_recovery(
+    mut pending: PendingRecoveryProcess,
+    decision: ProjectRecoveryDecision,
+) -> Result<RecoveryContinuationOutcome, BootstrapFailure> {
+    let continuation = ProjectRecoveryRequest {
+        protocol_version: super::protocol::PROTOCOL_VERSION,
+        attempt_id: pending.request.attempt_id.clone(),
+        launch_nonce: pending.request.launch_nonce.clone(),
+        decision,
+    };
+    serde_json::to_writer(&mut pending.stdin, &continuation).map_err(|_| transport_failure())?;
+    pending
+        .stdin
+        .write_all(b"\n")
+        .map_err(|_| transport_failure())?;
+    pending.stdin.flush().map_err(|_| transport_failure())?;
+    drop(pending.stdin);
+    let terminal = receive_terminal(&pending.terminal_receiver, pending.terminal_timeout)?;
+    match validate_terminal(&pending.request, pending.child.child_mut().id(), terminal) {
+        Ok(ValidatedTerminal::Ready {
+            host_pid,
+            project_id,
+            revision,
+        }) => {
+            pending.child.detach();
+            Ok(RecoveryContinuationOutcome::Ready(ReadyHost {
+                host_pid,
+                project_id,
+                revision,
+            }))
+        }
+        Ok(ValidatedTerminal::RecoveryDeferred { .. }) => Ok(RecoveryContinuationOutcome::Deferred),
+        Ok(ValidatedTerminal::Failed { stage, code, .. }) => Err(BootstrapFailure {
+            kind: BootstrapFailureKind::HostFailed,
+            stage: Some(stage),
+            code: Some(code),
+        }),
+        Ok(
+            ValidatedTerminal::FocusExisting { .. }
+            | ValidatedTerminal::ExternalCopyNotWritable { .. }
+            | ValidatedTerminal::RecoveryAvailable { .. },
+        ) => Err(BootstrapFailure {
+            kind: BootstrapFailureKind::InvalidTerminal,
+            stage: Some(super::FailureStage::Protocol),
+            code: Some(super::FailureCode::InvalidRequest),
         }),
         Err(TerminalValidationError::CorrelationMismatch) => Err(BootstrapFailure {
             kind: BootstrapFailureKind::CorrelationMismatch,
@@ -495,6 +612,50 @@ mod tests {
             }
             [Console]::Out.WriteLine(($ready | ConvertTo-Json -Compress))
             [Console]::Out.Flush()
+            "#,
+        )
+    }
+
+    #[cfg(windows)]
+    fn pending_recovery_host() -> Child {
+        powershell_host(
+            r#"
+            [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
+            $request = [Console]::In.ReadLine() | ConvertFrom-Json
+            $pending = @{
+              state = 'recoveryAvailable'
+              attemptId = $request.attemptId
+              launchNonce = $request.launchNonce
+              hostPid = $PID
+            }
+            [Console]::Out.WriteLine(($pending | ConvertTo-Json -Compress))
+            [Console]::Out.Flush()
+            $continuation = [Console]::In.ReadLine() | ConvertFrom-Json
+            if ($continuation.attemptId -ne $request.attemptId `
+                -or $continuation.launchNonce -ne $request.launchNonce `
+                -or $continuation.protocolVersion -ne $request.protocolVersion) {
+              exit 2
+            }
+            if ($continuation.decision -eq 'nowNot') {
+              $terminal = @{
+                state = 'recoveryDeferred'
+                attemptId = $request.attemptId
+                launchNonce = $request.launchNonce
+                hostPid = $PID
+              }
+            } else {
+              $terminal = @{
+                state = 'ready'
+                attemptId = $request.attemptId
+                launchNonce = $request.launchNonce
+                hostPid = $PID
+                projectId = 'a230216b-197c-424e-b146-2a95fc7dfbf7'
+                revision = 11
+              }
+            }
+            [Console]::Out.WriteLine(($terminal | ConvertTo-Json -Compress))
+            [Console]::Out.Flush()
+            if ($continuation.decision -ne 'nowNot') { Start-Sleep -Seconds 2 }
             "#,
         )
     }
@@ -763,12 +924,13 @@ mod tests {
         let request = fixture_request();
         let child = pending_external_copy_host();
         let spawned_pid = child.id();
-        let pending = match supervise_child(child, request, Duration::from_secs(2))
+        let mut pending = match supervise_child(child, request, Duration::from_secs(2))
             .expect("the actionable terminal is accepted")
         {
             BootstrapOutcome::ExternalCopyNotWritable(pending) => pending,
             _ => panic!("the fixture must remain pending"),
         };
+        assert_eq!(pending.host_process_id(), spawned_pid);
 
         drop(pending);
 
@@ -776,6 +938,67 @@ mod tests {
             !process_is_alive(spawned_pid),
             "cancellation leaves no source Host or editable Sessão"
         );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn recovery_decision_continues_in_the_exact_pending_host_before_ready() {
+        let request = fixture_request();
+        let expected_attempt_id = request.attempt_id.clone();
+        let child = pending_recovery_host();
+        let spawned_pid = child.id();
+        let pending = match supervise_child(child, request, Duration::from_secs(2))
+            .expect("the correlated Recovery signal is accepted")
+        {
+            BootstrapOutcome::RecoveryAvailable(pending) => pending,
+            _ => panic!("the fixture must wait for the Recovery decision"),
+        };
+        assert_eq!(pending.attempt_id(), expected_attempt_id);
+        assert!(process_is_alive(spawned_pid));
+
+        let outcome = pending
+            .resolve(ProjectRecoveryDecision::ReopenAndRecover)
+            .expect("the same Host reaches Ready after Recovery");
+        let RecoveryContinuationOutcome::Ready(ready) = outcome else {
+            panic!("Recovery must continue into the same ready Host")
+        };
+        assert_eq!(ready.host_pid, spawned_pid);
+        assert_eq!(ready.project_id, "a230216b-197c-424e-b146-2a95fc7dfbf7");
+        assert_eq!(ready.revision, 11);
+        assert!(process_is_alive(spawned_pid));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn deferring_or_abandoning_recovery_reaps_the_pending_host() {
+        let request = fixture_request();
+        let child = pending_recovery_host();
+        let deferred_pid = child.id();
+        let pending = match supervise_child(child, request, Duration::from_secs(2))
+            .expect("the correlated Recovery signal is accepted")
+        {
+            BootstrapOutcome::RecoveryAvailable(pending) => pending,
+            _ => panic!("the fixture must wait for the Recovery decision"),
+        };
+        assert!(matches!(
+            pending
+                .resolve(ProjectRecoveryDecision::NowNot)
+                .expect("Agora não is a closed Recovery terminal"),
+            RecoveryContinuationOutcome::Deferred
+        ));
+        assert!(!process_is_alive(deferred_pid));
+
+        let request = fixture_request();
+        let child = pending_recovery_host();
+        let abandoned_pid = child.id();
+        let pending = match supervise_child(child, request, Duration::from_secs(2))
+            .expect("the correlated Recovery signal is accepted")
+        {
+            BootstrapOutcome::RecoveryAvailable(pending) => pending,
+            _ => panic!("the fixture must wait for the Recovery decision"),
+        };
+        drop(pending);
+        assert!(!process_is_alive(abandoned_pid));
     }
 
     #[cfg(windows)]

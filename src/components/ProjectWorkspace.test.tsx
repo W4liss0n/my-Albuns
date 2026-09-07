@@ -60,6 +60,7 @@ import type { ContinuousCanvasLayout } from "./canvasGeometry";
 import { ProjectWorkspace as ProjectWorkspaceView } from "./ProjectWorkspace";
 import { useProjectMutationRunner } from "./useProjectMutationRunner";
 
+
 type ExportPort = LegacyExportPort;
 type ProjectSessionPort = ProjectCorePort;
 
@@ -67,6 +68,9 @@ const canvasHarness = vi.hoisted(() => ({
   props: null as null | {
     mode: AlbumCanvasMode;
     continuousCanvasLayout: ContinuousCanvasLayout;
+    focusedSheetId: string | null;
+    centeredSheetId: string | null;
+    viewport: { offsetX: number };
     mediaPreviewUrls?: Readonly<Record<string, string>>;
     technicalGuides?: CanvasTechnicalGuides;
     sheetReorder?: CanvasSheetReorder;
@@ -464,6 +468,110 @@ function getApplicationCommand(
   );
 }
 
+function performGridPointerReorder(
+  view: ReturnType<typeof render>,
+  sourceIndex: number,
+  targetIndex: number,
+) {
+  const slots = Array.from(
+    view.container.querySelectorAll<HTMLElement>(".sheet-grid-slot"),
+  );
+  const source = slots[sourceIndex]!;
+  const pressTarget = source.querySelector<HTMLElement>(".sheet-tile")!;
+  const surface = screen.getByTestId("sheet-reorder-grid");
+  const reorderEnabled = source.hasAttribute("data-reorder-enabled");
+  const pointerId = gridPointerId(sourceIndex, targetIndex);
+  arrangeWorkspaceGrid(view, slots);
+  Object.defineProperties(surface, {
+    releasePointerCapture: { configurable: true, value: vi.fn() },
+    setPointerCapture: { configurable: true, value: vi.fn() },
+  });
+  pressTarget.addEventListener(
+    "pointerdown",
+    (event) => event.stopPropagation(),
+    { once: true },
+  );
+  fireEvent.pointerDown(pressTarget, {
+    button: 0,
+    buttons: 1,
+    clientX: 50,
+    clientY: sourceIndex * 110 + 50,
+    pointerId,
+    pointerType: "mouse",
+  });
+  if (reorderEnabled) {
+    expect(surface.setPointerCapture).toHaveBeenCalledWith(pointerId);
+  } else {
+    expect(surface.setPointerCapture).not.toHaveBeenCalled();
+  }
+  fireEvent.pointerMove(surface, {
+    buttons: 1,
+    clientX: 50,
+    clientY: targetIndex * 110 + 50,
+    pointerId,
+    pointerType: "mouse",
+  });
+}
+
+function finishGridPointerReorder(sourceIndex: number, targetIndex: number) {
+  const surface = screen.getByTestId("sheet-reorder-grid");
+  fireEvent.pointerUp(surface, {
+    button: 0,
+    buttons: 0,
+    clientX: 50,
+    clientY: targetIndex * 110 + 50,
+    pointerId: gridPointerId(sourceIndex, targetIndex),
+    pointerType: "mouse",
+  });
+}
+
+function arrangeWorkspaceGrid(
+  view: ReturnType<typeof render>,
+  slots: readonly HTMLElement[],
+) {
+  slots.forEach((slot, index) => {
+    Object.defineProperty(slot, "getBoundingClientRect", {
+      configurable: true,
+      value: () => workspaceRect(0, index * 110, 100, index * 110 + 100),
+    });
+  });
+  const grid = screen.getByTestId("sheet-reorder-grid");
+  Object.defineProperty(grid, "getBoundingClientRect", {
+    configurable: true,
+    value: () => workspaceRect(0, 0, 220, slots.length * 110),
+  });
+  const viewport = view.container.querySelector<HTMLElement>(
+    ".inspector-scroll",
+  )!;
+  Object.defineProperty(viewport, "getBoundingClientRect", {
+    configurable: true,
+    value: () => workspaceRect(0, 0, 220, slots.length * 110),
+  });
+}
+
+function gridPointerId(sourceIndex: number, targetIndex: number): number {
+  return 500 + sourceIndex * 10 + targetIndex;
+}
+
+function workspaceRect(
+  left: number,
+  top: number,
+  right: number,
+  bottom: number,
+): DOMRect {
+  return {
+    bottom,
+    height: bottom - top,
+    left,
+    right,
+    top,
+    width: right - left,
+    x: left,
+    y: top,
+    toJSON: () => ({}),
+  };
+}
+
 beforeEach(() => {
   canvasHarness.props = null;
   localStorage.clear();
@@ -622,6 +730,124 @@ test("routes implicit menu and explicit context actions to their intended Sheets
   expect(
     screen.queryByRole("menu", { name: "Ações da Lâmina 03" }),
   ).not.toBeInTheDocument();
+});
+
+test("opens and dismisses an explicit Sheet context menu without navigating the Canvas", () => {
+  const physicalProjection = createThreeSheetProjection();
+  render(
+    <ProjectWorkspace
+      exportPipelinePort={exportPipelinePort}
+      projection={physicalProjection}
+      projectCorePort={projectCorePortWithApply(async () => physicalProjection)}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  act(() => {
+    canvasHarness.props?.onCanvasMetricsChange?.({
+      width: 1_000,
+      scale: 0.5,
+    });
+  });
+  fireEvent.click(
+    screen.getByRole("button", { name: /Ir para Lâmina 02/u }),
+  );
+  const before = {
+    centeredSheetId: useEditorView.getState().centeredSheetId,
+    focusedSheetId: useEditorView.getState().focusedSheetId,
+    selectedFrameId: useEditorView.getState().selectedFrameId,
+    viewport: { ...useEditorView.getState().viewport },
+  };
+
+  act(() =>
+    canvasHarness.props?.onOpenSheetContextMenu?.("sheet-003", {
+      x: 240,
+      y: 180,
+    }),
+  );
+  expect(
+    screen.getByRole("menu", { name: "Ações da Lâmina 03" }),
+  ).toBeInTheDocument();
+  expect(useEditorView.getState()).toMatchObject(before);
+
+  fireEvent.keyDown(document, { key: "Escape" });
+  expect(
+    screen.queryByRole("menu", { name: "Ações da Lâmina 03" }),
+  ).not.toBeInTheDocument();
+  expect(useEditorView.getState()).toMatchObject(before);
+
+  act(() =>
+    canvasHarness.props?.onOpenSheetContextMenu?.("sheet-003", {
+      x: 240,
+      y: 180,
+    }),
+  );
+  fireEvent.pointerDown(document.body);
+  expect(
+    screen.queryByRole("menu", { name: "Ações da Lâmina 03" }),
+  ).not.toBeInTheDocument();
+  expect(useEditorView.getState()).toMatchObject(before);
+
+  act(() =>
+    canvasHarness.props?.onOpenSheetContextMenu?.("sheet-003", {
+      x: 240,
+      y: 180,
+    }),
+  );
+  const dismissLayer = document.querySelector(
+    ".sheet-context-menu__dismiss-layer",
+  );
+  expect(dismissLayer).toBeInstanceOf(HTMLElement);
+  fireEvent.pointerDown(dismissLayer!, { button: 0, pointerId: 31 });
+  fireEvent.pointerUp(dismissLayer!, { button: 0, pointerId: 31 });
+  expect(
+    screen.getByRole("menu", { name: "Ações da Lâmina 03" }),
+  ).toBeInTheDocument();
+  expect(useEditorView.getState()).toMatchObject(before);
+  fireEvent.click(dismissLayer!);
+  expect(
+    screen.queryByRole("menu", { name: "Ações da Lâmina 03" }),
+  ).not.toBeInTheDocument();
+  expect(useEditorView.getState()).toMatchObject(before);
+});
+
+test("selects a Sheet through the Bar seam without navigating the Canvas", () => {
+  const physicalProjection = createThreeSheetProjection();
+  physicalProjection.state.album.sheets[0]!.activeSides = "right";
+  physicalProjection.state.album.sheets[0]!.pageNumbers = [1];
+  physicalProjection.composition.sheets[0]!.activeSides = "right";
+  render(
+    <ProjectWorkspace
+      exportPipelinePort={exportPipelinePort}
+      projection={physicalProjection}
+      projectCorePort={projectCorePortWithApply(async () => physicalProjection)}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  act(() => {
+    canvasHarness.props?.onCanvasMetricsChange?.({
+      width: 1_000,
+      scale: 0.5,
+    });
+  });
+  fireEvent.click(
+    screen.getByRole("button", { name: /Ir para Lâmina 02/u }),
+  );
+  const before = {
+    centeredSheetId: canvasHarness.props?.centeredSheetId,
+    offsetX: canvasHarness.props?.viewport.offsetX,
+  };
+  expect(before).toMatchObject({ centeredSheetId: "sheet-002" });
+  expect(before.offsetX).not.toBe(0);
+
+  for (const sheetId of ["sheet-001", "sheet-003", "sheet-003"]) {
+    act(() => canvasHarness.props?.sheetReorder?.onSelect(sheetId));
+
+    expect(canvasHarness.props?.focusedSheetId).toBe(sheetId);
+    expect(canvasHarness.props?.centeredSheetId).toBe(before.centeredSheetId);
+    expect(canvasHarness.props?.viewport.offsetX).toBe(before.offsetX);
+  }
 });
 
 test("routes Delete to the centered Sheet and guards text entry, Edit Mode, and the minimum", async () => {
@@ -951,20 +1177,12 @@ test("commits one valid Grade reorder and keeps structural controls inert in She
     />,
   );
 
-  const slots = Array.from(
-    view.container.querySelectorAll<HTMLElement>(".sheet-grid-slot"),
-  );
-  const dataTransfer = {
-    effectAllowed: "none",
-    setData: vi.fn(),
-  };
-  fireEvent.dragStart(slots[0], { dataTransfer });
-  fireEvent.dragEnter(slots[1]);
+  performGridPointerReorder(view, 0, 1);
   expect(screen.getByTestId("sheet-reorder-grid")).toHaveAttribute(
     "data-reorder-state",
     "preview",
   );
-  fireEvent.drop(screen.getByTestId("sheet-reorder-grid"));
+  finishGridPointerReorder(0, 1);
 
   await waitFor(() =>
     expect(applyWithOutcome).toHaveBeenCalledWith({
@@ -982,7 +1200,8 @@ test("commits one valid Grade reorder and keeps structural controls inert in She
     getApplicationCommand("Lâmina", "Converter extremidade"),
   ).toBeDisabled();
   for (const slot of view.container.querySelectorAll(".sheet-grid-slot")) {
-    expect(slot).toHaveAttribute("draggable", "false");
+    expect(slot).not.toHaveAttribute("draggable");
+    expect(slot).not.toHaveAttribute("data-reorder-enabled");
   }
   act(() =>
     canvasHarness.props?.onOpenSheetContextMenu?.("sheet-002", {
@@ -1092,16 +1311,8 @@ test("blocks a newer reorder while a queued reorder is pending and restores the 
   view = render(renderWorkspace(visibleProjection));
 
   fireEvent.click(getApplicationCommand("Editar", "Desfazer"));
-  const initialSlots = Array.from(
-    view.container.querySelectorAll<HTMLElement>(".sheet-grid-slot"),
-  );
-  const dataTransfer = {
-    effectAllowed: "none",
-    setData: vi.fn(),
-  };
-  fireEvent.dragStart(initialSlots[1], { dataTransfer });
-  fireEvent.dragEnter(initialSlots[0]);
-  fireEvent.drop(screen.getByTestId("sheet-reorder-grid"));
+  performGridPointerReorder(view, 1, 0);
+  finishGridPointerReorder(1, 0);
 
   expect(port.applyWithOutcome).not.toHaveBeenCalled();
   await act(async () => {
@@ -1169,21 +1380,14 @@ test("keeps both Sheet reorder surfaces inert while a commit is pending", async 
     />,
   );
 
-  const slots = Array.from(
-    view.container.querySelectorAll<HTMLElement>(".sheet-grid-slot"),
-  );
-  const dataTransfer = {
-    effectAllowed: "none",
-    setData: vi.fn(),
-  };
-  fireEvent.dragStart(slots[0], { dataTransfer });
-  fireEvent.dragEnter(slots[1]);
-  fireEvent.drop(screen.getByTestId("sheet-reorder-grid"));
+  performGridPointerReorder(view, 0, 1);
+  finishGridPointerReorder(0, 1);
 
   await waitFor(() => expect(port.applyWithOutcome).toHaveBeenCalledOnce());
   expect(canvasHarness.props?.sheetReorder?.status).toBe("committing");
   for (const slot of view.container.querySelectorAll(".sheet-grid-slot")) {
-    expect(slot).toHaveAttribute("draggable", "false");
+    expect(slot).not.toHaveAttribute("draggable");
+    expect(slot).not.toHaveAttribute("data-reorder-enabled");
   }
 
   await act(async () => {
@@ -1220,15 +1424,10 @@ test.each(["bar", "grid"] as const)(
     const slots = Array.from(
       view.container.querySelectorAll<HTMLElement>(".sheet-grid-slot"),
     );
-    const dataTransfer = {
-      effectAllowed: "none",
-      setData: vi.fn(),
-    };
     if (surface === "bar") {
       act(() => canvasHarness.props?.sheetReorder?.onPreview("sheet-001", 1));
     } else {
-      fireEvent.dragStart(slots[0], { dataTransfer });
-      fireEvent.dragEnter(slots[1]);
+      performGridPointerReorder(view, 0, 1);
     }
     expect(canvasHarness.props?.sheetReorder?.status).toBe("preview");
 
@@ -1244,16 +1443,16 @@ test.each(["bar", "grid"] as const)(
       "idle",
     );
     for (const slot of slots) {
-      expect(slot).toHaveAttribute("draggable", "false");
+      expect(slot).not.toHaveAttribute("draggable");
+      expect(slot).not.toHaveAttribute("data-reorder-enabled");
     }
 
     if (surface === "bar") {
       act(() => canvasHarness.props?.sheetReorder?.onPreview("sheet-001", 1));
       act(() => canvasHarness.props?.sheetReorder?.onDrop());
     } else {
-      fireEvent.dragStart(slots[0], { dataTransfer });
-      fireEvent.dragEnter(slots[1]);
-      fireEvent.drop(screen.getByTestId("sheet-reorder-grid"));
+      performGridPointerReorder(view, 0, 1);
+      finishGridPointerReorder(0, 1);
     }
     expect(canvasHarness.props?.sheetReorder?.status).toBe("idle");
     expect(port.applyWithOutcome).toHaveBeenCalledOnce();
@@ -4974,6 +5173,9 @@ test("shows Page numbers instead of cover and final aliases", () => {
   const tiles = Array.from(
     view.container.querySelectorAll<HTMLElement>(".sheet-tile"),
   );
+  const tilePreviews = tiles.map((tile) =>
+    tile.querySelector<HTMLElement>(".sheet-preview-shell"),
+  );
   expect(
     tiles.map(
       (tile) => tile.querySelector(".sheet-tile__pages")?.textContent,
@@ -4986,12 +5188,16 @@ test("shows Page numbers instead of cover and final aliases", () => {
     "Ir para Lâmina 02, Lâmina final, Página 2",
   );
   expect(
-    tiles[0].style.getPropertyValue("--sheet-inactive-side-gradient"),
+    tilePreviews[0]?.style.getPropertyValue(
+      "--sheet-inactive-side-gradient",
+    ),
   ).toBe(
     "linear-gradient(to right, #faf9f6 0%, #ebe3d8 58%, #cec2b2 100%)",
   );
   expect(
-    tiles[1].style.getPropertyValue("--sheet-inactive-side-gradient"),
+    tilePreviews[1]?.style.getPropertyValue(
+      "--sheet-inactive-side-gradient",
+    ),
   ).toBe(
     "linear-gradient(to left, #faf9f6 0%, #ebe3d8 58%, #cec2b2 100%)",
   );
@@ -5418,6 +5624,52 @@ test("centers a Grade navigation target in the visible Canvas", () => {
     canvasHarness.props!.continuousCanvasLayout.entriesAtScale(0.5)[1].center;
   expect(useEditorView.getState().viewport.offsetX).toBeCloseTo(
     1_000 / 2 - targetCenter * 0.5,
+  );
+});
+
+test("centers the previous and next physical Sheet with ArrowLeft and ArrowRight", () => {
+  const physicalProjection = createThreeSheetProjection();
+  render(
+    <ProjectWorkspace
+      exportPipelinePort={exportPipelinePort}
+      projection={physicalProjection}
+      projectCorePort={projectCorePortWithApply(async () => physicalProjection)}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  act(() => {
+    canvasHarness.props?.onCanvasMetricsChange?.({
+      width: 1_000,
+      scale: 0.5,
+    });
+  });
+
+  act(() => {
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }));
+  });
+  const thirdCenter =
+    canvasHarness.props!.continuousCanvasLayout.entriesAtScale(0.5)[2].center;
+  expect(useEditorView.getState()).toMatchObject({
+    centeredSheetId: "sheet-003",
+    focusedSheetId: "sheet-003",
+  });
+  expect(useEditorView.getState().viewport.offsetX).toBeCloseTo(
+    1_000 / 2 - thirdCenter * 0.5,
+  );
+
+  act(() => {
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft" }));
+  });
+  const secondCenter =
+    canvasHarness.props!.continuousCanvasLayout.entriesAtScale(0.5)[1].center;
+  expect(useEditorView.getState()).toMatchObject({
+    centeredSheetId: "sheet-002",
+    focusedSheetId: "sheet-002",
+  });
+  expect(useEditorView.getState().viewport.offsetX).toBeCloseTo(
+    1_000 / 2 - secondCenter * 0.5,
   );
 });
 

@@ -1,3 +1,59 @@
+function Resolve-GateRetainedEvidenceRoot {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $GitRoot,
+
+        [Parameter(Mandatory = $true)]
+        [string] $RetainedEvidenceRoot
+    )
+
+    $resolvedRoot = [System.IO.Path]::GetFullPath($RetainedEvidenceRoot)
+    $gitRootPrefix = $GitRoot.TrimEnd('\', '/') `
+        + [System.IO.Path]::DirectorySeparatorChar
+    if (-not $resolvedRoot.StartsWith(
+            $gitRootPrefix,
+            [System.StringComparison]::OrdinalIgnoreCase
+        )) {
+        throw 'The retained gate evidence root must stay inside the Git worktree.'
+    }
+    if (-not (Test-Path -LiteralPath $resolvedRoot -PathType Container)) {
+        throw 'The retained gate evidence root must be an existing directory.'
+    }
+
+    $relativeRoot = $resolvedRoot.Substring($gitRootPrefix.Length)
+    $cursor = $GitRoot
+    foreach ($segment in $relativeRoot.Split(
+            [char[]]@(
+                [System.IO.Path]::DirectorySeparatorChar,
+                [System.IO.Path]::AltDirectorySeparatorChar
+            ),
+            [System.StringSplitOptions]::RemoveEmptyEntries
+        )) {
+        $cursor = Join-Path $cursor $segment
+        $item = Get-Item -LiteralPath $cursor -Force
+        if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw 'The retained gate evidence root cannot traverse a reparse point.'
+        }
+    }
+
+    $pendingDirectories = [System.Collections.Generic.Stack[System.IO.DirectoryInfo]]::new()
+    $pendingDirectories.Push((Get-Item -LiteralPath $resolvedRoot -Force))
+    while ($pendingDirectories.Count -gt 0) {
+        $directory = $pendingDirectories.Pop()
+        foreach ($entry in $directory.EnumerateFileSystemInfos()) {
+            if (($entry.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw 'The retained gate evidence root cannot contain a reparse point.'
+            }
+            if ($entry -is [System.IO.DirectoryInfo]) {
+                $pendingDirectories.Push($entry)
+            }
+        }
+    }
+
+    return $relativeRoot.Replace('\', '/')
+}
+
 function Get-GateSourceStatus {
     [CmdletBinding()]
     param(
@@ -5,7 +61,9 @@ function Get-GateSourceStatus {
         [string] $WorkspaceRoot,
 
         [Parameter(Mandatory = $true)]
-        [string] $EvidencePath
+        [string] $EvidencePath,
+
+        [string] $RetainedEvidenceRoot
     )
 
     $resolvedWorkspaceRoot = (Resolve-Path -LiteralPath $WorkspaceRoot).Path
@@ -36,6 +94,12 @@ function Get-GateSourceStatus {
         $gitRelativeEvidencePath = $relativeEvidencePath.Replace('\', '/')
         $pathSpecs.Add(":(top,exclude,literal)$gitRelativeEvidencePath")
     }
+    if (-not [string]::IsNullOrWhiteSpace($RetainedEvidenceRoot)) {
+        $gitRelativeEvidenceRoot = Resolve-GateRetainedEvidenceRoot `
+            -GitRoot $gitRoot `
+            -RetainedEvidenceRoot $RetainedEvidenceRoot
+        $pathSpecs.Add(":(top,exclude,literal)$gitRelativeEvidenceRoot")
+    }
 
     $status = @(
         & git `
@@ -59,7 +123,9 @@ function Get-GateSourceSnapshot {
         [string] $WorkspaceRoot,
 
         [Parameter(Mandatory = $true)]
-        [string] $EvidencePath
+        [string] $EvidencePath,
+
+        [string] $RetainedEvidenceRoot
     )
 
     $headBeforeStatus = (& git -C $WorkspaceRoot rev-parse HEAD).Trim()
@@ -69,7 +135,8 @@ function Get-GateSourceSnapshot {
     $status = @(
         Get-GateSourceStatus `
             -WorkspaceRoot $WorkspaceRoot `
-            -EvidencePath $EvidencePath
+            -EvidencePath $EvidencePath `
+            -RetainedEvidenceRoot $RetainedEvidenceRoot
     )
     $headAfterStatus = (& git -C $WorkspaceRoot rev-parse HEAD).Trim()
     if ($LASTEXITCODE -ne 0 -or $headAfterStatus -notmatch '^[0-9a-f]{40}$') {

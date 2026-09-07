@@ -34,6 +34,10 @@ export type ProjectDialogState =
       message: string;
     }
   | {
+      kind: "graphicsFailure";
+      reason: string;
+    }
+  | {
       cancelRequested: boolean;
       cancellable: boolean;
       kind: "exportProgress";
@@ -56,6 +60,7 @@ export type ProjectDialogAction =
   | "cancelProjectClose"
   | "discardAndClose"
   | "confirmAlbumInformation"
+  | "closeProjectAfterGraphicsFailure"
   | "dismissExport"
   | "dismissProjectCloseFailure"
   | "dismissProjectOperationFailure"

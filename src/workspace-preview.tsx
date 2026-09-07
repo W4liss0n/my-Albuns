@@ -33,6 +33,11 @@ import "./ui/ui.css";
 const previewParameters = new URLSearchParams(window.location.search);
 const frameContext = previewParameters.get("frame");
 const decorativeContext = previewParameters.get("decorative");
+const previewScale = Number(previewParameters.get("scale") ?? "1");
+if ([1, 1.25, 1.5].includes(previewScale)) {
+  document.documentElement.style.zoom = String(previewScale);
+  document.documentElement.dataset.previewScale = String(previewScale);
+}
 const structureContext = previewParameters.get("structure");
 const unavailableDecorativeId = "decorative-preview-unavailable";
 let projection = createPreviewProjection(
@@ -125,8 +130,6 @@ const projectDialogPort: ProjectDialogPort = {
 };
 
 const projectStartupPort: ProjectStartupPort = {
-  recoveryStatus: async () => ({ kind: "none" }),
-  resolveRecovery: async () => ({ kind: "deferred" }),
   confirmUiReady: async () => undefined,
 };
 

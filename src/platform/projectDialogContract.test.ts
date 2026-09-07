@@ -24,6 +24,7 @@ const states: readonly ProjectDialogState[] = [
   { busy: false, kind: "projectCloseConfirmation" },
   { kind: "projectCloseFailure", message: "Falha ao fechar" },
   { kind: "projectOperationFailure", message: "Falha ao salvar" },
+  { kind: "graphicsFailure", reason: "O contexto WebGL2 foi perdido." },
   {
     cancelRequested: false,
     cancellable: true,
@@ -49,6 +50,7 @@ const actions: readonly ProjectDialogAction[] = [
   "cancelExport",
   "cancelProjectClose",
   "confirmAlbumInformation",
+  "closeProjectAfterGraphicsFailure",
   "discardAndClose",
   "dismissExport",
   "dismissProjectCloseFailure",

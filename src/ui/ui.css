@@ -143,6 +143,32 @@
   text-transform: uppercase;
 }
 
+/* Desktop chrome is not document prose. Native text selection remains opt-in
+   for editing controls and content explicitly exposed for copying. */
+.ui-chrome-selection-scope {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.ui-chrome-selection-scope :where(
+    input,
+    textarea,
+    [contenteditable]:not([contenteditable="false"]),
+    .ui-copyable-text
+  ) {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.ui-chrome-selection-scope select {
+  -webkit-user-select: auto;
+  user-select: auto;
+}
+
+.ui-copyable-text {
+  cursor: text;
+}
+
 .ui-application-header {
   position: relative;
   display: flex;

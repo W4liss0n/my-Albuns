@@ -15,6 +15,8 @@ export function defaultProjectDialogCloseAction(
       return "dismissProjectCloseFailure";
     case "projectOperationFailure":
       return "dismissProjectOperationFailure";
+    case "graphicsFailure":
+      return "closeProjectAfterGraphicsFailure";
     case "exportProgress":
       return state.cancellable && !state.cancelRequested
         ? "cancelExport"

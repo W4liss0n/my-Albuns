@@ -16,6 +16,16 @@ function targetAllowsSheetCommandShortcut(target: EventTarget | null) {
   );
 }
 
+function targetOwnsHorizontalNavigation(target: EventTarget | null) {
+  if (isTextEntryTarget(target)) return true;
+  return (
+    target instanceof Element &&
+    target.closest(
+      '[role="dialog"], [role="menu"], [role="menubar"], [role="listbox"], [role="scrollbar"]',
+    ) !== null
+  );
+}
+
 interface ProjectCommandShortcutHandlers {
   canDeleteSheet: boolean;
   canRedo: boolean;
@@ -23,11 +33,14 @@ interface ProjectCommandShortcutHandlers {
   closeProject(): void;
   deleteSheet(): void;
   disabled: boolean;
+  navigateToNextSheet(): void;
+  navigateToPreviousSheet(): void;
   redo(): void;
   save(): void;
   saveAs(): void;
   sheetShortcutActive: boolean;
   sheetCommandsDisabled: boolean;
+  sheetNavigationActive: boolean;
   undo(): void;
 }
 
@@ -38,11 +51,14 @@ export function useProjectCommandShortcuts({
   closeProject,
   deleteSheet,
   disabled,
+  navigateToNextSheet,
+  navigateToPreviousSheet,
   redo,
   save,
   saveAs,
   sheetShortcutActive,
   sheetCommandsDisabled,
+  sheetNavigationActive,
   undo,
 }: ProjectCommandShortcutHandlers) {
   useEffect(() => {
@@ -54,6 +70,12 @@ export function useProjectCommandShortcuts({
           ? matchProjectCommandShortcut(event, "sheet")
           : null);
       if (command === null) return;
+      if (
+        (command === "previous-sheet" || command === "next-sheet") &&
+        (!sheetNavigationActive || targetOwnsHorizontalNavigation(event.target))
+      ) {
+        return;
+      }
       if (
         (command === "undo" ||
           command === "redo" ||
@@ -69,7 +91,9 @@ export function useProjectCommandShortcuts({
         command === "close" ||
         command === "undo" ||
         command === "redo" ||
-        command === "delete-sheet";
+        command === "delete-sheet" ||
+        command === "previous-sheet" ||
+        command === "next-sheet";
       if (!handledCommand) return;
 
       event.preventDefault();
@@ -94,6 +118,12 @@ export function useProjectCommandShortcuts({
         case "delete-sheet":
           if (canDeleteSheet && !sheetCommandsDisabled) deleteSheet();
           break;
+        case "previous-sheet":
+          navigateToPreviousSheet();
+          break;
+        case "next-sheet":
+          navigateToNextSheet();
+          break;
       }
     };
     window.addEventListener("keydown", handleProjectCommand);
@@ -105,11 +135,14 @@ export function useProjectCommandShortcuts({
     closeProject,
     deleteSheet,
     disabled,
+    navigateToNextSheet,
+    navigateToPreviousSheet,
     redo,
     save,
     saveAs,
     sheetShortcutActive,
     sheetCommandsDisabled,
+    sheetNavigationActive,
     undo,
   ]);
 }

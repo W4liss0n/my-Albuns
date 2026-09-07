@@ -512,15 +512,53 @@ test("enters sheet editing by a double click on either surface or Frame", async 
   await finishPixiInitialization();
   const sheet = displayWithHandler("pointertap");
 
-  sheet.emit("pointertap", { target: sheet, detail: 2 });
+  sheet.emit("pointertap", { button: 0, target: sheet, detail: 2 });
   expect(onEditSheet).toHaveBeenCalledWith("sheet-001");
 
   displayWithLabel("canvas-frame-frame-001").emit("pointertap", {
+    button: 0,
     detail: 2,
     stopPropagation: vi.fn(),
   });
   expect(onEditSheet).toHaveBeenCalledTimes(2);
   expect(onEditSheet).toHaveBeenLastCalledWith("sheet-001");
+});
+
+test("leaves right-button taps on the Pixi surface, Frame, and Sheet Bar to the contextual owner", async () => {
+  const onEditSheet = vi.fn();
+  const onFocusSheet = vi.fn();
+  const onSelectFrame = vi.fn();
+  renderCanvas({
+    compositionPlan: interactiveComposition,
+    onEditSheet,
+    onFocusSheet,
+    onSelectFrame,
+  });
+  await finishPixiInitialization();
+
+  const sheet = displayWithLabel("canvas-sheet-sheet-001");
+  const frame = displayWithLabel("canvas-frame-frame-001");
+  const sheetBar = displayWithLabel("sheet-bar-sheet-001");
+  sheet.emit("pointertap", {
+    button: 2,
+    detail: 1,
+    target: sheet,
+  });
+  frame.emit("pointertap", {
+    altKey: false,
+    button: 2,
+    detail: 1,
+    stopPropagation: vi.fn(),
+  });
+  sheetBar.emit("pointertap", {
+    button: 2,
+    detail: 1,
+    target: sheetBar,
+  });
+
+  expect(onFocusSheet).not.toHaveBeenCalled();
+  expect(onSelectFrame).not.toHaveBeenCalled();
+  expect(onEditSheet).not.toHaveBeenCalled();
 });
 
 test("editing mode materializes only its isolated sheet", async () => {
@@ -801,10 +839,10 @@ test("enters Sheet Edit Mode on the second pointer tap of a Sheet", async () => 
   await finishPixiInitialization();
 
   const sheet = displayWithLabel("canvas-sheet-sheet-001");
-  sheet.emit("pointertap", { detail: 1, target: sheet });
+  sheet.emit("pointertap", { button: 0, detail: 1, target: sheet });
   expect(onEditSheet).not.toHaveBeenCalled();
 
-  sheet.emit("pointertap", { detail: 2, target: sheet });
+  sheet.emit("pointertap", { button: 0, detail: 2, target: sheet });
   expect(onEditSheet).toHaveBeenCalledWith("sheet-001");
 });
 
@@ -891,7 +929,7 @@ test.each([
     expect(sheetBar).toMatchObject({
       hitArea: { height: 40, width: 600, x: 0, y: 0 },
     });
-    sheetBar.emit("pointertap", { target: sheetBar });
+    sheetBar.emit("pointertap", { button: 0, target: sheetBar });
     expect(onFocusSheet).toHaveBeenCalledWith("sheet-001");
     expect(displayWithLabel("sheet-center-line-sheet-001")).toMatchObject({
       pathCommands: [
@@ -1758,10 +1796,10 @@ test("does not expose the structural context menu through masked Sangria", async
   expect(onOpenSheetContextMenu).not.toHaveBeenCalled();
 });
 
-test("mounts the productive Sheet Bar seam for navigation, context, and reorder", async () => {
+test("mounts the productive Sheet Bar seam for selection, edit, context, and reorder", async () => {
   const onCancel = vi.fn();
   const onDrop = vi.fn();
-  const onNavigate = vi.fn();
+  const onSelect = vi.fn();
   const onOpenSheetContextMenu = vi.fn();
   const onPreview = vi.fn();
   const view = renderCanvas({
@@ -1771,7 +1809,7 @@ test("mounts the productive Sheet Bar seam for navigation, context, and reorder"
       disabled: false,
       onCancel,
       onDrop,
-      onNavigate,
+      onSelect,
       onPreview,
       representation: {
         ghost: null,
@@ -1789,27 +1827,67 @@ test("mounts the productive Sheet Bar seam for navigation, context, and reorder"
   const second = screen.getByRole("button", {
     name: "Reordenar Lâmina 02 pela Barra",
   });
-  const dataTransfer = {
-    dropEffect: "none",
-    effectAllowed: "none",
-    setData: vi.fn(),
-  };
+  const overlay = view.getByRole("group", {
+    name: "Reordenação pela Barra da Lâmina",
+  });
+  vi.spyOn(overlay, "getBoundingClientRect").mockReturnValue({
+    left: 0,
+    right: 10_000,
+    top: 0,
+    bottom: 600,
+    width: 10_000,
+    height: 600,
+    x: 0,
+    y: 0,
+    toJSON: () => ({}),
+  });
 
   fireEvent.click(second);
-  expect(onNavigate).toHaveBeenCalledWith("sheet-002");
+  expect(onSelect).toHaveBeenCalledWith("sheet-002");
+  const firstWidth = Number.parseFloat(first.style.width);
+  const secondWidth = Number.parseFloat(second.style.width);
+  fireEvent.doubleClick(first, {
+    clientX: Number.parseFloat(first.style.left) + firstWidth * 0.25,
+    clientY: 36,
+  });
+  fireEvent.doubleClick(second, {
+    clientX: Number.parseFloat(second.style.left) + secondWidth * 0.75,
+    clientY: 36,
+  });
+  expect(view.onEditSheet).toHaveBeenNthCalledWith(1, "sheet-001");
+  expect(view.onEditSheet).toHaveBeenNthCalledWith(2, "sheet-002");
   fireEvent.contextMenu(second, { clientX: 220, clientY: 36 });
   expect(onOpenSheetContextMenu).toHaveBeenCalledWith("sheet-002", {
     x: 220,
     y: 36,
   });
 
-  fireEvent.dragStart(first, { dataTransfer });
-  fireEvent.dragEnter(second, { dataTransfer });
+  const firstX = Number.parseFloat(first.style.left) + 8;
+  const secondX = Number.parseFloat(second.style.left) + 8;
+  fireEvent.pointerDown(first, {
+    button: 0,
+    buttons: 1,
+    clientX: firstX,
+    clientY: 32,
+    pointerId: 31,
+    pointerType: "mouse",
+  });
+  fireEvent.pointerMove(first, {
+    buttons: 1,
+    clientX: secondX,
+    clientY: 32,
+    pointerId: 31,
+    pointerType: "mouse",
+  });
   expect(onPreview).toHaveBeenLastCalledWith("sheet-001", 1);
-  fireEvent.drop(
-    view.getByTestId("sheet-reorder-bar-drop-zone"),
-    { dataTransfer },
-  );
+  fireEvent.pointerUp(first, {
+    button: 0,
+    buttons: 0,
+    clientX: secondX,
+    clientY: 32,
+    pointerId: 31,
+    pointerType: "mouse",
+  });
   expect(onDrop).toHaveBeenCalledOnce();
 });
 
@@ -1838,7 +1916,7 @@ test("slides intermediate Pixi Sheets while the dragged Sheet yields to the plac
     disabled: false,
     onCancel: vi.fn(),
     onDrop: vi.fn(),
-    onNavigate: vi.fn(),
+    onSelect: vi.fn(),
     onPreview: vi.fn(),
   };
   const view = render(

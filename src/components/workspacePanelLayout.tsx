@@ -27,7 +27,7 @@ interface WorkspacePanelDefinition {
   orientation: "horizontal" | "vertical";
 }
 
-const WORKSPACE_SPLITTER_SIZE = 6;
+const WORKSPACE_SPLITTER_VISUAL_SIZE = 1;
 const KEYBOARD_RESIZE_STEP = 12;
 
 const PANEL_DEFINITIONS: Record<
@@ -190,13 +190,13 @@ export function useWorkspacePanelLayout({
       ? `${panels.inspector.size}px`
       : "0px",
     "--inspector-splitter-size": panels.inspector.visible
-      ? `${WORKSPACE_SPLITTER_SIZE}px`
+      ? "var(--ui-splitter-visual-size)"
       : "0px",
     "--media-panel-height": panels.media.visible
       ? `${panels.media.size}px`
       : "0px",
     "--media-splitter-size": panels.media.visible
-      ? `${WORKSPACE_SPLITTER_SIZE}px`
+      ? "var(--ui-splitter-visual-size)"
       : "0px",
   } as CSSProperties;
 
@@ -287,7 +287,7 @@ function constrainPanelSize(
             definition.maximumSize,
             workspaceSize -
               definition.minimumWorkAreaSize -
-              WORKSPACE_SPLITTER_SIZE,
+              WORKSPACE_SPLITTER_VISUAL_SIZE,
           ),
         )
       : definition.maximumSize;

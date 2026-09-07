@@ -3,7 +3,7 @@ status: current
 document: technical-research
 ticket: 10-movimentacao-copia-externa
 date: 2026-08-17
-updated: 2026-08-18
+updated: 2026-08-30
 ---
 
 # Movimentação e Cópia externa
@@ -150,11 +150,13 @@ de largura não autoriza `Different` nem promoção; outra consulta os dois
 formatos no mesmo handle NTFS real usado pelo runner.
 Os testes de Host e protocolo comprovam a correlação de `FocusExisting`, a
 eliminação do Host efêmero e o transporte separado das autoridades de fonte e
-Destino. Os testes da Tela Global verificam que o frontend não recebe pathname,
-oferece **Salvar cópia como…** apenas no resultado acionável e mantém a oferta
-quando uma abertura posterior é cancelada ou falha antes de substituir o Host
-pendente. Cancelar o diálogo de **Salvar cópia como…** descarta e reap o Host
-pendente; a fonte precisa ser aberta novamente para uma nova tentativa.
+Destino. A decisão acionável não atravessa mais como terminal público para o
+frontend da Tela Global: a mesma janela externa que apresentava o progresso de
+abertura transiciona para **Salvar cópia como…** ou **Cancelar**, enquanto o
+Host, a fonte opaca e a tentativa permanecem correlacionados. O seletor nativo
+de Destino pertence a essa janela. Cancelar somente esse seletor volta à mesma
+decisão e conserva o Host; **Cancelar** na decisão descarta e recolhe o Host
+pendente, exigindo nova abertura para uma nova tentativa.
 
 ## Limites
 
@@ -168,8 +170,9 @@ pendente; a fonte precisa ser aberta novamente para uma nova tentativa.
 - o Core não monta Cache ou WebView. A ordem “Identidade antes de namespace” é
   completada pelos contratos públicos do Host, enquanto o gate confirma que o
   namespace derivado já é distinto no primeiro resultado editável;
-- o cancelamento do diálogo nativo é coberto na fronteira Global e no teste de
-  aplicação; a jornada SMB não automatiza um diálogo modal do Windows.
+- os terminais da janela externa e o cancelamento do seletor nativo são cobertos
+  na fronteira Global e no teste de aplicação; a jornada SMB não automatiza um
+  diálogo modal do Windows.
 - a prova de mídia somente leitura depende dos serviços nativos IMAPI2 e Disco
   Virtual disponíveis no Windows; ela valida a recusa de escrita antes de
   expor a unidade ao teste.

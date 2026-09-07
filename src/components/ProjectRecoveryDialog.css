@@ -1,0 +1,23 @@
+.project-recovery-dialog-scope
+  .ui-dialog-window__footer
+  .ui-action-button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+@media (max-width: 30rem) {
+  .project-recovery-dialog-scope .ui-dialog-window__footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .project-recovery-dialog-scope .ui-dialog-action-spacer {
+    display: none;
+  }
+
+  .project-recovery-dialog-scope
+    .ui-dialog-window__footer
+    .ui-action-button {
+    width: 100%;
+  }
+}

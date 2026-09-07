@@ -9,15 +9,7 @@ Initialize-MyAlbunsToolchain
 
 Push-Location $script:WorkspaceRoot
 try {
-    $baseTargetDirectory = if ([string]::IsNullOrWhiteSpace($env:CARGO_TARGET_DIR)) {
-        Join-Path $script:WorkspaceRoot 'target'
-    }
-    elseif ([System.IO.Path]::IsPathRooted($env:CARGO_TARGET_DIR)) {
-        [System.IO.Path]::GetFullPath($env:CARGO_TARGET_DIR)
-    }
-    else {
-        [System.IO.Path]::GetFullPath((Join-Path $script:WorkspaceRoot $env:CARGO_TARGET_DIR))
-    }
+    $baseTargetDirectory = Resolve-MyAlbunsCargoTargetDirectory
     $sidecarTargetDirectory = Join-Path $baseTargetDirectory 'sidecar-build'
     $buildArguments = @(
         'build',
@@ -45,14 +37,29 @@ try {
     $destination = Join-Path $binaryDirectory 'myalbuns-imaging-x86_64-pc-windows-msvc.exe'
     $runtimeDirectory = Join-Path $baseTargetDirectory $Profile
     $runtimeDestination = Join-Path $runtimeDirectory 'myalbuns-imaging.exe'
+    $targetDirectoryPrefix = $baseTargetDirectory.TrimEnd(
+        [char[]] @('\', '/')
+    ) + [System.IO.Path]::DirectorySeparatorChar
+    $workspaceDirectoryPrefix = $script:WorkspaceRoot.TrimEnd(
+        [char[]] @('\', '/')
+    ) + [System.IO.Path]::DirectorySeparatorChar
 
-    if (-not $source.StartsWith($script:WorkspaceRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+    if (-not $source.StartsWith(
+            $targetDirectoryPrefix,
+            [System.StringComparison]::OrdinalIgnoreCase
+        )) {
         throw "Unexpected sidecar source: $source"
     }
-    if (-not $destination.StartsWith($script:WorkspaceRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+    if (-not $destination.StartsWith(
+            $workspaceDirectoryPrefix,
+            [System.StringComparison]::OrdinalIgnoreCase
+        )) {
         throw "Unexpected sidecar destination: $destination"
     }
-    if (-not $runtimeDestination.StartsWith($script:WorkspaceRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+    if (-not $runtimeDestination.StartsWith(
+            $targetDirectoryPrefix,
+            [System.StringComparison]::OrdinalIgnoreCase
+        )) {
         throw "Unexpected sidecar runtime destination: $runtimeDestination"
     }
 

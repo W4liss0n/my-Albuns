@@ -45,7 +45,6 @@ interface GlobalShellProps {
 
 const recentCoverVariants = [1, 2, 1, 3, 4, 1, 2] as const;
 const portraitCoverIndexes = new Set([1, 4, 6]);
-type LaunchOutcomeContext = "opening" | "externalCopyResolution";
 
 export function GlobalShell({
   failureDialogPort,
@@ -54,7 +53,6 @@ export function GlobalShell({
   projectPort,
 }: GlobalShellProps) {
   const [isOpening, setIsOpening] = useState(false);
-  const [externalCopyPending, setExternalCopyPending] = useState(false);
   const [surface, setSurface] = useState<"welcome" | "newProject">(
     "welcome",
   );
@@ -67,31 +65,19 @@ export function GlobalShell({
   const restoreNewProjectTriggerFocus = useRef(false);
 
   const handleLaunchOutcome = useCallback(
-    async (
-      outcome: OpenProjectOutcome,
-      context: LaunchOutcomeContext = "opening",
-    ) => {
+    async (outcome: OpenProjectOutcome) => {
       switch (outcome.status) {
         case "failed":
-          if (context === "externalCopyResolution") {
-            setExternalCopyPending(false);
-          }
           await failureDialogPort.present({
             context: "projectOpening",
             error: outcome.error,
           });
           return;
-        case "externalCopyNotWritable":
-          setExternalCopyPending(true);
-          return;
         case "opened":
         case "focused":
-          setExternalCopyPending(false);
           return;
         case "cancelled":
-          if (context === "externalCopyResolution") {
-            setExternalCopyPending(false);
-          }
+          return;
       }
     },
     [failureDialogPort],
@@ -161,14 +147,11 @@ export function GlobalShell({
   }, [handleLaunchOutcome, projectPort]);
 
   const runOpening = useCallback(
-    async (
-      attempt: () => Promise<OpenProjectOutcome>,
-      context: LaunchOutcomeContext = "opening",
-    ) => {
+    async (attempt: () => Promise<OpenProjectOutcome>) => {
       openingAttempt.current += 1;
       setIsOpening(true);
       const outcome = await attempt();
-      await handleLaunchOutcome(outcome, context);
+      await handleLaunchOutcome(outcome);
       setIsOpening(false);
     },
     [handleLaunchOutcome],
@@ -182,18 +165,8 @@ export function GlobalShell({
   const openRecentProject = (id: string) =>
     runOpening(() => projectPort.openRecentProject(id));
 
-  const saveExternalCopyAs = useCallback(
-    () =>
-      runOpening(
-        () => projectPort.saveExternalCopyAs(),
-        "externalCopyResolution",
-      ),
-    [projectPort, runOpening],
-  );
-
   const startCreation = useCallback(() => {
     openingAttempt.current += 1;
-    setExternalCopyPending(false);
     setSurface("newProject");
   }, []);
 
@@ -223,7 +196,7 @@ export function GlobalShell({
       return;
     }
 
-      const handleShortcut = (event: KeyboardEvent) => {
+    const handleShortcut = (event: KeyboardEvent) => {
       if (event.repeat) {
         return;
       }
@@ -254,7 +227,7 @@ export function GlobalShell({
 
   if (surface === "newProject") {
     return (
-      <div className="global-shell global-shell--new-project">
+      <div className="global-shell global-shell--new-project ui-chrome-selection-scope">
         <ApplicationHeader context="Novo Projeto" />
         <NewProjectFlow
           onCancel={cancelCreation}
@@ -279,124 +252,108 @@ export function GlobalShell({
   }
 
   return (
-    <div className="global-shell">
+    <div className="global-shell ui-chrome-selection-scope">
       <ApplicationHeader status="diagramação de Álbuns" />
 
-        <main className="global-recent-projects">
-          <h1 className="ui-section-eyebrow">Projetos recentes</h1>
-          {recentProjects.length === 0 ? (
-            <EmptyState
-              className="global-empty-state"
-              description="Os Projetos abertos recentemente aparecerão aqui."
-              icon={<AppIcon icon={FolderOpen} size={16} />}
-              title="Nenhum Projeto recente"
-            />
-          ) : (
-            <ul
-              aria-label="Projetos recentes"
-              className="global-recent-list"
-              data-placeholder-feature="recent-project-visual-metadata"
-            >
-              {/* PLACEHOLDER UI: capas, fixação e metadados secundários vêm da
-                  referência visual, mas ainda não existem no contrato de recentes. */}
-              {recentProjects.map((project, index) => (
-                <li key={project.id}>
-                  <button
-                    aria-label={project.name}
-                    disabled={isOpening}
-                    onClick={() => openRecentProject(project.id)}
-                    type="button"
+      <main className="global-recent-projects">
+        <h1 className="ui-section-eyebrow">Projetos recentes</h1>
+        {recentProjects.length === 0 ? (
+          <EmptyState
+            className="global-empty-state"
+            description="Os Projetos abertos recentemente aparecerão aqui."
+            title="Nenhum Projeto recente"
+          />
+        ) : (
+          <ul
+            aria-label="Projetos recentes"
+            className="global-recent-list"
+            data-placeholder-feature="recent-project-visual-metadata"
+          >
+            {/* PLACEHOLDER UI: capas, fixação e metadados secundários vêm da
+                referência visual, mas ainda não existem no contrato de recentes. */}
+            {recentProjects.map((project, index) => (
+              <li key={project.id}>
+                <button
+                  aria-label={project.name}
+                  disabled={isOpening}
+                  onClick={() => openRecentProject(project.id)}
+                  type="button"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="global-project-thumbnail"
+                    data-shape={
+                      portraitCoverIndexes.has(index % 7)
+                        ? "portrait"
+                        : "square"
+                    }
+                    data-variant={recentCoverVariants[index % 7]}
                   >
-                    <span
-                      aria-hidden="true"
-                      className="global-project-thumbnail"
-                      data-shape={
-                        portraitCoverIndexes.has(index % 7)
-                          ? "portrait"
-                          : "square"
-                      }
-                      data-variant={recentCoverVariants[index % 7]}
-                    >
-                      <i />
-                      <span className="global-project-pin">
-                        <AppIcon icon={Star} size={12} />
-                      </span>
+                    <i />
+                    <span className="global-project-pin">
+                      <AppIcon icon={Star} size={12} />
                     </span>
-                    <span className="global-project-summary">
-                      <strong>{project.name}</strong>
-                      <small>Projeto MyAlbuns</small>
-                      <small className="global-project-when">
-                        Aberto recentemente
-                      </small>
-                    </span>
-                    <span aria-hidden="true" className="global-project-open">
-                      <AppIcon icon={ChevronRight} size={12} />
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </main>
+                  </span>
+                  <span className="global-project-summary">
+                    <strong>{project.name}</strong>
+                    <small>Projeto MyAlbuns</small>
+                    <small className="global-project-when">
+                      Aberto recentemente
+                    </small>
+                  </span>
+                  <span aria-hidden="true" className="global-project-open">
+                    <AppIcon icon={ChevronRight} size={12} />
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </main>
 
-        <aside aria-label="Ações principais" className="global-primary-actions">
-          <BrandWordmark subtitle="diagramação de Álbuns · versão 0.1.0" />
-          <div className="global-action-stack">
-            <ActionButton
-              aria-label="Novo Projeto"
-              aria-keyshortcuts={projectCommandShortcutAria("new-project")}
-              disabled={isOpening}
-              onClick={startCreation}
-              ref={newProjectTriggerRef}
-              variant="primary"
-            >
-              <AppIcon icon={Plus} size={16} />
-              <span>Novo Projeto</span>
-              <kbd>{projectCommandShortcutLabel("new-project")}</kbd>
-            </ActionButton>
-            <ActionButton
-              aria-label={isOpening ? "Abrindo Projeto…" : "Abrir Projeto"}
-              aria-keyshortcuts={projectCommandShortcutAria("open-project")}
-              disabled={isOpening}
-              onClick={openProject}
-            >
-              <AppIcon icon={FolderOpen} size={16} />
-              <span>
-                {isOpening ? "Abrindo Projeto…" : "Abrir Projeto…"}
-              </span>
-              <kbd>{projectCommandShortcutLabel("open-project")}</kbd>
-            </ActionButton>
-          </div>
-          <div aria-hidden="true" className="global-action-divider" />
-          {externalCopyPending ? (
-            <section className="global-copy-resolution">
-              <h2>Cópia externa somente leitura</h2>
-              <p>
-                Escolha outro local para criar uma cópia editável sem alterar
-                o arquivo original.
-              </p>
-              <ActionButton
-                disabled={isOpening}
-                onClick={saveExternalCopyAs}
-              >
-                Salvar cópia como…
-              </ActionButton>
-            </section>
-          ) : null}
-          <div className="global-secondary-actions">
-            {/* PLACEHOLDER UI: ainda não existe uma porta de Exportação em lote. */}
-            <button
-              aria-label="Exportação em lote"
-              data-placeholder-feature="batch-export"
-              disabled
-              title="A Exportação em lote ainda não está disponível"
-              type="button"
-            >
-              <AppIcon icon={Download} size={14} />
-              <span>Exportação em lote</span>
-            </button>
-          </div>
-        </aside>
+      <aside aria-label="Ações principais" className="global-primary-actions">
+        <BrandWordmark subtitle="diagramação de Álbuns · versão 0.1.0" />
+        <div className="global-action-stack">
+          <ActionButton
+            aria-label="Novo Projeto"
+            aria-keyshortcuts={projectCommandShortcutAria("new-project")}
+            disabled={isOpening}
+            onClick={startCreation}
+            ref={newProjectTriggerRef}
+            variant="primary"
+          >
+            <AppIcon icon={Plus} size={16} />
+            <span>Novo Projeto</span>
+            <kbd>{projectCommandShortcutLabel("new-project")}</kbd>
+          </ActionButton>
+          <ActionButton
+            aria-label={isOpening ? "Abrindo Projeto…" : "Abrir Projeto"}
+            aria-keyshortcuts={projectCommandShortcutAria("open-project")}
+            disabled={isOpening}
+            onClick={openProject}
+          >
+            <AppIcon icon={FolderOpen} size={16} />
+            <span>
+              {isOpening ? "Abrindo Projeto…" : "Abrir Projeto…"}
+            </span>
+            <kbd>{projectCommandShortcutLabel("open-project")}</kbd>
+          </ActionButton>
+        </div>
+        <div aria-hidden="true" className="global-action-divider" />
+        <div className="global-secondary-actions">
+          {/* PLACEHOLDER UI: ainda não existe uma porta de Exportação em lote. */}
+          <button
+            aria-label="Exportação em lote"
+            data-placeholder-feature="batch-export"
+            disabled
+            title="A Exportação em lote ainda não está disponível"
+            type="button"
+          >
+            <AppIcon icon={Download} size={14} />
+            <span>Exportação em lote</span>
+          </button>
+        </div>
+      </aside>
     </div>
   );
 }

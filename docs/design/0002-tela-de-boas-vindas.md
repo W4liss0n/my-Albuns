@@ -82,6 +82,8 @@ respectivamente, `Novo Projeto` e `Abrir Projeto`; não são legendas decorativa
 
 Depois que `Abrir Projeto` ou um cartão de `Projetos recentes` confirma um Projeto existente, a Tela de Boas-vindas sai da área visível antes que a janela de progresso de abertura apareça. Essa é a única operação que substitui visualmente a superfície solicitante durante o processamento. Um resultado `Ready` transfere o trabalho à Janela do Projeto e permite encerrar o processo global; uma falha restaura a Tela de Boas-vindas visível e apresenta o aviso em uma janela pertencente, à frente dela.
 
+Se o Host correlacionado detectar Recuperação ou uma Cópia externa somente leitura, a janela externa de progresso permanece a proprietária causal da tentativa e troca apenas seu conteúdo para a decisão aplicável. A Global não renderiza essa decisão dentro da própria WebView e a Janela do Projeto ainda não é exibida. Em Cópia externa, `Salvar cópia como…` abre o seletor nativo a partir dessa janela e continua o mesmo Host; cancelar somente o seletor retorna à decisão, enquanto `Cancelar` encerra a tentativa. Ativações posteriores aguardam o terminal dessa tentativa em vez de substituir seu owner.
+
 `Novo Projeto` não herda essa exceção. O fluxo de criação ocupa a própria janela e qualquer seletor, confirmação, aviso ou progresso solicitado por ele preserva essa janela visível e bloqueada ao fundo, conforme o contrato de [diálogos pertencentes](0001-estrutura-da-janela-do-projeto.md#diálogos-pertencentes-a-uma-janela).
 
 ## Relação com as Janelas de Projeto

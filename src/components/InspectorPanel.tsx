@@ -4,7 +4,6 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type DragEvent as ReactDragEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
@@ -34,18 +33,22 @@ import { renderableMediaPreviewUrls } from "../application/mediaPreviews";
 import { ActionButton, AppIcon, EmptyState } from "../ui";
 import { AlbumDesignForm } from "./AlbumDesignForm";
 import { AlbumInformationForm } from "./AlbumInformationForm";
-import { SheetPreview } from "./SheetPreview";
+import { SheetPreviewShell } from "./SheetPreview";
 import {
   SheetDesignInspector,
   type SheetDesignScope,
 } from "./SheetDesignInspector";
-import { inactiveSideCssGradient } from "./sheetVisualStyle";
 import {
   SHEET_REORDER_INVALID_MESSAGE,
   sheetReorderAutoScrollVelocity,
   type SheetReorderRepresentation,
   type SheetReorderStatus,
 } from "./sheetReorderSession";
+import {
+  useSheetPointerReorder,
+  type SheetReorderPointerPosition,
+  type SheetReorderPointerState,
+} from "./useSheetPointerReorder";
 import "./InspectorPanel.css";
 
 const PHOTO_ZOOM_KEYS = new Set([
@@ -162,7 +165,8 @@ export function InspectorPanel({
     sheetId: string;
     scope: SheetDesignScope;
   } | null>(null);
-  const draggedSheetIdRef = useRef<string | null>(null);
+  const gridRef = useRef<HTMLDivElement | null>(null);
+  const gridGhostAnchorRef = useRef<GridGhostAnchor | null>(null);
   const gridAutoScrollRef = useRef<{
     frameId: number | null;
     lastTimestamp: number | null;
@@ -218,6 +222,7 @@ export function InspectorPanel({
         Math.max(0, timestamp - previousTimestamp),
       );
       state.viewport.scrollTop += (state.velocity * elapsedMs) / 1_000;
+      pointerReorder.refreshTarget();
     }
     state.frameId = window.requestAnimationFrame(advanceGridAutoScroll);
   }
@@ -241,67 +246,49 @@ export function InspectorPanel({
 
   useEffect(() => () => stopGridAutoScroll(), []);
 
-  useEffect(() => {
-    const cancelGridReorderOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || !draggedSheetIdRef.current) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      stopGridAutoScroll();
-      draggedSheetIdRef.current = null;
-      sheetReorder?.onCancel();
-    };
-    window.addEventListener("keydown", cancelGridReorderOnEscape, true);
-    return () =>
-      window.removeEventListener("keydown", cancelGridReorderOnEscape, true);
-  }, [sheetReorder]);
-
-  function beginGridReorder(
-    event: ReactDragEvent<HTMLDivElement>,
-    sheetId: string,
-    targetIndex: number,
-  ) {
-    if (!sheetReorder || !sheetReorderEnabled) {
-      event.preventDefault();
-      return;
-    }
-    draggedSheetIdRef.current = sheetId;
-    event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("text/plain", sheetId);
-    sheetReorder.onPreview(sheetId, targetIndex);
-  }
-
-  function previewGridReorder(
-    event: ReactDragEvent<HTMLDivElement>,
-    targetIndex: number,
-  ) {
-    const draggedSheetId = draggedSheetIdRef.current;
-    if (!sheetReorder || !sheetReorderEnabled || !draggedSheetId) return;
-    event.preventDefault();
-    sheetReorder.onPreview(draggedSheetId, targetIndex);
-  }
-
-  function autoScrollGrid(event: ReactDragEvent<HTMLDivElement>) {
-    if (
-      !sheetReorder ||
-      !sheetReorderEnabled ||
-      !draggedSheetIdRef.current
-    ) {
-      return;
-    }
-    event.preventDefault();
-    const viewport = event.currentTarget.closest<HTMLElement>(
+  function autoScrollGrid(position: SheetReorderPointerPosition) {
+    if (!sheetReorder || !sheetReorderEnabled) return;
+    const viewport = gridRef.current?.closest<HTMLElement>(
       ".inspector-scroll",
     );
     if (!viewport) return;
     const bounds = viewport.getBoundingClientRect();
     const velocity = sheetReorderAutoScrollVelocity({
       axis: "vertical",
-      pointerPosition: event.clientY,
+      pointerPosition: position.clientY,
       viewportStart: bounds.top,
       viewportEnd: bounds.bottom,
     });
     updateGridAutoScroll(viewport, velocity);
   }
+
+  const pointerReorder = useSheetPointerReorder({
+    enabled: sheetReorderEnabled,
+    onActivate: onNavigateToSheet,
+    onCancel: () => sheetReorder?.onCancel(),
+    onDrop: () => sheetReorder?.onDrop(),
+    onFinish: stopGridAutoScroll,
+    onMove: autoScrollGrid,
+    onPreview: (sheetId, targetIndex) =>
+      sheetReorder?.onPreview(sheetId, targetIndex),
+    resolveTarget: (position) =>
+      resolveGridTarget(gridRef.current, position),
+    validRelease: (position) =>
+      pointInsideGridViewport(gridRef.current, position),
+  });
+  const reorderGhostSheetId =
+    pointerReorder.pointer?.sourceId ??
+    sheetReorder?.representation.ghost?.sheetId ??
+    null;
+  const reorderGhostSheet = reorderGhostSheetId
+    ? composedSheetById.get(reorderGhostSheetId)
+    : undefined;
+  const reorderGhostSheetState = reorderGhostSheetId
+    ? sheetStateById.get(reorderGhostSheetId)
+    : undefined;
+  const reorderGhostPageMetadata = formatSheetPageMetadata(
+    reorderGhostSheetState,
+  );
 
   function openGridContextMenu(
     event: ReactMouseEvent<HTMLDivElement>,
@@ -510,14 +497,11 @@ export function InspectorPanel({
                   data-reorder-surface="grid"
                   data-sheet-order={sheets.map((sheet) => sheet.sheetId).join(",")}
                   data-testid="sheet-reorder-grid"
-                  onDragOver={autoScrollGrid}
-                  onDrop={(event) => {
-                    stopGridAutoScroll();
-                    if (!sheetReorder || !sheetReorderEnabled) return;
-                    event.preventDefault();
-                    draggedSheetIdRef.current = null;
-                    sheetReorder.onDrop();
-                  }}
+                  onLostPointerCapture={pointerReorder.lostCapture}
+                  onPointerCancel={pointerReorder.cancel}
+                  onPointerMove={pointerReorder.move}
+                  onPointerUp={pointerReorder.end}
+                  ref={gridRef}
                 >
                   {orderedSheets.map((sheet, index) => {
                     const number = String(sheet.number).padStart(2, "0");
@@ -531,38 +515,48 @@ export function InspectorPanel({
                     const active = sheet.sheetId === focusedSheetId;
                     const tileStyle = {
                       aspectRatio: `${document.sheetWidthUm} / ${document.sheetHeightUm}`,
-                      ...(sheet.activeSides === "both"
-                        ? {}
-                        : {
-                            "--sheet-inactive-side-gradient":
-                              inactiveSideCssGradient(sheet.activeSides),
-                          }),
                     } as CSSProperties;
                     const reorderGhost =
-                      sheetReorder?.representation.ghost?.sheetId ===
-                      sheet.sheetId;
+                      reorderGhostSheetId === sheet.sheetId;
                     return (
                       <div
                         className="sheet-grid-slot"
+                        data-reorder-enabled={
+                          sheetReorderEnabled || undefined
+                        }
                         data-reorder-ghost={reorderGhost || undefined}
                         data-sheet-id={sheet.sheetId}
-                        draggable={sheetReorderEnabled}
+                        data-slot-index={index}
                         key={sheet.sheetId}
                         onContextMenu={(event) =>
                           openGridContextMenu(event, sheet.sheetId)
                         }
-                        onDragEnd={() => {
-                          if (!draggedSheetIdRef.current) return;
-                          stopGridAutoScroll();
-                          draggedSheetIdRef.current = null;
-                          sheetReorder?.onCancel();
+                        onClickCapture={(event) => {
+                          if (
+                            !pointerReorder.consumeClickSuppression(
+                              sheet.sheetId,
+                            )
+                          ) {
+                            return;
+                          }
+                          event.preventDefault();
+                          event.stopPropagation();
                         }}
-                        onDragEnter={(event) =>
-                          previewGridReorder(event, index)
-                        }
-                        onDragStart={(event) =>
-                          beginGridReorder(event, sheet.sheetId, index)
-                        }
+                        onPointerDownCapture={(event) => {
+                          const bounds =
+                            event.currentTarget.getBoundingClientRect();
+                          gridGhostAnchorRef.current = {
+                            height: bounds.height,
+                            offsetX: event.clientX - bounds.left,
+                            offsetY: event.clientY - bounds.top,
+                            width: bounds.width,
+                          };
+                          pointerReorder.begin(
+                            event,
+                            sheet.sheetId,
+                            gridRef.current,
+                          );
+                        }}
                       >
                         {sheetReorder?.representation.placeholderIndex ===
                         index ? (
@@ -580,30 +574,57 @@ export function InspectorPanel({
                         style={tileStyle}
                         onPress={() => onNavigateToSheet(sheet.sheetId)}
                       >
-                        <SheetPreview
+                        <SheetPreviewShell
                           frameBorder={frameBorder}
                           sheet={sheet}
                           mediaPreviewUrls={mediaPreviewUrls}
-                        />
-                        <span aria-hidden="true" className="sheet-tile__number">
-                          {number}
-                        </span>
-                        <span aria-hidden="true" className="sheet-tile__pages">
-                          {visualPageLabel}
-                        </span>
+                        >
+                          <span aria-hidden="true" className="sheet-tile__number">
+                            {number}
+                          </span>
+                          <span aria-hidden="true" className="sheet-tile__pages">
+                            {visualPageLabel}
+                          </span>
+                        </SheetPreviewShell>
                       </Button>
                       </div>
                     );
                   })}
-                  {sheetReorder?.representation.ghost ? (
+                  {reorderGhostSheetId && reorderGhostSheet ? (
                     <span
                       aria-hidden="true"
                       className="sheet-reorder-ghost"
+                      data-active-sides={reorderGhostSheet.activeSides}
+                      data-origin-selected={
+                        reorderGhostSheetId === focusedSheetId || undefined
+                      }
+                      data-pointer-x={pointerReorder.pointer?.clientX}
+                      data-pointer-y={pointerReorder.pointer?.clientY}
+                      data-sheet-id={reorderGhostSheetId}
                       data-testid="reorder-ghost"
+                      style={gridGhostStyle(
+                        pointerReorder.pointer,
+                        gridGhostAnchorRef.current,
+                      )}
                     >
-                      {sheetStateById.get(
-                        sheetReorder.representation.ghost.sheetId,
-                      )?.number ?? ""}
+                      <SheetPreviewShell
+                        frameBorder={frameBorder}
+                        mediaPreviewUrls={mediaPreviewUrls}
+                        sheet={reorderGhostSheet}
+                      >
+                        <span className="sheet-tile__number">
+                          {String(
+                            reorderGhostSheetState?.number ??
+                              reorderGhostSheet.number,
+                          ).padStart(2, "0")}
+                        </span>
+                        <span className="sheet-tile__pages">
+                          {reorderGhostPageMetadata?.visualLabel ??
+                            `Lâmina ${String(
+                              reorderGhostSheet.number,
+                            ).padStart(2, "0")}`}
+                        </span>
+                      </SheetPreviewShell>
                     </span>
                   ) : null}
                   {sheetReorder?.status === "invalid" &&
@@ -624,6 +645,87 @@ export function InspectorPanel({
       </div>
     </aside>
   );
+}
+
+interface GridGhostAnchor {
+  readonly height: number;
+  readonly offsetX: number;
+  readonly offsetY: number;
+  readonly width: number;
+}
+
+function gridGhostStyle(
+  pointer: SheetReorderPointerState | null,
+  anchor: GridGhostAnchor | null,
+): CSSProperties | undefined {
+  if (!pointer || !anchor) return undefined;
+  return {
+    height: `${anchor.height}px`,
+    left: `${pointer.clientX - anchor.offsetX}px`,
+    top: `${pointer.clientY - anchor.offsetY}px`,
+    width: `${anchor.width}px`,
+  };
+}
+
+function resolveGridTarget(
+  grid: HTMLElement | null,
+  position: SheetReorderPointerPosition,
+): number | null {
+  if (!grid) return null;
+  const slots = Array.from(
+    grid.querySelectorAll<HTMLElement>(".sheet-grid-slot"),
+  );
+  if (slots.length === 0) return null;
+  let nearestIndex = 0;
+  let nearestDistance = Number.POSITIVE_INFINITY;
+  slots.forEach((slot, fallbackIndex) => {
+    const bounds = slot.getBoundingClientRect();
+    const deltaX = distanceOutside(
+      position.clientX,
+      bounds.left,
+      bounds.right,
+    );
+    const deltaY = distanceOutside(
+      position.clientY,
+      bounds.top,
+      bounds.bottom,
+    );
+    const distance = Math.hypot(deltaX, deltaY);
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      nearestIndex = Number(slot.dataset.slotIndex ?? fallbackIndex);
+    }
+  });
+  return nearestIndex;
+}
+
+function pointInsideGridViewport(
+  grid: HTMLElement | null,
+  position: SheetReorderPointerPosition,
+): boolean {
+  if (!grid || !pointInsideRenderedBounds(grid, position)) return false;
+  const viewport = grid.closest<HTMLElement>(".inspector-scroll");
+  return !viewport || pointInsideRenderedBounds(viewport, position);
+}
+
+function pointInsideRenderedBounds(
+  element: HTMLElement,
+  position: SheetReorderPointerPosition,
+): boolean {
+  const bounds = element.getBoundingClientRect();
+  if (bounds.width === 0 && bounds.height === 0) return true;
+  return (
+    position.clientX >= bounds.left &&
+    position.clientX <= bounds.right &&
+    position.clientY >= bounds.top &&
+    position.clientY <= bounds.bottom
+  );
+}
+
+function distanceOutside(value: number, start: number, end: number): number {
+  if (value < start) return start - value;
+  if (value > end) return value - end;
+  return 0;
 }
 
 function InspectorSection({

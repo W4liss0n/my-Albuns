@@ -24,11 +24,6 @@ const openFallbackFailure: ProjectLaunchFailure = {
   action: "Tente novamente. Se o problema continuar, reinicie o MyAlbuns.",
 };
 
-const saveCopyFallbackFailure: ProjectLaunchFailure = {
-  code: "save_copy_unavailable",
-  message: "Não foi possível salvar a Cópia externa.",
-  action: "Tente novamente. Se o problema continuar, reabra a cópia.",
-};
 const graphicsGateFallbackFailure: ProjectLaunchFailure = {
   code: "graphics_gate_unavailable",
   message: "Não foi possível confirmar o requisito gráfico do editor.",
@@ -110,11 +105,6 @@ export const tauriGlobalProjectPort: GlobalProjectPort = {
     settleProjectLaunch(
       () => invoke<unknown>("open_project"),
       openFallbackFailure,
-    ),
-  saveExternalCopyAs: () =>
-    settleProjectLaunch(
-      () => invoke<unknown>("save_external_copy_as"),
-      saveCopyFallbackFailure,
     ),
   listRecentProjects: async () => {
     try {

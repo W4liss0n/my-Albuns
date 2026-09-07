@@ -24,12 +24,27 @@ import {
   assertReopenedHostExport,
 } from "./ProductiveJourneyObservations.mjs";
 
-test("locates the New Project flow through stable accessible names", () => {
+test("productive journey uses the neutral captured-pointer gesture policy", () => {
   const runner = readFileSync(
     path.join(
       path.dirname(fileURLToPath(import.meta.url)),
       "Run-ProductiveJourneyGate.mjs",
     ),
+    "utf8",
+  );
+
+  assert.match(runner, /from "\.\/WebDriverPointerGestures\.mjs"/u);
+  assert.doesNotMatch(runner, /const visibleCenter =/u);
+});
+
+test("locates the New Project flow through stable accessible names", () => {
+  const scripts = path.dirname(fileURLToPath(import.meta.url));
+  const runner = readFileSync(
+    path.join(scripts, "Run-ProductiveJourneyGate.mjs"),
+    "utf8",
+  );
+  const wrapper = readFileSync(
+    path.join(scripts, "Test-ProductiveJourney.ps1"),
     "utf8",
   );
 
@@ -54,12 +69,26 @@ test("locates the New Project flow through stable accessible names", () => {
   assert.match(runner, /projectDialogDebugPort/);
   assert.match(
     runner,
+    /productive Grade click did not activate Sheet 2/,
+  );
+  assert.match(runner, /button\.active \.sheet-tile__number/);
+  assert.match(
+    runner,
     /startAttachedWebDriver\(\s*driver\.projectDialogDebugPort/,
   );
   assert.match(runner, /Aplicar alterações no Álbum\?/);
   assert.match(runner, /selectApplicationMenuCommand/);
   assert.match(runner, /clickElementWhenInteractable/);
   assert.match(runner, /withProjectDialog/);
+  assert.match(runner, /function accessibleProjectDialogXpath/);
+  assert.match(
+    runner,
+    /@aria-labelledby = \/\/\*\[normalize-space\(\)=\$\{title\}\]\/@id/,
+  );
+  assert.doesNotMatch(
+    runner,
+    /@role='dialog' and @aria-label=/,
+  );
   assert.match(runner, /openPhotoImportDialog/);
   assert.match(runner, /globalInspectorPreferencePreserved/);
   assert.match(runner, /projectLocalSelectionReset/);
@@ -90,7 +119,44 @@ test("locates the New Project flow through stable accessible names", () => {
   );
   assert.doesNotMatch(runner, /Importar JPEG…/);
   assert.doesNotMatch(runner, /\.media-card\[data-media-id\]/);
-  assert.doesNotMatch(runner, /\/window\/handles|DEBUG-project-dialog-targets/);
+  assert.match(runner, /switchToWebDriverWindow\(/);
+  assert.match(
+    runner,
+    /const ownerTargets = await devToolsTargets\(\s*recoveryGlobalDebugPort/,
+  );
+  assert.match(
+    runner,
+    /startAttachedWebDriver\(\s*recoveryGlobalDebugPort/,
+  );
+  assert.match(
+    runner,
+    /parsed\.pathname\.endsWith\("\/dialog\.html"\)[\s\S]*parsed\.searchParams\.get\("kind"\) === "project-recovery"/u,
+  );
+  assert.match(runner, /const actionGeometry =/u);
+  assert.match(runner, /action\.lineCount === 1/u);
+  assert.match(runner, /recoveryPresentation\.viewportWidth !== 492/u);
+  assert.match(
+    runner,
+    /parsed\.searchParams\.get\("kind"\) === "external-copy"/u,
+  );
+  assert.match(runner, /externalCopyPresentation\.viewportWidth !== 440/u);
+  assert.match(runner, /nativeOwnedWindowState\(externalCopyGlobal\)/u);
+  assert.match(runner, /cancelRestoredGlobalAndCleanedHost/u);
+  assert.match(runner, /\[externalCopyPath\]/u);
+  assert.match(runner, /realPathActivationsCompletedSerially/u);
+  assert.match(runner, /pickerCancellationPreservedAttempt/u);
+  assert.match(runner, /emptyActivationDidNotResurrectGlobal/u);
+  assert.match(runner, /samePendingHostCompletedHandoff/u);
+  assert.match(runner, /selectedExternalCopy\.exactProcess === true/u);
+  assert.match(runner, /new Event\('webglcontextlost'/u);
+  assert.match(runner, /canvas_context_restore_failed/u);
+  assert.match(runner, /graphicsDialogOwnedAndProjectBlocked/u);
+  assert.match(runner, /cancelledCloseRearmedSingleGraphicsDialog/u);
+  assert.match(runner, /workspaceInertBeforeDialogTerminal/u);
+  assert.match(runner, /exportDisabledBeforeDialogTerminal/u);
+  assert.match(wrapper, /externalCopyOpening\.pickerCancellationPreservedAttempt/u);
+  assert.match(wrapper, /graphicsFailure\.dialogOwnedByProject/u);
+  assert.doesNotMatch(runner, /DEBUG-project-dialog-targets/);
   assert.doesNotMatch(runner, /localStateStartedEmpty/);
 });
 
@@ -104,6 +170,9 @@ test("keeps the physical Album structure proof in the productive WebView2 contra
     path.join(scripts, "Test-ProductiveJourney.ps1"),
     "utf8",
   );
+
+  assert.match(wrapper, /presentation\.viewportWidth -ne 492/u);
+  assert.match(wrapper, /invalidRecoveryActionGeometry\.Count -ne 0/u);
 
   assert.match(runner, /physicalAlbumStructure:\s*\{/);
   assert.match(runner, /projectCoreEvents/);

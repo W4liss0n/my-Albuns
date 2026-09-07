@@ -96,6 +96,16 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
   const dragRequestRef = useRef(0);
 
   useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    const handleWheel = (event: WheelEvent) => {
+      sceneRef.current?.handleCanvasWheel(event);
+    };
+    host.addEventListener("wheel", handleWheel, { passive: false });
+    return () => host.removeEventListener("wheel", handleWheel);
+  }, []);
+
+  useEffect(() => {
     if (sheetAutoScrollVelocity === 0 || !canvasMetrics) return;
     let frame = 0;
     let previousTimestamp = performance.now();
@@ -511,6 +521,8 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
     <div className="canvas-shell">
       <div
         className="canvas-host"
+        data-centered-sheet-id={props.centeredSheetId ?? undefined}
+        data-viewport-offset-x={props.viewport.offsetX}
         ref={hostRef}
         onDragLeave={handlePhotoDragLeave}
         onDragOver={handlePhotoDragOver}
@@ -550,7 +562,10 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
           <SheetBarReorderOverlay
             bleedUm={props.technicalGuides?.bleedUm}
             disabled={props.sheetReorder.disabled}
+            focusedSheetId={props.focusedSheetId}
+            frameBorder={props.composition.frameBorder}
             layout={props.continuousCanvasLayout}
+            mediaPreviewUrls={props.mediaPreviewUrls}
             metrics={canvasMetrics}
             onAutoScrollVelocity={setSheetAutoScrollVelocity}
             onCancel={props.sheetReorder.onCancel}
@@ -558,9 +573,11 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
               props.onOpenSheetContextMenu?.(sheetId, position)
             }
             onDrop={props.sheetReorder.onDrop}
-            onNavigate={props.sheetReorder.onNavigate}
+            onEditSheet={props.onEditSheet}
+            onSelect={props.sheetReorder.onSelect}
             onPreview={props.sheetReorder.onPreview}
             representation={props.sheetReorder.representation}
+            sheetBarMetadata={props.sheetBarMetadata}
             sheets={props.composition.sheets}
             status={props.sheetReorder.status}
             viewport={props.viewport}

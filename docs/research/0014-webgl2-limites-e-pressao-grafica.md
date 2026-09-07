@@ -3,7 +3,7 @@ status: current
 document: technical-research
 ticket: 01-plataforma-e-arquitetura
 date: 2026-07-30
-updated: 2026-07-30
+updated: 2026-08-30
 ---
 
 # WebGL2, recuperação e pressão gráfica
@@ -28,7 +28,11 @@ O diagnóstico inicial cria um contexto WebGL2 descartável, exige limites
 positivos e recusa ausência de contexto, backend inconclusivo e rasterizadores
 de software conhecidos. Depois que o PixiJS inicia, o mesmo diagnóstico é
 repetido no elemento `<canvas>` real; falha nessa segunda fronteira também
-retira o editor de operação.
+retira o editor de operação. Uma falha tardia irrecuperável não troca a rota nem
+substitui o workspace por um cartão: ela cancela a demanda residente e abre o
+diálogo externo pertencente à Janela do Projeto pelo sistema `project-dialog`.
+O owner fica bloqueado, relatos repetidos atualizam a mesma sessão lógica e
+`Fechar Projeto` reutiliza o contrato normal de fechamento seguro.
 
 O Canvas mantém os listeners públicos `webglcontextlost` e
 `webglcontextrestored` durante toda a sua vida. Durante a perda ele suspende a
@@ -152,7 +156,9 @@ O critério está atendido. A implementação atual:
   explicitada;
 - mantém Boas-vindas, Configurações e Diagnóstico acessíveis quando o editor
   não pode iniciar;
-- bloqueia somente o editor e apresenta orientação clara ao usuário.
+- bloqueia somente o editor e apresenta orientação clara ao usuário;
+- apresenta falha tardia do Canvas em diálogo externo pertencente, sem página
+  de erro dentro da Janela do Projeto.
 
 Não foi introduzido fallback Canvas 2D, renderização por software, política de
 tiles ou alocação sintética de OOM.

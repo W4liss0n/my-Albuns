@@ -16,13 +16,14 @@ pub(crate) use host::bootstrap_host_project;
 pub(crate) use host::{BootstrappedHostProject, HostBootstrap, bootstrap_host_project_or_pending};
 pub(crate) use protocol::{
     BootstrapIntent, BootstrapRequest, CreateWriteAuthorization, FailureCode, FailureStage,
-    HostTerminal, SaveExternalCopyRequest, TargetAuthority, TerminalValidationError,
-    ValidatedTerminal, read_bootstrap_request, read_save_external_copy_request, validate_terminal,
-    write_host_terminal,
+    HostTerminal, ProjectRecoveryRequest, SaveExternalCopyRequest, TargetAuthority,
+    TerminalValidationError, ValidatedTerminal, read_bootstrap_request,
+    read_project_recovery_request, read_save_external_copy_request,
+    validate_project_recovery_request, validate_terminal, write_host_terminal,
 };
 #[cfg(debug_assertions)]
 pub(crate) use supervisor::new_open_request;
 pub(crate) use supervisor::{
     BootstrapFailure, BootstrapFailureKind, BootstrapOutcome, PendingExternalCopyProcess,
-    ProjectHostBootstrap,
+    PendingRecoveryProcess, ProjectHostBootstrap, RecoveryContinuationOutcome,
 };
