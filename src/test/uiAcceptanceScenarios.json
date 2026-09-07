@@ -929,6 +929,66 @@
       ]
     },
     {
+      "id": "canvas-frame-selected",
+      "title": "Frame único — seleção e oito alças",
+      "implementationPath": "/canvas-preview.html?acceptance=editor&geometry=selected",
+      "comparison": {
+        "kind": "implementation-only", "surface": "single-frame-geometry",
+        "implementationCaptureSelector": ".canvas-preview",
+        "reason": "O Modo de edição segue o design 0001, posterior à referência vigente. A composição desta captura é produzida e verificada pelo ProjectCore."
+      },
+      "viewport": { "width": 1600, "height": 900 },
+      "readySelector": "[data-geometry-case=\"selected\"] canvas", "actions": []
+    },
+    {
+      "id": "canvas-frame-moved",
+      "title": "Frame único — composição após movimento",
+      "implementationPath": "/canvas-preview.html?acceptance=editor&geometry=moved",
+      "comparison": {
+        "kind": "implementation-only", "surface": "single-frame-geometry",
+        "implementationCaptureSelector": ".canvas-preview",
+        "reason": "A captura renderiza o resultado do movimento calculado pelo ProjectCore; o design 0001 preserva tamanho e enquadramento da Foto."
+      },
+      "viewport": { "width": 1600, "height": 900 },
+      "readySelector": "[data-geometry-case=\"moved\"] canvas", "actions": []
+    },
+    {
+      "id": "canvas-frame-resized",
+      "title": "Frame único — redimensionamento e Preenchimento da Foto",
+      "implementationPath": "/canvas-preview.html?acceptance=editor&geometry=resized",
+      "comparison": {
+        "kind": "implementation-only", "surface": "single-frame-geometry",
+        "implementationCaptureSelector": ".canvas-preview",
+        "reason": "A captura usa a recomposição do ProjectCore após redimensionar largura e altura, preservando Pan e Zoom e impedindo áreas vazias."
+      },
+      "viewport": { "width": 1600, "height": 900 },
+      "readySelector": "[data-geometry-case=\"resized\"] canvas", "actions": []
+    },
+    {
+      "id": "canvas-frame-proportional-centered",
+      "title": "Frame único — proporção e centro preservados",
+      "implementationPath": "/canvas-preview.html?acceptance=editor&geometry=proportional-centered",
+      "comparison": {
+        "kind": "implementation-only", "surface": "single-frame-geometry",
+        "implementationCaptureSelector": ".canvas-preview",
+        "reason": "A captura renderiza o resultado de Shift + Alt calculado pelo ProjectCore conforme o design 0001."
+      },
+      "viewport": { "width": 1600, "height": 900 },
+      "readySelector": "[data-geometry-case=\"proportional-centered\"] canvas", "actions": []
+    },
+    {
+      "id": "canvas-frame-minimum",
+      "title": "Frame único — limite mínimo de redimensionamento",
+      "implementationPath": "/canvas-preview.html?acceptance=editor&geometry=minimum",
+      "comparison": {
+        "kind": "implementation-only", "surface": "single-frame-geometry",
+        "implementationCaptureSelector": ".canvas-preview",
+        "reason": "O design 0001 requer calibrar o menor tamanho interativo. Esta captura permite avaliar o limite físico calculado pelo ProjectCore e suas alças no Canvas."
+      },
+      "viewport": { "width": 1600, "height": 900 },
+      "readySelector": "[data-geometry-case=\"minimum\"] canvas", "actions": []
+    },
+    {
       "id": "canvas-sheet-editing",
       "title": "Canvas — entrada na Edição da Lâmina",
       "implementationPath": "/canvas-preview.html?acceptance=editor",

@@ -44,6 +44,8 @@ function projectCorePort(): ProjectCorePort {
       kind: "cancelled",
       projection: representativeProjection,
     }),
+    readFrameDragThreshold: async () => ({ x: 5, y: 5 }),
+    previewFrameGeometry: async () => { throw new Error("Frame geometry preview is not configured in this fixture."); },
     resolvePhotoDropTarget: async () => ({ kind: "invalid" }),
     relink: async () => representativeProjection,
     undo: async () => representativeProjection,

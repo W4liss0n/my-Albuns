@@ -58,6 +58,7 @@ pub(crate) async fn apply_project_intent(
     let previous_bindings = state.authorized_media_catalog()?.bindings;
     let previous = state.projection()?;
     let intent_kind = match &intent {
+        ProjectIntent::EditFrameGeometry { .. } => "edit_frame_geometry",
         ProjectIntent::SetAlbumInformation { .. } => "set_album_information",
         ProjectIntent::SetVisualDefaults { .. } => "set_visual_defaults",
         ProjectIntent::SetDpi { .. } => "set_dpi",
@@ -181,6 +182,53 @@ pub(crate) fn photo_drop_target(
         return Err("O alvo da Foto só pode ser consultado na Janela do Projeto.".into());
     }
     state.project_photo_drop_target(&sheet_id, x_um, y_um)
+}
+
+#[tauri::command]
+pub(crate) async fn preview_frame_geometry(
+    edit: myalbuns_core::FrameGeometryEdit,
+    window: WebviewWindow,
+    state: State<'_, ProjectHost>,
+) -> Result<myalbuns_core::ComposedFrame, String> {
+    if window.label() != PROJECT_WINDOW_LABEL {
+        return Err("A geometria do Frame só pode ser consultada na Janela do Projeto.".into());
+    }
+    state.preview_frame_geometry(&edit)
+}
+
+#[tauri::command]
+pub(crate) async fn frame_drag_threshold(
+    window: WebviewWindow,
+) -> Result<crate::ipc_contract::PointerDragThreshold, String> {
+    if window.label() != PROJECT_WINDOW_LABEL {
+        return Err("O arraste de Frame só está disponível na Janela do Projeto.".into());
+    }
+    let scale = window.scale_factor().map_err(|error| error.to_string())?;
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::UI::{
+            HiDpi::GetSystemMetricsForDpi,
+            WindowsAndMessaging::{SM_CXDRAG, SM_CYDRAG},
+        };
+        let dpi = (96.0 * scale).round() as u32;
+        // These metrics are the distances on each side of the press point.
+        // Convert device pixels to the CSS coordinates used by pointer events.
+        let (x, y) = unsafe {
+            (
+                GetSystemMetricsForDpi(SM_CXDRAG, dpi),
+                GetSystemMetricsForDpi(SM_CYDRAG, dpi),
+            )
+        };
+        Ok(crate::ipc_contract::PointerDragThreshold {
+            x: f64::from(x.unsigned_abs()) / scale,
+            y: f64::from(y.unsigned_abs()) / scale,
+        })
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = scale;
+        Err("A edição de Frames requer a plataforma Windows suportada.".into())
+    }
 }
 
 #[tauri::command]

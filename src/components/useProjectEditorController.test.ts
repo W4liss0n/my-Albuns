@@ -8,7 +8,8 @@ import {
   representativeProjection,
 } from "../test/projectFixtures";
 import { useProjectEditorController } from "./useProjectEditorController";
-import type { ProjectMutationRunner } from "./useProjectMutationRunner";
+import { useProjectMutationRunner, type ProjectMutationRunner } from "./useProjectMutationRunner";
+import type { EditorProjection, FrameGeometryEdit } from "../domain/project";
 
 function projectCorePort(): ProjectCorePort {
   return {
@@ -27,6 +28,8 @@ function projectCorePort(): ProjectCorePort {
       kind: "cancelled",
       projection: representativeProjection,
     }),
+    readFrameDragThreshold: async () => ({ x: 5, y: 5 }),
+    previewFrameGeometry: async () => { throw new Error("Frame geometry preview is not configured in this fixture."); },
     resolvePhotoDropTarget: async () => ({ kind: "invalid" }),
     relink: async () => representativeProjection,
     undo: async () => representativeProjection,
@@ -59,6 +62,66 @@ beforeEach(() => {
     editingSheetId: null,
     viewport: { offsetX: 0 },
   });
+});
+
+test.each(["success", "failure"])("a pending Frame edit followed by Save uses the shared queue (%s)", async (outcome) => {
+  const port = projectCorePort();
+  const pending = deferredValue<EditorProjection>();
+  const changed: EditorProjection = { ...representativeProjection,
+    state: { ...representativeProjection.state, revision: representativeProjection.state.revision + 1, dirty: true } };
+  const apply = vi.spyOn(port, "apply").mockReturnValue(pending.promise);
+  const save = vi.spyOn(port, "save").mockImplementation(async (revision) => ({
+    outcome: { kind: "saved", revision }, projection: changed,
+  }));
+  const onProjectionChange = vi.fn();
+  const view = renderHook(() => {
+    const runProjectMutation = useProjectMutationRunner(representativeProjection.state.projectId, port);
+    return useProjectEditorController({ projection: representativeProjection, projectCorePort: port,
+      runProjectMutation, onProjectionChange });
+  });
+  const edit: FrameGeometryEdit = {
+    frameId: "frame-001", expectedRect: representativeProjection.state.album.sheets[0].frames[0].rect,
+    gesture: { kind: "move", deltaXUm: 30_000, deltaYUm: 20_000 },
+  };
+  let finished!: Promise<boolean>;
+  act(() => {
+    finished = view.result.current.canvasProps.frameGeometry!.commit(edit);
+    view.result.current.save();
+  });
+  expect(apply).toHaveBeenCalledWith({ kind: "editFrameGeometry", edit }, expect.any(Function));
+  expect(save).not.toHaveBeenCalled();
+  await act(async () => {
+    if (outcome === "success") pending.resolve(changed);
+    else pending.reject(new Error("A geometria do Frame foi alterada durante o gesto."));
+    await finished;
+  });
+  if (outcome === "success") {
+    expect(save).toHaveBeenCalledWith(changed.state.revision);
+    expect(onProjectionChange).toHaveBeenCalledWith(changed);
+  } else {
+    expect(save).not.toHaveBeenCalled();
+    expect(onProjectionChange).not.toHaveBeenCalled();
+    expect(view.result.current.message).toContain("geometria do Frame");
+  }
+});
+
+test("loads the platform drag threshold on entry and ignores a late reply after leaving editing", async () => {
+  const port = projectCorePort();
+  const reply = deferredValue<{ x: number; y: number }>();
+  const read = vi.spyOn(port, "readFrameDragThreshold").mockReturnValue(reply.promise);
+  const view = renderHook(() => useProjectEditorController({
+    projection: representativeProjection, projectCorePort: port,
+    runProjectMutation: { run: vi.fn(), waitForIdle: async () => null }, onProjectionChange: vi.fn(),
+  }));
+  expect(read).not.toHaveBeenCalled();
+  act(() => view.result.current.canvasProps.onEditSheet("sheet-001"));
+  expect(read).toHaveBeenCalledOnce();
+  expect(view.result.current.canvasProps.frameGeometry!.dragThreshold).toBeNull();
+  fireEvent.keyDown(window, { key: "Escape" });
+  await act(async () => reply.resolve({ x: 7, y: 9 }));
+  expect(view.result.current.canvasProps.frameGeometry!.dragThreshold).toBeNull();
+  act(() => view.result.current.canvasProps.onEditSheet("sheet-001"));
+  await waitFor(() => expect(view.result.current.canvasProps.frameGeometry!.dragThreshold).toEqual({ x: 7, y: 9 }));
 });
 
 test("routes editor changes through the shared Project mutation runner", async () => {
@@ -101,10 +164,11 @@ test("routes editor changes through the shared Project mutation runner", async (
 });
 
 test("enters the centered Sheet Edit Mode with Enter and returns to normal mode with Escape", () => {
+  const port = projectCorePort();
   const view = renderHook(() =>
     useProjectEditorController({
       projection: representativeProjection,
-      projectCorePort: projectCorePort(),
+      projectCorePort: port,
       runProjectMutation: {
         run: vi.fn(),
         waitForIdle: async () => null,
@@ -142,10 +206,11 @@ test("enters the centered Sheet Edit Mode with Enter and returns to normal mode 
 
 test("targets the edited Sheet when leaving Sheet Edit Mode", () => {
   const projection = createTwoSheetProjection();
+  const port = projectCorePort();
   const view = renderHook(() =>
     useProjectEditorController({
       projection,
-      projectCorePort: projectCorePort(),
+      projectCorePort: port,
       runProjectMutation: {
         run: vi.fn(),
         waitForIdle: async () => null,

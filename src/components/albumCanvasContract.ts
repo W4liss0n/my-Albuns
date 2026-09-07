@@ -1,9 +1,12 @@
 import type {
   CompositionPlan,
+  ComposedFrame,
+  FrameGeometryEdit,
   PhotoDropTarget,
 } from "../domain/project";
 import type { GraphicsDiagnostic } from "../application/graphics";
 import type { MediaPreviewDemand } from "../application/projectPorts";
+import type { PointerDragThreshold } from "../application/projectPorts";
 import type { ViewportState } from "../state/viewport";
 import type { ContinuousCanvasLayout } from "./canvasGeometry";
 import type {
@@ -65,6 +68,14 @@ export interface CanvasPhotoDropPoint {
   xUm: number;
   yUm: number;
 }
+
+export interface CanvasFrameGeometry {
+  disabled: boolean;
+  dragThreshold: PointerDragThreshold | null;
+  preview(edit: FrameGeometryEdit): Promise<ComposedFrame>;
+  commit(edit: FrameGeometryEdit): Promise<boolean>;
+  onError(message: string): void;
+}
 export interface AlbumCanvasProps {
   projectId: string;
   mode: AlbumCanvasMode;
@@ -81,6 +92,7 @@ export interface AlbumCanvasProps {
   sheetReorder?: CanvasSheetReorder;
   photoDropHighlight?: PhotoDropTarget | null;
   photoZoomPreview?: PhotoZoomPreview | null;
+  frameGeometry?: CanvasFrameGeometry;
   onSelectFrame(frameId: string | null): void;
   onEditSheet(sheetId: string): void;
   onFocusSheet(sheetId: string): void;

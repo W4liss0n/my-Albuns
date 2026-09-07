@@ -248,7 +248,7 @@ Quando a Lâmina alvo possui Layout travado, a preview aplicada permanece destac
 - Arrastar o corpo de qualquer Frame selecionado move todos os selecionados juntos, preservando suas distâncias relativas.
 - A Caixa delimitadora possui oito alças: quatro laterais, que escalam somente um eixo, e quatro nos cantos, que escalam largura e altura de forma independente.
 - Durante o redimensionamento, o lado ou canto oposto permanece como âncora e as posições e dimensões de todos os Frames são escaladas proporcionalmente dentro da Caixa.
-- O gesto para no último resultado válido antes de inverter a Caixa, ultrapassar a superfície ativa ou reduzir qualquer Frame abaixo do tamanho mínimo. O valor mínimo será calibrado no protótipo.
+- O gesto para no último resultado válido antes de inverter a Caixa, ultrapassar a superfície ativa ou reduzir qualquer Frame abaixo do tamanho mínimo. O mínimo interativo por eixo é `12 mm`, calibrado no Canvas com as oito alças de `8 px` em 7 de setembro de 2026. Quando um Frame já começa menor em um eixo, esse eixo pode manter o tamanho inicial ou crescer, mas não encolher mais; a edição não amplia Frames existentes automaticamente. A [calibração do primeiro recorte](../research/2026-09-07-geometria-de-frame-unico.md) registra as evidências e seus limites.
 - `Shift` durante o arraste de uma alça de canto preserva a proporção da Caixa delimitadora.
 - `Alt` em qualquer alça redimensiona a partir do centro, substituindo a âncora no lado ou canto oposto.
 - `Shift + Alt` em uma alça de canto combina proporção preservada e redimensionamento central.

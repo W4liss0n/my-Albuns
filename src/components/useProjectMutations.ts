@@ -319,6 +319,7 @@ export function useProjectMutations({
   }
 
   return {
+    reportInteractionError: setMessage,
     message,
     importPending,
     imageProcessingProgress: imageProcessing.progress,

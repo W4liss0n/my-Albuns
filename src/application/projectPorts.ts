@@ -2,10 +2,14 @@ import type {
   AlbumInformation,
   AlbumInformationValidation,
   EditorProjection,
+  ComposedFrame,
+  FrameGeometryEdit,
   PhotoDropTarget,
   ProjectIntent,
   ProjectMutationOutcome,
 } from "../domain/project";
+import type { PointerDragThreshold } from "../platform/generated/PointerDragThreshold";
+export type { PointerDragThreshold } from "../platform/generated/PointerDragThreshold";
 
 export type MediaPreviewState =
   | "ready"
@@ -228,6 +232,8 @@ export interface PhotoImportCompletion {
 }
 
 export interface ProjectCorePort {
+  readFrameDragThreshold(): Promise<PointerDragThreshold>;
+  previewFrameGeometry(edit: FrameGeometryEdit): Promise<ComposedFrame>;
   load(operationId: string): Promise<EditorProjection>;
   validateAlbumInformation(
     information: AlbumInformation,

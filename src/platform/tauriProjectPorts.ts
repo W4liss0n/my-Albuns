@@ -5,6 +5,7 @@ import type {
   AlbumInformation,
   AlbumInformationValidation,
   EditorProjection,
+  ComposedFrame,
   PhotoDropTarget,
   ProjectIntent,
   ProjectMutationOutcome,
@@ -19,6 +20,7 @@ import {
   type ImageProcessingProblem,
   type ProjectStartupPort,
   type ProjectCorePort,
+  type PointerDragThreshold,
   type SaveAsProjectOutcome as ApplicationSaveAsProjectOutcome,
   type SaveAsProjectResult as ApplicationSaveAsProjectResult,
   type SaveProjectOutcome as ApplicationSaveProjectOutcome,
@@ -290,6 +292,8 @@ async function invokeImageProcessing<T>(
 }
 
 export const tauriProjectCorePort: ProjectCorePort = {
+  readFrameDragThreshold: () => invoke<PointerDragThreshold>("frame_drag_threshold"),
+  previewFrameGeometry: (edit) => invoke<ComposedFrame>("preview_frame_geometry", { edit }),
   load: (operationId) =>
     invoke<EditorProjection>("project_state", { operationId }),
   validateAlbumInformation: (information: AlbumInformation) =>

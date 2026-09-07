@@ -7,13 +7,13 @@ use myalbuns_desktop_lib::ipc_contract::{
     ImportPhotoResult, LinkedMediaChanged, MediaPanelSettings, MediaPanelTabSettings,
     MediaPreferenceKind, MediaPreview, MediaPreviewCommandError, MediaPreviewDemand,
     MediaPreviewState, MediaSortDirection, MediaThumbnailSizes, MediaUsageFilter,
-    OpeningExternalCopyDecision, ProjectCloseChoice, ProjectCloseRequestOutcome,
-    ProjectCloseResolution, ProjectDialogAction, ProjectDialogActionEvent,
-    ProjectDialogPresentation, ProjectDialogState, ProjectRecoveryDecision,
-    SaveAsProjectCommandError, SaveAsProjectOutcome, SaveAsProjectResult, SaveProjectCommandError,
-    SaveProjectOutcome, SaveProjectResult, SettingsPreferenceChange, WorkspacePanelKind,
-    WorkspacePanelPreference, WorkspacePanelPreferences, WorkspacePreferenceChange,
-    WorkspacePreferences,
+    OpeningExternalCopyDecision, PointerDragThreshold, ProjectCloseChoice,
+    ProjectCloseRequestOutcome, ProjectCloseResolution, ProjectDialogAction,
+    ProjectDialogActionEvent, ProjectDialogPresentation, ProjectDialogState,
+    ProjectRecoveryDecision, SaveAsProjectCommandError, SaveAsProjectOutcome, SaveAsProjectResult,
+    SaveProjectCommandError, SaveProjectOutcome, SaveProjectResult, SettingsPreferenceChange,
+    WorkspacePanelKind, WorkspacePanelPreference, WorkspacePanelPreferences,
+    WorkspacePreferenceChange, WorkspacePreferences,
 };
 use ts_rs::{Config, TS};
 
@@ -26,6 +26,8 @@ fn main() {
         .with_out_dir(output_dir)
         .with_large_int("number");
 
+    PointerDragThreshold::export_all(&config)
+        .expect("pointer drag threshold bindings should be generated");
     CancelDisposition::export_all(&config)
         .expect("cancel disposition bindings should be generated");
     CacheClearAllOutcome::export_all(&config)

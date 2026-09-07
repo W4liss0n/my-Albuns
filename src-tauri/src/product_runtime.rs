@@ -216,6 +216,8 @@ pub(crate) fn run(
             crate::project_commands::apply_project_intent,
             crate::project_commands::import_photo,
             crate::project_commands::photo_drop_target,
+            crate::project_commands::preview_frame_geometry,
+            crate::project_commands::frame_drag_threshold,
             crate::project_commands::relink_media,
             crate::media_preview_commands::retry_unavailable_media,
             crate::project_commands::undo_project,

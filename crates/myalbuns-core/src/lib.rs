@@ -1,4 +1,5 @@
 mod composition;
+mod frame_geometry;
 mod model;
 mod persistent_project;
 mod persistent_projection;
@@ -7,6 +8,8 @@ mod project_document;
 mod project_recovery;
 mod project_store;
 mod validation;
+
+pub use frame_geometry::{FrameGeometryEdit, FrameGeometryGesture, FrameResizeHandle};
 
 pub use model::{
     AlbumSnapshot, ComposedBackground, ComposedColor, ComposedDecorative, ComposedFrame,

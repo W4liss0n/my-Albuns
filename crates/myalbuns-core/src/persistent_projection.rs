@@ -22,6 +22,20 @@ pub(crate) fn editor_projection(
     project_name: &str,
     photo_sources: &HashMap<MediaId, HashMap<PathBuf, PhotoSourceMetadata>>,
 ) -> EditorProjection {
+    resolve_editor_projection(editor_state(
+        session,
+        history_enabled,
+        project_name,
+        photo_sources,
+    ))
+}
+
+pub(crate) fn editor_state(
+    session: &PersistentProjectSession,
+    history_enabled: bool,
+    project_name: &str,
+    photo_sources: &HashMap<MediaId, HashMap<PathBuf, PhotoSourceMetadata>>,
+) -> EditorState {
     let project = session.project();
     let settings = project.document();
     let last_sheet = project.sheets().len().saturating_sub(1);
@@ -124,7 +138,7 @@ pub(crate) fn editor_projection(
             .collect(),
         visual_defaults: projected_visual_defaults(project.visual_defaults()),
     };
-    let state = EditorState {
+    EditorState {
         project_id: session.project_id().hyphenated().to_string(),
         project_name: project_name.into(),
         document: DocumentSnapshot::from_settings(settings),
@@ -134,8 +148,7 @@ pub(crate) fn editor_projection(
         can_undo: history_enabled && session.can_undo(),
         can_redo: history_enabled && session.can_redo(),
         album,
-    };
-    resolve_editor_projection(state)
+    }
 }
 
 fn projected_active_sides(active_sides: ActiveSides) -> ProjectedActiveSides {

@@ -12,6 +12,7 @@ import {
 
 import type {
   ComposedSheet,
+  FrameResizeHandle,
   NormalizedPan,
   ProjectedFrameBorder,
 } from "../domain/project";
@@ -94,6 +95,11 @@ interface SheetRenderNodeCallbacks {
   onSheetTap: (sheetId: string) => void;
   onSheetDoubleTap: (sheetId: string) => void;
   onFrameTap: (sheetId: string, frameId: string) => void;
+  onFrameGeometryStart: (
+    frameId: string,
+    handle: FrameResizeHandle | null,
+    event: FederatedPointerEvent,
+  ) => void;
   onPhotoPanStart: (
     photoNode: PhotoRenderNode,
     event: FederatedPointerEvent,
@@ -219,7 +225,7 @@ export function createSheetRenderNode(
   const frameDropOutlines = new Map<string, Graphics>();
   const frameSelectionLayer = new Container();
   frameSelectionLayer.label = `frame-selection-layer-${sheet.sheetId}`;
-  frameSelectionLayer.eventMode = "none";
+  frameSelectionLayer.eventMode = "passive";
   const photoNodes: PhotoRenderNode[] = [];
   const placeholderLabels: Text[] = [];
   for (const frame of sheet.frames) {
@@ -232,7 +238,8 @@ export function createSheetRenderNode(
     frameContainer.position.set(frameX, frameY);
     frameContainer.eventMode = "static";
     frameContainer.hitArea = new Rectangle(0, 0, frameWidth, frameHeight);
-    frameContainer.cursor = "default";
+    frameContainer.cursor = modePolicy.showsFrameResizeHandles && !sheetBarMetadata?.layoutLocked
+      ? "move" : "default";
 
     let photoNode: PhotoRenderNode | null = null;
     let emptyPlaceholder: ReturnType<
@@ -343,6 +350,7 @@ export function createSheetRenderNode(
       frameHeight,
       modePolicy.showsFrameResizeHandles &&
         sheetBarMetadata?.layoutLocked === false,
+      (handle, event) => callbacks.onFrameGeometryStart(frame.frameId, handle, event),
     );
     frameSelection.container.position.set(frameX, frameY);
     frameSelections.set(frame.frameId, frameSelection);
@@ -364,11 +372,15 @@ export function createSheetRenderNode(
       if (event.button !== 0) return;
       event.stopPropagation();
       if (dispatchSheetDoubleTap(event)) return;
-      if (!event.altKey) {
+      if (!event.altKey || modePolicy.showsFrameResizeHandles) {
         callbacks.onFrameTap(sheet.sheetId, frame.frameId);
       }
     });
     frameContainer.on("pointerdown", (event: FederatedPointerEvent) => {
+      if (modePolicy.showsFrameResizeHandles) {
+        callbacks.onFrameGeometryStart(frame.frameId, null, event);
+        return;
+      }
       if (!modePolicy.enablesPhotoTransform || !event.altKey || !photoNode) {
         return;
       }

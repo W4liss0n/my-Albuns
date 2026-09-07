@@ -12,6 +12,8 @@
           "apply_project_intent",
           "import_photo",
           "photo_drop_target",
+          "preview_frame_geometry",
+          "frame_drag_threshold",
           "relink_media",
           "retry_unavailable_media",
           "undo_project",

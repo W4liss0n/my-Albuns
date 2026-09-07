@@ -90,7 +90,14 @@ impl PersistentProjectSession {
         intent: ProjectIntent,
     ) -> Result<ProjectIntentOutcome, CoreError> {
         let mut outcome = ProjectIntentOutcome::default();
+        if let ProjectIntent::EditFrameGeometry { edit } = &intent {
+            let (_, rect) = self.project().frame_geometry_edit(edit)?;
+            if crate::RectUm::from(rect) == edit.expected_rect {
+                return Ok(outcome);
+            }
+        }
         self.commit_edit(|project| match intent {
+            ProjectIntent::EditFrameGeometry { edit } => project.with_edited_frame_geometry(&edit),
             ProjectIntent::SetAlbumInformation { information } => project
                 .with_album_information(information)
                 .map_err(CoreError::InvalidAlbumInformation),
