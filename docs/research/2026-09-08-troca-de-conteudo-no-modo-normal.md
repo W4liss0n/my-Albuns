@@ -16,7 +16,10 @@ Pan e Zoom acompanham cada ocorrência. A seleção simples existente é preserv
 O gesto começa após o limiar de arraste configurado no Windows. O Core resolve
 qual Frame está sob o ponteiro, respeitando a Pilha visual e a superfície ativa.
 O Canvas destaca esse destino com contorno e tonalidade azuis e apresenta uma
-miniatura semitransparente do recorte da Foto acompanhando o ponteiro. A
+miniatura semitransparente da imagem inteira acompanhando o ponteiro. Ela
+preserva a proporção original, sem o recorte, Pan, Zoom, rotação ou espelhamento
+da ocorrência no Frame. Cabe em 80 × 60 pixels e fica a 6 pixels do ponteiro,
+respeitando os limites do Canvas. A
 composição confirmada permanece no lugar. O cursor fica como mão fechada ao
 longo do gesto e a consulta do próximo ponto não apaga o destaque confirmado.
 É possível navegar com a roda ou pela rolagem automática nas bordas.
@@ -54,8 +57,13 @@ Layout e os outros comandos pendentes continuam acompanhados pela issue #20.
 - `npm run test:normal-frame-swap` exercita clique, duplo clique, Pan com Alt,
   rolagem até um destino inicialmente fora da tela, cancelamento por Esc e
   estabilidade do cursor e do feedback durante movimentos entre destinos.
-- O ghost usa uma única textura temporária do viewport da Foto, limitada ao
+- O ghost usa uma única textura temporária da imagem inteira, limitada ao
   tamanho da miniatura. Ela permanece válida se a Lâmina de origem sair da área
   materializada e é liberada ao encerrar o gesto. O contrato de
   [geração de texturas](https://pixijs.com/8.x/guides/components/renderers) da série
-  8.x e as declarações instaladas do PixiJS 8.19.0 fundamentam a captura do recorte.
+  8.x e as declarações instaladas do PixiJS 8.19.0 fundamentam a captura isolada.
+  As dimensões originais da textura do Cache definem a proporção da miniatura;
+  os ajustes da Foto no Frame e as prévias transitórias de Pan/Zoom não entram
+  nessa captura. Testes com imagens horizontais e verticais verificam a imagem
+  inteira, o tamanho reduzido, a proximidade do ponteiro e a liberação da textura
+  temporária sem destruir a textura compartilhada da Foto.

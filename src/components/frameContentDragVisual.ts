@@ -25,17 +25,15 @@ export class FrameContentDragVisual {
       const source = this.photoNodes.get(preview.sourceFrameId);
       if (!source) return;
       const style = SHEET_VISUAL_STYLE.frameContentDrag;
-      const scale = Math.min(1, style.ghostMaxWidthPx / source.clipRect.width,
-        style.ghostMaxHeightPx / source.clipRect.height);
-      this.width = source.clipRect.width * scale;
-      this.height = source.clipRect.height * scale;
-      // Keep masks and render transforms in a detached tree. Rendering a subtree
-      // whose mask belongs to the live Sheet can corrupt its cached transforms.
       const snapshot = source.createDragPreview();
+      const scale = Math.min(1, style.ghostMaxWidthPx / snapshot.bounds.width,
+        style.ghostMaxHeightPx / snapshot.bounds.height);
+      this.width = snapshot.bounds.width * scale;
+      this.height = snapshot.bounds.height * scale;
       try {
-        this.texture = this.app.renderer.generateTexture({ target: snapshot,
-          frame: source.clipRect, resolution: scale * this.app.renderer.resolution });
-      } finally { snapshot.destroy({ children: true }); }
+        this.texture = this.app.renderer.generateTexture({ target: snapshot.container,
+          frame: snapshot.bounds, resolution: scale * this.app.renderer.resolution });
+      } finally { snapshot.container.destroy({ children: true }); }
       const photo = new Sprite({ texture: this.texture });
       photo.width = this.width;
       photo.height = this.height;
