@@ -17,7 +17,9 @@ interface PointerPosition {
 }
 
 interface FrameGesture {
-  frame: ComposedFrame;
+  frames: ComposedFrame[];
+  primaryFrameId: string;
+  replacesSelection: boolean;
   sheetId: string;
   sourceSignature: string;
   sourceComposition: AlbumCanvasProps["composition"];
@@ -32,7 +34,7 @@ interface FrameGesture {
   phase: "pressed" | "dragging" | "committing";
   desired: FrameGeometryEdit | null;
   inFlight: boolean;
-  preview: ComposedFrame | null;
+  preview: ComposedFrame[] | null;
 }
 
 /** Owns one pointer gesture. Only the Core may calculate its proposed geometry. */
@@ -83,14 +85,20 @@ export class FrameInteractionSession {
       (item) => item.sheetId === editingSheetId,
     )?.layoutLocked;
     if (!confirmedSheet || !frame || layoutLocked) return;
+    const replacesSelection = !input.selectedFrameIds.includes(frameId);
+    const frames = replacesSelection ? [frame] : confirmedSheet.frames.filter(
+      (candidate) => input.selectedFrameIds.includes(candidate.frameId),
+    );
     const bounds = this.canvas.getBoundingClientRect();
     if (bounds.width <= 0 || bounds.height <= 0 || canvasScale <= 0) return;
     this.suppressTap = false;
     clearTimeout(this.tapTimer);
     this.gesture = {
-      frame,
+      frames,
+      primaryFrameId: frameId,
+      replacesSelection,
       sheetId: editingSheetId,
-      sourceSignature: sourceSignature(input, confirmedSheet, frame),
+      sourceSignature: sourceSignature(input, confirmedSheet, frames),
       sourceComposition: input.composition,
       controls,
       pointerId: event.pointerId,
@@ -117,28 +125,28 @@ export class FrameInteractionSession {
     const sheet = input.composition.sheets.find(
       (item) => item.sheetId === gesture.sheetId,
     );
-    const frame = sheet?.frames.find(
-      (item) => item.frameId === gesture.frame.frameId,
-    );
+    const frames = gesture.frames.map((original) => sheet?.frames.find(
+      (item) => item.frameId === original.frameId,
+    )).filter((frame): frame is ComposedFrame => frame !== undefined);
     if (
       input.mode.kind !== "sheet-editing" || input.mode.sheetId !== gesture.sheetId ||
       input.frameGeometry?.disabled || !input.frameGeometry?.dragThreshold ||
-      !sheet || !frame || scale !== gesture.scale ||
+      !sheet || frames.length !== gesture.frames.length || scale !== gesture.scale ||
       // Undo can restore both the geometry and revision number. A new immutable
       // snapshot still ends the bridge, even if React skipped the edited snapshot.
       (gesture.phase === "committing" && input.composition !== gesture.sourceComposition) ||
-      sourceSignature(input, sheet, frame) !== gesture.sourceSignature
+      sourceSignature(input, sheet, frames) !== gesture.sourceSignature
     ) this.reset();
   }
 
   present(sheets: readonly ComposedSheet[]): readonly ComposedSheet[] {
     const gesture = this.gesture;
     if (!gesture?.preview) return sheets;
-    const preview = gesture.preview;
+    const preview = new Map(gesture.preview.map((frame) => [frame.frameId, frame]));
     return sheets.map((sheet) => sheet.sheetId !== gesture.sheetId ? sheet : {
       ...sheet,
       frames: sheet.frames.map((frame) =>
-        frame.frameId === preview.frameId ? preview : frame),
+        preview.get(frame.frameId) ?? frame),
     });
   }
 
@@ -178,7 +186,9 @@ export class FrameInteractionSession {
       ) return;
       gesture.phase = "dragging";
       this.suppressTap = true;
-      this.readContext().input?.onSelectFrame(gesture.frame.frameId);
+      if (gesture.replacesSelection) {
+        this.readContext().input?.onSelectFrame(gesture.primaryFrameId);
+      }
     }
     gesture.desired = this.edit(gesture);
     this.requestPreview(gesture);
@@ -192,8 +202,7 @@ export class FrameInteractionSession {
       (gesture.point.clientY - gesture.origin.clientY) * gesture.umPerPixelY,
     );
     return {
-      frameId: gesture.frame.frameId,
-      expectedRect: gesture.frame.clipRect,
+      frames: gesture.frames.map((frame) => ({ frameId: frame.frameId, expectedRect: frame.clipRect })),
       gesture: gesture.handle === null
         ? { kind: "move", deltaXUm, deltaYUm }
         : {
@@ -241,15 +250,15 @@ export class FrameInteractionSession {
     this.release(gesture);
     this.deferTapReset();
     // Queue the final edit immediately, before a following Save/Undo can enter the shared queue.
-    void gesture.controls.commit(this.edit(gesture)).then((committedFrame) => {
+    void gesture.controls.commit(this.edit(gesture)).then((committedFrames) => {
       if (this.gesture !== gesture) return;
-      const presentedFrame = this.readContext().input?.composition.sheets
-        .flatMap((sheet) => sheet.frames)
-        .find((frame) => frame.frameId === gesture.frame.frameId);
+      const presented = this.readContext().input?.composition.sheets.flatMap((sheet) => sheet.frames);
+      const presentedFrames = committedFrames?.map((frame) =>
+        presented?.find((current) => current.frameId === frame.frameId));
       // Command completion can precede React's next projection. Keep the Core's
       // committed Frame visible until that snapshot (or later history) is presented.
-      if (committedFrame && JSON.stringify(presentedFrame) !== JSON.stringify(committedFrame)) {
-        gesture.preview = committedFrame;
+      if (committedFrames && JSON.stringify(presentedFrames) !== JSON.stringify(committedFrames)) {
+        gesture.preview = committedFrames;
       } else this.reset();
       this.refresh();
     }).catch((error: unknown) => {
@@ -332,10 +341,10 @@ function pointerPosition(point: PointerPosition): PointerPosition {
 function sourceSignature(
   input: AlbumCanvasProps,
   sheet: ComposedSheet,
-  frame: ComposedFrame,
+  frames: readonly ComposedFrame[],
 ) {
   return JSON.stringify([
-    input.projectId, sheet.widthUm, sheet.heightUm, frame,
+    input.projectId, sheet.widthUm, sheet.heightUm, frames,
     input.composition.frameBorder,
     input.sheetBarMetadata.find((item) => item.sheetId === sheet.sheetId)?.layoutLocked,
   ]);

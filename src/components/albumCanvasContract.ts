@@ -72,9 +72,9 @@ export interface CanvasPhotoDropPoint {
 export interface CanvasFrameGeometry {
   disabled: boolean;
   dragThreshold: PointerDragThreshold | null;
-  preview(edit: FrameGeometryEdit): Promise<ComposedFrame>;
+  preview(edit: FrameGeometryEdit): Promise<ComposedFrame[]>;
   /** The exact committed composition bridges command completion and React presentation. */
-  commit(edit: FrameGeometryEdit): Promise<ComposedFrame | null>;
+  commit(edit: FrameGeometryEdit): Promise<ComposedFrame[] | null>;
   onError(message: string): void;
 }
 export interface AlbumCanvasProps {
@@ -85,7 +85,7 @@ export interface AlbumCanvasProps {
   mediaPreviewUrls?: Readonly<Record<string, string>>;
   technicalGuides?: CanvasTechnicalGuides;
   continuousCanvasLayout: ContinuousCanvasLayout;
-  selectedFrameId: string | null;
+  selectedFrameIds: readonly string[];
   focusedSheetId: string | null;
   centeredSheetId: string | null;
   viewport: ViewportState;
@@ -94,7 +94,7 @@ export interface AlbumCanvasProps {
   photoDropHighlight?: PhotoDropTarget | null;
   photoZoomPreview?: PhotoZoomPreview | null;
   frameGeometry?: CanvasFrameGeometry;
-  onSelectFrame(frameId: string | null): void;
+  onSelectFrame(frameId: string | null, toggle?: boolean): void;
   onEditSheet(sheetId: string): void;
   onFocusSheet(sheetId: string): void;
   onCenteredSheetChange(sheetId: string): void;

@@ -25,7 +25,7 @@ import {
   type PhotoRenderNode,
   type SheetRenderNode,
 } from "./albumCanvasRenderNodes";
-import { applyFrameSelectionScale } from "./frameSelectionRenderNode";
+import { applyFrameSelectionScale, createFrameSelectionRenderNode } from "./frameSelectionRenderNode";
 import {
   albumCanvasModePolicy,
   sheetsForCanvasMode,
@@ -236,14 +236,15 @@ export class AlbumCanvasScene {
       this.app.screen.height,
     );
 
+    const presentedSheets = this.frameInteractions.present(sheets);
     this.reconcileMaterializedSheets(
-      this.frameInteractions.present(sheets),
+      presentedSheets,
       layout,
       boundedOffsetX,
       scale,
       shouldAnimateSheetPositions,
     );
-    this.updateDecorations();
+    this.updateDecorations(presentedSheets);
     this.photoInteractions.applyExternalPreview();
   }
 
@@ -638,9 +639,10 @@ export class AlbumCanvasScene {
           if (this.frameInteractions.ignoresTap) return;
           this.input?.onEditSheet(sheetId);
         },
-        onFrameTap: (sheetId, frameId) => {
+        onFrameTap: (sheetId, frameId, toggle) => {
           if (!this.input || this.frameInteractions.ignoresTap) return;
-          this.input.onSelectFrame(frameId);
+          if (toggle) this.input.onSelectFrame(frameId, true);
+          else this.input.onSelectFrame(frameId);
           this.input.onFocusSheet(sheetId);
         },
         onPhotoPanStart: (photoNode, event) => {
@@ -672,7 +674,7 @@ export class AlbumCanvasScene {
     this.onPreviewTextureChange();
   };
 
-  private updateDecorations() {
+  private updateDecorations(sheets: readonly ComposedSheet[]) {
     if (!this.input) return;
     for (const [sheetId, node] of this.sheetNodes) {
       node.container.visible =
@@ -682,14 +684,50 @@ export class AlbumCanvasScene {
         this.input.photoDropHighlight?.kind === "sheet" &&
         this.input.photoDropHighlight.sheetId === sheetId;
       for (const [frameId, selection] of node.frameSelections) {
-        selection.container.visible = frameId === this.input.selectedFrameId;
+        selection.container.visible = this.input.selectedFrameIds.includes(frameId);
+        for (const handle of selection.resizeHandles) {
+          handle.visible = this.input.selectedFrameIds.length === 1;
+        }
       }
+      this.updateFrameGroupSelection(node, sheets.find((sheet) => sheet.sheetId === sheetId));
       for (const [frameId, outline] of node.frameDropOutlines) {
         outline.visible =
           this.input.photoDropHighlight?.kind === "frame" &&
           this.input.photoDropHighlight.frameId === frameId;
       }
     }
+  }
+
+  private updateFrameGroupSelection(node: SheetRenderNode, sheet: ComposedSheet | undefined) {
+    if (!this.input || !sheet) return;
+    const frames = sheet.frames.filter((frame) => this.input!.selectedFrameIds.includes(frame.frameId));
+    const showHandles = this.input.mode.kind === "sheet-editing" &&
+      !this.input.sheetBarMetadata.find((item) => item.sheetId === sheet.sheetId)?.layoutLocked;
+    const signature = frames.length > 1
+      ? JSON.stringify([frames.map((frame) => [frame.frameId, frame.clipRect]), showHandles]) : null;
+    if (node.frameGroupSelection?.signature !== signature) {
+      if (node.frameGroupSelection) {
+        node.frameSelectionLayer.removeChild(node.frameGroupSelection.node.container);
+        node.frameGroupSelection.node.container.destroy({ children: true });
+        node.frameGroupSelection = null;
+      }
+      if (signature) {
+        const left = Math.min(...frames.map((frame) => frame.clipRect.x));
+        const top = Math.min(...frames.map((frame) => frame.clipRect.y));
+        const right = Math.max(...frames.map((frame) => frame.clipRect.x + frame.clipRect.width));
+        const bottom = Math.max(...frames.map((frame) => frame.clipRect.y + frame.clipRect.height));
+        const selection = createFrameSelectionRenderNode(
+          `group-${sheet.sheetId}`, (right - left) * MICROMETER_TO_CANVAS_PIXEL,
+          (bottom - top) * MICROMETER_TO_CANVAS_PIXEL, showHandles,
+          (handle, event) => this.frameInteractions.start(frames[0].frameId, handle, event),
+        );
+        selection.container.position.set(left * MICROMETER_TO_CANVAS_PIXEL, top * MICROMETER_TO_CANVAS_PIXEL);
+        selection.container.visible = true;
+        node.frameSelectionLayer.addChild(selection.container);
+        node.frameGroupSelection = { signature, node: selection };
+      }
+    }
+    if (node.frameGroupSelection) applyFrameSelectionScale(node.frameGroupSelection.node, this.canvasScale);
   }
 
   readonly handleCanvasWheel = (event: WheelEvent) => {

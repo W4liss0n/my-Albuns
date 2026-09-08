@@ -11,7 +11,7 @@ vi.mock("./components/AlbumCanvas", () => ({
     onCanvasMetricsChange,
     onEditSheet,
     onSelectFrame,
-    selectedFrameId,
+    selectedFrameIds,
     viewport,
   }: AlbumCanvasProps) => (
     <div className="canvas-host">
@@ -20,7 +20,7 @@ vi.mock("./components/AlbumCanvas", () => ({
         data-testid="canvas-preview-surface"
         data-mode={mode.kind}
         data-offset-x={viewport.offsetX}
-        data-selected-frame={selectedFrameId ?? undefined}
+        data-selected-frame={selectedFrameIds[0]}
         data-sheet={mode.kind === "sheet-editing" ? mode.sheetId : undefined}
         onDoubleClick={() => onEditSheet("sheet-002")}
         tabIndex={0}

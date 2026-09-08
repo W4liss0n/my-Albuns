@@ -13,9 +13,10 @@ import type { CanvasMetrics } from "./albumCanvasContract";
 import { createNormalCanvasLayout } from "./canvasSheetViewGeometry";
 
 export function useProjectNavigation(projection: EditorProjection) {
-  const selectedFrameId = useEditorView(
-    (state) => state.selectedFrameId,
+  const selectedFrameIds = useEditorView(
+    (state) => state.selectedFrameIds,
   );
+  const selectedFrameId = selectedFrameIds.length === 1 ? selectedFrameIds[0] : null;
   const focusedSheetId = useEditorView(
     (state) => state.focusedSheetId,
   );
@@ -41,11 +42,12 @@ export function useProjectNavigation(projection: EditorProjection) {
     synchronizeProject(
       projection.state.projectId,
       projection.state.album.sheets.map((sheet) => sheet.id),
-      projection.state.album.sheets.flatMap((sheet) =>
+      projection.state.album.sheets.filter((sheet) =>
+        editingSheetId === null || sheet.id === editingSheetId).flatMap((sheet) =>
         sheet.frames.map((frame) => frame.id),
       ),
     );
-  }, [projection.state, synchronizeProject]);
+  }, [editingSheetId, projection.state, synchronizeProject]);
 
   useEffect(() => {
     pendingSheetNavigationRef.current = null;
@@ -152,6 +154,7 @@ export function useProjectNavigation(projection: EditorProjection) {
     : projection.state.album.sheets[0]?.id);
 
   return {
+    selectedFrameIds,
     selectedFrameId,
     focusedSheetId,
     centeredSheetId,

@@ -846,6 +846,8 @@ pub enum ProjectIntent {
 
 #[derive(Debug, Error, PartialEq)]
 pub enum CoreError {
+    #[error("Selecione Frames distintos de uma única Lâmina para editar a geometria")]
+    InvalidFrameGeometrySelection,
     #[error("A geometria do Frame mudou durante o gesto; tente novamente")]
     FrameGeometryChanged,
     #[error("A Sessão editável do Projeto foi invalidada e precisa ser reaberta")]

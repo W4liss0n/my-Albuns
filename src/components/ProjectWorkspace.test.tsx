@@ -610,7 +610,7 @@ beforeEach(() => {
   );
   useEditorView.setState({
     projectId: projection.state.projectId,
-    selectedFrameId: null,
+    selectedFrameIds: [],
     focusedSheetId: "sheet-001",
     centeredSheetId: "sheet-001",
     editingSheetId: null,
@@ -757,7 +757,7 @@ test("opens and dismisses an explicit Sheet context menu without navigating the 
   const before = {
     centeredSheetId: useEditorView.getState().centeredSheetId,
     focusedSheetId: useEditorView.getState().focusedSheetId,
-    selectedFrameId: useEditorView.getState().selectedFrameId,
+    selectedFrameIds: useEditorView.getState().selectedFrameIds,
     viewport: { ...useEditorView.getState().viewport },
   };
 
@@ -2125,12 +2125,12 @@ test("restores accordion preferences after context changes and remounts", async 
   fireEvent.click(albumInformation);
   expect(albumInformation).toHaveAttribute("aria-expanded", "false");
 
-  act(() => useEditorView.setState({ selectedFrameId: "frame-001" }));
+  act(() => useEditorView.setState({ selectedFrameIds: ["frame-001"] }));
   expect(
     screen.getByRole("button", { name: "Design" }),
   ).toBeInTheDocument();
 
-  act(() => useEditorView.setState({ selectedFrameId: null }));
+  act(() => useEditorView.setState({ selectedFrameIds: [] }));
   expect(
     screen.getByRole("button", { name: "Informações do Álbum" }),
   ).toHaveAttribute("aria-expanded", "false");
@@ -5833,7 +5833,7 @@ test("resizes both workspace panels and persists only completed drags", async ()
 test("commits a slider zoom once without flashing a global busy state", async () => {
   const pending = deferredProjection();
   const apply = vi.fn(() => pending.promise);
-  useEditorView.setState({ selectedFrameId: "frame-001" });
+  useEditorView.setState({ selectedFrameIds: ["frame-001"] });
 
   render(
     <ProjectWorkspace
@@ -5876,7 +5876,7 @@ test("commits a slider zoom once without flashing a global busy state", async ()
 
 test("updates the contextual Zoom slider during a Canvas gesture", () => {
   const apply = vi.fn(async () => projection);
-  useEditorView.setState({ selectedFrameId: "frame-001" });
+  useEditorView.setState({ selectedFrameIds: ["frame-001"] });
 
   render(
     <ProjectWorkspace
@@ -5920,7 +5920,7 @@ test("discards a live Canvas value when its commit fails", async () => {
     throw new Error("Falha simulada");
   });
   const dialog = projectDialogHarness();
-  useEditorView.setState({ selectedFrameId: "frame-001" });
+  useEditorView.setState({ selectedFrameIds: ["frame-001"] });
 
   render(
     <ProjectWorkspace
@@ -5980,7 +5980,7 @@ test("does not let an old Project completion clear a new slider draft", async ()
   const onProjectionChange = vi.fn();
   const oldProjectCorePort = projectCorePortWithApply(oldApply);
   const newProjectCorePort = projectCorePortWithApply(newApply);
-  useEditorView.setState({ selectedFrameId: "frame-001" });
+  useEditorView.setState({ selectedFrameIds: ["frame-001"] });
 
   const view = render(
     <ProjectWorkspace
@@ -6006,7 +6006,7 @@ test("does not let an old Project completion clear a new slider draft", async ()
       onProjectionChange={onProjectionChange}
     />,
   );
-  act(() => useEditorView.setState({ selectedFrameId: "frame-001" }));
+  act(() => useEditorView.setState({ selectedFrameIds: ["frame-001"] }));
   const newSlider = screen.getByRole("slider", {
     name: "Zoom da Foto",
   });
@@ -6258,7 +6258,7 @@ test("resolves a mode-free target while dropping a Photo in the current Canvas m
     yUm: 30_000,
     mode: "normal",
   }, expect.any(Function));
-  expect(useEditorView.getState().selectedFrameId).toBe("frame-001");
+  expect(useEditorView.getState().selectedFrameIds).toEqual(["frame-001"]);
 
   act(() => canvasHarness.props?.onEditSheet?.("sheet-001"));
   await canvasHarness.props?.onResolvePhotoDropTarget?.("media-002", point);

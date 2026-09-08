@@ -237,7 +237,7 @@ export interface PhotoImportCompletion {
 
 export interface ProjectCorePort {
   readFrameDragThreshold(): Promise<PointerDragThreshold>;
-  previewFrameGeometry(edit: FrameGeometryEdit): Promise<ComposedFrame>;
+  previewFrameGeometry(edit: FrameGeometryEdit): Promise<ComposedFrame[]>;
   load(operationId: string): Promise<EditorProjection>;
   validateAlbumInformation(
     information: AlbumInformation,

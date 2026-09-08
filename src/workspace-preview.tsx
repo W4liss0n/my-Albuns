@@ -27,6 +27,8 @@ import type {
   ProjectMutationOutcome,
 } from "./domain/project";
 import { createTwoSheetProjection } from "./test/projectFixtures";
+import { useEditorView } from "./state/editorView";
+import groupGeometryCorpus from "../tests/fixtures/frame-group-geometry-cases.json";
 import "./ui/theme.css";
 import "./ui/ui.css";
 
@@ -45,6 +47,11 @@ let projection = createPreviewProjection(
   decorativeContext,
   structureContext,
 );
+if (frameContext === "multiple") {
+  useEditorView.setState({ projectId: projection.state.projectId, editingSheetId: "sheet-001",
+    focusedSheetId: "sheet-001", centeredSheetId: "sheet-001",
+    selectedFrameIds: projection.state.album.sheets[0].frames.map((frame) => frame.id) });
+}
 const undoStack: EditorProjection[] = [];
 const redoStack: EditorProjection[] = [];
 let addedSheetSequence = 0;
@@ -232,6 +239,18 @@ function createPreviewProjection(
       mediaId: unavailableDecorativeId,
       count: preview.composition.sheets.length,
     });
+  }
+  if (frameMode === "multiple") {
+    const frames = groupGeometryCorpus.cases.find((item) => item.name === "selected")!.frames;
+    const original = preview.state.album.sheets[0].frames[0];
+    preview.state.album.sheets[0].frames = frames.map((frame) => ({
+      ...original, id: frame.frameId, rect: frame.clipRect, zIndex: frame.zIndex,
+      photo: frame.photo ? original.photo : null,
+    }));
+    preview.composition.sheets[0].frames = frames.map((frame) => ({ ...frame,
+      photo: frame.photo ? { ...frame.photo, palette: [frame.photo.palette[0], frame.photo.palette[1], frame.photo.palette[2]] } : null,
+    }));
+    return preview;
   }
   if (frameMode !== "photo" && frameMode !== "empty") return preview;
 

@@ -6,7 +6,6 @@ import {
   Rectangle,
   Sprite,
   type FillGradient,
-  type Text,
   type Texture,
 } from "pixi.js";
 
@@ -79,9 +78,11 @@ export interface SheetRenderNode {
   container: Container;
   signature: string;
   photoNodes: PhotoRenderNode[];
-  placeholderLabels: Text[];
+  framePlaceholders: ReturnType<typeof createCanvasFramePlaceholder>[];
   inactiveSideGradient: FillGradient | null;
   frameSelections: Map<string, FrameSelectionRenderNode>;
+  frameSelectionLayer: Container;
+  frameGroupSelection: { signature: string; node: FrameSelectionRenderNode } | null;
   frameDropOutlines: Map<string, Graphics>;
   focusOutline: Graphics;
   sheetDropOutline: Graphics;
@@ -94,7 +95,7 @@ interface SheetRenderNodeCallbacks {
   previewTextureFor: (mediaId: string) => Texture | undefined;
   onSheetTap: (sheetId: string) => void;
   onSheetDoubleTap: (sheetId: string) => void;
-  onFrameTap: (sheetId: string, frameId: string) => void;
+  onFrameTap: (sheetId: string, frameId: string, toggle: boolean) => void;
   onFrameGeometryStart: (
     frameId: string,
     handle: FrameResizeHandle | null,
@@ -139,7 +140,7 @@ export function createSheetRenderNode(
     modePolicy.masksBleed,
   );
   const dispatchSheetDoubleTap = (event: FederatedPointerEvent) => {
-    if (!(event.detail >= 2)) return false;
+    if (modePolicy.editingSheetId !== null || !(event.detail >= 2)) return false;
     callbacks.onSheetDoubleTap(sheet.sheetId);
     return true;
   };
@@ -227,7 +228,7 @@ export function createSheetRenderNode(
   frameSelectionLayer.label = `frame-selection-layer-${sheet.sheetId}`;
   frameSelectionLayer.eventMode = "passive";
   const photoNodes: PhotoRenderNode[] = [];
-  const placeholderLabels: Text[] = [];
+  const framePlaceholders: ReturnType<typeof createCanvasFramePlaceholder>[] = [];
   for (const frame of sheet.frames) {
     const frameContainer = new Container();
     const frameX = frame.clipRect.x * MICROMETER_TO_CANVAS_PIXEL;
@@ -305,7 +306,7 @@ export function createSheetRenderNode(
         frameHeight,
       );
       frameContainer.addChild(emptyPlaceholder.container);
-      placeholderLabels.push(emptyPlaceholder.label);
+      framePlaceholders.push(emptyPlaceholder);
     }
 
     const outlineStyle = frameOutlineStyle(frame.photo !== null);
@@ -373,7 +374,7 @@ export function createSheetRenderNode(
       event.stopPropagation();
       if (dispatchSheetDoubleTap(event)) return;
       if (!event.altKey || modePolicy.showsFrameResizeHandles) {
-        callbacks.onFrameTap(sheet.sheetId, frame.frameId);
+        callbacks.onFrameTap(sheet.sheetId, frame.frameId, modePolicy.showsFrameResizeHandles && event.ctrlKey);
       }
     });
     frameContainer.on("pointerdown", (event: FederatedPointerEvent) => {
@@ -514,9 +515,11 @@ export function createSheetRenderNode(
     container: sheetContainer,
     signature,
     photoNodes,
-    placeholderLabels,
+    framePlaceholders,
     inactiveSideGradient: inactiveSide?.gradient ?? null,
     frameSelections,
+    frameSelectionLayer,
+    frameGroupSelection: null,
     frameDropOutlines,
     focusOutline,
     sheetDropOutline,
@@ -530,9 +533,8 @@ export function applyPlaceholderLabelScale(
   node: SheetRenderNode,
   canvasScale: number,
 ) {
-  const inverseScale = 1 / Math.max(canvasScale, Number.EPSILON);
-  for (const label of node.placeholderLabels) {
-    label.scale.set(inverseScale);
+  for (const placeholder of node.framePlaceholders) {
+    placeholder.applyCanvasScale(canvasScale);
   }
 }
 

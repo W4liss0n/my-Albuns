@@ -313,7 +313,9 @@ export function ProjectWorkspace({
           (sheet) => sheet.sheetId === canvasMode.sheetId,
         ) ?? null
       : null;
-  const inspectorContext: InspectorContext = selectedFrame
+  const inspectorContext: InspectorContext = editingSheet && controller.selectedFrames.length > 1
+    ? { kind: "multiple-frames", frames: controller.selectedFrames, editingSheet }
+    : selectedFrame
     ? {
         kind: "frame",
         frame: selectedFrame,
@@ -492,7 +494,7 @@ export function ProjectWorkspace({
     sheetReorderSession.status === "invalid";
   const sheetNavigationActive =
     canvasMode.kind === "normal" &&
-    controller.selectedFrame === null &&
+    controller.selectedFrames.length === 0 &&
     draggedPhotoId === null &&
     sheetContextMenu === null &&
     !commandsBlocked &&
@@ -520,7 +522,7 @@ export function ProjectWorkspace({
     redo: controller.redo,
     save: controller.save,
     saveAs: controller.saveAs,
-    sheetShortcutActive: controller.selectedFrame === null,
+    sheetShortcutActive: controller.selectedFrames.length === 0,
     sheetCommandsDisabled: structuralCommandsBlocked,
     sheetNavigationActive,
     undo: controller.undo,

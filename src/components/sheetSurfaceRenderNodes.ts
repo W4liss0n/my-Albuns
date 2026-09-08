@@ -166,7 +166,14 @@ export function createCanvasFramePlaceholder(
   label.position.set(frameWidth / 2, frameHeight / 2);
   label.eventMode = "none";
   placeholder.addChild(base, label);
-  return { container: placeholder, label };
+  return {
+    container: placeholder,
+    applyCanvasScale(canvasScale: number) {
+      const inverseScale = 1 / Math.max(canvasScale, Number.EPSILON);
+      label.scale.set(inverseScale);
+      label.visible = label.width <= frameWidth && label.height <= frameHeight;
+    },
+  };
 }
 
 export function createSheetTechnicalGuideNodes(

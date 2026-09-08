@@ -91,8 +91,12 @@ impl PersistentProjectSession {
     ) -> Result<ProjectIntentOutcome, CoreError> {
         let mut outcome = ProjectIntentOutcome::default();
         if let ProjectIntent::EditFrameGeometry { edit } = &intent {
-            let (_, rect) = self.project().frame_geometry_edit(edit)?;
-            if crate::RectUm::from(rect) == edit.expected_rect {
+            let rects = self.project().frame_geometry_edit(edit)?;
+            if rects
+                .iter()
+                .zip(&edit.frames)
+                .all(|((_, rect), target)| crate::RectUm::from(*rect) == target.expected_rect)
+            {
                 return Ok(outcome);
             }
         }

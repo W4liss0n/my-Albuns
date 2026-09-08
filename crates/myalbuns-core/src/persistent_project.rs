@@ -479,33 +479,39 @@ impl EditableProject {
     pub fn preview_frame_geometry(
         &self,
         edit: &crate::FrameGeometryEdit,
-    ) -> Result<crate::ComposedFrame, CoreError> {
+    ) -> Result<Vec<crate::ComposedFrame>, CoreError> {
         if !self.session_valid {
             return Err(CoreError::EditableSessionInvalidated);
         }
-        let (frame_id, rect) = self.project().frame_geometry_edit(edit)?;
-        let frame_id = frame_id.hyphenated().to_string();
+        let edits = self
+            .project()
+            .frame_geometry_edit(edit)?
+            .into_iter()
+            .map(|(id, rect)| (id.hyphenated().to_string(), rect))
+            .collect::<Vec<_>>();
         let mut state = persistent_projection::editor_state(
             &self.session,
             self.session_valid,
             &project_name_from_path(self.project_path()),
             &self.photo_sources,
         );
-        let frame = state
+        for frame in state
             .album
             .sheets
             .iter_mut()
             .flat_map(|sheet| &mut sheet.frames)
-            .find(|frame| frame.id == frame_id)
-            .expect("the edit resolved an existing Frame");
-        frame.rect = rect.into();
-        crate::composition::resolve_editor_projection(state)
+        {
+            if let Some((_, rect)) = edits.iter().find(|(id, _)| *id == frame.id) {
+                frame.rect = (*rect).into();
+            }
+        }
+        Ok(crate::composition::resolve_editor_projection(state)
             .composition
             .sheets
             .into_iter()
             .flat_map(|sheet| sheet.frames)
-            .find(|frame| frame.frame_id == frame_id)
-            .ok_or_else(|| CoreError::FrameNotFound(edit.frame_id.clone()))
+            .filter(|frame| edits.iter().any(|(id, _)| *id == frame.frame_id))
+            .collect())
     }
 
     /// Freezes one resolved editor projection and only the exact linked

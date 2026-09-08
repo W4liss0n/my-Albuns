@@ -155,7 +155,7 @@ test("does not let an abandoned StrictMode initialization destroy the active Can
           continuousCanvasLayout={createContinuousCanvasLayout(
             composition.sheets,
           )}
-          selectedFrameId={null}
+          selectedFrameIds={[]}
           focusedSheetId="sheet-001"
           centeredSheetId="sheet-001"
           viewport={{ offsetX: 42 }}

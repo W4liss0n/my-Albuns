@@ -279,6 +279,14 @@ vi.mock("pixi.js", () => {
     style: Record<string, unknown>;
     text: string;
 
+    get width() {
+      return this.text.length * Number(this.style.fontSize ?? 12) * 0.6 * this.scale.x;
+    }
+
+    get height() {
+      return Number(this.style.fontSize ?? 12) * this.scale.y;
+    }
+
     constructor(options: {
       style?: Record<string, unknown>;
       text?: string;
@@ -407,6 +415,7 @@ export function renderCanvas({
     },
   ],
   selectedFrameId = null,
+  selectedFrameIds = selectedFrameId ? [selectedFrameId] : [],
   mediaPreviewUrls,
   technicalGuides,
   frameGeometry,
@@ -438,12 +447,13 @@ export function renderCanvas({
   compositionPlan?: CompositionPlan;
   sheetBarMetadata?: readonly SheetBarMetadata[];
   selectedFrameId?: string | null;
+  selectedFrameIds?: readonly string[];
   mediaPreviewUrls?: Readonly<Record<string, string>>;
   technicalGuides?: CanvasTechnicalGuides;
   frameGeometry?: AlbumCanvasProps["frameGeometry"];
   sheetReorder?: CanvasSheetReorder;
   onCanvasMetricsChange?: (metrics: CanvasMetrics) => void;
-  onSelectFrame?: (frameId: string | null) => void;
+  onSelectFrame?: (frameId: string | null, toggle?: boolean) => void;
   onEditSheet?: (sheetId: string) => void;
   onFocusSheet?: (sheetId: string) => void;
   onCenteredSheetChange?: (sheetId: string) => void;
@@ -495,7 +505,7 @@ export function renderCanvas({
               )
             : createContinuousCanvasLayout(compositionPlan.sheets)
         }
-        selectedFrameId={selectedFrameId}
+        selectedFrameIds={selectedFrameIds}
         focusedSheetId="sheet-001"
         centeredSheetId="sheet-001"
         viewport={{ offsetX: 42 }}

@@ -98,6 +98,12 @@
   text-overflow: ellipsis;
 }
 
+.context-heading p {
+  margin: var(--ui-space-2) 0 0;
+  color: var(--ui-text-muted);
+  font-size: var(--ui-font-size-control);
+}
+
 .property-row {
   display: flex;
   min-height: var(--ui-toolbar-height);
