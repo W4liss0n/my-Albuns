@@ -641,7 +641,8 @@ function createPhotoPreviewLayer({
   photoLayer.label = label;
   photoLayer.pivot.set(drawWidth / 2, drawHeight / 2);
   photoLayer.position.set(center.x, center.y);
-  photoLayer.rotation = (rotationDegrees * Math.PI) / 180;
+  // Pixi scales in local coordinates: reverse the angle to mirror after rotation.
+  photoLayer.rotation = ((mirrorX ? -rotationDegrees : rotationDegrees) * Math.PI) / 180;
   photoLayer.scale.set(mirrorX ? -1 : 1, 1);
 
   if (previewTexture) {

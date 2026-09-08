@@ -288,13 +288,14 @@ fn draw_frame(
 
         for y in top..bottom {
             for x in left..right {
-                let delta_x = x as f64 + 0.5 - draw_center_x;
+                let mut delta_x = x as f64 + 0.5 - draw_center_x;
                 let delta_y = y as f64 + 0.5 - draw_center_y;
-                let mut source_x = (cosine * delta_x + sine * delta_y) / draw_width;
-                let source_y = (-sine * delta_x + cosine * delta_y) / draw_height;
+                // Invert horizontal mirroring before inverting the Photo's rotation.
                 if photo.mirror_x {
-                    source_x = -source_x;
+                    delta_x = -delta_x;
                 }
+                let source_x = (cosine * delta_x + sine * delta_y) / draw_width;
+                let source_y = (-sine * delta_x + cosine * delta_y) / draw_height;
                 let horizontal = (source_x + 0.5).clamp(0.0, 1.0) as f32;
                 let vertical = (source_y + 0.5).clamp(0.0, 1.0) as f32;
                 let pixel = sample_bilinear(source, horizontal, vertical);

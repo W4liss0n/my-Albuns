@@ -131,7 +131,7 @@ test("renders the composed geometry and visual layers of each sheet", () => {
     firstPreview.querySelector('[data-preview-photo-id="media-001"]'),
   ).toHaveAttribute(
     "transform",
-    expect.stringContaining("rotate(12) scale(-1 1)"),
+    expect.stringContaining("scale(-1 1) rotate(12)"),
   );
   expect(
     firstPreview.querySelector('[fill="#10202b"]'),

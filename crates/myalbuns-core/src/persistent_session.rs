@@ -98,6 +98,13 @@ impl PersistentProjectSession {
         intent: ProjectIntent,
     ) -> Result<ProjectIntentOutcome, CoreError> {
         let mut outcome = ProjectIntentOutcome::default();
+        if let ProjectIntent::OrientPhotos { frame_ids, action } = &intent {
+            let next = self.project().with_oriented_photos(frame_ids, *action)?;
+            if next != *self.project() {
+                self.commit_edit(|_| Ok(next))?;
+            }
+            return Ok(outcome);
+        }
         if let ProjectIntent::SwapSheetSides { sheet_id } = &intent {
             let next = self.project().with_swapped_sheet_sides(sheet_id)?;
             if next != *self.project() {
@@ -143,6 +150,9 @@ impl PersistentProjectSession {
             }
         }
         self.commit_edit(|project| match intent {
+            ProjectIntent::OrientPhotos { .. } => {
+                unreachable!("Photo orientation handles unchanged compositions before committing")
+            }
             ProjectIntent::SwapSheetSides { .. } => {
                 unreachable!("side swapping handles unchanged compositions before committing")
             }

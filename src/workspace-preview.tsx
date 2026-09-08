@@ -35,6 +35,7 @@ import { frameDeletionCorpus } from "./test/frameDeletionPreview";
 import { frameContentSwapCorpus } from "./test/frameContentSwapPreview";
 import { frameClipboardCorpus } from "./test/frameClipboardPreview";
 import { sheetSideSwapCorpus } from "./test/sheetSideSwapPreview";
+import { photoOrientationCorpus } from "./test/photoOrientationPreview";
 import { continuousCanvasScale, createCanvasSheetPresentation } from "./components/canvasGeometry";
 import { createCanvasSheetViewGeometry, createNormalCanvasLayout } from "./components/canvasSheetViewGeometry";
 import "./ui/theme.css";
@@ -115,6 +116,17 @@ if (frameContext === "side-swap") {
   useEditorView.subscribe(exposeSheetSideSwapState);
 }
 
+if (frameContext === "orientation") {
+  const selection = previewParameters.get("selection") ?? "single";
+  useEditorView.setState({ projectId: projection.state.projectId,
+    editingSheetId: previewParameters.get("mode") === "normal" ? null : "sheet-001",
+    focusedSheetId: "sheet-001", centeredSheetId: "sheet-001",
+    selectedFrameIds: selection === "group" ? photoOrientationCorpus.group
+      : selection === "placeholders" ? photoOrientationCorpus.placeholders : photoOrientationCorpus.single });
+  exposePhotoOrientationState();
+  useEditorView.subscribe(exposePhotoOrientationState);
+}
+
 const projectCorePort: ProjectCorePort = {
   load: async () => projection,
   validateAlbumInformation: async () => ({
@@ -160,7 +172,10 @@ const projectCorePort: ProjectCorePort = {
 
 const mediaPreviewPort: MediaPreviewPort = {
   prepareMediaPreviews: async () =>
-    decorativeContext === "unavailable"
+    frameContext === "orientation" ? projection.state.album.media.map((media) => ({
+      mediaId: media.id, state: "ready" as const,
+      url: `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400"><path fill="#e63f35" d="M0 0h300v200H0z"/><path fill="#329858" d="M300 0h300v200H300z"/><path fill="#376dcc" d="M0 200h300v200H0z"/><path fill="#e3b634" d="M300 200h300v200H300z"/><g font-family="sans-serif" font-size="80" fill="white" text-anchor="middle"><text x="150" y="130">A</text><text x="450" y="130">B</text><text x="150" y="330">C</text><text x="450" y="330">D</text></g></svg>')}`,
+    })) : decorativeContext === "unavailable"
       ? [
           {
             mediaId: unavailableDecorativeId,
@@ -268,6 +283,7 @@ function createPreviewProjection(
   decorativeMode: string | null,
   structureMode: string | null,
 ): EditorProjection {
+  if (frameMode === "orientation") return structuredClone(photoOrientationCorpus.states[previewParameters.get("orientation") ?? "neutral"]);
   if (frameMode === "side-swap") return structuredClone(sideSwapCase.before ?? sheetSideSwapCorpus.before);
   if (frameMode === "clipboard") return structuredClone(frameClipboardCase.before ?? frameClipboardCorpus.before);
   if (frameMode === "swap") return structuredClone(frameContentSwapCorpus.before);
@@ -394,6 +410,15 @@ function configurePhysicalPreview(
 }
 
 function applyPreviewIntent(intent: ProjectIntent): ProjectMutationOutcome {
+  if (intent.kind === "orientPhotos") {
+    const current = photoOrientationStateName();
+    const transition = photoOrientationCorpus.transitions.find((item) => item.from === current && item.action === intent.action &&
+      [...item.frameIds].sort().join() === [...intent.frameIds].sort().join());
+    if (frameContext !== "orientation" || !transition) throw new Error("Comando fora do corpus de orientação desta prévia.");
+    projection = finalizePhysicalPreviewMutation(structuredClone(photoOrientationCorpus.states[transition.to]), structuredClone(projection));
+    exposePhotoOrientationState();
+    return { projection, affectedFrameId: null, affectedSheetId: null };
+  }
   if (intent.kind === "swapSheetSides") {
     if (frameContext !== "side-swap" || intent.sheetId !== sideSwapCase.targetSheetId || sideSwapCase.outcome === "unavailable") {
       throw new Error("Comando fora do cenário de Troca de lados desta prévia.");
@@ -623,6 +648,7 @@ function restorePreviewHistory(
   if (frameContext === "swap") exposeFrameSwapState();
   if (frameContext === "clipboard") exposeFrameClipboardState();
   if (frameContext === "side-swap") exposeSheetSideSwapState();
+  if (frameContext === "orientation") exposePhotoOrientationState();
   return projection;
 }
 
@@ -651,6 +677,16 @@ function exposeSheetSideSwapState() {
   document.body.dataset.sideSwapHistory = `${projection.state.canUndo},${projection.state.canRedo}`;
   document.body.dataset.sideSwapCentered = view.centeredSheetId ?? "none";
   document.body.dataset.sideSwapEditing = view.editingSheetId ?? "none";
+}
+
+function photoOrientationStateName() {
+  return Object.entries(photoOrientationCorpus.states).find(([, state]) =>
+    JSON.stringify(state.state.album) === JSON.stringify(projection.state.album))?.[0] ?? "unknown";
+}
+
+function exposePhotoOrientationState() {
+  document.body.dataset.photoOrientation = photoOrientationStateName();
+  document.body.dataset.orientationSelection = useEditorView.getState().selectedFrameIds.join(",");
 }
 
 function exposeFrameSwapState() {

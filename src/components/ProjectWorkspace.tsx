@@ -697,6 +697,7 @@ export function ProjectWorkspace({
 
         {workspacePanels.panels.inspector.visible && <InspectorPanel
           key={projectId}
+          photoOrientation={{ disabled: !controller.canOrientPhotos, onAction: (action) => { void controller.orientPhotos(action); } }}
           context={inspectorContext}
           displayedPhotoZoom={displayedPhotoZoom}
           displayedPhotoPanX={displayedPhotoPanX}

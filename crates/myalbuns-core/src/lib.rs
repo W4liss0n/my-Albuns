@@ -19,12 +19,12 @@ pub use model::{
     EditorProjection, EditorState, FrameSnapshot, FrameStackAction, ImportPhoto,
     ImportPhotoDisposition, ImportPhotoOutcome, ImportPhotosOutcome, Matrix2, MediaCatalogItem,
     MediaId, MediaKind, MediaTransform, MediaUsage, NormalizedPan, NumberRange, ParseMediaIdError,
-    PhotoDropTarget, PhotoPlacement, PhotoPlacementMode, PhotoPlacementPlan, PhotoSnapshot,
-    PhotoSourceMetadata, ProjectIntent, ProjectMutationOutcome, ProjectedActiveSides,
-    ProjectedBackground, ProjectedBackgroundContent, ProjectedDisplayUnit, ProjectedFrameBorder,
-    ProjectedOverlay, ProjectedOverlayContent, ProjectedVisualDefaults, RectUm, RelinkMedia,
-    RenderSnapshot, RenderSnapshotRef, SheetInsertionPosition, SheetRole, SheetSnapshot, SizeUm,
-    VectorUm,
+    PhotoDropTarget, PhotoOrientationAction, PhotoPlacement, PhotoPlacementMode,
+    PhotoPlacementPlan, PhotoSnapshot, PhotoSourceMetadata, ProjectIntent, ProjectMutationOutcome,
+    ProjectedActiveSides, ProjectedBackground, ProjectedBackgroundContent, ProjectedDisplayUnit,
+    ProjectedFrameBorder, ProjectedOverlay, ProjectedOverlayContent, ProjectedVisualDefaults,
+    RectUm, RelinkMedia, RenderSnapshot, RenderSnapshotRef, SheetInsertionPosition, SheetRole,
+    SheetSnapshot, SizeUm, VectorUm,
 };
 pub use persistent_project::{
     CreateAuthorization, CreateProjectError, CreateProjectRequest, EditableProject,

@@ -1740,6 +1740,14 @@ fn productive_snapshot(initial: InitialProject) -> RenderSnapshot {
 }
 
 fn productive_photo_snapshot(photo_path: &Path, overlay_path: Option<&Path>) -> RenderSnapshot {
+    oriented_photo_snapshot(photo_path, overlay_path, &[])
+}
+
+fn oriented_photo_snapshot(
+    photo_path: &Path,
+    overlay_path: Option<&Path>,
+    actions: &[myalbuns_core::PhotoOrientationAction],
+) -> RenderSnapshot {
     let initial =
         small_initial_project(100).with_personalization(InitialProjectPersonalization::new(
             InitialBackground::BothSides {
@@ -1779,14 +1787,89 @@ fn productive_photo_snapshot(photo_path: &Path, overlay_path: Option<&Path>) -> 
         .import_photo(ImportPhoto::new(photo_path.to_path_buf(), source_metadata))
         .expect("the linked Photo is imported through the productive Core");
     let sheet_id = imported.projection.state.album.sheets[0].id.clone();
-    project
+    let added = project
         .apply_with_outcome(ProjectIntent::AddPhoto {
             sheet_id,
             media_id: imported.media_id,
             mode: PhotoPlacementMode::Normal,
         })
         .expect("the linked Photo creates one productive Frame");
+    for action in actions {
+        project
+            .apply(ProjectIntent::OrientPhotos {
+                frame_ids: vec![added.affected_frame_id.clone().unwrap()],
+                action: *action,
+            })
+            .unwrap();
+    }
     project.render_snapshot()
+}
+
+#[test]
+fn processor_exports_quarter_turn_before_horizontal_mirroring() {
+    use myalbuns_core::PhotoOrientationAction::{
+        RotateCounterClockwise as Rotate, ToggleHorizontalMirror as Mirror,
+    };
+    let root = tempfile::tempdir().unwrap();
+    let source_path = root.path().join("quadrants.jpg");
+    let colors = [[240, 16, 16], [16, 180, 32], [16, 32, 240], [240, 220, 16]];
+    let source = RgbImage::from_fn(40, 20, |x, y| {
+        Rgb(colors[usize::from(x >= 20) + 2 * usize::from(y >= 10)])
+    });
+    source
+        .save_with_format(&source_path, ImageFormat::Jpeg)
+        .unwrap();
+    let original = std::fs::read(&source_path).unwrap();
+    // Expected quadrant permutations are hand-worked: TL, TR, BL, BR.
+    for (index, (actions, expected)) in [
+        (vec![], [0, 1, 2, 3]),
+        (vec![Rotate], [1, 3, 0, 2]),
+        (vec![Rotate, Mirror], [3, 1, 2, 0]),
+        (vec![Rotate, Rotate, Mirror], [2, 3, 0, 1]),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let snapshot = oriented_photo_snapshot(&source_path, None, &actions);
+        let frame = snapshot.composition.sheets[0].frames[0].clone();
+        let media_id = frame.photo.as_ref().unwrap().media_id;
+        let output = root.path().join(format!("orientation-{index}.jpg"));
+        let result = invoke_real_processor(
+            snapshot,
+            &output,
+            "orientation-pixels",
+            100,
+            vec![RenderSource::new(media_id, source_path.clone()).unwrap()],
+        );
+        assert!(
+            result.status.success(),
+            "{}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+        let rendered = image::open(output).unwrap().to_rgb8();
+        for ((x_fraction, y_fraction), color_index) in
+            [(0.25, 0.25), (0.75, 0.25), (0.25, 0.75), (0.75, 0.75)]
+                .into_iter()
+                .zip(expected)
+        {
+            let x = ((frame.clip_rect.x as f64 + frame.clip_rect.width as f64 * x_fraction) * 100.0
+                / 25_400.0) as u32;
+            let y = ((frame.clip_rect.y as f64 + frame.clip_rect.height as f64 * y_fraction)
+                * 100.0
+                / 25_400.0) as u32;
+            let actual = rendered.get_pixel(x, y);
+            assert!(
+                actual
+                    .0
+                    .iter()
+                    .zip(colors[color_index])
+                    .all(|(a, e)| a.abs_diff(e) < 40),
+                "case {index}, quadrant {x_fraction},{y_fraction}: {actual:?}, expected {:?}",
+                colors[color_index]
+            );
+        }
+    }
+    assert_eq!(std::fs::read(source_path).unwrap(), original);
 }
 
 fn invoke_real_processor(

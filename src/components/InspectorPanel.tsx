@@ -34,6 +34,7 @@ import { ActionButton, AppIcon, EmptyState } from "../ui";
 import { AlbumDesignForm } from "./AlbumDesignForm";
 import { AlbumInformationForm } from "./AlbumInformationForm";
 import { SheetPreviewShell } from "./SheetPreview";
+import { PhotoOrientationControls, type PhotoOrientationControlActions } from "./PhotoOrientationControls";
 import {
   SheetDesignInspector,
   type SheetDesignScope,
@@ -85,6 +86,7 @@ export type InspectorSectionState =
   | { kind: "local" };
 
 export interface InspectorPanelProps {
+  photoOrientation?: PhotoOrientationControlActions;
   context: InspectorContext;
   displayedPhotoZoom: number;
   displayedPhotoPanX: number;
@@ -130,6 +132,7 @@ export interface InspectorPanelProps {
 }
 
 export function InspectorPanel({
+  photoOrientation,
   context,
   displayedPhotoZoom,
   displayedPhotoPanX,
@@ -330,15 +333,28 @@ export function InspectorPanel({
     >
       <div className="inspector-scroll">
         {context.kind === "multiple-frames" ? (
-          <div className="context-heading">
-            <span>Seleção múltipla</span>
-            <h2>{context.frames.length} Frames selecionados</h2>
-            <p>
-              {selectedPhotoCount} {selectedPhotoCount === 1 ? "Foto" : "Fotos"}
-              {" · "}
-              {selectedPlaceholderCount} {selectedPlaceholderCount === 1 ? "placeholder" : "placeholders"}
-            </p>
-          </div>
+          <>
+            <div className="context-heading">
+              <span>Seleção múltipla</span>
+              <h2>{context.frames.length} Frames selecionados</h2>
+              <p>
+                {selectedPhotoCount} {selectedPhotoCount === 1 ? "Foto" : "Fotos"}
+                {" · "}
+                {selectedPlaceholderCount} {selectedPlaceholderCount === 1 ? "placeholder" : "placeholders"}
+              </p>
+            </div>
+            {photoOrientation && selectedPhotoCount > 0 && (
+              <InspectorSection
+                key="frame-photo-design"
+                title="Design"
+                preferenceKey="frame-photo.design"
+                sectionState={sectionState}
+                defaultOpen
+              >
+                <PhotoOrientationControls frames={context.frames} {...photoOrientation} />
+              </InspectorSection>
+            )}
+          </>
         ) : context.kind === "frame" ? (
           <>
             <div className="context-heading">
@@ -400,6 +416,7 @@ export function InspectorPanel({
                   />
                 </label>
               )}
+              {photoOrientation && <PhotoOrientationControls frames={[context.frame]} {...photoOrientation} />}
             </InspectorSection>
           </>
         ) : context.kind === "sheet" && selectedSheetScope ? (

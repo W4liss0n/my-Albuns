@@ -72,6 +72,24 @@ type ProjectCommandSourceDefinition<Id extends string> =
 
 const DEFINITIONS = [
   command({
+    id: "rotate-photo-counterclockwise",
+    label: "Girar 90° à esquerda",
+    description: "Gira as Fotos selecionadas 90° no sentido anti-horário.",
+    kind: "domain", contexts: ["frame", "frame-photo"], availability: "implemented", shortcuts: [],
+  }),
+  command({
+    id: "reset-photo-rotation",
+    label: "Restaurar giro",
+    description: "Retorna o Giro das Fotos selecionadas a 0°.",
+    kind: "domain", contexts: ["frame", "frame-photo"], availability: "implemented", shortcuts: [],
+  }),
+  command({
+    id: "mirror-photo-horizontal",
+    label: "Espelhar horizontalmente",
+    description: "Alterna o espelhamento horizontal das Fotos selecionadas.",
+    kind: "domain", contexts: ["frame", "frame-photo"], availability: "implemented", shortcuts: [],
+  }),
+  command({
     id: "new-project",
     label: "Novo Projeto…",
     description: "Inicia a criação de um novo Projeto.",
