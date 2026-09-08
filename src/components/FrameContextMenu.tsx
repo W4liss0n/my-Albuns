@@ -5,10 +5,11 @@ import { ContextMenuSurface } from "../ui/ContextMenuSurface";
 interface FrameContextMenuProps {
   position: { x: number; y: number };
   onArrange(action: FrameStackAction): void;
+  onDelete(): void;
   onDismiss(): void;
 }
 
-export function FrameContextMenu({ position, onArrange, onDismiss }: FrameContextMenuProps) {
+export function FrameContextMenu({ position, onArrange, onDelete, onDismiss }: FrameContextMenuProps) {
   return (
     <ContextMenuSurface label="Organizar Frames" position={position} onDismiss={onDismiss}>
       {FRAME_STACK_COMMANDS.map(({ id, action }) => {
@@ -21,6 +22,11 @@ export function FrameContextMenu({ position, onArrange, onDismiss }: FrameContex
           </button>
         );
       })}
+      <div className="ui-context-menu__separator" role="separator" />
+      <button type="button" role="menuitem" onClick={() => { onDelete(); onDismiss(); }}>
+        <span>{projectCommandDescriptor("delete-frames").label}</span>
+        <kbd aria-hidden="true">{projectCommandShortcutLabel("delete-frames")}</kbd>
+      </button>
     </ContextMenuSurface>
   );
 }

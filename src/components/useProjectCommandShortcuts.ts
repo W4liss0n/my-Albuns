@@ -29,6 +29,7 @@ function targetOwnsEditingKeys(target: EventTarget | null) {
 
 interface ProjectCommandShortcutHandlers {
   arrangeFrames(action: FrameStackAction): void;
+  deleteFrames(): void;
   frameCommandsActive: boolean;
   canDeleteSheet: boolean;
   canRedo: boolean;
@@ -49,6 +50,7 @@ interface ProjectCommandShortcutHandlers {
 
 export function useProjectCommandShortcuts({
   arrangeFrames,
+  deleteFrames,
   frameCommandsActive,
   canDeleteSheet,
   canRedo,
@@ -72,6 +74,11 @@ export function useProjectCommandShortcuts({
       if (frameCommandsActive && targetAllowsCommandShortcut(event.target, "frame") &&
           !targetOwnsEditingKeys(event.target)) {
         const frameCommand = matchProjectCommandShortcut(event, "frame");
+        if (frameCommand === "delete-frames") {
+          event.preventDefault();
+          if (!event.repeat && !disabled) deleteFrames();
+          return;
+        }
         const stackCommand = FRAME_STACK_COMMANDS.find(({ id }) => id === frameCommand);
         if (stackCommand) {
           event.preventDefault();
@@ -145,6 +152,7 @@ export function useProjectCommandShortcuts({
     return () => window.removeEventListener("keydown", handleProjectCommand);
   }, [
     arrangeFrames,
+    deleteFrames,
     frameCommandsActive,
     canDeleteSheet,
     canRedo,

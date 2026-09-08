@@ -208,6 +208,15 @@ const DEFINITIONS = [
     shortcuts: [],
   }),
   command({
+    id: "delete-frames",
+    label: "Excluir",
+    description: "Exclui os Frames selecionados no Modo de edição da Lâmina.",
+    kind: "domain",
+    contexts: ["frame"],
+    availability: "implemented",
+    shortcuts: [shortcut("delete", "Delete")],
+  }),
+  command({
     id: "bring-frames-to-front",
     label: "Trazer para frente",
     description: "Move os Frames selecionados para a frente.",

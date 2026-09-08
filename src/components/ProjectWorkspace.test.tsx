@@ -667,6 +667,31 @@ test("manual Frame creation is unavailable outside sheet editing", () => {
   expect(port.applyWithOutcome).not.toHaveBeenCalled();
 });
 
+test.each(["keyboard", "context"])("deletes the entire Frame selection via %s without confirmation", async (entry) => {
+  const grouped = structuredClone(projection);
+  grouped.state.album.sheets[0].frames.push({
+    ...grouped.state.album.sheets[0].frames[0], id: "frame-002", zIndex: 1, photo: null,
+  });
+  grouped.composition.sheets[0].frames.push({
+    ...grouped.composition.sheets[0].frames[0], frameId: "frame-002", zIndex: 1, photo: null,
+  });
+  const deleted = structuredClone(grouped);
+  deleted.state.album.sheets[0].frames = [];
+  deleted.composition.sheets[0].frames = [];
+  useEditorView.setState({ editingSheetId: "sheet-001", selectedFrameIds: ["frame-001", "frame-002"] });
+  const apply = vi.fn(async () => deleted);
+  render(<ProjectWorkspace projection={grouped} projectCorePort={projectCorePortWithApply(apply)} onProjectionChange={vi.fn()} />);
+  if (entry === "keyboard") fireEvent.keyDown(window, { key: "Delete" });
+  else {
+    act(() => canvasHarness.props?.onOpenFrameContextMenu?.("frame-002", { x: 320, y: 200 }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Excluir" }));
+  }
+  await waitFor(() => expect(apply).toHaveBeenCalledWith({ kind: "deleteFrames", frameIds: ["frame-001", "frame-002"] }, expect.any(Function)));
+  expect(apply).toHaveBeenCalledOnce();
+  expect(useEditorView.getState().selectedFrameIds).toEqual([]);
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+});
+
 test("arranges the entire Frame selection from Edit without changing the selection", async () => {
   const grouped = structuredClone(projection);
   grouped.state.album.sheets[0].frames.push({

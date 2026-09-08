@@ -31,12 +31,14 @@ import { useEditorView } from "./state/editorView";
 import groupGeometryCorpus from "../tests/fixtures/frame-group-geometry-cases.json";
 import stackCorpus from "../tests/fixtures/frame-stack-cases.json";
 import manualFrameCorpus from "../tests/fixtures/manual-frame-cases.json";
+import { frameDeletionCorpus } from "./test/frameDeletionPreview";
 import "./ui/theme.css";
 import "./ui/ui.css";
 
 const previewParameters = new URLSearchParams(window.location.search);
 const frameContext = previewParameters.get("frame");
 const manualFrameCase = manualFrameCorpus.cases.find((item) => item.name === (previewParameters.get("surface") ?? "double"));
+const frameDeletionCase = frameDeletionCorpus.cases.find((item) => item.name === (previewParameters.get("deletion") ?? "group"));
 const stackCase = stackCorpus.cases.find((item) => item.action === previewParameters.get("stack"));
 const decorativeContext = previewParameters.get("decorative");
 const previewScale = Number(previewParameters.get("scale") ?? "1");
@@ -72,6 +74,12 @@ if (frameContext === "manual") {
 const undoStack: EditorProjection[] = [];
 const redoStack: EditorProjection[] = [];
 let addedSheetSequence = 0;
+if (frameContext === "deletion") {
+  useEditorView.setState({ projectId: projection.state.projectId, editingSheetId: "sheet-001",
+    focusedSheetId: "sheet-001", centeredSheetId: "sheet-001", selectedFrameIds: frameDeletionCase!.selectedFrameIds });
+  exposeFrameDeletionState();
+  useEditorView.subscribe(exposeFrameDeletionState);
+}
 
 const projectCorePort: ProjectCorePort = {
   load: async () => projection,
@@ -222,6 +230,7 @@ function createPreviewProjection(
   decorativeMode: string | null,
   structureMode: string | null,
 ): EditorProjection {
+  if (frameMode === "deletion") return structuredClone(frameDeletionCorpus.before);
   if (frameMode === "manual") return structuredClone(manualFrameCase!.before) as EditorProjection;
   const preview = structuredClone(createTwoSheetProjection());
   if (structureMode === "physical") configurePhysicalPreview(preview, 5);
@@ -344,6 +353,18 @@ function configurePhysicalPreview(
 }
 
 function applyPreviewIntent(intent: ProjectIntent): ProjectMutationOutcome {
+  if (intent.kind === "deleteFrames") {
+    if (frameContext !== "deletion" || !frameDeletionCase ||
+        [...intent.frameIds].sort().join() !== [...frameDeletionCase.selectedFrameIds].sort().join() ||
+        projection.state.album.sheets[0].frames.map((frame) => frame.id).join() !==
+          frameDeletionCorpus.before.state.album.sheets[0].frames.map((frame) => frame.id).join()) {
+      throw new Error("Comando fora do cenário de exclusão desta prévia.");
+    }
+    const before = structuredClone(projection);
+    projection = finalizePhysicalPreviewMutation(structuredClone(frameDeletionCase.after), before);
+    exposeFrameDeletionState();
+    return { projection, affectedFrameId: null, affectedSheetId: null };
+  }
   if (intent.kind === "addFrame") {
     const sheet = projection.state.album.sheets.find((item) => item.id === intent.sheetId);
     if (frameContext !== "manual" || !manualFrameCase || intent.sheetId !== manualFrameCase.sheetId || sheet?.frames.length !== 0) {
@@ -516,12 +537,18 @@ function restorePreviewHistory(
     },
   };
   if (frameContext === "manual") exposeManualFrameState();
+  if (frameContext === "deletion") exposeFrameDeletionState();
   return projection;
 }
 
 function exposeManualFrameState() {
   document.body.dataset.manualFrameSelection = useEditorView.getState().selectedFrameIds.join(",");
   document.body.dataset.manualFrameCount = String(projection.state.album.sheets.reduce((count, sheet) => count + sheet.frames.length, 0));
+}
+
+function exposeFrameDeletionState() {
+  document.body.dataset.frameDeletionSelection = useEditorView.getState().selectedFrameIds.join(",");
+  document.body.dataset.frameDeletionCount = String(projection.state.album.sheets[0].frames.length);
 }
 
 function physicalSheetOrderIsValid(candidate: EditorProjection) {

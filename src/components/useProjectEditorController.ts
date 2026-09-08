@@ -81,7 +81,10 @@ export function useProjectEditorController({
   const mutations = useProjectMutations({
     projection,
     runProjectMutation,
-    onProjectionChange,
+    onProjectionChange: (next) => {
+      navigation.synchronizeProjection(next);
+      onProjectionChange(next);
+    },
     onAffectedFrame: navigation.selectFrame,
     onAffectedSheet: setPendingAffectedSheetId,
     onSaveAsBarrierChange,
@@ -126,6 +129,11 @@ export function useProjectEditorController({
     return mutations.applyWithOutcome({ kind: "addFrame", sheetId: canvasMode.sheetId });
   };
   const canArrangeFrames = canvasMode.kind === "sheet-editing" && selectedFrames.length > 0 && !interactionBlocked;
+  const canDeleteFrames = canArrangeFrames;
+  const deleteFrames = () => {
+    if (!canDeleteFrames) return Promise.resolve(false);
+    return mutations.applyIntent({ kind: "deleteFrames", frameIds: [...navigation.selectedFrameIds] });
+  };
   const arrangeFrames = (action: FrameStackAction) => {
     if (!canArrangeFrames) return Promise.resolve(false);
     return mutations.applyIntent({ kind: "arrangeFrames", frameIds: [...navigation.selectedFrameIds], action });
@@ -295,6 +303,8 @@ export function useProjectEditorController({
   return {
     addFrame,
     canAddFrame,
+    canDeleteFrames,
+    deleteFrames,
     arrangeFrames,
     canArrangeFrames,
     message: mutations.message,

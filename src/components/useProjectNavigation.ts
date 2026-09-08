@@ -38,16 +38,20 @@ export function useProjectNavigation(projection: EditorProjection) {
     useState<CanvasMetrics | null>(null);
   const pendingSheetNavigationRef = useRef<string | null>(null);
 
-  useLayoutEffect(() => {
+  const synchronizeProjection = useCallback((current: EditorProjection) => {
+    const editedSheetId = useEditorView.getState().editingSheetId;
     synchronizeProject(
-      projection.state.projectId,
-      projection.state.album.sheets.map((sheet) => sheet.id),
-      projection.state.album.sheets.filter((sheet) =>
-        editingSheetId === null || sheet.id === editingSheetId).flatMap((sheet) =>
+      current.state.projectId,
+      current.state.album.sheets.map((sheet) => sheet.id),
+      current.state.album.sheets.filter((sheet) =>
+        editedSheetId === null || sheet.id === editedSheetId).flatMap((sheet) =>
         sheet.frames.map((frame) => frame.id),
       ),
     );
-  }, [editingSheetId, projection.state, synchronizeProject]);
+  }, [synchronizeProject]);
+  useLayoutEffect(() => {
+    synchronizeProjection(projection);
+  }, [editingSheetId, projection, synchronizeProjection]);
 
   useEffect(() => {
     pendingSheetNavigationRef.current = null;
@@ -154,6 +158,7 @@ export function useProjectNavigation(projection: EditorProjection) {
     : projection.state.album.sheets[0]?.id);
 
   return {
+    synchronizeProjection,
     selectedFrameIds,
     selectedFrameId,
     focusedSheetId,

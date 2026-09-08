@@ -6,6 +6,7 @@ import { useProjectCommandShortcuts } from "./useProjectCommandShortcuts";
 function handlers() {
   return {
     arrangeFrames: vi.fn(),
+    deleteFrames: vi.fn(),
     frameCommandsActive: false,
     canDeleteSheet: true,
     closeProject: vi.fn(),
@@ -56,6 +57,50 @@ function dispatchShortcut(
   });
   return event;
 }
+
+test("Delete targets the Frame selection and never borrows the Sheet command", () => {
+  const actions = handlers();
+  const view = renderHook(({ active, disabled }) => useProjectCommandShortcuts({
+    ...actions, frameCommandsActive: active, sheetShortcutActive: false,
+    canRedo: true, canUndo: true, disabled,
+  }), { initialProps: { active: true, disabled: false } });
+  expect(dispatchShortcut("Delete", { ctrlKey: false }).defaultPrevented).toBe(true);
+  expect(actions.deleteFrames).toHaveBeenCalledOnce();
+  expect(actions.deleteSheet).not.toHaveBeenCalled();
+  dispatchShortcut("Delete", { ctrlKey: false, repeat: true });
+  dispatchShortcut("Delete", { ctrlKey: true });
+  view.rerender({ active: true, disabled: true });
+  dispatchShortcut("Delete", { ctrlKey: false });
+  view.rerender({ active: false, disabled: false });
+  expect(dispatchShortcut("Delete", { ctrlKey: false }).defaultPrevented).toBe(false);
+  expect(actions.deleteFrames).toHaveBeenCalledOnce();
+  expect(actions.deleteSheet).not.toHaveBeenCalled();
+});
+
+test("Frame Delete respects text entry, menus, dialogs and the media-panel command context", () => {
+  const actions = handlers();
+  renderHook(() => useProjectCommandShortcuts({
+    ...actions, frameCommandsActive: true, sheetShortcutActive: false,
+    canRedo: true, canUndo: true, disabled: false,
+  }));
+  const input = document.createElement("input");
+  const editable = document.createElement("div");
+  editable.setAttribute("contenteditable", "true");
+  const media = document.createElement("div");
+  media.dataset.projectCommandContext = "media-panel";
+  const owners = ["dialog", "menu", "menubar", "listbox", "scrollbar"].map((role) => {
+    const element = document.createElement("div");
+    element.setAttribute("role", role);
+    return element;
+  });
+  for (const owner of [input, editable, media, ...owners]) {
+    document.body.append(owner);
+    expect(dispatchShortcut("Delete", { ctrlKey: false }, owner).defaultPrevented).toBe(false);
+    owner.remove();
+  }
+  expect(actions.deleteFrames).not.toHaveBeenCalled();
+  expect(actions.deleteSheet).not.toHaveBeenCalled();
+});
 
 test("dispatches the implemented Project command for every accepted shortcut", () => {
   const actions = handlers();

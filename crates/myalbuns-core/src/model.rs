@@ -808,6 +808,9 @@ pub enum ProjectIntent {
     AddFrame {
         sheet_id: String,
     },
+    DeleteFrames {
+        frame_ids: Vec<String>,
+    },
     ArrangeFrames {
         frame_ids: Vec<String>,
         action: FrameStackAction,
@@ -862,6 +865,8 @@ pub enum ProjectIntent {
 
 #[derive(Debug, Error, PartialEq)]
 pub enum CoreError {
+    #[error("Selecione Frames distintos de uma única Lâmina para excluir")]
+    InvalidFrameDeletionSelection,
     #[error("Selecione Frames distintos de uma única Lâmina para organizar a Pilha visual")]
     InvalidFrameStackSelection,
     #[error("Selecione Frames distintos de uma única Lâmina para editar a geometria")]
