@@ -5,6 +5,7 @@ import type { PrepareImportedMedia } from "../application/mediaPreviews";
 import type { SheetStructureIntent } from "../application/sheetStructure";
 import type { EditorProjection, FrameStackAction } from "../domain/project";
 import { useEditorView } from "../state/editorView";
+import { CANVAS_MICROMETERS_PER_PIXEL } from "./canvasGeometry";
 import type {
   AlbumCanvasMode,
   AlbumCanvasProps,
@@ -141,7 +142,7 @@ export function useProjectEditorController({
     // Clipboard availability is checked again against the authoritative queued result.
     if (!canAddFrame || canvasMode.kind !== "sheet-editing") return Promise.resolve(false);
     const sheetId = canvasMode.sheetId;
-    const desiredOffsetUm = navigation.canvasScale ? Math.round(16 / navigation.canvasScale) : 0;
+    const desiredOffsetUm = navigation.canvasScale ? Math.round(16 * CANVAS_MICROMETERS_PER_PIXEL / navigation.canvasScale) : 0;
     return mutations.pasteFrames(sheetId, desiredOffsetUm, (ids, next) => {
       const view = useEditorView.getState();
       if (view.projectId !== next.state.projectId || view.editingSheetId !== sheetId) return;

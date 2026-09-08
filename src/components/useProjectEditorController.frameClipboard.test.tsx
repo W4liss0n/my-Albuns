@@ -44,7 +44,9 @@ function harness(name = "same-group") {
     return { runner: runProjectMutation, projection, ...useProjectEditorController({ projection, projectCorePort: currentPort,
       runProjectMutation, onProjectionChange: setProjection, interactionBlocked: blocked }) };
   }, { initialProps: { blocked: false, currentPort: port, projectId: initial.state.projectId } });
-  act(() => view.result.current.canvasProps.onCanvasMetricsChange?.({ width: 1200, scale: 0.002 }));
+  // AlbumCanvasScene reports its dimensionless scale; geometry separately uses
+  // 1 Canvas unit per 1,000 micrometers.
+  act(() => view.result.current.canvasProps.onCanvasMetricsChange?.({ width: 1200, scale: 2 }));
   return { view, initial, copied, pasted, scenario, pendingCopy, pendingPaste, apply, applyWithOutcome, save, undo, redo, port };
 }
 

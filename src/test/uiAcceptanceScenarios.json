@@ -2998,7 +2998,7 @@
         "reason": "A especificação e o design 0001 definem a cópia da seleção e a colagem na Lâmina isolada, com adaptação de superfície e lado lógico. A prévia reproduz resultados produzidos e conferidos pelo Core; a referência vigente antecede esses comandos."
       },
       "viewport": {
-        "width": 1440,
+        "width": 1567,
         "height": 900
       },
       "readySelector": "[role=\"menu\"][aria-label=\"Editar\"] [role=\"menuitem\"][aria-label=\"Colar\"][disabled]",
@@ -3020,7 +3020,7 @@
         "reason": "A especificação e o design 0001 definem a cópia da seleção e a colagem na Lâmina isolada, com adaptação de superfície e lado lógico. A prévia reproduz resultados produzidos e conferidos pelo Core; a referência vigente antecede esses comandos."
       },
       "viewport": {
-        "width": 1440,
+        "width": 1567,
         "height": 900
       },
       "readySelector": "[role=\"menu\"][aria-label=\"Editar\"] [role=\"menuitem\"][aria-label=\"Colar\"]:not([disabled])",
@@ -3057,7 +3057,7 @@
         "reason": "A especificação e o design 0001 definem a cópia da seleção e a colagem na Lâmina isolada, com adaptação de superfície e lado lógico. A prévia reproduz resultados produzidos e conferidos pelo Core; a referência vigente antecede esses comandos."
       },
       "viewport": {
-        "width": 1440,
+        "width": 1567,
         "height": 900
       },
       "readySelector": "body[data-clipboard-count=\"10\"][data-clipboard-selection=\"pasted-frame-0,pasted-frame-1\"][data-clipboard-editing-sheet=\"sheet-002\"]",
@@ -3101,7 +3101,7 @@
         "reason": "A especificação e o design 0001 definem a cópia da seleção e a colagem na Lâmina isolada, com adaptação de superfície e lado lógico. A prévia reproduz resultados produzidos e conferidos pelo Core; a referência vigente antecede esses comandos."
       },
       "viewport": {
-        "width": 1440,
+        "width": 1567,
         "height": 900
       },
       "readySelector": "body[data-clipboard-count=\"9\"][data-clipboard-selection=\"pasted-frame-0\"][data-clipboard-editing-sheet=\"sheet-002\"]",
@@ -3135,7 +3135,7 @@
         "reason": "A especificação e o design 0001 definem a cópia da seleção e a colagem na Lâmina isolada, com adaptação de superfície e lado lógico. A prévia reproduz resultados produzidos e conferidos pelo Core; a referência vigente antecede esses comandos."
       },
       "viewport": {
-        "width": 1440,
+        "width": 1567,
         "height": 900
       },
       "readySelector": "body[data-clipboard-count=\"10\"][data-clipboard-selection=\"pasted-frame-0,pasted-frame-1\"][data-clipboard-editing-sheet=\"sheet-003\"]",
@@ -3203,7 +3203,7 @@
         "reason": "A especificação e o design 0001 definem a cópia da seleção e a colagem na Lâmina isolada, com adaptação de superfície e lado lógico. A prévia reproduz resultados produzidos e conferidos pelo Core; a referência vigente antecede esses comandos."
       },
       "viewport": {
-        "width": 1440,
+        "width": 1567,
         "height": 900
       },
       "readySelector": "body[data-clipboard-count=\"10\"][data-clipboard-selection=\"pasted-frame-0,pasted-frame-1\"][data-clipboard-editing-sheet=\"sheet-001\"]",
@@ -3271,7 +3271,7 @@
         "reason": "A especificação e o design 0001 definem a cópia da seleção e a colagem na Lâmina isolada, com adaptação de superfície e lado lógico. A prévia reproduz resultados produzidos e conferidos pelo Core; a referência vigente antecede esses comandos."
       },
       "viewport": {
-        "width": 1440,
+        "width": 1567,
         "height": 900
       },
       "readySelector": "body[data-clipboard-count=\"10\"][data-clipboard-selection=\"pasted-frame-0,pasted-frame-1\"][data-clipboard-editing-sheet=\"sheet-004\"]",
@@ -3343,7 +3343,7 @@
         "reason": "A especificação e o design 0001 definem a cópia da seleção e a colagem na Lâmina isolada, com adaptação de superfície e lado lógico. A prévia reproduz resultados produzidos e conferidos pelo Core; a referência vigente antecede esses comandos."
       },
       "viewport": {
-        "width": 1440,
+        "width": 1567,
         "height": 900
       },
       "readySelector": "body[data-clipboard-count=\"10\"][data-clipboard-selection=\"pasted-frame-0,pasted-frame-1\"][data-clipboard-editing-sheet=\"sheet-002\"]",
@@ -3411,7 +3411,7 @@
         "reason": "A especificação e o design 0001 definem a cópia da seleção e a colagem na Lâmina isolada, com adaptação de superfície e lado lógico. A prévia reproduz resultados produzidos e conferidos pelo Core; a referência vigente antecede esses comandos."
       },
       "viewport": {
-        "width": 1440,
+        "width": 1567,
         "height": 900
       },
       "readySelector": "body[data-clipboard-count=\"10\"][data-clipboard-selection=\"pasted-frame-0,pasted-frame-1\"][data-clipboard-editing-sheet=\"sheet-002\"]",
@@ -3483,7 +3483,7 @@
         "reason": "A especificação e o design 0001 definem a cópia da seleção e a colagem na Lâmina isolada, com adaptação de superfície e lado lógico. A prévia reproduz resultados produzidos e conferidos pelo Core; a referência vigente antecede esses comandos."
       },
       "viewport": {
-        "width": 1440,
+        "width": 1567,
         "height": 900
       },
       "readySelector": "body[data-clipboard-count=\"10\"][data-clipboard-selection=\"pasted-frame-0,pasted-frame-1\"][data-clipboard-editing-sheet=\"sheet-002\"]",
@@ -3527,7 +3527,7 @@
         "reason": "A especificação e o design 0001 definem a cópia da seleção e a colagem na Lâmina isolada, com adaptação de superfície e lado lógico. A prévia reproduz resultados produzidos e conferidos pelo Core; a referência vigente antecede esses comandos."
       },
       "viewport": {
-        "width": 1440,
+        "width": 1567,
         "height": 900
       },
       "readySelector": "body[data-clipboard-count=\"8\"][data-clipboard-selection=\"\"][data-clipboard-available=\"true\"]",
@@ -3579,7 +3579,7 @@
         "reason": "A especificação e o design 0001 definem a cópia da seleção e a colagem na Lâmina isolada, com adaptação de superfície e lado lógico. A prévia reproduz resultados produzidos e conferidos pelo Core; a referência vigente antecede esses comandos."
       },
       "viewport": {
-        "width": 1440,
+        "width": 1567,
         "height": 900
       },
       "readySelector": "body[data-clipboard-count=\"10\"][data-clipboard-selection=\"\"][data-clipboard-available=\"true\"]",

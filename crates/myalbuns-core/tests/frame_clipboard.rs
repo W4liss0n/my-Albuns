@@ -412,7 +412,7 @@ fn clipboard_preview_corpus_matches_the_public_core() {
         let new_ids = outcome.affected_frame_ids.unwrap();
         let mut text = serde_json::to_string(&serde_json::json!({ "name": name, "before": before, "copied": copied,
             "after": outcome.projection, "sourceSheetId": before.state.album.sheets[source].id,
-            "targetSheetId": before.state.album.sheets[target].id, "selectedFrameIds": selected, "pastedFrameIds": new_ids })).unwrap();
+            "targetSheetId": before.state.album.sheets[target].id, "selectedFrameIds": selected, "pastedFrameIds": new_ids, "desiredOffsetUm": 8_000 })).unwrap();
         text = text.replace(&before.state.project_id, "frame-clipboard-project");
         for (sheet_index, sheet) in before.state.album.sheets.iter().enumerate() {
             text = text.replace(&sheet.id, &format!("sheet-{:03}", sheet_index + 1));

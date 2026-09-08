@@ -35,6 +35,7 @@ export interface PhotoTransformDelta {
 
 export interface CanvasMetrics {
   width: number;
+  /** Dimensionless scene scale; Canvas coordinates use 1 unit per 1,000 µm. */
   scale: number;
 }
 

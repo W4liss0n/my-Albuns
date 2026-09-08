@@ -1553,6 +1553,7 @@
           "savedRevision": 25
         }
       },
+      "desiredOffsetUm": 8000,
       "name": "same-group",
       "pastedFrameIds": [
         "pasted-frame-0",
@@ -2378,6 +2379,7 @@
           "savedRevision": 25
         }
       },
+      "desiredOffsetUm": 8000,
       "name": "same-single",
       "pastedFrameIds": [
         "pasted-frame-0"
@@ -3224,6 +3226,7 @@
           "savedRevision": 25
         }
       },
+      "desiredOffsetUm": 8000,
       "name": "other-double",
       "pastedFrameIds": [
         "pasted-frame-0",
@@ -4072,6 +4075,7 @@
           "savedRevision": 25
         }
       },
+      "desiredOffsetUm": 8000,
       "name": "double-right",
       "pastedFrameIds": [
         "pasted-frame-0",
@@ -4920,6 +4924,7 @@
           "savedRevision": 25
         }
       },
+      "desiredOffsetUm": 8000,
       "name": "double-left",
       "pastedFrameIds": [
         "pasted-frame-0",
@@ -5768,6 +5773,7 @@
           "savedRevision": 25
         }
       },
+      "desiredOffsetUm": 8000,
       "name": "right-double",
       "pastedFrameIds": [
         "pasted-frame-0",
@@ -6616,6 +6622,7 @@
           "savedRevision": 25
         }
       },
+      "desiredOffsetUm": 8000,
       "name": "left-double",
       "pastedFrameIds": [
         "pasted-frame-0",
@@ -8898,6 +8905,7 @@
           "savedRevision": 26
         }
       },
+      "desiredOffsetUm": 8000,
       "name": "same-no-offset",
       "pastedFrameIds": [
         "pasted-frame-0",
