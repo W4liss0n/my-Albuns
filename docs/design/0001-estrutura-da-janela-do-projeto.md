@@ -267,6 +267,9 @@ Quando a Lâmina alvo possui Layout travado, a preview aplicada permanece destac
 - Todos os quatro comandos preservam a ordem relativa entre os selecionados e entre os não selecionados. Cada comando completo é uma única ação de Undo/Redo e continua permitido em Layout travado.
 - Como regra geral, todo comando invocado sobre uma Seleção de Frames atua em todos os elementos compatíveis e gera uma única ação de Undo/Redo; restrições específicas continuam sendo respeitadas.
 - Quando exatamente dois Frames estão selecionados e ao menos um contém Foto, `Editar > Trocar conteúdo dos Frames` e o mesmo comando no menu de contexto ficam disponíveis. Dois placeholders mantêm a ação desabilitada.
+- No Modo normal, a mesma troca começa ao arrastar uma Foto sobre outro Frame, na mesma Lâmina ou em outra Lâmina do mesmo Projeto. A seleção continua simples e não muda ao concluir o arraste.
+- O limiar de arraste vem do Windows. O destino válido recebe destaque, a rolagem nas bordas permite atravessar o Álbum e `Alt` + arraste mantém o Pan existente.
+- A própria origem, áreas vazias, Páginas inativas e posições fora do Canvas não recebem a troca. `Esc`, perda de foco, cancelamento do ponteiro ou mudança da composição cancelam sem alterar o Projeto ou gerar Histórico.
 - Com duas Fotos, suas ocorrências completas trocam de Frame. Com uma Foto e um placeholder, a Foto é movida para o Frame vazio e o Frame de origem torna-se placeholder.
 - Geometria, estilo e posição permanecem com cada Frame. A Foto leva seu Arquivo vinculado e todos os ajustes; se a nova geometria exigir, o enquadramento é limitado somente no necessário para impedir áreas vazias.
 - A troca funciona em Layout travado porque não altera quantidade, posição ou dimensões dos Frames, e constitui uma única ação de Undo/Redo.

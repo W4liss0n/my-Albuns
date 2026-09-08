@@ -77,6 +77,14 @@ export interface CanvasFrameGeometry {
   commit(edit: FrameGeometryEdit): Promise<ComposedFrame[] | null>;
   onError(message: string): void;
 }
+export interface CanvasFrameContentSwap {
+  disabled: boolean;
+  dragThreshold: PointerDragThreshold | null;
+  resolveTarget(point: CanvasPhotoDropPoint): Promise<PhotoDropTarget>;
+  /** Resolves the release point and swaps in the shared mutation queue. */
+  commit(sourceFrameId: string, point: CanvasPhotoDropPoint): Promise<boolean>;
+  onError(message: string): void;
+}
 export interface AlbumCanvasProps {
   projectId: string;
   mode: AlbumCanvasMode;
@@ -94,6 +102,7 @@ export interface AlbumCanvasProps {
   photoDropHighlight?: PhotoDropTarget | null;
   photoZoomPreview?: PhotoZoomPreview | null;
   frameGeometry?: CanvasFrameGeometry;
+  frameContentSwap?: CanvasFrameContentSwap;
   onSelectFrame(frameId: string | null, toggle?: boolean): void;
   onEditSheet(sheetId: string): void;
   onFocusSheet(sheetId: string): void;

@@ -33,6 +33,7 @@ import {
 import { applySheetBarScale } from "./sheetBarRenderNode";
 import { PhotoInteractionSession } from "./photoInteractionSession";
 import { FrameInteractionSession } from "./frameInteractionSession";
+import { FrameContentDragSession } from "./frameContentDragSession";
 import { ViewportTexturePool } from "./viewportTexturePool";
 
 const PRELOAD_MARGIN = 1;
@@ -72,6 +73,7 @@ export class AlbumCanvasScene {
   private readonly previewTextures: ViewportTexturePool;
   private readonly photoInteractions: PhotoInteractionSession;
   private readonly frameInteractions: FrameInteractionSession;
+  private readonly frameContentDrag: FrameContentDragSession;
 
   constructor(
     private readonly app: Application,
@@ -96,6 +98,12 @@ export class AlbumCanvasScene {
       app.canvas,
       () => ({ input: this.input, canvasScale: this.canvasScale, screen: app.screen }),
       () => { if (this.input) this.update(this.input, app.screen.height); },
+    );
+    this.frameContentDrag = new FrameContentDragSession(
+      app.canvas, () => this.input,
+      (x, y) => this.resolvePhotoDropPoint(x, y),
+      (delta) => this.scrollContinuousCanvas(delta),
+      () => { if (this.input) this.updateDecorations(this.input.composition.sheets); },
     );
     this.world.label = "album-world";
     this.app.stage.addChild(this.world);
@@ -137,7 +145,7 @@ export class AlbumCanvasScene {
     this.input = input;
     this.app.canvas.setAttribute("aria-label", input.mode.kind === "sheet-editing"
       ? "Canvas da Lâmina em edição. Arraste um Frame para mover ou use as alças para redimensionar. Shift preserva a proporção; Alt preserva o centro; Esc cancela o gesto."
-      : "Canvas contínuo do Álbum. Use a roda para navegar e Alt mais roda para ajustar a Foto.");
+      : "Canvas contínuo do Álbum. Arraste uma Foto sobre outro Frame para trocar o conteúdo, inclusive entre Lâminas. Esc cancela. Use a roda para navegar, Alt mais arraste para Pan e Alt mais roda para Zoom.");
     const modePolicy = albumCanvasModePolicy(input.mode);
     const confirmedSheets = sheetsForCanvasMode(
       input.composition.sheets,
@@ -178,6 +186,7 @@ export class AlbumCanvasScene {
     );
     this.canvasScale = scale;
     this.frameInteractions.synchronize(input, scale);
+    this.frameContentDrag.synchronize(input);
     const transitionOffsetX =
       returnedToContinuousCanvas && input.centeredSheetId
         ? navigationLayout.centeredOffset(
@@ -261,6 +270,7 @@ export class AlbumCanvasScene {
   destroy() {
     this.resetTransientInteractions();
     this.frameInteractions.destroy();
+    this.frameContentDrag.destroy();
     this.app.stage.removeAllListeners();
     this.clearMaterializedSheets();
     this.previewTextures.destroy();
@@ -348,6 +358,7 @@ export class AlbumCanvasScene {
   private resetTransientInteractions() {
     this.photoInteractions.reset();
     this.frameInteractions.reset();
+    this.frameContentDrag.reset();
     this.sheetReorderPreviewActive = false;
     this.sheetReorderPlaceholderSheetId = null;
     this.stopSheetPositionAnimations();
@@ -636,16 +647,16 @@ export class AlbumCanvasScene {
       {
         previewTextureFor: (mediaId) => this.previewTextureFor(mediaId),
         onSheetTap: (sheetId) => {
-          if (!this.input || this.frameInteractions.ignoresTap) return;
+          if (!this.input || this.frameInteractions.ignoresTap || this.frameContentDrag.ignoresTap) return;
           this.input.onSelectFrame(null);
           this.input.onFocusSheet(sheetId);
         },
         onSheetDoubleTap: (sheetId) => {
-          if (this.frameInteractions.ignoresTap) return;
+          if (this.frameInteractions.ignoresTap || this.frameContentDrag.ignoresTap) return;
           this.input?.onEditSheet(sheetId);
         },
         onFrameTap: (sheetId, frameId, toggle) => {
-          if (!this.input || this.frameInteractions.ignoresTap) return;
+          if (!this.input || this.frameInteractions.ignoresTap || this.frameContentDrag.ignoresTap) return;
           if (toggle) this.input.onSelectFrame(frameId, true);
           else this.input.onSelectFrame(frameId);
           this.input.onFocusSheet(sheetId);
@@ -653,6 +664,7 @@ export class AlbumCanvasScene {
         onPhotoPanStart: (photoNode, event) => {
           this.photoInteractions.startPan(photoNode, event);
         },
+        onPhotoContentDragStart: (frameId, event) => this.frameContentDrag.start(frameId, event),
         onFrameContextMenu: (frameId, position) => {
           if (!this.input || this.input.frameGeometry?.disabled || this.frameInteractions.ignoresTap) return;
           this.input.onOpenFrameContextMenu?.(frameId, position);
@@ -686,6 +698,7 @@ export class AlbumCanvasScene {
 
   private updateDecorations(sheets: readonly ComposedSheet[]) {
     if (!this.input) return;
+    const highlight = this.frameContentDrag.highlight ?? this.input.photoDropHighlight;
     for (const [sheetId, node] of this.sheetNodes) {
       node.container.visible =
         sheetId !== this.sheetReorderPlaceholderSheetId;
@@ -702,8 +715,7 @@ export class AlbumCanvasScene {
       this.updateFrameGroupSelection(node, sheets.find((sheet) => sheet.sheetId === sheetId));
       for (const [frameId, outline] of node.frameDropOutlines) {
         outline.visible =
-          this.input.photoDropHighlight?.kind === "frame" &&
-          this.input.photoDropHighlight.frameId === frameId;
+          highlight?.kind === "frame" && highlight.frameId === frameId;
       }
     }
   }
@@ -757,10 +769,15 @@ export class AlbumCanvasScene {
     }
     event.preventDefault();
     if (event.ctrlKey) return;
+    this.scrollContinuousCanvas((event.deltaX || event.deltaY) * 0.9);
+  };
+
+  private scrollContinuousCanvas(deltaPx: number) {
+    if (!this.input || this.input.mode.kind !== "normal") return;
     const layout = this.input.continuousCanvasLayout;
     this.pendingViewportOffsetX = null;
     const nextOffset = layout.clampOffset(
-      this.input.viewport.offsetX - (event.deltaX || event.deltaY) * 0.9,
+      this.input.viewport.offsetX - deltaPx,
       this.canvasScale,
       this.app.screen.width,
     );
@@ -769,7 +786,7 @@ export class AlbumCanvasScene {
       offsetX: nextOffset,
     });
     this.synchronizeCenteredSheet(layout, nextOffset, this.canvasScale);
-  };
+  }
 }
 
 function resolveBarSheetReorderPreview(

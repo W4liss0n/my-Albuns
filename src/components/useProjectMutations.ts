@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { PhotoImportCompletion, ImageProcessingProgress } from "../application/projectPorts";
 import { createLogInstanceId } from "../application/logging";
 import { useImageProcessing } from "./useImageProcessing";
+import type { CanvasPhotoDropPoint } from "./albumCanvasContract";
 import type { PrepareImportedMedia } from "../application/mediaPreviews";
 
 import type {
@@ -241,6 +242,28 @@ export function useProjectMutations({
       .filter((frame) => edit.frames.some((target) => target.frameId === frame.frameId)) ?? null;
   }
 
+  async function swapFrameContentsAtPoint(sourceFrameId: string, point: CanvasPhotoDropPoint) {
+    let applied = false;
+    const expectedPhoto = projection.state.album.sheets.flatMap((sheet) => sheet.frames)
+      .find((frame) => frame.id === sourceFrameId)?.photo;
+    // Include hit testing in the queue: a following Save/Undo must not overtake the drop.
+    const completed = await runWithErrorFeedback(async (port, latestProjection) => {
+      const current = latestProjection ?? projection;
+      const source = current.state.album.sheets.flatMap((sheet) => sheet.frames)
+        .find((frame) => frame.id === sourceFrameId);
+      if (!source?.photo || JSON.stringify(source.photo) !== JSON.stringify(expectedPhoto) ||
+          !current.state.album.sheets.some((sheet) => sheet.id === point.sheetId)) return current;
+      const target = await port.resolvePhotoDropTarget(point.sheetId, point.xUm, point.yUm);
+      if (target.kind !== "frame" || target.frameId === sourceFrameId) return current;
+      const swapped = await imageProcessing.run((publish) => port.apply({
+        kind: "swapFrameContents", frameIds: [sourceFrameId, target.frameId],
+      }, publish));
+      applied = true;
+      return swapped;
+    }, true);
+    return completed && applied;
+  }
+
   async function commitProjectSettingsDraft<Value, Delta>(
     draft: ProjectSettingsDraft<Value, Delta>,
   ) {
@@ -340,6 +363,7 @@ export function useProjectMutations({
     applyIntent,
     commitInteraction,
     commitFrameGeometry,
+    swapFrameContentsAtPoint,
     applyAlbumInformation: commitAlbumInformation,
     applyAlbumDesign: (draft: AlbumDesignProjectDraft) =>
       commitProjectSettingsDraft(draft),

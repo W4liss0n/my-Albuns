@@ -841,16 +841,18 @@ impl ProjectDocument {
         frame_ids: &[String],
     ) -> Result<Self, crate::CoreError> {
         use crate::CoreError::InvalidFrameContentSwapSelection;
-        let (sheet_index, selected) = self
-            .frame_selection(frame_ids)
-            .map_err(|()| InvalidFrameContentSwapSelection)?;
-        if selected.len() != 2 {
+        let selected = frame_ids
+            .iter()
+            .map(|id| Uuid::parse_str(id).map_err(|_| InvalidFrameContentSwapSelection))
+            .collect::<Result<std::collections::HashSet<_>, _>>()?;
+        if frame_ids.len() != 2 || selected.len() != 2 {
             return Err(InvalidFrameContentSwapSelection);
         }
         let mut candidate = self.clone();
-        let mut frames = candidate.sheets[sheet_index]
-            .frames
+        let mut frames = candidate
+            .sheets
             .iter_mut()
+            .flat_map(|sheet| sheet.frames.iter_mut())
             .filter(|frame| selected.contains(&frame.id));
         let first = frames.next().ok_or(InvalidFrameContentSwapSelection)?;
         let second = frames.next().ok_or(InvalidFrameContentSwapSelection)?;

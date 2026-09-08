@@ -96,7 +96,6 @@ export function useProjectEditorController({
     let request = 0;
     let active = true;
     setDragThreshold(null);
-    if (!navigation.editingSheetId) return;
     const readThreshold = () => {
       const currentRequest = ++request;
       setDragThreshold(null);
@@ -226,6 +225,14 @@ export function useProjectEditorController({
       dragThreshold,
       preview: (edit) => projectCorePort.previewFrameGeometry(edit),
       commit: mutations.commitFrameGeometry,
+      onError: reportInteractionError,
+    },
+    frameContentSwap: {
+      disabled: interactionBlocked || structuralMutationPending || canvasMode.kind !== "normal",
+      dragThreshold,
+      resolveTarget: (point) => projectCorePort.resolvePhotoDropTarget(point.sheetId, point.xUm, point.yUm),
+      commit: (sourceFrameId, point) => interactionBlocked || structuralMutationPending || canvasMode.kind !== "normal"
+        ? Promise.resolve(false) : mutations.swapFrameContentsAtPoint(sourceFrameId, point),
       onError: reportInteractionError,
     },
     onSelectFrame: navigation.selectFrame,

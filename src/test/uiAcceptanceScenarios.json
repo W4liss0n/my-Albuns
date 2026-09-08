@@ -2556,6 +2556,320 @@
           "selector": "[role=\"menuitem\"][aria-label=\"Refazer\"]"
         }
       ]
+    },
+    {
+      "id": "workspace-normal-frame-swap-hover",
+      "title": "Troca no Modo normal — destino destacado durante o arraste",
+      "implementationPath": "/workspace-preview.html?frame=swap&mode=normal&swap=photos",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "normal-frame-content-swap",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A decisão aceita na especificação e no design 0001 inclui arraste no Modo normal entre Lâminas. A referência visual vigente antecede esse gesto; o cenário usa composição e alvos produzidos pelo Core."
+      },
+      "viewport": {
+        "width": 1896,
+        "height": 720
+      },
+      "readySelector": "body[data-frame-swap-all-photos=\"00000000-0000-4000-8000-000000000001,00000000-0000-4000-8000-000000000002,empty,empty,00000000-0000-4000-8000-000000000002,empty\"][data-frame-swap-selection=\"\"]:has(canvas.pixi-canvas--frame-gesture[style*=\"move\"])",
+      "actions": [
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": ".canvas-host canvas",
+          "targetSelector": ".canvas-host canvas",
+          "phase": "preview",
+          "sourceOffsetX": -657,
+          "sourceOffsetY": -13,
+          "targetOffsetX": -473,
+          "targetOffsetY": -13
+        }
+      ]
+    },
+    {
+      "id": "workspace-normal-frame-swap-photos",
+      "title": "Troca no Modo normal — duas Fotos na mesma Lâmina",
+      "implementationPath": "/workspace-preview.html?frame=swap&mode=normal&swap=photos",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "normal-frame-content-swap",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A decisão aceita na especificação e no design 0001 inclui arraste no Modo normal entre Lâminas. A referência visual vigente antecede esse gesto; o cenário usa composição e alvos produzidos pelo Core."
+      },
+      "viewport": {
+        "width": 1896,
+        "height": 720
+      },
+      "readySelector": "body[data-frame-swap-all-photos=\"00000000-0000-4000-8000-000000000002,00000000-0000-4000-8000-000000000001,empty,empty,00000000-0000-4000-8000-000000000002,empty\"][data-frame-swap-selection=\"\"]",
+      "actions": [
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": ".canvas-host canvas",
+          "targetSelector": ".canvas-host canvas",
+          "phase": "drop",
+          "sourceOffsetX": -657,
+          "sourceOffsetY": -13,
+          "targetOffsetX": -473,
+          "targetOffsetY": -13
+        }
+      ]
+    },
+    {
+      "id": "workspace-normal-frame-swap-placeholder",
+      "title": "Troca no Modo normal — Foto para Frame vazio",
+      "implementationPath": "/workspace-preview.html?frame=swap&mode=normal&swap=placeholder",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "normal-frame-content-swap",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A decisão aceita na especificação e no design 0001 inclui arraste no Modo normal entre Lâminas. A referência visual vigente antecede esse gesto; o cenário usa composição e alvos produzidos pelo Core."
+      },
+      "viewport": {
+        "width": 1896,
+        "height": 720
+      },
+      "readySelector": "body[data-frame-swap-all-photos=\"empty,00000000-0000-4000-8000-000000000002,00000000-0000-4000-8000-000000000001,empty,00000000-0000-4000-8000-000000000002,empty\"][data-frame-swap-selection=\"\"]",
+      "actions": [
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": ".canvas-host canvas",
+          "targetSelector": ".canvas-host canvas",
+          "phase": "drop",
+          "sourceOffsetX": -657,
+          "sourceOffsetY": -13,
+          "targetOffsetX": -308,
+          "targetOffsetY": 0
+        }
+      ]
+    },
+    {
+      "id": "workspace-normal-frame-swap-cross-photos",
+      "title": "Troca no Modo normal — Fotos entre Lâminas",
+      "implementationPath": "/workspace-preview.html?frame=swap&mode=normal&swap=cross-photos",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "normal-frame-content-swap",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A decisão aceita na especificação e no design 0001 inclui arraste no Modo normal entre Lâminas. A referência visual vigente antecede esse gesto; o cenário usa composição e alvos produzidos pelo Core."
+      },
+      "viewport": {
+        "width": 1896,
+        "height": 720
+      },
+      "readySelector": "body[data-frame-swap-all-photos=\"00000000-0000-4000-8000-000000000002,00000000-0000-4000-8000-000000000002,empty,empty,00000000-0000-4000-8000-000000000001,empty\"][data-frame-swap-selection=\"\"]",
+      "actions": [
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": ".canvas-host canvas",
+          "targetSelector": ".canvas-host canvas",
+          "phase": "drop",
+          "sourceOffsetX": -657,
+          "sourceOffsetY": -13,
+          "targetOffsetX": 270,
+          "targetOffsetY": 25
+        }
+      ]
+    },
+    {
+      "id": "workspace-normal-frame-swap-cross-placeholder",
+      "title": "Troca no Modo normal — Foto para Frame vazio de outra Lâmina",
+      "implementationPath": "/workspace-preview.html?frame=swap&mode=normal&swap=cross-placeholder",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "normal-frame-content-swap",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A decisão aceita na especificação e no design 0001 inclui arraste no Modo normal entre Lâminas. A referência visual vigente antecede esse gesto; o cenário usa composição e alvos produzidos pelo Core."
+      },
+      "viewport": {
+        "width": 1896,
+        "height": 720
+      },
+      "readySelector": "body[data-frame-swap-all-photos=\"empty,00000000-0000-4000-8000-000000000002,empty,empty,00000000-0000-4000-8000-000000000002,00000000-0000-4000-8000-000000000001\"][data-frame-swap-selection=\"\"]",
+      "actions": [
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": ".canvas-host canvas",
+          "targetSelector": ".canvas-host canvas",
+          "phase": "drop",
+          "sourceOffsetX": -657,
+          "sourceOffsetY": -13,
+          "targetOffsetX": 613,
+          "targetOffsetY": 25
+        }
+      ]
+    },
+    {
+      "id": "workspace-normal-frame-swap-escape",
+      "title": "Troca no Modo normal — Esc cancela sem alterar a composição",
+      "implementationPath": "/workspace-preview.html?frame=swap&mode=normal&swap=photos",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "normal-frame-content-swap",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A decisão aceita na especificação e no design 0001 inclui arraste no Modo normal entre Lâminas. A referência visual vigente antecede esse gesto; o cenário usa composição e alvos produzidos pelo Core."
+      },
+      "viewport": {
+        "width": 1896,
+        "height": 720
+      },
+      "readySelector": "body[data-frame-swap-all-photos=\"00000000-0000-4000-8000-000000000001,00000000-0000-4000-8000-000000000002,empty,empty,00000000-0000-4000-8000-000000000002,empty\"][data-frame-swap-selection=\"\"]",
+      "actions": [
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": ".canvas-host canvas",
+          "targetSelector": ".canvas-host canvas",
+          "phase": "escape",
+          "sourceOffsetX": -657,
+          "sourceOffsetY": -13,
+          "targetOffsetX": -473,
+          "targetOffsetY": -13
+        }
+      ]
+    },
+    {
+      "id": "workspace-normal-frame-swap-invalid",
+      "title": "Troca no Modo normal — soltura na área vazia preserva a composição",
+      "implementationPath": "/workspace-preview.html?frame=swap&mode=normal&swap=photos",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "normal-frame-content-swap",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A decisão aceita na especificação e no design 0001 inclui arraste no Modo normal entre Lâminas. A referência visual vigente antecede esse gesto; o cenário usa composição e alvos produzidos pelo Core."
+      },
+      "viewport": {
+        "width": 1896,
+        "height": 720
+      },
+      "readySelector": "body[data-frame-swap-all-photos=\"00000000-0000-4000-8000-000000000001,00000000-0000-4000-8000-000000000002,empty,empty,00000000-0000-4000-8000-000000000002,empty\"][data-frame-swap-selection=\"\"]",
+      "actions": [
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": ".canvas-host canvas",
+          "targetSelector": ".canvas-host canvas",
+          "phase": "drop",
+          "sourceOffsetX": -657,
+          "sourceOffsetY": -13,
+          "targetOffsetX": -373,
+          "targetOffsetY": -170
+        }
+      ]
+    },
+    {
+      "id": "workspace-normal-frame-swap-self",
+      "title": "Troca no Modo normal — soltura na origem preserva a composição",
+      "implementationPath": "/workspace-preview.html?frame=swap&mode=normal&swap=photos",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "normal-frame-content-swap",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A decisão aceita na especificação e no design 0001 inclui arraste no Modo normal entre Lâminas. A referência visual vigente antecede esse gesto; o cenário usa composição e alvos produzidos pelo Core."
+      },
+      "viewport": {
+        "width": 1896,
+        "height": 720
+      },
+      "readySelector": "body[data-frame-swap-all-photos=\"00000000-0000-4000-8000-000000000001,00000000-0000-4000-8000-000000000002,empty,empty,00000000-0000-4000-8000-000000000002,empty\"][data-frame-swap-selection=\"\"]",
+      "actions": [
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": ".canvas-host canvas",
+          "targetSelector": ".canvas-host canvas",
+          "phase": "drop",
+          "sourceOffsetX": -657,
+          "sourceOffsetY": -13,
+          "targetOffsetX": -657,
+          "targetOffsetY": -13
+        }
+      ]
+    },
+    {
+      "id": "workspace-normal-frame-swap-undo",
+      "title": "Troca no Modo normal — Desfazer restaura ambas as Lâminas",
+      "implementationPath": "/workspace-preview.html?frame=swap&mode=normal&swap=cross-photos",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "normal-frame-content-swap",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A decisão aceita na especificação e no design 0001 inclui arraste no Modo normal entre Lâminas. A referência visual vigente antecede esse gesto; o cenário usa composição e alvos produzidos pelo Core."
+      },
+      "viewport": {
+        "width": 1896,
+        "height": 720
+      },
+      "readySelector": "body[data-frame-swap-all-photos=\"00000000-0000-4000-8000-000000000001,00000000-0000-4000-8000-000000000002,empty,empty,00000000-0000-4000-8000-000000000002,empty\"][data-frame-swap-selection=\"\"]",
+      "actions": [
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": ".canvas-host canvas",
+          "targetSelector": ".canvas-host canvas",
+          "phase": "drop",
+          "sourceOffsetX": -657,
+          "sourceOffsetY": -13,
+          "targetOffsetX": 270,
+          "targetOffsetY": 25
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Desfazer\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-normal-frame-swap-redo",
+      "title": "Troca no Modo normal — Refazer reaplica a troca entre Lâminas",
+      "implementationPath": "/workspace-preview.html?frame=swap&mode=normal&swap=cross-photos",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "normal-frame-content-swap",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A decisão aceita na especificação e no design 0001 inclui arraste no Modo normal entre Lâminas. A referência visual vigente antecede esse gesto; o cenário usa composição e alvos produzidos pelo Core."
+      },
+      "viewport": {
+        "width": 1896,
+        "height": 720
+      },
+      "readySelector": "body[data-frame-swap-all-photos=\"00000000-0000-4000-8000-000000000002,00000000-0000-4000-8000-000000000002,empty,empty,00000000-0000-4000-8000-000000000001,empty\"][data-frame-swap-selection=\"\"]",
+      "actions": [
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": ".canvas-host canvas",
+          "targetSelector": ".canvas-host canvas",
+          "phase": "drop",
+          "sourceOffsetX": -657,
+          "sourceOffsetY": -13,
+          "targetOffsetX": 270,
+          "targetOffsetY": 25
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Desfazer\"]"
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Refazer\"]"
+        }
+      ]
     }
   ]
 }

@@ -33,6 +33,8 @@ import stackCorpus from "../tests/fixtures/frame-stack-cases.json";
 import manualFrameCorpus from "../tests/fixtures/manual-frame-cases.json";
 import { frameDeletionCorpus } from "./test/frameDeletionPreview";
 import { frameContentSwapCorpus } from "./test/frameContentSwapPreview";
+import { continuousCanvasScale, createCanvasSheetPresentation } from "./components/canvasGeometry";
+import { createCanvasSheetViewGeometry, createNormalCanvasLayout } from "./components/canvasSheetViewGeometry";
 import "./ui/theme.css";
 import "./ui/ui.css";
 
@@ -83,10 +85,11 @@ if (frameContext === "deletion") {
   useEditorView.subscribe(exposeFrameDeletionState);
 }
 if (frameContext === "swap") {
-  const selectedFrameIds = previewParameters.get("swap") === "empty"
+  const normal = previewParameters.get("mode") === "normal";
+  const selectedFrameIds = normal ? [] : previewParameters.get("swap") === "empty"
     ? ["swap-frame-2", "swap-frame-3"]
     : frameSwapCase!.selectedFrameIds;
-  useEditorView.setState({ projectId: projection.state.projectId, editingSheetId: "sheet-001",
+  useEditorView.setState({ projectId: projection.state.projectId, editingSheetId: normal ? null : "sheet-001",
     focusedSheetId: "sheet-001", centeredSheetId: "sheet-001", selectedFrameIds });
   exposeFrameSwapState();
   useEditorView.subscribe(exposeFrameSwapState);
@@ -107,7 +110,11 @@ const projectCorePort: ProjectCorePort = {
   importPhoto: async () => ({ kind: "cancelled", projection }),
   readFrameDragThreshold: async () => ({ x: 5, y: 5 }),
   previewFrameGeometry: async () => { throw new Error("Frame geometry preview is not configured in this fixture."); },
-  resolvePhotoDropTarget: async () => ({ kind: "invalid" }),
+  // Replay Core-produced point probes with tolerance for CSS pixel rounding.
+  resolvePhotoDropTarget: async (sheetId, xUm, yUm) => frameContext === "swap"
+    ? frameContentSwapCorpus.dropProbes.find((probe) => probe.sheetId === sheetId &&
+      Math.abs(probe.xUm - xUm) < 6_000 && Math.abs(probe.yUm - yUm) < 6_000)?.target ?? { kind: "invalid" }
+    : { kind: "invalid" },
   relink: async () => projection,
   undo: async () => restorePreviewHistory(undoStack, redoStack),
   redo: async () => restorePreviewHistory(redoStack, undoStack),
@@ -365,6 +372,7 @@ function configurePhysicalPreview(
 }
 
 function applyPreviewIntent(intent: ProjectIntent): ProjectMutationOutcome {
+  if (frameContext === "swap") document.body.dataset.frameSwapLastIntent = JSON.stringify(intent);
   if (intent.kind === "swapFrameContents") {
     if (frameContext !== "swap" || !frameSwapCase ||
         [...intent.frameIds].sort().join() !== [...frameSwapCase.selectedFrameIds].sort().join() ||
@@ -580,6 +588,32 @@ function exposeFrameSwapState() {
   document.body.dataset.frameSwapSelection = useEditorView.getState().selectedFrameIds.join(",");
   document.body.dataset.frameSwapPhotos = projection.state.album.sheets[0].frames
     .map((frame) => frame.photo?.mediaId ?? "empty").join(",");
+  document.body.dataset.frameSwapAllPhotos = projection.state.album.sheets.flatMap((sheet) => sheet.frames)
+    .map((frame) => frame.photo?.mediaId ?? "empty").join(",");
+  document.body.dataset.frameSwapRevision = String(projection.state.revision);
+}
+
+// Coordinates only: browser gesture tests still dispatch real pointer input to the Canvas.
+if (frameContext === "swap" && previewParameters.get("mode") === "normal") {
+  Object.assign(window, { normalSwapTest: {
+    point(frameId: string) {
+      const canvas = document.querySelector(".canvas-host canvas");
+      if (!canvas) return null;
+      const bounds = canvas.getBoundingClientRect();
+      const sheet = projection.composition.sheets.find((item) => item.frames.some((frame) => frame.frameId === frameId));
+      const frame = sheet?.frames.find((item) => item.frameId === frameId);
+      if (!sheet || !frame) return null;
+      const scale = continuousCanvasScale(bounds.height, sheet.heightUm / 1000);
+      const layout = createNormalCanvasLayout(projection.composition.sheets, projection.state.document.bleedUm);
+      const entry = layout.entriesAtScale(scale).find((item) => item.sheetId === sheet.sheetId)!;
+      const presentation = createCanvasSheetPresentation(sheet);
+      const view = createCanvasSheetViewGeometry(sheet, presentation, projection.state.document.bleedUm, true);
+      return { x: Math.round(bounds.left + useEditorView.getState().viewport.offsetX + scale *
+        (entry.left - view.visibleOuterBounds.x + presentation.activeOffsetXPx + (frame.clipRect.x + frame.clipRect.width / 2) / 1000)),
+        y: Math.round(bounds.top + 28 + scale * (frame.clipRect.y + frame.clipRect.height / 2) / 1000) };
+    },
+    viewport: () => useEditorView.getState().viewport.offsetX,
+  } });
 }
 
 function physicalSheetOrderIsValid(candidate: EditorProjection) {

@@ -197,6 +197,10 @@ export function validateUiAcceptanceManifest(manifest) {
           );
         }
         if (action.type === "drag") {
+          for (const offset of ["sourceOffsetX", "sourceOffsetY", "targetOffsetX", "targetOffsetY"]) {
+            invariant(action[offset] === undefined || (action.gesture === "pointer" && Number.isSafeInteger(action[offset])),
+              `${actionLocation}.${offset} must be an integer on a pointer drag`);
+          }
           invariant(
             action.gesture === undefined || action.gesture === "pointer",
             `${actionLocation}.gesture must be pointer when present`,
