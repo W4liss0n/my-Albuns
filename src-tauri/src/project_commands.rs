@@ -59,6 +59,7 @@ pub(crate) async fn apply_project_intent(
     let previous = state.projection()?;
     let intent_kind = match &intent {
         ProjectIntent::AddFrame { .. } => "add_frame",
+        ProjectIntent::DeleteFrames { .. } => "delete_frames",
         ProjectIntent::ArrangeFrames { .. } => "arrange_frames",
         ProjectIntent::EditFrameGeometry { .. } => "edit_frame_geometry",
         ProjectIntent::SetAlbumInformation { .. } => "set_album_information",

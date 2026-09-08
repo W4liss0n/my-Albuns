@@ -2124,6 +2124,214 @@
           "selector": ".canvas-host canvas"
         }
       ]
+    },
+    {
+      "id": "workspace-frame-deletion-context",
+      "title": "Exclusão de Frames — menu contextual da seleção com Foto e placeholder",
+      "implementationPath": "/workspace-preview.html?frame=deletion&deletion=group",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-deletion",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "O design 0001 define Delete e Excluir para toda a seleção no Modo de edição, preservando os demais Frames. O estado usa resultados produzidos e conferidos pelo Core; a referência visual vigente antecede esse fluxo."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-frame-deletion-count=\"4\"][data-frame-deletion-selection=\"delete-frame-1,delete-frame-2\"]:has([role=\"menu\"][aria-label=\"Organizar Frames\"])",
+      "actions": [
+        {
+          "type": "context-click",
+          "selector": ".canvas-host canvas",
+          "offsetX": -110,
+          "offsetY": 0
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-deletion-single",
+      "title": "Exclusão de Frames — exclusão do Frame superior pelo contexto",
+      "implementationPath": "/workspace-preview.html?frame=deletion&deletion=single",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-deletion",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "O design 0001 define Delete e Excluir para toda a seleção no Modo de edição, preservando os demais Frames. O estado usa resultados produzidos e conferidos pelo Core; a referência visual vigente antecede esse fluxo."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-frame-deletion-count=\"3\"][data-frame-deletion-selection=\"\"]",
+      "actions": [
+        {
+          "type": "context-click",
+          "selector": ".canvas-host canvas",
+          "offsetX": 0,
+          "offsetY": 0
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Excluir\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-deletion-group-context",
+      "title": "Exclusão de Frames — exclusão conjunta pelo menu preserva os demais Frames",
+      "implementationPath": "/workspace-preview.html?frame=deletion&deletion=group",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-deletion",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "O design 0001 define Delete e Excluir para toda a seleção no Modo de edição, preservando os demais Frames. O estado usa resultados produzidos e conferidos pelo Core; a referência visual vigente antecede esse fluxo."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-frame-deletion-count=\"2\"][data-frame-deletion-selection=\"\"]",
+      "actions": [
+        {
+          "type": "context-click",
+          "selector": ".canvas-host canvas",
+          "offsetX": -110,
+          "offsetY": 0
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Excluir\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-deletion-group-keyboard",
+      "title": "Exclusão de Frames — Delete remove a seleção e conserva as geometrias restantes",
+      "implementationPath": "/workspace-preview.html?frame=deletion&deletion=group",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-deletion",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "O design 0001 define Delete e Excluir para toda a seleção no Modo de edição, preservando os demais Frames. O estado usa resultados produzidos e conferidos pelo Core; a referência visual vigente antecede esse fluxo."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-frame-deletion-count=\"2\"][data-frame-deletion-selection=\"\"]",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "Delete"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-deletion-all",
+      "title": "Exclusão de Frames — exclusão de todos os Frames conserva a Lâmina e a Foto importada",
+      "implementationPath": "/workspace-preview.html?frame=deletion&deletion=all",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-deletion",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "O design 0001 define Delete e Excluir para toda a seleção no Modo de edição, preservando os demais Frames. O estado usa resultados produzidos e conferidos pelo Core; a referência visual vigente antecede esse fluxo."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-frame-deletion-count=\"0\"][data-frame-deletion-selection=\"\"]",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "Delete"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-deletion-undo",
+      "title": "Exclusão de Frames — Desfazer restaura os Frames sem restaurar a seleção",
+      "implementationPath": "/workspace-preview.html?frame=deletion&deletion=group",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-deletion",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "O design 0001 define Delete e Excluir para toda a seleção no Modo de edição, preservando os demais Frames. O estado usa resultados produzidos e conferidos pelo Core; a referência visual vigente antecede esse fluxo."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-frame-deletion-count=\"4\"][data-frame-deletion-selection=\"\"]",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "Delete"
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Desfazer\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-deletion-redo",
+      "title": "Exclusão de Frames — Refazer remove novamente o mesmo grupo",
+      "implementationPath": "/workspace-preview.html?frame=deletion&deletion=group",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-deletion",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "O design 0001 define Delete e Excluir para toda a seleção no Modo de edição, preservando os demais Frames. O estado usa resultados produzidos e conferidos pelo Core; a referência visual vigente antecede esse fluxo."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-frame-deletion-count=\"2\"][data-frame-deletion-selection=\"\"]",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "Delete"
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Desfazer\"]"
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Refazer\"]"
+        }
+      ]
     }
   ]
 }

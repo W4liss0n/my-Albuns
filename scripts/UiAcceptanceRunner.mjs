@@ -10,6 +10,7 @@ import {
 
 const webdriverKeys = Object.freeze({
   ArrowDown: "\uE015",
+  Delete: "\uE017",
   ArrowLeft: "\uE012",
   ArrowRight: "\uE014",
   ArrowUp: "\uE013",

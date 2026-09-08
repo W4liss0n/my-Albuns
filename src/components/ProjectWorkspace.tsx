@@ -529,6 +529,7 @@ export function ProjectWorkspace({
     setFrameContextMenu({ kind: "empty", position });
   };
   useProjectCommandShortcuts({
+    deleteFrames: () => { void controller.deleteFrames(); },
     arrangeFrames: (action) => { void controller.arrangeFrames(action); },
     frameCommandsActive: controller.canArrangeFrames && draggedPhotoId === null && sheetContextMenu === null && frameContextMenu === null,
     canDeleteSheet: implicitSheetAvailability.canDelete,
@@ -787,6 +788,7 @@ export function ProjectWorkspace({
       </div>
 
       {frameContextMenu?.kind === "frames" ? <FrameContextMenu position={frameContextMenu.position}
+        onDelete={() => { void controller.deleteFrames(); }}
         onArrange={(action) => { void controller.arrangeFrames(action); }}
         onDismiss={() => setFrameContextMenu(null)} /> : null}
       {frameContextMenu?.kind === "empty" ? (

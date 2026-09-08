@@ -1036,6 +1036,15 @@ test("runner executes focus, hover, keyboard and input actions through WebDriver
 
   await performUiAcceptanceAction({
     ...common,
+    action: { type: "key", key: "Delete" },
+  });
+  assert.deepEqual(requests.at(-1).body, {
+    text: "\uE017",
+    value: ["\uE017"],
+  });
+
+  await performUiAcceptanceAction({
+    ...common,
     action: { type: "key", key: "Escape" },
   });
   assert.deepEqual(requests.at(-1).body, {

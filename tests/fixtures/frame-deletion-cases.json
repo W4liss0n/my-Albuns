@@ -1,0 +1,1207 @@
+{
+  "before": {
+    "composition": {
+      "frameBorder": {
+        "kind": "none"
+      },
+      "sheets": [
+        {
+          "activeSides": "both",
+          "backgrounds": [
+            {
+              "drawRect": {
+                "height": 300000,
+                "width": 600000,
+                "x": 0,
+                "y": 0
+              },
+              "kind": "color",
+              "rgb": "#FFFFFF"
+            }
+          ],
+          "base": {
+            "drawRect": {
+              "height": 300000,
+              "width": 600000,
+              "x": 0,
+              "y": 0
+            },
+            "rgb": "#FFFFFF"
+          },
+          "frames": [
+            {
+              "borderFillRects": [],
+              "clipRect": {
+                "height": 160000,
+                "width": 240000,
+                "x": 90000,
+                "y": 70000
+              },
+              "frameId": "delete-frame-0",
+              "photo": {
+                "drawRect": {
+                  "height": 160000,
+                  "width": 240000,
+                  "x": 90000,
+                  "y": 70000
+                },
+                "mediaId": "00000000-0000-4000-8000-000000000001",
+                "mirrorX": false,
+                "name": "Foto.jpg",
+                "palette": [
+                  "#173B4B",
+                  "#84AAA7",
+                  "#E7C58B"
+                ],
+                "placement": {
+                  "baseFillZoom": 400.0,
+                  "current": {
+                    "center": {
+                      "x": 120000.0,
+                      "y": 80000.0
+                    },
+                    "size": {
+                      "height": 160000.0,
+                      "width": 240000.0
+                    }
+                  },
+                  "currentPan": {
+                    "x": 0.0,
+                    "y": 0.0
+                  },
+                  "currentZoom": 1.0,
+                  "panOrigin": {
+                    "x": 120000.0,
+                    "y": 80000.0
+                  },
+                  "panRange": {
+                    "maximum": 1.0,
+                    "minimum": -1.0
+                  },
+                  "panToCenter": {
+                    "xx": 0.0,
+                    "xy": -0.0,
+                    "yx": 0.0,
+                    "yy": 0.0
+                  },
+                  "panToCenterPerZoom": {
+                    "xx": 120000.0,
+                    "xy": -0.0,
+                    "yx": 0.0,
+                    "yy": 80000.0
+                  },
+                  "sizePerZoom": {
+                    "height": 160000.0,
+                    "width": 240000.0
+                  },
+                  "zoomRange": {
+                    "maximum": 4.0,
+                    "minimum": 1.0
+                  }
+                },
+                "rotationDegrees": 0.0
+              },
+              "zIndex": 0
+            },
+            {
+              "borderFillRects": [],
+              "clipRect": {
+                "height": 160000,
+                "width": 240000,
+                "x": 150000,
+                "y": 70000
+              },
+              "frameId": "delete-frame-1",
+              "photo": null,
+              "zIndex": 1
+            },
+            {
+              "borderFillRects": [],
+              "clipRect": {
+                "height": 160000,
+                "width": 240000,
+                "x": 210000,
+                "y": 70000
+              },
+              "frameId": "delete-frame-2",
+              "photo": {
+                "drawRect": {
+                  "height": 160000,
+                  "width": 240000,
+                  "x": 210000,
+                  "y": 70000
+                },
+                "mediaId": "00000000-0000-4000-8000-000000000001",
+                "mirrorX": false,
+                "name": "Foto.jpg",
+                "palette": [
+                  "#173B4B",
+                  "#84AAA7",
+                  "#E7C58B"
+                ],
+                "placement": {
+                  "baseFillZoom": 400.0,
+                  "current": {
+                    "center": {
+                      "x": 120000.0,
+                      "y": 80000.0
+                    },
+                    "size": {
+                      "height": 160000.0,
+                      "width": 240000.0
+                    }
+                  },
+                  "currentPan": {
+                    "x": 0.0,
+                    "y": 0.0
+                  },
+                  "currentZoom": 1.0,
+                  "panOrigin": {
+                    "x": 120000.0,
+                    "y": 80000.0
+                  },
+                  "panRange": {
+                    "maximum": 1.0,
+                    "minimum": -1.0
+                  },
+                  "panToCenter": {
+                    "xx": 0.0,
+                    "xy": -0.0,
+                    "yx": 0.0,
+                    "yy": 0.0
+                  },
+                  "panToCenterPerZoom": {
+                    "xx": 120000.0,
+                    "xy": -0.0,
+                    "yx": 0.0,
+                    "yy": 80000.0
+                  },
+                  "sizePerZoom": {
+                    "height": 160000.0,
+                    "width": 240000.0
+                  },
+                  "zoomRange": {
+                    "maximum": 4.0,
+                    "minimum": 1.0
+                  }
+                },
+                "rotationDegrees": 0.0
+              },
+              "zIndex": 2
+            },
+            {
+              "borderFillRects": [],
+              "clipRect": {
+                "height": 160000,
+                "width": 240000,
+                "x": 270000,
+                "y": 70000
+              },
+              "frameId": "delete-frame-3",
+              "photo": null,
+              "zIndex": 3
+            }
+          ],
+          "heightUm": 300000,
+          "number": 1,
+          "overlays": [],
+          "sheetId": "sheet-001",
+          "widthUm": 600000
+        },
+        {
+          "activeSides": "both",
+          "backgrounds": [
+            {
+              "drawRect": {
+                "height": 300000,
+                "width": 600000,
+                "x": 0,
+                "y": 0
+              },
+              "kind": "color",
+              "rgb": "#FFFFFF"
+            }
+          ],
+          "base": {
+            "drawRect": {
+              "height": 300000,
+              "width": 600000,
+              "x": 0,
+              "y": 0
+            },
+            "rgb": "#FFFFFF"
+          },
+          "frames": [],
+          "heightUm": 300000,
+          "number": 2,
+          "overlays": [],
+          "sheetId": "sheet-002",
+          "widthUm": 600000
+        }
+      ]
+    },
+    "mediaUsage": [
+      {
+        "count": 2,
+        "mediaId": "00000000-0000-4000-8000-000000000001"
+      }
+    ],
+    "state": {
+      "album": {
+        "media": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "kind": "photo",
+            "name": "Foto.jpg",
+            "palette": [
+              "#173B4B",
+              "#84AAA7",
+              "#E7C58B"
+            ],
+            "sourceHeightPx": 400,
+            "sourceWidthPx": 600
+          }
+        ],
+        "sheets": [
+          {
+            "activeSides": "both",
+            "frames": [
+              {
+                "id": "delete-frame-0",
+                "photo": {
+                  "mediaId": "00000000-0000-4000-8000-000000000001",
+                  "transform": {
+                    "fineRotationDegrees": 0.0,
+                    "mirrorX": false,
+                    "panX": 0.0,
+                    "panY": 0.0,
+                    "quarterTurns": 0,
+                    "userZoom": 1.0
+                  }
+                },
+                "rect": {
+                  "height": 160000,
+                  "width": 240000,
+                  "x": 90000,
+                  "y": 70000
+                },
+                "zIndex": 0
+              },
+              {
+                "id": "delete-frame-1",
+                "photo": null,
+                "rect": {
+                  "height": 160000,
+                  "width": 240000,
+                  "x": 150000,
+                  "y": 70000
+                },
+                "zIndex": 1
+              },
+              {
+                "id": "delete-frame-2",
+                "photo": {
+                  "mediaId": "00000000-0000-4000-8000-000000000001",
+                  "transform": {
+                    "fineRotationDegrees": 0.0,
+                    "mirrorX": false,
+                    "panX": 0.0,
+                    "panY": 0.0,
+                    "quarterTurns": 0,
+                    "userZoom": 1.0
+                  }
+                },
+                "rect": {
+                  "height": 160000,
+                  "width": 240000,
+                  "x": 210000,
+                  "y": 70000
+                },
+                "zIndex": 2
+              },
+              {
+                "id": "delete-frame-3",
+                "photo": null,
+                "rect": {
+                  "height": 160000,
+                  "width": 240000,
+                  "x": 270000,
+                  "y": 70000
+                },
+                "zIndex": 3
+              }
+            ],
+            "heightUm": 300000,
+            "id": "sheet-001",
+            "number": 1,
+            "pageNumbers": [
+              1,
+              2
+            ],
+            "role": "initial",
+            "widthUm": 600000
+          },
+          {
+            "activeSides": "both",
+            "frames": [],
+            "heightUm": 300000,
+            "id": "sheet-002",
+            "number": 2,
+            "pageNumbers": [
+              3,
+              4
+            ],
+            "role": "final",
+            "widthUm": 600000
+          }
+        ],
+        "visualDefaults": {
+          "background": {
+            "both": {
+              "kind": "color",
+              "rgb": "#FFFFFF"
+            },
+            "scope": "bothSides"
+          },
+          "frameBorder": {
+            "kind": "none"
+          },
+          "overlay": {
+            "both": null,
+            "scope": "bothSides"
+          }
+        }
+      },
+      "canRedo": false,
+      "canUndo": true,
+      "dirty": true,
+      "document": {
+        "bleedUm": 3000,
+        "displayUnit": "mm",
+        "dpi": 300,
+        "safetyUm": 3000,
+        "sheetHeightUm": 300000,
+        "sheetWidthUm": 600000
+      },
+      "projectId": "frame-deletion-project",
+      "projectName": "Exclusão",
+      "revision": 11,
+      "savedRevision": 0
+    }
+  },
+  "cases": [
+    {
+      "after": {
+        "composition": {
+          "frameBorder": {
+            "kind": "none"
+          },
+          "sheets": [
+            {
+              "activeSides": "both",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [
+                {
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 160000,
+                    "width": 240000,
+                    "x": 90000,
+                    "y": 70000
+                  },
+                  "frameId": "delete-frame-0",
+                  "photo": {
+                    "drawRect": {
+                      "height": 160000,
+                      "width": 240000,
+                      "x": 90000,
+                      "y": 70000
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000001",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#173B4B",
+                      "#84AAA7",
+                      "#E7C58B"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 400.0,
+                      "current": {
+                        "center": {
+                          "x": 120000.0,
+                          "y": 80000.0
+                        },
+                        "size": {
+                          "height": 160000.0,
+                          "width": 240000.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "currentZoom": 1.0,
+                      "panOrigin": {
+                        "x": 120000.0,
+                        "y": 80000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 0.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 0.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 120000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 80000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 160000.0,
+                        "width": 240000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 160000,
+                    "width": 240000,
+                    "x": 150000,
+                    "y": 70000
+                  },
+                  "frameId": "delete-frame-1",
+                  "photo": null,
+                  "zIndex": 1
+                },
+                {
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 160000,
+                    "width": 240000,
+                    "x": 210000,
+                    "y": 70000
+                  },
+                  "frameId": "delete-frame-2",
+                  "photo": {
+                    "drawRect": {
+                      "height": 160000,
+                      "width": 240000,
+                      "x": 210000,
+                      "y": 70000
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000001",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#173B4B",
+                      "#84AAA7",
+                      "#E7C58B"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 400.0,
+                      "current": {
+                        "center": {
+                          "x": 120000.0,
+                          "y": 80000.0
+                        },
+                        "size": {
+                          "height": 160000.0,
+                          "width": 240000.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "currentZoom": 1.0,
+                      "panOrigin": {
+                        "x": 120000.0,
+                        "y": 80000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 0.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 0.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 120000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 80000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 160000.0,
+                        "width": 240000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 2
+                }
+              ],
+              "heightUm": 300000,
+              "number": 1,
+              "overlays": [],
+              "sheetId": "sheet-001",
+              "widthUm": 600000
+            },
+            {
+              "activeSides": "both",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [],
+              "heightUm": 300000,
+              "number": 2,
+              "overlays": [],
+              "sheetId": "sheet-002",
+              "widthUm": 600000
+            }
+          ]
+        },
+        "mediaUsage": [
+          {
+            "count": 2,
+            "mediaId": "00000000-0000-4000-8000-000000000001"
+          }
+        ],
+        "state": {
+          "album": {
+            "media": [
+              {
+                "id": "00000000-0000-4000-8000-000000000001",
+                "kind": "photo",
+                "name": "Foto.jpg",
+                "palette": [
+                  "#173B4B",
+                  "#84AAA7",
+                  "#E7C58B"
+                ],
+                "sourceHeightPx": 400,
+                "sourceWidthPx": 600
+              }
+            ],
+            "sheets": [
+              {
+                "activeSides": "both",
+                "frames": [
+                  {
+                    "id": "delete-frame-0",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000001",
+                      "transform": {
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": 0.0,
+                        "panY": 0.0,
+                        "quarterTurns": 0,
+                        "userZoom": 1.0
+                      }
+                    },
+                    "rect": {
+                      "height": 160000,
+                      "width": 240000,
+                      "x": 90000,
+                      "y": 70000
+                    },
+                    "zIndex": 0
+                  },
+                  {
+                    "id": "delete-frame-1",
+                    "photo": null,
+                    "rect": {
+                      "height": 160000,
+                      "width": 240000,
+                      "x": 150000,
+                      "y": 70000
+                    },
+                    "zIndex": 1
+                  },
+                  {
+                    "id": "delete-frame-2",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000001",
+                      "transform": {
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": 0.0,
+                        "panY": 0.0,
+                        "quarterTurns": 0,
+                        "userZoom": 1.0
+                      }
+                    },
+                    "rect": {
+                      "height": 160000,
+                      "width": 240000,
+                      "x": 210000,
+                      "y": 70000
+                    },
+                    "zIndex": 2
+                  }
+                ],
+                "heightUm": 300000,
+                "id": "sheet-001",
+                "number": 1,
+                "pageNumbers": [
+                  1,
+                  2
+                ],
+                "role": "initial",
+                "widthUm": 600000
+              },
+              {
+                "activeSides": "both",
+                "frames": [],
+                "heightUm": 300000,
+                "id": "sheet-002",
+                "number": 2,
+                "pageNumbers": [
+                  3,
+                  4
+                ],
+                "role": "final",
+                "widthUm": 600000
+              }
+            ],
+            "visualDefaults": {
+              "background": {
+                "both": {
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                },
+                "scope": "bothSides"
+              },
+              "frameBorder": {
+                "kind": "none"
+              },
+              "overlay": {
+                "both": null,
+                "scope": "bothSides"
+              }
+            }
+          },
+          "canRedo": false,
+          "canUndo": true,
+          "dirty": true,
+          "document": {
+            "bleedUm": 3000,
+            "displayUnit": "mm",
+            "dpi": 300,
+            "safetyUm": 3000,
+            "sheetHeightUm": 300000,
+            "sheetWidthUm": 600000
+          },
+          "projectId": "frame-deletion-project",
+          "projectName": "Exclusão",
+          "revision": 12,
+          "savedRevision": 0
+        }
+      },
+      "name": "single",
+      "selectedFrameIds": [
+        "delete-frame-3"
+      ]
+    },
+    {
+      "after": {
+        "composition": {
+          "frameBorder": {
+            "kind": "none"
+          },
+          "sheets": [
+            {
+              "activeSides": "both",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [
+                {
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 160000,
+                    "width": 240000,
+                    "x": 90000,
+                    "y": 70000
+                  },
+                  "frameId": "delete-frame-0",
+                  "photo": {
+                    "drawRect": {
+                      "height": 160000,
+                      "width": 240000,
+                      "x": 90000,
+                      "y": 70000
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000001",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#173B4B",
+                      "#84AAA7",
+                      "#E7C58B"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 400.0,
+                      "current": {
+                        "center": {
+                          "x": 120000.0,
+                          "y": 80000.0
+                        },
+                        "size": {
+                          "height": 160000.0,
+                          "width": 240000.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "currentZoom": 1.0,
+                      "panOrigin": {
+                        "x": 120000.0,
+                        "y": 80000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 0.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 0.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 120000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 80000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 160000.0,
+                        "width": 240000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 160000,
+                    "width": 240000,
+                    "x": 270000,
+                    "y": 70000
+                  },
+                  "frameId": "delete-frame-3",
+                  "photo": null,
+                  "zIndex": 1
+                }
+              ],
+              "heightUm": 300000,
+              "number": 1,
+              "overlays": [],
+              "sheetId": "sheet-001",
+              "widthUm": 600000
+            },
+            {
+              "activeSides": "both",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [],
+              "heightUm": 300000,
+              "number": 2,
+              "overlays": [],
+              "sheetId": "sheet-002",
+              "widthUm": 600000
+            }
+          ]
+        },
+        "mediaUsage": [
+          {
+            "count": 1,
+            "mediaId": "00000000-0000-4000-8000-000000000001"
+          }
+        ],
+        "state": {
+          "album": {
+            "media": [
+              {
+                "id": "00000000-0000-4000-8000-000000000001",
+                "kind": "photo",
+                "name": "Foto.jpg",
+                "palette": [
+                  "#173B4B",
+                  "#84AAA7",
+                  "#E7C58B"
+                ],
+                "sourceHeightPx": 400,
+                "sourceWidthPx": 600
+              }
+            ],
+            "sheets": [
+              {
+                "activeSides": "both",
+                "frames": [
+                  {
+                    "id": "delete-frame-0",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000001",
+                      "transform": {
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": 0.0,
+                        "panY": 0.0,
+                        "quarterTurns": 0,
+                        "userZoom": 1.0
+                      }
+                    },
+                    "rect": {
+                      "height": 160000,
+                      "width": 240000,
+                      "x": 90000,
+                      "y": 70000
+                    },
+                    "zIndex": 0
+                  },
+                  {
+                    "id": "delete-frame-3",
+                    "photo": null,
+                    "rect": {
+                      "height": 160000,
+                      "width": 240000,
+                      "x": 270000,
+                      "y": 70000
+                    },
+                    "zIndex": 1
+                  }
+                ],
+                "heightUm": 300000,
+                "id": "sheet-001",
+                "number": 1,
+                "pageNumbers": [
+                  1,
+                  2
+                ],
+                "role": "initial",
+                "widthUm": 600000
+              },
+              {
+                "activeSides": "both",
+                "frames": [],
+                "heightUm": 300000,
+                "id": "sheet-002",
+                "number": 2,
+                "pageNumbers": [
+                  3,
+                  4
+                ],
+                "role": "final",
+                "widthUm": 600000
+              }
+            ],
+            "visualDefaults": {
+              "background": {
+                "both": {
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                },
+                "scope": "bothSides"
+              },
+              "frameBorder": {
+                "kind": "none"
+              },
+              "overlay": {
+                "both": null,
+                "scope": "bothSides"
+              }
+            }
+          },
+          "canRedo": false,
+          "canUndo": true,
+          "dirty": true,
+          "document": {
+            "bleedUm": 3000,
+            "displayUnit": "mm",
+            "dpi": 300,
+            "safetyUm": 3000,
+            "sheetHeightUm": 300000,
+            "sheetWidthUm": 600000
+          },
+          "projectId": "frame-deletion-project",
+          "projectName": "Exclusão",
+          "revision": 13,
+          "savedRevision": 0
+        }
+      },
+      "name": "group",
+      "selectedFrameIds": [
+        "delete-frame-1",
+        "delete-frame-2"
+      ]
+    },
+    {
+      "after": {
+        "composition": {
+          "frameBorder": {
+            "kind": "none"
+          },
+          "sheets": [
+            {
+              "activeSides": "both",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [],
+              "heightUm": 300000,
+              "number": 1,
+              "overlays": [],
+              "sheetId": "sheet-001",
+              "widthUm": 600000
+            },
+            {
+              "activeSides": "both",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [],
+              "heightUm": 300000,
+              "number": 2,
+              "overlays": [],
+              "sheetId": "sheet-002",
+              "widthUm": 600000
+            }
+          ]
+        },
+        "mediaUsage": [
+          {
+            "count": 0,
+            "mediaId": "00000000-0000-4000-8000-000000000001"
+          }
+        ],
+        "state": {
+          "album": {
+            "media": [
+              {
+                "id": "00000000-0000-4000-8000-000000000001",
+                "kind": "photo",
+                "name": "Foto.jpg",
+                "palette": [
+                  "#173B4B",
+                  "#84AAA7",
+                  "#E7C58B"
+                ],
+                "sourceHeightPx": 400,
+                "sourceWidthPx": 600
+              }
+            ],
+            "sheets": [
+              {
+                "activeSides": "both",
+                "frames": [],
+                "heightUm": 300000,
+                "id": "sheet-001",
+                "number": 1,
+                "pageNumbers": [
+                  1,
+                  2
+                ],
+                "role": "initial",
+                "widthUm": 600000
+              },
+              {
+                "activeSides": "both",
+                "frames": [],
+                "heightUm": 300000,
+                "id": "sheet-002",
+                "number": 2,
+                "pageNumbers": [
+                  3,
+                  4
+                ],
+                "role": "final",
+                "widthUm": 600000
+              }
+            ],
+            "visualDefaults": {
+              "background": {
+                "both": {
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                },
+                "scope": "bothSides"
+              },
+              "frameBorder": {
+                "kind": "none"
+              },
+              "overlay": {
+                "both": null,
+                "scope": "bothSides"
+              }
+            }
+          },
+          "canRedo": false,
+          "canUndo": true,
+          "dirty": true,
+          "document": {
+            "bleedUm": 3000,
+            "displayUnit": "mm",
+            "dpi": 300,
+            "safetyUm": 3000,
+            "sheetHeightUm": 300000,
+            "sheetWidthUm": 600000
+          },
+          "projectId": "frame-deletion-project",
+          "projectName": "Exclusão",
+          "revision": 14,
+          "savedRevision": 0
+        }
+      },
+      "name": "all",
+      "selectedFrameIds": [
+        "delete-frame-0",
+        "delete-frame-1",
+        "delete-frame-2",
+        "delete-frame-3"
+      ]
+    }
+  ]
+}

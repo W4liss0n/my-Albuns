@@ -107,6 +107,7 @@ impl PersistentProjectSession {
             }
         }
         self.commit_edit(|project| match intent {
+            ProjectIntent::DeleteFrames { frame_ids } => project.with_deleted_frames(&frame_ids),
             ProjectIntent::ArrangeFrames { frame_ids, action } => {
                 project.with_arranged_frames(&frame_ids, action)
             }

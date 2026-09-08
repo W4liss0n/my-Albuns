@@ -54,7 +54,8 @@ preserva foco, teclado, fechamento por Esc e consumo do clique externo.
 
 ## Escopo restante
 
-A issue #20 continua aberta para exclusão, troca de conteúdo, cópia/colagem e
+A [exclusão no Modo de edição](2026-09-08-exclusao-de-frames.md) continua esta
+entrega. A issue #20 permanece aberta para troca de conteúdo, cópia/colagem e
 outros comandos. O Core ainda não expõe travamento persistente de Layout; este
 recorte não acrescenta esse estado. O Canvas respeita o indicador de Layout
 travado quando fornecido, e o comando de criação está disponível no estado

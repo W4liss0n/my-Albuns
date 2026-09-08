@@ -806,23 +806,21 @@ impl ProjectDocument {
         ))
     }
 
-    pub(crate) fn with_arranged_frames(
+    fn frame_selection(
         &self,
         frame_ids: &[String],
-        action: crate::FrameStackAction,
-    ) -> Result<Self, crate::CoreError> {
-        use crate::{CoreError::InvalidFrameStackSelection, FrameStackAction::*};
+    ) -> Result<(usize, std::collections::HashSet<Uuid>), ()> {
         let ids = frame_ids
             .iter()
             .map(|id| Uuid::parse_str(id))
             .collect::<Result<Vec<_>, _>>()
-            .map_err(|_| InvalidFrameStackSelection)?;
-        let first = ids.first().ok_or(InvalidFrameStackSelection)?;
+            .map_err(|_| ())?;
+        let first = ids.first().ok_or(())?;
         let sheet_index = self
             .sheets
             .iter()
             .position(|sheet| sheet.frames.iter().any(|frame| &frame.id == first))
-            .ok_or(InvalidFrameStackSelection)?;
+            .ok_or(())?;
         let frames = &self.sheets[sheet_index].frames;
         let selected = ids
             .iter()
@@ -833,8 +831,35 @@ impl ProjectDocument {
                 .iter()
                 .all(|id| frames.iter().any(|frame| &frame.id == id))
         {
-            return Err(InvalidFrameStackSelection);
+            return Err(());
         }
+        Ok((sheet_index, selected))
+    }
+
+    pub(crate) fn with_deleted_frames(
+        &self,
+        frame_ids: &[String],
+    ) -> Result<Self, crate::CoreError> {
+        let (sheet_index, selected) = self
+            .frame_selection(frame_ids)
+            .map_err(|()| crate::CoreError::InvalidFrameDeletionSelection)?;
+        let mut candidate = self.clone();
+        candidate.sheets[sheet_index]
+            .frames
+            .retain(|frame| !selected.contains(&frame.id));
+        Ok(candidate)
+    }
+
+    pub(crate) fn with_arranged_frames(
+        &self,
+        frame_ids: &[String],
+        action: crate::FrameStackAction,
+    ) -> Result<Self, crate::CoreError> {
+        use crate::FrameStackAction::*;
+        let (sheet_index, selected) = self
+            .frame_selection(frame_ids)
+            .map_err(|()| crate::CoreError::InvalidFrameStackSelection)?;
+        let frames = &self.sheets[sheet_index].frames;
         let mut candidate = self.clone();
         let arranged = &mut candidate.sheets[sheet_index].frames;
         match action {
