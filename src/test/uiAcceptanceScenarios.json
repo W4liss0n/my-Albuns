@@ -2374,7 +2374,7 @@
         {
           "type": "context-click",
           "selector": ".canvas-host canvas",
-          "offsetX": -190,
+            "offsetX": -300,
           "offsetY": 0
         }
       ]
@@ -2424,7 +2424,7 @@
         {
           "type": "context-click",
           "selector": ".canvas-host canvas",
-          "offsetX": -190,
+            "offsetX": -300,
           "offsetY": 0
         },
         {
