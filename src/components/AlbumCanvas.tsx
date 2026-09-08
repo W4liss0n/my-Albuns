@@ -23,7 +23,7 @@ import type {
   CanvasMetrics,
 } from "./albumCanvasContract";
 import { CanvasHorizontalScrollbar } from "./CanvasHorizontalScrollbar";
-import { SheetBarReorderOverlay } from "./SheetBarReorderOverlay";
+import { SheetBarOverlay } from "./SheetBarOverlay";
 import {
   useCanvasGraphicsDiagnosticProbe,
 } from "./canvasGraphicsDiagnosticProbeContext";
@@ -75,8 +75,20 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
     );
     externalMetricsCallbackRef.current?.(metrics);
   }, []);
+  const doubleSheetIds = new Set(props.composition.sheets
+    .filter((sheet) => sheet.activeSides === "both")
+    .map((sheet) => sheet.sheetId));
+  const sheetBarMetadata = props.sheetBarMetadata.map((metadata) => ({
+    ...metadata,
+    canSwapSides: props.mode.kind === "normal" &&
+      Boolean(props.sheetSideSwap && !props.sheetSideSwap.disabled) &&
+      Boolean(props.sheetReorder && !props.sheetReorder.disabled && ["idle", "cancelled"].includes(props.sheetReorder.status)) &&
+      !metadata.layoutLocked &&
+      doubleSheetIds.has(metadata.sheetId),
+  }));
   const sceneProps = {
     ...props,
+    sheetBarMetadata,
     photoDropHighlight: resolvedPhotoDrop?.target ?? null,
     onCanvasMetricsChange: handleCanvasMetricsChange,
   };
@@ -535,11 +547,6 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
           role="group"
         >
           <button
-            aria-label="Trocar Frames — indisponível nesta versão"
-            disabled
-            type="button"
-          />
-          <button
             aria-label="Abrir Painel de Layouts — indisponível nesta versão"
             disabled
             type="button"
@@ -559,7 +566,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
           </span>
         )}
         {props.mode.kind === "normal" && props.sheetReorder ? (
-          <SheetBarReorderOverlay
+          <SheetBarOverlay
             bleedUm={props.technicalGuides?.bleedUm}
             disabled={props.sheetReorder.disabled}
             focusedSheetId={props.focusedSheetId}
@@ -575,9 +582,12 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
             onDrop={props.sheetReorder.onDrop}
             onEditSheet={props.onEditSheet}
             onSelect={props.sheetReorder.onSelect}
+            onSwapSides={props.sheetSideSwap?.onSwap}
+            onBarHover={(sheetId, hovered, swapHovered) => sceneRef.current?.handleSheetBarHover(sheetId, hovered, swapHovered)}
+            onSwapFocus={(sheetId, focused) => sceneRef.current?.handleSheetBarSwapFocus(sheetId, focused)}
             onPreview={props.sheetReorder.onPreview}
             representation={props.sheetReorder.representation}
-            sheetBarMetadata={props.sheetBarMetadata}
+            sheetBarMetadata={sheetBarMetadata}
             sheets={props.composition.sheets}
             status={props.sheetReorder.status}
             viewport={props.viewport}

@@ -781,14 +781,14 @@ test("materializes the integrated Sheet Bar instead of a loose sheet label", asy
     text: "2",
   });
   const swapAction = displayWithLabel(
-    "placeholder-sheet-bar-swap-sheet-001",
+    "sheet-bar-swap-sheet-001",
   );
   const layoutAction = displayWithLabel(
     "placeholder-sheet-bar-layout-sheet-001",
   );
   expect(swapAction).toMatchObject({
-    alpha: 0.8,
-    eventMode: "static",
+    alpha: 0.35,
+    eventMode: "none",
     tint: 0x403b35,
   });
   expect(layoutAction).toMatchObject({
@@ -796,11 +796,6 @@ test("materializes the integrated Sheet Bar instead of a loose sheet label", asy
     eventMode: "static",
     tint: 0x403b35,
   });
-  expect(
-    screen.getByRole("button", {
-      name: "Trocar Frames — indisponível nesta versão",
-    }),
-  ).toBeDisabled();
   expect(
     screen.getByRole("button", {
       name: "Abrir Painel de Layouts — indisponível nesta versão",
@@ -828,7 +823,7 @@ test("materializes the integrated Sheet Bar instead of a loose sheet label", asy
   });
   expect(sheetBar.alpha).toBe(1);
 
-  for (const action of [swapAction, layoutAction]) {
+  for (const action of [layoutAction]) {
     action.emit("pointerenter", {});
     expect(action).toMatchObject({ alpha: 1, tint: 0x2c2924 });
     action.emit("pointerleave", {});
@@ -846,6 +841,62 @@ test("materializes the integrated Sheet Bar instead of a loose sheet label", asy
     await vi.advanceTimersByTimeAsync(160);
   });
   expect(sheetBar.alpha).toBe(0);
+});
+
+test("shares side swap availability and hover between the DOM button and Pixi Bar", async () => {
+  vi.useFakeTimers();
+  const currentBarNode = (label: string) => [...pixiLifecycle.displays].reverse().find((node) => node.label === label)!;
+  const view = renderCanvas();
+  await finishPixiInitialization();
+  const onSwap = vi.fn();
+  const options = {
+    sheetSideSwap: { disabled: false, onSwap },
+    sheetReorder: {
+      disabled: false,
+      status: "idle" as const,
+      representation: { ghost: null, placeholderIndex: null, order: ["sheet-001"] },
+      onCancel: vi.fn(), onDrop: vi.fn(), onSelect: vi.fn(), onPreview: vi.fn(),
+    },
+  };
+  view.rerenderCanvas(options);
+  const button = screen.getByRole("button", { name: "Trocar lados da Lâmina 01" });
+  expect(button).toBeEnabled();
+  fireEvent.pointerEnter(button);
+  await act(async () => { await vi.advanceTimersByTimeAsync(160); });
+  expect(currentBarNode("sheet-bar-sheet-001").alpha).toBe(1);
+  expect(currentBarNode("sheet-bar-swap-sheet-001").alpha).toBe(1);
+  fireEvent.focus(button);
+  fireEvent.blur(button);
+  await act(async () => { await vi.advanceTimersByTimeAsync(160); });
+  expect(currentBarNode("sheet-bar-sheet-001").alpha).toBe(1);
+  fireEvent.focus(button);
+  fireEvent.pointerLeave(button);
+  currentBarNode("canvas-sheet-sheet-001").emit("pointerleave", {});
+  await act(async () => { await vi.advanceTimersByTimeAsync(160); });
+  expect(currentBarNode("sheet-bar-sheet-001").alpha).toBe(1);
+  expect(currentBarNode("sheet-bar-swap-sheet-001").alpha).toBe(1);
+  fireEvent.blur(button);
+  await act(async () => { await vi.advanceTimersByTimeAsync(160); });
+  expect(currentBarNode("sheet-bar-sheet-001").alpha).toBe(0);
+  expect(currentBarNode("sheet-bar-swap-sheet-001").alpha).toBe(0.8);
+  fireEvent.click(button);
+  expect(onSwap).toHaveBeenCalledExactlyOnceWith("sheet-001");
+  expect(view.onSelectFrame).not.toHaveBeenCalled();
+  expect(view.onEditSheet).not.toHaveBeenCalled();
+
+  view.rerenderCanvas({ ...options, sheetSideSwap: { ...options.sheetSideSwap, disabled: true } });
+  expect(button).toBeDisabled();
+  expect(currentBarNode("sheet-bar-swap-sheet-001").alpha).toBe(0.35);
+  view.rerenderCanvas({ ...options, sheetBarMetadata: [{ sheetId: "sheet-001", pageNumbers: [1, 2], layoutLocked: true }] });
+  expect(button).toBeDisabled();
+  view.rerenderCanvas({ ...options, composition: createSinglePageComposition("right") });
+  expect(button).toBeDisabled();
+  view.rerenderCanvas({ ...options, sheetReorder: { ...options.sheetReorder, status: "preview" } });
+  expect(button).toBeDisabled();
+  view.rerenderCanvas({ ...options, sheetReorder: { ...options.sheetReorder, status: "cancelled" } });
+  expect(button).toBeEnabled();
+  view.rerenderCanvas({ ...options, mode: { kind: "sheet-editing", sheetId: "sheet-001" } });
+  expect(screen.queryByRole("button", { name: "Trocar lados da Lâmina 01" })).not.toBeInTheDocument();
 });
 
 test("enters Sheet Edit Mode on the second pointer tap of a Sheet", async () => {

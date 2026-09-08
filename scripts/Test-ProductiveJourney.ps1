@@ -193,7 +193,7 @@ try {
         (Join-Path $workspaceRoot 'src\components\SheetContextMenu.test.tsx'),
         (Join-Path $workspaceRoot 'src\components\useProjectCommandShortcuts.test.tsx'),
         (Join-Path $workspaceRoot 'src\components\sheetReorderSession.test.ts'),
-        (Join-Path $workspaceRoot 'src\components\SheetBarReorderOverlay.test.tsx'),
+        (Join-Path $workspaceRoot 'src\components\SheetBarOverlay.test.tsx'),
         (Join-Path $workspaceRoot 'src\components\InspectorPanelStructure.test.tsx')
     )
     $priorErrorActionPreference = $ErrorActionPreference

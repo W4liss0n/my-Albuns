@@ -223,6 +223,14 @@ export function useProjectEditorController({
     onExitSheetEditing: exitSheetEditing,
   });
 
+  const swapSheetSides = (sheetId: string) => {
+    if (structuralCommandsDisabled || structuralMutationPendingRef.current ||
+        projection.state.album.sheets.find((sheet) => sheet.id === sheetId)?.activeSides !== "both") {
+      return Promise.resolve(false);
+    }
+    return mutations.swapSheetSides(sheetId);
+  };
+
   const canvasProps: AlbumCanvasProps = {
     projectId: projection.state.projectId,
     mode: canvasMode,
@@ -240,6 +248,10 @@ export function useProjectEditorController({
     centeredSheetId: navigation.centeredSheetId,
     viewport: navigation.viewport,
     photoZoomPreview: photoGestures.photoZoomPreview,
+    sheetSideSwap: {
+      disabled: structuralCommandsDisabled || structuralMutationPending,
+      onSwap: (sheetId) => { void swapSheetSides(sheetId); },
+    },
     frameGeometry: {
       disabled: interactionBlocked,
       dragThreshold,
@@ -345,6 +357,7 @@ export function useProjectEditorController({
     deleteFrames,
     canSwapFrameContents,
     swapFrameContents,
+    swapSheetSides,
     arrangeFrames,
     canArrangeFrames,
     message: mutations.message,

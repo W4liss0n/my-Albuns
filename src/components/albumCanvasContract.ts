@@ -48,6 +48,7 @@ export interface SheetBarMetadata {
   sheetId: string;
   pageNumbers: readonly number[];
   layoutLocked: boolean;
+  canSwapSides?: boolean;
 }
 
 export interface CanvasSheetReorder {
@@ -100,6 +101,10 @@ export interface AlbumCanvasProps {
   viewport: ViewportState;
   draggedPhotoId?: string | null;
   sheetReorder?: CanvasSheetReorder;
+  sheetSideSwap?: {
+    disabled: boolean;
+    onSwap(sheetId: string): void;
+  };
   photoDropHighlight?: PhotoDropTarget | null;
   photoZoomPreview?: PhotoZoomPreview | null;
   frameGeometry?: CanvasFrameGeometry;

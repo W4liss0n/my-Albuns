@@ -839,6 +839,32 @@ impl ProjectDocument {
         Ok((sheet_index, selected))
     }
 
+    pub(crate) fn with_swapped_sheet_sides(
+        &self,
+        sheet_id: &str,
+    ) -> Result<Self, crate::CoreError> {
+        let id = Uuid::parse_str(sheet_id)
+            .map_err(|_| crate::CoreError::SheetNotFound(sheet_id.into()))?;
+        let sheet_index = self
+            .sheets
+            .iter()
+            .position(|sheet| sheet.id == id)
+            .ok_or_else(|| crate::CoreError::SheetNotFound(sheet_id.into()))?;
+        if self.sheets[sheet_index].active_sides != ActiveSides::Both {
+            return Err(crate::CoreError::InvalidSheetSideSwap);
+        }
+        let page_width = self.document.sheet_width_um / 2;
+        let mut candidate = self.clone();
+        for frame in &mut candidate.sheets[sheet_index].frames {
+            if frame.rect.x + frame.rect.width <= page_width {
+                frame.rect.x += page_width;
+            } else if frame.rect.x >= page_width {
+                frame.rect.x -= page_width;
+            }
+        }
+        Ok(candidate)
+    }
+
     pub(crate) fn with_swapped_frame_contents(
         &self,
         frame_ids: &[String],

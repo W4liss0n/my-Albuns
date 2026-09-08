@@ -8,6 +8,7 @@ import type {
   ComposedSheet,
   ProjectedFrameBorder,
 } from "../domain/project";
+import { projectCommandDescriptor } from "../application/projectCommandCatalog";
 import type { ViewportState } from "../state/viewport";
 import type {
   CanvasMetrics,
@@ -35,9 +36,9 @@ import {
   useSheetPointerReorder,
   type SheetReorderPointerPosition,
 } from "./useSheetPointerReorder";
-import "./SheetBarReorderOverlay.css";
+import "./SheetBarOverlay.css";
 
-export interface SheetBarReorderOverlayProps {
+export interface SheetBarOverlayProps {
   readonly sheets: readonly ComposedSheet[];
   readonly layout: ContinuousCanvasLayout;
   readonly metrics: CanvasMetrics | null;
@@ -55,6 +56,9 @@ export interface SheetBarReorderOverlayProps {
   readonly onCancel: () => void;
   readonly onEditSheet: (sheetId: string) => void;
   readonly onSelect: (sheetId: string) => void;
+  readonly onSwapSides?: (sheetId: string) => void;
+  readonly onBarHover?: (sheetId: string, hovered: boolean, swapHovered?: boolean) => void;
+  readonly onSwapFocus?: (sheetId: string, focused: boolean) => void;
   readonly onContextMenu: (
     sheetId: string,
     position: { x: number; y: number },
@@ -62,8 +66,8 @@ export interface SheetBarReorderOverlayProps {
   readonly onAutoScrollVelocity: (pixelsPerSecond: number) => void;
 }
 
-export function SheetBarReorderOverlay(
-  props: SheetBarReorderOverlayProps,
+export function SheetBarOverlay(
+  props: SheetBarOverlayProps,
 ) {
   const scale = props.metrics?.scale ?? null;
   const entries =
@@ -186,7 +190,7 @@ export function SheetBarReorderOverlay(
     <div
       aria-disabled={!reorderEnabled}
       aria-label="Reordenação pela Barra da Lâmina"
-      className="sheet-bar-reorder-overlay"
+      className="sheet-bar-overlay"
       data-preview-order={props.representation.order.join(",")}
       data-reorder-state={props.status}
       data-reorder-surface="bar"
@@ -203,7 +207,7 @@ export function SheetBarReorderOverlay(
     >
       <span
         aria-hidden="true"
-        className="sheet-bar-reorder-overlay__drop-zone"
+        className="sheet-bar-overlay__drop-zone"
         data-testid="sheet-reorder-bar-drop-zone"
         style={{
           height: `${SHEET_VISUAL_STYLE.sheetBar.heightPx}px`,
@@ -213,7 +217,7 @@ export function SheetBarReorderOverlay(
       {placeholderEntry && placeholderBounds && scale !== null ? (
         <span
           aria-hidden="true"
-          className="sheet-bar-reorder-overlay__placeholder"
+          className="sheet-bar-overlay__placeholder"
           data-testid="reorder-placeholder"
           style={{
             height: `${placeholderBounds.height}px`,
@@ -243,7 +247,7 @@ export function SheetBarReorderOverlay(
         return [
           <button
             aria-label={`Reordenar Lâmina ${String(sheet.number).padStart(2, "0")} pela Barra`}
-            className="sheet-bar-reorder-overlay__handle"
+            className="sheet-bar-overlay__handle"
             data-reorder-ghost={ghostSheetId === sheet.sheetId || undefined}
             data-reorder-shift={
               confirmedIndexById.get(sheet.sheetId) !== index || undefined
@@ -251,6 +255,8 @@ export function SheetBarReorderOverlay(
             data-sheet-id={sheet.sheetId}
             data-slot-index={index}
             key={sheet.sheetId}
+            onPointerEnter={() => props.onBarHover?.(sheet.sheetId, true)}
+            onPointerLeave={() => props.onBarHover?.(sheet.sheetId, false)}
             onContextMenu={(event) =>
               openContextMenu(event, sheet.sheetId)
             }
@@ -290,17 +296,47 @@ export function SheetBarReorderOverlay(
           >
             <span
               aria-hidden="true"
-              className="sheet-bar-reorder-overlay__handle-label"
+              className="sheet-bar-overlay__handle-label"
             >
               L{String(sheet.number).padStart(2, "0")}
             </span>
           </button>,
+          <span
+            className="sheet-bar-overlay__swap"
+            key={`${sheet.sheetId}-swap`}
+            onPointerEnter={() => props.onBarHover?.(sheet.sheetId, true, true)}
+            onPointerLeave={() => props.onBarHover?.(sheet.sheetId, false)}
+            onPointerDown={(event) => event.stopPropagation()}
+            onDoubleClick={(event) => event.stopPropagation()}
+            onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); }}
+            style={{
+              height: `${SHEET_VISUAL_STYLE.sheetBar.actionSizePx}px`,
+              width: `${SHEET_VISUAL_STYLE.sheetBar.actionSizePx}px`,
+              left: `${entry.left * scale + props.viewport.offsetX + SHEET_VISUAL_STYLE.sheetBar.swapActionCenterPx - SHEET_VISUAL_STYLE.sheetBar.actionSizePx / 2}px`,
+              top: `${sheetBounds.top + (SHEET_VISUAL_STYLE.sheetBar.heightPx - SHEET_VISUAL_STYLE.sheetBar.actionSizePx) / 2}px`,
+            }}
+          >
+            <button
+              aria-label={`${projectCommandDescriptor("swap-sheet-sides").label} da Lâmina ${String(sheet.number).padStart(2, "0")}`}
+              disabled={!sheetBarMetadataById.get(sheet.sheetId)?.canSwapSides}
+              onClick={(event) => { event.stopPropagation(); props.onSwapSides?.(sheet.sheetId); }}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter" && event.key !== " ") return;
+                event.stopPropagation();
+                if (event.repeat) event.preventDefault();
+              }}
+              onFocus={() => props.onSwapFocus?.(sheet.sheetId, true)}
+              onBlur={() => props.onSwapFocus?.(sheet.sheetId, false)}
+              title={projectCommandDescriptor("swap-sheet-sides").label}
+              type="button"
+            />
+          </span>,
         ];
       })}
       {ghostSheet && ghostEntry && ghostBounds && scale !== null ? (
         <span
           aria-hidden="true"
-          className="sheet-bar-reorder-overlay__ghost"
+          className="sheet-bar-overlay__ghost"
           data-active-sides={ghostSheet.activeSides}
           data-origin-selected={
             ghostSheet.sheetId === props.focusedSheetId || undefined
@@ -321,7 +357,7 @@ export function SheetBarReorderOverlay(
           )}
         >
           <SheetPreviewShell
-            className="sheet-bar-reorder-overlay__ghost-visual"
+            className="sheet-bar-overlay__ghost-visual"
             frameBorder={props.frameBorder}
             mediaPreviewUrls={props.mediaPreviewUrls}
             sheet={ghostSheet}
@@ -331,7 +367,7 @@ export function SheetBarReorderOverlay(
             )}
           >
             <span
-              className="sheet-bar-reorder-overlay__ghost-bar"
+              className="sheet-bar-overlay__ghost-bar"
               data-active-sides={ghostSheet.activeSides}
               style={{
                 background: SHEET_VISUAL_STYLE.sheetBar.surface,
@@ -355,7 +391,7 @@ export function SheetBarReorderOverlay(
                   {ghostPageNumbers[0]}
                 </span>
               )}
-              <span className="sheet-bar-reorder-overlay__ghost-number">
+              <span className="sheet-bar-overlay__ghost-number">
                 L{String(ghostSheet.number).padStart(2, "0")}
               </span>
             </span>
@@ -364,7 +400,7 @@ export function SheetBarReorderOverlay(
       ) : null}
       {props.status === "invalid" && props.representation.ghost ? (
         <span
-          className="sheet-bar-reorder-overlay__invalid"
+          className="sheet-bar-overlay__invalid"
           data-reorder-invalid-indicator
           role="status"
         >

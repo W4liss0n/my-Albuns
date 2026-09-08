@@ -124,6 +124,19 @@ export function useProjectMutations({
     );
   }
 
+  async function swapSheetSides(sheetId: string) {
+    let applied = false;
+    const completed = await runWithErrorFeedback(async (port, latestProjection) => {
+      const current = latestProjection ?? projection;
+      const target = current.state.album.sheets.find((sheet) => sheet.id === sheetId);
+      if (target?.activeSides !== "both") return current;
+      const next = await imageProcessing.run((publish) => port.apply({ kind: "swapSheetSides", sheetId }, publish));
+      applied = true;
+      return next;
+    }, true);
+    return completed && applied;
+  }
+
   async function copyFrames(frameIds: string[]) {
     const session = frameCopySessionRef.current;
     session.pending += 1;
@@ -393,6 +406,7 @@ export function useProjectMutations({
     commitInteraction,
     commitFrameGeometry,
     swapFrameContentsAtPoint,
+    swapSheetSides,
     applyAlbumInformation: commitAlbumInformation,
     applyAlbumDesign: (draft: AlbumDesignProjectDraft) =>
       commitProjectSettingsDraft(draft),

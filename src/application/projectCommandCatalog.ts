@@ -196,6 +196,15 @@ const DEFINITIONS = [
     shortcuts: [],
   }),
   command({
+    id: "swap-sheet-sides",
+    label: "Trocar lados",
+    description: "Troca os Frames de Página dentro da Lâmina dupla.",
+    kind: "domain",
+    contexts: ["sheet"],
+    availability: "implemented",
+    shortcuts: [],
+  }),
+  command({
     id: "add-frame",
     label: "Adicionar Frame",
     description: "Adiciona um novo Frame à Lâmina ativa.",

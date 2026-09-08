@@ -826,6 +826,9 @@ pub enum ProjectIntent {
     SwapFrameContents {
         frame_ids: Vec<String>,
     },
+    SwapSheetSides {
+        sheet_id: String,
+    },
     ArrangeFrames {
         frame_ids: Vec<String>,
         action: FrameStackAction,
@@ -880,6 +883,8 @@ pub enum ProjectIntent {
 
 #[derive(Debug, Error, PartialEq)]
 pub enum CoreError {
+    #[error("A Troca de lados exige uma Lâmina dupla")]
+    InvalidSheetSideSwap,
     #[error("Selecione Frames distintos de uma única Lâmina para copiar")]
     InvalidFrameCopySelection,
     #[error("Copie Frames neste Projeto antes de colar")]

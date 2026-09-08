@@ -63,6 +63,7 @@ pub(crate) async fn apply_project_intent(
         ProjectIntent::AddFrame { .. } => "add_frame",
         ProjectIntent::DeleteFrames { .. } => "delete_frames",
         ProjectIntent::SwapFrameContents { .. } => "swap_frame_contents",
+        ProjectIntent::SwapSheetSides { .. } => "swap_sheet_sides",
         ProjectIntent::ArrangeFrames { .. } => "arrange_frames",
         ProjectIntent::EditFrameGeometry { .. } => "edit_frame_geometry",
         ProjectIntent::SetAlbumInformation { .. } => "set_album_information",

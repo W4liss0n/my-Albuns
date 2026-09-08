@@ -98,6 +98,13 @@ impl PersistentProjectSession {
         intent: ProjectIntent,
     ) -> Result<ProjectIntentOutcome, CoreError> {
         let mut outcome = ProjectIntentOutcome::default();
+        if let ProjectIntent::SwapSheetSides { sheet_id } = &intent {
+            let next = self.project().with_swapped_sheet_sides(sheet_id)?;
+            if next != *self.project() {
+                self.commit_edit(|_| Ok(next))?;
+            }
+            return Ok(outcome);
+        }
         if let ProjectIntent::CopyFrames { frame_ids } = &intent {
             self.frame_clipboard = Some(self.project().copy_frames(frame_ids)?);
             return Ok(outcome);
@@ -136,6 +143,9 @@ impl PersistentProjectSession {
             }
         }
         self.commit_edit(|project| match intent {
+            ProjectIntent::SwapSheetSides { .. } => {
+                unreachable!("side swapping handles unchanged compositions before committing")
+            }
             ProjectIntent::CopyFrames { .. } | ProjectIntent::PasteFrames { .. } => {
                 unreachable!("clipboard commands are handled before document intents")
             }

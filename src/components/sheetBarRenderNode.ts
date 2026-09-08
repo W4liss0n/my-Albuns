@@ -12,8 +12,11 @@ export interface SheetBarRenderNode {
   horizontallyFixedElements: Container[];
   directlyHovered: boolean;
   sheetHovered: boolean;
+  swapFocused: boolean;
+  swapHovered: boolean;
   sheetNumber: Text;
-  swapPlaceholder: Container;
+  swapAction: Container;
+  canSwapSides: boolean;
   transitionTimer: ReturnType<typeof setTimeout> | null;
   width: number;
 }
@@ -77,15 +80,15 @@ export function createSheetBarRenderNode(
     bar.addChild(pageLabel);
   }
 
-  // Fidelity placeholders: these controls intentionally have no command
-  // until the Sheet Bar interaction flow is implemented.
-  const swapPlaceholder = createSheetBarAction({
-    label: `placeholder-sheet-bar-swap-${sheet.sheetId}`,
+  // The semantic DOM control owns input; Pixi owns the integrated Bar visual.
+  const swapAction = createSheetBarAction({
+    hoverable: false,
+    label: `sheet-bar-swap-${sheet.sheetId}`,
     visual: createSheetBarText({
       text: "⇄",
       x: 0,
       y: 0,
-      label: `placeholder-sheet-bar-swap-glyph-${sheet.sheetId}`,
+      label: `sheet-bar-swap-glyph-${sheet.sheetId}`,
       fill: "#ffffff",
       fontSize: 15,
     }),
@@ -109,9 +112,9 @@ export function createSheetBarRenderNode(
     fontWeight: "500",
     letterSpacing: 1,
   });
-  bar.addChild(swapPlaceholder, layoutPlaceholder, sheetNumber);
+  bar.addChild(swapAction, layoutPlaceholder, sheetNumber);
   horizontallyFixedElements.push(
-    swapPlaceholder,
+    swapAction,
     layoutPlaceholder,
     sheetNumber,
   );
@@ -120,11 +123,15 @@ export function createSheetBarRenderNode(
     horizontallyFixedElements,
     directlyHovered: false,
     sheetHovered: false,
+    swapFocused: false,
+    swapHovered: false,
     sheetNumber,
-    swapPlaceholder,
+    swapAction,
+    canSwapSides: metadata?.canSwapSides ?? false,
     transitionTimer: null,
     width,
   };
+  updateSheetBarSwapAppearance(node);
   bar.on("pointerenter", () => {
     setSheetBarDirectlyHovered(node, true);
   });
@@ -132,6 +139,29 @@ export function createSheetBarRenderNode(
     setSheetBarDirectlyHovered(node, false);
   });
   return node;
+}
+
+export function setSheetBarOverlayHovered(node: SheetBarRenderNode, hovered: boolean, swapHovered = false) {
+  if (node.sheetHovered !== hovered || node.directlyHovered !== hovered) {
+    node.sheetHovered = hovered;
+    node.directlyHovered = hovered;
+    transitionSheetBarOpacity(node);
+  }
+  node.swapHovered = hovered && swapHovered;
+  updateSheetBarSwapAppearance(node);
+}
+
+export function setSheetBarSwapFocused(node: SheetBarRenderNode, focused: boolean) {
+  if (node.swapFocused !== focused) {
+    node.swapFocused = focused;
+    transitionSheetBarOpacity(node);
+  }
+  updateSheetBarSwapAppearance(node);
+}
+
+function updateSheetBarSwapAppearance(node: SheetBarRenderNode) {
+  setSheetBarActionHovered(node.swapAction, (node.swapHovered || node.swapFocused) && node.canSwapSides);
+  if (!node.canSwapSides) node.swapAction.alpha = SHEET_VISUAL_STYLE.sheetBar.disabledActionOpacity;
 }
 
 export function setSheetBarSheetHovered(
@@ -154,7 +184,9 @@ function transitionSheetBarOpacity(node: SheetBarRenderNode) {
   stopSheetBarTransition(node);
   const style = SHEET_VISUAL_STYLE.sheetBar;
   const initialOpacity = node.container.alpha;
-  const targetOpacity = !node.sheetHovered
+  const targetOpacity = node.swapFocused
+    ? style.directHoverOpacity
+    : !node.sheetHovered
     ? 0
     : node.directlyHovered
       ? style.directHoverOpacity
@@ -196,7 +228,7 @@ export function applySheetBarScale(
   for (const element of node.horizontallyFixedElements) {
     element.scale.x = 1 / safeScale;
   }
-  node.swapPlaceholder.position.x =
+  node.swapAction.position.x =
     SHEET_VISUAL_STYLE.sheetBar.swapActionCenterPx / safeScale;
   node.sheetNumber.position.x = node.width - 11 / safeScale;
 }
@@ -290,16 +322,18 @@ function createSheetBarAction({
   visual,
   x,
   y,
+  hoverable = true,
 }: {
   label: string;
   visual: Container;
   x: number;
   y: number;
+  hoverable?: boolean;
 }) {
   const style = SHEET_VISUAL_STYLE.sheetBar;
   const action = new Container();
   action.label = label;
-  action.eventMode = "static";
+  action.eventMode = hoverable ? "static" : "none";
   action.cursor = "default";
   action.hitArea = new Rectangle(
     -style.actionSizePx / 2,
@@ -311,8 +345,10 @@ function createSheetBarAction({
   action.alpha = style.placeholderActionOpacity;
   action.tint = pixiColor(style.action);
   action.addChild(visual);
-  action.on("pointerenter", () => setSheetBarActionHovered(action, true));
-  action.on("pointerleave", () => setSheetBarActionHovered(action, false));
+  if (hoverable) {
+    action.on("pointerenter", () => setSheetBarActionHovered(action, true));
+    action.on("pointerleave", () => setSheetBarActionHovered(action, false));
+  }
   return action;
 }
 

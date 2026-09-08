@@ -5,15 +5,55 @@ import { expect, test, vi } from "vitest";
 import type { ComposedSheet } from "../domain/project";
 import { createContinuousCanvasLayout } from "./canvasGeometry";
 import { createNormalCanvasLayout } from "./canvasSheetViewGeometry";
-import { SheetBarReorderOverlay } from "./SheetBarReorderOverlay";
+import { SheetBarOverlay } from "./SheetBarOverlay";
 
 const sheets = [sheet("sheet-1", 1), sheet("sheet-2", 2)];
 const layout = createContinuousCanvasLayout(sheets);
 
+test("the swap hotspot targets its Sheet and owns pointer, double-click and context-menu input", () => {
+  const callbacks = props({
+    onSwapSides: vi.fn(),
+    onBarHover: vi.fn(),
+    sheetBarMetadata: sheets.map((sheet) => ({ sheetId: sheet.sheetId, pageNumbers: [], layoutLocked: false, canSwapSides: true })),
+  });
+  render(<SheetBarOverlay {...callbacks} />);
+  const button = screen.getByRole("button", { name: "Trocar lados da Lâmina 02" });
+  expect(button.parentElement).toHaveStyle({ left: "180px", top: "35px", width: "26px", height: "26px" });
+  fireEvent.pointerEnter(button);
+  fireEvent.pointerDown(button, { button: 0, pointerId: 1, clientX: 190, clientY: 40 });
+  fireEvent.pointerMove(button, { pointerId: 1, clientX: 290, clientY: 40 });
+  fireEvent.pointerUp(button, { pointerId: 1, clientX: 290, clientY: 40 });
+  fireEvent.click(button);
+  fireEvent.doubleClick(button);
+  fireEvent.contextMenu(button);
+  expect(callbacks.onSwapSides).toHaveBeenCalledExactlyOnceWith("sheet-2");
+  expect(callbacks.onSelect).not.toHaveBeenCalled();
+  expect(callbacks.onPreview).not.toHaveBeenCalled();
+  expect(callbacks.onEditSheet).not.toHaveBeenCalled();
+  expect(callbacks.onContextMenu).not.toHaveBeenCalled();
+  expect(callbacks.onBarHover).toHaveBeenCalledWith("sheet-2", true, true);
+});
+
+test("the unavailable swap hotspot does not fall through to reordering or editing", () => {
+  const callbacks = props({ onSwapSides: vi.fn() });
+  render(<SheetBarOverlay {...callbacks} />);
+  const button = screen.getByRole("button", { name: "Trocar lados da Lâmina 01" });
+  expect(button).toBeDisabled();
+  fireEvent.pointerDown(button, { button: 0, pointerId: 1, clientX: 45, clientY: 40 });
+  fireEvent.pointerMove(button, { pointerId: 1, clientX: 220, clientY: 40 });
+  fireEvent.pointerUp(button, { pointerId: 1 });
+  fireEvent.click(button);
+  fireEvent.doubleClick(button);
+  expect(callbacks.onSwapSides).not.toHaveBeenCalled();
+  expect(callbacks.onSelect).not.toHaveBeenCalled();
+  expect(callbacks.onPreview).not.toHaveBeenCalled();
+  expect(callbacks.onEditSheet).not.toHaveBeenCalled();
+});
+
 test("aligns enabled pointer handles with the scaled Sheet Bar slots", () => {
   const onPreview = vi.fn();
   const { rerender } = render(
-    <SheetBarReorderOverlay {...props({ onPreview })} />,
+    <SheetBarOverlay {...props({ onPreview })} />,
   );
   const overlay = screen.getByRole("group", {
     name: "Reordenação pela Barra da Lâmina",
@@ -26,14 +66,14 @@ test("aligns enabled pointer handles with the scaled Sheet Bar slots", () => {
   expect(first).not.toHaveAttribute("draggable");
   expect(overlay).toHaveAttribute("aria-disabled", "false");
 
-  rerender(<SheetBarReorderOverlay {...props({ onPreview })} disabled />);
+  rerender(<SheetBarOverlay {...props({ onPreview })} disabled />);
   expect(overlay).toHaveAttribute("aria-disabled", "true");
   pointerDown(first, 1, 100, 40);
   pointerMove(first, 1, 240, 40);
   expect(onPreview).not.toHaveBeenCalled();
 
   rerender(
-    <SheetBarReorderOverlay
+    <SheetBarOverlay
       {...props({ onPreview, status: "committing" })}
     />,
   );
@@ -49,7 +89,7 @@ test.each([
     const onCancel = vi.fn();
     const onPreview = vi.fn();
     const view = render(
-      <SheetBarReorderOverlay
+      <SheetBarOverlay
         {...props({ onCancel, onPreview })}
       />,
     );
@@ -73,7 +113,7 @@ test("ignores pointer gestures outside every rendered Sheet Bar handle", () => {
   const onSelect = vi.fn();
   const onPreview = vi.fn();
   render(
-    <SheetBarReorderOverlay {...props({ onSelect, onPreview })} />,
+    <SheetBarOverlay {...props({ onSelect, onPreview })} />,
   );
   const reservedSurface = screen.getByTestId(
     "sheet-reorder-bar-drop-zone",
@@ -93,12 +133,12 @@ test("ignores pointer gestures outside every rendered Sheet Bar handle", () => {
 });
 
 test("moves neighboring handles and renders only the declared preview markers", () => {
-  const { rerender } = render(<SheetBarReorderOverlay {...props()} />);
+  const { rerender } = render(<SheetBarOverlay {...props()} />);
   expect(screen.queryByTestId("reorder-placeholder")).not.toBeInTheDocument();
   expect(screen.queryByTestId("reorder-ghost")).not.toBeInTheDocument();
 
   rerender(
-    <SheetBarReorderOverlay
+    <SheetBarOverlay
       {...props({
         representation: {
           ghost: { sheetId: "sheet-2" },
@@ -128,7 +168,7 @@ test("moves neighboring handles and renders only the declared preview markers", 
   });
 
   rerender(
-    <SheetBarReorderOverlay
+    <SheetBarOverlay
       {...props({
         representation: {
           ghost: { sheetId: "sheet-2" },
@@ -184,7 +224,7 @@ test("renders the exact double and single-page Sheet visual inside the Bar ghost
     },
   ];
   const view = render(
-    <SheetBarReorderOverlay
+    <SheetBarOverlay
       {...props({
         focusedSheetId: doubleSheet.sheetId,
         layout: visualLayout,
@@ -218,7 +258,7 @@ test("renders the exact double and single-page Sheet visual inside the Bar ghost
   );
 
   view.rerender(
-    <SheetBarReorderOverlay
+    <SheetBarOverlay
       {...props({
         focusedSheetId: doubleSheet.sheetId,
         layout: visualLayout,
@@ -251,7 +291,7 @@ test("renders the exact double and single-page Sheet visual inside the Bar ghost
 
 test("matches full-size markers to the bleed-cropped visible Sheet bounds", () => {
   render(
-    <SheetBarReorderOverlay
+    <SheetBarOverlay
       {...props({
         bleedUm: 3_000,
         representation: {
@@ -294,7 +334,7 @@ test.each([
       },
     } satisfies ComposedSheet;
     render(
-      <SheetBarReorderOverlay
+      <SheetBarOverlay
         {...props({
           bleedUm: 3_000,
           layout: createNormalCanvasLayout([singleSheet], 3_000),
@@ -321,7 +361,7 @@ test("keeps selection, edit, and context gestures distinct from reorder", () => 
   const onSelect = vi.fn();
   const onPreview = vi.fn();
   render(
-    <SheetBarReorderOverlay
+    <SheetBarOverlay
       {...props({ onContextMenu, onEditSheet, onPreview, onSelect })}
     />,
   );
@@ -342,7 +382,7 @@ test("captures the pointer after press, crosses the threshold, and follows it in
   const onSelect = vi.fn();
   const onPreview = vi.fn();
   render(
-    <SheetBarReorderOverlay
+    <SheetBarOverlay
       {...props({ onDrop, onPreview, onSelect })}
     />,
   );
@@ -396,7 +436,7 @@ test("keeps a below-threshold press as an ordinary Sheet click", () => {
   const onSelect = vi.fn();
   const onPreview = vi.fn();
   render(
-    <SheetBarReorderOverlay
+    <SheetBarOverlay
       {...props({ onDrop, onPreview, onSelect })}
     />,
   );
@@ -424,7 +464,7 @@ test.each([
     const onPreview = vi.fn();
     const onSelect = vi.fn();
     render(
-      <SheetBarReorderOverlay
+      <SheetBarOverlay
         {...props({ onDrop, onPreview, onSelect })}
       />,
     );
@@ -449,7 +489,7 @@ test("expires synthetic click suppression before a later deliberate click", () =
   vi.useFakeTimers();
   const onSelect = vi.fn();
   const view = render(
-    <SheetBarReorderOverlay {...props({ onSelect })} />,
+    <SheetBarOverlay {...props({ onSelect })} />,
   );
   try {
     const surface = barSurface();
@@ -475,7 +515,7 @@ test.each(["Escape", "pointercancel", "outside release"] as const)(
     const onCancel = vi.fn();
     const onDrop = vi.fn();
     render(
-      <SheetBarReorderOverlay
+      <SheetBarOverlay
         {...props({ onAutoScrollVelocity, onCancel, onDrop })}
       />,
     );
@@ -504,7 +544,7 @@ test.each(["Escape", "pointercancel", "outside release"] as const)(
 test("reports progressive horizontal auto-scroll from captured pointer coordinates", () => {
   const onAutoScrollVelocity = vi.fn();
   render(
-    <SheetBarReorderOverlay
+    <SheetBarOverlay
       {...props({ onAutoScrollVelocity })}
     />,
   );
@@ -527,7 +567,7 @@ test("reports progressive horizontal auto-scroll from captured pointer coordinat
 test("refreshes the Bar destination while viewport auto-scroll advances", () => {
   const onPreview = vi.fn();
   const view = render(
-    <SheetBarReorderOverlay {...props({ onPreview })} />,
+    <SheetBarOverlay {...props({ onPreview })} />,
   );
   setOverlayBounds();
   const surface = barSurface();
@@ -539,7 +579,7 @@ test("refreshes the Bar destination while viewport auto-scroll advances", () => 
 
   onPreview.mockClear();
   view.rerender(
-    <SheetBarReorderOverlay
+    <SheetBarOverlay
       {...props({ onPreview, viewport: { offsetX: 200 } })}
     />,
   );
@@ -550,7 +590,7 @@ test("cancels and releases an active Bar reorder when its surface unmounts", () 
   const onAutoScrollVelocity = vi.fn();
   const onCancel = vi.fn();
   const view = render(
-    <SheetBarReorderOverlay
+    <SheetBarOverlay
       {...props({ onAutoScrollVelocity, onCancel })}
     />,
   );
@@ -675,8 +715,8 @@ function rect(left: number, top: number, right: number, bottom: number): DOMRect
 }
 
 function props(
-  overrides: Partial<ComponentProps<typeof SheetBarReorderOverlay>> = {},
-): ComponentProps<typeof SheetBarReorderOverlay> {
+  overrides: Partial<ComponentProps<typeof SheetBarOverlay>> = {},
+): ComponentProps<typeof SheetBarOverlay> {
   return {
     disabled: false,
     layout,
