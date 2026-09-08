@@ -3160,8 +3160,12 @@
           "key": "Escape"
         },
         {
-          "type": "click",
-          "selector": "[aria-label^=\"Ir para Lâmina 3,\"]"
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "ArrowRight"
         },
         {
           "type": "focus",
@@ -3224,8 +3228,12 @@
           "key": "Escape"
         },
         {
-          "type": "click",
-          "selector": "[aria-label^=\"Ir para Lâmina 1,\"]"
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "ArrowLeft"
         },
         {
           "type": "focus",
@@ -3288,8 +3296,16 @@
           "key": "Escape"
         },
         {
-          "type": "click",
-          "selector": "[aria-label^=\"Ir para Lâmina 4,\"]"
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "ArrowRight"
+        },
+        {
+          "type": "key",
+          "key": "ArrowRight"
         },
         {
           "type": "focus",
@@ -3352,8 +3368,12 @@
           "key": "Escape"
         },
         {
-          "type": "click",
-          "selector": "[aria-label^=\"Ir para Lâmina 2,\"]"
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "ArrowRight"
         },
         {
           "type": "focus",
@@ -3416,8 +3436,16 @@
           "key": "Escape"
         },
         {
-          "type": "click",
-          "selector": "[aria-label^=\"Ir para Lâmina 2,\"]"
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "ArrowLeft"
+        },
+        {
+          "type": "key",
+          "key": "ArrowLeft"
         },
         {
           "type": "focus",
