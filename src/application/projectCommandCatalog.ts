@@ -194,8 +194,7 @@ const DEFINITIONS = [
     description: "Troca o conteúdo entre os Frames selecionados.",
     kind: "domain",
     contexts: ["frame"],
-    availability: "placeholder",
-    placeholderFeature: "swap-selected-frame-contents",
+    availability: "implemented",
     shortcuts: [],
   }),
   command({

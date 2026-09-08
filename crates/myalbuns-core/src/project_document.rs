@@ -836,6 +836,31 @@ impl ProjectDocument {
         Ok((sheet_index, selected))
     }
 
+    pub(crate) fn with_swapped_frame_contents(
+        &self,
+        frame_ids: &[String],
+    ) -> Result<Self, crate::CoreError> {
+        use crate::CoreError::InvalidFrameContentSwapSelection;
+        let (sheet_index, selected) = self
+            .frame_selection(frame_ids)
+            .map_err(|()| InvalidFrameContentSwapSelection)?;
+        if selected.len() != 2 {
+            return Err(InvalidFrameContentSwapSelection);
+        }
+        let mut candidate = self.clone();
+        let mut frames = candidate.sheets[sheet_index]
+            .frames
+            .iter_mut()
+            .filter(|frame| selected.contains(&frame.id));
+        let first = frames.next().ok_or(InvalidFrameContentSwapSelection)?;
+        let second = frames.next().ok_or(InvalidFrameContentSwapSelection)?;
+        if first.photo.is_none() && second.photo.is_none() {
+            return Err(InvalidFrameContentSwapSelection);
+        }
+        std::mem::swap(&mut first.photo, &mut second.photo);
+        Ok(candidate)
+    }
+
     pub(crate) fn with_deleted_frames(
         &self,
         frame_ids: &[String],

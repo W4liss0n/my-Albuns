@@ -6,10 +6,12 @@ interface FrameContextMenuProps {
   position: { x: number; y: number };
   onArrange(action: FrameStackAction): void;
   onDelete(): void;
+  onSwapContents(): void;
+  canSwapContents: boolean;
   onDismiss(): void;
 }
 
-export function FrameContextMenu({ position, onArrange, onDelete, onDismiss }: FrameContextMenuProps) {
+export function FrameContextMenu({ position, onArrange, onDelete, onSwapContents, canSwapContents, onDismiss }: FrameContextMenuProps) {
   return (
     <ContextMenuSurface label="Organizar Frames" position={position} onDismiss={onDismiss}>
       {FRAME_STACK_COMMANDS.map(({ id, action }) => {
@@ -23,6 +25,10 @@ export function FrameContextMenu({ position, onArrange, onDelete, onDismiss }: F
         );
       })}
       <div className="ui-context-menu__separator" role="separator" />
+      <button type="button" role="menuitem" disabled={!canSwapContents}
+        onClick={() => { onSwapContents(); onDismiss(); }}>
+        {projectCommandDescriptor("swap-frame-contents").label}
+      </button>
       <button type="button" role="menuitem" aria-label={projectCommandDescriptor("delete-frames").label}
         onClick={() => { onDelete(); onDismiss(); }}>
         <span>{projectCommandDescriptor("delete-frames").label}</span>

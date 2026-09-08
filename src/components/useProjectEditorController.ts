@@ -130,6 +130,13 @@ export function useProjectEditorController({
   };
   const canArrangeFrames = canvasMode.kind === "sheet-editing" && selectedFrames.length > 0 && !interactionBlocked;
   const canDeleteFrames = canArrangeFrames;
+  const canSwapFrameContents = canvasMode.kind === "sheet-editing" &&
+    selectedFrames.length === 2 && selectedFrames.some((frame) => frame.photo !== null) &&
+    !interactionBlocked;
+  const swapFrameContents = () => {
+    if (!canSwapFrameContents) return Promise.resolve(false);
+    return mutations.applyIntent({ kind: "swapFrameContents", frameIds: [...navigation.selectedFrameIds] });
+  };
   const deleteFrames = () => {
     if (!canDeleteFrames) return Promise.resolve(false);
     return mutations.applyIntent({ kind: "deleteFrames", frameIds: [...navigation.selectedFrameIds] });
@@ -305,6 +312,8 @@ export function useProjectEditorController({
     canAddFrame,
     canDeleteFrames,
     deleteFrames,
+    canSwapFrameContents,
+    swapFrameContents,
     arrangeFrames,
     canArrangeFrames,
     message: mutations.message,

@@ -552,6 +552,8 @@ export function ProjectWorkspace({
     undo: controller.undo,
   });
   const applicationMenus = createProjectApplicationMenus({
+    swapFrameContents: () => { void controller.swapFrameContents(); },
+    canSwapFrameContents: controller.canSwapFrameContents,
     addFrame: () => { void controller.addFrame(); },
     canAddFrame: controller.canAddFrame,
     arrangeFrames: (action) => { void controller.arrangeFrames(action); },
@@ -788,6 +790,8 @@ export function ProjectWorkspace({
       </div>
 
       {frameContextMenu?.kind === "frames" ? <FrameContextMenu position={frameContextMenu.position}
+        onSwapContents={() => { void controller.swapFrameContents(); }}
+        canSwapContents={controller.canSwapFrameContents}
         onDelete={() => { void controller.deleteFrames(); }}
         onArrange={(action) => { void controller.arrangeFrames(action); }}
         onDismiss={() => setFrameContextMenu(null)} /> : null}

@@ -17,6 +17,8 @@ interface ProjectApplicationMenuOptions {
   canAddFrame: boolean;
   arrangeFrames(action: FrameStackAction): void;
   canArrangeFrames: boolean;
+  swapFrameContents(): void;
+  canSwapFrameContents: boolean;
   addSheetAfter(): void;
   addSheetBefore(): void;
   canAddAfter: boolean;
@@ -46,6 +48,8 @@ export function createProjectApplicationMenus({
   canAddFrame,
   arrangeFrames,
   canArrangeFrames,
+  swapFrameContents,
+  canSwapFrameContents,
   addSheetAfter,
   addSheetBefore,
   canAddAfter,
@@ -98,7 +102,7 @@ export function createProjectApplicationMenus({
         placeholder("copy-frames", "frame"),
         placeholder("paste-frames", "frame"),
         separator("edit-frame-separator"),
-        placeholder("swap-frame-contents", "frame"),
+        implemented("swap-frame-contents", "frame", swapFrameContents, !canSwapFrameContents),
         implemented("add-frame", "frame", addFrame, !canAddFrame),
         submenu("arrange-frames", "Organizar", FRAME_STACK_COMMANDS.map(({ id, action }) =>
           implemented(id, "frame", () => arrangeFrames(action), !canArrangeFrames))),
