@@ -5,7 +5,9 @@ import { useImageProcessing } from "./useImageProcessing";
 import type { PrepareImportedMedia } from "../application/mediaPreviews";
 
 import type {
+  ComposedFrame,
   EditorProjection,
+  FrameGeometryEdit,
   ProjectIntent,
 } from "../domain/project";
 import {
@@ -218,7 +220,7 @@ export function useProjectMutations({
 
   async function commitInteraction(intent: ProjectIntent) {
     const capturedProjection = projection;
-    return commitMutation((port, latestProjection) =>
+    return (await commitProjection((port, latestProjection) =>
       imageProcessing.run((publish) => port.apply(
         materializeProjectIntent(
           intent,
@@ -227,19 +229,28 @@ export function useProjectMutations({
         ),
         publish,
       )),
-    );
+    )) !== null;
   }
 
-  function commitProjectSettingsDraft<Value, Delta>(
+  async function commitFrameGeometry(edit: FrameGeometryEdit): Promise<ComposedFrame | null> {
+    const committed = await commitProjection((port) =>
+      imageProcessing.run((publish) => port.apply({ kind: "editFrameGeometry", edit }, publish)),
+    );
+    return committed?.composition.sheets
+      .flatMap((sheet) => sheet.frames)
+      .find((frame) => frame.frameId === edit.frameId) ?? null;
+  }
+
+  async function commitProjectSettingsDraft<Value, Delta>(
     draft: ProjectSettingsDraft<Value, Delta>,
   ) {
-    return commitMutation((port, latestProjection) => {
+    return (await commitProjection((port, latestProjection) => {
       const effectiveProjection = latestProjection ?? projection;
       const materialized = draft.materializeAgainst(effectiveProjection);
       return materialized.changed
         ? imageProcessing.run((publish) => port.apply(materialized.intent, publish))
         : Promise.resolve(effectiveProjection);
-    });
+    })) !== null;
   }
 
   async function commitAlbumInformation(
@@ -304,21 +315,22 @@ export function useProjectMutations({
     return { kind: "rejected" };
   }
 
-  async function commitMutation(operation: ProjectMutationOperation) {
-    if (saveAsBarrierRef.current) return false;
+  async function commitProjection(operation: ProjectMutationOperation) {
+    if (saveAsBarrierRef.current) return null;
     setMessage(null);
     const outcome = await runProjectMutation.run(operation);
     if (outcome.status === "completed") {
       onProjectionChange(outcome.projection);
-      return true;
+      return outcome.projection;
     }
     if (outcome.status === "failed") {
       setMessage(messageFromError(outcome.error));
     }
-    return false;
+    return null;
   }
 
   return {
+    reportInteractionError: setMessage,
     message,
     importPending,
     imageProcessingProgress: imageProcessing.progress,
@@ -327,6 +339,7 @@ export function useProjectMutations({
     photoImportResult,
     applyIntent,
     commitInteraction,
+    commitFrameGeometry,
     applyAlbumInformation: commitAlbumInformation,
     applyAlbumDesign: (draft: AlbumDesignProjectDraft) =>
       commitProjectSettingsDraft(draft),

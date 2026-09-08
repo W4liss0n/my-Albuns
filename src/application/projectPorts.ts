@@ -2,10 +2,18 @@ import type {
   AlbumInformation,
   AlbumInformationValidation,
   EditorProjection,
+  ComposedFrame,
+  FrameGeometryEdit,
   PhotoDropTarget,
   ProjectIntent,
   ProjectMutationOutcome,
 } from "../domain/project";
+
+/** Distance from the pressed point, in CSS pixels, before a Frame drag starts. */
+export interface PointerDragThreshold {
+  x: number;
+  y: number;
+}
 
 export type MediaPreviewState =
   | "ready"
@@ -228,6 +236,8 @@ export interface PhotoImportCompletion {
 }
 
 export interface ProjectCorePort {
+  readFrameDragThreshold(): Promise<PointerDragThreshold>;
+  previewFrameGeometry(edit: FrameGeometryEdit): Promise<ComposedFrame>;
   load(operationId: string): Promise<EditorProjection>;
   validateAlbumInformation(
     information: AlbumInformation,

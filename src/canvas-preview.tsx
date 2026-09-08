@@ -28,6 +28,11 @@ import type {
   CompositionPlan,
 } from "./domain/project";
 import "./canvas-preview.css";
+import geometryCorpus from "../tests/fixtures/frame-geometry-cases.json";
+import geometryPhotoUrl from "./test/dev-media/serra-amanhecer.svg";
+
+const geometryCase = geometryCorpus.cases.find((item) =>
+  item.name === new URLSearchParams(window.location.search).get("geometry"));
 
 const previewGraphicsDiagnosticProbe: CanvasGraphicsDiagnosticProbe = () => ({
   supported: true,
@@ -90,7 +95,13 @@ const sheets: readonly ComposedSheet[] = [
 
 const composition: CompositionPlan = {
   frameBorder: { kind: "none" },
-  sheets: [...sheets],
+  sheets: geometryCase ? [createSheet({
+    activeSides: "both", number: 2, widthUm: 600_000,
+    frames: [{ ...geometryCase.frame, photo: {
+      ...geometryCase.frame.photo,
+      palette: [geometryCase.frame.photo.palette[0], geometryCase.frame.photo.palette[1], geometryCase.frame.photo.palette[2]],
+    } }],
+  })] : [...sheets],
 };
 
 const previewTechnicalGuides = {
@@ -140,13 +151,13 @@ export function CanvasPreview() {
     [],
   );
   const centeredOnce = useRef(false);
-  const [selectedFrameId, setSelectedFrameId] = useState<string | null>(null);
+  const [selectedFrameId, setSelectedFrameId] = useState<string | null>(geometryCase?.frame.frameId ?? null);
   const [focusedSheetId, setFocusedSheetId] = useState("sheet-002");
   const [centeredSheetId, setCenteredSheetId] = useState("sheet-002");
   const [viewport, setViewport] = useState({ offsetX: 0 });
   const [mode, setMode] = useState<AlbumCanvasMode>(() => {
     const parameters = new URLSearchParams(window.location.search);
-    return parameters.get("mode") === "sheet-editing"
+    return geometryCase || parameters.get("mode") === "sheet-editing"
       ? {
           kind: "sheet-editing",
           sheetId: parameters.get("sheet") ?? "sheet-002",
@@ -192,6 +203,7 @@ export function CanvasPreview() {
       data-acceptance-surface={acceptanceSurface}
       data-canvas-mode={mode.kind}
       data-development-preview="canvas"
+      data-geometry-case={geometryCase?.name}
       data-editing-sheet={
         mode.kind === "sheet-editing" ? mode.sheetId : undefined
       }
@@ -200,6 +212,9 @@ export function CanvasPreview() {
         projectId="canvas-visual-preview"
         mode={mode}
         composition={composition}
+        mediaPreviewUrls={geometryCase ? {
+          [geometryCase.frame.photo.mediaId]: geometryPhotoUrl,
+        } : undefined}
         sheetBarMetadata={sheetBarMetadata}
         technicalGuides={previewTechnicalGuides}
         continuousCanvasLayout={layout}

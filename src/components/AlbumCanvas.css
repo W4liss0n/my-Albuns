@@ -26,6 +26,12 @@
   outline: none;
 }
 
+/* During capture, the gesture owns the cursor. Pixi's hover hit-testing keeps
+   writing a normal inline cursor as the moving Frame passes under the pointer. */
+.pixi-canvas--frame-gesture {
+  cursor: var(--frame-gesture-cursor) !important;
+}
+
 /* O foco espacial é desenhado na Lâmina pelo renderer; um contorno em torno
    do Canvas confundiria o alvo atual com o viewport inteiro. */
 .pixi-canvas:focus-visible {

@@ -787,6 +787,51 @@ impl ProjectDocument {
         ))
     }
 
+    pub(crate) fn frame_geometry_edit(
+        &self,
+        edit: &crate::FrameGeometryEdit,
+    ) -> Result<(Uuid, ProjectRect), crate::CoreError> {
+        let missing = || crate::CoreError::FrameNotFound(edit.frame_id.clone());
+        let id = Uuid::parse_str(&edit.frame_id).map_err(|_| missing())?;
+        let (sheet, frame) = self
+            .sheets
+            .iter()
+            .find_map(|sheet| {
+                sheet
+                    .frames
+                    .iter()
+                    .find(|frame| frame.id == id)
+                    .map(|frame| (sheet, frame))
+            })
+            .ok_or_else(missing)?;
+        if crate::RectUm::from(frame.rect) != edit.expected_rect {
+            return Err(crate::CoreError::FrameGeometryChanged);
+        }
+        let rect = crate::frame_geometry::edited_rect(
+            frame.rect,
+            active_surface_width(sheet, self.document.sheet_width_um),
+            self.document.sheet_height_um,
+            &edit.gesture,
+        );
+        Ok((id, rect))
+    }
+
+    pub(crate) fn with_edited_frame_geometry(
+        &self,
+        edit: &crate::FrameGeometryEdit,
+    ) -> Result<Self, crate::CoreError> {
+        let (id, rect) = self.frame_geometry_edit(edit)?;
+        let mut candidate = self.clone();
+        let frame = candidate
+            .sheets
+            .iter_mut()
+            .flat_map(|sheet| &mut sheet.frames)
+            .find(|frame| frame.id == id)
+            .expect("the geometry edit resolved an existing Frame");
+        frame.rect = rect;
+        Ok(candidate)
+    }
+
     fn ensure_photo(&self, media_id: Uuid) -> Result<(), ()> {
         self.media
             .iter()

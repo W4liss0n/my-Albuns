@@ -409,6 +409,7 @@ export function renderCanvas({
   selectedFrameId = null,
   mediaPreviewUrls,
   technicalGuides,
+  frameGeometry,
   sheetReorder,
   onCanvasMetricsChange = vi.fn<(metrics: CanvasMetrics) => void>(),
   onSelectFrame = vi.fn<(frameId: string | null) => void>(),
@@ -439,6 +440,7 @@ export function renderCanvas({
   selectedFrameId?: string | null;
   mediaPreviewUrls?: Readonly<Record<string, string>>;
   technicalGuides?: CanvasTechnicalGuides;
+  frameGeometry?: AlbumCanvasProps["frameGeometry"];
   sheetReorder?: CanvasSheetReorder;
   onCanvasMetricsChange?: (metrics: CanvasMetrics) => void;
   onSelectFrame?: (frameId: string | null) => void;
@@ -471,7 +473,7 @@ export function renderCanvas({
   canvasGraphicsDiagnosticProbe?: CanvasGraphicsDiagnosticProbe;
   logger?: Logger;
 } = {}) {
-  const view = render(
+  const canvasElement = (overrides: Partial<AlbumCanvasProps> = {}) => (
     <LoggingProvider logger={logger}>
       <AlbumCanvas
         canvasGraphicsDiagnosticProbe={
@@ -483,6 +485,7 @@ export function renderCanvas({
         sheetBarMetadata={sheetBarMetadata}
         mediaPreviewUrls={mediaPreviewUrls}
         technicalGuides={technicalGuides}
+        frameGeometry={frameGeometry}
         sheetReorder={sheetReorder}
         continuousCanvasLayout={
           mode.kind === "normal"
@@ -511,12 +514,15 @@ export function renderCanvas({
         onCanvasMetricsChange={onCanvasMetricsChange}
         onMediaDemandChange={onMediaDemandChange}
         onGraphicsUnavailable={onGraphicsUnavailable}
+        {...overrides}
       />
-    </LoggingProvider>,
+    </LoggingProvider>
   );
+  const view = render(canvasElement());
 
   return {
     ...view,
+    rerenderCanvas: (overrides: Partial<AlbumCanvasProps>) => view.rerender(canvasElement(overrides)),
     onCanvasMetricsChange,
     onSelectFrame,
     onEditSheet,

@@ -243,7 +243,21 @@ test("shows the complete active surface and technical guides only in Sheet Edit 
   expect(displayWithLabel("sheet-bar-sheet-001").visible).toBe(false);
 });
 
-test("shows the selected Frame boundary and eight visual-only resize handles in Sheet Edit Mode", async () => {
+test("fits the complete edited Sheet in a narrow Canvas so its edge handles remain reachable", async () => {
+  renderCanvas({
+    mode: { kind: "sheet-editing", sheetId: "sheet-001" },
+    compositionPlan: interactiveComposition,
+    selectedFrameId: "frame-001",
+  });
+  getPixiLifecycle().instances[0].screen.width = 600;
+  await finishPixiInitialization();
+  const world = displayWithLabel("album-world");
+  expect(world.scale.x).toBeCloseTo((600 - 2 * 28) / 600);
+  expect(world.position.x).toBeCloseTo(28);
+  expect(world.position.y).toBeCloseTo((500 - 300 * world.scale.y) / 2);
+});
+
+test("shows the selected Frame boundary and eight interactive resize handles in Sheet Edit Mode", async () => {
   renderCanvas({
     mode: { kind: "sheet-editing", sheetId: "sheet-001" },
     compositionPlan: interactiveComposition,
@@ -282,7 +296,7 @@ test("shows the selected Frame boundary and eight visual-only resize handles in 
     "left",
   ].map(
     (position) =>
-      `frame-resize-handle-placeholder-${position}-frame-001`,
+      `frame-resize-handle-${position}-frame-001`,
   );
   const expectedPositions = [
     { x: 0, y: 0 },
@@ -311,6 +325,7 @@ test("shows the selected Frame boundary and eight visual-only resize handles in 
       visible: boolean;
     };
     expect(handle).toMatchObject({
+      eventMode: "static",
       position: expectedPositions[index],
       rectCommands: [{ height: 8, width: 8, x: -4, y: -4 }],
       visible: true,
@@ -346,7 +361,7 @@ test("keeps the selected Frame boundary but omits resize handles for a locked La
   });
   expect(
     pixiLifecycle.displays.some(({ label }) =>
-      label.startsWith("frame-resize-handle-placeholder-"),
+      label.startsWith("frame-resize-handle-"),
     ),
   ).toBe(false);
 });

@@ -474,6 +474,40 @@ impl EditableProject {
         )
     }
 
+    /// Composes a transient Frame with the same constraints and fill calculation
+    /// as the committed gesture, without touching the Session or its History.
+    pub fn preview_frame_geometry(
+        &self,
+        edit: &crate::FrameGeometryEdit,
+    ) -> Result<crate::ComposedFrame, CoreError> {
+        if !self.session_valid {
+            return Err(CoreError::EditableSessionInvalidated);
+        }
+        let (frame_id, rect) = self.project().frame_geometry_edit(edit)?;
+        let frame_id = frame_id.hyphenated().to_string();
+        let mut state = persistent_projection::editor_state(
+            &self.session,
+            self.session_valid,
+            &project_name_from_path(self.project_path()),
+            &self.photo_sources,
+        );
+        let frame = state
+            .album
+            .sheets
+            .iter_mut()
+            .flat_map(|sheet| &mut sheet.frames)
+            .find(|frame| frame.id == frame_id)
+            .expect("the edit resolved an existing Frame");
+        frame.rect = rect.into();
+        crate::composition::resolve_editor_projection(state)
+            .composition
+            .sheets
+            .into_iter()
+            .flat_map(|sheet| sheet.frames)
+            .find(|frame| frame.frame_id == frame_id)
+            .ok_or_else(|| CoreError::FrameNotFound(edit.frame_id.clone()))
+    }
+
     /// Freezes one resolved editor projection and only the exact linked
     /// originals referenced by its CompositionPlan at that creative Revision.
     pub fn freeze_rendering(&self) -> FrozenProjectRendering {

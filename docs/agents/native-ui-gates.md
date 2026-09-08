@@ -13,6 +13,12 @@ Browser captures prove frontend behavior and appearance, not WebView2/native
 ownership or physical GPU compatibility. Visual acceptance still requires review
 of the captured evidence; a successful capture alone is not visual approval.
 
+`npm run test:frame-gestures` is a focused headless browser regression for Frame
+movement and resizing. It samples rendered geometry across command completion,
+checks computed cursor continuity and release, and retains screenshots and source
+provenance. Its delayed fixture port tests presentation timing, not Core geometry
+policy or native WebView ownership.
+
 ## Native scenarios
 
 Visible native gates are disabled locally unless the user gives explicit

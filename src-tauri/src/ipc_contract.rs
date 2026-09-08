@@ -4,6 +4,12 @@ use myalbuns_core::EditorProjection;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize, TS)]
+pub struct PointerDragThreshold {
+    pub x: f64,
+    pub y: f64,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 #[ts(tag = "kind")]

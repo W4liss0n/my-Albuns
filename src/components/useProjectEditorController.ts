@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { ProjectCorePort } from "../application/projectPorts";
+import type { PointerDragThreshold, ProjectCorePort } from "../application/projectPorts";
 import type { PrepareImportedMedia } from "../application/mediaPreviews";
 import type { SheetStructureIntent } from "../application/sheetStructure";
 import type { EditorProjection } from "../domain/project";
@@ -87,6 +87,31 @@ export function useProjectEditorController({
     onSaveAsBarrierChange,
     prepareImportedMedia,
   });
+  const [dragThreshold, setDragThreshold] = useState<PointerDragThreshold | null>(null);
+  const reportInteractionError = mutations.reportInteractionError;
+  useEffect(() => {
+    let request = 0;
+    let active = true;
+    setDragThreshold(null);
+    if (!navigation.editingSheetId) return;
+    const readThreshold = () => {
+      const currentRequest = ++request;
+      setDragThreshold(null);
+      void projectCorePort.readFrameDragThreshold().then((threshold) => {
+        if (active && currentRequest === request) setDragThreshold(threshold);
+      }).catch((error: unknown) => {
+        if (active && currentRequest === request) {
+          reportInteractionError(error instanceof Error ? error.message : String(error));
+        }
+      });
+    };
+    readThreshold();
+    window.addEventListener("resize", readThreshold);
+    return () => {
+      active = false;
+      window.removeEventListener("resize", readThreshold);
+    };
+  }, [navigation.editingSheetId, projection.state.projectId, projectCorePort, reportInteractionError]);
   const selectedFrame = useMemo(
     () =>
       projection.state.album.sheets
@@ -171,6 +196,13 @@ export function useProjectEditorController({
     centeredSheetId: navigation.centeredSheetId,
     viewport: navigation.viewport,
     photoZoomPreview: photoGestures.photoZoomPreview,
+    frameGeometry: {
+      disabled: interactionBlocked,
+      dragThreshold,
+      preview: (edit) => projectCorePort.previewFrameGeometry(edit),
+      commit: mutations.commitFrameGeometry,
+      onError: reportInteractionError,
+    },
     onSelectFrame: navigation.selectFrame,
     onEditSheet: enterSheetEditing,
     onFocusSheet: navigation.focusSheet,

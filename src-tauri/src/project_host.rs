@@ -498,6 +498,15 @@ impl ProjectHost {
             .map_err(|error| error.to_string())
     }
 
+    pub(crate) fn preview_frame_geometry(
+        &self,
+        edit: &myalbuns_core::FrameGeometryEdit,
+    ) -> Result<myalbuns_core::ComposedFrame, String> {
+        self.project()?
+            .preview_frame_geometry(edit)
+            .map_err(|error| error.to_string())
+    }
+
     pub(crate) fn observe_photo_source(
         &self,
         binding: &MediaBinding,
@@ -1920,13 +1929,43 @@ mod tests {
                 .expect("the added Frame is returned to the UI boundary");
             let transformed = host
                 .apply_with_outcome(ProjectIntent::TransformPhoto {
-                    frame_id: affected_frame_id,
+                    frame_id: affected_frame_id.clone(),
                     delta_pan_x: 0.4,
                     delta_pan_y: 0.2,
                     delta_zoom: 0.5,
                 })
                 .expect("Pan and user Zoom are persisted through the public intent");
-            host.save(transformed.projection.state.revision)
+            let original_rect = transformed.projection.composition.sheets[1].frames[0]
+                .clip_rect
+                .clone();
+            let geometry_edit = myalbuns_core::FrameGeometryEdit {
+                frame_id: affected_frame_id,
+                expected_rect: original_rect.clone(),
+                gesture: myalbuns_core::FrameGeometryGesture::Resize {
+                    handle: myalbuns_core::FrameResizeHandle::TopLeft,
+                    delta_x_um: 60_000,
+                    delta_y_um: 40_000,
+                    preserve_aspect_ratio: false,
+                    from_center: false,
+                },
+            };
+            let preview = host.preview_frame_geometry(&geometry_edit).unwrap();
+            assert_eq!(host.projection().unwrap(), transformed.projection);
+            let resized = host
+                .apply_with_outcome(ProjectIntent::EditFrameGeometry {
+                    edit: geometry_edit,
+                })
+                .unwrap();
+            assert_eq!(resized.projection.composition.sheets[1].frames[0], preview);
+            assert_eq!(
+                host.undo().unwrap().state.album,
+                transformed.projection.state.album
+            );
+            assert_eq!(
+                host.redo().unwrap().state.album,
+                resized.projection.state.album
+            );
+            host.save(resized.projection.state.revision)
                 .expect("the Photo composition is saved before reopening");
             assert_eq!(
                 host.begin_close(),
@@ -1944,6 +1983,7 @@ mod tests {
                 "the initial and visible noninitial Lâminas must be semantically distinguishable"
             );
             let reopened_frame = &dirty.composition.sheets[1].frames[0];
+            assert_eq!(reopened_frame.clip_rect, preview.clip_rect);
             let reopened_photo = reopened_frame
                 .photo
                 .as_ref()
@@ -2045,6 +2085,15 @@ mod tests {
                 "the red translucent Overlay is composed over the blue right Background"
             );
             let actual_photo = rendered.get_pixel(rendered.width() / 2, rendered.height() / 2);
+            let outside_resized_frame = rendered.get_pixel(
+                (((original_rect.x + 10_000) as f64 / 600_000.0) * f64::from(rendered.width()))
+                    as u32,
+                rendered.height() / 2,
+            );
+            assert!(
+                (0..3).all(|channel| outside_resized_frame[channel].abs_diff(left[channel]) <= 12),
+                "the area removed by resize contains the Background and Overlay, not the previous Photo"
+            );
             let decoded_original = image::open(&photo_path)
                 .expect("the current linked Original decodes")
                 .to_rgb8();

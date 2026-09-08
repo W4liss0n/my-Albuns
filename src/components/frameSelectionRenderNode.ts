@@ -1,34 +1,36 @@
-import { Container, Graphics } from "pixi.js";
+import { Container, Graphics, type FederatedPointerEvent } from "pixi.js";
+import type { FrameResizeHandle } from "../domain/project";
 
 import { pixiColor } from "./pixiColor";
 import { SHEET_VISUAL_STYLE } from "./sheetVisualStyle";
 
 const RESIZE_HANDLE_POSITIONS = [
-  { name: "top-left", xRatio: 0, yRatio: 0 },
-  { name: "top", xRatio: 0.5, yRatio: 0 },
-  { name: "top-right", xRatio: 1, yRatio: 0 },
-  { name: "right", xRatio: 1, yRatio: 0.5 },
-  { name: "bottom-right", xRatio: 1, yRatio: 1 },
-  { name: "bottom", xRatio: 0.5, yRatio: 1 },
-  { name: "bottom-left", xRatio: 0, yRatio: 1 },
-  { name: "left", xRatio: 0, yRatio: 0.5 },
+  { name: "top-left", id: "topLeft", cursor: "nwse-resize", xRatio: 0, yRatio: 0 },
+  { name: "top", id: "top", cursor: "ns-resize", xRatio: 0.5, yRatio: 0 },
+  { name: "top-right", id: "topRight", cursor: "nesw-resize", xRatio: 1, yRatio: 0 },
+  { name: "right", id: "right", cursor: "ew-resize", xRatio: 1, yRatio: 0.5 },
+  { name: "bottom-right", id: "bottomRight", cursor: "nwse-resize", xRatio: 1, yRatio: 1 },
+  { name: "bottom", id: "bottom", cursor: "ns-resize", xRatio: 0.5, yRatio: 1 },
+  { name: "bottom-left", id: "bottomLeft", cursor: "nesw-resize", xRatio: 0, yRatio: 1 },
+  { name: "left", id: "left", cursor: "ew-resize", xRatio: 0, yRatio: 0.5 },
 ] as const;
 
 export interface FrameSelectionRenderNode {
   container: Container;
-  resizeHandlePlaceholders: readonly Graphics[];
+  resizeHandles: readonly Graphics[];
 }
 
 export function createFrameSelectionRenderNode(
   frameId: string,
   width: number,
   height: number,
-  showResizeHandlePlaceholders: boolean,
+  showResizeHandles: boolean,
+  onResizeStart: (handle: FrameResizeHandle, event: FederatedPointerEvent) => void,
 ): FrameSelectionRenderNode {
   const handleStyle = SHEET_VISUAL_STYLE.frameSelection;
   const container = new Container();
   container.label = `frame-selection-container-${frameId}`;
-  container.eventMode = "none";
+  container.eventMode = "passive";
   container.visible = false;
 
   const outline = new Graphics()
@@ -38,14 +40,12 @@ export function createFrameSelectionRenderNode(
   outline.eventMode = "none";
   container.addChild(outline);
 
-  if (!showResizeHandlePlaceholders) {
-    return { container, resizeHandlePlaceholders: [] };
+  if (!showResizeHandles) {
+    return { container, resizeHandles: [] };
   }
 
-  // Visual-only placeholder: these handles intentionally have no pointer
-  // events until the Frame resize gesture and its domain mutation exist.
-  const resizeHandlePlaceholders = RESIZE_HANDLE_POSITIONS.map(
-    ({ name, xRatio, yRatio }) => {
+  const resizeHandles = RESIZE_HANDLE_POSITIONS.map(
+    ({ name, id, cursor, xRatio, yRatio }) => {
       const halfSize = handleStyle.handleSizePx / 2;
       const handle = new Graphics()
         .rect(
@@ -62,15 +62,18 @@ export function createFrameSelectionRenderNode(
           pixelLine: true,
         });
       handle.label =
-        `frame-resize-handle-placeholder-${name}-${frameId}`;
-      handle.eventMode = "none";
+        `frame-resize-handle-${name}-${frameId}`;
+      handle.eventMode = "static";
+      handle.cursor = cursor;
+      handle.on("pointerdown", (event: FederatedPointerEvent) => onResizeStart(id, event));
+      handle.on("pointertap", (event: FederatedPointerEvent) => event.stopPropagation());
       handle.position.set(width * xRatio, height * yRatio);
       container.addChild(handle);
       return handle;
     },
   );
 
-  return { container, resizeHandlePlaceholders };
+  return { container, resizeHandles };
 }
 
 export function applyFrameSelectionScale(
@@ -78,7 +81,7 @@ export function applyFrameSelectionScale(
   canvasScale: number,
 ) {
   const inverseScale = 1 / Math.max(canvasScale, Number.EPSILON);
-  for (const handle of node.resizeHandlePlaceholders) {
+  for (const handle of node.resizeHandles) {
     handle.scale.set(inverseScale);
   }
 }

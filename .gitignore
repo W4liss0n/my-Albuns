@@ -9,6 +9,7 @@ src-tauri/binaries/*.exe
 .scratch/topology-spike-target/
 .scratch/topology-corpus/
 .scratch/ui-acceptance/
+.scratch/frame-gesture-evidence/
 .scratch/productive-journey-evidence/
 .scratch/focused-owned-dialog-evidence/
 .scratch/project-close-evidence/

@@ -5,6 +5,7 @@ import type {
   AlbumInformation,
   AlbumInformationValidation,
   EditorProjection,
+  ComposedFrame,
   PhotoDropTarget,
   ProjectIntent,
   ProjectMutationOutcome,
@@ -41,6 +42,7 @@ import type { ImageProcessingProgress as IpcImageProcessingProgress } from "./ge
 import type { LinkedMediaChanged as IpcLinkedMediaChanged } from "./generated/LinkedMediaChanged";
 import type { MediaPreview as IpcMediaPreview } from "./generated/MediaPreview";
 import type { MediaPreviewCommandError as IpcMediaPreviewCommandError } from "./generated/MediaPreviewCommandError";
+import type { PointerDragThreshold } from "./generated/PointerDragThreshold";
 import type { SaveProjectOutcome as IpcSaveProjectOutcome } from "./generated/SaveProjectOutcome";
 import type { SaveProjectResult as IpcSaveProjectResult } from "./generated/SaveProjectResult";
 import type { SaveAsProjectOutcome as IpcSaveAsProjectOutcome } from "./generated/SaveAsProjectOutcome";
@@ -290,6 +292,8 @@ async function invokeImageProcessing<T>(
 }
 
 export const tauriProjectCorePort: ProjectCorePort = {
+  readFrameDragThreshold: () => invoke<PointerDragThreshold>("frame_drag_threshold"),
+  previewFrameGeometry: (edit) => invoke<ComposedFrame>("preview_frame_geometry", { edit }),
   load: (operationId) =>
     invoke<EditorProjection>("project_state", { operationId }),
   validateAlbumInformation: (information: AlbumInformation) =>

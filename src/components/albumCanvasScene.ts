@@ -32,6 +32,7 @@ import {
 } from "./albumCanvasMode";
 import { applySheetBarScale } from "./sheetBarRenderNode";
 import { PhotoInteractionSession } from "./photoInteractionSession";
+import { FrameInteractionSession } from "./frameInteractionSession";
 import { ViewportTexturePool } from "./viewportTexturePool";
 
 const PRELOAD_MARGIN = 1;
@@ -70,6 +71,7 @@ export class AlbumCanvasScene {
   >();
   private readonly previewTextures: ViewportTexturePool;
   private readonly photoInteractions: PhotoInteractionSession;
+  private readonly frameInteractions: FrameInteractionSession;
 
   constructor(
     private readonly app: Application,
@@ -89,6 +91,11 @@ export class AlbumCanvasScene {
         projectGeneration: this.projectGeneration,
         canvasScale: this.canvasScale,
       }),
+    );
+    this.frameInteractions = new FrameInteractionSession(
+      app.canvas,
+      () => ({ input: this.input, canvasScale: this.canvasScale, screen: app.screen }),
+      () => { if (this.input) this.update(this.input, app.screen.height); },
     );
     this.world.label = "album-world";
     this.app.stage.addChild(this.world);
@@ -123,6 +130,9 @@ export class AlbumCanvasScene {
     }
     this.modeSignature = modeSignature;
     this.input = input;
+    this.app.canvas.setAttribute("aria-label", input.mode.kind === "sheet-editing"
+      ? "Canvas da Lâmina em edição. Arraste um Frame para mover ou use as alças para redimensionar. Shift preserva a proporção; Alt preserva o centro; Esc cancela o gesto."
+      : "Canvas contínuo do Álbum. Use a roda para navegar e Alt mais roda para ajustar a Foto.");
     const modePolicy = albumCanvasModePolicy(input.mode);
     const confirmedSheets = sheetsForCanvasMode(
       input.composition.sheets,
@@ -152,11 +162,17 @@ export class AlbumCanvasScene {
         : navigationLayout;
 
     const sheetHeight = firstSheet.heightUm * MICROMETER_TO_CANVAS_PIXEL;
-    const scale = continuousCanvasScale(
+    const heightScale = continuousCanvasScale(
       hostHeight || this.app.screen.height,
       sheetHeight,
     );
+    const scale = modePolicy.enablesContinuousNavigation ? heightScale : Math.min(
+      heightScale,
+      Math.max(1, this.app.screen.width - 2 * CANVAS_VERTICAL_MARGIN_PX) /
+        layout.entriesAtScale(1)[0].width,
+    );
     this.canvasScale = scale;
+    this.frameInteractions.synchronize(input, scale);
     const transitionOffsetX =
       returnedToContinuousCanvas && input.centeredSheetId
         ? navigationLayout.centeredOffset(
@@ -209,7 +225,8 @@ export class AlbumCanvasScene {
     this.reportCanvasMetrics(scale);
     this.world.position.set(
       boundedOffsetX,
-      CANVAS_VERTICAL_MARGIN_PX,
+      modePolicy.enablesContinuousNavigation ? CANVAS_VERTICAL_MARGIN_PX
+        : ((hostHeight || this.app.screen.height) - sheetHeight * scale) / 2,
     );
     this.world.scale.set(scale);
     this.app.stage.hitArea = new Rectangle(
@@ -220,7 +237,7 @@ export class AlbumCanvasScene {
     );
 
     this.reconcileMaterializedSheets(
-      sheets,
+      this.frameInteractions.present(sheets),
       layout,
       boundedOffsetX,
       scale,
@@ -237,6 +254,7 @@ export class AlbumCanvasScene {
 
   destroy() {
     this.resetTransientInteractions();
+    this.frameInteractions.destroy();
     this.app.stage.removeAllListeners();
     this.clearMaterializedSheets();
     this.previewTextures.destroy();
@@ -323,6 +341,7 @@ export class AlbumCanvasScene {
 
   private resetTransientInteractions() {
     this.photoInteractions.reset();
+    this.frameInteractions.reset();
     this.sheetReorderPreviewActive = false;
     this.sheetReorderPlaceholderSheetId = null;
     this.stopSheetPositionAnimations();
@@ -611,20 +630,24 @@ export class AlbumCanvasScene {
       {
         previewTextureFor: (mediaId) => this.previewTextureFor(mediaId),
         onSheetTap: (sheetId) => {
-          if (!this.input) return;
+          if (!this.input || this.frameInteractions.ignoresTap) return;
           this.input.onSelectFrame(null);
           this.input.onFocusSheet(sheetId);
         },
         onSheetDoubleTap: (sheetId) => {
+          if (this.frameInteractions.ignoresTap) return;
           this.input?.onEditSheet(sheetId);
         },
         onFrameTap: (sheetId, frameId) => {
-          if (!this.input) return;
+          if (!this.input || this.frameInteractions.ignoresTap) return;
           this.input.onSelectFrame(frameId);
           this.input.onFocusSheet(sheetId);
         },
         onPhotoPanStart: (photoNode, event) => {
           this.photoInteractions.startPan(photoNode, event);
+        },
+        onFrameGeometryStart: (frameId, handle, event) => {
+          this.frameInteractions.start(frameId, handle, event);
         },
         onPhotoWheel: (photoNode, event) => {
           this.photoInteractions.handleWheel(photoNode, event);
