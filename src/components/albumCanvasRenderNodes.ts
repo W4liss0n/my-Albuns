@@ -63,6 +63,8 @@ const PAN_OUTSIDE_OPACITY = 0.24;
 
 export interface PhotoRenderNode {
   frameId: string;
+  createDragPreview: () => Container;
+  clipRect: Rectangle;
   layer: Container;
   outsideLayer: Container;
   thirdsGuides: Graphics;
@@ -84,6 +86,7 @@ export interface SheetRenderNode {
   frameSelectionLayer: Container;
   frameGroupSelection: { signature: string; node: FrameSelectionRenderNode } | null;
   frameDropOutlines: Map<string, Graphics>;
+  frameContentDropHighlights: Map<string, Graphics>;
   focusOutline: Graphics;
   sheetDropOutline: Graphics;
   sheetBar: SheetBarRenderNode;
@@ -232,6 +235,7 @@ export function createSheetRenderNode(
 
   const frameSelections = new Map<string, FrameSelectionRenderNode>();
   const frameDropOutlines = new Map<string, Graphics>();
+  const frameContentDropHighlights = new Map<string, Graphics>();
   const frameSelectionLayer = new Container();
   frameSelectionLayer.label = `frame-selection-layer-${sheet.sheetId}`;
   frameSelectionLayer.eventMode = "passive";
@@ -275,16 +279,10 @@ export function createSheetRenderNode(
       outsidePhotoLayer.alpha = PAN_OUTSIDE_OPACITY;
       outsidePhotoLayer.eventMode = "none";
       outsidePhotoLayer.visible = false;
-      const photoLayer = createPhotoPreviewLayer({
+      const { viewport: photoViewport, layer: photoLayer, clip } = createClippedPhotoPreview({
         ...previewOptions,
         label: "photo-pan-inside-preview",
-      });
-      const clip = new Graphics()
-        .rect(0, 0, frameWidth, frameHeight)
-        .fill(0xffffff);
-      const photoViewport = new Container();
-      photoViewport.addChild(photoLayer);
-      photoViewport.mask = clip;
+      }, frameWidth, frameHeight);
       const thirdsGuides = createThirdsGuides(frameWidth, frameHeight);
       frameContainer.addChild(
         outsidePhotoLayer,
@@ -296,6 +294,13 @@ export function createSheetRenderNode(
       const baseZoom = frame.photo.placement.currentZoom;
       photoNode = {
         frameId: frame.frameId,
+        createDragPreview: () => {
+          const preview = createClippedPhotoPreview({ ...previewOptions, label: "photo-drag-preview" }, frameWidth, frameHeight);
+          const container = new Container();
+          container.addChild(preview.viewport, preview.clip);
+          return container;
+        },
+        clipRect: new Rectangle(0, 0, frameWidth, frameHeight),
         layer: photoLayer,
         outsideLayer: outsidePhotoLayer,
         thirdsGuides,
@@ -376,6 +381,17 @@ export function createSheetRenderNode(
     frameDropOutline.visible = false;
     frameDropOutlines.set(frame.frameId, frameDropOutline);
     frameSelectionLayer.addChild(frameDropOutline);
+
+    const contentDragStyle = SHEET_VISUAL_STYLE.frameContentDrag;
+    const contentDropHighlight = new Graphics()
+      .rect(frameX, frameY, frameWidth, frameHeight)
+      .fill({ color: contentDragStyle.targetColor, alpha: contentDragStyle.targetFillOpacity })
+      .stroke({ color: contentDragStyle.targetColor, width: contentDragStyle.targetOutlineWidthPx });
+    contentDropHighlight.label = `frame-content-drop-${frame.frameId}`;
+    contentDropHighlight.eventMode = "none";
+    contentDropHighlight.visible = false;
+    frameContentDropHighlights.set(frame.frameId, contentDropHighlight);
+    frameSelectionLayer.addChild(contentDropHighlight);
 
     frameContainer.on("pointertap", (event: FederatedPointerEvent) => {
       if (event.button !== 0) return;
@@ -535,6 +551,7 @@ export function createSheetRenderNode(
     frameSelectionLayer,
     frameGroupSelection: null,
     frameDropOutlines,
+    frameContentDropHighlights,
     focusOutline,
     sheetDropOutline,
     sheetBar,
@@ -596,6 +613,15 @@ export function setPhotoPreviewPosition(
 ) {
   node.layer.position.set(x, y);
   node.outsideLayer.position.set(x, y);
+}
+
+function createClippedPhotoPreview(options: PhotoPreviewLayerOptions, width: number, height: number) {
+  const viewport = new Container();
+  const layer = createPhotoPreviewLayer(options);
+  const clip = new Graphics().rect(0, 0, width, height).fill(0xffffff);
+  viewport.addChild(layer);
+  viewport.mask = clip;
+  return { viewport, layer, clip };
 }
 
 function createPhotoPreviewLayer({

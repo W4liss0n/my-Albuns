@@ -45,6 +45,24 @@ test("normal clicks below the Windows threshold do not swap or suppress selectio
   const h = harness(); h.start(); h.pointer("pointermove", 205, 205); h.pointer("pointerup", 205, 205);
   expect(h.commit).not.toHaveBeenCalled(); expect(h.resolveTarget).not.toHaveBeenCalled();
   expect(h.session.ignoresTap).toBe(false);
+  expect(h.session.preview).toBeNull();
+});
+
+test("ghost follows the pointer and a pending hover keeps feedback stable until the Core answers", async () => {
+  const h = harness(); h.start(); h.pointer("pointermove");
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  let resolve!: (target: PhotoDropTarget) => void;
+  h.resolveTarget.mockReturnValueOnce(new Promise((complete) => { resolve = complete; }));
+  h.pointer("pointermove", 520, 220);
+  expect(h.session.preview).toEqual({ sourceFrameId: "swap-frame-0", clientX: 520, clientY: 220 });
+  expect(h.session.highlight).toEqual({ kind: "frame", frameId: "swap-frame-4" });
+  expect(h.canvas.style.getPropertyValue("--frame-gesture-cursor")).toBe("grabbing");
+  resolve({ kind: "invalid" }); await Promise.resolve();
+  expect(h.session.highlight).toBeNull();
+  expect(h.canvas.style.getPropertyValue("--frame-gesture-cursor")).toBe("grabbing");
+  h.pointer("pointerup");
+  expect(h.session.preview).toBeNull();
+  expect(h.canvas.style.getPropertyValue("--frame-gesture-cursor")).toBe("");
 });
 
 test("a Photo drag highlights the Core target and queues release independently of pending hover", async () => {
@@ -71,6 +89,7 @@ test.each(["escape", "pointercancel", "outside", "mode", "projection", "blocked"
   h.pointer("pointerup", reason === "outside" ? 950 : 500);
   resolve({ kind: "frame", frameId: "swap-frame-4" }); await Promise.resolve();
   expect(h.commit).not.toHaveBeenCalled(); expect(h.session.highlight).toBeNull();
+  expect(h.session.preview).toBeNull();
 });
 
 test.each(["alt", "control", "right", "empty", "editing", "blocked"])("%s does not start a content drag", (reason) => {
