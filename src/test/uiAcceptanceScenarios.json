@@ -1937,7 +1937,7 @@
         {
           "type": "context-click",
           "selector": ".canvas-host canvas",
-          "offsetY": -250
+          "offsetY": -320
         }
       ]
     },
