@@ -33,6 +33,8 @@ Histórico aguardam a mesma fila e não ultrapassam uma troca pendente.
 A Barra possui um único controle semântico sobre a região das setas; o Pixi
 desenha sua aparência e recebe hover e foco dessa superfície. O gesto não inicia
 reordenação, seleção, menu contextual ou entrada no Modo de edição.
+O foco e o ponteiro são independentes: sair de um preserva a Barra enquanto o
+outro permanece sobre ela.
 
 Os testes públicos do Core verificam limites centrais, preservação das Fotos,
 Histórico, Salvamento, reabertura e composição de Exportação. O corpus visual é

@@ -12,6 +12,8 @@ export interface SheetBarRenderNode {
   horizontallyFixedElements: Container[];
   directlyHovered: boolean;
   sheetHovered: boolean;
+  swapFocused: boolean;
+  swapHovered: boolean;
   sheetNumber: Text;
   swapAction: Container;
   canSwapSides: boolean;
@@ -121,13 +123,15 @@ export function createSheetBarRenderNode(
     horizontallyFixedElements,
     directlyHovered: false,
     sheetHovered: false,
+    swapFocused: false,
+    swapHovered: false,
     sheetNumber,
     swapAction,
     canSwapSides: metadata?.canSwapSides ?? false,
     transitionTimer: null,
     width,
   };
-  updateSheetBarSwapAppearance(node, false);
+  updateSheetBarSwapAppearance(node);
   bar.on("pointerenter", () => {
     setSheetBarDirectlyHovered(node, true);
   });
@@ -143,11 +147,20 @@ export function setSheetBarOverlayHovered(node: SheetBarRenderNode, hovered: boo
     node.directlyHovered = hovered;
     transitionSheetBarOpacity(node);
   }
-  updateSheetBarSwapAppearance(node, hovered && swapHovered);
+  node.swapHovered = hovered && swapHovered;
+  updateSheetBarSwapAppearance(node);
 }
 
-function updateSheetBarSwapAppearance(node: SheetBarRenderNode, hovered: boolean) {
-  setSheetBarActionHovered(node.swapAction, hovered && node.canSwapSides);
+export function setSheetBarSwapFocused(node: SheetBarRenderNode, focused: boolean) {
+  if (node.swapFocused !== focused) {
+    node.swapFocused = focused;
+    transitionSheetBarOpacity(node);
+  }
+  updateSheetBarSwapAppearance(node);
+}
+
+function updateSheetBarSwapAppearance(node: SheetBarRenderNode) {
+  setSheetBarActionHovered(node.swapAction, (node.swapHovered || node.swapFocused) && node.canSwapSides);
   if (!node.canSwapSides) node.swapAction.alpha = SHEET_VISUAL_STYLE.sheetBar.disabledActionOpacity;
 }
 
@@ -171,7 +184,9 @@ function transitionSheetBarOpacity(node: SheetBarRenderNode) {
   stopSheetBarTransition(node);
   const style = SHEET_VISUAL_STYLE.sheetBar;
   const initialOpacity = node.container.alpha;
-  const targetOpacity = !node.sheetHovered
+  const targetOpacity = node.swapFocused
+    ? style.directHoverOpacity
+    : !node.sheetHovered
     ? 0
     : node.directlyHovered
       ? style.directHoverOpacity

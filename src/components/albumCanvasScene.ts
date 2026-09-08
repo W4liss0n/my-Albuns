@@ -30,7 +30,7 @@ import {
   albumCanvasModePolicy,
   sheetsForCanvasMode,
 } from "./albumCanvasMode";
-import { applySheetBarScale, setSheetBarOverlayHovered } from "./sheetBarRenderNode";
+import { applySheetBarScale, setSheetBarOverlayHovered, setSheetBarSwapFocused } from "./sheetBarRenderNode";
 import { PhotoInteractionSession } from "./photoInteractionSession";
 import { FrameInteractionSession } from "./frameInteractionSession";
 import { FrameContentDragSession } from "./frameContentDragSession";
@@ -56,6 +56,7 @@ export class AlbumCanvasScene {
   private readonly world = new Container();
   private readonly sheetNodes = new Map<string, SheetRenderNode>();
   private hoveredBar: { sheetId: string; swapHovered: boolean } | null = null;
+  private focusedBarSheetId: string | null = null;
   private readonly photoNodes = new Map<string, PhotoRenderNode>();
   private input: AlbumCanvasProps | null = null;
   private projectId: string | null = null;
@@ -130,6 +131,12 @@ export class AlbumCanvasScene {
     this.hoveredBar = hovered ? { sheetId, swapHovered } : null;
     const node = this.sheetNodes.get(sheetId);
     if (node) setSheetBarOverlayHovered(node.sheetBar, hovered, swapHovered);
+  }
+
+  handleSheetBarSwapFocus(sheetId: string, focused: boolean) {
+    this.focusedBarSheetId = focused ? sheetId : null;
+    const node = this.sheetNodes.get(sheetId);
+    if (node) setSheetBarSwapFocused(node.sheetBar, focused);
   }
 
   update(input: AlbumCanvasProps, hostHeight: number) {
@@ -368,6 +375,7 @@ export class AlbumCanvasScene {
 
   private resetTransientInteractions() {
     this.hoveredBar = null;
+    this.focusedBarSheetId = null;
     this.photoInteractions.reset();
     this.frameInteractions.reset();
     this.frameContentDrag.reset();
@@ -528,6 +536,9 @@ export class AlbumCanvasScene {
       applySheetBarScale(node.sheetBar, scale);
       if (this.hoveredBar?.sheetId === sheet.sheetId) {
         setSheetBarOverlayHovered(node.sheetBar, true, this.hoveredBar.swapHovered);
+      }
+      if (this.focusedBarSheetId === sheet.sheetId) {
+        setSheetBarSwapFocused(node.sheetBar, true);
       }
       applyPlaceholderLabelScale(node, scale);
       for (const selection of node.frameSelections.values()) {

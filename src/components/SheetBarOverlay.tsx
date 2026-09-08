@@ -58,6 +58,7 @@ export interface SheetBarOverlayProps {
   readonly onSelect: (sheetId: string) => void;
   readonly onSwapSides?: (sheetId: string) => void;
   readonly onBarHover?: (sheetId: string, hovered: boolean, swapHovered?: boolean) => void;
+  readonly onSwapFocus?: (sheetId: string, focused: boolean) => void;
   readonly onContextMenu: (
     sheetId: string,
     position: { x: number; y: number },
@@ -324,8 +325,8 @@ export function SheetBarOverlay(
                 event.stopPropagation();
                 if (event.repeat) event.preventDefault();
               }}
-              onFocus={() => props.onBarHover?.(sheet.sheetId, true, true)}
-              onBlur={() => props.onBarHover?.(sheet.sheetId, false)}
+              onFocus={() => props.onSwapFocus?.(sheet.sheetId, true)}
+              onBlur={() => props.onSwapFocus?.(sheet.sheetId, false)}
               title={projectCommandDescriptor("swap-sheet-sides").label}
               type="button"
             />

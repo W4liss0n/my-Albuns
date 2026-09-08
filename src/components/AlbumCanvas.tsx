@@ -584,6 +584,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
             onSelect={props.sheetReorder.onSelect}
             onSwapSides={props.sheetSideSwap?.onSwap}
             onBarHover={(sheetId, hovered, swapHovered) => sceneRef.current?.handleSheetBarHover(sheetId, hovered, swapHovered)}
+            onSwapFocus={(sheetId, focused) => sceneRef.current?.handleSheetBarSwapFocus(sheetId, focused)}
             onPreview={props.sheetReorder.onPreview}
             representation={props.sheetReorder.representation}
             sheetBarMetadata={sheetBarMetadata}

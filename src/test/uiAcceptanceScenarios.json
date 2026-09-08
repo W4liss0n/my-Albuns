@@ -3927,7 +3927,6 @@
       "comparison": {
         "kind": "implementation-only",
         "surface": "sheet-side-swap",
-        "implementationCaptureSelector": ".app-shell",
         "reason": "A Barra segue a referência vigente; a especificação aceita define a translação dos Frames entre Páginas e a preservação de Travessias centrais. Esta prévia reproduz projeções produzidas e verificadas pelo Core."
       },
       "viewport": {
@@ -3953,7 +3952,6 @@
       "comparison": {
         "kind": "implementation-only",
         "surface": "sheet-side-swap",
-        "implementationCaptureSelector": ".app-shell",
         "reason": "A Barra segue a referência vigente; a especificação aceita define a translação dos Frames entre Páginas e a preservação de Travessias centrais. Esta prévia reproduz projeções produzidas e verificadas pelo Core."
       },
       "viewport": {
@@ -3969,6 +3967,36 @@
         {
           "type": "hover",
           "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-side-swap-focus-hover",
+      "title": "Troca de lados: sair do foco mantém a Barra sob o ponteiro",
+      "implementationPath": "/workspace-preview.html?frame=side-swap&side-swap=mixed",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-side-swap",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A Barra segue a referência vigente; a especificação aceita define a translação dos Frames entre Páginas e a preservação de Travessias centrais. Esta prévia reproduz projeções produzidas e verificadas pelo Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "body[data-side-swap-state=\"before\"][data-side-swap-editing=\"none\"]",
+      "actions": [
+        {
+          "type": "hover",
+          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+        },
+        {
+          "type": "focus",
+          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+        },
+        {
+          "type": "key",
+          "key": "Tab"
         }
       ]
     }
