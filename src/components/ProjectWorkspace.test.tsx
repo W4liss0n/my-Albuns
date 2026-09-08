@@ -41,6 +41,7 @@ import type {
   PhotoDropTarget,
 } from "../domain/project";
 import { useEditorView } from "../state/editorView";
+import { frameContentSwapCorpus } from "../test/frameContentSwapPreview";
 import type { ProjectIntent } from "../domain/project";
 import {
   createEmptyProjection,
@@ -690,6 +691,47 @@ test.each(["keyboard", "context"])("deletes the entire Frame selection via %s wi
   expect(apply).toHaveBeenCalledOnce();
   expect(useEditorView.getState().selectedFrameIds).toEqual([]);
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+});
+
+test.each([
+  ["photos", "edit"], ["photos", "context"], ["placeholder", "edit"], ["placeholder", "context"],
+])("swaps %s through %s and preserves the selected pair", async (name, entry) => {
+  const swap = frameContentSwapCorpus.cases.find((item) => item.name === name)!;
+  const initial = structuredClone(frameContentSwapCorpus.before);
+  useEditorView.setState({ projectId: initial.state.projectId, editingSheetId: "sheet-001", selectedFrameIds: swap.selectedFrameIds });
+  const apply = vi.fn(async () => structuredClone(swap.after));
+  render(<ProjectWorkspace projection={initial} projectCorePort={projectCorePortWithApply(apply)} onProjectionChange={vi.fn()} />);
+  if (entry === "edit") {
+    const command = getApplicationCommand("Editar", "Trocar conteúdo dos Frames");
+    expect(command).toBeEnabled();
+    expect(command).not.toHaveAttribute("data-placeholder-feature");
+    fireEvent.click(command);
+  } else {
+    act(() => canvasHarness.props?.onOpenFrameContextMenu?.(swap.selectedFrameIds[1], { x: 320, y: 200 }));
+    const command = screen.getByRole("menuitem", { name: "Trocar conteúdo dos Frames" });
+    expect(command).toBeEnabled();
+    fireEvent.click(command);
+  }
+  await waitFor(() => expect(apply).toHaveBeenCalledWith({ kind: "swapFrameContents", frameIds: swap.selectedFrameIds }, expect.any(Function)));
+  expect(apply).toHaveBeenCalledOnce();
+  expect(useEditorView.getState().selectedFrameIds).toEqual(swap.selectedFrameIds);
+  expect(screen.queryByRole("menu", { name: "Organizar Frames" })).not.toBeInTheDocument();
+});
+
+test.each([
+  ["swap-frame-0"], ["swap-frame-0", "swap-frame-1", "swap-frame-2"], ["swap-frame-2", "swap-frame-3"],
+])("keeps swap disabled in both menus for incompatible selection %j", (...selectedFrameIds) => {
+  const initial = structuredClone(frameContentSwapCorpus.before);
+  useEditorView.setState({ projectId: initial.state.projectId, editingSheetId: "sheet-001", selectedFrameIds });
+  const apply = vi.fn(async () => initial);
+  render(<ProjectWorkspace projection={initial} projectCorePort={projectCorePortWithApply(apply)} onProjectionChange={vi.fn()} />);
+  expect(getApplicationCommand("Editar", "Trocar conteúdo dos Frames")).toBeDisabled();
+  fireEvent.keyDown(screen.getByRole("menu", { name: "Editar" }), { key: "Escape" });
+  act(() => canvasHarness.props?.onOpenFrameContextMenu?.(selectedFrameIds[0], { x: 320, y: 200 }));
+  const command = screen.getByRole("menuitem", { name: "Trocar conteúdo dos Frames" });
+  expect(command).toBeDisabled();
+  fireEvent.click(command);
+  expect(apply).not.toHaveBeenCalled();
 });
 
 test("arranges the entire Frame selection from Edit without changing the selection", async () => {

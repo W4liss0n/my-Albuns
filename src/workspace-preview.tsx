@@ -32,6 +32,7 @@ import groupGeometryCorpus from "../tests/fixtures/frame-group-geometry-cases.js
 import stackCorpus from "../tests/fixtures/frame-stack-cases.json";
 import manualFrameCorpus from "../tests/fixtures/manual-frame-cases.json";
 import { frameDeletionCorpus } from "./test/frameDeletionPreview";
+import { frameContentSwapCorpus } from "./test/frameContentSwapPreview";
 import "./ui/theme.css";
 import "./ui/ui.css";
 
@@ -39,6 +40,7 @@ const previewParameters = new URLSearchParams(window.location.search);
 const frameContext = previewParameters.get("frame");
 const manualFrameCase = manualFrameCorpus.cases.find((item) => item.name === (previewParameters.get("surface") ?? "double"));
 const frameDeletionCase = frameDeletionCorpus.cases.find((item) => item.name === (previewParameters.get("deletion") ?? "group"));
+const frameSwapCase = frameContentSwapCorpus.cases.find((item) => item.name === (previewParameters.get("swap") ?? "photos"));
 const stackCase = stackCorpus.cases.find((item) => item.action === previewParameters.get("stack"));
 const decorativeContext = previewParameters.get("decorative");
 const previewScale = Number(previewParameters.get("scale") ?? "1");
@@ -79,6 +81,15 @@ if (frameContext === "deletion") {
     focusedSheetId: "sheet-001", centeredSheetId: "sheet-001", selectedFrameIds: frameDeletionCase!.selectedFrameIds });
   exposeFrameDeletionState();
   useEditorView.subscribe(exposeFrameDeletionState);
+}
+if (frameContext === "swap") {
+  const selectedFrameIds = previewParameters.get("swap") === "empty"
+    ? ["swap-frame-2", "swap-frame-3"]
+    : frameSwapCase!.selectedFrameIds;
+  useEditorView.setState({ projectId: projection.state.projectId, editingSheetId: "sheet-001",
+    focusedSheetId: "sheet-001", centeredSheetId: "sheet-001", selectedFrameIds });
+  exposeFrameSwapState();
+  useEditorView.subscribe(exposeFrameSwapState);
 }
 
 const projectCorePort: ProjectCorePort = {
@@ -230,6 +241,7 @@ function createPreviewProjection(
   decorativeMode: string | null,
   structureMode: string | null,
 ): EditorProjection {
+  if (frameMode === "swap") return structuredClone(frameContentSwapCorpus.before);
   if (frameMode === "deletion") return structuredClone(frameDeletionCorpus.before);
   if (frameMode === "manual") return structuredClone(manualFrameCase!.before) as EditorProjection;
   const preview = structuredClone(createTwoSheetProjection());
@@ -353,6 +365,18 @@ function configurePhysicalPreview(
 }
 
 function applyPreviewIntent(intent: ProjectIntent): ProjectMutationOutcome {
+  if (intent.kind === "swapFrameContents") {
+    if (frameContext !== "swap" || !frameSwapCase ||
+        [...intent.frameIds].sort().join() !== [...frameSwapCase.selectedFrameIds].sort().join() ||
+        JSON.stringify(projection.state.album.sheets[0].frames) !==
+          JSON.stringify(frameContentSwapCorpus.before.state.album.sheets[0].frames)) {
+      throw new Error("Comando fora do cenário de troca de conteúdo desta prévia.");
+    }
+    const before = structuredClone(projection);
+    projection = finalizePhysicalPreviewMutation(structuredClone(frameSwapCase.after), before);
+    exposeFrameSwapState();
+    return { projection, affectedFrameId: null, affectedSheetId: null };
+  }
   if (intent.kind === "deleteFrames") {
     if (frameContext !== "deletion" || !frameDeletionCase ||
         [...intent.frameIds].sort().join() !== [...frameDeletionCase.selectedFrameIds].sort().join() ||
@@ -538,6 +562,7 @@ function restorePreviewHistory(
   };
   if (frameContext === "manual") exposeManualFrameState();
   if (frameContext === "deletion") exposeFrameDeletionState();
+  if (frameContext === "swap") exposeFrameSwapState();
   return projection;
 }
 
@@ -549,6 +574,12 @@ function exposeManualFrameState() {
 function exposeFrameDeletionState() {
   document.body.dataset.frameDeletionSelection = useEditorView.getState().selectedFrameIds.join(",");
   document.body.dataset.frameDeletionCount = String(projection.state.album.sheets[0].frames.length);
+}
+
+function exposeFrameSwapState() {
+  document.body.dataset.frameSwapSelection = useEditorView.getState().selectedFrameIds.join(",");
+  document.body.dataset.frameSwapPhotos = projection.state.album.sheets[0].frames
+    .map((frame) => frame.photo?.mediaId ?? "empty").join(",");
 }
 
 function physicalSheetOrderIsValid(candidate: EditorProjection) {

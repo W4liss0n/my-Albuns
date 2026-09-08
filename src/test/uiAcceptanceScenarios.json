@@ -2332,6 +2332,230 @@
           "selector": "[role=\"menuitem\"][aria-label=\"Refazer\"]"
         }
       ]
+    },
+    {
+      "id": "workspace-frame-content-swap-edit-menu",
+      "title": "Troca de conteúdo — menu Editar disponível para duas Fotos",
+      "implementationPath": "/workspace-preview.html?frame=swap&swap=photos",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-content-swap",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A especificação e o design 0001 definem a troca entre duas ocorrências ou Foto e placeholder. O cenário usa resultados produzidos e conferidos pelo Core; a referência visual vigente antecede esse comando."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-frame-swap-photos=\"00000000-0000-4000-8000-000000000001,00000000-0000-4000-8000-000000000002,empty,empty\"][data-frame-swap-selection=\"swap-frame-0,swap-frame-1\"]:has([role=\"menu\"][aria-label=\"Editar\"])",
+      "actions": [
+        {
+          "type": "click-text",
+          "text": "Editar"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-content-swap-context-menu",
+      "title": "Troca de conteúdo — menu contextual disponível para duas Fotos",
+      "implementationPath": "/workspace-preview.html?frame=swap&swap=photos",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-content-swap",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A especificação e o design 0001 definem a troca entre duas ocorrências ou Foto e placeholder. O cenário usa resultados produzidos e conferidos pelo Core; a referência visual vigente antecede esse comando."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-frame-swap-photos=\"00000000-0000-4000-8000-000000000001,00000000-0000-4000-8000-000000000002,empty,empty\"][data-frame-swap-selection=\"swap-frame-0,swap-frame-1\"]:has([role=\"menu\"][aria-label=\"Organizar Frames\"])",
+      "actions": [
+        {
+          "type": "context-click",
+          "selector": ".canvas-host canvas",
+            "offsetX": -300,
+          "offsetY": 0
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-content-swap-photos-edit",
+      "title": "Troca de conteúdo — Fotos trocadas pelo menu Editar preservam os dois Frames",
+      "implementationPath": "/workspace-preview.html?frame=swap&swap=photos",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-content-swap",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A especificação e o design 0001 definem a troca entre duas ocorrências ou Foto e placeholder. O cenário usa resultados produzidos e conferidos pelo Core; a referência visual vigente antecede esse comando."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-frame-swap-photos=\"00000000-0000-4000-8000-000000000002,00000000-0000-4000-8000-000000000001,empty,empty\"][data-frame-swap-selection=\"swap-frame-0,swap-frame-1\"]",
+      "actions": [
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click-text",
+          "text": "Trocar conteúdo dos Frames"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-content-swap-photos-context",
+      "title": "Troca de conteúdo — Fotos trocadas pelo menu contextual preservam os dois Frames",
+      "implementationPath": "/workspace-preview.html?frame=swap&swap=photos",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-content-swap",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A especificação e o design 0001 definem a troca entre duas ocorrências ou Foto e placeholder. O cenário usa resultados produzidos e conferidos pelo Core; a referência visual vigente antecede esse comando."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-frame-swap-photos=\"00000000-0000-4000-8000-000000000002,00000000-0000-4000-8000-000000000001,empty,empty\"][data-frame-swap-selection=\"swap-frame-0,swap-frame-1\"]",
+      "actions": [
+        {
+          "type": "context-click",
+          "selector": ".canvas-host canvas",
+            "offsetX": -300,
+          "offsetY": 0
+        },
+        {
+          "type": "click-text",
+          "text": "Trocar conteúdo dos Frames"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-content-swap-placeholder",
+      "title": "Troca de conteúdo — Foto passa para o placeholder e a origem fica vazia",
+      "implementationPath": "/workspace-preview.html?frame=swap&swap=placeholder",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-content-swap",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A especificação e o design 0001 definem a troca entre duas ocorrências ou Foto e placeholder. O cenário usa resultados produzidos e conferidos pelo Core; a referência visual vigente antecede esse comando."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-frame-swap-photos=\"empty,00000000-0000-4000-8000-000000000002,00000000-0000-4000-8000-000000000001,empty\"][data-frame-swap-selection=\"swap-frame-0,swap-frame-2\"]",
+      "actions": [
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click-text",
+          "text": "Trocar conteúdo dos Frames"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-content-swap-empty-disabled",
+      "title": "Troca de conteúdo — dois placeholders mantêm a troca desabilitada",
+      "implementationPath": "/workspace-preview.html?frame=swap&swap=empty",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-content-swap",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A especificação e o design 0001 definem a troca entre duas ocorrências ou Foto e placeholder. O cenário usa resultados produzidos e conferidos pelo Core; a referência visual vigente antecede esse comando."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-frame-swap-photos=\"00000000-0000-4000-8000-000000000001,00000000-0000-4000-8000-000000000002,empty,empty\"][data-frame-swap-selection=\"swap-frame-2,swap-frame-3\"]:has([role=\"menuitem\"][aria-label=\"Trocar conteúdo dos Frames\"][disabled])",
+      "actions": [
+        {
+          "type": "click-text",
+          "text": "Editar"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-content-swap-undo",
+      "title": "Troca de conteúdo — Desfazer restaura as Fotos e conserva a seleção",
+      "implementationPath": "/workspace-preview.html?frame=swap&swap=photos",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-content-swap",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A especificação e o design 0001 definem a troca entre duas ocorrências ou Foto e placeholder. O cenário usa resultados produzidos e conferidos pelo Core; a referência visual vigente antecede esse comando."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-frame-swap-photos=\"00000000-0000-4000-8000-000000000001,00000000-0000-4000-8000-000000000002,empty,empty\"][data-frame-swap-selection=\"swap-frame-0,swap-frame-1\"]",
+      "actions": [
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click-text",
+          "text": "Trocar conteúdo dos Frames"
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Desfazer\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-content-swap-redo",
+      "title": "Troca de conteúdo — Refazer reaplica a troca e conserva a seleção",
+      "implementationPath": "/workspace-preview.html?frame=swap&swap=photos",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-content-swap",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A especificação e o design 0001 definem a troca entre duas ocorrências ou Foto e placeholder. O cenário usa resultados produzidos e conferidos pelo Core; a referência visual vigente antecede esse comando."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-frame-swap-photos=\"00000000-0000-4000-8000-000000000002,00000000-0000-4000-8000-000000000001,empty,empty\"][data-frame-swap-selection=\"swap-frame-0,swap-frame-1\"]",
+      "actions": [
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click-text",
+          "text": "Trocar conteúdo dos Frames"
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Desfazer\"]"
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Refazer\"]"
+        }
+      ]
     }
   ]
 }

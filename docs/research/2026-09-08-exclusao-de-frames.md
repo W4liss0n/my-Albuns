@@ -70,5 +70,6 @@ de versão. Testes automatizados com janelas nativas permanecem suspensos.
 A issue #20 continua aberta. Este recorte cobre o estado destravado atualmente
 exposto pelo Core. A regra de remover somente Fotos e preservar placeholders
 em Layout travado acompanha a futura entrega do travamento persistente.
-Exclusão no modo normal com reaplicação de Layout, troca de conteúdo e
-cópia/colagem permanecem para os próximos recortes.
+A [troca de conteúdo](2026-09-08-troca-de-conteudo-de-frames.md) continua este
+ciclo. Exclusão no modo normal com reaplicação de Layout e cópia/colagem
+permanecem para os próximos recortes.
