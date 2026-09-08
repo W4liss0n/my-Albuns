@@ -805,6 +805,9 @@ pub enum FrameStackAction {
 )]
 #[ts(tag = "kind")]
 pub enum ProjectIntent {
+    AddFrame {
+        sheet_id: String,
+    },
     ArrangeFrames {
         frame_ids: Vec<String>,
         action: FrameStackAction,

@@ -204,8 +204,7 @@ const DEFINITIONS = [
     description: "Adiciona um novo Frame à Lâmina ativa.",
     kind: "domain",
     contexts: ["frame"],
-    availability: "placeholder",
-    placeholderFeature: "add-frame",
+    availability: "implemented",
     shortcuts: [],
   }),
   command({

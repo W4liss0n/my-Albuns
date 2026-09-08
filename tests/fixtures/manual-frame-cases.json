@@ -1,0 +1,812 @@
+{
+  "cases": [
+    {
+      "before": {
+        "composition": {
+          "frameBorder": {
+            "kind": "none"
+          },
+          "sheets": [
+            {
+              "activeSides": "right",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 300000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 300000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [],
+              "heightUm": 300000,
+              "number": 1,
+              "overlays": [],
+              "sheetId": "sheet-001",
+              "widthUm": 300000
+            },
+            {
+              "activeSides": "both",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [],
+              "heightUm": 300000,
+              "number": 2,
+              "overlays": [],
+              "sheetId": "sheet-002",
+              "widthUm": 600000
+            },
+            {
+              "activeSides": "left",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 300000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 300000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [],
+              "heightUm": 300000,
+              "number": 3,
+              "overlays": [],
+              "sheetId": "sheet-003",
+              "widthUm": 300000
+            }
+          ]
+        },
+        "mediaUsage": [],
+        "state": {
+          "album": {
+            "media": [],
+            "sheets": [
+              {
+                "activeSides": "right",
+                "frames": [],
+                "heightUm": 300000,
+                "id": "sheet-001",
+                "number": 1,
+                "pageNumbers": [
+                  1
+                ],
+                "role": "initial",
+                "widthUm": 600000
+              },
+              {
+                "activeSides": "both",
+                "frames": [],
+                "heightUm": 300000,
+                "id": "sheet-002",
+                "number": 2,
+                "pageNumbers": [
+                  2,
+                  3
+                ],
+                "role": "internal",
+                "widthUm": 600000
+              },
+              {
+                "activeSides": "left",
+                "frames": [],
+                "heightUm": 300000,
+                "id": "sheet-003",
+                "number": 3,
+                "pageNumbers": [
+                  4
+                ],
+                "role": "final",
+                "widthUm": 600000
+              }
+            ],
+            "visualDefaults": {
+              "background": {
+                "both": {
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                },
+                "scope": "bothSides"
+              },
+              "frameBorder": {
+                "kind": "none"
+              },
+              "overlay": {
+                "both": null,
+                "scope": "bothSides"
+              }
+            }
+          },
+          "canRedo": false,
+          "canUndo": false,
+          "dirty": false,
+          "document": {
+            "bleedUm": 0,
+            "displayUnit": "mm",
+            "dpi": 300,
+            "safetyUm": 0,
+            "sheetHeightUm": 300000,
+            "sheetWidthUm": 600000
+          },
+          "projectId": "manual-frame-project",
+          "projectName": "Criação manual",
+          "revision": 0,
+          "savedRevision": 0
+        }
+      },
+      "composedFrame": {
+        "borderFillRects": [],
+        "clipRect": {
+          "height": 160000,
+          "width": 240000,
+          "x": 180000,
+          "y": 70000
+        },
+        "frameId": "manual-frame",
+        "photo": null,
+        "zIndex": 0
+      },
+      "frame": {
+        "id": "manual-frame",
+        "photo": null,
+        "rect": {
+          "height": 160000,
+          "width": 240000,
+          "x": 180000,
+          "y": 70000
+        },
+        "zIndex": 0
+      },
+      "name": "double",
+      "sheetId": "sheet-002"
+    },
+    {
+      "before": {
+        "composition": {
+          "frameBorder": {
+            "kind": "none"
+          },
+          "sheets": [
+            {
+              "activeSides": "right",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 300000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 300000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [],
+              "heightUm": 300000,
+              "number": 1,
+              "overlays": [],
+              "sheetId": "sheet-001",
+              "widthUm": 300000
+            },
+            {
+              "activeSides": "both",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [],
+              "heightUm": 300000,
+              "number": 2,
+              "overlays": [],
+              "sheetId": "sheet-002",
+              "widthUm": 600000
+            },
+            {
+              "activeSides": "left",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 300000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 300000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [],
+              "heightUm": 300000,
+              "number": 3,
+              "overlays": [],
+              "sheetId": "sheet-003",
+              "widthUm": 300000
+            }
+          ]
+        },
+        "mediaUsage": [],
+        "state": {
+          "album": {
+            "media": [],
+            "sheets": [
+              {
+                "activeSides": "right",
+                "frames": [],
+                "heightUm": 300000,
+                "id": "sheet-001",
+                "number": 1,
+                "pageNumbers": [
+                  1
+                ],
+                "role": "initial",
+                "widthUm": 600000
+              },
+              {
+                "activeSides": "both",
+                "frames": [],
+                "heightUm": 300000,
+                "id": "sheet-002",
+                "number": 2,
+                "pageNumbers": [
+                  2,
+                  3
+                ],
+                "role": "internal",
+                "widthUm": 600000
+              },
+              {
+                "activeSides": "left",
+                "frames": [],
+                "heightUm": 300000,
+                "id": "sheet-003",
+                "number": 3,
+                "pageNumbers": [
+                  4
+                ],
+                "role": "final",
+                "widthUm": 600000
+              }
+            ],
+            "visualDefaults": {
+              "background": {
+                "both": {
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                },
+                "scope": "bothSides"
+              },
+              "frameBorder": {
+                "kind": "none"
+              },
+              "overlay": {
+                "both": null,
+                "scope": "bothSides"
+              }
+            }
+          },
+          "canRedo": false,
+          "canUndo": false,
+          "dirty": false,
+          "document": {
+            "bleedUm": 0,
+            "displayUnit": "mm",
+            "dpi": 300,
+            "safetyUm": 0,
+            "sheetHeightUm": 300000,
+            "sheetWidthUm": 600000
+          },
+          "projectId": "manual-frame-project",
+          "projectName": "Criação manual",
+          "revision": 0,
+          "savedRevision": 0
+        }
+      },
+      "composedFrame": {
+        "borderFillRects": [],
+        "clipRect": {
+          "height": 80000,
+          "width": 120000,
+          "x": 90000,
+          "y": 110000
+        },
+        "frameId": "manual-frame",
+        "photo": null,
+        "zIndex": 0
+      },
+      "frame": {
+        "id": "manual-frame",
+        "photo": null,
+        "rect": {
+          "height": 80000,
+          "width": 120000,
+          "x": 90000,
+          "y": 110000
+        },
+        "zIndex": 0
+      },
+      "name": "right",
+      "sheetId": "sheet-001"
+    },
+    {
+      "before": {
+        "composition": {
+          "frameBorder": {
+            "kind": "none"
+          },
+          "sheets": [
+            {
+              "activeSides": "right",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 300000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 300000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [],
+              "heightUm": 300000,
+              "number": 1,
+              "overlays": [],
+              "sheetId": "sheet-001",
+              "widthUm": 300000
+            },
+            {
+              "activeSides": "both",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [],
+              "heightUm": 300000,
+              "number": 2,
+              "overlays": [],
+              "sheetId": "sheet-002",
+              "widthUm": 600000
+            },
+            {
+              "activeSides": "left",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 300000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 300000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [],
+              "heightUm": 300000,
+              "number": 3,
+              "overlays": [],
+              "sheetId": "sheet-003",
+              "widthUm": 300000
+            }
+          ]
+        },
+        "mediaUsage": [],
+        "state": {
+          "album": {
+            "media": [],
+            "sheets": [
+              {
+                "activeSides": "right",
+                "frames": [],
+                "heightUm": 300000,
+                "id": "sheet-001",
+                "number": 1,
+                "pageNumbers": [
+                  1
+                ],
+                "role": "initial",
+                "widthUm": 600000
+              },
+              {
+                "activeSides": "both",
+                "frames": [],
+                "heightUm": 300000,
+                "id": "sheet-002",
+                "number": 2,
+                "pageNumbers": [
+                  2,
+                  3
+                ],
+                "role": "internal",
+                "widthUm": 600000
+              },
+              {
+                "activeSides": "left",
+                "frames": [],
+                "heightUm": 300000,
+                "id": "sheet-003",
+                "number": 3,
+                "pageNumbers": [
+                  4
+                ],
+                "role": "final",
+                "widthUm": 600000
+              }
+            ],
+            "visualDefaults": {
+              "background": {
+                "both": {
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                },
+                "scope": "bothSides"
+              },
+              "frameBorder": {
+                "kind": "none"
+              },
+              "overlay": {
+                "both": null,
+                "scope": "bothSides"
+              }
+            }
+          },
+          "canRedo": false,
+          "canUndo": false,
+          "dirty": false,
+          "document": {
+            "bleedUm": 0,
+            "displayUnit": "mm",
+            "dpi": 300,
+            "safetyUm": 0,
+            "sheetHeightUm": 300000,
+            "sheetWidthUm": 600000
+          },
+          "projectId": "manual-frame-project",
+          "projectName": "Criação manual",
+          "revision": 0,
+          "savedRevision": 0
+        }
+      },
+      "composedFrame": {
+        "borderFillRects": [],
+        "clipRect": {
+          "height": 80000,
+          "width": 120000,
+          "x": 90000,
+          "y": 110000
+        },
+        "frameId": "manual-frame",
+        "photo": null,
+        "zIndex": 0
+      },
+      "frame": {
+        "id": "manual-frame",
+        "photo": null,
+        "rect": {
+          "height": 80000,
+          "width": 120000,
+          "x": 90000,
+          "y": 110000
+        },
+        "zIndex": 0
+      },
+      "name": "left",
+      "sheetId": "sheet-003"
+    },
+    {
+      "before": {
+        "composition": {
+          "frameBorder": {
+            "kind": "none"
+          },
+          "sheets": [
+            {
+              "activeSides": "right",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 100000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 100000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [],
+              "heightUm": 100000,
+              "number": 1,
+              "overlays": [],
+              "sheetId": "sheet-001",
+              "widthUm": 600000
+            },
+            {
+              "activeSides": "both",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 100000,
+                    "width": 1200000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 100000,
+                  "width": 1200000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [],
+              "heightUm": 100000,
+              "number": 2,
+              "overlays": [],
+              "sheetId": "sheet-002",
+              "widthUm": 1200000
+            },
+            {
+              "activeSides": "left",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 100000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 100000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [],
+              "heightUm": 100000,
+              "number": 3,
+              "overlays": [],
+              "sheetId": "sheet-003",
+              "widthUm": 600000
+            }
+          ]
+        },
+        "mediaUsage": [],
+        "state": {
+          "album": {
+            "media": [],
+            "sheets": [
+              {
+                "activeSides": "right",
+                "frames": [],
+                "heightUm": 100000,
+                "id": "sheet-001",
+                "number": 1,
+                "pageNumbers": [
+                  1
+                ],
+                "role": "initial",
+                "widthUm": 1200000
+              },
+              {
+                "activeSides": "both",
+                "frames": [],
+                "heightUm": 100000,
+                "id": "sheet-002",
+                "number": 2,
+                "pageNumbers": [
+                  2,
+                  3
+                ],
+                "role": "internal",
+                "widthUm": 1200000
+              },
+              {
+                "activeSides": "left",
+                "frames": [],
+                "heightUm": 100000,
+                "id": "sheet-003",
+                "number": 3,
+                "pageNumbers": [
+                  4
+                ],
+                "role": "final",
+                "widthUm": 1200000
+              }
+            ],
+            "visualDefaults": {
+              "background": {
+                "both": {
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                },
+                "scope": "bothSides"
+              },
+              "frameBorder": {
+                "kind": "none"
+              },
+              "overlay": {
+                "both": null,
+                "scope": "bothSides"
+              }
+            }
+          },
+          "canRedo": false,
+          "canUndo": false,
+          "dirty": false,
+          "document": {
+            "bleedUm": 0,
+            "displayUnit": "mm",
+            "dpi": 300,
+            "safetyUm": 0,
+            "sheetHeightUm": 100000,
+            "sheetWidthUm": 1200000
+          },
+          "projectId": "manual-frame-project",
+          "projectName": "Criação manual",
+          "revision": 0,
+          "savedRevision": 0
+        }
+      },
+      "composedFrame": {
+        "borderFillRects": [],
+        "clipRect": {
+          "height": 100000,
+          "width": 150000,
+          "x": 525000,
+          "y": 0
+        },
+        "frameId": "manual-frame",
+        "photo": null,
+        "zIndex": 0
+      },
+      "frame": {
+        "id": "manual-frame",
+        "photo": null,
+        "rect": {
+          "height": 100000,
+          "width": 150000,
+          "x": 525000,
+          "y": 0
+        },
+        "zIndex": 0
+      },
+      "name": "height-limited",
+      "sheetId": "sheet-002"
+    }
+  ]
+}

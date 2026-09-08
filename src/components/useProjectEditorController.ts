@@ -120,6 +120,11 @@ export function useProjectEditorController({
     [projection.state.album.sheets, navigation.selectedFrameIds],
   );
   const selectedFrame = selectedFrames.length === 1 ? selectedFrames[0] : null;
+  const canAddFrame = canvasMode.kind === "sheet-editing" && !interactionBlocked;
+  const addFrame = () => {
+    if (!canAddFrame || canvasMode.kind !== "sheet-editing") return Promise.resolve(false);
+    return mutations.applyWithOutcome({ kind: "addFrame", sheetId: canvasMode.sheetId });
+  };
   const canArrangeFrames = canvasMode.kind === "sheet-editing" && selectedFrames.length > 0 && !interactionBlocked;
   const arrangeFrames = (action: FrameStackAction) => {
     if (!canArrangeFrames) return Promise.resolve(false);
@@ -288,6 +293,8 @@ export function useProjectEditorController({
   };
 
   return {
+    addFrame,
+    canAddFrame,
     arrangeFrames,
     canArrangeFrames,
     message: mutations.message,

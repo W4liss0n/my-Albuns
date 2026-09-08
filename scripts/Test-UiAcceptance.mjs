@@ -1103,7 +1103,7 @@ test("runner emits real W3C secondary-button and hit-tested primary clicks", asy
   const requests = [];
 
   await performUiAcceptanceAction({
-    action: { type: "context-click", selector: "#sheet" },
+    action: { type: "context-click", selector: "#sheet", offsetX: -30, offsetY: 20 },
     execute: async () => true,
     locateSelector: async (selector) => `element:${selector}`,
     locateText: async (text) => `text:${text}`,
@@ -1143,8 +1143,8 @@ test("runner emits real W3C secondary-button and hit-tested primary clicks", asy
                 origin: {
                   "element-6066-11e4-a52e-4f735466cecf": "element:#sheet",
                 },
-                x: 0,
-                y: 0,
+                x: -30,
+                y: 20,
               },
               { type: "pointerDown", button: 2 },
               { type: "pointerUp", button: 2 },

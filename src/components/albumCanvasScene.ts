@@ -100,6 +100,11 @@ export class AlbumCanvasScene {
     this.world.label = "album-world";
     this.app.stage.addChild(this.world);
     this.app.stage.eventMode = "static";
+    this.app.stage.hitArea = this.app.screen;
+    this.app.stage.on("rightclick", (event) => {
+      if (event.target !== this.app.stage || this.input?.mode.kind !== "sheet-editing") return;
+      this.openEmptyCanvasContextMenu(this.input.mode.sheetId, { x: event.clientX, y: event.clientY });
+    });
     this.app.stage.on(
       "globalpointermove",
       this.photoInteractions.handlePointerMove,
@@ -652,6 +657,7 @@ export class AlbumCanvasScene {
           if (!this.input || this.input.frameGeometry?.disabled || this.frameInteractions.ignoresTap) return;
           this.input.onOpenFrameContextMenu?.(frameId, position);
         },
+        onEmptyCanvasContextMenu: (sheetId, position) => this.openEmptyCanvasContextMenu(sheetId, position),
         onFrameGeometryStart: (frameId, handle, event) => {
           this.frameInteractions.start(frameId, handle, event);
         },
@@ -700,6 +706,12 @@ export class AlbumCanvasScene {
           this.input.photoDropHighlight.frameId === frameId;
       }
     }
+  }
+
+  private openEmptyCanvasContextMenu(sheetId: string, position: { x: number; y: number }) {
+    if (!this.input || this.input.frameGeometry?.disabled || this.frameInteractions.ignoresTap ||
+        this.input.sheetBarMetadata.find((sheet) => sheet.sheetId === sheetId)?.layoutLocked) return;
+    this.input.onOpenEmptyCanvasContextMenu?.(sheetId, position);
   }
 
   private updateFrameGroupSelection(node: SheetRenderNode, sheet: ComposedSheet | undefined) {

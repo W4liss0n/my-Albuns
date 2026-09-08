@@ -1873,6 +1873,257 @@
           "selector": ".canvas-host canvas"
         }
       ]
+    },
+    {
+      "id": "workspace-manual-frame-edit-menu",
+      "title": "Criação manual de Frame — menu Editar disponível sem seleção",
+      "implementationPath": "/workspace-preview.html?frame=manual&surface=double",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "manual-frame-creation",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "O design 0001 define a criação imediata de um placeholder 3:2 com 40% da superfície ativa, centralizado e selecionado. A referência vigente antecede esse estado."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "[role=\"menu\"][aria-label=\"Editar\"]",
+      "actions": [
+        {
+          "type": "click-text",
+          "text": "Editar"
+        }
+      ]
+    },
+    {
+      "id": "workspace-manual-frame-empty-context",
+      "title": "Criação manual de Frame — menu contextual na Lâmina vazia",
+      "implementationPath": "/workspace-preview.html?frame=manual&surface=double",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "manual-frame-creation",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "O design 0001 define a criação imediata de um placeholder 3:2 com 40% da superfície ativa, centralizado e selecionado. A referência vigente antecede esse estado."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "[role=\"menu\"][aria-label=\"Área vazia do Canvas\"]",
+      "actions": [
+        {
+          "type": "context-click",
+          "selector": ".canvas-host canvas"
+        }
+      ]
+    },
+    {
+      "id": "workspace-manual-frame-background-context",
+      "title": "Criação manual de Frame — clique direito no fundo vazio do Canvas",
+      "implementationPath": "/workspace-preview.html?frame=manual&surface=double",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "manual-frame-creation",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "O design 0001 define a criação imediata de um placeholder 3:2 com 40% da superfície ativa, centralizado e selecionado. A referência vigente antecede esse estado."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "[role=\"menu\"][aria-label=\"Área vazia do Canvas\"]",
+      "actions": [
+        {
+          "type": "context-click",
+          "selector": ".canvas-host canvas",
+          "offsetY": -320
+        }
+      ]
+    },
+    {
+      "id": "workspace-manual-frame-double",
+      "title": "Criação manual de Frame — placeholder centralizado na Lâmina dupla",
+      "implementationPath": "/workspace-preview.html?frame=manual&surface=double",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "manual-frame-creation",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "O design 0001 define a criação imediata de um placeholder 3:2 com 40% da superfície ativa, centralizado e selecionado. A referência vigente antecede esse estado."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-manual-frame-count=\"1\"][data-manual-frame-selection=\"manual-frame\"]",
+      "actions": [
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click-text",
+          "text": "Adicionar Frame"
+        }
+      ]
+    },
+    {
+      "id": "workspace-manual-frame-right",
+      "title": "Criação manual de Frame — placeholder centralizado na Página direita",
+      "implementationPath": "/workspace-preview.html?frame=manual&surface=right",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "manual-frame-creation",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "O design 0001 define a criação imediata de um placeholder 3:2 com 40% da superfície ativa, centralizado e selecionado. A referência vigente antecede esse estado."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-manual-frame-count=\"1\"][data-manual-frame-selection=\"manual-frame\"]",
+      "actions": [
+        {
+          "type": "context-click",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "click-text",
+          "text": "Adicionar Frame"
+        }
+      ]
+    },
+    {
+      "id": "workspace-manual-frame-left",
+      "title": "Criação manual de Frame — placeholder centralizado na Página esquerda",
+      "implementationPath": "/workspace-preview.html?frame=manual&surface=left",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "manual-frame-creation",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "O design 0001 define a criação imediata de um placeholder 3:2 com 40% da superfície ativa, centralizado e selecionado. A referência vigente antecede esse estado."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-manual-frame-count=\"1\"][data-manual-frame-selection=\"manual-frame\"]",
+      "actions": [
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click-text",
+          "text": "Adicionar Frame"
+        }
+      ]
+    },
+    {
+      "id": "workspace-manual-frame-height-limited",
+      "title": "Criação manual de Frame — proporção preservada no limite da altura",
+      "implementationPath": "/workspace-preview.html?frame=manual&surface=height-limited",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "manual-frame-creation",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "O design 0001 define a criação imediata de um placeholder 3:2 com 40% da superfície ativa, centralizado e selecionado. A referência vigente antecede esse estado."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-manual-frame-count=\"1\"][data-manual-frame-selection=\"manual-frame\"]",
+      "actions": [
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click-text",
+          "text": "Adicionar Frame"
+        }
+      ]
+    },
+    {
+      "id": "workspace-manual-frame-undo",
+      "title": "Criação manual de Frame — desfazer remove o Frame criado e sua seleção",
+      "implementationPath": "/workspace-preview.html?frame=manual&surface=double",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "manual-frame-creation",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "O design 0001 define a criação imediata de um placeholder 3:2 com 40% da superfície ativa, centralizado e selecionado. A referência vigente antecede esse estado."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-manual-frame-count=\"0\"][data-manual-frame-selection=\"\"]",
+      "actions": [
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click-text",
+          "text": "Adicionar Frame"
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Desfazer\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-manual-frame-redo",
+      "title": "Criação manual de Frame — refazer restaura o placeholder e permite selecioná-lo",
+      "implementationPath": "/workspace-preview.html?frame=manual&surface=double",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "manual-frame-creation",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "O design 0001 define a criação imediata de um placeholder 3:2 com 40% da superfície ativa, centralizado e selecionado. A referência vigente antecede esse estado."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-manual-frame-count=\"1\"][data-manual-frame-selection=\"manual-frame\"]",
+      "actions": [
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click-text",
+          "text": "Adicionar Frame"
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Desfazer\"]"
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Refazer\"]"
+        },
+        {
+          "type": "pointer-click",
+          "selector": ".canvas-host canvas"
+        }
+      ]
     }
   ]
 }

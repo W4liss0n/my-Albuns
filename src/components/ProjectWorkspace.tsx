@@ -45,6 +45,8 @@ import { useImageProcessingProgressDialog } from "./useImageProcessingProgressDi
 import { useAlbumInformationApplyController } from "./useAlbumInformationApplyController";
 import { SheetContextMenu } from "./SheetContextMenu";
 import { FrameContextMenu } from "./FrameContextMenu";
+import { ContextMenuSurface } from "../ui/ContextMenuSurface";
+import { projectCommandDescriptor } from "../application/projectCommandCatalog";
 import {
   createSheetReorderSession,
   reduceSheetReorderSession,
@@ -139,7 +141,10 @@ export function ProjectWorkspace({
     sheetId: string;
   } | null>(null);
   const [closeMessage, setCloseMessage] = useState<string | null>(null);
-  const [frameContextMenu, setFrameContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [frameContextMenu, setFrameContextMenu] = useState<{
+    kind: "frames" | "empty";
+    position: { x: number; y: number };
+  } | null>(null);
   const [presentationUnitOverride, setPresentationUnitOverride] = useState<{
     projectId: string;
     unit: DisplayUnit;
@@ -510,13 +515,18 @@ export function ProjectWorkspace({
     [structuralCommandsBlocked],
   );
   useEffect(() => {
-    if (!controller.canArrangeFrames || commandsBlocked) setFrameContextMenu(null);
-  }, [controller.canArrangeFrames, commandsBlocked, projectId]);
+    if (!controller.canAddFrame || commandsBlocked ||
+        (frameContextMenu?.kind === "frames" && !controller.canArrangeFrames)) setFrameContextMenu(null);
+  }, [controller.canAddFrame, controller.canArrangeFrames, frameContextMenu?.kind, commandsBlocked, projectId]);
   const openFrameContextMenu = (frameId: string, position: { x: number; y: number }) => {
     if (commandsBlocked || canvasMode.kind !== "sheet-editing" ||
         !projection.state.album.sheets.find((sheet) => sheet.id === canvasMode.sheetId)?.frames.some((frame) => frame.id === frameId)) return;
     if (!controller.canvasProps.selectedFrameIds.includes(frameId)) controller.canvasProps.onSelectFrame(frameId);
-    setFrameContextMenu(position);
+    setFrameContextMenu({ kind: "frames", position });
+  };
+  const openEmptyCanvasContextMenu = (sheetId: string, position: { x: number; y: number }) => {
+    if (!controller.canAddFrame || commandsBlocked || canvasMode.kind !== "sheet-editing" || canvasMode.sheetId !== sheetId) return;
+    setFrameContextMenu({ kind: "empty", position });
   };
   useProjectCommandShortcuts({
     arrangeFrames: (action) => { void controller.arrangeFrames(action); },
@@ -541,6 +551,8 @@ export function ProjectWorkspace({
     undo: controller.undo,
   });
   const applicationMenus = createProjectApplicationMenus({
+    addFrame: () => { void controller.addFrame(); },
+    canAddFrame: controller.canAddFrame,
     arrangeFrames: (action) => { void controller.arrangeFrames(action); },
     canArrangeFrames: controller.canArrangeFrames,
     addSheetAfter: () => {
@@ -627,6 +639,7 @@ export function ProjectWorkspace({
           <AlbumCanvas
             {...controller.canvasProps}
             onOpenFrameContextMenu={openFrameContextMenu}
+            onOpenEmptyCanvasContextMenu={openEmptyCanvasContextMenu}
             draggedPhotoId={draggedPhotoId}
             onPhotoDragCancel={() => setDraggedPhotoId(null)}
             sheetReorder={{
@@ -773,9 +786,18 @@ export function ProjectWorkspace({
         />}
       </div>
 
-      {frameContextMenu ? <FrameContextMenu position={frameContextMenu}
+      {frameContextMenu?.kind === "frames" ? <FrameContextMenu position={frameContextMenu.position}
         onArrange={(action) => { void controller.arrangeFrames(action); }}
         onDismiss={() => setFrameContextMenu(null)} /> : null}
+      {frameContextMenu?.kind === "empty" ? (
+        <ContextMenuSurface label="Área vazia do Canvas" position={frameContextMenu.position}
+          onDismiss={() => setFrameContextMenu(null)}>
+          <button type="button" role="menuitem" onClick={() => {
+            void controller.addFrame();
+            setFrameContextMenu(null);
+          }}>{projectCommandDescriptor("add-frame").label}</button>
+        </ContextMenuSurface>
+      ) : null}
       {sheetContextMenu ? (
         <SheetContextMenu
           availability={sheetStructureAvailability(

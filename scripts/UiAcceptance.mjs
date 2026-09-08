@@ -147,6 +147,11 @@ export function validateUiAcceptanceManifest(manifest) {
         if (action.type === "input") {
           invariant(typeof action.value === "string", `${actionLocation}.value must be a string`);
         }
+        for (const offset of ["offsetX", "offsetY"]) {
+          if (action[offset] === undefined) continue;
+          invariant(["context-click", "pointer-click"].includes(action.type) && Number.isSafeInteger(action[offset]),
+            `${actionLocation}.${offset} must be an integer on a pointer click`);
+        }
         if (action.type === "key") {
           invariant(supportedKeys.has(action.key), `${actionLocation}.key is not supported`);
           invariant(action.selector === undefined, `${actionLocation}.selector is not valid for key actions`);

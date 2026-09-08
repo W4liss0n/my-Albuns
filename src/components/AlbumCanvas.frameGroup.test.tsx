@@ -142,6 +142,19 @@ test("right-clicking a Frame opens its context actions without starting a geomet
   expect(view.onSelectFrame).not.toHaveBeenCalled();
 });
 
+test.each(["sheet", "background"])("right-clicking empty %s offers creation without changing the selection", async (surface) => {
+  const onOpenEmptyCanvasContextMenu = vi.fn();
+  const view = renderCanvas({ compositionPlan: groupComposition(),
+    mode: { kind: "sheet-editing", sheetId: "sheet-001" }, selectedFrameIds: ["frame-001", "frame-002"] });
+  await finishPixiInitialization();
+  view.rerenderCanvas({ onOpenEmptyCanvasContextMenu });
+  const target = surface === "sheet" ? displayWithLabel("canvas-sheet-sheet-001") : getPixiLifecycle().instances[0].stage;
+  act(() => target.emit("rightclick", { target,
+    button: 2, clientX: 320, clientY: 180, stopPropagation: vi.fn() }));
+  expect(onOpenEmptyCanvasContextMenu).toHaveBeenCalledWith("sheet-001", { x: 320, y: 180 });
+  expect(view.onSelectFrame).not.toHaveBeenCalled();
+});
+
 test("multiple selected Frames retain individual outlines and share eight bounding-box handles", async () => {
   const composition = structuredClone(interactiveComposition);
   const original = composition.sheets[0].frames[0];
