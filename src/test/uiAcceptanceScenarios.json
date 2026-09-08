@@ -3999,6 +3999,95 @@
           "key": "Tab"
         }
       ]
+    },
+    {
+      "id": "workspace-photo-orientation-single",
+      "title": "Orientação da Foto — giro e espelhamento no Modo normal",
+      "implementationPath": "/workspace-preview.html?frame=orientation&mode=normal",
+      "comparison": { "kind": "implementation-only", "surface": "photo-orientation", "reason": "O Painel segue a referência vigente e o contexto de Frame/Fotos do design 0001. Os controles de Giro e Espelhamento usam as projeções verificadas pelo ProjectCore e uma imagem de quadrantes para conferir sua ordem." },
+      "viewport": { "width": 1440, "height": 800 },
+      "readySelector": "body[data-photo-orientation=\"single-both\"] [aria-label=\"Giro das Fotos\"]",
+      "actions": [
+        { "type": "click", "selector": "[aria-label=\"Girar 90° à esquerda\"]" },
+        { "type": "click", "selector": ".photo-mirror-control" },
+        { "type": "assert", "selector": ".photo-mirror-control[aria-pressed=\"true\"]" }
+      ]
+    },
+    {
+      "id": "workspace-photo-orientation-mixed",
+      "title": "Orientação das Fotos — valores divergentes e placeholder",
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-both&selection=group",
+      "comparison": { "kind": "implementation-only", "surface": "photo-orientation", "reason": "O design 0001 determina valores neutros na seleção múltipla, sem escolher uma Foto para preview, e a indicação explícita das Fotos atingidas. O corpus vem de comandos públicos do Core." },
+      "viewport": { "width": 1440, "height": 800 },
+      "readySelector": ".photo-mirror-control[aria-pressed=\"mixed\"]",
+      "actions": []
+    },
+    {
+      "id": "workspace-photo-orientation-group",
+      "title": "Orientação das Fotos — ajuste coletivo preserva o placeholder",
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-both&selection=group",
+      "comparison": { "kind": "implementation-only", "surface": "photo-orientation", "reason": "A seleção múltipla aplica uma escolha absoluta às Fotos compatíveis como uma ação por comando, preservando a estrutura do placeholder, conforme o design 0001 e a especificação aceita." },
+      "viewport": { "width": 1440, "height": 800 },
+      "readySelector": "body[data-photo-orientation=\"group-both\"][data-orientation-selection=\"orientation-frame-0,orientation-frame-1,orientation-frame-2\"]",
+      "actions": [
+        { "type": "click", "selector": "[aria-label=\"Girar 90° à esquerda\"]" },
+        { "type": "click", "selector": ".photo-mirror-control" },
+        { "type": "assert", "selector": ".photo-mirror-control[aria-pressed=\"true\"]" }
+      ]
+    },
+    {
+      "id": "workspace-photo-orientation-reset",
+      "title": "Orientação da Foto — restaurar Giro preserva o espelhamento",
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-both",
+      "comparison": { "kind": "implementation-only", "surface": "photo-orientation", "reason": "Giro e demais ajustes são independentes. Restaurar Giro conserva o Espelhamento e o enquadramento, conforme o contrato da entrega e o design 0001." },
+      "viewport": { "width": 1440, "height": 800 },
+      "readySelector": "body[data-photo-orientation=\"single-mirrored\"] [aria-label=\"Restaurar giro\"]:disabled",
+      "actions": [{ "type": "click", "selector": "[aria-label=\"Restaurar giro\"]" }]
+    },
+    {
+      "id": "workspace-photo-orientation-keyboard-history",
+      "title": "Orientação da Foto — teclado, Desfazer e Refazer",
+      "implementationPath": "/workspace-preview.html?frame=orientation",
+      "comparison": { "kind": "implementation-only", "surface": "photo-orientation", "reason": "Os controles reais respondem ao teclado e o Histórico restaura a composição sem mudar a seleção, conforme a especificação aceita. As transições do corpus foram verificadas no Core." },
+      "viewport": { "width": 1440, "height": 800 },
+      "readySelector": "body[data-photo-orientation=\"single-both\"]",
+      "actions": [
+        { "type": "focus", "selector": "[aria-label=\"Girar 90° à esquerda\"]" },
+        { "type": "key", "key": "Enter" },
+        { "type": "click", "selector": ".photo-mirror-control" },
+        { "type": "click-text", "text": "Editar" },
+        { "type": "click", "selector": "[role=\"menuitem\"][aria-label=\"Desfazer\"]" },
+        { "type": "assert", "selector": "body[data-photo-orientation=\"single-rotated\"]" },
+        { "type": "click-text", "text": "Editar" },
+        { "type": "click", "selector": "[role=\"menuitem\"][aria-label=\"Refazer\"]" }
+      ]
+    },
+    {
+      "id": "workspace-photo-orientation-placeholder",
+      "title": "Orientação da Foto — controles ocultos no placeholder",
+      "implementationPath": "/workspace-preview.html?frame=orientation&selection=placeholders",
+      "comparison": { "kind": "implementation-only", "surface": "photo-orientation", "reason": "Controles exclusivos de Foto ficam ocultos quando a seleção contém somente placeholders, conforme o contexto múltiplo e individual do design 0001." },
+      "viewport": { "width": 1440, "height": 800 },
+      "readySelector": "body[data-photo-orientation=\"neutral\"]:not(:has(.photo-orientation-controls))",
+      "actions": []
+    },
+    {
+      "id": "workspace-photo-orientation-scale-125",
+      "title": "Orientação das Fotos — controles a 125%",
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-both&selection=group&scale=1.25",
+      "comparison": { "kind": "implementation-only", "surface": "photo-orientation", "reason": "Os novos controles usam a tipografia e os componentes da referência vigente, mantendo a seleção múltipla legível na escala de 125%." },
+      "viewport": { "width": 1800, "height": 1000 },
+      "readySelector": ".photo-mirror-control[aria-pressed=\"mixed\"]",
+      "actions": []
+    },
+    {
+      "id": "workspace-photo-orientation-scale-150",
+      "title": "Orientação das Fotos — controles a 150%",
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-both&scale=1.5",
+      "comparison": { "kind": "implementation-only", "surface": "photo-orientation", "reason": "Os novos controles usam a tipografia e os componentes da referência vigente, mantendo o Giro e o Espelhamento legíveis na escala de 150%." },
+      "viewport": { "width": 2160, "height": 1200 },
+      "readySelector": ".photo-mirror-control[aria-pressed=\"true\"]",
+      "actions": []
     }
   ]
 }

@@ -98,6 +98,37 @@
   text-overflow: ellipsis;
 }
 
+.photo-orientation-controls {
+  display: grid;
+  gap: var(--ui-space-2);
+  margin-top: var(--ui-space-3);
+}
+
+.photo-orientation-row {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  font-size: var(--ui-font-size-control);
+}
+
+.photo-orientation-row > output {
+  margin-left: auto;
+  font-family: var(--ui-font-mono);
+  color: var(--ui-text-secondary);
+}
+
+.photo-orientation-scope {
+  margin: 0;
+  color: var(--ui-text-muted);
+  font-size: var(--ui-font-size-micro);
+}
+
+.photo-mirror-control[aria-pressed="true"] {
+  color: var(--ui-accent);
+  border-color: var(--ui-accent);
+  background: var(--ui-surface-muted);
+}
+
 .context-heading p {
   margin: var(--ui-space-2) 0 0;
   color: var(--ui-text-muted);

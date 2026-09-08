@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PointerDragThreshold, ProjectCorePort } from "../application/projectPorts";
 import type { PrepareImportedMedia } from "../application/mediaPreviews";
 import type { SheetStructureIntent } from "../application/sheetStructure";
-import type { EditorProjection, FrameStackAction } from "../domain/project";
+import type { EditorProjection, FrameStackAction, PhotoOrientationAction } from "../domain/project";
 import { useEditorView } from "../state/editorView";
 import { CANVAS_MICROMETERS_PER_PIXEL } from "./canvasGeometry";
 import type {
@@ -130,6 +130,11 @@ export function useProjectEditorController({
     return mutations.applyWithOutcome({ kind: "addFrame", sheetId: canvasMode.sheetId });
   };
   const canArrangeFrames = canvasMode.kind === "sheet-editing" && selectedFrames.length > 0 && !interactionBlocked;
+  const canOrientPhotos = selectedFrames.some((frame) => frame.photo !== null) && !interactionBlocked;
+  const orientPhotos = (action: PhotoOrientationAction) => {
+    if (!canOrientPhotos) return Promise.resolve(false);
+    return mutations.orientPhotos([...navigation.selectedFrameIds], action);
+  };
   const canDeleteFrames = canArrangeFrames;
   const canCopyFrames = canArrangeFrames;
   const canPasteFrames = canAddFrame && (projection.canPasteFrames || mutations.frameCopyPending);
@@ -347,6 +352,8 @@ export function useProjectEditorController({
   };
 
   return {
+    canOrientPhotos,
+    orientPhotos,
     addFrame,
     canAddFrame,
     canDeleteFrames,

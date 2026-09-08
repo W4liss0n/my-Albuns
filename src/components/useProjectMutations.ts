@@ -9,6 +9,7 @@ import type {
   ComposedFrame,
   EditorProjection,
   FrameGeometryEdit,
+  PhotoOrientationAction,
   ProjectIntent,
 } from "../domain/project";
 import {
@@ -135,6 +136,14 @@ export function useProjectMutations({
       return next;
     }, true);
     return completed && applied;
+  }
+
+  function orientPhotos(frameIds: string[], action: PhotoOrientationAction) {
+    return runWithErrorFeedback(
+      (port) => imageProcessing.run((publish) =>
+        port.apply({ kind: "orientPhotos", frameIds, action }, publish)),
+      true,
+    );
   }
 
   async function copyFrames(frameIds: string[]) {
@@ -407,6 +416,7 @@ export function useProjectMutations({
     commitFrameGeometry,
     swapFrameContentsAtPoint,
     swapSheetSides,
+    orientPhotos,
     applyAlbumInformation: commitAlbumInformation,
     applyAlbumDesign: (draft: AlbumDesignProjectDraft) =>
       commitProjectSettingsDraft(draft),

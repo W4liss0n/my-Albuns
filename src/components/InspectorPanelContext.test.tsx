@@ -54,6 +54,32 @@ function sheetContext(): InspectorContext {
 
 beforeEach(() => localStorage.clear());
 
+test("Photo orientation controls show mixed values and target compatible Photos", () => {
+  const frames = [structuredClone(sheetState.frames[0]), { ...structuredClone(sheetState.frames[0]), id: "second-photo" }];
+  frames[0].photo!.transform.quarterTurns = 3;
+  frames[0].photo!.transform.mirrorX = true;
+  frames[1].photo!.transform.quarterTurns = 0;
+  frames[1].photo!.transform.mirrorX = false;
+  frames.push({ ...structuredClone(frames[0]), id: "placeholder", photo: null });
+  const onAction = vi.fn();
+  const props = inspectorProps({ kind: "multiple-frames", frames, editingSheet: composedSheet });
+  const view = render(<InspectorPanel {...props} photoOrientation={{ disabled: false, onAction }} />);
+  expect(screen.getByText("Aplicado a 2 Fotos de 3 Frames")).toBeInTheDocument();
+  expect(screen.getByLabelText("Giro das Fotos")).toHaveTextContent("—");
+  const mirror = screen.getByRole("button", { name: "Espelhar horizontalmente" });
+  expect(mirror).toHaveAttribute("aria-pressed", "mixed");
+  fireEvent.click(screen.getByRole("button", { name: "Girar 90° à esquerda" }));
+  fireEvent.click(mirror);
+  fireEvent.click(screen.getByRole("button", { name: "Restaurar giro" }));
+  expect(onAction.mock.calls).toEqual([["rotateCounterClockwise"], ["toggleHorizontalMirror"], ["resetRotation"]]);
+  view.rerender(<InspectorPanel {...props} photoOrientation={{ disabled: true, onAction }} />);
+  expect(screen.getByRole("button", { name: "Girar 90° à esquerda" })).toBeDisabled();
+  expect(mirror).toBeDisabled();
+  view.rerender(<InspectorPanel {...inspectorProps({ kind: "frame", frame: frames[2], composedPhoto: null })}
+    photoOrientation={{ disabled: false, onAction }} />);
+  expect(screen.queryByRole("button", { name: "Espelhar horizontalmente" })).not.toBeInTheDocument();
+});
+
 test("shows Design da Lâmina and preserves its scope while Frame temporarily owns the Inspector", () => {
   const view = render(<InspectorPanel {...inspectorProps(sheetContext())} />);
 

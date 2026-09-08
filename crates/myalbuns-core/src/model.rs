@@ -859,6 +859,10 @@ pub enum ProjectIntent {
         sheet_id: String,
         target_index: usize,
     },
+    OrientPhotos {
+        frame_ids: Vec<String>,
+        action: PhotoOrientationAction,
+    },
     TransformPhoto {
         frame_id: String,
         delta_pan_x: f32,
@@ -881,8 +885,18 @@ pub enum ProjectIntent {
     },
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum PhotoOrientationAction {
+    RotateCounterClockwise,
+    ResetRotation,
+    ToggleHorizontalMirror,
+}
+
 #[derive(Debug, Error, PartialEq)]
 pub enum CoreError {
+    #[error("Selecione Frames distintos de uma única Lâmina para orientar as Fotos")]
+    InvalidPhotoOrientationSelection,
     #[error("A Troca de lados exige uma Lâmina dupla")]
     InvalidSheetSideSwap,
     #[error("Selecione Frames distintos de uma única Lâmina para copiar")]

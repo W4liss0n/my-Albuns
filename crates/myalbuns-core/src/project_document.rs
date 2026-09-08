@@ -251,6 +251,8 @@ pub struct ProjectPhotoTransform {
     pan_x_scaled: i32,
     pan_y_scaled: i32,
     user_zoom_scaled: u32,
+    quarter_turns: i8,
+    mirror_x: bool,
 }
 
 impl Default for ProjectPhotoTransform {
@@ -272,6 +274,27 @@ impl ProjectPhotoTransform {
         self.user_zoom_scaled as f32 / TRANSFORM_SCALE
     }
 
+    pub const fn quarter_turns(&self) -> i8 {
+        self.quarter_turns
+    }
+
+    pub const fn mirror_x(&self) -> bool {
+        self.mirror_x
+    }
+
+    pub(crate) fn with_orientation(
+        mut self,
+        quarter_turns: i8,
+        mirror_x: bool,
+    ) -> Result<Self, ()> {
+        if !(0..=3).contains(&quarter_turns) {
+            return Err(());
+        }
+        self.quarter_turns = quarter_turns;
+        self.mirror_x = mirror_x;
+        Ok(self)
+    }
+
     pub(crate) fn new(pan_x: f32, pan_y: f32, user_zoom: f32) -> Result<Self, ()> {
         if !pan_x.is_finite()
             || !pan_y.is_finite()
@@ -286,6 +309,8 @@ impl ProjectPhotoTransform {
             pan_x_scaled: (pan_x * TRANSFORM_SCALE).round() as i32,
             pan_y_scaled: (pan_y * TRANSFORM_SCALE).round() as i32,
             user_zoom_scaled: (user_zoom * TRANSFORM_SCALE).round() as u32,
+            quarter_turns: 0,
+            mirror_x: false,
         })
     }
 
@@ -293,11 +318,14 @@ impl ProjectPhotoTransform {
         if !delta_pan_x.is_finite() || !delta_pan_y.is_finite() || !delta_zoom.is_finite() {
             return Err(());
         }
-        Self::new(
+        let mut next = Self::new(
             (self.pan_x() + delta_pan_x).clamp(PHOTO_PAN_MIN, PHOTO_PAN_MAX),
             (self.pan_y() + delta_pan_y).clamp(PHOTO_PAN_MIN, PHOTO_PAN_MAX),
             (self.user_zoom() + delta_zoom).clamp(PHOTO_ZOOM_MIN, PHOTO_ZOOM_MAX),
-        )
+        )?;
+        next.quarter_turns = self.quarter_turns;
+        next.mirror_x = self.mirror_x;
+        Ok(next)
     }
 }
 
@@ -837,6 +865,53 @@ impl ProjectDocument {
             return Err(());
         }
         Ok((sheet_index, selected))
+    }
+
+    pub(crate) fn with_oriented_photos(
+        &self,
+        frame_ids: &[String],
+        action: crate::PhotoOrientationAction,
+    ) -> Result<Self, crate::CoreError> {
+        let (sheet_index, selected) = self
+            .frame_selection(frame_ids)
+            .map_err(|()| crate::CoreError::InvalidPhotoOrientationSelection)?;
+        let transforms: Vec<_> = self.sheets[sheet_index]
+            .frames
+            .iter()
+            .filter(|frame| selected.contains(&frame.id))
+            .filter_map(|frame| frame.photo.as_ref().map(|photo| photo.transform))
+            .collect();
+        let Some(first) = transforms.first() else {
+            return Ok(self.clone());
+        };
+        // Mixed controls make one absolute choice for every compatible Photo.
+        let next_turn = if transforms
+            .iter()
+            .all(|t| t.quarter_turns == first.quarter_turns)
+        {
+            (first.quarter_turns + 3) % 4
+        } else {
+            3
+        };
+        let next_mirror = !transforms.iter().all(|t| t.mirror_x);
+        let mut candidate = self.clone();
+        for photo in candidate.sheets[sheet_index]
+            .frames
+            .iter_mut()
+            .filter(|frame| selected.contains(&frame.id))
+            .filter_map(|frame| frame.photo.as_mut())
+        {
+            match action {
+                crate::PhotoOrientationAction::RotateCounterClockwise => {
+                    photo.transform.quarter_turns = next_turn
+                }
+                crate::PhotoOrientationAction::ResetRotation => photo.transform.quarter_turns = 0,
+                crate::PhotoOrientationAction::ToggleHorizontalMirror => {
+                    photo.transform.mirror_x = next_mirror
+                }
+            }
+        }
+        Ok(candidate)
     }
 
     pub(crate) fn with_swapped_sheet_sides(

@@ -74,6 +74,7 @@ pub(crate) async fn apply_project_intent(
         ProjectIntent::ConvertEdgeSheet { .. } => "convert_edge_sheet",
         ProjectIntent::ReorderSheet { .. } => "reorder_sheet",
         ProjectIntent::TransformPhoto { .. } => "transform_photo",
+        ProjectIntent::OrientPhotos { .. } => "orient_photos",
         ProjectIntent::AddPhoto { .. } => "add_photo",
         ProjectIntent::DropPhoto { .. } => "drop_photo",
     };

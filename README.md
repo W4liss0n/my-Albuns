@@ -54,6 +54,7 @@ Contratos detalhados por área. Os de interface descrevem superfícies e intera�
 - [0017 — Contrato da primeira composição com Foto](docs/design/0017-contrato-da-primeira-composicao-com-foto.md) — esquema v3, Frames, enquadramento, resolução do alvo de soltura e autoridade do Original na Exportação.
 - [0019 — Contrato do Renderizador final](docs/design/0019-contrato-do-renderizador-final.md) — composição canônica, JPEG/PNG/PDF, captura estável dos Originais, Publicação e corpus dourado.
 - [0020 — Importação com decode único e lotes](docs/design/0020-importacao-com-decode-unico-e-lotes.md) — tentativa com caminhos congelados, adoção pelo Monitor, transações de Cache e capacidade de CPU/RAM.
+- [0021 — Orientação de Fotos e Projeto v4](docs/design/0021-orientacao-de-fotos-e-projeto-v4.md) — Giro, Espelhamento, seleção múltipla e migração do arquivo persistente.
 
 ## Pesquisas
 
@@ -81,6 +82,8 @@ Material técnico não normativo, conservado como histórico das avaliações.
 - [Rótulos de triagem](docs/agents/triage-labels.md) — estados canônicos de um ticket.
 
 ## Entregas
+
+O [primeiro recorte de orientação de Fotos](docs/design/0021-orientacao-de-fotos-e-projeto-v4.md) acrescenta Giro de 90° anti-horário, restauração do Giro e Espelhamento horizontal no Painel contextual. As ações alcançam as Fotos selecionadas e preservam Frames, placeholders e enquadramento, com Undo/Redo, Salvamento, reabertura e Exportação. O formato v4 conserva a abertura de v1–v3 e só é gravado ao salvar explicitamente. A [conferência da edição de Frames](docs/research/2026-09-08-conferencia-edicao-de-frames.md) registra a base entregue e os critérios ainda vinculados às issues #22, #25 e #26.
 
 O mapa de implementação está no [GitHub, issue #1](https://github.com/W4liss0n/my-Albuns/issues/1), com tickets de entrega e seus bloqueadores. Os arquivos antigos em `.scratch/programa-diagramacao/` são históricos.
 

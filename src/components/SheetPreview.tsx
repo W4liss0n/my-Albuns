@@ -343,8 +343,8 @@ function PhotoPreview({
   const centerY = drawRect.y + drawRect.height / 2;
   const transform = [
     `translate(${centerX} ${centerY})`,
-    `rotate(${photo.rotationDegrees})`,
     `scale(${photo.mirrorX ? -1 : 1} 1)`,
+    `rotate(${photo.rotationDegrees})`,
     `translate(${-centerX} ${-centerY})`,
   ].join(" ");
 
