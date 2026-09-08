@@ -108,23 +108,28 @@ test.each(["success", "failure"])("a pending Frame edit followed by Save uses th
   }
 });
 
-test("loads the platform drag threshold on entry and ignores a late reply after leaving editing", async () => {
+test("loads the platform drag threshold in both modes and ignores replies from the previous mode", async () => {
   const port = projectCorePort();
   const reply = deferredValue<{ x: number; y: number }>();
-  const read = vi.spyOn(port, "readFrameDragThreshold").mockReturnValue(reply.promise);
+  const currentReply = deferredValue<{ x: number; y: number }>();
+  const read = vi.spyOn(port, "readFrameDragThreshold").mockReturnValueOnce(reply.promise)
+    .mockReturnValueOnce(reply.promise).mockReturnValue(currentReply.promise);
   const view = renderHook(() => useProjectEditorController({
     projection: representativeProjection, projectCorePort: port,
     runProjectMutation: { run: vi.fn(), waitForIdle: async () => null }, onProjectionChange: vi.fn(),
   }));
-  expect(read).not.toHaveBeenCalled();
-  act(() => view.result.current.canvasProps.onEditSheet("sheet-001"));
   expect(read).toHaveBeenCalledOnce();
+  act(() => view.result.current.canvasProps.onEditSheet("sheet-001"));
+  expect(read).toHaveBeenCalledTimes(2);
   expect(view.result.current.canvasProps.frameGeometry!.dragThreshold).toBeNull();
   fireEvent.keyDown(window, { key: "Escape" });
   await act(async () => reply.resolve({ x: 7, y: 9 }));
   expect(view.result.current.canvasProps.frameGeometry!.dragThreshold).toBeNull();
+  expect(view.result.current.canvasProps.frameContentSwap!.dragThreshold).toBeNull();
+  await act(async () => currentReply.resolve({ x: 8, y: 10 }));
+  expect(view.result.current.canvasProps.frameContentSwap!.dragThreshold).toEqual({ x: 8, y: 10 });
   act(() => view.result.current.canvasProps.onEditSheet("sheet-001"));
-  await waitFor(() => expect(view.result.current.canvasProps.frameGeometry!.dragThreshold).toEqual({ x: 7, y: 9 }));
+  await waitFor(() => expect(view.result.current.canvasProps.frameGeometry!.dragThreshold).toEqual({ x: 8, y: 10 }));
 });
 
 test("routes editor changes through the shared Project mutation runner", async () => {

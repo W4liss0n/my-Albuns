@@ -1425,6 +1425,22 @@ test("runner initiates declared pointer capture through the proven WebDriver seq
   );
 });
 
+test("pointer drag offsets address distinct points within a Canvas", async () => {
+  const { performUiAcceptanceAction } = await import("./UiAcceptanceRunner.mjs");
+  let pointerActions;
+  await performUiAcceptanceAction({
+    action: { type: "drag", gesture: "pointer", selector: "canvas", targetSelector: "canvas", phase: "drop",
+      sourceOffsetX: -100, sourceOffsetY: -20, targetOffsetX: 120, targetOffsetY: 30 },
+    execute: async (script) => script.includes("getBoundingClientRect")
+      ? { source: { x: 500, y: 300 }, target: { x: 500, y: 300 }, dropTarget: null } : true,
+    locateSelector: async (selector) => selector, locateText: async () => "",
+    request: async (_method, _endpoint, body) => { pointerActions = body.actions[0].actions; }, sessionId: "canvas",
+  });
+  assert.equal(pointerActions[0].x, 400); assert.equal(pointerActions[0].y, 280);
+  assert.equal(pointerActions[4].x, 620); assert.equal(pointerActions[4].y, 330);
+  assert.equal(pointerActions.at(-1).type, "pointerUp");
+});
+
 test("runner verifies native selection policy through real pointer motion", async () => {
   const { performUiAcceptanceAction } = await import(
     "./UiAcceptanceRunner.mjs"

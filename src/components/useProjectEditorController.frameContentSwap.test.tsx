@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 
 import type { ProjectCorePort } from "../application/projectPorts";
@@ -41,8 +41,59 @@ function swapHarness() {
     return useProjectEditorController({ projection, projectCorePort: port,
       runProjectMutation, onProjectionChange: setProjection, interactionBlocked: blocked });
   }, { initialProps: { blocked: false } });
-  return { view, initial, swapped, resolve, reject, apply, save, undo, redo };
+  return { view, initial, swapped, resolve, reject, apply, save, undo, redo, port };
 }
+
+test.each([false, true])("normal drop serializes Core resolution, swap and adjacent Save/Undo; failure=%s", async (fails) => {
+  const h = swapHarness();
+  let resolveTarget!: (target: Awaited<ReturnType<ProjectCorePort["resolvePhotoDropTarget"]>>) => void;
+  h.port.resolvePhotoDropTarget = vi.fn<ProjectCorePort["resolvePhotoDropTarget"]>(() => new Promise((yes) => { resolveTarget = yes; }));
+  act(() => useEditorView.getState().exitSheetEdit());
+  let completion!: Promise<boolean>;
+  act(() => {
+    completion = h.view.result.current.canvasProps.frameContentSwap!.commit("swap-frame-0", { sheetId: "sheet-002", xUm: 100, yUm: 200 });
+    h.view.result.current.save(); h.view.result.current.undo();
+    useEditorView.getState().selectFrame("swap-frame-3");
+  });
+  await waitFor(() => expect(h.port.resolvePhotoDropTarget).toHaveBeenCalledWith("sheet-002", 100, 200));
+  expect(h.apply).not.toHaveBeenCalled(); expect(h.save).not.toHaveBeenCalled(); expect(h.undo).not.toHaveBeenCalled();
+  await act(async () => {
+    resolveTarget({ kind: "frame", frameId: "swap-frame-4" });
+    if (fails) h.reject(new Error("A troca falhou.")); else h.resolve(h.swapped);
+    await completion;
+  });
+  expect(h.apply.mock.calls[0][0]).toEqual({ kind: "swapFrameContents", frameIds: ["swap-frame-0", "swap-frame-4"] });
+  if (fails) {
+    expect(h.save).not.toHaveBeenCalled(); expect(h.undo).not.toHaveBeenCalled();
+    expect(h.view.result.current.message).toBe("A troca falhou.");
+  } else {
+    expect(h.save).toHaveBeenCalledWith(h.swapped.state.revision); expect(h.undo).toHaveBeenCalledOnce();
+  }
+  expect(useEditorView.getState().selectedFrameIds).toEqual(["swap-frame-3"]);
+});
+
+test.each(["self", "background", "invalid", "empty-source", "blocked", "editing"])("normal drop on %s does not create a History command", async (reason) => {
+  const h = swapHarness();
+  h.port.resolvePhotoDropTarget = vi.fn<ProjectCorePort["resolvePhotoDropTarget"]>(async () => reason === "self" ? { kind: "frame", frameId: "swap-frame-0" }
+    : reason === "background" ? { kind: "sheet", sheetId: "sheet-002" } : { kind: "invalid" });
+  if (reason !== "editing") act(() => useEditorView.getState().exitSheetEdit());
+  if (reason === "blocked") h.view.rerender({ blocked: true });
+  await act(async () => {
+    expect(await h.view.result.current.canvasProps.frameContentSwap!.commit(reason === "empty-source" ? "swap-frame-2" : "swap-frame-0",
+      { sheetId: "sheet-002", xUm: 100, yUm: 200 })).toBe(false);
+  });
+  expect(h.apply).not.toHaveBeenCalled();
+});
+
+test("a pending command that changes the source Photo cancels the queued normal drop", async () => {
+  const h = swapHarness();
+  let first!: Promise<boolean>;
+  act(() => { first = h.view.result.current.swapFrameContents(); useEditorView.getState().exitSheetEdit(); });
+  let drop!: Promise<boolean>;
+  act(() => { drop = h.view.result.current.canvasProps.frameContentSwap!.commit("swap-frame-0", { sheetId: "sheet-002", xUm: 100, yUm: 200 }); });
+  await act(async () => { h.resolve(h.swapped); await first; expect(await drop).toBe(false); });
+  expect(h.apply).toHaveBeenCalledOnce();
+});
 
 test.each([false, true])("swap captures the pair and queues Save/Undo while preserving a later selection; failure=%s", async (fails) => {
   const harness = swapHarness();

@@ -31,9 +31,12 @@ fn metadata(index: usize) -> PhotoSourceMetadata {
 
 fn edit_geometry(project: &mut EditableProject, frame_id: &str, gesture: FrameGeometryGesture) {
     let projection = project.projection();
-    let frame = projection.state.album.sheets[0]
-        .frames
+    let frame = projection
+        .state
+        .album
+        .sheets
         .iter()
+        .flat_map(|sheet| &sheet.frames)
         .find(|frame| frame.id == frame_id)
         .unwrap();
     project
@@ -136,7 +139,12 @@ fn project_with_frames(root: &Path, same_media: bool) -> EditableProject {
 }
 
 fn assert_photos_fill_frames(projection: &EditorProjection) {
-    for frame in &projection.composition.sheets[0].frames {
+    for frame in projection
+        .composition
+        .sheets
+        .iter()
+        .flat_map(|sheet| &sheet.frames)
+    {
         let Some(photo) = &frame.photo else { continue };
         let placement = &photo.placement.current;
         let epsilon = 0.001;
@@ -150,6 +158,96 @@ fn assert_photos_fill_frames(projection: &EditorProjection) {
             placement.center.y + placement.size.height / 2.0 + epsilon
                 >= frame.clip_rect.height as f64
         );
+    }
+}
+
+fn project_with_cross_sheet_frames(root: &Path) -> EditableProject {
+    let mut project = project_with_frames(root, false);
+    let before = project.projection();
+    let sheet_id = before.state.album.sheets[1].id.clone();
+    for index in 0..2 {
+        let added = project
+            .apply_with_outcome(ProjectIntent::AddFrame {
+                sheet_id: sheet_id.clone(),
+            })
+            .unwrap();
+        let frame_id = added.affected_frame_id.unwrap();
+        let rect = added.projection.state.album.sheets[1]
+            .frames
+            .last()
+            .unwrap()
+            .rect
+            .clone();
+        if index == 0 {
+            project
+                .apply(ProjectIntent::DropPhoto {
+                    sheet_id: sheet_id.clone(),
+                    media_id: before.state.album.media[1].id,
+                    x_um: rect.x + rect.width / 2,
+                    y_um: rect.y + rect.height / 2,
+                    mode: PhotoPlacementMode::Edit,
+                })
+                .unwrap();
+            project
+                .apply(ProjectIntent::TransformPhoto {
+                    frame_id: frame_id.clone(),
+                    delta_pan_x: 0.4,
+                    delta_pan_y: -0.7,
+                    delta_zoom: 0.8,
+                })
+                .unwrap();
+        }
+        edit_geometry(
+            &mut project,
+            &frame_id,
+            FrameGeometryGesture::Move {
+                delta_x_um: if index == 0 { 90_000 } else { 450_000 } - rect.x,
+                delta_y_um: 90_000 - rect.y,
+            },
+        );
+    }
+    project
+}
+
+#[test]
+fn cross_sheet_swap_is_one_edit_preserving_occurrences_frames_and_saved_composition() {
+    for destination in 0..2 {
+        let root = tempfile::tempdir().unwrap();
+        let mut project = project_with_cross_sheet_frames(root.path());
+        let before = project.projection();
+        let frozen = project.render_snapshot();
+        let source = &before.state.album.sheets[0].frames[0];
+        let target = &before.state.album.sheets[1].frames[destination];
+        let swapped = project
+            .apply(ProjectIntent::SwapFrameContents {
+                frame_ids: vec![source.id.clone(), target.id.clone()],
+            })
+            .unwrap();
+        let mut expected = before.state.album.clone();
+        expected.sheets[0].frames[0].photo = target.photo.clone();
+        expected.sheets[1].frames[destination].photo = source.photo.clone();
+        assert_eq!(swapped.state.album, expected);
+        assert_eq!(swapped.media_usage, before.media_usage);
+        assert_eq!(swapped.state.revision, before.state.revision + 1);
+        assert_photos_fill_frames(&swapped);
+        assert_eq!(frozen.composition, before.composition);
+        assert_eq!(project.undo().unwrap().state.album, before.state.album);
+        assert_eq!(project.redo().unwrap().state.album, expected);
+        project.save(project.revision()).unwrap();
+        let saved = project.render_snapshot();
+        drop(project);
+        let mut reopened = core(root.path())
+            .open_editable(OpenProjectRequest::new(location(
+                &root.path().join("Troca.myalbuns"),
+            )))
+            .unwrap();
+        for (index, media) in expected.media.iter().enumerate() {
+            reopened
+                .observe_photo_source(media.id, metadata(index))
+                .unwrap();
+        }
+        assert_eq!(reopened.projection().state.album, expected);
+        assert_eq!(reopened.render_snapshot().composition, saved.composition);
     }
 }
 
@@ -267,7 +365,7 @@ fn invalid_swap_selections_leave_the_project_and_redo_branch_unchanged() {
             frames[2].id.clone(),
         ],
         vec![frames[0].id.clone(), frames[0].id.to_uppercase()],
-        vec![frames[0].id.clone(), other],
+        vec![frames[2].id.clone(), other],
         vec![
             frames[0].id.clone(),
             "00000000-0000-0000-0000-000000000000".into(),
@@ -336,11 +434,14 @@ fn swapped_photos_fill_extreme_frame_proportions_even_at_pan_limits() {
 #[test]
 fn swap_preview_corpus_matches_the_public_core() {
     let root = tempfile::tempdir().unwrap();
-    let mut project = project_with_frames(root.path(), false);
+    let mut project = project_with_cross_sheet_frames(root.path());
     let before = project.projection();
-    let ids = before.state.album.sheets[0]
-        .frames
+    let ids = before
+        .state
+        .album
+        .sheets
         .iter()
+        .flat_map(|sheet| &sheet.frames)
         .map(|frame| frame.id.clone())
         .collect::<Vec<_>>();
     let normalized_media = |id| {
@@ -391,7 +492,12 @@ fn swap_preview_corpus_matches_the_public_core() {
         value
     };
     let mut cases = Vec::new();
-    for (name, destination) in [("photos", 1), ("placeholder", 2)] {
+    for (name, destination) in [
+        ("photos", 1),
+        ("placeholder", 2),
+        ("cross-photos", 4),
+        ("cross-placeholder", 5),
+    ] {
         let after = project
             .apply(ProjectIntent::SwapFrameContents {
                 frame_ids: vec![ids[0].clone(), ids[destination].clone()],
@@ -403,10 +509,21 @@ fn swap_preview_corpus_matches_the_public_core() {
         }));
         project.undo().unwrap();
     }
+    let drop_probes = before.state.album.sheets.iter().enumerate().flat_map(|(sheet_index, sheet)| {
+        sheet.frames.iter().map(|frame| {
+            let x = frame.rect.x + frame.rect.width / 2;
+            let y = frame.rect.y + frame.rect.height / 2;
+            let mut target = serde_json::to_value(project.photo_drop_target(&sheet.id, x, y).unwrap()).unwrap();
+            if let Some(id) = target.get_mut("frameId") {
+                *id = serde_json::json!(format!("swap-frame-{}", ids.iter().position(|item| item == id.as_str().unwrap()).unwrap()));
+            }
+            serde_json::json!({ "sheetId": format!("sheet-{:03}", sheet_index + 1), "xUm": x, "yUm": y, "target": target })
+        }).collect::<Vec<_>>()
+    }).collect::<Vec<_>>();
     let serialized = format!(
         "{}\n",
         serde_json::to_string_pretty(&serde_json::json!({
-            "before": normalize(&before), "cases": cases,
+            "before": normalize(&before), "cases": cases, "dropProbes": drop_probes,
         }))
         .unwrap()
     );

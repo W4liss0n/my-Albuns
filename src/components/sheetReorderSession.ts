@@ -1,3 +1,8 @@
+export {
+  EDGE_AUTO_SCROLL as SHEET_REORDER_AUTO_SCROLL,
+  edgeAutoScrollVelocity as sheetReorderAutoScrollVelocity,
+  type EdgeAutoScrollInput as SheetReorderAutoScrollInput,
+} from "./edgeAutoScroll";
 import { planSheetReorder } from "../application/sheetStructure";
 import type { SheetSnapshot } from "../domain/project";
 
@@ -54,23 +59,8 @@ export interface SheetReorderRepresentation {
   readonly ghost: SheetReorderGhost | null;
 }
 
-export const SHEET_REORDER_AUTO_SCROLL = {
-  edgeMarginPx: 72,
-  maxVelocityPxPerSecond: {
-    horizontal: 960,
-    vertical: 720,
-  },
-} as const;
-
 export const SHEET_REORDER_INVALID_MESSAGE =
   "Posição inválida: Páginas únicas permanecem nas extremidades.";
-
-export interface SheetReorderAutoScrollInput {
-  readonly axis: "horizontal" | "vertical";
-  readonly pointerPosition: number;
-  readonly viewportStart: number;
-  readonly viewportEnd: number;
-}
 
 export function createSheetReorderSession(
   sheets: readonly SheetSnapshot[],
@@ -196,51 +186,6 @@ export function sheetReorderRepresentation(
   return confirmedRepresentation(session.confirmedOrder);
 }
 
-export function sheetReorderAutoScrollVelocity({
-  axis,
-  pointerPosition,
-  viewportStart,
-  viewportEnd,
-}: SheetReorderAutoScrollInput): number {
-  if (
-    !Number.isFinite(pointerPosition) ||
-    !Number.isFinite(viewportStart) ||
-    !Number.isFinite(viewportEnd) ||
-    viewportEnd <= viewportStart
-  ) {
-    return 0;
-  }
-
-  const viewportLength = viewportEnd - viewportStart;
-  const edgeMargin = Math.min(
-    SHEET_REORDER_AUTO_SCROLL.edgeMarginPx,
-    viewportLength / 2,
-  );
-  if (edgeMargin <= 0) {
-    return 0;
-  }
-
-  const maximumVelocity =
-    SHEET_REORDER_AUTO_SCROLL.maxVelocityPxPerSecond[axis];
-  const leadingThreshold = viewportStart + edgeMargin;
-  if (pointerPosition < leadingThreshold) {
-    const proximity = clampUnit(
-      (leadingThreshold - pointerPosition) / edgeMargin,
-    );
-    return -maximumVelocity * proximity * proximity;
-  }
-
-  const trailingThreshold = viewportEnd - edgeMargin;
-  if (pointerPosition > trailingThreshold) {
-    const proximity = clampUnit(
-      (pointerPosition - trailingThreshold) / edgeMargin,
-    );
-    return maximumVelocity * proximity * proximity;
-  }
-
-  return 0;
-}
-
 function confirmedSheetOrder(
   sheets: readonly SheetSnapshot[],
 ): readonly string[] {
@@ -277,8 +222,4 @@ function confirmedRepresentation(
 
 function unchanged(session: SheetReorderSession): SheetReorderTransition {
   return { session, effect: null };
-}
-
-function clampUnit(value: number): number {
-  return Math.min(1, Math.max(0, value));
 }

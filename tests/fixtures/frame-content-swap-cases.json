@@ -231,7 +231,94 @@
             },
             "rgb": "#FFFFFF"
           },
-          "frames": [],
+          "frames": [
+            {
+              "borderFillRects": [],
+              "clipRect": {
+                "height": 160000,
+                "width": 240000,
+                "x": 90000,
+                "y": 90000
+              },
+              "frameId": "swap-frame-4",
+              "photo": {
+                "drawRect": {
+                  "height": 1008000,
+                  "width": 432000,
+                  "x": 32400,
+                  "y": -630800
+                },
+                "mediaId": "00000000-0000-4000-8000-000000000002",
+                "mirrorX": false,
+                "name": "Foto-1.jpg",
+                "palette": [
+                  "#66314A",
+                  "#D88370",
+                  "#EAD8B5"
+                ],
+                "placement": {
+                  "baseFillZoom": 800.0,
+                  "current": {
+                    "center": {
+                      "x": 158399.9982833862,
+                      "y": -216799.985599518
+                    },
+                    "size": {
+                      "height": 1007999.9732971191,
+                      "width": 431999.9885559082
+                    }
+                  },
+                  "currentPan": {
+                    "x": 0.4000000059604645,
+                    "y": -0.699999988079071
+                  },
+                  "currentZoom": 1.7999999523162842,
+                  "panOrigin": {
+                    "x": 120000.0,
+                    "y": 80000.0
+                  },
+                  "panRange": {
+                    "maximum": 1.0,
+                    "minimum": -1.0
+                  },
+                  "panToCenter": {
+                    "xx": 95999.9942779541,
+                    "xy": -0.0,
+                    "yx": 0.0,
+                    "yy": 423999.98664855957
+                  },
+                  "panToCenterPerZoom": {
+                    "xx": 120000.0,
+                    "xy": -0.0,
+                    "yx": 0.0,
+                    "yy": 280000.0
+                  },
+                  "sizePerZoom": {
+                    "height": 560000.0,
+                    "width": 240000.0
+                  },
+                  "zoomRange": {
+                    "maximum": 4.0,
+                    "minimum": 1.0
+                  }
+                },
+                "rotationDegrees": 0.0
+              },
+              "zIndex": 0
+            },
+            {
+              "borderFillRects": [],
+              "clipRect": {
+                "height": 160000,
+                "width": 240000,
+                "x": 360000,
+                "y": 90000
+              },
+              "frameId": "swap-frame-5",
+              "photo": null,
+              "zIndex": 1
+            }
+          ],
           "heightUm": 300000,
           "number": 2,
           "overlays": [],
@@ -246,7 +333,7 @@
         "mediaId": "00000000-0000-4000-8000-000000000001"
       },
       {
-        "count": 1,
+        "count": 2,
         "mediaId": "00000000-0000-4000-8000-000000000002"
       }
     ],
@@ -359,7 +446,40 @@
           },
           {
             "activeSides": "both",
-            "frames": [],
+            "frames": [
+              {
+                "id": "swap-frame-4",
+                "photo": {
+                  "mediaId": "00000000-0000-4000-8000-000000000002",
+                  "transform": {
+                    "fineRotationDegrees": 0.0,
+                    "mirrorX": false,
+                    "panX": 0.4000000059604645,
+                    "panY": -0.699999988079071,
+                    "quarterTurns": 0,
+                    "userZoom": 1.7999999523162842
+                  }
+                },
+                "rect": {
+                  "height": 160000,
+                  "width": 240000,
+                  "x": 90000,
+                  "y": 90000
+                },
+                "zIndex": 0
+              },
+              {
+                "id": "swap-frame-5",
+                "photo": null,
+                "rect": {
+                  "height": 160000,
+                  "width": 240000,
+                  "x": 360000,
+                  "y": 90000
+                },
+                "zIndex": 1
+              }
+            ],
             "heightUm": 300000,
             "id": "sheet-002",
             "number": 2,
@@ -401,7 +521,7 @@
       },
       "projectId": "frame-content-swap-project",
       "projectName": "Troca",
-      "revision": 18,
+      "revision": 24,
       "savedRevision": 0
     }
   },
@@ -639,7 +759,94 @@
                 },
                 "rgb": "#FFFFFF"
               },
-              "frames": [],
+              "frames": [
+                {
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 160000,
+                    "width": 240000,
+                    "x": 90000,
+                    "y": 90000
+                  },
+                  "frameId": "swap-frame-4",
+                  "photo": {
+                    "drawRect": {
+                      "height": 1008000,
+                      "width": 432000,
+                      "x": 32400,
+                      "y": -630800
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000002",
+                    "mirrorX": false,
+                    "name": "Foto-1.jpg",
+                    "palette": [
+                      "#66314A",
+                      "#D88370",
+                      "#EAD8B5"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 800.0,
+                      "current": {
+                        "center": {
+                          "x": 158399.9982833862,
+                          "y": -216799.985599518
+                        },
+                        "size": {
+                          "height": 1007999.9732971191,
+                          "width": 431999.9885559082
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.4000000059604645,
+                        "y": -0.699999988079071
+                      },
+                      "currentZoom": 1.7999999523162842,
+                      "panOrigin": {
+                        "x": 120000.0,
+                        "y": 80000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 95999.9942779541,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 423999.98664855957
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 120000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 280000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 560000.0,
+                        "width": 240000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 160000,
+                    "width": 240000,
+                    "x": 360000,
+                    "y": 90000
+                  },
+                  "frameId": "swap-frame-5",
+                  "photo": null,
+                  "zIndex": 1
+                }
+              ],
               "heightUm": 300000,
               "number": 2,
               "overlays": [],
@@ -654,7 +861,7 @@
             "mediaId": "00000000-0000-4000-8000-000000000001"
           },
           {
-            "count": 1,
+            "count": 2,
             "mediaId": "00000000-0000-4000-8000-000000000002"
           }
         ],
@@ -767,7 +974,40 @@
               },
               {
                 "activeSides": "both",
-                "frames": [],
+                "frames": [
+                  {
+                    "id": "swap-frame-4",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000002",
+                      "transform": {
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": 0.4000000059604645,
+                        "panY": -0.699999988079071,
+                        "quarterTurns": 0,
+                        "userZoom": 1.7999999523162842
+                      }
+                    },
+                    "rect": {
+                      "height": 160000,
+                      "width": 240000,
+                      "x": 90000,
+                      "y": 90000
+                    },
+                    "zIndex": 0
+                  },
+                  {
+                    "id": "swap-frame-5",
+                    "photo": null,
+                    "rect": {
+                      "height": 160000,
+                      "width": 240000,
+                      "x": 360000,
+                      "y": 90000
+                    },
+                    "zIndex": 1
+                  }
+                ],
                 "heightUm": 300000,
                 "id": "sheet-002",
                 "number": 2,
@@ -809,7 +1049,7 @@
           },
           "projectId": "frame-content-swap-project",
           "projectName": "Troca",
-          "revision": 19,
+          "revision": 25,
           "savedRevision": 0
         }
       },
@@ -1052,7 +1292,94 @@
                 },
                 "rgb": "#FFFFFF"
               },
-              "frames": [],
+              "frames": [
+                {
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 160000,
+                    "width": 240000,
+                    "x": 90000,
+                    "y": 90000
+                  },
+                  "frameId": "swap-frame-4",
+                  "photo": {
+                    "drawRect": {
+                      "height": 1008000,
+                      "width": 432000,
+                      "x": 32400,
+                      "y": -630800
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000002",
+                    "mirrorX": false,
+                    "name": "Foto-1.jpg",
+                    "palette": [
+                      "#66314A",
+                      "#D88370",
+                      "#EAD8B5"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 800.0,
+                      "current": {
+                        "center": {
+                          "x": 158399.9982833862,
+                          "y": -216799.985599518
+                        },
+                        "size": {
+                          "height": 1007999.9732971191,
+                          "width": 431999.9885559082
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.4000000059604645,
+                        "y": -0.699999988079071
+                      },
+                      "currentZoom": 1.7999999523162842,
+                      "panOrigin": {
+                        "x": 120000.0,
+                        "y": 80000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 95999.9942779541,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 423999.98664855957
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 120000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 280000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 560000.0,
+                        "width": 240000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 160000,
+                    "width": 240000,
+                    "x": 360000,
+                    "y": 90000
+                  },
+                  "frameId": "swap-frame-5",
+                  "photo": null,
+                  "zIndex": 1
+                }
+              ],
               "heightUm": 300000,
               "number": 2,
               "overlays": [],
@@ -1067,7 +1394,7 @@
             "mediaId": "00000000-0000-4000-8000-000000000001"
           },
           {
-            "count": 1,
+            "count": 2,
             "mediaId": "00000000-0000-4000-8000-000000000002"
           }
         ],
@@ -1180,7 +1507,40 @@
               },
               {
                 "activeSides": "both",
-                "frames": [],
+                "frames": [
+                  {
+                    "id": "swap-frame-4",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000002",
+                      "transform": {
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": 0.4000000059604645,
+                        "panY": -0.699999988079071,
+                        "quarterTurns": 0,
+                        "userZoom": 1.7999999523162842
+                      }
+                    },
+                    "rect": {
+                      "height": 160000,
+                      "width": 240000,
+                      "x": 90000,
+                      "y": 90000
+                    },
+                    "zIndex": 0
+                  },
+                  {
+                    "id": "swap-frame-5",
+                    "photo": null,
+                    "rect": {
+                      "height": 160000,
+                      "width": 240000,
+                      "x": 360000,
+                      "y": 90000
+                    },
+                    "zIndex": 1
+                  }
+                ],
                 "heightUm": 300000,
                 "id": "sheet-002",
                 "number": 2,
@@ -1222,7 +1582,7 @@
           },
           "projectId": "frame-content-swap-project",
           "projectName": "Troca",
-          "revision": 20,
+          "revision": 26,
           "savedRevision": 0
         }
       },
@@ -1231,6 +1591,1128 @@
         "swap-frame-0",
         "swap-frame-2"
       ]
+    },
+    {
+      "after": {
+        "composition": {
+          "frameBorder": {
+            "kind": "none"
+          },
+          "sheets": [
+            {
+              "activeSides": "both",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [
+                {
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 100000,
+                    "width": 160000,
+                    "x": 30000,
+                    "y": 90000
+                  },
+                  "frameId": "swap-frame-0",
+                  "photo": {
+                    "drawRect": {
+                      "height": 672000,
+                      "width": 288000,
+                      "x": -8400,
+                      "y": -396200
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000002",
+                    "mirrorX": false,
+                    "name": "Foto-1.jpg",
+                    "palette": [
+                      "#66314A",
+                      "#D88370",
+                      "#EAD8B5"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 533.3333333333334,
+                      "current": {
+                        "center": {
+                          "x": 105599.99885559079,
+                          "y": -150199.99035994223
+                        },
+                        "size": {
+                          "height": 671999.9821980795,
+                          "width": 287999.99237060547
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.4000000059604645,
+                        "y": -0.699999988079071
+                      },
+                      "currentZoom": 1.7999999523162842,
+                      "panOrigin": {
+                        "x": 80000.0,
+                        "y": 50000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 63999.996185302734,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 285999.99109903973
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 80000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 186666.6666666667
+                      },
+                      "sizePerZoom": {
+                        "height": 373333.3333333334,
+                        "width": 160000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 200000,
+                    "width": 90000,
+                    "x": 210000,
+                    "y": 40000
+                  },
+                  "frameId": "swap-frame-1",
+                  "photo": {
+                    "drawRect": {
+                      "height": 441000,
+                      "width": 189000,
+                      "x": 185250,
+                      "y": -128700
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000002",
+                    "mirrorX": false,
+                    "name": "Foto-1.jpg",
+                    "palette": [
+                      "#66314A",
+                      "#D88370",
+                      "#EAD8B5"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 300.0,
+                      "current": {
+                        "center": {
+                          "x": 69749.99785423279,
+                          "y": 51800.00328719622
+                        },
+                        "size": {
+                          "height": 440999.97997283936,
+                          "width": 188999.99141693115
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.5,
+                        "y": -0.4000000059604645
+                      },
+                      "currentZoom": 2.0999999046325684,
+                      "panOrigin": {
+                        "x": 45000.0,
+                        "y": 100000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 49499.995708465576,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 120499.98998641968
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 45000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 105000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 210000.0,
+                        "width": 90000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 1
+                },
+                {
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 100000,
+                    "width": 110000,
+                    "x": 330000,
+                    "y": 100000
+                  },
+                  "frameId": "swap-frame-2",
+                  "photo": null,
+                  "zIndex": 2
+                },
+                {
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 100000,
+                    "width": 100000,
+                    "x": 470000,
+                    "y": 100000
+                  },
+                  "frameId": "swap-frame-3",
+                  "photo": null,
+                  "zIndex": 3
+                }
+              ],
+              "heightUm": 300000,
+              "number": 1,
+              "overlays": [],
+              "sheetId": "sheet-001",
+              "widthUm": 600000
+            },
+            {
+              "activeSides": "both",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [
+                {
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 160000,
+                    "width": 240000,
+                    "x": 90000,
+                    "y": 90000
+                  },
+                  "frameId": "swap-frame-4",
+                  "photo": {
+                    "drawRect": {
+                      "height": 256001,
+                      "width": 384001,
+                      "x": -25200,
+                      "y": 56400
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000001",
+                    "mirrorX": false,
+                    "name": "Foto-0.jpg",
+                    "palette": [
+                      "#173B4B",
+                      "#84AAA7",
+                      "#E7C58B"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 400.0,
+                      "current": {
+                        "center": {
+                          "x": 76799.9965667724,
+                          "y": 94400.00114440921
+                        },
+                        "size": {
+                          "height": 256000.00381469727,
+                          "width": 384000.0057220459
+                        }
+                      },
+                      "currentPan": {
+                        "x": -0.6000000238418579,
+                        "y": 0.30000001192092896
+                      },
+                      "currentZoom": 1.600000023841858,
+                      "panOrigin": {
+                        "x": 120000.0,
+                        "y": 80000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 72000.00286102295,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 48000.00190734863
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 120000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 80000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 160000.0,
+                        "width": 240000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 160000,
+                    "width": 240000,
+                    "x": 360000,
+                    "y": 90000
+                  },
+                  "frameId": "swap-frame-5",
+                  "photo": null,
+                  "zIndex": 1
+                }
+              ],
+              "heightUm": 300000,
+              "number": 2,
+              "overlays": [],
+              "sheetId": "sheet-002",
+              "widthUm": 600000
+            }
+          ]
+        },
+        "mediaUsage": [
+          {
+            "count": 1,
+            "mediaId": "00000000-0000-4000-8000-000000000001"
+          },
+          {
+            "count": 2,
+            "mediaId": "00000000-0000-4000-8000-000000000002"
+          }
+        ],
+        "state": {
+          "album": {
+            "media": [
+              {
+                "id": "00000000-0000-4000-8000-000000000001",
+                "kind": "photo",
+                "name": "Foto-0.jpg",
+                "palette": [
+                  "#173B4B",
+                  "#84AAA7",
+                  "#E7C58B"
+                ],
+                "sourceHeightPx": 400,
+                "sourceWidthPx": 600
+              },
+              {
+                "id": "00000000-0000-4000-8000-000000000002",
+                "kind": "photo",
+                "name": "Foto-1.jpg",
+                "palette": [
+                  "#66314A",
+                  "#D88370",
+                  "#EAD8B5"
+                ],
+                "sourceHeightPx": 700,
+                "sourceWidthPx": 300
+              }
+            ],
+            "sheets": [
+              {
+                "activeSides": "both",
+                "frames": [
+                  {
+                    "id": "swap-frame-0",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000002",
+                      "transform": {
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": 0.4000000059604645,
+                        "panY": -0.699999988079071,
+                        "quarterTurns": 0,
+                        "userZoom": 1.7999999523162842
+                      }
+                    },
+                    "rect": {
+                      "height": 100000,
+                      "width": 160000,
+                      "x": 30000,
+                      "y": 90000
+                    },
+                    "zIndex": 0
+                  },
+                  {
+                    "id": "swap-frame-1",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000002",
+                      "transform": {
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": 0.5,
+                        "panY": -0.4000000059604645,
+                        "quarterTurns": 0,
+                        "userZoom": 2.0999999046325684
+                      }
+                    },
+                    "rect": {
+                      "height": 200000,
+                      "width": 90000,
+                      "x": 210000,
+                      "y": 40000
+                    },
+                    "zIndex": 1
+                  },
+                  {
+                    "id": "swap-frame-2",
+                    "photo": null,
+                    "rect": {
+                      "height": 100000,
+                      "width": 110000,
+                      "x": 330000,
+                      "y": 100000
+                    },
+                    "zIndex": 2
+                  },
+                  {
+                    "id": "swap-frame-3",
+                    "photo": null,
+                    "rect": {
+                      "height": 100000,
+                      "width": 100000,
+                      "x": 470000,
+                      "y": 100000
+                    },
+                    "zIndex": 3
+                  }
+                ],
+                "heightUm": 300000,
+                "id": "sheet-001",
+                "number": 1,
+                "pageNumbers": [
+                  1,
+                  2
+                ],
+                "role": "initial",
+                "widthUm": 600000
+              },
+              {
+                "activeSides": "both",
+                "frames": [
+                  {
+                    "id": "swap-frame-4",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000001",
+                      "transform": {
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": -0.6000000238418579,
+                        "panY": 0.30000001192092896,
+                        "quarterTurns": 0,
+                        "userZoom": 1.600000023841858
+                      }
+                    },
+                    "rect": {
+                      "height": 160000,
+                      "width": 240000,
+                      "x": 90000,
+                      "y": 90000
+                    },
+                    "zIndex": 0
+                  },
+                  {
+                    "id": "swap-frame-5",
+                    "photo": null,
+                    "rect": {
+                      "height": 160000,
+                      "width": 240000,
+                      "x": 360000,
+                      "y": 90000
+                    },
+                    "zIndex": 1
+                  }
+                ],
+                "heightUm": 300000,
+                "id": "sheet-002",
+                "number": 2,
+                "pageNumbers": [
+                  3,
+                  4
+                ],
+                "role": "final",
+                "widthUm": 600000
+              }
+            ],
+            "visualDefaults": {
+              "background": {
+                "both": {
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                },
+                "scope": "bothSides"
+              },
+              "frameBorder": {
+                "kind": "none"
+              },
+              "overlay": {
+                "both": null,
+                "scope": "bothSides"
+              }
+            }
+          },
+          "canRedo": false,
+          "canUndo": true,
+          "dirty": true,
+          "document": {
+            "bleedUm": 3000,
+            "displayUnit": "mm",
+            "dpi": 300,
+            "safetyUm": 3000,
+            "sheetHeightUm": 300000,
+            "sheetWidthUm": 600000
+          },
+          "projectId": "frame-content-swap-project",
+          "projectName": "Troca",
+          "revision": 27,
+          "savedRevision": 0
+        }
+      },
+      "name": "cross-photos",
+      "selectedFrameIds": [
+        "swap-frame-0",
+        "swap-frame-4"
+      ]
+    },
+    {
+      "after": {
+        "composition": {
+          "frameBorder": {
+            "kind": "none"
+          },
+          "sheets": [
+            {
+              "activeSides": "both",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [
+                {
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 100000,
+                    "width": 160000,
+                    "x": 30000,
+                    "y": 90000
+                  },
+                  "frameId": "swap-frame-0",
+                  "photo": null,
+                  "zIndex": 0
+                },
+                {
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 200000,
+                    "width": 90000,
+                    "x": 210000,
+                    "y": 40000
+                  },
+                  "frameId": "swap-frame-1",
+                  "photo": {
+                    "drawRect": {
+                      "height": 441000,
+                      "width": 189000,
+                      "x": 185250,
+                      "y": -128700
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000002",
+                    "mirrorX": false,
+                    "name": "Foto-1.jpg",
+                    "palette": [
+                      "#66314A",
+                      "#D88370",
+                      "#EAD8B5"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 300.0,
+                      "current": {
+                        "center": {
+                          "x": 69749.99785423279,
+                          "y": 51800.00328719622
+                        },
+                        "size": {
+                          "height": 440999.97997283936,
+                          "width": 188999.99141693115
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.5,
+                        "y": -0.4000000059604645
+                      },
+                      "currentZoom": 2.0999999046325684,
+                      "panOrigin": {
+                        "x": 45000.0,
+                        "y": 100000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 49499.995708465576,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 120499.98998641968
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 45000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 105000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 210000.0,
+                        "width": 90000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 1
+                },
+                {
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 100000,
+                    "width": 110000,
+                    "x": 330000,
+                    "y": 100000
+                  },
+                  "frameId": "swap-frame-2",
+                  "photo": null,
+                  "zIndex": 2
+                },
+                {
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 100000,
+                    "width": 100000,
+                    "x": 470000,
+                    "y": 100000
+                  },
+                  "frameId": "swap-frame-3",
+                  "photo": null,
+                  "zIndex": 3
+                }
+              ],
+              "heightUm": 300000,
+              "number": 1,
+              "overlays": [],
+              "sheetId": "sheet-001",
+              "widthUm": 600000
+            },
+            {
+              "activeSides": "both",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [
+                {
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 160000,
+                    "width": 240000,
+                    "x": 90000,
+                    "y": 90000
+                  },
+                  "frameId": "swap-frame-4",
+                  "photo": {
+                    "drawRect": {
+                      "height": 1008000,
+                      "width": 432000,
+                      "x": 32400,
+                      "y": -630800
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000002",
+                    "mirrorX": false,
+                    "name": "Foto-1.jpg",
+                    "palette": [
+                      "#66314A",
+                      "#D88370",
+                      "#EAD8B5"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 800.0,
+                      "current": {
+                        "center": {
+                          "x": 158399.9982833862,
+                          "y": -216799.985599518
+                        },
+                        "size": {
+                          "height": 1007999.9732971191,
+                          "width": 431999.9885559082
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.4000000059604645,
+                        "y": -0.699999988079071
+                      },
+                      "currentZoom": 1.7999999523162842,
+                      "panOrigin": {
+                        "x": 120000.0,
+                        "y": 80000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 95999.9942779541,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 423999.98664855957
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 120000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 280000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 560000.0,
+                        "width": 240000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 160000,
+                    "width": 240000,
+                    "x": 360000,
+                    "y": 90000
+                  },
+                  "frameId": "swap-frame-5",
+                  "photo": {
+                    "drawRect": {
+                      "height": 256001,
+                      "width": 384001,
+                      "x": 244800,
+                      "y": 56400
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000001",
+                    "mirrorX": false,
+                    "name": "Foto-0.jpg",
+                    "palette": [
+                      "#173B4B",
+                      "#84AAA7",
+                      "#E7C58B"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 400.0,
+                      "current": {
+                        "center": {
+                          "x": 76799.9965667724,
+                          "y": 94400.00114440921
+                        },
+                        "size": {
+                          "height": 256000.00381469727,
+                          "width": 384000.0057220459
+                        }
+                      },
+                      "currentPan": {
+                        "x": -0.6000000238418579,
+                        "y": 0.30000001192092896
+                      },
+                      "currentZoom": 1.600000023841858,
+                      "panOrigin": {
+                        "x": 120000.0,
+                        "y": 80000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 72000.00286102295,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 48000.00190734863
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 120000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 80000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 160000.0,
+                        "width": 240000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 1
+                }
+              ],
+              "heightUm": 300000,
+              "number": 2,
+              "overlays": [],
+              "sheetId": "sheet-002",
+              "widthUm": 600000
+            }
+          ]
+        },
+        "mediaUsage": [
+          {
+            "count": 1,
+            "mediaId": "00000000-0000-4000-8000-000000000001"
+          },
+          {
+            "count": 2,
+            "mediaId": "00000000-0000-4000-8000-000000000002"
+          }
+        ],
+        "state": {
+          "album": {
+            "media": [
+              {
+                "id": "00000000-0000-4000-8000-000000000001",
+                "kind": "photo",
+                "name": "Foto-0.jpg",
+                "palette": [
+                  "#173B4B",
+                  "#84AAA7",
+                  "#E7C58B"
+                ],
+                "sourceHeightPx": 400,
+                "sourceWidthPx": 600
+              },
+              {
+                "id": "00000000-0000-4000-8000-000000000002",
+                "kind": "photo",
+                "name": "Foto-1.jpg",
+                "palette": [
+                  "#66314A",
+                  "#D88370",
+                  "#EAD8B5"
+                ],
+                "sourceHeightPx": 700,
+                "sourceWidthPx": 300
+              }
+            ],
+            "sheets": [
+              {
+                "activeSides": "both",
+                "frames": [
+                  {
+                    "id": "swap-frame-0",
+                    "photo": null,
+                    "rect": {
+                      "height": 100000,
+                      "width": 160000,
+                      "x": 30000,
+                      "y": 90000
+                    },
+                    "zIndex": 0
+                  },
+                  {
+                    "id": "swap-frame-1",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000002",
+                      "transform": {
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": 0.5,
+                        "panY": -0.4000000059604645,
+                        "quarterTurns": 0,
+                        "userZoom": 2.0999999046325684
+                      }
+                    },
+                    "rect": {
+                      "height": 200000,
+                      "width": 90000,
+                      "x": 210000,
+                      "y": 40000
+                    },
+                    "zIndex": 1
+                  },
+                  {
+                    "id": "swap-frame-2",
+                    "photo": null,
+                    "rect": {
+                      "height": 100000,
+                      "width": 110000,
+                      "x": 330000,
+                      "y": 100000
+                    },
+                    "zIndex": 2
+                  },
+                  {
+                    "id": "swap-frame-3",
+                    "photo": null,
+                    "rect": {
+                      "height": 100000,
+                      "width": 100000,
+                      "x": 470000,
+                      "y": 100000
+                    },
+                    "zIndex": 3
+                  }
+                ],
+                "heightUm": 300000,
+                "id": "sheet-001",
+                "number": 1,
+                "pageNumbers": [
+                  1,
+                  2
+                ],
+                "role": "initial",
+                "widthUm": 600000
+              },
+              {
+                "activeSides": "both",
+                "frames": [
+                  {
+                    "id": "swap-frame-4",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000002",
+                      "transform": {
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": 0.4000000059604645,
+                        "panY": -0.699999988079071,
+                        "quarterTurns": 0,
+                        "userZoom": 1.7999999523162842
+                      }
+                    },
+                    "rect": {
+                      "height": 160000,
+                      "width": 240000,
+                      "x": 90000,
+                      "y": 90000
+                    },
+                    "zIndex": 0
+                  },
+                  {
+                    "id": "swap-frame-5",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000001",
+                      "transform": {
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": -0.6000000238418579,
+                        "panY": 0.30000001192092896,
+                        "quarterTurns": 0,
+                        "userZoom": 1.600000023841858
+                      }
+                    },
+                    "rect": {
+                      "height": 160000,
+                      "width": 240000,
+                      "x": 360000,
+                      "y": 90000
+                    },
+                    "zIndex": 1
+                  }
+                ],
+                "heightUm": 300000,
+                "id": "sheet-002",
+                "number": 2,
+                "pageNumbers": [
+                  3,
+                  4
+                ],
+                "role": "final",
+                "widthUm": 600000
+              }
+            ],
+            "visualDefaults": {
+              "background": {
+                "both": {
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                },
+                "scope": "bothSides"
+              },
+              "frameBorder": {
+                "kind": "none"
+              },
+              "overlay": {
+                "both": null,
+                "scope": "bothSides"
+              }
+            }
+          },
+          "canRedo": false,
+          "canUndo": true,
+          "dirty": true,
+          "document": {
+            "bleedUm": 3000,
+            "displayUnit": "mm",
+            "dpi": 300,
+            "safetyUm": 3000,
+            "sheetHeightUm": 300000,
+            "sheetWidthUm": 600000
+          },
+          "projectId": "frame-content-swap-project",
+          "projectName": "Troca",
+          "revision": 28,
+          "savedRevision": 0
+        }
+      },
+      "name": "cross-placeholder",
+      "selectedFrameIds": [
+        "swap-frame-0",
+        "swap-frame-5"
+      ]
+    }
+  ],
+  "dropProbes": [
+    {
+      "sheetId": "sheet-001",
+      "target": {
+        "frameId": "swap-frame-0",
+        "kind": "frame"
+      },
+      "xUm": 110000,
+      "yUm": 140000
+    },
+    {
+      "sheetId": "sheet-001",
+      "target": {
+        "frameId": "swap-frame-1",
+        "kind": "frame"
+      },
+      "xUm": 255000,
+      "yUm": 140000
+    },
+    {
+      "sheetId": "sheet-001",
+      "target": {
+        "frameId": "swap-frame-2",
+        "kind": "frame"
+      },
+      "xUm": 385000,
+      "yUm": 150000
+    },
+    {
+      "sheetId": "sheet-001",
+      "target": {
+        "frameId": "swap-frame-3",
+        "kind": "frame"
+      },
+      "xUm": 520000,
+      "yUm": 150000
+    },
+    {
+      "sheetId": "sheet-002",
+      "target": {
+        "frameId": "swap-frame-4",
+        "kind": "frame"
+      },
+      "xUm": 210000,
+      "yUm": 170000
+    },
+    {
+      "sheetId": "sheet-002",
+      "target": {
+        "frameId": "swap-frame-5",
+        "kind": "frame"
+      },
+      "xUm": 480000,
+      "yUm": 170000
     }
   ]
 }

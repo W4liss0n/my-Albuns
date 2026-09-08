@@ -107,6 +107,7 @@ interface SheetRenderNodeCallbacks {
     photoNode: PhotoRenderNode,
     event: FederatedPointerEvent,
   ) => void;
+  onPhotoContentDragStart: (frameId: string, event: FederatedPointerEvent) => void;
   onPhotoWheel: (
     photoNode: PhotoRenderNode,
     event: FederatedWheelEvent,
@@ -394,11 +395,12 @@ export function createSheetRenderNode(
         callbacks.onFrameGeometryStart(frame.frameId, null, event);
         return;
       }
-      if (!modePolicy.enablesPhotoTransform || !event.altKey || !photoNode) {
+      if (!modePolicy.enablesPhotoTransform || !photoNode) {
         return;
       }
       event.stopPropagation();
-      callbacks.onPhotoPanStart(photoNode, event);
+      if (event.altKey) callbacks.onPhotoPanStart(photoNode, event);
+      else callbacks.onPhotoContentDragStart(frame.frameId, event);
     });
     frameContainer.on("wheel", (event: FederatedWheelEvent) => {
       if (!modePolicy.enablesPhotoTransform || !event.altKey || !photoNode) {

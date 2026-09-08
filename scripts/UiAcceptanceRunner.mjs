@@ -542,6 +542,8 @@ export async function performUiAcceptanceAction({
     const pointerActions = capturedPointerGesture
       ? buildCapturedPointerGestureActions({
           ...gestureGeometry,
+          source: { x: gestureGeometry.source.x + (action.sourceOffsetX ?? 0), y: gestureGeometry.source.y + (action.sourceOffsetY ?? 0) },
+          target: { x: gestureGeometry.target.x + (action.targetOffsetX ?? 0), y: gestureGeometry.target.y + (action.targetOffsetY ?? 0) },
           phase: action.phase,
         })
       : [
