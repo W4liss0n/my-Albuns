@@ -63,8 +63,7 @@ const PAN_OUTSIDE_OPACITY = 0.24;
 
 export interface PhotoRenderNode {
   frameId: string;
-  createDragPreview: () => Container;
-  clipRect: Rectangle;
+  createDragPreview: () => { container: Container; bounds: Rectangle };
   layer: Container;
   outsideLayer: Container;
   thirdsGuides: Graphics;
@@ -295,15 +294,16 @@ export function createSheetRenderNode(
       photoNode = {
         frameId: frame.frameId,
         createDragPreview: () => {
-          const preview = createClippedPhotoPreview({ ...previewOptions, label: "photo-drag-preview" }, frameWidth, frameHeight);
-          // Include a visible Pan/Zoom preview that has not settled into the Core yet.
-          preview.layer.position.set(photoLayer.x, photoLayer.y);
-          preview.layer.scale.set(photoLayer.scale.x, photoLayer.scale.y);
-          const container = new Container();
-          container.addChild(preview.viewport, preview.clip);
-          return container;
+          const width = previewOptions.previewTexture?.orig.width ?? previewOptions.drawWidth;
+          const height = previewOptions.previewTexture?.orig.height ?? previewOptions.drawHeight;
+          // The drag represents the source Photo, independent of its Frame crop and transforms.
+          return {
+            container: createPhotoPreviewLayer({ ...previewOptions, label: "photo-drag-preview",
+              drawWidth: width, drawHeight: height, center: { x: width / 2, y: height / 2 },
+              rotationDegrees: 0, mirrorX: false }),
+            bounds: new Rectangle(0, 0, width, height),
+          };
         },
-        clipRect: new Rectangle(0, 0, frameWidth, frameHeight),
         layer: photoLayer,
         outsideLayer: outsidePhotoLayer,
         thirdsGuides,

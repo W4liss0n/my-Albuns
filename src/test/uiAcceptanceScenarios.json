@@ -2873,7 +2873,7 @@
     },
     {
       "id": "workspace-normal-frame-swap-ghost-empty",
-      "title": "Troca no Modo normal — miniatura acompanha o ponteiro sobre área vazia",
+      "title": "Troca no Modo normal — imagem inteira em miniatura próxima do ponteiro sobre área vazia",
       "implementationPath": "/workspace-preview.html?frame=swap&mode=normal&swap=photos",
       "comparison": {
         "kind": "implementation-only",
@@ -2960,7 +2960,7 @@
     },
     {
       "id": "workspace-normal-frame-swap-ghost-portrait",
-      "title": "Troca no Modo normal — miniatura preserva o recorte vertical da origem",
+      "title": "Troca no Modo normal — miniatura mostra a imagem vertical inteira, sem o recorte do Frame",
       "implementationPath": "/workspace-preview.html?frame=swap&mode=normal&swap=photos",
       "comparison": {
         "kind": "implementation-only",
