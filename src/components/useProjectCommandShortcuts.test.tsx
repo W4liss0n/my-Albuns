@@ -5,6 +5,8 @@ import { useProjectCommandShortcuts } from "./useProjectCommandShortcuts";
 
 function handlers() {
   return {
+    arrangeFrames: vi.fn(),
+    frameCommandsActive: false,
     canDeleteSheet: true,
     closeProject: vi.fn(),
     deleteSheet: vi.fn(),
@@ -19,6 +21,23 @@ function handlers() {
     undo: vi.fn(),
   };
 }
+
+test("routes bracket shortcuts to the active Frame selection while respecting text and menu focus", () => {
+  const actions = handlers();
+  renderHook(() => useProjectCommandShortcuts({
+    ...actions, frameCommandsActive: true, canRedo: true, canUndo: true, disabled: false,
+  }));
+  expect(dispatchShortcut("]").defaultPrevented).toBe(true);
+  expect(dispatchShortcut("[").defaultPrevented).toBe(true);
+  expect(actions.arrangeFrames.mock.calls).toEqual([["advance"], ["recede"]]);
+  for (const target of [document.createElement("input"), document.createElement("div")]) {
+    if (target.tagName === "DIV") target.setAttribute("role", "menu");
+    document.body.appendChild(target);
+    expect(dispatchShortcut("]", {}, target).defaultPrevented).toBe(false);
+    target.remove();
+  }
+  expect(actions.arrangeFrames).toHaveBeenCalledTimes(2);
+});
 
 function dispatchShortcut(
   key: string,

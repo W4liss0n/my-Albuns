@@ -787,6 +787,73 @@ impl ProjectDocument {
         ))
     }
 
+    pub(crate) fn with_arranged_frames(
+        &self,
+        frame_ids: &[String],
+        action: crate::FrameStackAction,
+    ) -> Result<Self, crate::CoreError> {
+        use crate::{CoreError::InvalidFrameStackSelection, FrameStackAction::*};
+        let ids = frame_ids
+            .iter()
+            .map(|id| Uuid::parse_str(id))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|_| InvalidFrameStackSelection)?;
+        let first = ids.first().ok_or(InvalidFrameStackSelection)?;
+        let sheet_index = self
+            .sheets
+            .iter()
+            .position(|sheet| sheet.frames.iter().any(|frame| &frame.id == first))
+            .ok_or(InvalidFrameStackSelection)?;
+        let frames = &self.sheets[sheet_index].frames;
+        let selected = ids
+            .iter()
+            .copied()
+            .collect::<std::collections::HashSet<_>>();
+        if selected.len() != ids.len()
+            || !ids
+                .iter()
+                .all(|id| frames.iter().any(|frame| &frame.id == id))
+        {
+            return Err(InvalidFrameStackSelection);
+        }
+        let mut candidate = self.clone();
+        let arranged = &mut candidate.sheets[sheet_index].frames;
+        match action {
+            Advance => {
+                for index in (0..arranged.len().saturating_sub(1)).rev() {
+                    if selected.contains(&arranged[index].id)
+                        && !selected.contains(&arranged[index + 1].id)
+                    {
+                        arranged.swap(index, index + 1);
+                    }
+                }
+            }
+            Recede => {
+                for index in 1..arranged.len() {
+                    if selected.contains(&arranged[index].id)
+                        && !selected.contains(&arranged[index - 1].id)
+                    {
+                        arranged.swap(index, index - 1);
+                    }
+                }
+            }
+            BringToFront | SendToBack => {
+                let selected_first = action == SendToBack;
+                *arranged = frames
+                    .iter()
+                    .filter(|frame| selected.contains(&frame.id) == selected_first)
+                    .chain(
+                        frames
+                            .iter()
+                            .filter(|frame| selected.contains(&frame.id) != selected_first),
+                    )
+                    .cloned()
+                    .collect();
+            }
+        }
+        Ok(candidate)
+    }
+
     pub(crate) fn frame_geometry_edit(
         &self,
         edit: &crate::FrameGeometryEdit,

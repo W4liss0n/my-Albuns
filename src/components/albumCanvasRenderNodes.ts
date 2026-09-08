@@ -96,6 +96,7 @@ interface SheetRenderNodeCallbacks {
   onSheetTap: (sheetId: string) => void;
   onSheetDoubleTap: (sheetId: string) => void;
   onFrameTap: (sheetId: string, frameId: string, toggle: boolean) => void;
+  onFrameContextMenu: (frameId: string, position: { x: number; y: number }) => void;
   onFrameGeometryStart: (
     frameId: string,
     handle: FrameResizeHandle | null,
@@ -376,6 +377,11 @@ export function createSheetRenderNode(
       if (!event.altKey || modePolicy.showsFrameResizeHandles) {
         callbacks.onFrameTap(sheet.sheetId, frame.frameId, modePolicy.showsFrameResizeHandles && event.ctrlKey);
       }
+    });
+    frameContainer.on("rightclick", (event: FederatedPointerEvent) => {
+      if (!modePolicy.showsFrameResizeHandles) return;
+      event.stopPropagation();
+      callbacks.onFrameContextMenu(frame.frameId, { x: event.clientX, y: event.clientY });
     });
     frameContainer.on("pointerdown", (event: FederatedPointerEvent) => {
       if (modePolicy.showsFrameResizeHandles) {

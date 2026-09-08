@@ -1,16 +1,20 @@
 import {
+  FRAME_STACK_COMMANDS,
   projectCommandBinding,
   projectCommandDescriptor,
   projectCommandShortcutLabel,
   type ProjectCommandContext,
   type ProjectCommandId,
 } from "../application/projectCommandCatalog";
+import type { FrameStackAction } from "../domain/project";
 import type {
   ApplicationMenuCommand,
   ApplicationMenuGroup,
 } from "./ApplicationMenuBar";
 
 interface ProjectApplicationMenuOptions {
+  arrangeFrames(action: FrameStackAction): void;
+  canArrangeFrames: boolean;
   addSheetAfter(): void;
   addSheetBefore(): void;
   canAddAfter: boolean;
@@ -36,6 +40,8 @@ interface ProjectApplicationMenuOptions {
 }
 
 export function createProjectApplicationMenus({
+  arrangeFrames,
+  canArrangeFrames,
   addSheetAfter,
   addSheetBefore,
   canAddAfter,
@@ -90,12 +96,8 @@ export function createProjectApplicationMenus({
         separator("edit-frame-separator"),
         placeholder("swap-frame-contents", "frame"),
         placeholder("add-frame", "frame"),
-        submenu("arrange-frames", "Organizar", [
-          placeholder("bring-frames-to-front", "frame"),
-          placeholder("advance-frames", "frame"),
-          placeholder("recede-frames", "frame"),
-          placeholder("send-frames-to-back", "frame"),
-        ]),
+        submenu("arrange-frames", "Organizar", FRAME_STACK_COMMANDS.map(({ id, action }) =>
+          implemented(id, "frame", () => arrangeFrames(action), !canArrangeFrames))),
         separator("edit-layout-separator"),
         placeholder("save-frame-arrangement-as-layout", "frame"),
         placeholder("select-all", "frame"),

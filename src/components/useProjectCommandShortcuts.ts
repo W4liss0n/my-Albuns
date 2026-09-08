@@ -1,22 +1,23 @@
 import { useEffect } from "react";
 
-import { matchProjectCommandShortcut } from "../application/projectCommandCatalog";
+import { FRAME_STACK_COMMANDS, matchProjectCommandShortcut } from "../application/projectCommandCatalog";
+import type { FrameStackAction } from "../domain/project";
 import { isTextEntryTarget } from "./isTextEntryTarget";
 
 const PROJECT_COMMAND_CONTEXT_ATTRIBUTE = "data-project-command-context";
 
-function targetAllowsSheetCommandShortcut(target: EventTarget | null) {
+function targetAllowsCommandShortcut(target: EventTarget | null, context: "sheet" | "frame") {
   if (!(target instanceof Element)) return true;
   const owner = target.closest<HTMLElement>(
     `[${PROJECT_COMMAND_CONTEXT_ATTRIBUTE}]`,
   );
   return (
     owner === null ||
-    owner.dataset.projectCommandContext === "sheet"
+    owner.dataset.projectCommandContext === context
   );
 }
 
-function targetOwnsHorizontalNavigation(target: EventTarget | null) {
+function targetOwnsEditingKeys(target: EventTarget | null) {
   if (isTextEntryTarget(target)) return true;
   return (
     target instanceof Element &&
@@ -27,6 +28,8 @@ function targetOwnsHorizontalNavigation(target: EventTarget | null) {
 }
 
 interface ProjectCommandShortcutHandlers {
+  arrangeFrames(action: FrameStackAction): void;
+  frameCommandsActive: boolean;
   canDeleteSheet: boolean;
   canRedo: boolean;
   canUndo: boolean;
@@ -45,6 +48,8 @@ interface ProjectCommandShortcutHandlers {
 }
 
 export function useProjectCommandShortcuts({
+  arrangeFrames,
+  frameCommandsActive,
   canDeleteSheet,
   canRedo,
   canUndo,
@@ -64,15 +69,25 @@ export function useProjectCommandShortcuts({
   useEffect(() => {
     const handleProjectCommand = (event: KeyboardEvent) => {
       if (event.defaultPrevented) return;
+      if (frameCommandsActive && targetAllowsCommandShortcut(event.target, "frame") &&
+          !targetOwnsEditingKeys(event.target)) {
+        const frameCommand = matchProjectCommandShortcut(event, "frame");
+        const stackCommand = FRAME_STACK_COMMANDS.find(({ id }) => id === frameCommand);
+        if (stackCommand) {
+          event.preventDefault();
+          if (!event.repeat && !disabled) arrangeFrames(stackCommand.action);
+          return;
+        }
+      }
       const command =
         matchProjectCommandShortcut(event, "project-window") ??
-        (sheetShortcutActive && targetAllowsSheetCommandShortcut(event.target)
+        (sheetShortcutActive && targetAllowsCommandShortcut(event.target, "sheet")
           ? matchProjectCommandShortcut(event, "sheet")
           : null);
       if (command === null) return;
       if (
         (command === "previous-sheet" || command === "next-sheet") &&
-        (!sheetNavigationActive || targetOwnsHorizontalNavigation(event.target))
+        (!sheetNavigationActive || targetOwnsEditingKeys(event.target))
       ) {
         return;
       }
@@ -129,6 +144,8 @@ export function useProjectCommandShortcuts({
     window.addEventListener("keydown", handleProjectCommand);
     return () => window.removeEventListener("keydown", handleProjectCommand);
   }, [
+    arrangeFrames,
+    frameCommandsActive,
     canDeleteSheet,
     canRedo,
     canUndo,

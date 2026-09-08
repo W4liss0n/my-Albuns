@@ -41,6 +41,7 @@ import type {
   PhotoDropTarget,
 } from "../domain/project";
 import { useEditorView } from "../state/editorView";
+import type { ProjectIntent } from "../domain/project";
 import {
   createEmptyProjection,
   createThreeSheetProjection,
@@ -92,6 +93,7 @@ const canvasHarness = vi.hoisted(() => ({
       sheetId: string,
       position: { x: number; y: number },
     ): void;
+    onOpenFrameContextMenu?(frameId: string, position: { x: number; y: number }): void;
     onTransformPreview?(
       preview: PhotoTransformPreview | null,
     ): void;
@@ -618,6 +620,58 @@ beforeEach(() => {
   });
 });
 
+test("arranges the entire Frame selection from Edit without changing the selection", async () => {
+  const grouped = structuredClone(projection);
+  grouped.state.album.sheets[0].frames.push({
+    ...grouped.state.album.sheets[0].frames[0], id: "frame-002", zIndex: 1, photo: null,
+  });
+  grouped.composition.sheets[0].frames.push({
+    ...grouped.composition.sheets[0].frames[0], frameId: "frame-002", zIndex: 1, photo: null,
+  });
+  useEditorView.setState({ editingSheetId: "sheet-001", selectedFrameIds: ["frame-002", "frame-001"] });
+  const apply = vi.fn(async (_intent: ProjectIntent) => grouped);
+  render(<ProjectWorkspace projection={grouped} projectCorePort={projectCorePortWithApply(apply)}
+    onProjectionChange={vi.fn()} />);
+  for (const [label, action] of [
+    ["Trazer para frente", "bringToFront"], ["Avançar uma posição", "advance"],
+    ["Recuar uma posição", "recede"], ["Enviar para trás", "sendToBack"],
+  ]) {
+    fireEvent.click(getApplicationCommand("Editar", "Organizar"));
+    fireEvent.click(screen.getByRole("menuitem", { name: label }));
+    await waitFor(() => expect(apply).toHaveBeenLastCalledWith({
+      kind: "arrangeFrames", frameIds: ["frame-002", "frame-001"], action,
+    }, expect.any(Function)));
+    expect(useEditorView.getState().selectedFrameIds).toEqual(["frame-002", "frame-001"]);
+  }
+});
+
+test("opens Frame context actions for the clicked selection and preserves it after arranging", async () => {
+  const grouped = structuredClone(projection);
+  grouped.state.album.sheets[0].frames.push({
+    ...grouped.state.album.sheets[0].frames[0], id: "frame-002", zIndex: 1, photo: null,
+  });
+  grouped.composition.sheets[0].frames.push({
+    ...grouped.composition.sheets[0].frames[0], frameId: "frame-002", zIndex: 1, photo: null,
+  });
+  useEditorView.setState({ editingSheetId: "sheet-001", selectedFrameIds: ["frame-001", "frame-002"] });
+  const apply = vi.fn(async (_intent: ProjectIntent) => grouped);
+  render(<ProjectWorkspace projection={grouped} projectCorePort={projectCorePortWithApply(apply)}
+    onProjectionChange={vi.fn()} />);
+  act(() => canvasHarness.props?.onOpenFrameContextMenu?.("frame-002", { x: 120, y: 180 }));
+  const menu = screen.getByRole("menu", { name: "Organizar Frames" });
+  expect(useEditorView.getState().selectedFrameIds).toEqual(["frame-001", "frame-002"]);
+  fireEvent.click(within(menu).getByRole("menuitem", { name: "Enviar para trás" }));
+  await waitFor(() => expect(apply).toHaveBeenLastCalledWith({
+    kind: "arrangeFrames", frameIds: ["frame-001", "frame-002"], action: "sendToBack",
+  }, expect.any(Function)));
+  expect(screen.queryByRole("menu", { name: "Organizar Frames" })).not.toBeInTheDocument();
+  act(() => useEditorView.getState().selectFrame("frame-001"));
+  act(() => canvasHarness.props?.onOpenFrameContextMenu?.("frame-002", { x: 120, y: 180 }));
+  expect(useEditorView.getState().selectedFrameIds).toEqual(["frame-002"]);
+  fireEvent.keyDown(screen.getByRole("menu", { name: "Organizar Frames" }), { key: "Escape" });
+  expect(screen.queryByRole("menu", { name: "Organizar Frames" })).not.toBeInTheDocument();
+});
+
 test("presents the canonical desktop menus and marks unfinished commands", () => {
   render(
     <ProjectWorkspace
@@ -797,7 +851,7 @@ test("opens and dismisses an explicit Sheet context menu without navigating the 
     }),
   );
   const dismissLayer = document.querySelector(
-    ".sheet-context-menu__dismiss-layer",
+    ".ui-context-menu__dismiss-layer",
   );
   expect(dismissLayer).toBeInstanceOf(HTMLElement);
   fireEvent.pointerDown(dismissLayer!, { button: 0, pointerId: 31 });

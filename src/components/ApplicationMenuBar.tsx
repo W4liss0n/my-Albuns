@@ -383,9 +383,7 @@ export function ApplicationMenuBar({
                         role="menuitem"
                         type="button"
                         onClick={() =>
-                          setOpenSubmenuId((current) =>
-                            current === item.id ? null : item.id,
-                          )
+                          setOpenSubmenuId(item.id)
                         }
                         onPointerEnter={() => setOpenSubmenuId(item.id)}
                       >

@@ -1599,6 +1599,280 @@
       },
       "readySelector": ".ui-problems-table",
       "actions": []
+    },
+    {
+      "id": "workspace-frame-stack-edit-menu",
+      "title": "Ordenação de Frames — submenu Organizar e atalhos",
+      "implementationPath": "/workspace-preview.html?frame=stack&stack=bringToFront",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-stack-order",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Os comandos de pilha e a seleção de Frames são definidos no design 0001, seção Ordenação; a referência visual vigente antecede esse estado."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "[role=\"menu\"][aria-label=\"Organizar\"]",
+      "actions": [
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[data-submenu-trigger=\"arrange-frames\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-stack-single-context",
+      "title": "Ordenação de Frames — clique direito seleciona o Frame superior",
+      "implementationPath": "/workspace-preview.html?frame=stack&stack=advance",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-stack-order",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Os comandos de pilha e a seleção de Frames são definidos no design 0001, seção Ordenação; a referência visual vigente antecede esse estado."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-stack-selection=\"stack-frame-2\"]:has([role=\"menu\"][aria-label=\"Organizar Frames\"])",
+      "actions": [
+        {
+          "type": "context-click",
+          "selector": ".canvas-host canvas"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-stack-group-context",
+      "title": "Ordenação de Frames — clique direito preserva o grupo",
+      "implementationPath": "/workspace-preview.html?frame=stack&stack=sendToBack",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-stack-order",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Os comandos de pilha e a seleção de Frames são definidos no design 0001, seção Ordenação; a referência visual vigente antecede esse estado."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-stack-selection=\"stack-frame-1,stack-frame-2\"]:has([role=\"menu\"][aria-label=\"Organizar Frames\"])",
+      "actions": [
+        {
+          "type": "context-click",
+          "selector": ".canvas-host canvas"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-stack-front",
+      "title": "Ordenação de Frames — grupo à frente e placeholder recebe o clique",
+      "implementationPath": "/workspace-preview.html?frame=stack&stack=bringToFront",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-stack-order",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Os comandos de pilha e a seleção de Frames são definidos no design 0001, seção Ordenação; a referência visual vigente antecede esse estado."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-stack-selection=\"stack-frame-1\"]",
+      "actions": [
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[data-submenu-trigger=\"arrange-frames\"]"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Trazer para frente\"]"
+        },
+        {
+          "type": "pointer-click",
+          "selector": ".canvas-host canvas"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-stack-back",
+      "title": "Ordenação de Frames — grupo ao fundo e Foto recebe o clique",
+      "implementationPath": "/workspace-preview.html?frame=stack&stack=sendToBack",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-stack-order",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Os comandos de pilha e a seleção de Frames são definidos no design 0001, seção Ordenação; a referência visual vigente antecede esse estado."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-stack-selection=\"stack-frame-0\"]",
+      "actions": [
+        {
+          "type": "context-click",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "click-text",
+          "text": "Enviar para trás"
+        },
+        {
+          "type": "pointer-click",
+          "selector": ".canvas-host canvas"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-stack-advance",
+      "title": "Ordenação de Frames — avançar uma posição",
+      "implementationPath": "/workspace-preview.html?frame=stack&stack=advance",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-stack-order",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Os comandos de pilha e a seleção de Frames são definidos no design 0001, seção Ordenação; a referência visual vigente antecede esse estado."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-stack-selection=\"stack-frame-1\"]",
+      "actions": [
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[data-submenu-trigger=\"arrange-frames\"]"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Avançar uma posição\"]"
+        },
+        {
+          "type": "pointer-click",
+          "selector": ".canvas-host canvas"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-stack-recede",
+      "title": "Ordenação de Frames — recuar uma posição",
+      "implementationPath": "/workspace-preview.html?frame=stack&stack=recede",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-stack-order",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Os comandos de pilha e a seleção de Frames são definidos no design 0001, seção Ordenação; a referência visual vigente antecede esse estado."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-stack-selection=\"stack-frame-2\"]",
+      "actions": [
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[data-submenu-trigger=\"arrange-frames\"]"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Recuar uma posição\"]"
+        },
+        {
+          "type": "pointer-click",
+          "selector": ".canvas-host canvas"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-stack-undo",
+      "title": "Ordenação de Frames — desfazer restaura o alvo superior",
+      "implementationPath": "/workspace-preview.html?frame=stack&stack=advance",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-stack-order",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Os comandos de pilha e a seleção de Frames são definidos no design 0001, seção Ordenação; a referência visual vigente antecede esse estado."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-stack-selection=\"stack-frame-2\"]",
+      "actions": [
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[data-submenu-trigger=\"arrange-frames\"]"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Avançar uma posição\"]"
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Desfazer\"]"
+        },
+        {
+          "type": "pointer-click",
+          "selector": ".canvas-host canvas"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-stack-outside-context",
+      "title": "Ordenação de Frames — novo clique direito externo fecha o menu",
+      "implementationPath": "/workspace-preview.html?frame=stack&stack=sendToBack",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-stack-order",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Os comandos de pilha e a seleção de Frames são definidos no design 0001, seção Ordenação; a referência visual vigente antecede esse estado."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-stack-selection=\"stack-frame-1,stack-frame-2\"]:not(:has([role=\"menu\"][aria-label=\"Organizar Frames\"]))",
+      "actions": [
+        {
+          "type": "context-click",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "assert",
+          "selector": "[role=\"menu\"][aria-label=\"Organizar Frames\"]"
+        },
+        {
+          "type": "context-click",
+          "selector": ".canvas-host canvas"
+        }
+      ]
     }
   ]
 }

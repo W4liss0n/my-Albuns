@@ -153,3 +153,11 @@ test("supports desktop keyboard navigation and nested menus", async () => {
   );
   expect(screen.queryByRole("menu")).not.toBeInTheDocument();
 });
+
+test("clicking a submenu after pointer entry keeps its commands open", async () => {
+  const user = userEvent.setup();
+  render(<ApplicationMenuBar groups={menuFixture()} />);
+  await user.click(screen.getByRole("menuitem", { name: "Editar" }));
+  await user.click(screen.getByRole("menuitem", { name: "Organizar" }));
+  expect(screen.getByRole("menu", { name: "Organizar" })).toBeInTheDocument();
+});

@@ -129,6 +129,19 @@ test.each([[true, 1], [true, 2], [false, 1]] as const)("Ctrl-click requests a to
   expect(vi.mocked(view.onSelectFrame).mock.calls).toEqual(editing ? [["frame-002", true]] : [["frame-002"]]);
 });
 
+test("right-clicking a Frame opens its context actions without starting a geometry gesture", async () => {
+  const onOpenFrameContextMenu = vi.fn();
+  const view = renderCanvas({ compositionPlan: groupComposition(),
+    mode: { kind: "sheet-editing", sheetId: "sheet-001" } });
+  await finishPixiInitialization();
+  view.rerenderCanvas({ onOpenFrameContextMenu });
+  act(() => displayWithLabel("canvas-frame-frame-002").emit("rightclick", {
+    button: 2, clientX: 320, clientY: 180, stopPropagation: vi.fn(),
+  }));
+  expect(onOpenFrameContextMenu).toHaveBeenCalledWith("frame-002", { x: 320, y: 180 });
+  expect(view.onSelectFrame).not.toHaveBeenCalled();
+});
+
 test("multiple selected Frames retain individual outlines and share eight bounding-box handles", async () => {
   const composition = structuredClone(interactiveComposition);
   const original = composition.sheets[0].frames[0];

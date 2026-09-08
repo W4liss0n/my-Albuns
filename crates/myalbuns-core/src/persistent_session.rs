@@ -90,6 +90,12 @@ impl PersistentProjectSession {
         intent: ProjectIntent,
     ) -> Result<ProjectIntentOutcome, CoreError> {
         let mut outcome = ProjectIntentOutcome::default();
+        if let ProjectIntent::ArrangeFrames { frame_ids, action } = &intent {
+            let next = self.project().with_arranged_frames(frame_ids, *action)?;
+            if next == *self.project() {
+                return Ok(outcome);
+            }
+        }
         if let ProjectIntent::EditFrameGeometry { edit } = &intent {
             let rects = self.project().frame_geometry_edit(edit)?;
             if rects
@@ -101,6 +107,9 @@ impl PersistentProjectSession {
             }
         }
         self.commit_edit(|project| match intent {
+            ProjectIntent::ArrangeFrames { frame_ids, action } => {
+                project.with_arranged_frames(&frame_ids, action)
+            }
             ProjectIntent::EditFrameGeometry { edit } => project.with_edited_frame_geometry(&edit),
             ProjectIntent::SetAlbumInformation { information } => project
                 .with_album_information(information)
