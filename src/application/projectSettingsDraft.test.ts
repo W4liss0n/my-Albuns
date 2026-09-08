@@ -31,6 +31,7 @@ const baselineVisualDefaults: ProjectedVisualDefaults = {
 };
 
 const representativeProjection: EditorProjection = {
+  canPasteFrames: false,
   state: {
     projectId: "draft-contract-project",
     projectName: "Contrato de draft",

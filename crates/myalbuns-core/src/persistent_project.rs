@@ -556,6 +556,11 @@ impl EditableProject {
             projection: self.projection(),
             affected_frame_id,
             affected_sheet_id,
+            affected_frame_ids: intent_outcome.affected_frame_ids.map(|ids| {
+                ids.into_iter()
+                    .map(|id| id.hyphenated().to_string())
+                    .collect()
+            }),
         })
     }
 

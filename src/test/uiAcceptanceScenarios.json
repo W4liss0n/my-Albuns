@@ -2986,6 +2986,619 @@
           "targetOffsetY": -13
         }
       ]
+    },
+    {
+      "id": "workspace-frame-clipboard-menu-empty",
+      "title": "Copiar e colar Frames — Copiar disponível e Colar indisponível antes da primeira cópia",
+      "implementationPath": "/workspace-preview.html?frame=clipboard&clipboard=same-group",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-clipboard",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A especificação e o design 0001 definem a cópia da seleção e a colagem na Lâmina isolada, com adaptação de superfície e lado lógico. A prévia reproduz resultados produzidos e conferidos pelo Core; a referência vigente antecede esses comandos."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "[role=\"menu\"][aria-label=\"Editar\"] [role=\"menuitem\"][aria-label=\"Colar\"][aria-disabled=\"true\"]",
+      "actions": [
+        {
+          "type": "click-text",
+          "text": "Editar"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-clipboard-menu-copied",
+      "title": "Copiar e colar Frames — Colar disponível depois de copiar uma seleção mista",
+      "implementationPath": "/workspace-preview.html?frame=clipboard&clipboard=same-group",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-clipboard",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A especificação e o design 0001 definem a cópia da seleção e a colagem na Lâmina isolada, com adaptação de superfície e lado lógico. A prévia reproduz resultados produzidos e conferidos pelo Core; a referência vigente antecede esses comandos."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "[role=\"menu\"][aria-label=\"Editar\"] [role=\"menuitem\"][aria-label=\"Colar\"]:not([aria-disabled=\"true\"])",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "KeyC",
+          "modifiers": [
+            "Control"
+          ]
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-clipboard-available=\"true\"]"
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-clipboard-same-group",
+      "title": "Copiar e colar Frames — Ctrl+C/V duplica a seleção e destaca as novas ocorrências",
+      "implementationPath": "/workspace-preview.html?frame=clipboard&clipboard=same-group",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-clipboard",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A especificação e o design 0001 definem a cópia da seleção e a colagem na Lâmina isolada, com adaptação de superfície e lado lógico. A prévia reproduz resultados produzidos e conferidos pelo Core; a referência vigente antecede esses comandos."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-clipboard-count=\"10\"][data-clipboard-selection=\"pasted-frame-0,pasted-frame-1\"][data-clipboard-editing-sheet=\"sheet-002\"]",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "KeyC",
+          "modifiers": [
+            "Control"
+          ]
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-clipboard-available=\"true\"]"
+        },
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "KeyV",
+          "modifiers": [
+            "Control"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-clipboard-same-single",
+      "title": "Copiar e colar Frames — menu Editar copia e cola uma Foto com seus ajustes",
+      "implementationPath": "/workspace-preview.html?frame=clipboard&clipboard=same-single",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-clipboard",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A especificação e o design 0001 definem a cópia da seleção e a colagem na Lâmina isolada, com adaptação de superfície e lado lógico. A prévia reproduz resultados produzidos e conferidos pelo Core; a referência vigente antecede esses comandos."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-clipboard-count=\"9\"][data-clipboard-selection=\"pasted-frame-0\"][data-clipboard-editing-sheet=\"sheet-002\"]",
+      "actions": [
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Copiar\"]"
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Colar\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-clipboard-other-double",
+      "title": "Copiar e colar Frames — outra Lâmina dupla preserva as coordenadas",
+      "implementationPath": "/workspace-preview.html?frame=clipboard&clipboard=other-double",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-clipboard",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A especificação e o design 0001 definem a cópia da seleção e a colagem na Lâmina isolada, com adaptação de superfície e lado lógico. A prévia reproduz resultados produzidos e conferidos pelo Core; a referência vigente antecede esses comandos."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-clipboard-count=\"10\"][data-clipboard-selection=\"pasted-frame-0,pasted-frame-1\"][data-clipboard-editing-sheet=\"sheet-003\"]",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "KeyC",
+          "modifiers": [
+            "Control"
+          ]
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-clipboard-available=\"true\"]"
+        },
+        {
+          "type": "key",
+          "key": "Escape"
+        },
+        {
+          "type": "click",
+          "selector": "[aria-label^=\"Ir para Lâmina 3,\"]"
+        },
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-clipboard-editing-sheet=\"sheet-003\"]"
+        },
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "KeyV",
+          "modifiers": [
+            "Control"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-clipboard-double-right",
+      "title": "Copiar e colar Frames — Lâmina dupla adaptada à Página direita",
+      "implementationPath": "/workspace-preview.html?frame=clipboard&clipboard=double-right",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-clipboard",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A especificação e o design 0001 definem a cópia da seleção e a colagem na Lâmina isolada, com adaptação de superfície e lado lógico. A prévia reproduz resultados produzidos e conferidos pelo Core; a referência vigente antecede esses comandos."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-clipboard-count=\"10\"][data-clipboard-selection=\"pasted-frame-0,pasted-frame-1\"][data-clipboard-editing-sheet=\"sheet-001\"]",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "KeyC",
+          "modifiers": [
+            "Control"
+          ]
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-clipboard-available=\"true\"]"
+        },
+        {
+          "type": "key",
+          "key": "Escape"
+        },
+        {
+          "type": "click",
+          "selector": "[aria-label^=\"Ir para Lâmina 1,\"]"
+        },
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-clipboard-editing-sheet=\"sheet-001\"]"
+        },
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "KeyV",
+          "modifiers": [
+            "Control"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-clipboard-double-left",
+      "title": "Copiar e colar Frames — Lâmina dupla adaptada à Página esquerda",
+      "implementationPath": "/workspace-preview.html?frame=clipboard&clipboard=double-left",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-clipboard",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A especificação e o design 0001 definem a cópia da seleção e a colagem na Lâmina isolada, com adaptação de superfície e lado lógico. A prévia reproduz resultados produzidos e conferidos pelo Core; a referência vigente antecede esses comandos."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-clipboard-count=\"10\"][data-clipboard-selection=\"pasted-frame-0,pasted-frame-1\"][data-clipboard-editing-sheet=\"sheet-004\"]",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "KeyC",
+          "modifiers": [
+            "Control"
+          ]
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-clipboard-available=\"true\"]"
+        },
+        {
+          "type": "key",
+          "key": "Escape"
+        },
+        {
+          "type": "click",
+          "selector": "[aria-label^=\"Ir para Lâmina 4,\"]"
+        },
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-clipboard-editing-sheet=\"sheet-004\"]"
+        },
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "KeyV",
+          "modifiers": [
+            "Control"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-clipboard-right-double",
+      "title": "Copiar e colar Frames — Página direita permanece à direita na Lâmina dupla",
+      "implementationPath": "/workspace-preview.html?frame=clipboard&clipboard=right-double",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-clipboard",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A especificação e o design 0001 definem a cópia da seleção e a colagem na Lâmina isolada, com adaptação de superfície e lado lógico. A prévia reproduz resultados produzidos e conferidos pelo Core; a referência vigente antecede esses comandos."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-clipboard-count=\"10\"][data-clipboard-selection=\"pasted-frame-0,pasted-frame-1\"][data-clipboard-editing-sheet=\"sheet-002\"]",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "KeyC",
+          "modifiers": [
+            "Control"
+          ]
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-clipboard-available=\"true\"]"
+        },
+        {
+          "type": "key",
+          "key": "Escape"
+        },
+        {
+          "type": "click",
+          "selector": "[aria-label^=\"Ir para Lâmina 2,\"]"
+        },
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-clipboard-editing-sheet=\"sheet-002\"]"
+        },
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "KeyV",
+          "modifiers": [
+            "Control"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-clipboard-left-double",
+      "title": "Copiar e colar Frames — Página esquerda permanece à esquerda na Lâmina dupla",
+      "implementationPath": "/workspace-preview.html?frame=clipboard&clipboard=left-double",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-clipboard",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A especificação e o design 0001 definem a cópia da seleção e a colagem na Lâmina isolada, com adaptação de superfície e lado lógico. A prévia reproduz resultados produzidos e conferidos pelo Core; a referência vigente antecede esses comandos."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-clipboard-count=\"10\"][data-clipboard-selection=\"pasted-frame-0,pasted-frame-1\"][data-clipboard-editing-sheet=\"sheet-002\"]",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "KeyC",
+          "modifiers": [
+            "Control"
+          ]
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-clipboard-available=\"true\"]"
+        },
+        {
+          "type": "key",
+          "key": "Escape"
+        },
+        {
+          "type": "click",
+          "selector": "[aria-label^=\"Ir para Lâmina 2,\"]"
+        },
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-clipboard-editing-sheet=\"sheet-002\"]"
+        },
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "KeyV",
+          "modifiers": [
+            "Control"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-clipboard-same-no-offset",
+      "title": "Copiar e colar Frames — cópias ficam sobre a origem quando não há espaço para deslocar",
+      "implementationPath": "/workspace-preview.html?frame=clipboard&clipboard=same-no-offset",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-clipboard",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A especificação e o design 0001 definem a cópia da seleção e a colagem na Lâmina isolada, com adaptação de superfície e lado lógico. A prévia reproduz resultados produzidos e conferidos pelo Core; a referência vigente antecede esses comandos."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-clipboard-count=\"10\"][data-clipboard-selection=\"pasted-frame-0,pasted-frame-1\"][data-clipboard-editing-sheet=\"sheet-002\"]",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "KeyC",
+          "modifiers": [
+            "Control"
+          ]
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-clipboard-available=\"true\"]"
+        },
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "KeyV",
+          "modifiers": [
+            "Control"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-clipboard-undo",
+      "title": "Copiar e colar Frames — Desfazer remove a colagem inteira e limpa a seleção",
+      "implementationPath": "/workspace-preview.html?frame=clipboard&clipboard=same-group",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-clipboard",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A especificação e o design 0001 definem a cópia da seleção e a colagem na Lâmina isolada, com adaptação de superfície e lado lógico. A prévia reproduz resultados produzidos e conferidos pelo Core; a referência vigente antecede esses comandos."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-clipboard-count=\"8\"][data-clipboard-selection=\"\"][data-clipboard-available=\"true\"]",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "KeyC",
+          "modifiers": [
+            "Control"
+          ]
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-clipboard-available=\"true\"]"
+        },
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "KeyV",
+          "modifiers": [
+            "Control"
+          ]
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Desfazer\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-clipboard-redo",
+      "title": "Copiar e colar Frames — Refazer restaura a colagem inteira",
+      "implementationPath": "/workspace-preview.html?frame=clipboard&clipboard=same-group",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-clipboard",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A especificação e o design 0001 definem a cópia da seleção e a colagem na Lâmina isolada, com adaptação de superfície e lado lógico. A prévia reproduz resultados produzidos e conferidos pelo Core; a referência vigente antecede esses comandos."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-clipboard-count=\"10\"][data-clipboard-selection=\"\"][data-clipboard-available=\"true\"]",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "KeyC",
+          "modifiers": [
+            "Control"
+          ]
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-clipboard-available=\"true\"]"
+        },
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "KeyV",
+          "modifiers": [
+            "Control"
+          ]
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Desfazer\"]"
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Refazer\"]"
+        }
+      ]
     }
   ]
 }

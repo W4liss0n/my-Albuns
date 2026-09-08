@@ -33,6 +33,7 @@ import stackCorpus from "../tests/fixtures/frame-stack-cases.json";
 import manualFrameCorpus from "../tests/fixtures/manual-frame-cases.json";
 import { frameDeletionCorpus } from "./test/frameDeletionPreview";
 import { frameContentSwapCorpus } from "./test/frameContentSwapPreview";
+import { frameClipboardCorpus } from "./test/frameClipboardPreview";
 import { continuousCanvasScale, createCanvasSheetPresentation } from "./components/canvasGeometry";
 import { createCanvasSheetViewGeometry, createNormalCanvasLayout } from "./components/canvasSheetViewGeometry";
 import "./ui/theme.css";
@@ -40,6 +41,7 @@ import "./ui/ui.css";
 
 const previewParameters = new URLSearchParams(window.location.search);
 const frameContext = previewParameters.get("frame");
+const frameClipboardCase = frameClipboardCorpus.cases.find((item) => item.name === (previewParameters.get("clipboard") ?? "same-group"))!;
 const manualFrameCase = manualFrameCorpus.cases.find((item) => item.name === (previewParameters.get("surface") ?? "double"));
 const frameDeletionCase = frameDeletionCorpus.cases.find((item) => item.name === (previewParameters.get("deletion") ?? "group"));
 const frameSwapCase = frameContentSwapCorpus.cases.find((item) => item.name === (previewParameters.get("swap") ?? "photos"));
@@ -93,6 +95,14 @@ if (frameContext === "swap") {
     focusedSheetId: "sheet-001", centeredSheetId: "sheet-001", selectedFrameIds });
   exposeFrameSwapState();
   useEditorView.subscribe(exposeFrameSwapState);
+}
+
+if (frameContext === "clipboard") {
+  const sheetId = frameClipboardCase.sourceSheetId;
+  useEditorView.setState({ projectId: projection.state.projectId, editingSheetId: sheetId,
+    focusedSheetId: sheetId, centeredSheetId: sheetId, selectedFrameIds: frameClipboardCase.selectedFrameIds });
+  exposeFrameClipboardState();
+  useEditorView.subscribe(exposeFrameClipboardState);
 }
 
 const projectCorePort: ProjectCorePort = {
@@ -248,6 +258,7 @@ function createPreviewProjection(
   decorativeMode: string | null,
   structureMode: string | null,
 ): EditorProjection {
+  if (frameMode === "clipboard") return structuredClone(frameClipboardCase.before ?? frameClipboardCorpus.before);
   if (frameMode === "swap") return structuredClone(frameContentSwapCorpus.before);
   if (frameMode === "deletion") return structuredClone(frameDeletionCorpus.before);
   if (frameMode === "manual") return structuredClone(manualFrameCase!.before) as EditorProjection;
@@ -372,6 +383,22 @@ function configurePhysicalPreview(
 }
 
 function applyPreviewIntent(intent: ProjectIntent): ProjectMutationOutcome {
+  if (intent.kind === "copyFrames") {
+    if (frameContext !== "clipboard" || [...intent.frameIds].sort().join() !== [...frameClipboardCase.selectedFrameIds].sort().join()) {
+      throw new Error("Seleção fora do cenário de cópia desta prévia.");
+    }
+    projection = structuredClone(frameClipboardCase.copied ?? frameClipboardCorpus.copied);
+    exposeFrameClipboardState();
+    return { projection, affectedFrameId: null, affectedSheetId: null };
+  }
+  if (intent.kind === "pasteFrames") {
+    if (frameContext !== "clipboard" || !projection.canPasteFrames || intent.sheetId !== frameClipboardCase.targetSheetId) {
+      throw new Error("Destino fora do cenário de colagem desta prévia.");
+    }
+    projection = finalizePhysicalPreviewMutation(structuredClone(frameClipboardCase.after), structuredClone(projection));
+    exposeFrameClipboardState();
+    return { projection, affectedFrameId: null, affectedSheetId: null, affectedFrameIds: frameClipboardCase.pastedFrameIds };
+  }
   if (frameContext === "swap") document.body.dataset.frameSwapLastIntent = JSON.stringify(intent);
   if (intent.kind === "swapFrameContents") {
     if (frameContext !== "swap" || !frameSwapCase ||
@@ -571,6 +598,7 @@ function restorePreviewHistory(
   if (frameContext === "manual") exposeManualFrameState();
   if (frameContext === "deletion") exposeFrameDeletionState();
   if (frameContext === "swap") exposeFrameSwapState();
+  if (frameContext === "clipboard") exposeFrameClipboardState();
   return projection;
 }
 
@@ -582,6 +610,14 @@ function exposeManualFrameState() {
 function exposeFrameDeletionState() {
   document.body.dataset.frameDeletionSelection = useEditorView.getState().selectedFrameIds.join(",");
   document.body.dataset.frameDeletionCount = String(projection.state.album.sheets[0].frames.length);
+}
+
+function exposeFrameClipboardState() {
+  const view = useEditorView.getState();
+  document.body.dataset.clipboardSelection = view.selectedFrameIds.join(",");
+  document.body.dataset.clipboardCount = String(projection.state.album.sheets.reduce((count, sheet) => count + sheet.frames.length, 0));
+  document.body.dataset.clipboardAvailable = String(projection.canPasteFrames);
+  document.body.dataset.clipboardEditingSheet = view.editingSheetId ?? "none";
 }
 
 function exposeFrameSwapState() {

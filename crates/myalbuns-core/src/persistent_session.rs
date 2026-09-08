@@ -1,13 +1,14 @@
 use crate::{
     model::{CoreError, ProjectIntent, RelinkMedia},
-    project_document::{MAX_SAFE_INTEGER, ProjectDocument, ProjectRevision},
+    project_document::{FrameClipboard, MAX_SAFE_INTEGER, ProjectDocument, ProjectRevision},
 };
 use uuid::Uuid;
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct ProjectIntentOutcome {
     pub(crate) affected_frame_id: Option<Uuid>,
     pub(crate) affected_sheet_id: Option<Uuid>,
+    pub(crate) affected_frame_ids: Option<Vec<Uuid>>,
 }
 
 #[derive(Clone, Debug)]
@@ -19,6 +20,7 @@ pub(crate) struct PersistentProjectSession {
     recovered_unsaved: bool,
     undo: Vec<ProjectRevision>,
     redo: Vec<ProjectRevision>,
+    frame_clipboard: Option<FrameClipboard>,
 }
 
 impl PersistentProjectSession {
@@ -33,6 +35,7 @@ impl PersistentProjectSession {
             recovered_unsaved: false,
             undo: Vec::new(),
             redo: Vec::new(),
+            frame_clipboard: None,
         }
     }
 
@@ -46,6 +49,7 @@ impl PersistentProjectSession {
             recovered_unsaved: true,
             undo: Vec::new(),
             redo: Vec::new(),
+            frame_clipboard: None,
         }
     }
 
@@ -85,11 +89,36 @@ impl PersistentProjectSession {
         !self.redo.is_empty()
     }
 
+    pub(crate) fn can_paste_frames(&self) -> bool {
+        self.frame_clipboard.is_some()
+    }
+
     pub(crate) fn apply(
         &mut self,
         intent: ProjectIntent,
     ) -> Result<ProjectIntentOutcome, CoreError> {
         let mut outcome = ProjectIntentOutcome::default();
+        if let ProjectIntent::CopyFrames { frame_ids } = &intent {
+            self.frame_clipboard = Some(self.project().copy_frames(frame_ids)?);
+            return Ok(outcome);
+        }
+        if let ProjectIntent::PasteFrames {
+            sheet_id,
+            desired_offset_um,
+        } = &intent
+        {
+            let clipboard = self
+                .frame_clipboard
+                .clone()
+                .ok_or(CoreError::FrameClipboardEmpty)?;
+            self.commit_edit(|project| {
+                let (next, ids) =
+                    project.with_pasted_frames(&clipboard, sheet_id, *desired_offset_um)?;
+                outcome.affected_frame_ids = Some(ids);
+                Ok(next)
+            })?;
+            return Ok(outcome);
+        }
         if let ProjectIntent::ArrangeFrames { frame_ids, action } = &intent {
             let next = self.project().with_arranged_frames(frame_ids, *action)?;
             if next == *self.project() {
@@ -107,6 +136,9 @@ impl PersistentProjectSession {
             }
         }
         self.commit_edit(|project| match intent {
+            ProjectIntent::CopyFrames { .. } | ProjectIntent::PasteFrames { .. } => {
+                unreachable!("clipboard commands are handled before document intents")
+            }
             ProjectIntent::SwapFrameContents { frame_ids } => {
                 project.with_swapped_frame_contents(&frame_ids)
             }
@@ -318,6 +350,7 @@ impl PersistentProjectSession {
             return Err(());
         }
         self.current.project_id = candidate.project_id;
+        self.frame_clipboard = None;
         for revision in self.undo.iter_mut().chain(self.redo.iter_mut()) {
             revision.project_id = candidate.project_id;
         }

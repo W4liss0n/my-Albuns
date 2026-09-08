@@ -63,12 +63,16 @@ export function useProjectMutations({
   const [photoImportResult, setPhotoImportResult] = useState<PhotoImportCompletion | null>(null);
   const feedbackTokenRef = useRef(0);
   const saveAsBarrierRef = useRef(false);
+  const [pendingFrameCopies, setPendingFrameCopies] = useState(0);
+  const frameCopySessionRef = useRef({ pending: 0 });
 
   useEffect(() => {
     setMessage(null);
     importAttemptRef.current = { pending: false };
     setImportPending(false);
     setPhotoImportResult(null);
+    frameCopySessionRef.current = { pending: 0 };
+    setPendingFrameCopies(0);
     return () => { importAttemptRef.current = { pending: false }; };
   }, [runProjectMutation, projection.state.projectId]);
 
@@ -85,6 +89,7 @@ export function useProjectMutations({
   async function runWithErrorFeedback(
     operation: ProjectMutationOperation,
     cancelAfterPendingFailure = false,
+    onCompleted?: (next: EditorProjection) => void,
   ) {
     if (saveAsBarrierRef.current) return false;
     const feedbackToken = feedbackTokenRef.current + 1;
@@ -95,6 +100,7 @@ export function useProjectMutations({
     });
     if (outcome.status === "completed") {
       onProjectionChange(outcome.projection);
+      onCompleted?.(outcome.projection);
     } else if (
       outcome.status === "failed" &&
       feedbackToken === feedbackTokenRef.current
@@ -116,6 +122,29 @@ export function useProjectMutations({
         publish,
       )),
     );
+  }
+
+  async function copyFrames(frameIds: string[]) {
+    const session = frameCopySessionRef.current;
+    session.pending += 1;
+    setPendingFrameCopies(session.pending);
+    try {
+      return await runWithErrorFeedback((port) => port.apply({ kind: "copyFrames", frameIds }), true);
+    } finally {
+      session.pending -= 1;
+      if (frameCopySessionRef.current === session) setPendingFrameCopies(session.pending);
+    }
+  }
+
+  function pasteFrames(sheetId: string, desiredOffsetUm: number, selectPasted: (ids: string[], next: EditorProjection) => void) {
+    let ids: string[] = [];
+    return runWithErrorFeedback(async (port, latestProjection) => {
+      const current = latestProjection ?? projection;
+      if (!current.canPasteFrames) return current;
+      const result = await imageProcessing.run((publish) => port.applyWithOutcome({ kind: "pasteFrames", sheetId, desiredOffsetUm }, publish));
+      ids = result.affectedFrameIds ?? [];
+      return result.projection;
+    }, true, (next) => { if (ids.length > 0) selectPasted(ids, next); });
   }
 
   async function applyWithOutcome(intent: ProjectIntent) {
@@ -369,6 +398,9 @@ export function useProjectMutations({
       commitProjectSettingsDraft(draft),
     applyWithOutcome,
     applyPhotoWithStatus: applyWithOutcome,
+    copyFrames,
+    pasteFrames,
+    frameCopyPending: pendingFrameCopies > 0,
     importPhoto: async () => {
       if (importAttemptRef.current.pending || saveAsBarrierRef.current) return null;
       const attempt = { pending: true };

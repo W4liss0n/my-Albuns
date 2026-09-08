@@ -17,6 +17,9 @@ use crate::model::{
 
 pub(crate) const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
 
+mod frame_clipboard;
+pub(crate) use frame_clipboard::FrameClipboard;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub enum DisplayUnit {

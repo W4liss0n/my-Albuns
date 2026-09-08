@@ -13,6 +13,10 @@ import type {
 } from "./ApplicationMenuBar";
 
 interface ProjectApplicationMenuOptions {
+  copyFrames(): void;
+  pasteFrames(): void;
+  canCopyFrames: boolean;
+  canPasteFrames: boolean;
   addFrame(): void;
   canAddFrame: boolean;
   arrangeFrames(action: FrameStackAction): void;
@@ -44,6 +48,10 @@ interface ProjectApplicationMenuOptions {
 }
 
 export function createProjectApplicationMenus({
+  copyFrames,
+  pasteFrames,
+  canCopyFrames,
+  canPasteFrames,
   addFrame,
   canAddFrame,
   arrangeFrames,
@@ -99,8 +107,8 @@ export function createProjectApplicationMenus({
         implemented("undo", "project-window", undo, !canUndo),
         implemented("redo", "project-window", redo, !canRedo),
         separator("edit-clipboard-separator"),
-        placeholder("copy-frames", "frame"),
-        placeholder("paste-frames", "frame"),
+        implemented("copy-frames", "frame", copyFrames, !canCopyFrames),
+        implemented("paste-frames", "frame", pasteFrames, !canPasteFrames),
         separator("edit-frame-separator"),
         implemented("swap-frame-contents", "frame", swapFrameContents, !canSwapFrameContents),
         implemented("add-frame", "frame", addFrame, !canAddFrame),

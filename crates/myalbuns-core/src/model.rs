@@ -551,6 +551,8 @@ pub struct MediaUsage {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct EditorProjection {
+    #[serde(default)]
+    pub can_paste_frames: bool,
     pub state: EditorState,
     pub composition: CompositionPlan,
     pub media_usage: Vec<MediaUsage>,
@@ -658,6 +660,9 @@ pub struct ProjectMutationOutcome {
     pub projection: EditorProjection,
     pub affected_frame_id: Option<String>,
     pub affected_sheet_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub affected_frame_ids: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -805,6 +810,13 @@ pub enum FrameStackAction {
 )]
 #[ts(tag = "kind")]
 pub enum ProjectIntent {
+    CopyFrames {
+        frame_ids: Vec<String>,
+    },
+    PasteFrames {
+        sheet_id: String,
+        desired_offset_um: u64,
+    },
     AddFrame {
         sheet_id: String,
     },
@@ -868,6 +880,12 @@ pub enum ProjectIntent {
 
 #[derive(Debug, Error, PartialEq)]
 pub enum CoreError {
+    #[error("Selecione Frames distintos de uma única Lâmina para copiar")]
+    InvalidFrameCopySelection,
+    #[error("Copie Frames neste Projeto antes de colar")]
+    FrameClipboardEmpty,
+    #[error("O conjunto copiado não cabe na superfície ativa")]
+    InvalidFramePaste,
     #[error("Selecione exatamente dois Frames distintos da mesma Lâmina, com ao menos uma Foto")]
     InvalidFrameContentSwapSelection,
     #[error("Selecione Frames distintos de uma única Lâmina para excluir")]

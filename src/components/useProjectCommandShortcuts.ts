@@ -28,6 +28,9 @@ function targetOwnsEditingKeys(target: EventTarget | null) {
 }
 
 interface ProjectCommandShortcutHandlers {
+  copyFrames(): void;
+  pasteFrames(): void;
+  frameClipboardActive: boolean;
   arrangeFrames(action: FrameStackAction): void;
   deleteFrames(): void;
   frameCommandsActive: boolean;
@@ -49,6 +52,9 @@ interface ProjectCommandShortcutHandlers {
 }
 
 export function useProjectCommandShortcuts({
+  copyFrames,
+  pasteFrames,
+  frameClipboardActive,
   arrangeFrames,
   deleteFrames,
   frameCommandsActive,
@@ -71,6 +77,17 @@ export function useProjectCommandShortcuts({
   useEffect(() => {
     const handleProjectCommand = (event: KeyboardEvent) => {
       if (event.defaultPrevented) return;
+      if (frameClipboardActive && targetAllowsCommandShortcut(event.target, "frame") && !targetOwnsEditingKeys(event.target)) {
+        const command = matchProjectCommandShortcut(event, "frame");
+        if (command === "copy-frames" || command === "paste-frames") {
+          event.preventDefault();
+          if (!event.repeat && !disabled) {
+            if (command === "copy-frames") copyFrames();
+            else pasteFrames();
+          }
+          return;
+        }
+      }
       if (frameCommandsActive && targetAllowsCommandShortcut(event.target, "frame") &&
           !targetOwnsEditingKeys(event.target)) {
         const frameCommand = matchProjectCommandShortcut(event, "frame");
@@ -151,6 +168,9 @@ export function useProjectCommandShortcuts({
     window.addEventListener("keydown", handleProjectCommand);
     return () => window.removeEventListener("keydown", handleProjectCommand);
   }, [
+    copyFrames,
+    pasteFrames,
+    frameClipboardActive,
     arrangeFrames,
     deleteFrames,
     frameCommandsActive,

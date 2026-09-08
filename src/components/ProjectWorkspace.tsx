@@ -529,6 +529,9 @@ export function ProjectWorkspace({
     setFrameContextMenu({ kind: "empty", position });
   };
   useProjectCommandShortcuts({
+    copyFrames: () => { void controller.copyFrames(); },
+    pasteFrames: () => { void controller.pasteFrames(); },
+    frameClipboardActive: canvasMode.kind === "sheet-editing" && draggedPhotoId === null && sheetContextMenu === null && frameContextMenu === null,
     deleteFrames: () => { void controller.deleteFrames(); },
     arrangeFrames: (action) => { void controller.arrangeFrames(action); },
     frameCommandsActive: controller.canArrangeFrames && draggedPhotoId === null && sheetContextMenu === null && frameContextMenu === null,
@@ -552,6 +555,10 @@ export function ProjectWorkspace({
     undo: controller.undo,
   });
   const applicationMenus = createProjectApplicationMenus({
+    copyFrames: () => { void controller.copyFrames(); },
+    pasteFrames: () => { void controller.pasteFrames(); },
+    canCopyFrames: controller.canCopyFrames,
+    canPasteFrames: controller.canPasteFrames,
     swapFrameContents: () => { void controller.swapFrameContents(); },
     canSwapFrameContents: controller.canSwapFrameContents,
     addFrame: () => { void controller.addFrame(); },
