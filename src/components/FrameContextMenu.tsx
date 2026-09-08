@@ -23,7 +23,8 @@ export function FrameContextMenu({ position, onArrange, onDelete, onDismiss }: F
         );
       })}
       <div className="ui-context-menu__separator" role="separator" />
-      <button type="button" role="menuitem" onClick={() => { onDelete(); onDismiss(); }}>
+      <button type="button" role="menuitem" aria-label={projectCommandDescriptor("delete-frames").label}
+        onClick={() => { onDelete(); onDismiss(); }}>
         <span>{projectCommandDescriptor("delete-frames").label}</span>
         <kbd aria-hidden="true">{projectCommandShortcutLabel("delete-frames")}</kbd>
       </button>

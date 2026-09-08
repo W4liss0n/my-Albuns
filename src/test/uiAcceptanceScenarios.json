@@ -6,14 +6,8 @@
       "title": "Tela de Boas-vindas",
       "implementationPath": "/welcome-preview.html",
       "referencePath": "/docs/references/ui-programa-diagramacao/Boas-vindas.dc.html",
-      "comparison": {
-        "kind": "paired",
-        "surface": "welcome-window"
-      },
-      "viewport": {
-        "width": 1280,
-        "height": 720
-      },
+      "comparison": { "kind": "paired", "surface": "welcome-window" },
+      "viewport": { "width": 1280, "height": 720 },
       "readySelector": "[aria-label=\"Ações principais\"]",
       "actions": []
     },
@@ -27,10 +21,7 @@
         "implementationCaptureSelector": ".ui-owned-window-shell",
         "reason": "Problemas de preparação também são apresentados fora da importação, preservando a imagem válida conforme a política compartilhada aceita."
       },
-      "viewport": {
-        "width": 640,
-        "height": 460
-      },
+      "viewport": { "width": 640, "height": 460 },
       "readySelector": ".ui-problems-table",
       "actions": []
     },
@@ -44,10 +35,7 @@
         "implementationCaptureSelector": ".ui-owned-window-shell",
         "reason": "A política aceita de processamento compartilhado estende o mesmo progresso à preparação provisória, antes da identidade do Projeto."
       },
-      "viewport": {
-        "width": 440,
-        "height": 360
-      },
+      "viewport": { "width": 440, "height": 360 },
       "readySelector": "[role=\"progressbar\"]",
       "actions": []
     },
@@ -60,10 +48,7 @@
         "surface": "welcome-empty-state",
         "reason": "A referência visual vigente representa a Tela de Boas-vindas populada e não define o estado sem Projetos recentes."
       },
-      "viewport": {
-        "width": 1280,
-        "height": 720
-      },
+      "viewport": { "width": 1280, "height": 720 },
       "readySelector": ".global-shell:has(.global-empty-state[role=\"status\"][aria-label=\"Nenhum Projeto recente\"]):not(:has(.global-recent-list)):not(:has(.global-project-thumbnail)):not(:has(.ui-empty-state__icon))",
       "actions": [
         {
@@ -86,10 +71,7 @@
         "implementationCaptureSelector": ".ui-owned-window-shell",
         "reason": "A referência visual vigente mostra o antigo rótulo redundante de estimativa e não representa o diálogo em janela nativa do Windows definido nas decisões aceitas posteriores."
       },
-      "viewport": {
-        "width": 520,
-        "height": 320
-      },
+      "viewport": { "width": 520, "height": 320 },
       "readySelector": ".ui-progress-dialog__track[role=\"progressbar\"]",
       "actions": []
     },
@@ -103,17 +85,10 @@
         "implementationCaptureSelector": ".ui-owned-window-shell",
         "reason": "Falhas operacionais de Novo Projeto usam o diálogo pertencente canônico definido nas decisões aceitas posteriores; o título mais longo valida a fronteira visual comum aos contextos tipados."
       },
-      "viewport": {
-        "width": 520,
-        "height": 320
-      },
+      "viewport": { "width": 520, "height": 320 },
       "readySelector": ".ui-standard-message[role=\"alert\"]",
       "actions": [
-        {
-          "type": "selection-drag",
-          "selector": ".ui-standard-message__description.ui-copyable-text",
-          "expect": "text"
-        }
+        { "type": "selection-drag", "selector": ".ui-standard-message__description.ui-copyable-text", "expect": "text" }
       ]
     },
     {
@@ -126,10 +101,7 @@
         "implementationCaptureSelector": ".ui-owned-window-shell",
         "reason": "A referência visual vigente antecede o resumo dinâmico que apresenta somente as alterações efetivas em diálogos nativos do Windows, conforme as decisões aceitas posteriores."
       },
-      "viewport": {
-        "width": 600,
-        "height": 320
-      },
+      "viewport": { "width": 600, "height": 320 },
       "readySelector": ".album-information-change-list",
       "actions": []
     },
@@ -143,10 +115,7 @@
         "implementationCaptureSelector": ".ui-owned-window-shell",
         "reason": "Falhas operacionais seguem o componente canônico de diálogo pertencente à Janela, sem aviso flutuante dentro do editor."
       },
-      "viewport": {
-        "width": 520,
-        "height": 320
-      },
+      "viewport": { "width": 520, "height": 320 },
       "readySelector": ".ui-standard-message[role=\"alert\"]",
       "actions": []
     },
@@ -160,10 +129,7 @@
         "implementationCaptureSelector": ".ui-owned-window-shell",
         "reason": "A conclusão da Exportação usa o componente canônico de diálogo pertencente à Janela, sem aviso flutuante dentro do editor."
       },
-      "viewport": {
-        "width": 520,
-        "height": 320
-      },
+      "viewport": { "width": 520, "height": 320 },
       "readySelector": ".ui-standard-message[role=\"status\"]",
       "actions": []
     },
@@ -177,10 +143,7 @@
         "implementationCaptureSelector": ".ui-owned-window-shell",
         "reason": "O estado ocupado preserva o resumo confirmado e bloqueia suas ações enquanto a aplicação termina, conforme o fluxo nativo aceito posterior à referência."
       },
-      "viewport": {
-        "width": 600,
-        "height": 320
-      },
+      "viewport": { "width": 600, "height": 320 },
       "readySelector": ".album-information-change-list",
       "actions": []
     },
@@ -194,10 +157,7 @@
         "implementationCaptureSelector": ".ui-owned-window-shell",
         "reason": "O fechamento usa o diálogo pertencente à Janela definido nas decisões aceitas posteriores."
       },
-      "viewport": {
-        "width": 600,
-        "height": 320
-      },
+      "viewport": { "width": 600, "height": 320 },
       "readySelector": ".ui-standard-message",
       "actions": []
     },
@@ -211,10 +171,7 @@
         "implementationCaptureSelector": ".ui-owned-window-shell",
         "reason": "O estado ocupado do fechamento pertence ao fluxo nativo aceito e não possui equivalente na referência visual vigente."
       },
-      "viewport": {
-        "width": 600,
-        "height": 320
-      },
+      "viewport": { "width": 600, "height": 320 },
       "readySelector": ".ui-standard-message",
       "actions": []
     },
@@ -228,10 +185,7 @@
         "implementationCaptureSelector": ".ui-owned-window-shell",
         "reason": "Falhas de fechamento seguem o componente canônico pertencente à Janela."
       },
-      "viewport": {
-        "width": 520,
-        "height": 320
-      },
+      "viewport": { "width": 520, "height": 320 },
       "readySelector": ".ui-standard-message[role=\"alert\"]",
       "actions": []
     },
@@ -245,10 +199,7 @@
         "implementationCaptureSelector": ".ui-owned-window-shell",
         "reason": "A Exportação usa progresso pertencente à Janela conforme as decisões aceitas posteriores."
       },
-      "viewport": {
-        "width": 520,
-        "height": 320
-      },
+      "viewport": { "width": 520, "height": 320 },
       "readySelector": ".ui-progress-dialog__track[role=\"progressbar\"]",
       "actions": []
     },
@@ -262,10 +213,7 @@
         "implementationCaptureSelector": ".ui-owned-window-shell",
         "reason": "O cancelamento em andamento não possui equivalente na referência visual vigente."
       },
-      "viewport": {
-        "width": 520,
-        "height": 320
-      },
+      "viewport": { "width": 520, "height": 320 },
       "readySelector": ".ui-progress-dialog__track[role=\"progressbar\"]",
       "actions": []
     },
@@ -279,10 +227,7 @@
         "implementationCaptureSelector": ".ui-owned-window-shell",
         "reason": "A fase de publicação pode retirar a ação Cancelar quando o adaptador produtivo informa que a tentativa deixou de ser cancelável."
       },
-      "viewport": {
-        "width": 520,
-        "height": 320
-      },
+      "viewport": { "width": 520, "height": 320 },
       "readySelector": ".ui-progress-dialog__track[role=\"progressbar\"]",
       "actions": []
     },
@@ -296,10 +241,7 @@
         "implementationCaptureSelector": ".ui-owned-window-shell",
         "reason": "Falhas de Exportação seguem o componente canônico pertencente à Janela."
       },
-      "viewport": {
-        "width": 520,
-        "height": 320
-      },
+      "viewport": { "width": 520, "height": 320 },
       "readySelector": ".ui-standard-message[role=\"alert\"]",
       "actions": []
     },
@@ -313,10 +255,7 @@
         "implementationCaptureSelector": ".ui-owned-window-shell",
         "reason": "A conclusão cancelada usa o estado canônico posterior à referência visual vigente."
       },
-      "viewport": {
-        "width": 520,
-        "height": 320
-      },
+      "viewport": { "width": 520, "height": 320 },
       "readySelector": ".ui-standard-message[role=\"alert\"]",
       "actions": []
     },
@@ -325,20 +264,11 @@
       "title": "Novo Projeto — Configurações",
       "implementationPath": "/welcome-preview.html",
       "referencePath": "/docs/references/ui-programa-diagramacao/Criar%20projeto.dc.html",
-      "comparison": {
-        "kind": "paired",
-        "surface": "new-project-window"
-      },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "comparison": { "kind": "paired", "surface": "new-project-window" },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": "[aria-label=\"Continuar\"]",
       "actions": [
-        {
-          "type": "click",
-          "selector": "[aria-label=\"Novo Projeto\"]"
-        }
+        { "type": "click", "selector": "[aria-label=\"Novo Projeto\"]" }
       ]
     },
     {
@@ -346,30 +276,15 @@
       "title": "Novo Projeto — Personalização",
       "implementationPath": "/welcome-preview.html",
       "referencePath": "/docs/references/ui-programa-diagramacao/Criar%20projeto.dc.html",
-      "comparison": {
-        "kind": "paired",
-        "surface": "new-project-window"
-      },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "comparison": { "kind": "paired", "surface": "new-project-window" },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": "[aria-label=\"Criar Projeto\"]",
       "actions": [
-        {
-          "type": "click",
-          "selector": "[aria-label=\"Novo Projeto\"]"
-        },
-        {
-          "type": "click",
-          "selector": "[aria-label=\"Continuar\"]"
-        }
+        { "type": "click", "selector": "[aria-label=\"Novo Projeto\"]" },
+        { "type": "click", "selector": "[aria-label=\"Continuar\"]" }
       ],
       "referenceActions": [
-        {
-          "type": "click-text",
-          "text": "Continuar"
-        }
+        { "type": "click-text", "text": "Continuar" }
       ]
     },
     {
@@ -382,20 +297,11 @@
         "implementationCaptureSelector": ".global-shell--new-project",
         "reason": "A referência visual vigente não define o indicador de foco da etapa atual exigido pela navegação por teclado aceita posteriormente."
       },
-      "viewport": {
-        "width": 1280,
-        "height": 720
-      },
+      "viewport": { "width": 1280, "height": 720 },
       "readySelector": ".new-project-steps li[aria-current=\"step\"]:focus",
       "actions": [
-        {
-          "type": "focus",
-          "selector": "[aria-label=\"Novo Projeto\"]"
-        },
-        {
-          "type": "key",
-          "key": "Enter"
-        }
+        { "type": "focus", "selector": "[aria-label=\"Novo Projeto\"]" },
+        { "type": "key", "key": "Enter" }
       ]
     },
     {
@@ -409,10 +315,7 @@
         "implementationCaptureSelector": ".app-shell",
         "referenceCaptureSelector": "body"
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": ".app-shell:has(.workspace-grid canvas):has(#contextual-panel button[aria-label=\"Informações do Álbum\"][aria-expanded=\"true\"])",
       "referenceReadySelector": "[data-l=\"2\"]",
       "actions": [],
@@ -428,10 +331,7 @@
         "implementationCaptureSelector": ".app-shell",
         "reason": "A referência visual vigente antecede o estado explícito de Cache indisponível e seu fallback compartilhado com Canvas e Grade."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": "[aria-label=\"Overlay de ambos os lados\"][data-preview-state=\"unavailable\"]",
       "actions": []
     },
@@ -445,22 +345,11 @@
         "implementationCaptureSelector": ".app-shell",
         "reason": "A referência visual vigente não explicita a política semântica que bloqueia seleção no chrome e preserva caret e seleção nos campos editáveis."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": ".app-shell.ui-chrome-selection-scope:has(input[aria-label=\"DPI\"])",
       "actions": [
-        {
-          "type": "selection-drag",
-          "selector": ".album-information-form h3",
-          "expect": "none"
-        },
-        {
-          "type": "selection-drag",
-          "selector": "input[aria-label=\"DPI\"]",
-          "expect": "control"
-        }
+        { "type": "selection-drag", "selector": ".album-information-form h3", "expect": "none" },
+        { "type": "selection-drag", "selector": "input[aria-label=\"DPI\"]", "expect": "control" }
       ]
     },
     {
@@ -473,10 +362,7 @@
         "implementationCaptureSelector": ".ui-owned-window-shell",
         "reason": "A referência visual vigente antecede o diálogo externo de Recuperação pertencente ao fluxo Global de abertura definido pelos contratos multiprocesso aceitos posteriormente."
       },
-      "viewport": {
-        "width": 492,
-        "height": 320
-      },
+      "viewport": { "width": 492, "height": 320 },
       "readySelector": ".ui-owned-window-shell:has([data-opening-owner-transition] [role=\"dialog\"][aria-modal=\"true\"]):not(:has(.ui-modal-dialog-layer)):not(:has(.ui-application-header__status:not(:empty)))",
       "actions": [
         {
@@ -503,10 +389,7 @@
         "implementationCaptureSelector": ".ui-owned-window-shell",
         "reason": "A referência visual vigente antecede a transição da janela externa de progresso para a decisão de Cópia externa no mesmo owner e Host correlacionado."
       },
-      "viewport": {
-        "width": 440,
-        "height": 320
-      },
+      "viewport": { "width": 440, "height": 320 },
       "readySelector": ".ui-owned-window-shell:has([data-opening-owner-transition] .external-copy-decision-dialog-scope [role=\"dialog\"][aria-modal=\"true\"]):not(:has(.ui-modal-dialog-layer))",
       "actions": [
         {
@@ -529,20 +412,11 @@
         "implementationCaptureSelector": ".app-shell",
         "reason": "A referência visual vigente não representa o Modo de edição da Lâmina e seu Painel contextual definidos nas decisões aceitas posteriores."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": "#contextual-panel button[aria-label=\"Design da Lâmina\"][aria-expanded=\"true\"]",
       "actions": [
-        {
-          "type": "focus",
-          "selector": ".workspace-grid canvas"
-        },
-        {
-          "type": "key",
-          "key": "Enter"
-        }
+        { "type": "focus", "selector": ".workspace-grid canvas" },
+        { "type": "key", "key": "Enter" }
       ]
     },
     {
@@ -555,24 +429,12 @@
         "implementationCaptureSelector": ".app-shell",
         "reason": "A referência visual vigente não representa a composição integrada de Frame e Foto exercitada aqui pelo App real com projeção e portas determinísticas de aceitação."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": "#contextual-panel [aria-label=\"Zoom da Foto\"]",
       "actions": [
-        {
-          "type": "focus",
-          "selector": ".workspace-grid canvas"
-        },
-        {
-          "type": "key",
-          "key": "Enter"
-        },
-        {
-          "type": "click",
-          "selector": ".workspace-grid canvas"
-        }
+        { "type": "focus", "selector": ".workspace-grid canvas" },
+        { "type": "key", "key": "Enter" },
+        { "type": "click", "selector": ".workspace-grid canvas" }
       ]
     },
     {
@@ -585,24 +447,12 @@
         "implementationCaptureSelector": ".app-shell",
         "reason": "A referência visual vigente não representa a composição integrada de Frame placeholder exercitada aqui pelo App real com projeção e portas determinísticas de aceitação."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": "#contextual-panel:has(.context-heading):not(:has([aria-label=\"Zoom da Foto\"])) .context-heading h2",
       "actions": [
-        {
-          "type": "focus",
-          "selector": ".workspace-grid canvas"
-        },
-        {
-          "type": "key",
-          "key": "Enter"
-        },
-        {
-          "type": "click",
-          "selector": ".workspace-grid canvas"
-        }
+        { "type": "focus", "selector": ".workspace-grid canvas" },
+        { "type": "key", "key": "Enter" },
+        { "type": "click", "selector": ".workspace-grid canvas" }
       ]
     },
     {
@@ -616,23 +466,14 @@
         "implementationCaptureSelector": ".app-shell",
         "referenceCaptureSelector": "body"
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": "#application-menu-file",
       "referenceReadySelector": "button[data-menu=\"arquivo\"]",
       "actions": [
-        {
-          "type": "click",
-          "selector": "[aria-controls=\"application-menu-file\"]"
-        }
+        { "type": "click", "selector": "[aria-controls=\"application-menu-file\"]" }
       ],
       "referenceActions": [
-        {
-          "type": "click",
-          "selector": "button[data-menu=\"arquivo\"]"
-        }
+        { "type": "click", "selector": "button[data-menu=\"arquivo\"]" }
       ]
     },
     {
@@ -645,16 +486,10 @@
         "implementationCaptureSelector": ".app-shell",
         "reason": "A referência visual vigente não representa os comandos estruturais nem as restrições físicas aceitas posteriormente."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": ".app-shell:has(#application-menu-sheet button[aria-label=\"Adicionar antes\"]:disabled):has(#application-menu-sheet button[aria-label=\"Excluir\"]:disabled)",
       "actions": [
-        {
-          "type": "click",
-          "selector": "[aria-controls=\"application-menu-sheet\"]"
-        }
+        { "type": "click", "selector": "[aria-controls=\"application-menu-sheet\"]" }
       ]
     },
     {
@@ -667,16 +502,10 @@
         "implementationCaptureSelector": ".app-shell",
         "reason": "A referência visual vigente não representa o menu contextual estrutural nem as restrições físicas aceitas posteriormente."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": ".app-shell:has(.canvas-host[data-centered-sheet-id=\"sheet-001\"][data-viewport-offset-x=\"0\"]):has([role=\"menu\"][aria-label=\"Ações da Lâmina 01\"] button:nth-of-type(1):disabled):has([role=\"menu\"][aria-label=\"Ações da Lâmina 01\"] button:nth-of-type(4):disabled)",
       "actions": [
-        {
-          "type": "context-click",
-          "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-001\"]"
-        }
+        { "type": "context-click", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-001\"]" }
       ]
     },
     {
@@ -689,24 +518,12 @@
         "implementationCaptureSelector": ".app-shell",
         "reason": "A referência visual vigente não representa o comando público de navegação pelas teclas físicas ←/→ aceito posteriormente."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 600
-      },
+      "viewport": { "width": 1440, "height": 600 },
       "readySelector": ".app-shell:has(.canvas-host[data-centered-sheet-id=\"sheet-003\"]):not(:has(.canvas-sheet-navigation))",
       "actions": [
-        {
-          "type": "assert",
-          "selector": ".canvas-host[data-centered-sheet-id=\"sheet-002\"]"
-        },
-        {
-          "type": "focus",
-          "selector": ".canvas-host canvas"
-        },
-        {
-          "type": "key",
-          "key": "ArrowRight"
-        }
+        { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-002\"]" },
+        { "type": "focus", "selector": ".canvas-host canvas" },
+        { "type": "key", "key": "ArrowRight" }
       ]
     },
     {
@@ -719,20 +536,11 @@
         "implementationCaptureSelector": ".app-shell",
         "reason": "A referência visual vigente não representa o menu contextual estrutural nem a separação posterior entre seu alvo explícito e a Lâmina centralizada."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 600
-      },
+      "viewport": { "width": 1440, "height": 600 },
       "readySelector": ".app-shell:has(.canvas-host[data-centered-sheet-id=\"sheet-002\"]):has([role=\"menu\"][aria-label=\"Ações da Lâmina 02\"])",
       "actions": [
-        {
-          "type": "assert",
-          "selector": ".canvas-host[data-centered-sheet-id=\"sheet-002\"]"
-        },
-        {
-          "type": "context-click",
-          "selector": ".canvas-host canvas"
-        }
+        { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-002\"]" },
+        { "type": "context-click", "selector": ".canvas-host canvas" }
       ]
     },
     {
@@ -745,40 +553,16 @@
         "implementationCaptureSelector": ".app-shell",
         "reason": "A referência visual vigente não representa a separação aceita posteriormente entre seleção pela Barra e navegação explícita do Canvas."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 600
-      },
+      "viewport": { "width": 1440, "height": 600 },
       "readySelector": ".app-shell:has(.canvas-host[data-centered-sheet-id=\"sheet-003\"][data-viewport-offset-x]:not([data-viewport-offset-x=\"0\"])):has([data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"] .sheet-tile[aria-current=\"true\"])",
       "actions": [
-        {
-          "type": "assert",
-          "selector": ".canvas-host[data-centered-sheet-id=\"sheet-002\"]"
-        },
-        {
-          "type": "focus",
-          "selector": ".canvas-host canvas"
-        },
-        {
-          "type": "key",
-          "key": "ArrowRight"
-        },
-        {
-          "type": "assert",
-          "selector": ".canvas-host[data-centered-sheet-id=\"sheet-003\"][data-viewport-offset-x]:not([data-viewport-offset-x=\"0\"])"
-        },
-        {
-          "type": "pointer-click",
-          "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]"
-        },
-        {
-          "type": "assert",
-          "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"] .sheet-tile[aria-current=\"true\"]"
-        },
-        {
-          "type": "assert",
-          "selector": ".canvas-host[data-centered-sheet-id=\"sheet-003\"][data-viewport-offset-x]:not([data-viewport-offset-x=\"0\"])"
-        }
+        { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-002\"]" },
+        { "type": "focus", "selector": ".canvas-host canvas" },
+        { "type": "key", "key": "ArrowRight" },
+        { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-003\"][data-viewport-offset-x]:not([data-viewport-offset-x=\"0\"])" },
+        { "type": "pointer-click", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]" },
+        { "type": "assert", "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"] .sheet-tile[aria-current=\"true\"]" },
+        { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-003\"][data-viewport-offset-x]:not([data-viewport-offset-x=\"0\"])" }
       ]
     },
     {
@@ -791,28 +575,13 @@
         "implementationCaptureSelector": ".app-shell",
         "reason": "A referência visual vigente não representa o ownership do gesto externo ao menu contextual aceito posteriormente."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 600
-      },
+      "viewport": { "width": 1440, "height": 600 },
       "readySelector": ".app-shell:has(.canvas-host[data-centered-sheet-id=\"sheet-002\"]):not(:has([role=\"menu\"][aria-label^=\"Ações da Lâmina\"]))",
       "actions": [
-        {
-          "type": "context-click",
-          "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]"
-        },
-        {
-          "type": "assert",
-          "selector": "[role=\"menu\"][aria-label=\"Ações da Lâmina 02\"]"
-        },
-        {
-          "type": "pointer-click",
-          "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-001\"]"
-        },
-        {
-          "type": "assert",
-          "selector": ".canvas-host[data-centered-sheet-id=\"sheet-002\"]"
-        }
+        { "type": "context-click", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]" },
+        { "type": "assert", "selector": "[role=\"menu\"][aria-label=\"Ações da Lâmina 02\"]" },
+        { "type": "pointer-click", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-001\"]" },
+        { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-002\"]" }
       ]
     },
     {
@@ -825,37 +594,15 @@
         "implementationCaptureSelector": ".app-shell",
         "reason": "A referência visual vigente não representa o ownership do gesto externo ao menu contextual aceito posteriormente."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": ".app-shell:has(.canvas-host[data-centered-sheet-id=\"sheet-001\"]):not(:has([role=\"menu\"][aria-label^=\"Ações da Lâmina\"]))",
       "actions": [
-        {
-          "type": "wheel",
-          "selector": ".inspector",
-          "deltaY": 1100
-        },
-        {
-          "type": "assert",
-          "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"]"
-        },
-        {
-          "type": "context-click",
-          "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"]"
-        },
-        {
-          "type": "assert",
-          "selector": "[role=\"menu\"][aria-label=\"Ações da Lâmina 02\"]"
-        },
-        {
-          "type": "pointer-click",
-          "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-001\"]"
-        },
-        {
-          "type": "assert",
-          "selector": ".canvas-host[data-centered-sheet-id=\"sheet-001\"]"
-        }
+        { "type": "wheel", "selector": ".inspector", "deltaY": 1100 },
+        { "type": "assert", "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"]" },
+        { "type": "context-click", "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"]" },
+        { "type": "assert", "selector": "[role=\"menu\"][aria-label=\"Ações da Lâmina 02\"]" },
+        { "type": "pointer-click", "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-001\"]" },
+        { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-001\"]" }
       ]
     },
     {
@@ -868,24 +615,12 @@
         "implementationCaptureSelector": ".app-shell",
         "reason": "A referência visual vigente não representa o comando público de navegação pelas teclas físicas ←/→ aceito posteriormente."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 600
-      },
+      "viewport": { "width": 1440, "height": 600 },
       "readySelector": ".app-shell:has(.canvas-host[data-centered-sheet-id=\"sheet-001\"]):not(:has(.canvas-sheet-navigation))",
       "actions": [
-        {
-          "type": "assert",
-          "selector": ".canvas-host[data-centered-sheet-id=\"sheet-002\"]"
-        },
-        {
-          "type": "focus",
-          "selector": ".canvas-host canvas"
-        },
-        {
-          "type": "key",
-          "key": "ArrowLeft"
-        }
+        { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-002\"]" },
+        { "type": "focus", "selector": ".canvas-host canvas" },
+        { "type": "key", "key": "ArrowLeft" }
       ]
     },
     {
@@ -898,17 +633,10 @@
         "implementationCaptureSelector": ".app-shell",
         "reason": "A referência visual vigente não registra o hit-testing produtivo da roda sobre toda a Barra da Lâmina."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 600
-      },
+      "viewport": { "width": 1440, "height": 600 },
       "readySelector": ".app-shell:has(.canvas-host:not([data-centered-sheet-id=\"sheet-001\"]))",
       "actions": [
-        {
-          "type": "wheel",
-          "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-001\"]",
-          "deltaY": 1200
-        }
+        { "type": "wheel", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-001\"]", "deltaY": 1200 }
       ]
     },
     {
@@ -921,29 +649,13 @@
         "implementationCaptureSelector": ".app-shell",
         "reason": "A referência visual vigente não registra o hit-testing produtivo da roda sobre toda a Barra da Lâmina."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 600
-      },
+      "viewport": { "width": 1440, "height": 600 },
       "readySelector": ".app-shell:has(.canvas-host:not([data-centered-sheet-id=\"sheet-003\"]))",
       "actions": [
-        {
-          "type": "focus",
-          "selector": ".canvas-host canvas"
-        },
-        {
-          "type": "key",
-          "key": "ArrowRight"
-        },
-        {
-          "type": "assert",
-          "selector": ".canvas-host[data-centered-sheet-id=\"sheet-003\"]"
-        },
-        {
-          "type": "wheel",
-          "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-003\"]",
-          "deltaY": -1200
-        }
+        { "type": "focus", "selector": ".canvas-host canvas" },
+        { "type": "key", "key": "ArrowRight" },
+        { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-003\"]" },
+        { "type": "wheel", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-003\"]", "deltaY": -1200 }
       ]
     },
     {
@@ -956,10 +668,7 @@
         "implementationCaptureSelector": ".app-shell",
         "reason": "A referência visual vigente não representa a restauração persistida dos tamanhos dos Painéis definida nas decisões aceitas posteriores."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": ".workspace-grid[style*=\"--inspector-width: 420px\"][style*=\"--media-panel-height: 140px\"]",
       "actions": []
     },
@@ -973,10 +682,7 @@
         "implementationCaptureSelector": ".app-shell",
         "reason": "A referência visual vigente usa faixas antigas; os splitters produtivos agora separam uma linha visual fina de seu alvo interativo sobreposto."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": "html[data-preview-scale=\"1\"] .workspace-grid:has(.inspector-splitter):has(.media-splitter)",
       "actions": []
     },
@@ -990,16 +696,10 @@
         "implementationCaptureSelector": ".app-shell",
         "reason": "A referência visual vigente não representa a linha fina com alvo invisível e realce de hover na escala exercitada."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": "html[data-preview-scale=\"1.25\"] .workspace-grid:has(.media-splitter)",
       "actions": [
-        {
-          "type": "hover",
-          "selector": ".media-splitter"
-        }
+        { "type": "hover", "selector": ".media-splitter" }
       ]
     },
     {
@@ -1012,16 +712,10 @@
         "implementationCaptureSelector": ".app-shell",
         "reason": "A referência visual vigente não representa a linha fina com alvo invisível e foco por teclado na escala exercitada."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": "html[data-preview-scale=\"1.5\"] .inspector-splitter:focus",
       "actions": [
-        {
-          "type": "focus",
-          "selector": ".inspector-splitter"
-        }
+        { "type": "focus", "selector": ".inspector-splitter" }
       ]
     },
     {
@@ -1034,24 +728,11 @@
         "implementationCaptureSelector": ".app-shell",
         "reason": "A referência visual vigente não representa os tracks finos após o resize funcional e persistido dos dois Painéis."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": ".workspace-grid[style*=\"--inspector-width: 480px\"][style*=\"--media-panel-height: 360px\"]",
       "actions": [
-        {
-          "type": "drag",
-          "selector": ".inspector-splitter",
-          "targetSelector": ".canvas-section",
-          "phase": "drop"
-        },
-        {
-          "type": "drag",
-          "selector": ".media-splitter",
-          "targetSelector": ".canvas-section",
-          "phase": "drop"
-        }
+        { "type": "drag", "selector": ".inspector-splitter", "targetSelector": ".canvas-section", "phase": "drop" },
+        { "type": "drag", "selector": ".media-splitter", "targetSelector": ".canvas-section", "phase": "drop" }
       ]
     },
     {
@@ -1064,10 +745,7 @@
         "implementationCaptureSelector": ".app-shell",
         "reason": "A referência visual vigente não representa a restauração persistida da visibilidade dos Painéis definida nas decisões aceitas posteriores."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": ".workspace-grid:not(:has(#contextual-panel)):not(:has(.media-panel))",
       "actions": []
     },
@@ -1081,10 +759,7 @@
         "implementationCaptureSelector": ".ui-owned-window-shell",
         "reason": "A referência visual vigente não representa o diálogo externo pertencente que bloqueia a Janela do Projeto após uma falha tardia do Canvas WebGL2."
       },
-      "viewport": {
-        "width": 440,
-        "height": 320
-      },
+      "viewport": { "width": 440, "height": 320 },
       "readySelector": ".ui-owned-window-shell:has([role=\"dialog\"][aria-modal=\"true\"] button):not(:has(.startup-card))",
       "actions": []
     },
@@ -1098,10 +773,7 @@
         "implementationCaptureSelector": ".safe-application-shell",
         "reason": "A referência visual vigente não representa o Safe Shell global definido pelas decisões aceitas posteriores para hardware gráfico indisponível."
       },
-      "viewport": {
-        "width": 1280,
-        "height": 720
-      },
+      "viewport": { "width": 1280, "height": 720 },
       "readySelector": ".safe-shell",
       "actions": []
     },
@@ -1116,10 +788,7 @@
         "implementationCaptureSelector": ".media-panel-preview[data-acceptance-surface=\"editor\"] > .media-panel",
         "referenceCaptureSelector": "div:has(> div > div > button[data-mode=\"imagens\"])"
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": "[data-development-preview=\"imported-media\"] .media-grid [data-media-id]",
       "referenceReadySelector": "button[data-mode=\"imagens\"]",
       "actions": []
@@ -1135,39 +804,18 @@
         "implementationCaptureSelector": ".media-panel-preview[data-acceptance-surface=\"editor\"] > .media-panel",
         "referenceCaptureSelector": "div:has(> div > div > button[data-mode=\"imagens\"])"
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": ".media-grid [data-media-id][aria-pressed=\"true\"]",
       "referenceReadySelector": "[data-asset=\"a1\"]",
       "actions": [
-        {
-          "type": "click",
-          "selector": "[aria-label=\"Decorativos\"]"
-        },
-        {
-          "type": "click",
-          "selector": ".media-grid [data-media-id]"
-        },
-        {
-          "type": "hover",
-          "selector": ".media-grid [data-media-id]"
-        }
+        { "type": "click", "selector": "[aria-label=\"Decorativos\"]" },
+        { "type": "click", "selector": ".media-grid [data-media-id]" },
+        { "type": "hover", "selector": ".media-grid [data-media-id]" }
       ],
       "referenceActions": [
-        {
-          "type": "click",
-          "selector": "button[data-mode=\"estilos\"]"
-        },
-        {
-          "type": "click",
-          "selector": "[data-asset=\"a1\"]"
-        },
-        {
-          "type": "hover",
-          "selector": "[data-asset=\"a1\"]"
-        }
+        { "type": "click", "selector": "button[data-mode=\"estilos\"]" },
+        { "type": "click", "selector": "[data-asset=\"a1\"]" },
+        { "type": "hover", "selector": "[data-asset=\"a1\"]" }
       ]
     },
     {
@@ -1181,31 +829,16 @@
         "implementationCaptureSelector": ".media-panel-preview[data-acceptance-surface=\"editor\"] > .media-panel",
         "referenceCaptureSelector": "div:has(> div > div > button[data-mode=\"imagens\"])"
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": "#media-panel-options",
       "referenceReadySelector": "select:has(option[value=\"naousadas\"])",
       "actions": [
-        {
-          "type": "focus",
-          "selector": "button[aria-label=\"Filtro, ordem e tamanho\"]"
-        },
-        {
-          "type": "key",
-          "key": "Enter"
-        }
+        { "type": "focus", "selector": "button[aria-label=\"Filtro, ordem e tamanho\"]" },
+        { "type": "key", "key": "Enter" }
       ],
       "referenceActions": [
-        {
-          "type": "focus",
-          "selector": "button[title=\"Filtro, ordem e tamanho\"]"
-        },
-        {
-          "type": "key",
-          "key": "Enter"
-        }
+        { "type": "focus", "selector": "button[title=\"Filtro, ordem e tamanho\"]" },
+        { "type": "key", "key": "Enter" }
       ]
     },
     {
@@ -1219,10 +852,7 @@
         "implementationCaptureSelector": ".inspector-section:has(.sheet-grid)",
         "referenceCaptureSelector": "div:has(> button[data-sec=\"grade\"])"
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": ".sheet-grid .sheet-tile",
       "referenceReadySelector": "div:has(> button[data-sec=\"grade\"]) [style*=\"aspect-ratio\"]",
       "actions": [],
@@ -1238,16 +868,10 @@
         "implementationCaptureSelector": ".inspector-section:has(.sheet-grid)",
         "reason": "A referência visual vigente antecede o hover padronizado da Grade de Lâminas definido nas decisões aceitas posteriores."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": ".sheet-grid .sheet-tile",
       "actions": [
-        {
-          "type": "hover",
-          "selector": ".sheet-grid > .sheet-grid-slot:nth-child(3) > .sheet-tile"
-        }
+        { "type": "hover", "selector": ".sheet-grid > .sheet-grid-slot:nth-child(3) > .sheet-tile" }
       ]
     },
     {
@@ -1260,16 +884,10 @@
         "implementationCaptureSelector": ".inspector-section:has(.sheet-grid)",
         "reason": "A referência visual vigente antecede a seleção integrada à numeração da Grade de Lâminas definida nas decisões aceitas posteriores."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": ".sheet-grid > .sheet-grid-slot:nth-child(3) > .sheet-tile[aria-current=\"true\"]",
       "actions": [
-        {
-          "type": "click",
-          "selector": ".sheet-grid > .sheet-grid-slot:nth-child(3) > .sheet-tile"
-        }
+        { "type": "click", "selector": ".sheet-grid > .sheet-grid-slot:nth-child(3) > .sheet-tile" }
       ]
     },
     {
@@ -1282,21 +900,11 @@
         "implementationCaptureSelector": ".inspector-section:has(#album-information-settings)",
         "reason": "A referência visual vigente antecede o balão de validação compartilhado definido nas decisões aceitas posteriores."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": ".ui-field-validation-auto-tooltip[role=\"tooltip\"]",
       "actions": [
-        {
-          "type": "focus",
-          "selector": "#album-information-settings input[aria-label=\"Largura\"]"
-        },
-        {
-          "type": "input",
-          "selector": "#album-information-settings input[aria-label=\"Largura\"]",
-          "value": "600.0001"
-        }
+        { "type": "focus", "selector": "#album-information-settings input[aria-label=\"Largura\"]" },
+        { "type": "input", "selector": "#album-information-settings input[aria-label=\"Largura\"]", "value": "600.0001" }
       ]
     },
     {
@@ -1310,23 +918,14 @@
         "implementationCaptureSelector": ".canvas-preview[data-acceptance-surface=\"editor\"]",
         "referenceCaptureSelector": "div:has(> [data-l=\"1\"]):has(> [data-l=\"2\"])"
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": "[data-canvas-mode=\"normal\"] canvas",
       "referenceReadySelector": "[data-l=\"2\"]",
       "actions": [
-        {
-          "type": "hover",
-          "selector": "[data-canvas-mode=\"normal\"] canvas"
-        }
+        { "type": "hover", "selector": "[data-canvas-mode=\"normal\"] canvas" }
       ],
       "referenceActions": [
-        {
-          "type": "hover",
-          "selector": "[data-l=\"2\"]"
-        }
+        { "type": "hover", "selector": "[data-l=\"2\"]" }
       ]
     },
     {
@@ -1334,85 +933,60 @@
       "title": "Frame único — seleção e oito alças",
       "implementationPath": "/canvas-preview.html?acceptance=editor&geometry=selected",
       "comparison": {
-        "kind": "implementation-only",
-        "surface": "single-frame-geometry",
+        "kind": "implementation-only", "surface": "single-frame-geometry",
         "implementationCaptureSelector": ".canvas-preview",
         "reason": "O Modo de edição segue o design 0001, posterior à referência vigente. A composição desta captura é produzida e verificada pelo ProjectCore."
       },
-      "viewport": {
-        "width": 1600,
-        "height": 900
-      },
-      "readySelector": "[data-geometry-case=\"selected\"] canvas",
-      "actions": []
+      "viewport": { "width": 1600, "height": 900 },
+      "readySelector": "[data-geometry-case=\"selected\"] canvas", "actions": []
     },
     {
       "id": "canvas-frame-moved",
       "title": "Frame único — composição após movimento",
       "implementationPath": "/canvas-preview.html?acceptance=editor&geometry=moved",
       "comparison": {
-        "kind": "implementation-only",
-        "surface": "single-frame-geometry",
+        "kind": "implementation-only", "surface": "single-frame-geometry",
         "implementationCaptureSelector": ".canvas-preview",
         "reason": "A captura renderiza o resultado do movimento calculado pelo ProjectCore; o design 0001 preserva tamanho e enquadramento da Foto."
       },
-      "viewport": {
-        "width": 1600,
-        "height": 900
-      },
-      "readySelector": "[data-geometry-case=\"moved\"] canvas",
-      "actions": []
+      "viewport": { "width": 1600, "height": 900 },
+      "readySelector": "[data-geometry-case=\"moved\"] canvas", "actions": []
     },
     {
       "id": "canvas-frame-resized",
       "title": "Frame único — redimensionamento e Preenchimento da Foto",
       "implementationPath": "/canvas-preview.html?acceptance=editor&geometry=resized",
       "comparison": {
-        "kind": "implementation-only",
-        "surface": "single-frame-geometry",
+        "kind": "implementation-only", "surface": "single-frame-geometry",
         "implementationCaptureSelector": ".canvas-preview",
         "reason": "A captura usa a recomposição do ProjectCore após redimensionar largura e altura, preservando Pan e Zoom e impedindo áreas vazias."
       },
-      "viewport": {
-        "width": 1600,
-        "height": 900
-      },
-      "readySelector": "[data-geometry-case=\"resized\"] canvas",
-      "actions": []
+      "viewport": { "width": 1600, "height": 900 },
+      "readySelector": "[data-geometry-case=\"resized\"] canvas", "actions": []
     },
     {
       "id": "canvas-frame-proportional-centered",
       "title": "Frame único — proporção e centro preservados",
       "implementationPath": "/canvas-preview.html?acceptance=editor&geometry=proportional-centered",
       "comparison": {
-        "kind": "implementation-only",
-        "surface": "single-frame-geometry",
+        "kind": "implementation-only", "surface": "single-frame-geometry",
         "implementationCaptureSelector": ".canvas-preview",
         "reason": "A captura renderiza o resultado de Shift + Alt calculado pelo ProjectCore conforme o design 0001."
       },
-      "viewport": {
-        "width": 1600,
-        "height": 900
-      },
-      "readySelector": "[data-geometry-case=\"proportional-centered\"] canvas",
-      "actions": []
+      "viewport": { "width": 1600, "height": 900 },
+      "readySelector": "[data-geometry-case=\"proportional-centered\"] canvas", "actions": []
     },
     {
       "id": "canvas-frame-minimum",
       "title": "Frame único — limite mínimo de redimensionamento",
       "implementationPath": "/canvas-preview.html?acceptance=editor&geometry=minimum",
       "comparison": {
-        "kind": "implementation-only",
-        "surface": "single-frame-geometry",
+        "kind": "implementation-only", "surface": "single-frame-geometry",
         "implementationCaptureSelector": ".canvas-preview",
         "reason": "O design 0001 requer calibrar o menor tamanho interativo. Esta captura permite avaliar o limite físico calculado pelo ProjectCore e suas alças no Canvas."
       },
-      "viewport": {
-        "width": 1600,
-        "height": 900
-      },
-      "readySelector": "[data-geometry-case=\"minimum\"] canvas",
-      "actions": []
+      "viewport": { "width": 1600, "height": 900 },
+      "readySelector": "[data-geometry-case=\"minimum\"] canvas", "actions": []
     },
     {
       "id": "canvas-frame-group-selected",
@@ -1526,20 +1100,11 @@
         "implementationCaptureSelector": ".canvas-preview[data-acceptance-surface=\"editor\"]",
         "reason": "A referência visual vigente não representa o Modo de edição da Lâmina definido nas decisões aceitas posteriores."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": "[data-canvas-mode=\"sheet-editing\"] canvas",
       "actions": [
-        {
-          "type": "focus",
-          "selector": "[data-canvas-mode=\"normal\"] canvas"
-        },
-        {
-          "type": "key",
-          "key": "Enter"
-        }
+        { "type": "focus", "selector": "[data-canvas-mode=\"normal\"] canvas" },
+        { "type": "key", "key": "Enter" }
       ]
     },
     {
@@ -1552,10 +1117,7 @@
         "implementationCaptureSelector": ".canvas-preview[data-acceptance-surface=\"editor\"]",
         "reason": "A referência visual vigente antecede a direção cromática da scrollbar horizontal do Canvas definida nas decisões aceitas posteriores."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": ".canvas-horizontal-scrollbar__thumb",
       "actions": []
     },
@@ -1569,16 +1131,10 @@
         "implementationCaptureSelector": ".canvas-preview[data-acceptance-surface=\"editor\"]",
         "reason": "A referência visual vigente antecede o hover da scrollbar horizontal do Canvas definido nas decisões aceitas posteriores."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": ".canvas-horizontal-scrollbar__thumb",
       "actions": [
-        {
-          "type": "hover",
-          "selector": ".canvas-horizontal-scrollbar-shell"
-        }
+        { "type": "hover", "selector": ".canvas-horizontal-scrollbar-shell" }
       ]
     },
     {
@@ -1591,16 +1147,10 @@
         "implementationCaptureSelector": ".canvas-preview[data-acceptance-surface=\"editor\"]",
         "reason": "A referência visual vigente antecede o indicador neutro de foco da scrollbar horizontal do Canvas definido nas decisões aceitas posteriores."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": ".canvas-horizontal-scrollbar__thumb",
       "actions": [
-        {
-          "type": "focus",
-          "selector": ".canvas-horizontal-scrollbar"
-        }
+        { "type": "focus", "selector": ".canvas-horizontal-scrollbar" }
       ]
     },
     {
@@ -1613,20 +1163,11 @@
         "implementationCaptureSelector": ".canvas-preview[data-acceptance-surface=\"editor\"]",
         "reason": "A referência visual vigente não representa a transição de saída do Modo de edição definida nas decisões aceitas posteriores."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": "[data-canvas-mode=\"normal\"] canvas",
       "actions": [
-        {
-          "type": "focus",
-          "selector": "[data-canvas-mode=\"sheet-editing\"] canvas"
-        },
-        {
-          "type": "key",
-          "key": "Escape"
-        }
+        { "type": "focus", "selector": "[data-canvas-mode=\"sheet-editing\"] canvas" },
+        { "type": "key", "key": "Escape" }
       ]
     },
     {
@@ -1639,10 +1180,7 @@
         "implementationCaptureSelector": ".ui-architecture-prototype",
         "reason": "A referência visual vigente distribui as superfícies por arquivos e antecede o mapa canônico navegável que reconcilia nomes, transições e ownership posteriores."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": ".ui-architecture-prototype[data-prototype-surface=\"map\"]:has([data-surface-id=\"global.settings\"])",
       "actions": []
     },
@@ -1656,23 +1194,11 @@
         "implementationCaptureSelector": ".ui-architecture-prototype",
         "reason": "A referência visual vigente não representa a ViewportTransform transitória nem os gestos de Zoom aceitos posteriormente para o Modo de edição."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": "[aria-label=\"Canvas do protótipo\"][data-last-zoom-input=\"keyboard-in\"][data-zoom-state=\"raised\"][data-zoom-anchor=\"center\"]",
       "actions": [
-        {
-          "type": "focus",
-          "selector": "[aria-label=\"Canvas do protótipo\"]"
-        },
-        {
-          "type": "key",
-          "key": "Plus",
-          "modifiers": [
-            "Control"
-          ]
-        }
+        { "type": "focus", "selector": "[aria-label=\"Canvas do protótipo\"]" },
+        { "type": "key", "key": "Plus", "modifiers": ["Control"] }
       ]
     },
     {
@@ -1685,37 +1211,13 @@
         "implementationCaptureSelector": ".ui-architecture-prototype",
         "reason": "A referência visual vigente não representa a ViewportTransform transitória nem os gestos de Zoom aceitos posteriormente para o Modo de edição."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": "[aria-label=\"Canvas do protótipo\"][data-last-zoom-input=\"keyboard-out\"][data-zoom-state=\"raised\"][data-zoom-anchor=\"center\"]",
       "actions": [
-        {
-          "type": "focus",
-          "selector": "[aria-label=\"Canvas do protótipo\"]"
-        },
-        {
-          "type": "key",
-          "key": "Plus",
-          "modifiers": [
-            "Control"
-          ]
-        },
-        {
-          "type": "key",
-          "key": "Plus",
-          "modifiers": [
-            "Control"
-          ]
-        },
-        {
-          "type": "key",
-          "key": "Minus",
-          "modifiers": [
-            "Control"
-          ]
-        }
+        { "type": "focus", "selector": "[aria-label=\"Canvas do protótipo\"]" },
+        { "type": "key", "key": "Plus", "modifiers": ["Control"] },
+        { "type": "key", "key": "Plus", "modifiers": ["Control"] },
+        { "type": "key", "key": "Minus", "modifiers": ["Control"] }
       ]
     },
     {
@@ -1728,20 +1230,10 @@
         "implementationCaptureSelector": ".ui-architecture-prototype",
         "reason": "A referência visual vigente não representa a ViewportTransform transitória nem a âncora sob o cursor aceita posteriormente."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": "[aria-label=\"Canvas do protótipo\"][data-last-zoom-input=\"wheel-in\"][data-zoom-state=\"raised\"][data-zoom-anchor=\"cursor\"]:not([data-zoom-origin-x=\"50\"]):not([data-zoom-origin-y=\"50\"])",
       "actions": [
-        {
-          "type": "wheel",
-          "selector": "[data-frame-gesture-target=\"resize\"]",
-          "deltaY": -120,
-          "modifiers": [
-            "Control"
-          ]
-        }
+        { "type": "wheel", "selector": "[data-frame-gesture-target=\"resize\"]", "deltaY": -120, "modifiers": ["Control"] }
       ]
     },
     {
@@ -1754,37 +1246,13 @@
         "implementationCaptureSelector": ".ui-architecture-prototype",
         "reason": "A referência visual vigente não representa a ViewportTransform transitória nem o reset aceito posteriormente para o Modo de edição."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": "[aria-label=\"Canvas do protótipo\"][data-last-zoom-input=\"reset\"][data-zoom-state=\"fit\"][data-zoom-anchor=\"center\"]",
       "actions": [
-        {
-          "type": "focus",
-          "selector": "[aria-label=\"Canvas do protótipo\"]"
-        },
-        {
-          "type": "key",
-          "key": "Plus",
-          "modifiers": [
-            "Control"
-          ]
-        },
-        {
-          "type": "key",
-          "key": "Plus",
-          "modifiers": [
-            "Control"
-          ]
-        },
-        {
-          "type": "key",
-          "key": "Digit0",
-          "modifiers": [
-            "Control"
-          ]
-        }
+        { "type": "focus", "selector": "[aria-label=\"Canvas do protótipo\"]" },
+        { "type": "key", "key": "Plus", "modifiers": ["Control"] },
+        { "type": "key", "key": "Plus", "modifiers": ["Control"] },
+        { "type": "key", "key": "Digit0", "modifiers": ["Control"] }
       ]
     },
     {
@@ -1797,100 +1265,22 @@
         "implementationCaptureSelector": ".ui-architecture-prototype",
         "reason": "A referência visual vigente não representa o teto calibrado posteriormente para a ViewportTransform do Modo de edição."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": "[aria-label=\"Canvas do protótipo\"][data-last-zoom-input=\"keyboard-in\"][data-zoom-level=\"4\"][data-zoom-state=\"cap\"]",
       "actions": [
-        {
-          "type": "focus",
-          "selector": "[aria-label=\"Canvas do protótipo\"]"
-        },
-        {
-          "type": "key",
-          "key": "Plus",
-          "modifiers": [
-            "Control"
-          ]
-        },
-        {
-          "type": "key",
-          "key": "Plus",
-          "modifiers": [
-            "Control"
-          ]
-        },
-        {
-          "type": "key",
-          "key": "Plus",
-          "modifiers": [
-            "Control"
-          ]
-        },
-        {
-          "type": "key",
-          "key": "Plus",
-          "modifiers": [
-            "Control"
-          ]
-        },
-        {
-          "type": "key",
-          "key": "Plus",
-          "modifiers": [
-            "Control"
-          ]
-        },
-        {
-          "type": "key",
-          "key": "Plus",
-          "modifiers": [
-            "Control"
-          ]
-        },
-        {
-          "type": "key",
-          "key": "Plus",
-          "modifiers": [
-            "Control"
-          ]
-        },
-        {
-          "type": "key",
-          "key": "Plus",
-          "modifiers": [
-            "Control"
-          ]
-        },
-        {
-          "type": "key",
-          "key": "Plus",
-          "modifiers": [
-            "Control"
-          ]
-        },
-        {
-          "type": "key",
-          "key": "Plus",
-          "modifiers": [
-            "Control"
-          ]
-        },
-        {
-          "type": "key",
-          "key": "Plus",
-          "modifiers": [
-            "Control"
-          ]
-        },
-        {
-          "type": "key",
-          "key": "Plus",
-          "modifiers": [
-            "Control"
-          ]
-        }
+        { "type": "focus", "selector": "[aria-label=\"Canvas do protótipo\"]" },
+        { "type": "key", "key": "Plus", "modifiers": ["Control"] },
+        { "type": "key", "key": "Plus", "modifiers": ["Control"] },
+        { "type": "key", "key": "Plus", "modifiers": ["Control"] },
+        { "type": "key", "key": "Plus", "modifiers": ["Control"] },
+        { "type": "key", "key": "Plus", "modifiers": ["Control"] },
+        { "type": "key", "key": "Plus", "modifiers": ["Control"] },
+        { "type": "key", "key": "Plus", "modifiers": ["Control"] },
+        { "type": "key", "key": "Plus", "modifiers": ["Control"] },
+        { "type": "key", "key": "Plus", "modifiers": ["Control"] },
+        { "type": "key", "key": "Plus", "modifiers": ["Control"] },
+        { "type": "key", "key": "Plus", "modifiers": ["Control"] },
+        { "type": "key", "key": "Plus", "modifiers": ["Control"] }
       ]
     },
     {
@@ -1903,32 +1293,13 @@
         "implementationCaptureSelector": ".app-shell",
         "reason": "A referência visual vigente não representa os estados intermediários de reordenação agora integrados à Janela produtiva."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 600
-      },
+      "viewport": { "width": 1440, "height": 600 },
       "readySelector": ".app-shell:has([data-reorder-surface=\"bar\"][data-reorder-state=\"preview\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"][data-preview-order=\"sheet-001,sheet-003,sheet-002,sheet-004,sheet-005\"]):has([data-reorder-surface=\"bar\"] [data-testid=\"reorder-placeholder\"]):has([data-reorder-surface=\"bar\"] [data-testid=\"reorder-ghost\"][data-active-sides=\"both\"] .sheet-preview):has([data-reorder-surface=\"grid\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"])",
       "actions": [
-        {
-          "type": "focus",
-          "selector": ".canvas-host canvas"
-        },
-        {
-          "type": "key",
-          "key": "ArrowRight"
-        },
-        {
-          "type": "assert",
-          "selector": ".canvas-host[data-centered-sheet-id=\"sheet-003\"]"
-        },
-        {
-          "type": "drag",
-          "gesture": "pointer",
-          "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-003\"]",
-          "sourceXRatio": 0.25,
-          "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]",
-          "phase": "preview"
-        }
+        { "type": "focus", "selector": ".canvas-host canvas" },
+        { "type": "key", "key": "ArrowRight" },
+        { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-003\"]" },
+        { "type": "drag", "gesture": "pointer", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-003\"]", "sourceXRatio": 0.25, "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "phase": "preview" }
       ]
     },
     {
@@ -1941,32 +1312,13 @@
         "implementationCaptureSelector": ".app-shell",
         "reason": "A referência visual vigente não representa o commit sincronizado agora integrado à Janela produtiva."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 600
-      },
+      "viewport": { "width": 1440, "height": 600 },
       "readySelector": ".app-shell:has([data-reorder-surface=\"bar\"][data-reorder-state=\"idle\"][data-sheet-order=\"sheet-001,sheet-003,sheet-002,sheet-004,sheet-005\"]):has([data-reorder-surface=\"grid\"][data-sheet-order=\"sheet-001,sheet-003,sheet-002,sheet-004,sheet-005\"])",
       "actions": [
-        {
-          "type": "focus",
-          "selector": ".canvas-host canvas"
-        },
-        {
-          "type": "key",
-          "key": "ArrowRight"
-        },
-        {
-          "type": "assert",
-          "selector": ".canvas-host[data-centered-sheet-id=\"sheet-003\"]"
-        },
-        {
-          "type": "drag",
-          "gesture": "pointer",
-          "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-003\"]",
-          "sourceXRatio": 0.75,
-          "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]",
-          "phase": "drop"
-        }
+        { "type": "focus", "selector": ".canvas-host canvas" },
+        { "type": "key", "key": "ArrowRight" },
+        { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-003\"]" },
+        { "type": "drag", "gesture": "pointer", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-003\"]", "sourceXRatio": 0.75, "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "phase": "drop" }
       ]
     },
     {
@@ -1979,19 +1331,10 @@
         "implementationCaptureSelector": ".app-shell",
         "reason": "A referência visual vigente não representa os estados intermediários agora integrados à Grade produtiva."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 600
-      },
+      "viewport": { "width": 1440, "height": 600 },
       "readySelector": ".app-shell:has([data-reorder-surface=\"grid\"][data-reorder-state=\"preview\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"]):has([data-reorder-surface=\"grid\"] > .sheet-grid-slot:nth-child(2)[data-sheet-id=\"sheet-003\"]):has([data-reorder-surface=\"grid\"] [data-testid=\"reorder-placeholder\"]):has([data-reorder-surface=\"grid\"] [data-testid=\"reorder-ghost\"][data-active-sides=\"both\"] .sheet-preview):has([data-reorder-surface=\"bar\"][data-preview-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"])",
       "actions": [
-        {
-          "type": "drag",
-          "gesture": "pointer",
-          "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-003\"]",
-          "targetSelector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"]",
-          "phase": "preview"
-        }
+        { "type": "drag", "gesture": "pointer", "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-003\"]", "targetSelector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"]", "phase": "preview" }
       ]
     },
     {
@@ -2004,19 +1347,10 @@
         "implementationCaptureSelector": ".app-shell",
         "reason": "A referência visual vigente não representa o commit sincronizado agora integrado à Grade produtiva."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 600
-      },
+      "viewport": { "width": 1440, "height": 600 },
       "readySelector": ".app-shell:has([data-reorder-surface=\"grid\"][data-reorder-state=\"idle\"][data-sheet-order=\"sheet-001,sheet-003,sheet-002,sheet-004,sheet-005\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001,sheet-003,sheet-002,sheet-004,sheet-005\"])",
       "actions": [
-        {
-          "type": "drag",
-          "gesture": "pointer",
-          "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-003\"]",
-          "targetSelector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"]",
-          "phase": "drop"
-        }
+        { "type": "drag", "gesture": "pointer", "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-003\"]", "targetSelector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"]", "phase": "drop" }
       ]
     },
     {
@@ -2029,31 +1363,13 @@
         "implementationCaptureSelector": ".app-shell",
         "reason": "A referência visual vigente não representa o cancelamento de reordenação agora integrado à Janela produtiva."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 600
-      },
+      "viewport": { "width": 1440, "height": 600 },
       "readySelector": ".app-shell:has([data-reorder-surface=\"bar\"][data-reorder-state=\"cancelled\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"][data-preview-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"]):has([data-reorder-surface=\"grid\"][data-reorder-state=\"cancelled\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"] > .sheet-grid-slot:nth-child(1)[data-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"grid\"] > .sheet-grid-slot:nth-child(2)[data-sheet-id=\"sheet-002\"]):has([data-reorder-surface=\"grid\"] > .sheet-grid-slot:nth-child(3)[data-sheet-id=\"sheet-003\"]):has([data-reorder-surface=\"grid\"] > .sheet-grid-slot:nth-child(4)[data-sheet-id=\"sheet-004\"]):has([data-reorder-surface=\"grid\"] > .sheet-grid-slot:nth-child(5)[data-sheet-id=\"sheet-005\"]):not(:has([data-reorder-surface=\"bar\"] [data-testid=\"reorder-placeholder\"])):not(:has([data-reorder-surface=\"bar\"] [data-testid=\"reorder-ghost\"])):not(:has([data-reorder-surface=\"grid\"] [data-testid=\"reorder-placeholder\"])):not(:has([data-reorder-surface=\"grid\"] [data-testid=\"reorder-ghost\"]))",
       "actions": [
-        {
-          "type": "focus",
-          "selector": ".canvas-host canvas"
-        },
-        {
-          "type": "key",
-          "key": "ArrowRight"
-        },
-        {
-          "type": "assert",
-          "selector": ".canvas-host[data-centered-sheet-id=\"sheet-003\"]"
-        },
-        {
-          "type": "drag",
-          "gesture": "pointer",
-          "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-003\"]",
-          "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]",
-          "phase": "escape"
-        }
+        { "type": "focus", "selector": ".canvas-host canvas" },
+        { "type": "key", "key": "ArrowRight" },
+        { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-003\"]" },
+        { "type": "drag", "gesture": "pointer", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-003\"]", "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "phase": "escape" }
       ]
     },
     {
@@ -2066,32 +1382,13 @@
         "implementationCaptureSelector": ".app-shell",
         "reason": "A referência visual vigente não representa o cancelamento de uma prévia produtiva ao soltar fora da superfície originadora."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 600
-      },
+      "viewport": { "width": 1440, "height": 600 },
       "readySelector": ".app-shell:has([data-reorder-surface=\"bar\"][data-reorder-state=\"cancelled\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"]):has([data-reorder-surface=\"grid\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"])",
       "actions": [
-        {
-          "type": "focus",
-          "selector": ".canvas-host canvas"
-        },
-        {
-          "type": "key",
-          "key": "ArrowRight"
-        },
-        {
-          "type": "assert",
-          "selector": ".canvas-host[data-centered-sheet-id=\"sheet-003\"]"
-        },
-        {
-          "type": "drag",
-          "gesture": "pointer",
-          "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-003\"]",
-          "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]",
-          "dropTargetSelector": "[data-reorder-surface=\"grid\"]",
-          "phase": "drop"
-        }
+        { "type": "focus", "selector": ".canvas-host canvas" },
+        { "type": "key", "key": "ArrowRight" },
+        { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-003\"]" },
+        { "type": "drag", "gesture": "pointer", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-003\"]", "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "dropTargetSelector": "[data-reorder-surface=\"grid\"]", "phase": "drop" }
       ]
     },
     {
@@ -2104,19 +1401,10 @@
         "implementationCaptureSelector": ".app-shell",
         "reason": "A referência visual vigente não representa a rejeição produtiva de posições que interiorizariam uma Página única."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 600
-      },
+      "viewport": { "width": 1440, "height": 600 },
       "readySelector": ".app-shell:has([data-reorder-surface=\"grid\"][data-reorder-state=\"cancelled\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"] > .sheet-grid-slot:nth-child(1)[data-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"grid\"] > .sheet-grid-slot:nth-child(2)[data-sheet-id=\"sheet-002\"]):has([data-reorder-surface=\"grid\"] > .sheet-grid-slot:nth-child(3)[data-sheet-id=\"sheet-003\"]):has([data-reorder-surface=\"grid\"] > .sheet-grid-slot:nth-child(4)[data-sheet-id=\"sheet-004\"]):has([data-reorder-surface=\"grid\"] > .sheet-grid-slot:nth-child(5)[data-sheet-id=\"sheet-005\"]):has([data-reorder-surface=\"bar\"][data-reorder-state=\"cancelled\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"][data-preview-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"]):not(:has([data-reorder-surface=\"grid\"] [data-testid=\"reorder-placeholder\"])):not(:has([data-reorder-surface=\"grid\"] [data-testid=\"reorder-ghost\"])):not(:has([data-reorder-surface=\"bar\"] [data-testid=\"reorder-placeholder\"])):not(:has([data-reorder-surface=\"bar\"] [data-testid=\"reorder-ghost\"]))",
       "actions": [
-        {
-          "type": "drag",
-          "gesture": "pointer",
-          "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-003\"]",
-          "targetSelector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-001\"]",
-          "phase": "drop"
-        }
+        { "type": "drag", "gesture": "pointer", "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-003\"]", "targetSelector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-001\"]", "phase": "drop" }
       ]
     },
     {
@@ -2129,19 +1417,10 @@
         "implementationCaptureSelector": ".app-shell",
         "reason": "A referência visual vigente não representa a indicação produtiva de uma posição que interiorizaria uma Página única."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 600
-      },
+      "viewport": { "width": 1440, "height": 600 },
       "readySelector": ".app-shell:has([data-reorder-surface=\"grid\"][data-reorder-state=\"invalid\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"] > .sheet-grid-slot:nth-child(3)[data-sheet-id=\"sheet-003\"][data-reorder-ghost=\"true\"]):has([data-reorder-surface=\"grid\"] [data-testid=\"reorder-ghost\"]):has([data-reorder-surface=\"grid\"] [data-reorder-invalid-indicator]):not(:has([data-reorder-surface=\"grid\"] [data-testid=\"reorder-placeholder\"])):has([data-reorder-surface=\"bar\"][data-reorder-state=\"invalid\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"][data-preview-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"]):not(:has([data-reorder-surface=\"bar\"] [data-testid=\"reorder-placeholder\"])):not(:has([data-reorder-surface=\"bar\"] [data-testid=\"reorder-ghost\"]))",
       "actions": [
-        {
-          "type": "drag",
-          "gesture": "pointer",
-          "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-003\"]",
-          "targetSelector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-001\"]",
-          "phase": "preview"
-        }
+        { "type": "drag", "gesture": "pointer", "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-003\"]", "targetSelector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-001\"]", "phase": "preview" }
       ]
     },
     {
@@ -2154,23 +1433,11 @@
         "implementationCaptureSelector": ".ui-architecture-prototype",
         "reason": "A referência visual vigente não representa a seleção múltipla nem a projeção de valores divergentes aceitas posteriormente."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": "[aria-label=\"Inspector de Frames\"][data-selection-count=\"2\"]:has([data-mixed-value=\"numeric\"]):has([data-mixed-value=\"color\"]):has([aria-checked=\"mixed\"])",
       "actions": [
-        {
-          "type": "click",
-          "selector": "[data-frame-id=\"frame-001\"]"
-        },
-        {
-          "type": "click",
-          "selector": "[data-frame-id=\"frame-002\"]",
-          "modifiers": [
-            "Control"
-          ]
-        }
+        { "type": "click", "selector": "[data-frame-id=\"frame-001\"]" },
+        { "type": "click", "selector": "[data-frame-id=\"frame-002\"]", "modifiers": ["Control"] }
       ]
     },
     {
@@ -2183,28 +1450,12 @@
         "implementationCaptureSelector": ".ui-architecture-prototype",
         "reason": "A referência visual vigente não representa a aplicação absoluta de um valor a uma Seleção de Frames aceita posteriormente."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": "[data-history-count=\"1\"]:has([data-frame-id=\"frame-001\"][data-opacity=\"80\"]):has([data-frame-id=\"frame-002\"][data-opacity=\"80\"])",
       "actions": [
-        {
-          "type": "click",
-          "selector": "[data-frame-id=\"frame-001\"]"
-        },
-        {
-          "type": "click",
-          "selector": "[data-frame-id=\"frame-002\"]",
-          "modifiers": [
-            "Control"
-          ]
-        },
-        {
-          "type": "input",
-          "selector": "[aria-label=\"Opacidade dos Frames\"]",
-          "value": "80"
-        }
+        { "type": "click", "selector": "[data-frame-id=\"frame-001\"]" },
+        { "type": "click", "selector": "[data-frame-id=\"frame-002\"]", "modifiers": ["Control"] },
+        { "type": "input", "selector": "[aria-label=\"Opacidade dos Frames\"]", "value": "80" }
       ]
     },
     {
@@ -2217,22 +1468,11 @@
         "implementationCaptureSelector": ".ui-architecture-prototype",
         "reason": "A referência visual vigente não representa a manipulação geométrica direta de Frames aceita posteriormente."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": "[data-history-count=\"1\"]:has([data-frame-id=\"frame-001\"][data-x=\"16\"][data-y=\"18\"])",
       "actions": [
-        {
-          "type": "click",
-          "selector": "[data-frame-id=\"frame-001\"]"
-        },
-        {
-          "type": "drag",
-          "selector": "[data-frame-id=\"frame-001\"]",
-          "targetSelector": "[data-frame-gesture-target=\"move\"]",
-          "phase": "drop"
-        }
+        { "type": "click", "selector": "[data-frame-id=\"frame-001\"]" },
+        { "type": "drag", "selector": "[data-frame-id=\"frame-001\"]", "targetSelector": "[data-frame-gesture-target=\"move\"]", "phase": "drop" }
       ]
     },
     {
@@ -2245,22 +1485,11 @@
         "implementationCaptureSelector": ".ui-architecture-prototype",
         "reason": "A referência visual vigente não representa as oito alças nem o redimensionamento direto de Frames aceitos posteriormente."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": "[data-history-count=\"1\"]:has([data-frame-id=\"frame-001\"][data-width=\"38\"][data-height=\"42\"])",
       "actions": [
-        {
-          "type": "click",
-          "selector": "[data-frame-id=\"frame-001\"]"
-        },
-        {
-          "type": "drag",
-          "selector": "[data-resize-handle=\"se\"]",
-          "targetSelector": "[data-frame-gesture-target=\"resize\"]",
-          "phase": "drop"
-        }
+        { "type": "click", "selector": "[data-frame-id=\"frame-001\"]" },
+        { "type": "drag", "selector": "[data-resize-handle=\"se\"]", "targetSelector": "[data-frame-gesture-target=\"resize\"]", "phase": "drop" }
       ]
     },
     {
@@ -2273,26 +1502,12 @@
         "implementationCaptureSelector": ".ui-architecture-prototype",
         "reason": "A referência visual vigente não representa a seleção preservada sem alças e o bloqueio geométrico de Layout travado aceitos posteriormente."
       },
-      "viewport": {
-        "width": 1440,
-        "height": 900
-      },
+      "viewport": { "width": 1440, "height": 900 },
       "readySelector": "[data-layout-locked=\"true\"][data-history-count=\"0\"]:has([data-layout-lock-feedback][data-blocked=\"true\"]):has([data-frame-id=\"frame-001\"][aria-pressed=\"true\"]):not(:has([data-resize-handle]))",
       "actions": [
-        {
-          "type": "click",
-          "selector": "[data-frame-id=\"frame-001\"]"
-        },
-        {
-          "type": "click",
-          "selector": "button[aria-label=\"Layout travado\"]"
-        },
-        {
-          "type": "drag",
-          "selector": "[data-frame-id=\"frame-001\"]",
-          "targetSelector": "[data-frame-gesture-target=\"move\"]",
-          "phase": "drop"
-        }
+        { "type": "click", "selector": "[data-frame-id=\"frame-001\"]" },
+        { "type": "click", "selector": "button[aria-label=\"Layout travado\"]" },
+        { "type": "drag", "selector": "[data-frame-id=\"frame-001\"]", "targetSelector": "[data-frame-gesture-target=\"move\"]", "phase": "drop" }
       ]
     },
     {
@@ -2957,8 +2172,8 @@
           "offsetY": 0
         },
         {
-          "type": "click-text",
-          "text": "Excluir"
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Excluir\"]"
         }
       ]
     },
@@ -2985,8 +2200,8 @@
           "offsetY": 0
         },
         {
-          "type": "click-text",
-          "text": "Excluir"
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Excluir\"]"
         }
       ]
     },
