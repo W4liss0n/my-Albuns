@@ -22,9 +22,10 @@ function preparePointerCanvas() {
 }
 
 function startPointer(label = "canvas-frame-frame-001") {
-  act(() => displayWithLabel(label).emit("pointerdown", {
+  const target = displayWithLabel(label);
+  act(() => target.emit("pointerdown", {
     button: 0, pointerId: 7, clientX: 100, clientY: 100,
-    altKey: false, shiftKey: false, stopPropagation: vi.fn(),
+    altKey: false, shiftKey: false, stopPropagation: vi.fn(), currentTarget: target,
   }));
 }
 
@@ -36,7 +37,7 @@ function controls() {
   return {
     disabled: false, dragThreshold: { x: 5, y: 5 },
     preview: vi.fn(async (_edit: FrameGeometryEdit) => interactiveComposition.sheets[0].frames[0]),
-    commit: vi.fn(async (_edit: FrameGeometryEdit) => true), onError: vi.fn(),
+    commit: vi.fn(async (_edit: FrameGeometryEdit): Promise<ComposedFrame | null> => interactiveComposition.sheets[0].frames[0]), onError: vi.fn(),
   };
 }
 
@@ -46,11 +47,86 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
+test.each(["move", "resize"])(
+  "%s does not flash the old Frame between commit completion and the confirmed projection", async (action) => {
+    const composition = structuredClone(interactiveComposition);
+    const proposed: ComposedFrame = {
+      ...composition.sheets[0].frames[0],
+      clipRect: { x: 40_000, y: 20_000, width: 250_000, height: 150_000 },
+    };
+    const commit = deferred<ComposedFrame | null>();
+    const frameGeometry = controls();
+    frameGeometry.preview.mockResolvedValue(proposed);
+    frameGeometry.commit.mockReturnValue(commit.promise);
+    const view = renderCanvas({
+      mode: { kind: "sheet-editing", sheetId: "sheet-001" },
+      compositionPlan: composition, selectedFrameId: "frame-001", frameGeometry,
+    });
+    await finishPixiInitialization();
+    preparePointerCanvas();
+    startPointer(action === "resize" ? "frame-resize-handle-top-left-frame-001" : undefined);
+    fireEvent.pointerMove(window, { pointerId: 7, clientX: 140, clientY: 120 });
+    await waitFor(() => expect(latestFrame().position).toMatchObject({ x: 40, y: 20 }));
+    fireEvent.pointerUp(window, { pointerId: 7, clientX: 140, clientY: 120 });
+    await act(async () => commit.resolve(proposed));
+    // React may present the authoritative projection after the command promise resolves.
+    expect(latestFrame().position).toMatchObject({ x: 40, y: 20 });
+    composition.sheets[0].frames[0] = proposed;
+    view.rerenderCanvas({ composition });
+    expect(latestFrame().position).toMatchObject({ x: 40, y: 20 });
+  },
+);
+
+test("presents the exact committed Frame when release differs from the last preview", async () => {
+  const composition = structuredClone(interactiveComposition);
+  const original = composition.sheets[0].frames[0];
+  const preview = { ...original, clipRect: { ...original.clipRect, x: 40_000, y: 20_000 } };
+  const committed = { ...original, clipRect: { ...original.clipRect, x: 55_000, y: 25_000 } };
+  const reply = deferred<ComposedFrame | null>();
+  const frameGeometry = controls();
+  frameGeometry.preview.mockResolvedValue(preview);
+  frameGeometry.commit.mockReturnValue(reply.promise);
+  const view = renderCanvas({ mode: { kind: "sheet-editing", sheetId: "sheet-001" },
+    compositionPlan: composition, frameGeometry });
+  await finishPixiInitialization();
+  preparePointerCanvas();
+  startPointer();
+  fireEvent.pointerMove(window, { pointerId: 7, clientX: 140, clientY: 120 });
+  await waitFor(() => expect(latestFrame().position.x).toBe(40));
+  fireEvent.pointerUp(window, { pointerId: 7, clientX: 155, clientY: 125 });
+  await act(async () => reply.resolve(committed));
+  expect(latestFrame().position).toMatchObject({ x: 55, y: 25 });
+  composition.sheets[0].frames[0] = committed;
+  view.rerenderCanvas({ composition });
+  expect(latestFrame().position).toMatchObject({ x: 55, y: 25 });
+});
+
+test("a no-op receipt restores the original Frame and allows the next gesture without a new projection", async () => {
+  const original = interactiveComposition.sheets[0].frames[0];
+  const frameGeometry = controls();
+  frameGeometry.preview.mockResolvedValue({ ...original, clipRect: { ...original.clipRect, x: 40_000 } });
+  frameGeometry.commit.mockResolvedValue(original);
+  renderCanvas({ mode: { kind: "sheet-editing", sheetId: "sheet-001" },
+    compositionPlan: interactiveComposition, frameGeometry });
+  await finishPixiInitialization();
+  preparePointerCanvas();
+  startPointer();
+  fireEvent.pointerMove(window, { pointerId: 7, clientX: 140, clientY: 100 });
+  await waitFor(() => expect(latestFrame().position.x).toBe(40));
+  fireEvent.pointerUp(window, { pointerId: 7, clientX: 100, clientY: 100 });
+  await waitFor(() => expect(latestFrame().position.x).toBe(0));
+  const target = latestFrame();
+  act(() => target.emit("pointerdown", { button: 0, pointerId: 9, clientX: 100, clientY: 100,
+    altKey: false, shiftKey: false, currentTarget: target, stopPropagation: vi.fn() }));
+  fireEvent.pointerMove(window, { pointerId: 9, clientX: 160, clientY: 110 });
+  await waitFor(() => expect(frameGeometry.preview).toHaveBeenCalledTimes(2));
+});
+
 test("previews a Frame drag only beyond the platform threshold and commits the released position once", async () => {
   const original = interactiveComposition.sheets[0].frames[0];
   const proposed: ComposedFrame = { ...original, clipRect: { ...original.clipRect, x: 40_000, y: 20_000 } };
   const reply = deferred<ComposedFrame>();
-  const commit = deferred<boolean>();
+  const commit = deferred<ComposedFrame | null>();
   const frameGeometry = {
     disabled: false, dragThreshold: { x: 5, y: 5 },
     preview: vi.fn((_edit: FrameGeometryEdit) => reply.promise),
@@ -75,6 +151,8 @@ test("previews a Frame drag only beyond the platform threshold and commits the r
   expect(latestFrame().position).toMatchObject({ x: 40, y: 20 });
 
   fireEvent.pointerUp(window, { pointerId: 7, clientX: 145, clientY: 123 });
+  expect(app.canvas.style.getPropertyValue("--frame-gesture-cursor")).toBe("");
+  expect(app.canvas).not.toHaveClass("pixi-canvas--frame-gesture");
   vi.mocked(view.onSelectFrame).mockClear();
   act(() => latestFrame().emit("pointertap", {
     button: 0, altKey: false, stopPropagation: vi.fn(), nativeEvent: { detail: 1 },
@@ -85,7 +163,7 @@ test("previews a Frame drag only beyond the platform threshold and commits the r
   expect(edit).toMatchObject({ frameId: "frame-001", expectedRect: original.clipRect, gesture: { kind: "move" } });
   expect(edit.gesture).not.toEqual(frameGeometry.preview.mock.calls[0][0].gesture);
   expect(app.canvas.releasePointerCapture).toHaveBeenCalledWith(7);
-  await act(async () => commit.resolve(false));
+  await act(async () => commit.resolve(null));
   expect(latestFrame().position).toMatchObject({ x: 0, y: 0 });
 });
 
@@ -97,8 +175,11 @@ test.each<[string, FrameResizeHandle]>([
   renderCanvas({ mode: { kind: "sheet-editing", sheetId: "sheet-001" }, compositionPlan: interactiveComposition,
     selectedFrameId: "frame-001", frameGeometry });
   await finishPixiInitialization();
-  preparePointerCanvas();
+  const app = preparePointerCanvas();
   startPointer(`frame-resize-handle-${label}-frame-001`);
+  expect(app.canvas.style.getPropertyValue("--frame-gesture-cursor"))
+    .toBe(displayWithLabel(`frame-resize-handle-${label}-frame-001`).cursor);
+  expect(app.canvas).toHaveClass("pixi-canvas--frame-gesture");
   fireEvent.pointerMove(window, { pointerId: 7, clientX: 130, clientY: 120 });
   await waitFor(() => expect(frameGeometry.preview).toHaveBeenCalledOnce());
   expect(frameGeometry.preview.mock.calls[0][0].gesture).toMatchObject({
@@ -108,6 +189,7 @@ test.each<[string, FrameResizeHandle]>([
   await waitFor(() => expect(frameGeometry.preview).toHaveBeenCalledTimes(2));
   expect(frameGeometry.preview.mock.calls[1][0].gesture).toMatchObject({ preserveAspectRatio: true });
   fireEvent.pointerUp(window, { pointerId: 7, clientX: 130, clientY: 120, shiftKey: true, altKey: true });
+  expect(app.canvas).not.toHaveClass("pixi-canvas--frame-gesture");
   await waitFor(() => expect(frameGeometry.commit).toHaveBeenCalledOnce());
   expect(frameGeometry.commit.mock.calls[0][0]).toMatchObject({
     expectedRect: interactiveComposition.sheets[0].frames[0].clipRect,
@@ -135,6 +217,8 @@ test.each(["Escape", "pointercancel", "blur", "lostpointercapture", "save-shortc
     if (cancellation === "lostpointercapture") fireEvent(app.canvas, new PointerEvent("lostpointercapture", { pointerId: 7 }));
     if (cancellation === "save-shortcut") fireEvent.keyDown(window, { key: "s", ctrlKey: true });
     if (cancellation === "context-loss") fireEvent(app.canvas, new Event("webglcontextlost", { cancelable: true }));
+    expect(app.canvas.style.getPropertyValue("--frame-gesture-cursor")).toBe("");
+    expect(app.canvas).not.toHaveClass("pixi-canvas--frame-gesture");
     if (cancellation === "Escape") expect(laterShortcut).not.toHaveBeenCalled();
     if (cancellation === "save-shortcut") expect(laterShortcut).toHaveBeenCalledOnce();
     window.removeEventListener("keydown", laterShortcut);

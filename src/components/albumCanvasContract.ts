@@ -73,7 +73,8 @@ export interface CanvasFrameGeometry {
   disabled: boolean;
   dragThreshold: PointerDragThreshold | null;
   preview(edit: FrameGeometryEdit): Promise<ComposedFrame>;
-  commit(edit: FrameGeometryEdit): Promise<boolean>;
+  /** The exact committed composition bridges command completion and React presentation. */
+  commit(edit: FrameGeometryEdit): Promise<ComposedFrame | null>;
   onError(message: string): void;
 }
 export interface AlbumCanvasProps {

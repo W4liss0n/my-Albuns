@@ -104,6 +104,8 @@ export class FrameInteractionSession {
       preview: null,
     };
     event.stopPropagation();
+    this.canvas.style.setProperty("--frame-gesture-cursor", event.currentTarget.cursor ?? "move");
+    this.canvas.classList.add("pixi-canvas--frame-gesture");
     this.canvas.setPointerCapture(event.pointerId);
   }
 
@@ -233,16 +235,28 @@ export class FrameInteractionSession {
     this.release(gesture);
     this.deferTapReset();
     // Queue the final edit immediately, before a following Save/Undo can enter the shared queue.
-    void gesture.controls.commit(this.edit(gesture)).catch((error: unknown) => {
-      if (this.gesture === gesture) gesture.controls.onError(errorMessage(error));
-    }).finally(() => {
+    void gesture.controls.commit(this.edit(gesture)).then((committedFrame) => {
       if (this.gesture !== gesture) return;
+      const presentedFrame = this.readContext().input?.composition.sheets
+        .flatMap((sheet) => sheet.frames)
+        .find((frame) => frame.frameId === gesture.frame.frameId);
+      // Command completion can precede React's next projection. Keep the Core's
+      // committed Frame visible until that projection replaces the original input.
+      if (committedFrame && JSON.stringify(presentedFrame) !== JSON.stringify(committedFrame)) {
+        gesture.preview = committedFrame;
+      } else this.reset();
+      this.refresh();
+    }).catch((error: unknown) => {
+      if (this.gesture !== gesture) return;
+      gesture.controls.onError(errorMessage(error));
       this.reset();
       this.refresh();
     });
   };
 
   private release(gesture: FrameGesture) {
+    this.canvas.classList.remove("pixi-canvas--frame-gesture");
+    this.canvas.style.removeProperty("--frame-gesture-cursor");
     // The browser may already have released capture after cancellation or context loss.
     try {
       this.canvas.releasePointerCapture(gesture.pointerId);

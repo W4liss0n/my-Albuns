@@ -84,3 +84,40 @@ usam os cenários declarados no manifesto de UI; registram aparência dos
 resultados, enquanto os testes de interação verificam o gesto. Elas não
 representam uma execução com ponteiro no WebView nativo. A suspensão dos testes
 com janelas permanece conforme a política de validação.
+
+## Continuidade da imagem e do cursor
+
+O teste manual identificou duas piscadas: o Frame voltava brevemente à geometria
+inicial ao soltar, e o cursor alternava entre a ação e o padrão durante o gesto.
+A reprodução no navegador com Pixi real registrou, no redimensionamento, larguras
+`289,166 → 240 → 289,166` unidades do Canvas após a soltura. Durante o arraste,
+registrou `auto → ew-resize → auto → ew-resize`; o movimento alternava entre
+`auto` e `move`.
+
+A confirmação do comando encerrava a prévia antes da próxima apresentação da
+projeção pelo React. Agora a porta da interação devolve o `ComposedFrame` confirmado
+pelo Core, e o Canvas o conserva até receber a projeção correspondente. Isso
+também cobre uma soltura diferente da última prévia, falha e resultado sem
+alteração. A fila de mutações continua sendo a mesma de Salvar e Desfazer.
+
+O cursor de hover do Pixi depende do objeto atingido em cada evento. Uma alça
+pode ficar para trás enquanto a prévia assíncrona acompanha o ponteiro. Durante
+a captura, o gesto conserva o cursor do alvo inicial e o libera ao terminar ou
+cancelar. A regra CSS temporária prevalece sobre o cursor inline de hover;
+nenhum cursor direcional é duplicado fora do proprietário das alças.
+
+Essas decisões foram conferidas contra a documentação de
+[eventos do Pixi 8](https://pixijs.com/8.x/guides/components/events), o código
+instalado do Pixi 8.19.0, as etapas de
+[renderização e confirmação do React 19.2](https://react.dev/learn/render-and-commit)
+e a [precedência de estilos CSS](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Values/important).
+
+O comando `npm test -- src/components/AlbumCanvas.frameGeometry.test.tsx -t "does not flash"`
+falhou antes da correção: esperava posição `40,20`, mas recebeu `0,0`. O teste
+permanente `npm run test:frame-gestures` exercita movimento e a alça direita com
+ponteiro real no navegador headless, amostra o cursor calculado e a geometria
+entre os quadros e verifica a liberação do cursor. Conserva capturas, logs,
+proveniência e resultado em `.scratch/frame-gesture-evidence/` ou no diretório
+fornecido como argumento. A fixture usa a cena produtiva e uma porta com atraso
+determinístico; ela verifica apresentação, sem substituir os testes da política
+geométrica do Core ou a validação manual no WebView nativo.

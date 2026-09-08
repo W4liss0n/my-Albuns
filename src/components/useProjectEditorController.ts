@@ -200,7 +200,7 @@ export function useProjectEditorController({
       disabled: interactionBlocked,
       dragThreshold,
       preview: (edit) => projectCorePort.previewFrameGeometry(edit),
-      commit: (edit) => mutations.commitInteraction({ kind: "editFrameGeometry", edit }),
+      commit: mutations.commitFrameGeometry,
       onError: reportInteractionError,
     },
     onSelectFrame: navigation.selectFrame,

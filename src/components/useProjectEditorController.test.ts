@@ -9,7 +9,7 @@ import {
 } from "../test/projectFixtures";
 import { useProjectEditorController } from "./useProjectEditorController";
 import { useProjectMutationRunner, type ProjectMutationRunner } from "./useProjectMutationRunner";
-import type { EditorProjection, FrameGeometryEdit } from "../domain/project";
+import type { ComposedFrame, EditorProjection, FrameGeometryEdit } from "../domain/project";
 
 function projectCorePort(): ProjectCorePort {
   return {
@@ -67,8 +67,9 @@ beforeEach(() => {
 test.each(["success", "failure"])("a pending Frame edit followed by Save uses the shared queue (%s)", async (outcome) => {
   const port = projectCorePort();
   const pending = deferredValue<EditorProjection>();
-  const changed: EditorProjection = { ...representativeProjection,
+  const changed: EditorProjection = { ...structuredClone(representativeProjection),
     state: { ...representativeProjection.state, revision: representativeProjection.state.revision + 1, dirty: true } };
+  changed.composition.sheets[0].frames[0].clipRect.x += 30_000;
   const apply = vi.spyOn(port, "apply").mockReturnValue(pending.promise);
   const save = vi.spyOn(port, "save").mockImplementation(async (revision) => ({
     outcome: { kind: "saved", revision }, projection: changed,
@@ -83,7 +84,7 @@ test.each(["success", "failure"])("a pending Frame edit followed by Save uses th
     frameId: "frame-001", expectedRect: representativeProjection.state.album.sheets[0].frames[0].rect,
     gesture: { kind: "move", deltaXUm: 30_000, deltaYUm: 20_000 },
   };
-  let finished!: Promise<boolean>;
+  let finished!: Promise<ComposedFrame | null>;
   act(() => {
     finished = view.result.current.canvasProps.frameGeometry!.commit(edit);
     view.result.current.save();
@@ -96,9 +97,11 @@ test.each(["success", "failure"])("a pending Frame edit followed by Save uses th
     await finished;
   });
   if (outcome === "success") {
+    expect(await finished).toEqual(changed.composition.sheets[0].frames[0]);
     expect(save).toHaveBeenCalledWith(changed.state.revision);
     expect(onProjectionChange).toHaveBeenCalledWith(changed);
   } else {
+    expect(await finished).toBeNull();
     expect(save).not.toHaveBeenCalled();
     expect(onProjectionChange).not.toHaveBeenCalled();
     expect(view.result.current.message).toContain("geometria do Frame");
