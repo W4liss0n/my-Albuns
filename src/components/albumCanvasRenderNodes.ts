@@ -6,7 +6,6 @@ import {
   Rectangle,
   Sprite,
   type FillGradient,
-  type Text,
   type Texture,
 } from "pixi.js";
 
@@ -79,7 +78,7 @@ export interface SheetRenderNode {
   container: Container;
   signature: string;
   photoNodes: PhotoRenderNode[];
-  placeholderLabels: Text[];
+  framePlaceholders: ReturnType<typeof createCanvasFramePlaceholder>[];
   inactiveSideGradient: FillGradient | null;
   frameSelections: Map<string, FrameSelectionRenderNode>;
   frameSelectionLayer: Container;
@@ -229,7 +228,7 @@ export function createSheetRenderNode(
   frameSelectionLayer.label = `frame-selection-layer-${sheet.sheetId}`;
   frameSelectionLayer.eventMode = "passive";
   const photoNodes: PhotoRenderNode[] = [];
-  const placeholderLabels: Text[] = [];
+  const framePlaceholders: ReturnType<typeof createCanvasFramePlaceholder>[] = [];
   for (const frame of sheet.frames) {
     const frameContainer = new Container();
     const frameX = frame.clipRect.x * MICROMETER_TO_CANVAS_PIXEL;
@@ -307,7 +306,7 @@ export function createSheetRenderNode(
         frameHeight,
       );
       frameContainer.addChild(emptyPlaceholder.container);
-      placeholderLabels.push(emptyPlaceholder.label);
+      framePlaceholders.push(emptyPlaceholder);
     }
 
     const outlineStyle = frameOutlineStyle(frame.photo !== null);
@@ -516,7 +515,7 @@ export function createSheetRenderNode(
     container: sheetContainer,
     signature,
     photoNodes,
-    placeholderLabels,
+    framePlaceholders,
     inactiveSideGradient: inactiveSide?.gradient ?? null,
     frameSelections,
     frameSelectionLayer,
@@ -534,9 +533,8 @@ export function applyPlaceholderLabelScale(
   node: SheetRenderNode,
   canvasScale: number,
 ) {
-  const inverseScale = 1 / Math.max(canvasScale, Number.EPSILON);
-  for (const label of node.placeholderLabels) {
-    label.scale.set(inverseScale);
+  for (const placeholder of node.framePlaceholders) {
+    placeholder.applyCanvasScale(canvasScale);
   }
 }
 

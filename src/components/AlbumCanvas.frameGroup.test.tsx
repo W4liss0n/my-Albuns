@@ -8,6 +8,19 @@ import {
 
 setupAlbumCanvasTestHarness();
 
+test("a small placeholder keeps its outline without an overflowing instruction and restores the label when it fits", async () => {
+  const composition = groupComposition();
+  composition.sheets[0].frames[1].clipRect = { x: 200_000, y: 80_000, width: 12_000, height: 16_800 };
+  const view = renderCanvas({ compositionPlan: composition, mode: { kind: "sheet-editing", sheetId: "sheet-001" },
+    selectedFrameIds: ["frame-001", "frame-002"] });
+  await finishPixiInitialization();
+  expect(latest("frame-placeholder-label-frame-002").visible).toBe(false);
+  expect(latest("frame-selection-container-frame-002").visible).toBe(true);
+  expect(latest("frame-selection-container-group-sheet-001").visible).toBe(true);
+  view.rerenderCanvas({ composition: groupComposition() });
+  expect(latest("frame-placeholder-label-frame-002").visible).toBe(true);
+});
+
 function groupComposition() {
   const composition = structuredClone(interactiveComposition);
   const original = composition.sheets[0].frames[0];

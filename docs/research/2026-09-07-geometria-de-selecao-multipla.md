@@ -76,6 +76,12 @@ Workspace com o painel de seleção conjunta. As capturas são resultados estát
 o teste de ponteiro verifica os gestos. A validação geral usa `npm run validate`.
 Os testes automatizados com janelas nativas continuam suspensos.
 
+A inspeção do grupo no mínimo identificou a indicação `Adicionar Foto`
+ultrapassando um placeholder de `12 mm`. O placeholder agora mostra a indicação
+somente quando o texto cabe em suas dimensões na escala atual do Canvas. O tamanho
+da fonte e o contorno são preservados; aumentar o Frame torna a indicação visível
+novamente. O teste público do Canvas reproduziu a falha antes dessa correção.
+
 As decisões sobre eventos foram conferidas com o
 [Pixi 8](https://pixijs.com/8.x/guides/components/events), instalado na versão
 8.19.0. As ações de teclado e ponteiro seguem o

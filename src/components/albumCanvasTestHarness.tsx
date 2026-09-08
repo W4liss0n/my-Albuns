@@ -279,6 +279,14 @@ vi.mock("pixi.js", () => {
     style: Record<string, unknown>;
     text: string;
 
+    get width() {
+      return this.text.length * Number(this.style.fontSize ?? 12) * 0.6 * this.scale.x;
+    }
+
+    get height() {
+      return Number(this.style.fontSize ?? 12) * this.scale.y;
+    }
+
     constructor(options: {
       style?: Record<string, unknown>;
       text?: string;
