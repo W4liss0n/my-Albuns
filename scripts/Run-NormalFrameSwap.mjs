@@ -39,7 +39,7 @@ try {
   const move = point => ({type:'pointerMove',origin:'viewport',...point,duration:120});
   const point = () => execute("return window.normalSwapTest.point('swap-frame-0')");
   const state = () => execute("return {photos:document.body.dataset.frameSwapAllPhotos,selection:document.body.dataset.frameSwapSelection,intent:document.body.dataset.frameSwapLastIntent,editing:document.querySelector('.canvas-host canvas')?.getAttribute('aria-label')?.startsWith('Canvas da Lâmina em edição')} ");
-  for (const name of ['click','double-click','alt-pan','cross-sheet-scroll','escape']) {
+  for (const name of ['click','double-click','alt-pan','cross-sheet-scroll','escape','feedback']) {
     await request('POST', `/session/${session}/url`, {url:`http://127.0.0.1:${port}/workspace-preview.html?frame=swap&swap=cross-photos&mode=normal`});
     let ready = false;
     for(let i=0;i<600;i++) {
@@ -63,6 +63,27 @@ try {
       const intent=JSON.parse((await state()).intent);
       assert.equal(intent.kind,'transformPhoto'); assert.equal(intent.frameId,'swap-frame-0');
       assert.notEqual(intent.deltaPanX,0); assert.equal((await state()).photos,initial.photos);
+    } else if(name==='feedback') {
+      const target = await execute("return window.normalSwapTest.point('swap-frame-1')");
+      const bounds = await execute('return document.querySelector(".canvas-host canvas").getBoundingClientRect().toJSON()');
+      await execute(`window.dragFeedbackSamples=[];
+        window.dragFeedbackTimer=setInterval(()=>{
+          const canvas=document.querySelector('.canvas-host canvas');
+          if(canvas.classList.contains('pixi-canvas--frame-gesture'))window.dragFeedbackSamples.push({
+            cursor:getComputedStyle(canvas).cursor,ghost:canvas.dataset.frameContentDragGhost,target:canvas.dataset.frameContentDragTarget});
+        },16);`);
+      await pointer([move(source),{type:'pointerDown',button:0},move(target),{type:'pause',duration:200},
+        move({x:target.x+8,y:target.y+8}),{type:'pause',duration:100},
+        move({x:Math.round(bounds.left+60),y:Math.round(bounds.top+70)}),{type:'pause',duration:200},{type:'pointerUp',button:0}]);
+      const samples = await execute('clearInterval(window.dragFeedbackTimer); return window.dragFeedbackSamples');
+      assert.ok(samples.length>=5,'feedback sampled during the real gesture');
+      assert.ok(samples.every(sample=>sample.cursor==='grabbing'),'cursor stays grabbing across targets and empty areas');
+      assert.ok(samples.every(sample=>sample.ghost==='swap-frame-0'),'ghost persists throughout the drag');
+      assert.ok(samples.some(sample=>sample.target==='swap-frame-1'),'valid destination is visibly highlighted');
+      assert.ok(samples.some(sample=>sample.target===''),'empty areas have no destination highlight');
+      const after=await execute('const canvas=document.querySelector(".canvas-host canvas"); return {ghost:canvas.dataset.frameContentDragGhost,target:canvas.dataset.frameContentDragTarget,cursor:getComputedStyle(canvas).cursor}');
+      assert.equal(after.ghost??null,null); assert.equal(after.target??null,null); assert.notEqual(after.cursor,'grabbing');
+      assert.equal((await state()).photos,initial.photos);
     } else {
       const bounds=await execute('return document.querySelector(".canvas-host canvas").getBoundingClientRect().toJSON()');
       assert.ok((await execute("return window.normalSwapTest.point('swap-frame-4')")).x>bounds.right,'destination starts outside viewport');
@@ -103,7 +124,7 @@ try {
   for (let attempt = 0; attempt < 100 && aliveProcessInstances(owned).length > 0; ++attempt) await delay(100);
   evidence.cleanupCompleted = aliveProcessInstances(owned).length === 0;
   evidence.sourceInputs.final = source();
-  evidence.passed = !evidence.error && evidence.cleanupCompleted && evidence.scenarios.length === 5 &&
+  evidence.passed = !evidence.error && evidence.cleanupCompleted && evidence.scenarios.length === 6 &&
     evidence.scenarios.every(item => item.passed) && JSON.stringify(evidence.sourceInputs.initial) === JSON.stringify(evidence.sourceInputs.final);
   writeFileSync(path.join(output, 'evidence.json'), JSON.stringify(evidence, null, 2) + '\n');
   console.log('Normal Frame swap evidence: ' + path.join(output, 'evidence.json'));

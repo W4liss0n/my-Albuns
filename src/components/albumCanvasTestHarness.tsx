@@ -72,6 +72,7 @@ const pixiLifecycle = vi.hoisted(() => ({
   resolveAssetLoads: [] as Array<(texture: object) => void>,
   rejectAssetLoads: [] as Array<(reason?: unknown) => void>,
   spriteTextures: [] as unknown[],
+  generatedTextures: [] as Array<{ options: Record<string, unknown>; destroy: (destroySource?: boolean) => void }>,
   fillGradients: [] as Array<{ destroyCount: number }>,
 }));
 
@@ -325,6 +326,14 @@ vi.mock("pixi.js", () => {
     resizeTarget: HTMLElement | null = null;
     screen = { width: 1_200, height: 500 };
     stage = new Container();
+    renderer = {
+      resolution: 1,
+      generateTexture: (options: Record<string, unknown>) => {
+        const texture = { options, destroy: vi.fn() };
+        pixiLifecycle.generatedTextures.push(texture);
+        return texture;
+      },
+    };
     ticker = {
       add: (callback: (ticker: { deltaMS: number }) => void) => {
         pixiLifecycle.tickerCallbacks.push(callback);
@@ -419,6 +428,7 @@ export function renderCanvas({
   mediaPreviewUrls,
   technicalGuides,
   frameGeometry,
+  frameContentSwap,
   sheetReorder,
   onCanvasMetricsChange = vi.fn<(metrics: CanvasMetrics) => void>(),
   onSelectFrame = vi.fn<(frameId: string | null) => void>(),
@@ -451,6 +461,7 @@ export function renderCanvas({
   mediaPreviewUrls?: Readonly<Record<string, string>>;
   technicalGuides?: CanvasTechnicalGuides;
   frameGeometry?: AlbumCanvasProps["frameGeometry"];
+  frameContentSwap?: AlbumCanvasProps["frameContentSwap"];
   sheetReorder?: CanvasSheetReorder;
   onCanvasMetricsChange?: (metrics: CanvasMetrics) => void;
   onSelectFrame?: (frameId: string | null, toggle?: boolean) => void;
@@ -496,6 +507,7 @@ export function renderCanvas({
         mediaPreviewUrls={mediaPreviewUrls}
         technicalGuides={technicalGuides}
         frameGeometry={frameGeometry}
+        frameContentSwap={frameContentSwap}
         sheetReorder={sheetReorder}
         continuousCanvasLayout={
           mode.kind === "normal"
@@ -603,6 +615,7 @@ export function setupAlbumCanvasTestHarness() {
     pixiLifecycle.resolveAssetLoads.length = 0;
     pixiLifecycle.rejectAssetLoads.length = 0;
     pixiLifecycle.spriteTextures.length = 0;
+    pixiLifecycle.generatedTextures.length = 0;
     pixiLifecycle.fillGradients.length = 0;
     vi.stubGlobal(
       "ResizeObserver",

@@ -2571,7 +2571,7 @@
         "width": 1896,
         "height": 720
       },
-      "readySelector": "body[data-frame-swap-all-photos=\"00000000-0000-4000-8000-000000000001,00000000-0000-4000-8000-000000000002,empty,empty,00000000-0000-4000-8000-000000000002,empty\"][data-frame-swap-selection=\"\"]:has(canvas.pixi-canvas--frame-gesture[style*=\"move\"])",
+      "readySelector": "canvas.pixi-canvas--frame-gesture[data-frame-content-drag-ghost=\"swap-frame-0\"][data-frame-content-drag-target=\"swap-frame-1\"]",
       "actions": [
         {
           "type": "drag",
@@ -2868,6 +2868,122 @@
         {
           "type": "click",
           "selector": "[role=\"menuitem\"][aria-label=\"Refazer\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-normal-frame-swap-ghost-empty",
+      "title": "Troca no Modo normal — miniatura acompanha o ponteiro sobre área vazia",
+      "implementationPath": "/workspace-preview.html?frame=swap&mode=normal&swap=photos",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "normal-frame-content-swap",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A decisão aceita na especificação e no design 0001 inclui arraste no Modo normal entre Lâminas. A referência visual vigente antecede esse gesto; o cenário usa composição e alvos produzidos pelo Core."
+      },
+      "viewport": {
+        "width": 1896,
+        "height": 720
+      },
+      "readySelector": "canvas.pixi-canvas--frame-gesture[data-frame-content-drag-ghost=\"swap-frame-0\"][data-frame-content-drag-target=\"\"]",
+      "actions": [
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": ".canvas-host canvas",
+          "targetSelector": ".canvas-host canvas",
+          "phase": "preview",
+          "sourceOffsetX": -657,
+          "sourceOffsetY": -13,
+          "targetOffsetX": -373,
+          "targetOffsetY": -170
+        }
+      ]
+    },
+    {
+      "id": "workspace-normal-frame-swap-hover-placeholder",
+      "title": "Troca no Modo normal — Frame vazio recebe destaque durante o arraste",
+      "implementationPath": "/workspace-preview.html?frame=swap&mode=normal&swap=photos",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "normal-frame-content-swap",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A decisão aceita na especificação e no design 0001 inclui arraste no Modo normal entre Lâminas. A referência visual vigente antecede esse gesto; o cenário usa composição e alvos produzidos pelo Core."
+      },
+      "viewport": {
+        "width": 1896,
+        "height": 720
+      },
+      "readySelector": "canvas.pixi-canvas--frame-gesture[data-frame-content-drag-ghost=\"swap-frame-0\"][data-frame-content-drag-target=\"swap-frame-2\"]",
+      "actions": [
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": ".canvas-host canvas",
+          "targetSelector": ".canvas-host canvas",
+          "phase": "preview",
+          "sourceOffsetX": -657,
+          "sourceOffsetY": -13,
+          "targetOffsetX": -308,
+          "targetOffsetY": 0
+        }
+      ]
+    },
+    {
+      "id": "workspace-normal-frame-swap-hover-cross",
+      "title": "Troca no Modo normal — miniatura e destino em outra Lâmina",
+      "implementationPath": "/workspace-preview.html?frame=swap&mode=normal&swap=photos",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "normal-frame-content-swap",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A decisão aceita na especificação e no design 0001 inclui arraste no Modo normal entre Lâminas. A referência visual vigente antecede esse gesto; o cenário usa composição e alvos produzidos pelo Core."
+      },
+      "viewport": {
+        "width": 1896,
+        "height": 720
+      },
+      "readySelector": "canvas.pixi-canvas--frame-gesture[data-frame-content-drag-ghost=\"swap-frame-0\"][data-frame-content-drag-target=\"swap-frame-4\"]",
+      "actions": [
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": ".canvas-host canvas",
+          "targetSelector": ".canvas-host canvas",
+          "phase": "preview",
+          "sourceOffsetX": -657,
+          "sourceOffsetY": -13,
+          "targetOffsetX": 270,
+          "targetOffsetY": 25
+        }
+      ]
+    },
+    {
+      "id": "workspace-normal-frame-swap-ghost-portrait",
+      "title": "Troca no Modo normal — miniatura preserva o recorte vertical da origem",
+      "implementationPath": "/workspace-preview.html?frame=swap&mode=normal&swap=photos",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "normal-frame-content-swap",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A decisão aceita na especificação e no design 0001 inclui arraste no Modo normal entre Lâminas. A referência visual vigente antecede esse gesto; o cenário usa composição e alvos produzidos pelo Core."
+      },
+      "viewport": {
+        "width": 1896,
+        "height": 720
+      },
+      "readySelector": "canvas.pixi-canvas--frame-gesture[data-frame-content-drag-ghost=\"swap-frame-1\"][data-frame-content-drag-target=\"swap-frame-0\"]",
+      "actions": [
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": ".canvas-host canvas",
+          "targetSelector": ".canvas-host canvas",
+          "phase": "preview",
+          "sourceOffsetX": -473,
+          "sourceOffsetY": -13,
+          "targetOffsetX": -657,
+          "targetOffsetY": -13
         }
       ]
     }

@@ -17,6 +17,12 @@ interface Drag {
   desired: CanvasPhotoDropPoint | null;
 }
 
+export interface FrameContentDragPreview {
+  sourceFrameId: string;
+  clientX: number;
+  clientY: number;
+}
+
 /** Keeps a Photo in place until an authoritative drop, without changing normal selection. */
 export class FrameContentDragSession {
   private drag: Drag | null = null;
@@ -45,6 +51,9 @@ export class FrameContentDragSession {
   }
 
   get highlight() { return this.target; }
+  get preview(): FrameContentDragPreview | null {
+    return this.drag?.dragging ? { sourceFrameId: this.drag.sourceFrameId, ...this.drag.point } : null;
+  }
   get ignoresTap() { return this.suppressedPointer !== null; }
 
   start(sourceFrameId: string, event: FederatedPointerEvent) {
@@ -113,11 +122,12 @@ export class FrameContentDragSession {
       // Ordinary clicks keep their native target and double-click sequence.
       this.canvas.setPointerCapture(drag.pointerId);
       this.canvas.classList.add("pixi-canvas--frame-gesture");
-      this.canvas.style.setProperty("--frame-gesture-cursor", "no-drop");
+      this.canvas.style.setProperty("--frame-gesture-cursor", "grabbing");
       this.previousTime = performance.now();
       this.animation = requestAnimationFrame(this.tick);
     }
     this.updateTarget(drag);
+    this.refresh();
   };
 
   private updateTarget(drag: Drag) {
@@ -125,8 +135,9 @@ export class FrameContentDragSession {
     if (JSON.stringify(point) === JSON.stringify(drag.desired)) return;
     drag.desired = point;
     drag.request += 1;
-    this.target = null;
-    this.canvas.style.setProperty("--frame-gesture-cursor", "no-drop");
+    // Keep the confirmed highlight while the next hover is being resolved.
+    // An absent Canvas point clears it immediately; only the Core chooses Frames.
+    if (!point) this.target = null;
     this.refresh();
     this.requestTarget(drag);
   }
@@ -138,7 +149,6 @@ export class FrameContentDragSession {
     void drag.controls.resolveTarget(drag.desired).then((target) => {
       if (this.drag !== drag || drag.request !== request) return;
       this.target = target.kind === "frame" && target.frameId !== drag.sourceFrameId ? target : null;
-      this.canvas.style.setProperty("--frame-gesture-cursor", this.target ? "move" : "no-drop");
       this.refresh();
     }).catch((error: unknown) => {
       if (this.drag !== drag || drag.request !== request) return;

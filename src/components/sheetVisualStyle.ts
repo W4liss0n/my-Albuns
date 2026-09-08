@@ -91,6 +91,15 @@ export const SHEET_VISUAL_STYLE = {
     handleOutlineWidthPx: 1,
     handleSizePx: 8,
   },
+  frameContentDrag: {
+    targetColor: 0x2f7fba,
+    targetFillOpacity: 0.14,
+    targetOutlineWidthPx: 3,
+    ghostOpacity: 0.84,
+    ghostMaxWidthPx: 140,
+    ghostMaxHeightPx: 110,
+    ghostPointerOffsetPx: 18,
+  },
   overlay: {
     cornerRadiusPx: VISUAL_MEDIA_FALLBACK_STYLE.overlay.cornerRadiusPx,
     insetPx: 8,

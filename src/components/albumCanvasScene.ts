@@ -34,6 +34,7 @@ import { applySheetBarScale } from "./sheetBarRenderNode";
 import { PhotoInteractionSession } from "./photoInteractionSession";
 import { FrameInteractionSession } from "./frameInteractionSession";
 import { FrameContentDragSession } from "./frameContentDragSession";
+import { FrameContentDragVisual } from "./frameContentDragVisual";
 import { ViewportTexturePool } from "./viewportTexturePool";
 
 const PRELOAD_MARGIN = 1;
@@ -74,6 +75,7 @@ export class AlbumCanvasScene {
   private readonly photoInteractions: PhotoInteractionSession;
   private readonly frameInteractions: FrameInteractionSession;
   private readonly frameContentDrag: FrameContentDragSession;
+  private readonly frameContentDragVisual: FrameContentDragVisual;
 
   constructor(
     private readonly app: Application,
@@ -107,6 +109,7 @@ export class AlbumCanvasScene {
     );
     this.world.label = "album-world";
     this.app.stage.addChild(this.world);
+    this.frameContentDragVisual = new FrameContentDragVisual(app, this.photoNodes);
     this.app.stage.eventMode = "static";
     this.app.stage.hitArea = this.app.screen;
     this.app.stage.on("rightclick", (event) => {
@@ -271,6 +274,7 @@ export class AlbumCanvasScene {
     this.resetTransientInteractions();
     this.frameInteractions.destroy();
     this.frameContentDrag.destroy();
+    this.frameContentDragVisual.destroy();
     this.app.stage.removeAllListeners();
     this.clearMaterializedSheets();
     this.previewTextures.destroy();
@@ -359,6 +363,11 @@ export class AlbumCanvasScene {
     this.photoInteractions.reset();
     this.frameInteractions.reset();
     this.frameContentDrag.reset();
+    this.frameContentDragVisual.reset();
+    delete this.app.canvas.dataset.frameContentDragTarget;
+    for (const node of this.sheetNodes.values()) {
+      for (const highlight of node.frameContentDropHighlights.values()) highlight.visible = false;
+    }
     this.sheetReorderPreviewActive = false;
     this.sheetReorderPlaceholderSheetId = null;
     this.stopSheetPositionAnimations();
@@ -698,7 +707,12 @@ export class AlbumCanvasScene {
 
   private updateDecorations(sheets: readonly ComposedSheet[]) {
     if (!this.input) return;
-    const highlight = this.frameContentDrag.highlight ?? this.input.photoDropHighlight;
+    this.frameContentDragVisual.update(this.frameContentDrag.preview);
+    if (this.frameContentDrag.preview) {
+      this.app.canvas.dataset.frameContentDragTarget = this.frameContentDrag.highlight?.kind === "frame"
+        ? this.frameContentDrag.highlight.frameId : "";
+    } else delete this.app.canvas.dataset.frameContentDragTarget;
+    const highlight = this.input.photoDropHighlight;
     for (const [sheetId, node] of this.sheetNodes) {
       node.container.visible =
         sheetId !== this.sheetReorderPlaceholderSheetId;
@@ -716,6 +730,10 @@ export class AlbumCanvasScene {
       for (const [frameId, outline] of node.frameDropOutlines) {
         outline.visible =
           highlight?.kind === "frame" && highlight.frameId === frameId;
+      }
+      for (const [frameId, highlight] of node.frameContentDropHighlights) {
+        highlight.visible = this.frameContentDrag.highlight?.kind === "frame" &&
+          this.frameContentDrag.highlight.frameId === frameId;
       }
     }
   }
