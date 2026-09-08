@@ -110,6 +110,7 @@ export interface AlbumCanvasProps {
     point: CanvasPhotoDropPoint,
   ): Promise<boolean>;
   onPhotoDragCancel?(): void;
+  onOpenFrameContextMenu?(frameId: string, position: { x: number; y: number }): void;
   onOpenSheetContextMenu?(
     sheetId: string,
     position: { x: number; y: number },

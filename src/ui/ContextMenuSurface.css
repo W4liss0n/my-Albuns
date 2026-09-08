@@ -1,11 +1,11 @@
-.sheet-context-menu__dismiss-layer {
+.ui-context-menu__dismiss-layer {
   position: fixed;
   inset: 0;
   z-index: 49;
   background: transparent;
 }
 
-.sheet-context-menu {
+.ui-context-menu {
   position: fixed;
   z-index: 50;
   display: grid;
@@ -17,29 +17,45 @@
   overflow-y: auto;
 }
 
-.sheet-context-menu button {
+.ui-context-menu button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-5);
   min-height: var(--ui-compact-control-height);
   padding: 0 var(--ui-space-3);
   border: 0;
+  border-radius: 0;
+  font: inherit;
+  font-size: var(--ui-font-size-control);
   color: var(--ui-text-secondary);
   background: transparent;
   text-align: left;
 }
 
-.sheet-context-menu button:hover:not(:disabled),
-.sheet-context-menu button:focus-visible:not(:disabled) {
+.ui-context-menu kbd {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-family: var(--ui-font-mono);
+  font-size: var(--ui-font-size-support);
+  color: var(--ui-text-muted);
+}
+
+.ui-context-menu button:hover:not(:disabled),
+.ui-context-menu button:focus-visible:not(:disabled) {
   color: var(--ui-text);
   background: var(--ui-surface-muted);
   outline: 0;
 }
 
-.sheet-context-menu button:disabled {
+.ui-context-menu button:disabled {
   color: var(--ui-text-disabled);
   cursor: default;
   opacity: 0.72;
 }
 
-.sheet-context-menu__separator {
+.ui-context-menu__separator {
   height: 1px;
   margin: var(--ui-space-1) 0;
   background: var(--ui-border);

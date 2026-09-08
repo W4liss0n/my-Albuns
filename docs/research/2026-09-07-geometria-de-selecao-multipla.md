@@ -92,7 +92,8 @@ instalado na versão 5.0.14.
 
 ## Escopo restante
 
-A issue #20 permanece aberta. Organização da Pilha visual, troca de conteúdo,
+A issue #20 permanece aberta. A Organização da Pilha visual é tratada no
+[recorte seguinte](2026-09-07-ordenacao-de-frames.md); troca de conteúdo,
 cópia/colagem e outros comandos coletivos ainda pertencem às próximas etapas.
 Edição coletiva de estilos e ajustes de Foto também depende das capacidades
 correspondentes do Core. O Travamento de Layout ainda não é um estado persistente

@@ -788,6 +788,15 @@ pub enum SheetInsertionPosition {
     After,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum FrameStackAction {
+    BringToFront,
+    Advance,
+    Recede,
+    SendToBack,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(
     tag = "kind",
@@ -796,6 +805,10 @@ pub enum SheetInsertionPosition {
 )]
 #[ts(tag = "kind")]
 pub enum ProjectIntent {
+    ArrangeFrames {
+        frame_ids: Vec<String>,
+        action: FrameStackAction,
+    },
     EditFrameGeometry {
         edit: crate::FrameGeometryEdit,
     },
@@ -846,6 +859,8 @@ pub enum ProjectIntent {
 
 #[derive(Debug, Error, PartialEq)]
 pub enum CoreError {
+    #[error("Selecione Frames distintos de uma única Lâmina para organizar a Pilha visual")]
+    InvalidFrameStackSelection,
     #[error("Selecione Frames distintos de uma única Lâmina para editar a geometria")]
     InvalidFrameGeometrySelection,
     #[error("A geometria do Frame mudou durante o gesto; tente novamente")]

@@ -44,6 +44,7 @@ import { useProjectOperationResultDialog } from "./useProjectOperationResultDial
 import { useImageProcessingProgressDialog } from "./useImageProcessingProgressDialog";
 import { useAlbumInformationApplyController } from "./useAlbumInformationApplyController";
 import { SheetContextMenu } from "./SheetContextMenu";
+import { FrameContextMenu } from "./FrameContextMenu";
 import {
   createSheetReorderSession,
   reduceSheetReorderSession,
@@ -138,6 +139,7 @@ export function ProjectWorkspace({
     sheetId: string;
   } | null>(null);
   const [closeMessage, setCloseMessage] = useState<string | null>(null);
+  const [frameContextMenu, setFrameContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [presentationUnitOverride, setPresentationUnitOverride] = useState<{
     projectId: string;
     unit: DisplayUnit;
@@ -507,7 +509,18 @@ export function ProjectWorkspace({
     },
     [structuralCommandsBlocked],
   );
+  useEffect(() => {
+    if (!controller.canArrangeFrames || commandsBlocked) setFrameContextMenu(null);
+  }, [controller.canArrangeFrames, commandsBlocked, projectId]);
+  const openFrameContextMenu = (frameId: string, position: { x: number; y: number }) => {
+    if (commandsBlocked || canvasMode.kind !== "sheet-editing" ||
+        !projection.state.album.sheets.find((sheet) => sheet.id === canvasMode.sheetId)?.frames.some((frame) => frame.id === frameId)) return;
+    if (!controller.canvasProps.selectedFrameIds.includes(frameId)) controller.canvasProps.onSelectFrame(frameId);
+    setFrameContextMenu(position);
+  };
   useProjectCommandShortcuts({
+    arrangeFrames: (action) => { void controller.arrangeFrames(action); },
+    frameCommandsActive: controller.canArrangeFrames && draggedPhotoId === null && sheetContextMenu === null && frameContextMenu === null,
     canDeleteSheet: implicitSheetAvailability.canDelete,
     canRedo: projection.state.canRedo,
     canUndo: projection.state.canUndo,
@@ -528,6 +541,8 @@ export function ProjectWorkspace({
     undo: controller.undo,
   });
   const applicationMenus = createProjectApplicationMenus({
+    arrangeFrames: (action) => { void controller.arrangeFrames(action); },
+    canArrangeFrames: controller.canArrangeFrames,
     addSheetAfter: () => {
       void controller.addSheetAfter();
     },
@@ -611,6 +626,7 @@ export function ProjectWorkspace({
         >
           <AlbumCanvas
             {...controller.canvasProps}
+            onOpenFrameContextMenu={openFrameContextMenu}
             draggedPhotoId={draggedPhotoId}
             onPhotoDragCancel={() => setDraggedPhotoId(null)}
             sheetReorder={{
@@ -757,6 +773,9 @@ export function ProjectWorkspace({
         />}
       </div>
 
+      {frameContextMenu ? <FrameContextMenu position={frameContextMenu}
+        onArrange={(action) => { void controller.arrangeFrames(action); }}
+        onDismiss={() => setFrameContextMenu(null)} /> : null}
       {sheetContextMenu ? (
         <SheetContextMenu
           availability={sheetStructureAvailability(

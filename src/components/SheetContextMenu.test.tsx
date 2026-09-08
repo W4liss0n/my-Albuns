@@ -157,7 +157,7 @@ describe("SheetContextMenu", () => {
       .spyOn(HTMLElement.prototype, "getBoundingClientRect")
       .mockImplementation(function (this: HTMLElement) {
         const menu = this.classList.contains(
-          "sheet-context-menu",
+          "ui-context-menu",
         );
         const measuredWidth = menu ? 220 : 0;
         const measuredHeight = menu ? 200 : 0;

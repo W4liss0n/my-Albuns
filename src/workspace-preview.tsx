@@ -29,11 +29,13 @@ import type {
 import { createTwoSheetProjection } from "./test/projectFixtures";
 import { useEditorView } from "./state/editorView";
 import groupGeometryCorpus from "../tests/fixtures/frame-group-geometry-cases.json";
+import stackCorpus from "../tests/fixtures/frame-stack-cases.json";
 import "./ui/theme.css";
 import "./ui/ui.css";
 
 const previewParameters = new URLSearchParams(window.location.search);
 const frameContext = previewParameters.get("frame");
+const stackCase = stackCorpus.cases.find((item) => item.action === previewParameters.get("stack"));
 const decorativeContext = previewParameters.get("decorative");
 const previewScale = Number(previewParameters.get("scale") ?? "1");
 if ([1, 1.25, 1.5].includes(previewScale)) {
@@ -47,10 +49,16 @@ let projection = createPreviewProjection(
   decorativeContext,
   structureContext,
 );
-if (frameContext === "multiple") {
+if (frameContext === "multiple" || frameContext === "stack") {
   useEditorView.setState({ projectId: projection.state.projectId, editingSheetId: "sheet-001",
     focusedSheetId: "sheet-001", centeredSheetId: "sheet-001",
-    selectedFrameIds: projection.state.album.sheets[0].frames.map((frame) => frame.id) });
+    selectedFrameIds: frameContext === "stack" ? stackCase!.selectedFrameIds :
+      projection.state.album.sheets[0].frames.map((frame) => frame.id) });
+}
+if (frameContext === "stack") {
+  const exposeSelection = () => { document.body.dataset.stackSelection = useEditorView.getState().selectedFrameIds.join(","); };
+  exposeSelection();
+  useEditorView.subscribe(exposeSelection);
 }
 const undoStack: EditorProjection[] = [];
 const redoStack: EditorProjection[] = [];
@@ -240,16 +248,10 @@ function createPreviewProjection(
       count: preview.composition.sheets.length,
     });
   }
-  if (frameMode === "multiple") {
-    const frames = groupGeometryCorpus.cases.find((item) => item.name === "selected")!.frames;
-    const original = preview.state.album.sheets[0].frames[0];
-    preview.state.album.sheets[0].frames = frames.map((frame) => ({
-      ...original, id: frame.frameId, rect: frame.clipRect, zIndex: frame.zIndex,
-      photo: frame.photo ? original.photo : null,
-    }));
-    preview.composition.sheets[0].frames = frames.map((frame) => ({ ...frame,
-      photo: frame.photo ? { ...frame.photo, palette: [frame.photo.palette[0], frame.photo.palette[1], frame.photo.palette[2]] } : null,
-    }));
+  if (frameMode === "multiple" || frameMode === "stack") {
+    const frames = frameMode === "stack" ? stackCorpus.before :
+      groupGeometryCorpus.cases.find((item) => item.name === "selected")!.frames;
+    setPreviewFrames(preview, frames);
     return preview;
   }
   if (frameMode !== "photo" && frameMode !== "empty") return preview;
@@ -273,6 +275,18 @@ function createPreviewProjection(
     composedFrame.photo = null;
   }
   return preview;
+}
+
+function setPreviewFrames(preview: EditorProjection, frames: typeof stackCorpus.before) {
+  const original = preview.state.album.sheets[0].frames.find((frame) => frame.photo)!;
+  preview.state.album.sheets[0].frames = frames.map((frame) => ({
+    ...original, id: frame.frameId, rect: frame.clipRect, zIndex: frame.zIndex,
+    photo: frame.photo ? original.photo : null,
+  }));
+  preview.composition.sheets[0].frames = frames.map((frame) => ({ ...frame,
+    photo: frame.photo ? { ...frame.photo,
+      palette: [frame.photo.palette[0], frame.photo.palette[1], frame.photo.palette[2]] } : null,
+  }));
 }
 
 function configurePhysicalPreview(
@@ -320,6 +334,20 @@ function configurePhysicalPreview(
 }
 
 function applyPreviewIntent(intent: ProjectIntent): ProjectMutationOutcome {
+  if (intent.kind === "arrangeFrames") {
+    // This fixture replays Core-produced outcomes; it does not implement stack policy.
+    if (!stackCase || intent.action !== stackCase.action ||
+      [...intent.frameIds].sort().join() !== [...stackCase.selectedFrameIds].sort().join() ||
+      projection.composition.sheets[0].frames.map((frame) => frame.frameId).join() !==
+        stackCorpus.before.map((frame) => frame.frameId).join()) {
+      throw new Error("Comando fora do cenário de ordenação desta prévia.");
+    }
+    const before = structuredClone(projection);
+    const next = structuredClone(projection);
+    setPreviewFrames(next, stackCase.frames);
+    projection = finalizePhysicalPreviewMutation(next, before);
+    return { projection, affectedFrameId: null, affectedSheetId: null };
+  }
   if (
     intent.kind !== "addSheet" &&
     intent.kind !== "deleteSheet" &&

@@ -1,0 +1,840 @@
+{
+  "before": [
+    {
+      "borderFillRects": [],
+      "clipRect": {
+        "height": 220000,
+        "width": 340000,
+        "x": 130000,
+        "y": 40000
+      },
+      "frameId": "stack-frame-0",
+      "photo": {
+        "drawRect": {
+          "height": 226667,
+          "width": 340000,
+          "x": 130000,
+          "y": 36667
+        },
+        "mediaId": "00000000-0000-4000-8000-000000000001",
+        "mirrorX": false,
+        "name": "Foto.jpg",
+        "palette": [
+          "#173B4B",
+          "#84AAA7",
+          "#E7C58B"
+        ],
+        "placement": {
+          "baseFillZoom": 566.6666666666666,
+          "current": {
+            "center": {
+              "x": 170000.0,
+              "y": 110000.0
+            },
+            "size": {
+              "height": 226666.66666666666,
+              "width": 340000.0
+            }
+          },
+          "currentPan": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "currentZoom": 1.0,
+          "panOrigin": {
+            "x": 170000.0,
+            "y": 110000.0
+          },
+          "panRange": {
+            "maximum": 1.0,
+            "minimum": -1.0
+          },
+          "panToCenter": {
+            "xx": 0.0,
+            "xy": -0.0,
+            "yx": 0.0,
+            "yy": 3333.3333333333285
+          },
+          "panToCenterPerZoom": {
+            "xx": 170000.0,
+            "xy": -0.0,
+            "yx": 0.0,
+            "yy": 113333.33333333333
+          },
+          "sizePerZoom": {
+            "height": 226666.66666666666,
+            "width": 340000.0
+          },
+          "zoomRange": {
+            "maximum": 4.0,
+            "minimum": 1.0
+          }
+        },
+        "rotationDegrees": 0.0
+      },
+      "zIndex": 0
+    },
+    {
+      "borderFillRects": [],
+      "clipRect": {
+        "height": 180000,
+        "width": 240000,
+        "x": 210000,
+        "y": 80000
+      },
+      "frameId": "stack-frame-1",
+      "photo": null,
+      "zIndex": 1
+    },
+    {
+      "borderFillRects": [],
+      "clipRect": {
+        "height": 100000,
+        "width": 150000,
+        "x": 260000,
+        "y": 100000
+      },
+      "frameId": "stack-frame-2",
+      "photo": {
+        "drawRect": {
+          "height": 100000,
+          "width": 150000,
+          "x": 260000,
+          "y": 100000
+        },
+        "mediaId": "00000000-0000-4000-8000-000000000001",
+        "mirrorX": false,
+        "name": "Foto.jpg",
+        "palette": [
+          "#173B4B",
+          "#84AAA7",
+          "#E7C58B"
+        ],
+        "placement": {
+          "baseFillZoom": 250.0,
+          "current": {
+            "center": {
+              "x": 75000.0,
+              "y": 50000.0
+            },
+            "size": {
+              "height": 100000.0,
+              "width": 150000.0
+            }
+          },
+          "currentPan": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "currentZoom": 1.0,
+          "panOrigin": {
+            "x": 75000.0,
+            "y": 50000.0
+          },
+          "panRange": {
+            "maximum": 1.0,
+            "minimum": -1.0
+          },
+          "panToCenter": {
+            "xx": 0.0,
+            "xy": -0.0,
+            "yx": 0.0,
+            "yy": 0.0
+          },
+          "panToCenterPerZoom": {
+            "xx": 75000.0,
+            "xy": -0.0,
+            "yx": 0.0,
+            "yy": 50000.0
+          },
+          "sizePerZoom": {
+            "height": 100000.0,
+            "width": 150000.0
+          },
+          "zoomRange": {
+            "maximum": 4.0,
+            "minimum": 1.0
+          }
+        },
+        "rotationDegrees": 0.0
+      },
+      "zIndex": 2
+    }
+  ],
+  "cases": [
+    {
+      "action": "bringToFront",
+      "frames": [
+        {
+          "borderFillRects": [],
+          "clipRect": {
+            "height": 100000,
+            "width": 150000,
+            "x": 260000,
+            "y": 100000
+          },
+          "frameId": "stack-frame-2",
+          "photo": {
+            "drawRect": {
+              "height": 100000,
+              "width": 150000,
+              "x": 260000,
+              "y": 100000
+            },
+            "mediaId": "00000000-0000-4000-8000-000000000001",
+            "mirrorX": false,
+            "name": "Foto.jpg",
+            "palette": [
+              "#173B4B",
+              "#84AAA7",
+              "#E7C58B"
+            ],
+            "placement": {
+              "baseFillZoom": 250.0,
+              "current": {
+                "center": {
+                  "x": 75000.0,
+                  "y": 50000.0
+                },
+                "size": {
+                  "height": 100000.0,
+                  "width": 150000.0
+                }
+              },
+              "currentPan": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "currentZoom": 1.0,
+              "panOrigin": {
+                "x": 75000.0,
+                "y": 50000.0
+              },
+              "panRange": {
+                "maximum": 1.0,
+                "minimum": -1.0
+              },
+              "panToCenter": {
+                "xx": 0.0,
+                "xy": -0.0,
+                "yx": 0.0,
+                "yy": 0.0
+              },
+              "panToCenterPerZoom": {
+                "xx": 75000.0,
+                "xy": -0.0,
+                "yx": 0.0,
+                "yy": 50000.0
+              },
+              "sizePerZoom": {
+                "height": 100000.0,
+                "width": 150000.0
+              },
+              "zoomRange": {
+                "maximum": 4.0,
+                "minimum": 1.0
+              }
+            },
+            "rotationDegrees": 0.0
+          },
+          "zIndex": 0
+        },
+        {
+          "borderFillRects": [],
+          "clipRect": {
+            "height": 220000,
+            "width": 340000,
+            "x": 130000,
+            "y": 40000
+          },
+          "frameId": "stack-frame-0",
+          "photo": {
+            "drawRect": {
+              "height": 226667,
+              "width": 340000,
+              "x": 130000,
+              "y": 36667
+            },
+            "mediaId": "00000000-0000-4000-8000-000000000001",
+            "mirrorX": false,
+            "name": "Foto.jpg",
+            "palette": [
+              "#173B4B",
+              "#84AAA7",
+              "#E7C58B"
+            ],
+            "placement": {
+              "baseFillZoom": 566.6666666666666,
+              "current": {
+                "center": {
+                  "x": 170000.0,
+                  "y": 110000.0
+                },
+                "size": {
+                  "height": 226666.66666666666,
+                  "width": 340000.0
+                }
+              },
+              "currentPan": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "currentZoom": 1.0,
+              "panOrigin": {
+                "x": 170000.0,
+                "y": 110000.0
+              },
+              "panRange": {
+                "maximum": 1.0,
+                "minimum": -1.0
+              },
+              "panToCenter": {
+                "xx": 0.0,
+                "xy": -0.0,
+                "yx": 0.0,
+                "yy": 3333.3333333333285
+              },
+              "panToCenterPerZoom": {
+                "xx": 170000.0,
+                "xy": -0.0,
+                "yx": 0.0,
+                "yy": 113333.33333333333
+              },
+              "sizePerZoom": {
+                "height": 226666.66666666666,
+                "width": 340000.0
+              },
+              "zoomRange": {
+                "maximum": 4.0,
+                "minimum": 1.0
+              }
+            },
+            "rotationDegrees": 0.0
+          },
+          "zIndex": 1
+        },
+        {
+          "borderFillRects": [],
+          "clipRect": {
+            "height": 180000,
+            "width": 240000,
+            "x": 210000,
+            "y": 80000
+          },
+          "frameId": "stack-frame-1",
+          "photo": null,
+          "zIndex": 2
+        }
+      ],
+      "selectedFrameIds": [
+        "stack-frame-0",
+        "stack-frame-1"
+      ]
+    },
+    {
+      "action": "advance",
+      "frames": [
+        {
+          "borderFillRects": [],
+          "clipRect": {
+            "height": 220000,
+            "width": 340000,
+            "x": 130000,
+            "y": 40000
+          },
+          "frameId": "stack-frame-0",
+          "photo": {
+            "drawRect": {
+              "height": 226667,
+              "width": 340000,
+              "x": 130000,
+              "y": 36667
+            },
+            "mediaId": "00000000-0000-4000-8000-000000000001",
+            "mirrorX": false,
+            "name": "Foto.jpg",
+            "palette": [
+              "#173B4B",
+              "#84AAA7",
+              "#E7C58B"
+            ],
+            "placement": {
+              "baseFillZoom": 566.6666666666666,
+              "current": {
+                "center": {
+                  "x": 170000.0,
+                  "y": 110000.0
+                },
+                "size": {
+                  "height": 226666.66666666666,
+                  "width": 340000.0
+                }
+              },
+              "currentPan": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "currentZoom": 1.0,
+              "panOrigin": {
+                "x": 170000.0,
+                "y": 110000.0
+              },
+              "panRange": {
+                "maximum": 1.0,
+                "minimum": -1.0
+              },
+              "panToCenter": {
+                "xx": 0.0,
+                "xy": -0.0,
+                "yx": 0.0,
+                "yy": 3333.3333333333285
+              },
+              "panToCenterPerZoom": {
+                "xx": 170000.0,
+                "xy": -0.0,
+                "yx": 0.0,
+                "yy": 113333.33333333333
+              },
+              "sizePerZoom": {
+                "height": 226666.66666666666,
+                "width": 340000.0
+              },
+              "zoomRange": {
+                "maximum": 4.0,
+                "minimum": 1.0
+              }
+            },
+            "rotationDegrees": 0.0
+          },
+          "zIndex": 0
+        },
+        {
+          "borderFillRects": [],
+          "clipRect": {
+            "height": 100000,
+            "width": 150000,
+            "x": 260000,
+            "y": 100000
+          },
+          "frameId": "stack-frame-2",
+          "photo": {
+            "drawRect": {
+              "height": 100000,
+              "width": 150000,
+              "x": 260000,
+              "y": 100000
+            },
+            "mediaId": "00000000-0000-4000-8000-000000000001",
+            "mirrorX": false,
+            "name": "Foto.jpg",
+            "palette": [
+              "#173B4B",
+              "#84AAA7",
+              "#E7C58B"
+            ],
+            "placement": {
+              "baseFillZoom": 250.0,
+              "current": {
+                "center": {
+                  "x": 75000.0,
+                  "y": 50000.0
+                },
+                "size": {
+                  "height": 100000.0,
+                  "width": 150000.0
+                }
+              },
+              "currentPan": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "currentZoom": 1.0,
+              "panOrigin": {
+                "x": 75000.0,
+                "y": 50000.0
+              },
+              "panRange": {
+                "maximum": 1.0,
+                "minimum": -1.0
+              },
+              "panToCenter": {
+                "xx": 0.0,
+                "xy": -0.0,
+                "yx": 0.0,
+                "yy": 0.0
+              },
+              "panToCenterPerZoom": {
+                "xx": 75000.0,
+                "xy": -0.0,
+                "yx": 0.0,
+                "yy": 50000.0
+              },
+              "sizePerZoom": {
+                "height": 100000.0,
+                "width": 150000.0
+              },
+              "zoomRange": {
+                "maximum": 4.0,
+                "minimum": 1.0
+              }
+            },
+            "rotationDegrees": 0.0
+          },
+          "zIndex": 1
+        },
+        {
+          "borderFillRects": [],
+          "clipRect": {
+            "height": 180000,
+            "width": 240000,
+            "x": 210000,
+            "y": 80000
+          },
+          "frameId": "stack-frame-1",
+          "photo": null,
+          "zIndex": 2
+        }
+      ],
+      "selectedFrameIds": [
+        "stack-frame-1"
+      ]
+    },
+    {
+      "action": "recede",
+      "frames": [
+        {
+          "borderFillRects": [],
+          "clipRect": {
+            "height": 180000,
+            "width": 240000,
+            "x": 210000,
+            "y": 80000
+          },
+          "frameId": "stack-frame-1",
+          "photo": null,
+          "zIndex": 0
+        },
+        {
+          "borderFillRects": [],
+          "clipRect": {
+            "height": 220000,
+            "width": 340000,
+            "x": 130000,
+            "y": 40000
+          },
+          "frameId": "stack-frame-0",
+          "photo": {
+            "drawRect": {
+              "height": 226667,
+              "width": 340000,
+              "x": 130000,
+              "y": 36667
+            },
+            "mediaId": "00000000-0000-4000-8000-000000000001",
+            "mirrorX": false,
+            "name": "Foto.jpg",
+            "palette": [
+              "#173B4B",
+              "#84AAA7",
+              "#E7C58B"
+            ],
+            "placement": {
+              "baseFillZoom": 566.6666666666666,
+              "current": {
+                "center": {
+                  "x": 170000.0,
+                  "y": 110000.0
+                },
+                "size": {
+                  "height": 226666.66666666666,
+                  "width": 340000.0
+                }
+              },
+              "currentPan": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "currentZoom": 1.0,
+              "panOrigin": {
+                "x": 170000.0,
+                "y": 110000.0
+              },
+              "panRange": {
+                "maximum": 1.0,
+                "minimum": -1.0
+              },
+              "panToCenter": {
+                "xx": 0.0,
+                "xy": -0.0,
+                "yx": 0.0,
+                "yy": 3333.3333333333285
+              },
+              "panToCenterPerZoom": {
+                "xx": 170000.0,
+                "xy": -0.0,
+                "yx": 0.0,
+                "yy": 113333.33333333333
+              },
+              "sizePerZoom": {
+                "height": 226666.66666666666,
+                "width": 340000.0
+              },
+              "zoomRange": {
+                "maximum": 4.0,
+                "minimum": 1.0
+              }
+            },
+            "rotationDegrees": 0.0
+          },
+          "zIndex": 1
+        },
+        {
+          "borderFillRects": [],
+          "clipRect": {
+            "height": 100000,
+            "width": 150000,
+            "x": 260000,
+            "y": 100000
+          },
+          "frameId": "stack-frame-2",
+          "photo": {
+            "drawRect": {
+              "height": 100000,
+              "width": 150000,
+              "x": 260000,
+              "y": 100000
+            },
+            "mediaId": "00000000-0000-4000-8000-000000000001",
+            "mirrorX": false,
+            "name": "Foto.jpg",
+            "palette": [
+              "#173B4B",
+              "#84AAA7",
+              "#E7C58B"
+            ],
+            "placement": {
+              "baseFillZoom": 250.0,
+              "current": {
+                "center": {
+                  "x": 75000.0,
+                  "y": 50000.0
+                },
+                "size": {
+                  "height": 100000.0,
+                  "width": 150000.0
+                }
+              },
+              "currentPan": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "currentZoom": 1.0,
+              "panOrigin": {
+                "x": 75000.0,
+                "y": 50000.0
+              },
+              "panRange": {
+                "maximum": 1.0,
+                "minimum": -1.0
+              },
+              "panToCenter": {
+                "xx": 0.0,
+                "xy": -0.0,
+                "yx": 0.0,
+                "yy": 0.0
+              },
+              "panToCenterPerZoom": {
+                "xx": 75000.0,
+                "xy": -0.0,
+                "yx": 0.0,
+                "yy": 50000.0
+              },
+              "sizePerZoom": {
+                "height": 100000.0,
+                "width": 150000.0
+              },
+              "zoomRange": {
+                "maximum": 4.0,
+                "minimum": 1.0
+              }
+            },
+            "rotationDegrees": 0.0
+          },
+          "zIndex": 2
+        }
+      ],
+      "selectedFrameIds": [
+        "stack-frame-1"
+      ]
+    },
+    {
+      "action": "sendToBack",
+      "frames": [
+        {
+          "borderFillRects": [],
+          "clipRect": {
+            "height": 180000,
+            "width": 240000,
+            "x": 210000,
+            "y": 80000
+          },
+          "frameId": "stack-frame-1",
+          "photo": null,
+          "zIndex": 0
+        },
+        {
+          "borderFillRects": [],
+          "clipRect": {
+            "height": 100000,
+            "width": 150000,
+            "x": 260000,
+            "y": 100000
+          },
+          "frameId": "stack-frame-2",
+          "photo": {
+            "drawRect": {
+              "height": 100000,
+              "width": 150000,
+              "x": 260000,
+              "y": 100000
+            },
+            "mediaId": "00000000-0000-4000-8000-000000000001",
+            "mirrorX": false,
+            "name": "Foto.jpg",
+            "palette": [
+              "#173B4B",
+              "#84AAA7",
+              "#E7C58B"
+            ],
+            "placement": {
+              "baseFillZoom": 250.0,
+              "current": {
+                "center": {
+                  "x": 75000.0,
+                  "y": 50000.0
+                },
+                "size": {
+                  "height": 100000.0,
+                  "width": 150000.0
+                }
+              },
+              "currentPan": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "currentZoom": 1.0,
+              "panOrigin": {
+                "x": 75000.0,
+                "y": 50000.0
+              },
+              "panRange": {
+                "maximum": 1.0,
+                "minimum": -1.0
+              },
+              "panToCenter": {
+                "xx": 0.0,
+                "xy": -0.0,
+                "yx": 0.0,
+                "yy": 0.0
+              },
+              "panToCenterPerZoom": {
+                "xx": 75000.0,
+                "xy": -0.0,
+                "yx": 0.0,
+                "yy": 50000.0
+              },
+              "sizePerZoom": {
+                "height": 100000.0,
+                "width": 150000.0
+              },
+              "zoomRange": {
+                "maximum": 4.0,
+                "minimum": 1.0
+              }
+            },
+            "rotationDegrees": 0.0
+          },
+          "zIndex": 1
+        },
+        {
+          "borderFillRects": [],
+          "clipRect": {
+            "height": 220000,
+            "width": 340000,
+            "x": 130000,
+            "y": 40000
+          },
+          "frameId": "stack-frame-0",
+          "photo": {
+            "drawRect": {
+              "height": 226667,
+              "width": 340000,
+              "x": 130000,
+              "y": 36667
+            },
+            "mediaId": "00000000-0000-4000-8000-000000000001",
+            "mirrorX": false,
+            "name": "Foto.jpg",
+            "palette": [
+              "#173B4B",
+              "#84AAA7",
+              "#E7C58B"
+            ],
+            "placement": {
+              "baseFillZoom": 566.6666666666666,
+              "current": {
+                "center": {
+                  "x": 170000.0,
+                  "y": 110000.0
+                },
+                "size": {
+                  "height": 226666.66666666666,
+                  "width": 340000.0
+                }
+              },
+              "currentPan": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "currentZoom": 1.0,
+              "panOrigin": {
+                "x": 170000.0,
+                "y": 110000.0
+              },
+              "panRange": {
+                "maximum": 1.0,
+                "minimum": -1.0
+              },
+              "panToCenter": {
+                "xx": 0.0,
+                "xy": -0.0,
+                "yx": 0.0,
+                "yy": 3333.3333333333285
+              },
+              "panToCenterPerZoom": {
+                "xx": 170000.0,
+                "xy": -0.0,
+                "yx": 0.0,
+                "yy": 113333.33333333333
+              },
+              "sizePerZoom": {
+                "height": 226666.66666666666,
+                "width": 340000.0
+              },
+              "zoomRange": {
+                "maximum": 4.0,
+                "minimum": 1.0
+              }
+            },
+            "rotationDegrees": 0.0
+          },
+          "zIndex": 2
+        }
+      ],
+      "selectedFrameIds": [
+        "stack-frame-1",
+        "stack-frame-2"
+      ]
+    }
+  ]
+}

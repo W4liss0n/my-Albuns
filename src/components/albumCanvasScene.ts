@@ -648,6 +648,10 @@ export class AlbumCanvasScene {
         onPhotoPanStart: (photoNode, event) => {
           this.photoInteractions.startPan(photoNode, event);
         },
+        onFrameContextMenu: (frameId, position) => {
+          if (!this.input || this.input.frameGeometry?.disabled || this.frameInteractions.ignoresTap) return;
+          this.input.onOpenFrameContextMenu?.(frameId, position);
+        },
         onFrameGeometryStart: (frameId, handle, event) => {
           this.frameInteractions.start(frameId, handle, event);
         },

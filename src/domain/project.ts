@@ -15,6 +15,7 @@ export type { DocumentSnapshot } from "./generated/DocumentSnapshot";
 export type { DisplayUnit } from "./generated/DisplayUnit";
 export type { EndSheetFormat } from "./generated/EndSheetFormat";
 export type { FrameSnapshot } from "./generated/FrameSnapshot";
+export type { FrameStackAction } from "./generated/FrameStackAction";
 export type { FrameGeometryEdit } from "./generated/FrameGeometryEdit";
 export type { FrameGeometryTarget } from "./generated/FrameGeometryTarget";
 export type { FrameGeometryGesture } from "./generated/FrameGeometryGesture";

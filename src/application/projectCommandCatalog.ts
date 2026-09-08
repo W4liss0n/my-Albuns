@@ -1,3 +1,5 @@
+import type { FrameStackAction } from "../domain/project";
+
 export type ProjectCommandContext =
   | "welcome"
   | "project-window"
@@ -212,8 +214,7 @@ const DEFINITIONS = [
     description: "Move os Frames selecionados para a frente.",
     kind: "domain",
     contexts: ["frame"],
-    availability: "placeholder",
-    placeholderFeature: "bring-selected-frames-to-front",
+    availability: "implemented",
     shortcuts: [],
   }),
   command({
@@ -222,8 +223,7 @@ const DEFINITIONS = [
     description: "Avança os Frames selecionados uma posição.",
     kind: "domain",
     contexts: ["frame"],
-    availability: "placeholder",
-    placeholderFeature: "advance-selected-frames",
+    availability: "implemented",
     shortcuts: [shortcut("]", "Ctrl+]", { ctrlKey: true })],
   }),
   command({
@@ -232,8 +232,7 @@ const DEFINITIONS = [
     description: "Recua os Frames selecionados uma posição.",
     kind: "domain",
     contexts: ["frame"],
-    availability: "placeholder",
-    placeholderFeature: "recede-selected-frames",
+    availability: "implemented",
     shortcuts: [shortcut("[", "Ctrl+[", { ctrlKey: true })],
   }),
   command({
@@ -242,8 +241,7 @@ const DEFINITIONS = [
     description: "Move os Frames selecionados para trás.",
     kind: "domain",
     contexts: ["frame"],
-    availability: "placeholder",
-    placeholderFeature: "send-selected-frames-to-back",
+    availability: "implemented",
     shortcuts: [],
   }),
   command({
@@ -412,6 +410,13 @@ const DEFINITIONS = [
 ] as const;
 
 export type ProjectCommandId = (typeof DEFINITIONS)[number]["id"];
+
+export const FRAME_STACK_COMMANDS = [
+  { id: "bring-frames-to-front", action: "bringToFront" },
+  { id: "advance-frames", action: "advance" },
+  { id: "recede-frames", action: "recede" },
+  { id: "send-frames-to-back", action: "sendToBack" },
+] as const satisfies readonly { id: ProjectCommandId; action: FrameStackAction }[];
 
 export const PROJECT_COMMAND_CATALOG: readonly ProjectCommandDefinition<ProjectCommandId>[] =
   DEFINITIONS;

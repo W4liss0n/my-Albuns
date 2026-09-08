@@ -16,14 +16,15 @@ pub use frame_geometry::{
 pub use model::{
     AlbumSnapshot, ComposedBackground, ComposedColor, ComposedDecorative, ComposedFrame,
     ComposedOutputUnit, ComposedPhoto, ComposedSheet, CompositionPlan, CoreError, DocumentSnapshot,
-    EditorProjection, EditorState, FrameSnapshot, ImportPhoto, ImportPhotoDisposition,
-    ImportPhotoOutcome, ImportPhotosOutcome, Matrix2, MediaCatalogItem, MediaId, MediaKind,
-    MediaTransform, MediaUsage, NormalizedPan, NumberRange, ParseMediaIdError, PhotoDropTarget,
-    PhotoPlacement, PhotoPlacementMode, PhotoPlacementPlan, PhotoSnapshot, PhotoSourceMetadata,
-    ProjectIntent, ProjectMutationOutcome, ProjectedActiveSides, ProjectedBackground,
-    ProjectedBackgroundContent, ProjectedDisplayUnit, ProjectedFrameBorder, ProjectedOverlay,
-    ProjectedOverlayContent, ProjectedVisualDefaults, RectUm, RelinkMedia, RenderSnapshot,
-    RenderSnapshotRef, SheetInsertionPosition, SheetRole, SheetSnapshot, SizeUm, VectorUm,
+    EditorProjection, EditorState, FrameSnapshot, FrameStackAction, ImportPhoto,
+    ImportPhotoDisposition, ImportPhotoOutcome, ImportPhotosOutcome, Matrix2, MediaCatalogItem,
+    MediaId, MediaKind, MediaTransform, MediaUsage, NormalizedPan, NumberRange, ParseMediaIdError,
+    PhotoDropTarget, PhotoPlacement, PhotoPlacementMode, PhotoPlacementPlan, PhotoSnapshot,
+    PhotoSourceMetadata, ProjectIntent, ProjectMutationOutcome, ProjectedActiveSides,
+    ProjectedBackground, ProjectedBackgroundContent, ProjectedDisplayUnit, ProjectedFrameBorder,
+    ProjectedOverlay, ProjectedOverlayContent, ProjectedVisualDefaults, RectUm, RelinkMedia,
+    RenderSnapshot, RenderSnapshotRef, SheetInsertionPosition, SheetRole, SheetSnapshot, SizeUm,
+    VectorUm,
 };
 pub use persistent_project::{
     CreateAuthorization, CreateProjectError, CreateProjectRequest, EditableProject,

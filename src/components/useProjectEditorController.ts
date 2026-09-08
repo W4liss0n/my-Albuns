@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PointerDragThreshold, ProjectCorePort } from "../application/projectPorts";
 import type { PrepareImportedMedia } from "../application/mediaPreviews";
 import type { SheetStructureIntent } from "../application/sheetStructure";
-import type { EditorProjection } from "../domain/project";
+import type { EditorProjection, FrameStackAction } from "../domain/project";
 import type {
   AlbumCanvasMode,
   AlbumCanvasProps,
@@ -120,6 +120,11 @@ export function useProjectEditorController({
     [projection.state.album.sheets, navigation.selectedFrameIds],
   );
   const selectedFrame = selectedFrames.length === 1 ? selectedFrames[0] : null;
+  const canArrangeFrames = canvasMode.kind === "sheet-editing" && selectedFrames.length > 0 && !interactionBlocked;
+  const arrangeFrames = (action: FrameStackAction) => {
+    if (!canArrangeFrames) return Promise.resolve(false);
+    return mutations.applyIntent({ kind: "arrangeFrames", frameIds: [...navigation.selectedFrameIds], action });
+  };
   const selectedComposedPhoto = useMemo(
     () =>
       projection.composition.sheets
@@ -283,6 +288,8 @@ export function useProjectEditorController({
   };
 
   return {
+    arrangeFrames,
+    canArrangeFrames,
     message: mutations.message,
     importPending: mutations.importPending,
     imageProcessingProgress: mutations.imageProcessingProgress,
