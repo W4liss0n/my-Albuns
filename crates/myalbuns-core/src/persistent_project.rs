@@ -514,6 +514,38 @@ impl EditableProject {
             .collect())
     }
 
+    /// Resolves a Photo-angle draft through the productive document and composer.
+    /// No revision, History entry or source file is changed by this preview.
+    pub fn preview_photo_angle(
+        &self,
+        edit: &crate::PhotoAngleEdit,
+    ) -> Result<Vec<crate::ComposedFrame>, CoreError> {
+        if !self.session_valid {
+            return Err(CoreError::EditableSessionInvalidated);
+        }
+        let candidate = self.project().with_photo_angle(edit)?;
+        let transient = PersistentProjectSession::from_persisted(
+            crate::project_document::ProjectRevision::new(
+                self.session.project_id(),
+                self.revision(),
+                candidate,
+            ),
+            false,
+        );
+        Ok(persistent_projection::editor_projection(
+            &transient,
+            false,
+            &project_name_from_path(self.project_path()),
+            &self.photo_sources,
+        )
+        .composition
+        .sheets
+        .into_iter()
+        .flat_map(|sheet| sheet.frames)
+        .filter(|frame| edit.frame_ids.contains(&frame.frame_id))
+        .collect())
+    }
+
     /// Freezes one resolved editor projection and only the exact linked
     /// originals referenced by its CompositionPlan at that creative Revision.
     pub fn freeze_rendering(&self) -> FrozenProjectRendering {

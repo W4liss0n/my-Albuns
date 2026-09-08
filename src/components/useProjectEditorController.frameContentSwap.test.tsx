@@ -29,6 +29,8 @@ function swapHarness() {
   const port: ProjectCorePort = {
     load: async () => initial, apply, save, undo, redo,
     readFrameDragThreshold: async () => ({ x: 5, y: 5 }),
+    readPhotoAngleDoubleClickTime: async () => 500,
+    previewPhotoAngle: async () => { throw new Error("Photo angle preview is not configured in this fixture."); },
     previewFrameGeometry: unsupported, saveAs: unsupported,
     validateAlbumInformation: unsupported, applyWithOutcome: unsupported,
     importPhoto: unsupported, resolvePhotoDropTarget: unsupported, relink: unsupported,

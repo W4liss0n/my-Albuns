@@ -253,6 +253,19 @@ pub struct ProjectPhotoTransform {
     user_zoom_scaled: u32,
     quarter_turns: i8,
     mirror_x: bool,
+    angle: PhotoFineAngle,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+struct PhotoFineAngle(i16);
+
+impl PhotoFineAngle {
+    fn new(tenths: i16) -> Result<Self, ()> {
+        (-450..=450)
+            .contains(&tenths)
+            .then_some(Self(tenths))
+            .ok_or(())
+    }
 }
 
 impl Default for ProjectPhotoTransform {
@@ -280,6 +293,19 @@ impl ProjectPhotoTransform {
 
     pub const fn mirror_x(&self) -> bool {
         self.mirror_x
+    }
+
+    pub const fn angle_tenths(&self) -> i16 {
+        self.angle.0
+    }
+
+    pub fn fine_rotation_degrees(&self) -> f32 {
+        self.angle.0 as f32 / 10.0
+    }
+
+    pub(crate) fn with_fine_rotation(mut self, tenths: i16) -> Result<Self, ()> {
+        self.angle = PhotoFineAngle::new(tenths)?;
+        Ok(self)
     }
 
     pub(crate) fn with_orientation(
@@ -311,6 +337,7 @@ impl ProjectPhotoTransform {
             user_zoom_scaled: (user_zoom * TRANSFORM_SCALE).round() as u32,
             quarter_turns: 0,
             mirror_x: false,
+            angle: PhotoFineAngle::default(),
         })
     }
 
@@ -325,6 +352,7 @@ impl ProjectPhotoTransform {
         )?;
         next.quarter_turns = self.quarter_turns;
         next.mirror_x = self.mirror_x;
+        next.angle = self.angle;
         Ok(next)
     }
 }
@@ -910,6 +938,27 @@ impl ProjectDocument {
                     photo.transform.mirror_x = next_mirror
                 }
             }
+        }
+        Ok(candidate)
+    }
+
+    pub(crate) fn with_photo_angle(
+        &self,
+        edit: &crate::PhotoAngleEdit,
+    ) -> Result<Self, crate::CoreError> {
+        let angle = PhotoFineAngle::new(edit.angle_tenths)
+            .map_err(|()| crate::CoreError::InvalidPhotoAngle)?;
+        let (sheet_index, selected) = self
+            .frame_selection(&edit.frame_ids)
+            .map_err(|()| crate::CoreError::InvalidPhotoOrientationSelection)?;
+        let mut candidate = self.clone();
+        for photo in candidate.sheets[sheet_index]
+            .frames
+            .iter_mut()
+            .filter(|frame| selected.contains(&frame.id))
+            .filter_map(|frame| frame.photo.as_mut())
+        {
+            photo.transform.angle = angle;
         }
         Ok(candidate)
     }

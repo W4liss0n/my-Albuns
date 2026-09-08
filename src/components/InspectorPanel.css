@@ -123,6 +123,54 @@
   font-size: var(--ui-font-size-micro);
 }
 
+.photo-angle-control {
+  display: grid;
+  gap: var(--ui-space-1);
+}
+
+.photo-angle-heading,
+.photo-angle-number {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-1);
+  font-size: var(--ui-font-size-control);
+}
+
+.photo-angle-heading {
+  justify-content: space-between;
+}
+
+.photo-angle-number input {
+  width: 64px;
+  min-width: 0;
+  padding: 3px 6px;
+  text-align: right;
+  font-family: var(--ui-font-mono);
+}
+
+.photo-angle-help {
+  margin: 0;
+  color: var(--ui-text-muted);
+  font-size: var(--ui-font-size-micro);
+}
+
+.photo-angle-help[data-invalid="true"] {
+  color: var(--ui-danger);
+}
+
+.photo-angle-slider[data-mixed="true"]::-webkit-slider-thumb {
+  opacity: 0;
+}
+
+.photo-angle-slider[data-mixed="true"]::-moz-range-thumb {
+  opacity: 0;
+}
+
+.photo-angle-slider[data-mixed="true"]:focus-visible {
+  outline: 1px solid var(--ui-focus-neutral);
+  outline-offset: 2px;
+}
+
 .photo-mirror-control[aria-pressed="true"] {
   color: var(--ui-accent);
   border-color: var(--ui-accent);

@@ -25,6 +25,7 @@ const SCHEMA_VERSION_V1: u32 = 1;
 pub(super) const SCHEMA_VERSION_V2: u32 = 2;
 pub(super) const SCHEMA_VERSION_V3: u32 = 3;
 pub(super) const SCHEMA_VERSION_V4: u32 = 4;
+pub(super) const SCHEMA_VERSION_V5: u32 = 5;
 const UTF8_BOM: &[u8] = &[0xEF, 0xBB, 0xBF];
 
 pub(super) struct DecodedProjectRevision {
@@ -41,18 +42,24 @@ pub(super) fn decode(bytes: &[u8]) -> Result<DecodedProjectRevision, DecodeFailu
         SCHEMA_VERSION_V1 => {
             let document: ProjectDocumentV1 = serde_json::from_slice(bytes)
                 .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))?;
-            migrate_v3_to_v4(migrate_v2_to_v3(migrate_v1_to_v2(document)?)?)?
+            migrate_v4_to_v5(migrate_v3_to_v4(migrate_v2_to_v3(migrate_v1_to_v2(
+                document,
+            )?)?)?)?
         }
         SCHEMA_VERSION_V2 => {
             let document = serde_json::from_slice::<ProjectDocumentV2>(bytes)
                 .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))?;
-            migrate_v3_to_v4(migrate_v2_to_v3(document)?)?
+            migrate_v4_to_v5(migrate_v3_to_v4(migrate_v2_to_v3(document)?)?)?
         }
-        SCHEMA_VERSION_V3 => migrate_v3_to_v4(
+        SCHEMA_VERSION_V3 => migrate_v4_to_v5(migrate_v3_to_v4(
             serde_json::from_slice::<ProjectDocumentV3>(bytes)
                 .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))?,
+        )?)?,
+        SCHEMA_VERSION_V4 => migrate_v4_to_v5(
+            serde_json::from_slice::<ProjectDocumentV4>(bytes)
+                .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))?,
         )?,
-        SCHEMA_VERSION_V4 => serde_json::from_slice::<ProjectDocumentV4>(bytes)
+        SCHEMA_VERSION_V5 => serde_json::from_slice::<ProjectDocumentV5>(bytes)
             .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))?,
         _ => unreachable!("classify_header accepts only supported public schemas"),
     };
@@ -69,7 +76,7 @@ pub(super) fn encode(revision: &ProjectRevision) -> Result<Vec<u8>, DecodeFailur
     if revision.revision > MAX_SAFE_INTEGER {
         return Err(document_failure(DocumentFailure::InvalidProjectDocument));
     }
-    let dto = ProjectDocumentV4::from_domain(revision)?;
+    let dto = ProjectDocumentV5::from_domain(revision)?;
     let mut bytes = serde_json::to_vec_pretty(&dto)
         .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))?;
     bytes.push(b'\n');
@@ -107,6 +114,12 @@ pub(super) fn rewrite_project_id(
             document.project_id = project_id;
             serde_json::to_vec_pretty(&document)
         }
+        SCHEMA_VERSION_V5 => {
+            let mut document: ProjectDocumentV5 = serde_json::from_slice(bytes)
+                .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))?;
+            document.project_id = project_id;
+            serde_json::to_vec_pretty(&document)
+        }
         _ => unreachable!("decode accepts only supported public schemas"),
     }
     .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))?;
@@ -130,9 +143,8 @@ fn classify_header(bytes: &[u8]) -> Result<u32, DecodeFailure> {
         return Err(document_failure(DocumentFailure::InvalidProjectDocument));
     };
     match version {
-        SCHEMA_VERSION_V1 | SCHEMA_VERSION_V2 | SCHEMA_VERSION_V3 | SCHEMA_VERSION_V4 => {
-            Ok(version)
-        }
+        SCHEMA_VERSION_V1 | SCHEMA_VERSION_V2 | SCHEMA_VERSION_V3 | SCHEMA_VERSION_V4
+        | SCHEMA_VERSION_V5 => Ok(version),
         0 => Err(document_failure(DocumentFailure::UnsupportedLegacySchema {
             version,
         })),
@@ -142,8 +154,8 @@ fn classify_header(bytes: &[u8]) -> Result<u32, DecodeFailure> {
     }
 }
 
-fn map_document(document: ProjectDocumentV4) -> Result<ProjectRevision, DecodeFailure> {
-    if document.document_type != DOCUMENT_TYPE || document.schema_version != SCHEMA_VERSION_V4 {
+fn map_document(document: ProjectDocumentV5) -> Result<ProjectRevision, DecodeFailure> {
+    if document.document_type != DOCUMENT_TYPE || document.schema_version != SCHEMA_VERSION_V5 {
         return Err(document_failure(DocumentFailure::InvalidProjectDocument));
     }
     if document.revision > MAX_SAFE_INTEGER {
@@ -257,7 +269,7 @@ fn map_media(media: MediaRefV2) -> Result<MediaRef, DecodeFailure> {
     Ok(MediaRef::new(parse_uuid_v4(&media.id)?, kind, path))
 }
 
-fn map_sheet(sheet: SheetWithFrames<PhotoTransformV4>) -> Result<ProjectSheet, DecodeFailure> {
+fn map_sheet(sheet: SheetWithFrames<PhotoTransformV5>) -> Result<ProjectSheet, DecodeFailure> {
     let frames = sheet
         .frames
         .into_iter()
@@ -270,7 +282,7 @@ fn map_sheet(sheet: SheetWithFrames<PhotoTransformV4>) -> Result<ProjectSheet, D
     ))
 }
 
-fn map_frame(frame: FrameWithPhoto<PhotoTransformV4>) -> Result<ProjectFrame, DecodeFailure> {
+fn map_frame(frame: FrameWithPhoto<PhotoTransformV5>) -> Result<ProjectFrame, DecodeFailure> {
     let photo = frame
         .photo
         .map(|photo| {
@@ -284,6 +296,9 @@ fn map_frame(frame: FrameWithPhoto<PhotoTransformV4>) -> Result<ProjectFrame, De
                 .and_then(|transform| {
                     transform
                         .with_orientation(photo.transform.quarter_turns, photo.transform.mirror_x)
+                        .and_then(|transform| {
+                            transform.with_fine_rotation(photo.transform.angle_tenths)
+                        })
                 })
                 .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))?,
             ))
@@ -443,12 +458,13 @@ struct FramedProjectDocument<Transform> {
 
 type ProjectDocumentV3 = FramedProjectDocument<PhotoTransformV3>;
 type ProjectDocumentV4 = FramedProjectDocument<PhotoTransformV4>;
+type ProjectDocumentV5 = FramedProjectDocument<PhotoTransformV5>;
 
-impl ProjectDocumentV4 {
+impl ProjectDocumentV5 {
     fn from_domain(revision: &ProjectRevision) -> Result<Self, DecodeFailure> {
         Ok(Self {
             document_type: DOCUMENT_TYPE.into(),
-            schema_version: SCHEMA_VERSION_V4,
+            schema_version: SCHEMA_VERSION_V5,
             project_id: revision.project_id.hyphenated().to_string(),
             revision: revision.revision,
             project: FramedProjectPayload::from_domain(&revision.project)?,
@@ -483,7 +499,7 @@ struct FramedProjectPayload<Transform> {
     sheets: Vec<SheetWithFrames<Transform>>,
 }
 
-impl FramedProjectPayload<PhotoTransformV4> {
+impl FramedProjectPayload<PhotoTransformV5> {
     fn from_domain(project: &ProjectDocument) -> Result<Self, DecodeFailure> {
         Ok(Self {
             document: DocumentSettingsV1::from_domain(project.document()),
@@ -530,44 +546,68 @@ fn migrate_v3_to_v4(document: ProjectDocumentV3) -> Result<ProjectDocumentV4, De
     if document.document_type != DOCUMENT_TYPE || document.schema_version != SCHEMA_VERSION_V3 {
         return Err(document_failure(DocumentFailure::InvalidProjectDocument));
     }
-    Ok(ProjectDocumentV4 {
-        document_type: document.document_type,
-        schema_version: SCHEMA_VERSION_V4,
-        project_id: document.project_id,
-        revision: document.revision,
-        project: FramedProjectPayload {
-            document: document.project.document,
-            visual_defaults: document.project.visual_defaults,
-            media: document.project.media,
-            sheets: document
-                .project
-                .sheets
-                .into_iter()
-                .map(|sheet| SheetWithFrames {
-                    id: sheet.id,
-                    active_sides: sheet.active_sides,
-                    frames: sheet
-                        .frames
-                        .into_iter()
-                        .map(|frame| FrameWithPhoto {
-                            id: frame.id,
-                            rect: frame.rect,
-                            photo: frame.photo.map(|photo| PhotoWithTransform {
-                                media_id: photo.media_id,
-                                transform: PhotoTransformV4 {
-                                    pan_x: photo.transform.pan_x,
-                                    pan_y: photo.transform.pan_y,
-                                    user_zoom: photo.transform.user_zoom,
-                                    quarter_turns: 0,
-                                    mirror_x: false,
-                                },
-                            }),
-                        })
-                        .collect(),
-                })
-                .collect(),
-        },
-    })
+    Ok(
+        document.map_transforms(SCHEMA_VERSION_V4, |old| PhotoTransformV4 {
+            pan_x: old.pan_x,
+            pan_y: old.pan_y,
+            user_zoom: old.user_zoom,
+            quarter_turns: 0,
+            mirror_x: false,
+        }),
+    )
+}
+
+fn migrate_v4_to_v5(document: ProjectDocumentV4) -> Result<ProjectDocumentV5, DecodeFailure> {
+    if document.document_type != DOCUMENT_TYPE || document.schema_version != SCHEMA_VERSION_V4 {
+        return Err(document_failure(DocumentFailure::InvalidProjectDocument));
+    }
+    Ok(
+        document.map_transforms(SCHEMA_VERSION_V5, |old| PhotoTransformV5 {
+            pan_x: old.pan_x,
+            pan_y: old.pan_y,
+            user_zoom: old.user_zoom,
+            quarter_turns: old.quarter_turns,
+            mirror_x: old.mirror_x,
+            angle_tenths: 0,
+        }),
+    )
+}
+
+impl<T> FramedProjectDocument<T> {
+    fn map_transforms<U>(self, version: u32, convert: impl Fn(T) -> U) -> FramedProjectDocument<U> {
+        FramedProjectDocument {
+            document_type: self.document_type,
+            schema_version: version,
+            project_id: self.project_id,
+            revision: self.revision,
+            project: FramedProjectPayload {
+                document: self.project.document,
+                visual_defaults: self.project.visual_defaults,
+                media: self.project.media,
+                sheets: self
+                    .project
+                    .sheets
+                    .into_iter()
+                    .map(|sheet| SheetWithFrames {
+                        id: sheet.id,
+                        active_sides: sheet.active_sides,
+                        frames: sheet
+                            .frames
+                            .into_iter()
+                            .map(|frame| FrameWithPhoto {
+                                id: frame.id,
+                                rect: frame.rect,
+                                photo: frame.photo.map(|photo| PhotoWithTransform {
+                                    media_id: photo.media_id,
+                                    transform: convert(photo.transform),
+                                }),
+                            })
+                            .collect(),
+                    })
+                    .collect(),
+            },
+        }
+    }
 }
 
 fn migrate_v2_to_v3(document: ProjectDocumentV2) -> Result<ProjectDocumentV3, DecodeFailure> {
@@ -866,7 +906,7 @@ impl SheetWithFrames<PhotoTransformV3> {
     }
 }
 
-impl SheetWithFrames<PhotoTransformV4> {
+impl SheetWithFrames<PhotoTransformV5> {
     fn from_domain(sheet: &ProjectSheet) -> Self {
         Self {
             id: sheet.id().hyphenated().to_string(),
@@ -888,7 +928,7 @@ struct FrameWithPhoto<Transform> {
     photo: Option<PhotoWithTransform<Transform>>,
 }
 
-impl FrameWithPhoto<PhotoTransformV4> {
+impl FrameWithPhoto<PhotoTransformV5> {
     fn from_domain(frame: &ProjectFrame) -> Self {
         Self {
             id: frame.id().hyphenated().to_string(),
@@ -925,11 +965,11 @@ struct PhotoWithTransform<Transform> {
     transform: Transform,
 }
 
-impl PhotoWithTransform<PhotoTransformV4> {
+impl PhotoWithTransform<PhotoTransformV5> {
     fn from_domain(photo: &ProjectPhoto) -> Self {
         Self {
             media_id: photo.media_id().hyphenated().to_string(),
-            transform: PhotoTransformV4::from_domain(photo.transform()),
+            transform: PhotoTransformV5::from_domain(photo.transform()),
         }
     }
 }
@@ -952,7 +992,18 @@ struct PhotoTransformV4 {
     mirror_x: bool,
 }
 
-impl PhotoTransformV4 {
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct PhotoTransformV5 {
+    pan_x: f32,
+    pan_y: f32,
+    user_zoom: f32,
+    quarter_turns: i8,
+    mirror_x: bool,
+    angle_tenths: i16,
+}
+
+impl PhotoTransformV5 {
     fn from_domain(transform: ProjectPhotoTransform) -> Self {
         Self {
             pan_x: transform.pan_x(),
@@ -960,6 +1011,7 @@ impl PhotoTransformV4 {
             user_zoom: transform.user_zoom(),
             quarter_turns: transform.quarter_turns(),
             mirror_x: transform.mirror_x(),
+            angle_tenths: transform.angle_tenths(),
         }
     }
 }

@@ -45,7 +45,7 @@ Undo/Redo.
 ## Modelo persistente v3
 
 `schemaVersion: 3` é a versão deste primeiro recorte. A versão pública atual é a
-[v4, que acrescenta Giro e Espelhamento](0021-orientacao-de-fotos-e-projeto-v4.md).
+[v5, que inclui Giro, Espelhamento e Ângulo fino](0022-angulo-fino-da-foto-e-projeto-v5.md).
 O DTO fechado v3 conserva o envelope,
 documento, Padrões visuais, mídias e Lâminas anteriores e acrescenta a cada
 Lâmina uma lista ordenada de Frames:

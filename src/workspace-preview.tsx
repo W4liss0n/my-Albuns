@@ -23,6 +23,7 @@ import {
 import type { CanvasGraphicsDiagnosticProbe } from "./components/canvasGraphicsDiagnosticProbeContext";
 import type {
   EditorProjection,
+  PhotoAngleEdit,
   ProjectIntent,
   ProjectMutationOutcome,
 } from "./domain/project";
@@ -141,6 +142,14 @@ const projectCorePort: ProjectCorePort = {
   applyWithOutcome: async (intent) => applyPreviewIntent(intent),
   importPhoto: async () => ({ kind: "cancelled", projection }),
   readFrameDragThreshold: async () => ({ x: 5, y: 5 }),
+  readPhotoAngleDoubleClickTime: async () => 500,
+  previewPhotoAngle: async (edit) => {
+    const sample = photoOrientationCorpus.anglePreviews.find((item) =>
+      item.from === photoOrientationStateName() && sameAngleEdit(item.edit, edit));
+    if (frameContext !== "orientation" || !sample) throw new Error("Ângulo fora do corpus desta prévia.");
+    document.body.dataset.photoAnglePreview = String(edit.angleTenths);
+    return structuredClone(sample.frames);
+  },
   previewFrameGeometry: async () => { throw new Error("Frame geometry preview is not configured in this fixture."); },
   // Replay Core-produced point probes with tolerance for CSS pixel rounding.
   resolvePhotoDropTarget: async (sheetId, xUm, yUm) => frameContext === "swap"
@@ -410,6 +419,20 @@ function configurePhysicalPreview(
 }
 
 function applyPreviewIntent(intent: ProjectIntent): ProjectMutationOutcome {
+  if (intent.kind === "setPhotoAngle") {
+    const current = photoOrientationStateName();
+    const selected = projection.state.album.sheets.flatMap((sheet) => sheet.frames)
+      .filter((frame) => intent.edit.frameIds.includes(frame.id) && frame.photo);
+    if (selected.every((frame) => Math.round(frame.photo!.transform.fineRotationDegrees * 10) === intent.edit.angleTenths)) {
+      return { projection, affectedFrameId: null, affectedSheetId: null };
+    }
+    const transition = photoOrientationCorpus.angleTransitions.find((item) =>
+      item.from === current && sameAngleEdit(item.edit, intent.edit));
+    if (frameContext !== "orientation" || !transition) throw new Error("Comando fora do corpus de Ângulo desta prévia.");
+    projection = finalizePhysicalPreviewMutation(structuredClone(photoOrientationCorpus.states[transition.to]), structuredClone(projection));
+    exposePhotoOrientationState();
+    return { projection, affectedFrameId: null, affectedSheetId: null };
+  }
   if (intent.kind === "orientPhotos") {
     const current = photoOrientationStateName();
     const transition = photoOrientationCorpus.transitions.find((item) => item.from === current && item.action === intent.action &&
@@ -684,9 +707,15 @@ function photoOrientationStateName() {
     JSON.stringify(state.state.album) === JSON.stringify(projection.state.album))?.[0] ?? "unknown";
 }
 
+function sameAngleEdit(left: PhotoAngleEdit, right: PhotoAngleEdit) {
+  return left.angleTenths === right.angleTenths && [...left.frameIds].sort().join() === [...right.frameIds].sort().join();
+}
+
 function exposePhotoOrientationState() {
   document.body.dataset.photoOrientation = photoOrientationStateName();
   document.body.dataset.orientationSelection = useEditorView.getState().selectedFrameIds.join(",");
+  document.body.dataset.photoOrientationHistory = `${undoStack.length},${redoStack.length}`;
+  delete document.body.dataset.photoAnglePreview;
 }
 
 function exposeFrameSwapState() {

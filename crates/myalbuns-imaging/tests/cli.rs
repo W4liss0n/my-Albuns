@@ -1740,13 +1740,14 @@ fn productive_snapshot(initial: InitialProject) -> RenderSnapshot {
 }
 
 fn productive_photo_snapshot(photo_path: &Path, overlay_path: Option<&Path>) -> RenderSnapshot {
-    oriented_photo_snapshot(photo_path, overlay_path, &[])
+    oriented_photo_snapshot(photo_path, overlay_path, &[], 0)
 }
 
 fn oriented_photo_snapshot(
     photo_path: &Path,
     overlay_path: Option<&Path>,
     actions: &[myalbuns_core::PhotoOrientationAction],
+    angle_tenths: i16,
 ) -> RenderSnapshot {
     let initial =
         small_initial_project(100).with_personalization(InitialProjectPersonalization::new(
@@ -1802,6 +1803,14 @@ fn oriented_photo_snapshot(
             })
             .unwrap();
     }
+    project
+        .apply(ProjectIntent::SetPhotoAngle {
+            edit: myalbuns_core::PhotoAngleEdit {
+                frame_ids: vec![added.affected_frame_id.unwrap()],
+                angle_tenths,
+            },
+        })
+        .unwrap();
     project.render_snapshot()
 }
 
@@ -1830,7 +1839,7 @@ fn processor_exports_quarter_turn_before_horizontal_mirroring() {
     .into_iter()
     .enumerate()
     {
-        let snapshot = oriented_photo_snapshot(&source_path, None, &actions);
+        let snapshot = oriented_photo_snapshot(&source_path, None, &actions, 0);
         let frame = snapshot.composition.sheets[0].frames[0].clone();
         let media_id = frame.photo.as_ref().unwrap().media_id;
         let output = root.path().join(format!("orientation-{index}.jpg"));
@@ -1866,6 +1875,73 @@ fn processor_exports_quarter_turn_before_horizontal_mirroring() {
                     .all(|(a, e)| a.abs_diff(e) < 40),
                 "case {index}, quadrant {x_fraction},{y_fraction}: {actual:?}, expected {:?}",
                 colors[color_index]
+            );
+        }
+    }
+    assert_eq!(std::fs::read(source_path).unwrap(), original);
+}
+
+#[test]
+fn processor_exports_positive_fine_angle_counterclockwise_before_mirroring() {
+    use myalbuns_core::PhotoOrientationAction::{
+        RotateCounterClockwise as Rotate, ToggleHorizontalMirror as Mirror,
+    };
+    let root = tempfile::tempdir().unwrap();
+    let source_path = root.path().join("fine-angle-quadrants.jpg");
+    let colors = [[240, 16, 16], [16, 180, 32], [16, 32, 240], [240, 220, 16]];
+    RgbImage::from_fn(40, 20, |x, y| {
+        Rgb(colors[usize::from(x >= 20) + 2 * usize::from(y >= 10)])
+    })
+    .save_with_format(&source_path, ImageFormat::Jpeg)
+    .unwrap();
+    let original = std::fs::read(&source_path).unwrap();
+    // Hand-worked cardinal samples: top, right, bottom, left of the Frame center.
+    for (index, (actions, angle, expected)) in [
+        (vec![], 450, [1, 3, 2, 0]),
+        (vec![], -450, [0, 1, 3, 2]),
+        (vec![Rotate], 450, [3, 2, 0, 1]),
+        (vec![Rotate, Mirror], 450, [3, 1, 0, 2]),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let snapshot = oriented_photo_snapshot(&source_path, None, &actions, angle);
+        let frame = snapshot.composition.sheets[0].frames[0].clone();
+        let output = root.path().join(format!("fine-angle-{index}.jpg"));
+        let result = invoke_real_processor(
+            snapshot,
+            &output,
+            "fine-angle-pixels",
+            100,
+            vec![
+                RenderSource::new(frame.photo.as_ref().unwrap().media_id, source_path.clone())
+                    .unwrap(),
+            ],
+        );
+        assert!(
+            result.status.success(),
+            "{}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+        let rendered = image::open(output).unwrap().to_rgb8();
+        for ((x_fraction, y_fraction), color_index) in
+            [(0.5, 0.2), (0.8, 0.5), (0.5, 0.8), (0.2, 0.5)]
+                .into_iter()
+                .zip(expected)
+        {
+            let x = ((frame.clip_rect.x as f64 + frame.clip_rect.width as f64 * x_fraction) * 100.0
+                / 25_400.0) as u32;
+            let y = ((frame.clip_rect.y as f64 + frame.clip_rect.height as f64 * y_fraction)
+                * 100.0
+                / 25_400.0) as u32;
+            let actual = rendered.get_pixel(x, y);
+            assert!(
+                actual
+                    .0
+                    .iter()
+                    .zip(colors[color_index])
+                    .all(|(a, e)| a.abs_diff(e) < 40),
+                "case {index}, cardinal point {x_fraction},{y_fraction}: {actual:?}"
             );
         }
     }

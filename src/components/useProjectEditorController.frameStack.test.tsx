@@ -27,6 +27,8 @@ test.each([false, true])("ordering followed by Save and Undo uses the queue when
   const port: ProjectCorePort = {
     load: async () => initial, apply, save, undo,
     readFrameDragThreshold: async () => ({ x: 5, y: 5 }),
+    readPhotoAngleDoubleClickTime: async () => 500,
+    previewPhotoAngle: async () => { throw new Error("Photo angle preview is not configured in this fixture."); },
     previewFrameGeometry: unsupported, redo: unsupported, saveAs: unsupported,
     validateAlbumInformation: unsupported, applyWithOutcome: unsupported,
     importPhoto: unsupported, resolvePhotoDropTarget: unsupported, relink: unsupported,

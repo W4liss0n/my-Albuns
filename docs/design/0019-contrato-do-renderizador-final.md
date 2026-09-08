@@ -220,7 +220,11 @@ Q32.32 é uma string decimal canônica para não perder precisão em JavaScript.
 No sistema físico, X cresce para a direita e Y para baixo. Para Giro visual
 anti-horário, `R = [[C, S], [-S, C]]`, onde `C` e `S` são as entradas Q32.32
 da tabela. Pan positivo move o centro da Foto nos eixos locais já girados;
-Espelhamento não inverte o sentido do controle. Para eliminar qualquer escolha
+Espelhamento não inverte o sentido do controle. Conforme o refinamento do
+[Ângulo fino](0022-angulo-fino-da-foto-e-projeto-v5.md), os eixos de Pan usam
+`panAngleTenths = giroTenths + (mirrorHorizontal ? -angleTenths : angleTenths)`.
+`Cp` e `Sp` são as entradas Q32.32 correspondentes a esse ângulo. A rotação
+da imagem mantém `C` e `S` da rotação total. Para eliminar qualquer escolha
 implícita de quantização, a direta e a inversa são construídas exatamente nesta
 ordem (`max` compara os inteiros Q32.32 e cada chamada arredonda uma vez):
 
@@ -241,8 +245,8 @@ panV = qMul(qRatio(panYMillionths, 1.000.000), overflowV)
 
 centerX = qInt(innerXUm) + qDiv(W, qInt(2))
 centerY = qInt(innerYUm) + qDiv(H, qInt(2))
-photoCenterX = centerX + linearQ(C, panU, S, panV)
-photoCenterY = centerY + linearQ(-S, panU, C, panV)
+photoCenterX = centerX + linearQ(Cp, panU, Sp, panV)
+photoCenterY = centerY + linearQ(-Sp, panU, Cp, panV)
 
 Dxx = qMul(qMul(m, C), scale)
 Dxy = qMul(qMul(m, S), scale)
