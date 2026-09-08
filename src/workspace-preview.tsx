@@ -34,6 +34,7 @@ import manualFrameCorpus from "../tests/fixtures/manual-frame-cases.json";
 import { frameDeletionCorpus } from "./test/frameDeletionPreview";
 import { frameContentSwapCorpus } from "./test/frameContentSwapPreview";
 import { frameClipboardCorpus } from "./test/frameClipboardPreview";
+import { sheetSideSwapCorpus } from "./test/sheetSideSwapPreview";
 import { continuousCanvasScale, createCanvasSheetPresentation } from "./components/canvasGeometry";
 import { createCanvasSheetViewGeometry, createNormalCanvasLayout } from "./components/canvasSheetViewGeometry";
 import "./ui/theme.css";
@@ -41,6 +42,7 @@ import "./ui/ui.css";
 
 const previewParameters = new URLSearchParams(window.location.search);
 const frameContext = previewParameters.get("frame");
+const sideSwapCase = sheetSideSwapCorpus.cases.find((item) => item.name === (previewParameters.get("side-swap") ?? "mixed"))!;
 const frameClipboardCase = frameClipboardCorpus.cases.find((item) => item.name === (previewParameters.get("clipboard") ?? "same-group"))!;
 const manualFrameCase = manualFrameCorpus.cases.find((item) => item.name === (previewParameters.get("surface") ?? "double"));
 const frameDeletionCase = frameDeletionCorpus.cases.find((item) => item.name === (previewParameters.get("deletion") ?? "group"));
@@ -103,6 +105,14 @@ if (frameContext === "clipboard") {
     focusedSheetId: sheetId, centeredSheetId: sheetId, selectedFrameIds: frameClipboardCase.selectedFrameIds });
   exposeFrameClipboardState();
   useEditorView.subscribe(exposeFrameClipboardState);
+}
+
+if (frameContext === "side-swap") {
+  const centeredSheetId = previewParameters.get("centered") ?? sideSwapCase.targetSheetId;
+  useEditorView.setState({ projectId: projection.state.projectId, editingSheetId: null,
+    focusedSheetId: centeredSheetId, centeredSheetId, selectedFrameIds: [] });
+  exposeSheetSideSwapState();
+  useEditorView.subscribe(exposeSheetSideSwapState);
 }
 
 const projectCorePort: ProjectCorePort = {
@@ -258,6 +268,7 @@ function createPreviewProjection(
   decorativeMode: string | null,
   structureMode: string | null,
 ): EditorProjection {
+  if (frameMode === "side-swap") return structuredClone(sideSwapCase.before ?? sheetSideSwapCorpus.before);
   if (frameMode === "clipboard") return structuredClone(frameClipboardCase.before ?? frameClipboardCorpus.before);
   if (frameMode === "swap") return structuredClone(frameContentSwapCorpus.before);
   if (frameMode === "deletion") return structuredClone(frameDeletionCorpus.before);
@@ -383,6 +394,18 @@ function configurePhysicalPreview(
 }
 
 function applyPreviewIntent(intent: ProjectIntent): ProjectMutationOutcome {
+  if (intent.kind === "swapSheetSides") {
+    if (frameContext !== "side-swap" || intent.sheetId !== sideSwapCase.targetSheetId || sideSwapCase.outcome === "unavailable") {
+      throw new Error("Comando fora do cenário de Troca de lados desta prévia.");
+    }
+    if (sideSwapCase.outcome === "changed") {
+      const before = sideSwapCase.before ?? sheetSideSwapCorpus.before;
+      const next = JSON.stringify(projection.state.album) === JSON.stringify(before.state.album) ? sideSwapCase.after : before;
+      projection = finalizePhysicalPreviewMutation(structuredClone(next), structuredClone(projection));
+    }
+    exposeSheetSideSwapState();
+    return { projection, affectedFrameId: null, affectedSheetId: null };
+  }
   if (intent.kind === "copyFrames") {
     if (frameContext !== "clipboard" || [...intent.frameIds].sort().join() !== [...frameClipboardCase.selectedFrameIds].sort().join()) {
       throw new Error("Seleção fora do cenário de cópia desta prévia.");
@@ -599,6 +622,7 @@ function restorePreviewHistory(
   if (frameContext === "deletion") exposeFrameDeletionState();
   if (frameContext === "swap") exposeFrameSwapState();
   if (frameContext === "clipboard") exposeFrameClipboardState();
+  if (frameContext === "side-swap") exposeSheetSideSwapState();
   return projection;
 }
 
@@ -618,6 +642,15 @@ function exposeFrameClipboardState() {
   document.body.dataset.clipboardCount = String(projection.state.album.sheets.reduce((count, sheet) => count + sheet.frames.length, 0));
   document.body.dataset.clipboardAvailable = String(projection.canPasteFrames);
   document.body.dataset.clipboardEditingSheet = view.editingSheetId ?? "none";
+}
+
+function exposeSheetSideSwapState() {
+  const view = useEditorView.getState();
+  const before = sideSwapCase.before ?? sheetSideSwapCorpus.before;
+  document.body.dataset.sideSwapState = JSON.stringify(projection.state.album) === JSON.stringify(before.state.album) ? "before" : "after";
+  document.body.dataset.sideSwapHistory = `${projection.state.canUndo},${projection.state.canRedo}`;
+  document.body.dataset.sideSwapCentered = view.centeredSheetId ?? "none";
+  document.body.dataset.sideSwapEditing = view.editingSheetId ?? "none";
 }
 
 function exposeFrameSwapState() {

@@ -47,6 +47,7 @@ export const SHEET_VISUAL_STYLE = {
     hoverTransitionDurationMs: 140,
     hoverTransitionFrameMs: 16,
     placeholderActionOpacity: 0.8,
+    disabledActionOpacity: 0.35,
     pageFontSizePx: 12.5,
     numberFontSizePx: 12.5,
   },

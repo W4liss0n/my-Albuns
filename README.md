@@ -84,6 +84,8 @@ Material técnico não normativo, conservado como histórico das avaliações.
 
 O mapa de implementação está no [GitHub, issue #1](https://github.com/W4liss0n/my-Albuns/issues/1), com tickets de entrega e seus bloqueadores. Os arquivos antigos em `.scratch/programa-diagramacao/` são históricos.
 
+A [Troca de lados da Lâmina](docs/research/2026-09-08-troca-de-lados-da-lamina.md) ativa o botão de duas setas na Barra. Frames contidos em uma Página passam para a posição equivalente da oposta; Travessias centrais, Fotos, ajustes e Numeração de Página são preservados. A troca forma uma ação de Undo/Redo e persiste no Salvamento, na reabertura e na composição da Exportação.
+
 A [cópia e colagem de Frames](docs/research/2026-09-08-copiar-e-colar-frames.md) acrescenta Copiar e Colar no menu Editar e nos atalhos Ctrl+C/V. A cópia da seleção fica na Janela do Projeto; a colagem cria novas ocorrências na Lâmina isolada, adapta o conjunto à superfície e ao lado lógico de destino e constitui uma ação de Undo/Redo. Fotos e placeholders preservam seus vínculos e ajustes, sem copiar Originais ou Cache.
 
 A [troca de conteúdo entre dois Frames](docs/research/2026-09-08-troca-de-conteudo-de-frames.md) permite trocar duas Fotos ou mover uma Foto para um placeholder por Editar e pelo menu contextual. A [troca no Modo normal](docs/research/2026-09-08-troca-de-conteudo-no-modo-normal.md) também permite arrastar a Foto sobre outro Frame, inclusive em outra Lâmina do mesmo Projeto. Cada ocorrência leva seu vínculo, Pan e Zoom; identidade, geometria, estilo e ordem permanecem nos Frames. A seleção é preservada e a troca forma uma ação de Undo/Redo, com Salvamento e reabertura.

@@ -3627,6 +3627,350 @@
           "selector": "[role=\"menuitem\"][aria-label=\"Refazer\"]"
         }
       ]
+    },
+    {
+      "id": "workspace-sheet-side-swap-mixed",
+      "title": "Troca de lados — Fotos e placeholders mudam de Página, Travessia central permanece",
+      "implementationPath": "/workspace-preview.html?frame=side-swap&side-swap=mixed",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-side-swap",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A Barra segue a referência vigente; a especificação aceita define a translação dos Frames entre Páginas e a preservação de Travessias centrais. Esta prévia reproduz projeções produzidas e verificadas pelo Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "body[data-side-swap-state=\"after\"][data-side-swap-editing=\"none\"]",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+        },
+        {
+          "type": "hover",
+          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-side-swap-before",
+      "title": "Troca de lados — composição antes da troca",
+      "implementationPath": "/workspace-preview.html?frame=side-swap&side-swap=mixed",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-side-swap",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A Barra segue a referência vigente; a especificação aceita define a translação dos Frames entre Páginas e a preservação de Travessias centrais. Esta prévia reproduz projeções produzidas e verificadas pelo Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "body[data-side-swap-state=\"before\"][data-side-swap-editing=\"none\"]",
+      "actions": [
+        {
+          "type": "hover",
+          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-side-swap-undo",
+      "title": "Troca de lados — Desfazer restaura todas as posições em uma ação",
+      "implementationPath": "/workspace-preview.html?frame=side-swap&side-swap=mixed",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-side-swap",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A Barra segue a referência vigente; a especificação aceita define a translação dos Frames entre Páginas e a preservação de Travessias centrais. Esta prévia reproduz projeções produzidas e verificadas pelo Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "body[data-side-swap-state=\"before\"][data-side-swap-editing=\"none\"][data-side-swap-history=\"false,true\"]",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Desfazer\"]"
+        },
+        {
+          "type": "hover",
+          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-side-swap-redo",
+      "title": "Troca de lados — Refazer reaplica a troca inteira",
+      "implementationPath": "/workspace-preview.html?frame=side-swap&side-swap=mixed",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-side-swap",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A Barra segue a referência vigente; a especificação aceita define a translação dos Frames entre Páginas e a preservação de Travessias centrais. Esta prévia reproduz projeções produzidas e verificadas pelo Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "body[data-side-swap-state=\"after\"][data-side-swap-editing=\"none\"]",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Desfazer\"]"
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Refazer\"]"
+        },
+        {
+          "type": "hover",
+          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-side-swap-keyboard",
+      "title": "Troca de lados — ativação pelo teclado e foco visível",
+      "implementationPath": "/workspace-preview.html?frame=side-swap&side-swap=mixed",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-side-swap",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A Barra segue a referência vigente; a especificação aceita define a translação dos Frames entre Páginas e a preservação de Travessias centrais. Esta prévia reproduz projeções produzidas e verificadas pelo Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "body[data-side-swap-state=\"after\"][data-side-swap-editing=\"none\"]",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-side-swap-explicit-sheet",
+      "title": "Troca de lados — troca na outra Lâmina preserva a centralização",
+      "implementationPath": "/workspace-preview.html?frame=side-swap&side-swap=mixed&centered=sheet-002",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-side-swap",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A Barra segue a referência vigente; a especificação aceita define a translação dos Frames entre Páginas e a preservação de Travessias centrais. Esta prévia reproduz projeções produzidas e verificadas pelo Core."
+      },
+      "viewport": {
+        "width": 1800,
+        "height": 600
+      },
+      "readySelector": "body[data-side-swap-state=\"after\"][data-side-swap-editing=\"none\"][data-side-swap-centered=\"sheet-002\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": "body[data-side-swap-centered=\"sheet-002\"] .pixi-canvas"
+        },
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+        },
+        {
+          "type": "hover",
+          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-side-swap-right-page",
+      "title": "Troca de lados — Página única direita deixa o comando indisponível",
+      "implementationPath": "/workspace-preview.html?frame=side-swap&side-swap=right-page",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-side-swap",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A Barra segue a referência vigente; a especificação aceita define a translação dos Frames entre Páginas e a preservação de Travessias centrais. Esta prévia reproduz projeções produzidas e verificadas pelo Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "body[data-side-swap-state=\"before\"][data-side-swap-editing=\"none\"][data-side-swap-history=\"false,false\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]:disabled"
+        },
+        {
+          "type": "pointer-click",
+          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+        },
+        {
+          "type": "hover",
+          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-side-swap-left-page",
+      "title": "Troca de lados — Página única esquerda deixa o comando indisponível",
+      "implementationPath": "/workspace-preview.html?frame=side-swap&side-swap=left-page",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-side-swap",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A Barra segue a referência vigente; a especificação aceita define a translação dos Frames entre Páginas e a preservação de Travessias centrais. Esta prévia reproduz projeções produzidas e verificadas pelo Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "body[data-side-swap-state=\"before\"][data-side-swap-editing=\"none\"][data-side-swap-history=\"false,false\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": "[aria-label=\"Trocar lados da Lâmina 02\"]:disabled"
+        },
+        {
+          "type": "pointer-click",
+          "selector": "[aria-label=\"Trocar lados da Lâmina 02\"]"
+        },
+        {
+          "type": "hover",
+          "selector": "[aria-label=\"Trocar lados da Lâmina 02\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-side-swap-empty",
+      "title": "Troca de lados — Lâmina vazia mantém o Histórico",
+      "implementationPath": "/workspace-preview.html?frame=side-swap&side-swap=empty",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-side-swap",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A Barra segue a referência vigente; a especificação aceita define a translação dos Frames entre Páginas e a preservação de Travessias centrais. Esta prévia reproduz projeções produzidas e verificadas pelo Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "body[data-side-swap-state=\"before\"][data-side-swap-editing=\"none\"][data-side-swap-history=\"false,false\"]",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+        },
+        {
+          "type": "hover",
+          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-side-swap-only-crossings",
+      "title": "Troca de lados — somente Travessias centrais mantêm o Histórico",
+      "implementationPath": "/workspace-preview.html?frame=side-swap&side-swap=only-crossings",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-side-swap",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A Barra segue a referência vigente; a especificação aceita define a translação dos Frames entre Páginas e a preservação de Travessias centrais. Esta prévia reproduz projeções produzidas e verificadas pelo Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "body[data-side-swap-state=\"before\"][data-side-swap-editing=\"none\"][data-side-swap-history=\"false,false\"]",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+        },
+        {
+          "type": "hover",
+          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-side-swap-scale-125",
+      "title": "Troca de lados — botão e composição a 125%",
+      "implementationPath": "/workspace-preview.html?frame=side-swap&side-swap=mixed&scale=1.25",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-side-swap",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A Barra segue a referência vigente; a especificação aceita define a translação dos Frames entre Páginas e a preservação de Travessias centrais. Esta prévia reproduz projeções produzidas e verificadas pelo Core."
+      },
+      "viewport": {
+        "width": 1800,
+        "height": 1000
+      },
+      "readySelector": "body[data-side-swap-state=\"after\"][data-side-swap-editing=\"none\"]",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+        },
+        {
+          "type": "hover",
+          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-side-swap-scale-150",
+      "title": "Troca de lados — botão e composição a 150%",
+      "implementationPath": "/workspace-preview.html?frame=side-swap&side-swap=mixed&scale=1.5",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-side-swap",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A Barra segue a referência vigente; a especificação aceita define a translação dos Frames entre Páginas e a preservação de Travessias centrais. Esta prévia reproduz projeções produzidas e verificadas pelo Core."
+      },
+      "viewport": {
+        "width": 2160,
+        "height": 1200
+      },
+      "readySelector": "body[data-side-swap-state=\"after\"][data-side-swap-editing=\"none\"]",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+        },
+        {
+          "type": "hover",
+          "selector": "[aria-label=\"Trocar lados da Lâmina 01\"]"
+        }
+      ]
     }
   ]
 }
