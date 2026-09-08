@@ -22,6 +22,7 @@ const original = structuredClone(composition.sheets[0].frames[0]);
 const noop = () => undefined;
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 const trace: ReturnType<typeof sample>[] = [];
+const completion = { committedAt: null as number | null, presentedAt: null as number | null };
 const input: AlbumCanvasProps = {
   projectId: "frame-gesture-regression",
   mode: { kind: "sheet-editing", sheetId: "sheet-001" },
@@ -41,9 +42,12 @@ const input: AlbumCanvasProps = {
       await wait(30);
       const committed = proposed(edit);
       setTimeout(() => {
-        composition.sheets[0].frames[0] = committed;
+        input.composition = structuredClone(composition);
+        input.composition.sheets[0].frames[0] = committed;
         scene.update(input, 600);
+        completion.presentedAt = performance.now();
       }, 70);
+      completion.committedAt = performance.now();
       return committed;
     },
     onError: (message) => { throw new Error(message); },
@@ -88,6 +92,7 @@ Object.assign(window, {
     start: () => { recording = true; trace.length = 0; },
     sample,
     trace: () => trace,
+    completion: () => completion,
     point: (action: string) => {
       const frame = find("canvas-frame-frame-001");
       const target = action === "resize" ? find("frame-resize-handle-right-frame-001") : frame;

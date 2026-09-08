@@ -20,6 +20,7 @@ interface FrameGesture {
   frame: ComposedFrame;
   sheetId: string;
   sourceSignature: string;
+  sourceComposition: AlbumCanvasProps["composition"];
   controls: CanvasFrameGeometry;
   pointerId: number;
   origin: PointerPosition;
@@ -90,6 +91,7 @@ export class FrameInteractionSession {
       frame,
       sheetId: editingSheetId,
       sourceSignature: sourceSignature(input, confirmedSheet, frame),
+      sourceComposition: input.composition,
       controls,
       pointerId: event.pointerId,
       origin: pointerPosition(event),
@@ -122,6 +124,9 @@ export class FrameInteractionSession {
       input.mode.kind !== "sheet-editing" || input.mode.sheetId !== gesture.sheetId ||
       input.frameGeometry?.disabled || !input.frameGeometry?.dragThreshold ||
       !sheet || !frame || scale !== gesture.scale ||
+      // Undo can restore both the geometry and revision number. A new immutable
+      // snapshot still ends the bridge, even if React skipped the edited snapshot.
+      (gesture.phase === "committing" && input.composition !== gesture.sourceComposition) ||
       sourceSignature(input, sheet, frame) !== gesture.sourceSignature
     ) this.reset();
   }
@@ -232,6 +237,7 @@ export class FrameInteractionSession {
     }
     gesture.point = pointerPosition(event);
     gesture.phase = "committing";
+    gesture.sourceComposition = this.readContext().input!.composition;
     this.release(gesture);
     this.deferTapReset();
     // Queue the final edit immediately, before a following Save/Undo can enter the shared queue.
@@ -241,7 +247,7 @@ export class FrameInteractionSession {
         .flatMap((sheet) => sheet.frames)
         .find((frame) => frame.frameId === gesture.frame.frameId);
       // Command completion can precede React's next projection. Keep the Core's
-      // committed Frame visible until that projection replaces the original input.
+      // committed Frame visible until that snapshot (or later history) is presented.
       if (committedFrame && JSON.stringify(presentedFrame) !== JSON.stringify(committedFrame)) {
         gesture.preview = committedFrame;
       } else this.reset();

@@ -67,7 +67,16 @@ try {
     const before = await execute('return window.frameGestureTest.sample()');
     writeFileSync(path.join(output, `${action}-before-release.png`), Buffer.from(await request('GET', `/session/${session}/screenshot`), 'base64'));
     await actions([{ type: 'pointerUp', button: 0 }]);
-    await delay(200);
+    let completion;
+    for (let attempt = 0; attempt < 100; ++attempt) {
+      completion = await execute(`
+        const completion = window.frameGestureTest.completion();
+        return { ...completion, frameAfterPresentation: completion.presentedAt !== null &&
+          window.frameGestureTest.trace().some(frame => frame.time > completion.presentedAt) };
+      `);
+      if (completion.committedAt !== null && completion.frameAfterPresentation) break;
+      await delay(50);
+    }
     const trace = await execute('return window.frameGestureTest.trace()');
     writeFileSync(path.join(output, `${action}-after-release.png`), Buffer.from(await request('GET', `/session/${session}/screenshot`), 'base64'));
     const expected = action === 'resize' ? 'ew-resize' : 'move';
@@ -75,7 +84,8 @@ try {
     const afterRelease = trace.filter(item => item.time >= before.time);
     const frameFlash = afterRelease
       .some(item => item.x !== before.x || item.y !== before.y || item.width !== before.width);
-    const exercised = afterRelease.length >= 2 && (
+    const exercised = completion.committedAt !== null && completion.frameAfterPresentation &&
+      afterRelease.length >= 2 && (
       action === 'resize' ? before.width !== initial.width : before.y !== initial.y
     );
     await actions([{ type: 'pointerMove', origin: 'viewport', x: 5, y: 5, duration: 0 }]);
@@ -83,7 +93,7 @@ try {
     const cursorReleased = cursorAfterRelease === 'auto' || cursorAfterRelease === 'default';
     const passed = exercised && cursorReleased && !cursorFailure && !frameFlash;
     evidence.scenarios.push({ action, passed, exercised, expectedCursor: expected,
-      cursorFailure, cursorAfterRelease, frameFlash, samples, before, trace });
+      cursorFailure, cursorAfterRelease, frameFlash, completion, samples, before, trace });
     console.log(action + ' cursors: ' + samples.map(item => item.cursor).join(' -> '));
     console.log(action + ' frame flash: ' + frameFlash + '; cursor released: ' + cursorReleased);
   }

@@ -99,6 +99,11 @@ projeção pelo React. Agora a porta da interação devolve o `ComposedFrame` co
 pelo Core, e o Canvas o conserva até receber a projeção correspondente. Isso
 também cobre uma soltura diferente da última prévia, falha e resultado sem
 alteração. A fila de mutações continua sendo a mesma de Salvar e Desfazer.
+O fim dessa ponte também observa a identidade da composição apresentada: se mover
+e desfazer forem apresentados juntos pelo React, o novo snapshot encerra a prévia.
+O Core restaura tanto a geometria quanto o número da revisão no Desfazer;
+comparar somente esses valores não distingue a nova apresentação. A regressão usa o
+controlador, a fila e o estado React reais, com respostas determinísticas da porta.
 
 O cursor de hover do Pixi depende do objeto atingido em cada evento. Uma alça
 pode ficar para trás enquanto a prévia assíncrona acompanha o ponteiro. Durante
@@ -116,7 +121,8 @@ O comando `npm test -- src/components/AlbumCanvas.frameGeometry.test.tsx -t "doe
 falhou antes da correção: esperava posição `40,20`, mas recebeu `0,0`. O teste
 permanente `npm run test:frame-gestures` exercita movimento e a alça direita com
 ponteiro real no navegador headless, amostra o cursor calculado e a geometria
-entre os quadros e verifica a liberação do cursor. Conserva capturas, logs,
+entre os quadros e verifica a liberação do cursor. Exige a confirmação do comando,
+a apresentação da projeção e um quadro posterior a ela. Conserva capturas, logs,
 proveniência e resultado em `.scratch/frame-gesture-evidence/` ou no diretório
 fornecido como argumento. A fixture usa a cena produtiva e uma porta com atraso
 determinístico; ela verifica apresentação, sem substituir os testes da política
