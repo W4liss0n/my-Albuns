@@ -3,4 +3,4 @@ import type { CompositionPlan } from "./CompositionPlan";
 import type { EditorState } from "./EditorState";
 import type { MediaUsage } from "./MediaUsage";
 
-export type EditorProjection = { state: EditorState, composition: CompositionPlan, mediaUsage: Array<MediaUsage>, };
+export type EditorProjection = { canPasteFrames: boolean, state: EditorState, composition: CompositionPlan, mediaUsage: Array<MediaUsage>, };

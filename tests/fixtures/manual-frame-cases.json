@@ -2,6 +2,7 @@
   "cases": [
     {
       "before": {
+        "canPasteFrames": false,
         "composition": {
           "frameBorder": {
             "kind": "none"
@@ -204,6 +205,7 @@
     },
     {
       "before": {
+        "canPasteFrames": false,
         "composition": {
           "frameBorder": {
             "kind": "none"
@@ -406,6 +408,7 @@
     },
     {
       "before": {
+        "canPasteFrames": false,
         "composition": {
           "frameBorder": {
             "kind": "none"
@@ -608,6 +611,7 @@
     },
     {
       "before": {
+        "canPasteFrames": false,
         "composition": {
           "frameBorder": {
             "kind": "none"

@@ -12,6 +12,7 @@ interface EditorViewState {
   editingSheetId: string | null;
   viewport: ViewportState;
   selectFrame(frameId: string | null, toggle?: boolean): void;
+  selectFrames(frameIds: readonly string[]): void;
   focusSheet(sheetId: string): void;
   centerSheet(sheetId: string): void;
   enterSheetEdit(sheetId: string, preserveSelectedFrame?: boolean): void;
@@ -40,6 +41,7 @@ export const useEditorView = create<EditorViewState>((set) => ({
         : [...state.selectedFrameIds, frameId]
       : [frameId],
   })),
+  selectFrames: (frameIds) => set({ selectedFrameIds: [...frameIds] }),
   focusSheet: (focusedSheetId) => set({ focusedSheetId }),
   centerSheet: (centeredSheetId) => set({ centeredSheetId }),
   enterSheetEdit: (editingSheetId, preserveSelectedFrame = false) =>

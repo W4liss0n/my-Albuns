@@ -159,6 +159,7 @@ export function useProjectNavigation(projection: EditorProjection) {
 
   return {
     synchronizeProjection,
+    canvasScale: canvasMetrics?.scale ?? null,
     selectedFrameIds,
     selectedFrameId,
     focusedSheetId,

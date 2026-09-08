@@ -152,6 +152,7 @@ pub(crate) fn resolve_editor_projection(state: EditorState) -> EditorProjection 
     let composition = CompositionCore::compose(&state.album);
     let media_usage = derive_media_usage(&state.album, &composition);
     EditorProjection {
+        can_paste_frames: false,
         state,
         composition,
         media_usage,

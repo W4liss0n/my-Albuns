@@ -5,6 +5,7 @@ import type {
 } from "../domain/project";
 
 export const representativeProjection: EditorProjection = {
+  canPasteFrames: false,
   state: {
     projectId: "project-spike-001",
     projectName: "Álbum Horizonte",
@@ -153,6 +154,7 @@ export const representativeProjection: EditorProjection = {
 
 export function createEmptyProjection(): EditorProjection {
   return {
+    canPasteFrames: false,
     state: {
       ...representativeProjection.state,
       revision: 0,
@@ -175,6 +177,7 @@ export function createEmptyProjection(): EditorProjection {
 
 export function createTwoSheetProjection(): EditorProjection {
   return {
+    canPasteFrames: false,
     state: {
       ...representativeProjection.state,
       album: {

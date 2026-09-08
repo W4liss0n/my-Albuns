@@ -19,6 +19,8 @@ const webdriverKeys = Object.freeze({
   Space: "\uE00D",
   Tab: "\uE004",
   Digit0: "0",
+  KeyC: "c",
+  KeyV: "v",
   Minus: "\uE027",
   Plus: "\uE025",
 });

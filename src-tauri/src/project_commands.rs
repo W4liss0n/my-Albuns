@@ -58,6 +58,8 @@ pub(crate) async fn apply_project_intent(
     let previous_bindings = state.authorized_media_catalog()?.bindings;
     let previous = state.projection()?;
     let intent_kind = match &intent {
+        ProjectIntent::CopyFrames { .. } => "copy_frames",
+        ProjectIntent::PasteFrames { .. } => "paste_frames",
         ProjectIntent::AddFrame { .. } => "add_frame",
         ProjectIntent::DeleteFrames { .. } => "delete_frames",
         ProjectIntent::SwapFrameContents { .. } => "swap_frame_contents",

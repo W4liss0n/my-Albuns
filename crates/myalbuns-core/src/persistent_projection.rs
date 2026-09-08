@@ -22,12 +22,14 @@ pub(crate) fn editor_projection(
     project_name: &str,
     photo_sources: &HashMap<MediaId, HashMap<PathBuf, PhotoSourceMetadata>>,
 ) -> EditorProjection {
-    resolve_editor_projection(editor_state(
+    let mut projection = resolve_editor_projection(editor_state(
         session,
         history_enabled,
         project_name,
         photo_sources,
-    ))
+    ));
+    projection.can_paste_frames = session.can_paste_frames();
+    projection
 }
 
 pub(crate) fn editor_state(

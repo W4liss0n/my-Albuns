@@ -4,6 +4,8 @@ import type { PointerDragThreshold, ProjectCorePort } from "../application/proje
 import type { PrepareImportedMedia } from "../application/mediaPreviews";
 import type { SheetStructureIntent } from "../application/sheetStructure";
 import type { EditorProjection, FrameStackAction } from "../domain/project";
+import { useEditorView } from "../state/editorView";
+import { CANVAS_MICROMETERS_PER_PIXEL } from "./canvasGeometry";
 import type {
   AlbumCanvasMode,
   AlbumCanvasProps,
@@ -129,6 +131,24 @@ export function useProjectEditorController({
   };
   const canArrangeFrames = canvasMode.kind === "sheet-editing" && selectedFrames.length > 0 && !interactionBlocked;
   const canDeleteFrames = canArrangeFrames;
+  const canCopyFrames = canArrangeFrames;
+  const canPasteFrames = canAddFrame && (projection.canPasteFrames || mutations.frameCopyPending);
+  const copyFrames = () => {
+    if (!canCopyFrames) return Promise.resolve(false);
+    return mutations.copyFrames([...navigation.selectedFrameIds]);
+  };
+  const pasteFrames = () => {
+    // Queue a rapid Ctrl+V after Ctrl+C even before its projection is rendered.
+    // Clipboard availability is checked again against the authoritative queued result.
+    if (!canAddFrame || canvasMode.kind !== "sheet-editing") return Promise.resolve(false);
+    const sheetId = canvasMode.sheetId;
+    const desiredOffsetUm = navigation.canvasScale ? Math.round(16 * CANVAS_MICROMETERS_PER_PIXEL / navigation.canvasScale) : 0;
+    return mutations.pasteFrames(sheetId, desiredOffsetUm, (ids, next) => {
+      const view = useEditorView.getState();
+      if (view.projectId !== next.state.projectId || view.editingSheetId !== sheetId) return;
+      view.selectFrames(ids);
+    });
+  };
   const canSwapFrameContents = canvasMode.kind === "sheet-editing" &&
     selectedFrames.length === 2 && selectedFrames.some((frame) => frame.photo !== null) &&
     !interactionBlocked;
@@ -318,6 +338,10 @@ export function useProjectEditorController({
     addFrame,
     canAddFrame,
     canDeleteFrames,
+    canCopyFrames,
+    canPasteFrames,
+    copyFrames,
+    pasteFrames,
     deleteFrames,
     canSwapFrameContents,
     swapFrameContents,

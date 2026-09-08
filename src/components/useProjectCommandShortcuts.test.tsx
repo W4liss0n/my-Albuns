@@ -5,6 +5,9 @@ import { useProjectCommandShortcuts } from "./useProjectCommandShortcuts";
 
 function handlers() {
   return {
+    copyFrames: vi.fn(),
+    pasteFrames: vi.fn(),
+    frameClipboardActive: false,
     arrangeFrames: vi.fn(),
     deleteFrames: vi.fn(),
     frameCommandsActive: false,
@@ -57,6 +60,31 @@ function dispatchShortcut(
   });
   return event;
 }
+
+test("Ctrl+C/V work with an empty editing selection and preserve text, media and menu clipboard ownership", () => {
+  const actions = handlers();
+  const view = renderHook(({ active }) => useProjectCommandShortcuts({ ...actions,
+    frameClipboardActive: active, canRedo: true, canUndo: true, disabled: false,
+  }), { initialProps: { active: true } });
+  expect(dispatchShortcut("c").defaultPrevented).toBe(true);
+  expect(dispatchShortcut("v").defaultPrevented).toBe(true);
+  dispatchShortcut("v", { repeat: true });
+  for (const kind of ["input", "textarea", "editable", "media", "menu", "dialog"]) {
+    const target = document.createElement(kind === "input" || kind === "textarea" ? kind : "div");
+    if (kind === "editable") target.setAttribute("contenteditable", "true");
+    if (kind === "media") target.dataset.projectCommandContext = "media";
+    if (kind === "menu" || kind === "dialog") target.setAttribute("role", kind);
+    document.body.appendChild(target);
+    expect(dispatchShortcut("c", {}, target).defaultPrevented).toBe(false);
+    expect(dispatchShortcut("v", {}, target).defaultPrevented).toBe(false);
+    target.remove();
+  }
+  view.rerender({ active: false });
+  expect(dispatchShortcut("c").defaultPrevented).toBe(false);
+  expect(dispatchShortcut("v").defaultPrevented).toBe(false);
+  expect(actions.copyFrames).toHaveBeenCalledOnce();
+  expect(actions.pasteFrames).toHaveBeenCalledOnce();
+});
 
 test("Delete targets the Frame selection and never borrows the Sheet command", () => {
   const actions = handlers();

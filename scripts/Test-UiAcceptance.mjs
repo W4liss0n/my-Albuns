@@ -1209,6 +1209,14 @@ test("runner emits W3C actions for Ctrl gestures, wheel, and preview or committe
     sessionId: "session-gestures",
   };
 
+  for (const [key, value] of [["KeyC", "c"], ["KeyV", "v"]]) {
+    await performUiAcceptanceAction({ ...common, action: { type: "key", key, modifiers: ["Control"] } });
+    assert.deepEqual(requests.at(-1).body.actions[0].actions, [
+      { type: "keyDown", value: "\uE009" }, { type: "keyDown", value },
+      { type: "keyUp", value }, { type: "keyUp", value: "\uE009" },
+    ]);
+  }
+
   await performUiAcceptanceAction({
     ...common,
     action: { type: "key", key: "Plus", modifiers: ["Control"] },

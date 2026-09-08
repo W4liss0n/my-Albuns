@@ -174,8 +174,7 @@ const DEFINITIONS = [
     description: "Copia os Frames selecionados.",
     kind: "domain",
     contexts: ["frame"],
-    availability: "placeholder",
-    placeholderFeature: "copy-frames",
+    availability: "implemented",
     shortcuts: [shortcut("c", "Ctrl+C", { ctrlKey: true })],
   }),
   command({
@@ -184,8 +183,7 @@ const DEFINITIONS = [
     description: "Cola Frames copiados na Lâmina ativa.",
     kind: "domain",
     contexts: ["frame"],
-    availability: "placeholder",
-    placeholderFeature: "paste-frames",
+    availability: "implemented",
     shortcuts: [shortcut("v", "Ctrl+V", { ctrlKey: true })],
   }),
   command({
