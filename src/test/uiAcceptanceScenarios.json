@@ -3001,7 +3001,7 @@
         "width": 1440,
         "height": 900
       },
-      "readySelector": "[role=\"menu\"][aria-label=\"Editar\"] [role=\"menuitem\"][aria-label=\"Colar\"][aria-disabled=\"true\"]",
+      "readySelector": "[role=\"menu\"][aria-label=\"Editar\"] [role=\"menuitem\"][aria-label=\"Colar\"][disabled]",
       "actions": [
         {
           "type": "click-text",
@@ -3023,7 +3023,7 @@
         "width": 1440,
         "height": 900
       },
-      "readySelector": "[role=\"menu\"][aria-label=\"Editar\"] [role=\"menuitem\"][aria-label=\"Colar\"]:not([aria-disabled=\"true\"])",
+      "readySelector": "[role=\"menu\"][aria-label=\"Editar\"] [role=\"menuitem\"][aria-label=\"Colar\"]:not([disabled])",
       "actions": [
         {
           "type": "focus",
