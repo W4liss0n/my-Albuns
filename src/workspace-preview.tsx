@@ -30,11 +30,13 @@ import { createTwoSheetProjection } from "./test/projectFixtures";
 import { useEditorView } from "./state/editorView";
 import groupGeometryCorpus from "../tests/fixtures/frame-group-geometry-cases.json";
 import stackCorpus from "../tests/fixtures/frame-stack-cases.json";
+import manualFrameCorpus from "../tests/fixtures/manual-frame-cases.json";
 import "./ui/theme.css";
 import "./ui/ui.css";
 
 const previewParameters = new URLSearchParams(window.location.search);
 const frameContext = previewParameters.get("frame");
+const manualFrameCase = manualFrameCorpus.cases.find((item) => item.name === (previewParameters.get("surface") ?? "double"));
 const stackCase = stackCorpus.cases.find((item) => item.action === previewParameters.get("stack"));
 const decorativeContext = previewParameters.get("decorative");
 const previewScale = Number(previewParameters.get("scale") ?? "1");
@@ -59,6 +61,13 @@ if (frameContext === "stack") {
   const exposeSelection = () => { document.body.dataset.stackSelection = useEditorView.getState().selectedFrameIds.join(","); };
   exposeSelection();
   useEditorView.subscribe(exposeSelection);
+}
+if (frameContext === "manual") {
+  const sheetId = manualFrameCase!.sheetId;
+  useEditorView.setState({ projectId: projection.state.projectId, editingSheetId: sheetId,
+    focusedSheetId: sheetId, centeredSheetId: sheetId, selectedFrameIds: [] });
+  exposeManualFrameState();
+  useEditorView.subscribe(exposeManualFrameState);
 }
 const undoStack: EditorProjection[] = [];
 const redoStack: EditorProjection[] = [];
@@ -213,6 +222,7 @@ function createPreviewProjection(
   decorativeMode: string | null,
   structureMode: string | null,
 ): EditorProjection {
+  if (frameMode === "manual") return structuredClone(manualFrameCase!.before) as EditorProjection;
   const preview = structuredClone(createTwoSheetProjection());
   if (structureMode === "physical") configurePhysicalPreview(preview, 5);
   if (structureMode === "minimum-single-edges") {
@@ -334,6 +344,19 @@ function configurePhysicalPreview(
 }
 
 function applyPreviewIntent(intent: ProjectIntent): ProjectMutationOutcome {
+  if (intent.kind === "addFrame") {
+    const sheet = projection.state.album.sheets.find((item) => item.id === intent.sheetId);
+    if (frameContext !== "manual" || !manualFrameCase || intent.sheetId !== manualFrameCase.sheetId || sheet?.frames.length !== 0) {
+      throw new Error("Comando fora do cenário de criação manual desta prévia.");
+    }
+    const before = structuredClone(projection);
+    const next = structuredClone(projection);
+    next.state.album.sheets.find((item) => item.id === intent.sheetId)!.frames = [structuredClone(manualFrameCase.frame)];
+    next.composition.sheets.find((item) => item.sheetId === intent.sheetId)!.frames = [structuredClone(manualFrameCase.composedFrame)];
+    projection = finalizePhysicalPreviewMutation(next, before);
+    exposeManualFrameState();
+    return { projection, affectedFrameId: manualFrameCase.frame.id, affectedSheetId: null };
+  }
   if (intent.kind === "arrangeFrames") {
     // This fixture replays Core-produced outcomes; it does not implement stack policy.
     if (!stackCase || intent.action !== stackCase.action ||
@@ -492,7 +515,13 @@ function restorePreviewHistory(
       canRedo: redoStack.length > 0,
     },
   };
+  if (frameContext === "manual") exposeManualFrameState();
   return projection;
+}
+
+function exposeManualFrameState() {
+  document.body.dataset.manualFrameSelection = useEditorView.getState().selectedFrameIds.join(",");
+  document.body.dataset.manualFrameCount = String(projection.state.album.sheets.reduce((count, sheet) => count + sheet.frames.length, 0));
 }
 
 function physicalSheetOrderIsValid(candidate: EditorProjection) {

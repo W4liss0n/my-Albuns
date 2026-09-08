@@ -191,6 +191,15 @@ impl PersistentProjectSession {
                 outcome.affected_frame_id = Some(parsed);
                 Ok(next)
             }
+            ProjectIntent::AddFrame { sheet_id } => {
+                let parsed_sheet = parse_uuid(&sheet_id)
+                    .map_err(|()| CoreError::SheetNotFound(sheet_id.clone()))?;
+                let (next, frame_id) = project
+                    .with_added_frame(parsed_sheet)
+                    .map_err(|()| CoreError::SheetNotFound(sheet_id))?;
+                outcome.affected_frame_id = Some(frame_id);
+                Ok(next)
+            }
             ProjectIntent::AddPhoto {
                 sheet_id,
                 media_id,

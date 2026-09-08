@@ -97,6 +97,7 @@ interface SheetRenderNodeCallbacks {
   onSheetDoubleTap: (sheetId: string) => void;
   onFrameTap: (sheetId: string, frameId: string, toggle: boolean) => void;
   onFrameContextMenu: (frameId: string, position: { x: number; y: number }) => void;
+  onEmptyCanvasContextMenu: (sheetId: string, position: { x: number; y: number }) => void;
   onFrameGeometryStart: (
     frameId: string,
     handle: FrameResizeHandle | null,
@@ -154,6 +155,11 @@ export function createSheetRenderNode(
     viewGeometry.visibleOuterBounds.height,
   );
   sheetContainer.cursor = "default";
+  sheetContainer.on("rightclick", (event: FederatedPointerEvent) => {
+    if (modePolicy.editingSheetId === null || sheetBarMetadata?.layoutLocked || event.target !== sheetContainer) return;
+    event.stopPropagation();
+    callbacks.onEmptyCanvasContextMenu(sheet.sheetId, { x: event.clientX, y: event.clientY });
+  });
   sheetContainer.on("pointertap", (event: FederatedPointerEvent) => {
     if (event.button !== 0) return;
     if (event.target === sheetContainer) {

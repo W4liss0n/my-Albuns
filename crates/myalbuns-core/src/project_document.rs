@@ -666,6 +666,25 @@ impl ProjectDocument {
         Ok(candidate)
     }
 
+    pub(crate) fn with_added_frame(&self, sheet_id: Uuid) -> Result<(Self, Uuid), ()> {
+        let mut candidate = self.clone();
+        let sheet = candidate
+            .sheets
+            .iter_mut()
+            .find(|sheet| sheet.id == sheet_id)
+            .ok_or(())?;
+        let rect = proportional_frame_rect(
+            sheet,
+            candidate.document.sheet_width_um,
+            candidate.document.sheet_height_um,
+            None,
+        )?;
+        let frame_id = Uuid::new_v4();
+        sheet.frames.push(ProjectFrame::new(frame_id, rect, None));
+        validate_project_state(&candidate)?;
+        Ok((candidate, frame_id))
+    }
+
     pub(crate) fn with_added_photo(
         &self,
         sheet_id: Uuid,
@@ -972,23 +991,7 @@ fn add_frame(
             return Ok(id);
         }
         PhotoPlacementMode::Edit => {
-            let width = active_surface_width(sheet, sheet_width_um);
-            let frame_width = (width.saturating_mul(2) / 5)
-                .min(sheet_height_um.saturating_mul(3) / 2)
-                .max(1);
-            let frame_height = (frame_width.saturating_mul(2) / 3).max(1);
-            let (center_x, center_y) = point.unwrap_or((
-                i64::try_from(width / 2).map_err(|_| ())?,
-                i64::try_from(sheet_height_um / 2).map_err(|_| ())?,
-            ));
-            centered_inside_rect(
-                width,
-                sheet_height_um,
-                frame_width,
-                frame_height,
-                center_x,
-                center_y,
-            )?
+            proportional_frame_rect(sheet, sheet_width_um, sheet_height_um, point)?
         }
     };
     sheet.frames.push(ProjectFrame::new(
@@ -1000,6 +1003,31 @@ fn add_frame(
         )),
     ));
     Ok(id)
+}
+
+fn proportional_frame_rect(
+    sheet: &ProjectSheet,
+    sheet_width_um: u64,
+    sheet_height_um: u64,
+    point: Option<(i64, i64)>,
+) -> Result<ProjectRect, ()> {
+    let width = active_surface_width(sheet, sheet_width_um);
+    let frame_width = (width.saturating_mul(2) / 5)
+        .min(sheet_height_um.saturating_mul(3) / 2)
+        .max(1);
+    let frame_height = (frame_width.saturating_mul(2) / 3).max(1);
+    let (center_x, center_y) = point.unwrap_or((
+        i64::try_from(width / 2).map_err(|_| ())?,
+        i64::try_from(sheet_height_um / 2).map_err(|_| ())?,
+    ));
+    centered_inside_rect(
+        width,
+        sheet_height_um,
+        frame_width,
+        frame_height,
+        center_x,
+        center_y,
+    )
 }
 
 fn centered_inside_rect(

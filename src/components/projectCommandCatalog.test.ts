@@ -56,6 +56,8 @@ test("feeds the canonical shortcuts into the Project application menu", () => {
   const groups = createProjectApplicationMenus({
     arrangeFrames: () => undefined,
     canArrangeFrames: true,
+    addFrame: vi.fn(),
+    canAddFrame: true,
     addSheetAfter: () => undefined,
     addSheetBefore: () => undefined,
     canAddAfter: true,
@@ -217,6 +219,8 @@ test("projects each Sheet structure command with its own availability and owner"
   const groups = createProjectApplicationMenus({
     arrangeFrames: () => undefined,
     canArrangeFrames: true,
+    addFrame: vi.fn(),
+    canAddFrame: true,
     addSheetAfter,
     addSheetBefore,
     canAddAfter: true,
@@ -295,6 +299,8 @@ test("disables Sheet structure commands during editing without disabling global 
   const groups = createProjectApplicationMenus({
     arrangeFrames: () => undefined,
     canArrangeFrames: true,
+    addFrame: vi.fn(),
+    canAddFrame: true,
     addSheetAfter: () => undefined,
     addSheetBefore: () => undefined,
     canAddAfter: true,
@@ -352,6 +358,8 @@ test("projects every application-menu command from its canonical descriptor", ()
   const groups = createProjectApplicationMenus({
     arrangeFrames: () => undefined,
     canArrangeFrames: true,
+    addFrame: vi.fn(),
+    canAddFrame: true,
     addSheetAfter: () => undefined,
     addSheetBefore: () => undefined,
     canAddAfter: true,

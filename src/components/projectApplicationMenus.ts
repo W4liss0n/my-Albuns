@@ -13,6 +13,8 @@ import type {
 } from "./ApplicationMenuBar";
 
 interface ProjectApplicationMenuOptions {
+  addFrame(): void;
+  canAddFrame: boolean;
   arrangeFrames(action: FrameStackAction): void;
   canArrangeFrames: boolean;
   addSheetAfter(): void;
@@ -40,6 +42,8 @@ interface ProjectApplicationMenuOptions {
 }
 
 export function createProjectApplicationMenus({
+  addFrame,
+  canAddFrame,
   arrangeFrames,
   canArrangeFrames,
   addSheetAfter,
@@ -95,7 +99,7 @@ export function createProjectApplicationMenus({
         placeholder("paste-frames", "frame"),
         separator("edit-frame-separator"),
         placeholder("swap-frame-contents", "frame"),
-        placeholder("add-frame", "frame"),
+        implemented("add-frame", "frame", addFrame, !canAddFrame),
         submenu("arrange-frames", "Organizar", FRAME_STACK_COMMANDS.map(({ id, action }) =>
           implemented(id, "frame", () => arrangeFrames(action), !canArrangeFrames))),
         separator("edit-layout-separator"),

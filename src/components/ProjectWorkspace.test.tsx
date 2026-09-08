@@ -94,6 +94,7 @@ const canvasHarness = vi.hoisted(() => ({
       position: { x: number; y: number },
     ): void;
     onOpenFrameContextMenu?(frameId: string, position: { x: number; y: number }): void;
+    onOpenEmptyCanvasContextMenu?(sheetId: string, position: { x: number; y: number }): void;
     onTransformPreview?(
       preview: PhotoTransformPreview | null,
     ): void;
@@ -618,6 +619,52 @@ beforeEach(() => {
     editingSheetId: null,
     viewport: { offsetX: 42 },
   });
+});
+
+test("creates one placeholder from Edit and selects only the new Frame", async () => {
+  const added = structuredClone(projection);
+  added.state.album.sheets[0].frames.push({
+    ...added.state.album.sheets[0].frames[0], id: "manual-frame", zIndex: 1, photo: null,
+  });
+  added.composition.sheets[0].frames.push({
+    ...added.composition.sheets[0].frames[0], frameId: "manual-frame", zIndex: 1, photo: null,
+  });
+  useEditorView.setState({ editingSheetId: "sheet-001", selectedFrameIds: ["frame-001"] });
+  const port = projectCorePortWithApply(async () => added);
+  port.applyWithOutcome = vi.fn(async () => ({ projection: added,
+    affectedFrameId: "manual-frame", affectedSheetId: null }));
+  render(<ProjectWorkspace projection={projection} projectCorePort={port} onProjectionChange={vi.fn()} />);
+  fireEvent.click(getApplicationCommand("Editar", "Adicionar Frame"));
+  await waitFor(() => expect(port.applyWithOutcome).toHaveBeenCalledWith(
+    { kind: "addFrame", sheetId: "sheet-001" }, expect.any(Function)));
+  expect(useEditorView.getState().selectedFrameIds).toEqual(["manual-frame"]);
+});
+
+test("empty Canvas context creates a Frame without requiring a previous selection", async () => {
+  useEditorView.setState({ editingSheetId: "sheet-001", selectedFrameIds: [] });
+  const port = projectCorePortWithApply(async () => projection);
+  port.applyWithOutcome = vi.fn(async () => ({ projection, affectedFrameId: "frame-001", affectedSheetId: null }));
+  render(<ProjectWorkspace projection={projection} projectCorePort={port} onProjectionChange={vi.fn()} />);
+  act(() => canvasHarness.props?.onOpenEmptyCanvasContextMenu?.("sheet-001", { x: 120, y: 180 }));
+  const menu = screen.getByRole("menu", { name: "Área vazia do Canvas" });
+  expect(within(menu).getAllByRole("menuitem")).toHaveLength(1);
+  expect(useEditorView.getState().selectedFrameIds).toEqual([]);
+  fireEvent.click(within(menu).getByRole("menuitem", { name: "Adicionar Frame" }));
+  await waitFor(() => expect(port.applyWithOutcome).toHaveBeenCalledWith(
+    { kind: "addFrame", sheetId: "sheet-001" }, expect.any(Function)));
+  expect(screen.queryByRole("menu", { name: "Área vazia do Canvas" })).not.toBeInTheDocument();
+  expect(useEditorView.getState().selectedFrameIds).toEqual(["frame-001"]);
+});
+
+test("manual Frame creation is unavailable outside sheet editing", () => {
+  const port = projectCorePortWithApply(async () => projection);
+  port.applyWithOutcome = vi.fn();
+  render(<ProjectWorkspace projection={projection} projectCorePort={port} onProjectionChange={vi.fn()} />);
+  expect(getApplicationCommand("Editar", "Adicionar Frame")).toBeDisabled();
+  fireEvent.keyDown(screen.getByRole("menu", { name: "Editar" }), { key: "Escape" });
+  act(() => canvasHarness.props?.onOpenEmptyCanvasContextMenu?.("sheet-001", { x: 120, y: 180 }));
+  expect(screen.queryByRole("menu", { name: "Área vazia do Canvas" })).not.toBeInTheDocument();
+  expect(port.applyWithOutcome).not.toHaveBeenCalled();
 });
 
 test("arranges the entire Frame selection from Edit without changing the selection", async () => {
