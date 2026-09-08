@@ -189,7 +189,7 @@ pub(crate) async fn preview_frame_geometry(
     edit: myalbuns_core::FrameGeometryEdit,
     window: WebviewWindow,
     state: State<'_, ProjectHost>,
-) -> Result<myalbuns_core::ComposedFrame, String> {
+) -> Result<Vec<myalbuns_core::ComposedFrame>, String> {
     if window.label() != PROJECT_WINDOW_LABEL {
         return Err("A geometria do Frame só pode ser consultada na Janela do Projeto.".into());
     }

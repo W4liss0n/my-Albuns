@@ -29,10 +29,17 @@ import type {
 } from "./domain/project";
 import "./canvas-preview.css";
 import geometryCorpus from "../tests/fixtures/frame-geometry-cases.json";
+import groupGeometryCorpus from "../tests/fixtures/frame-group-geometry-cases.json";
 import geometryPhotoUrl from "./test/dev-media/serra-amanhecer.svg";
 
 const geometryCase = geometryCorpus.cases.find((item) =>
   item.name === new URLSearchParams(window.location.search).get("geometry"));
+const groupGeometryCase = groupGeometryCorpus.cases.find((item) =>
+  item.name === new URLSearchParams(window.location.search).get("groupGeometry"));
+const geometryFrames = (groupGeometryCase?.frames ?? (geometryCase ? [geometryCase.frame] : undefined))
+  ?.map((frame): ComposedFrame => ({ ...frame, photo: frame.photo ? {
+    ...frame.photo, palette: [frame.photo.palette[0], frame.photo.palette[1], frame.photo.palette[2]],
+  } : null }));
 
 const previewGraphicsDiagnosticProbe: CanvasGraphicsDiagnosticProbe = () => ({
   supported: true,
@@ -95,12 +102,9 @@ const sheets: readonly ComposedSheet[] = [
 
 const composition: CompositionPlan = {
   frameBorder: { kind: "none" },
-  sheets: geometryCase ? [createSheet({
+  sheets: geometryFrames ? [createSheet({
     activeSides: "both", number: 2, widthUm: 600_000,
-    frames: [{ ...geometryCase.frame, photo: {
-      ...geometryCase.frame.photo,
-      palette: [geometryCase.frame.photo.palette[0], geometryCase.frame.photo.palette[1], geometryCase.frame.photo.palette[2]],
-    } }],
+    frames: geometryFrames,
   })] : [...sheets],
 };
 
@@ -151,13 +155,13 @@ export function CanvasPreview() {
     [],
   );
   const centeredOnce = useRef(false);
-  const [selectedFrameId, setSelectedFrameId] = useState<string | null>(geometryCase?.frame.frameId ?? null);
+  const [selectedFrameIds, setSelectedFrameIds] = useState<readonly string[]>(geometryFrames?.map((frame) => frame.frameId) ?? []);
   const [focusedSheetId, setFocusedSheetId] = useState("sheet-002");
   const [centeredSheetId, setCenteredSheetId] = useState("sheet-002");
   const [viewport, setViewport] = useState({ offsetX: 0 });
   const [mode, setMode] = useState<AlbumCanvasMode>(() => {
     const parameters = new URLSearchParams(window.location.search);
-    return geometryCase || parameters.get("mode") === "sheet-editing"
+    return geometryFrames || parameters.get("mode") === "sheet-editing"
       ? {
           kind: "sheet-editing",
           sheetId: parameters.get("sheet") ?? "sheet-002",
@@ -187,7 +191,7 @@ export function CanvasPreview() {
       setFocusedSheetId(mode.sheetId);
       setCenteredSheetId(mode.sheetId);
     }
-    setSelectedFrameId(null);
+    setSelectedFrameIds([]);
     setMode({ kind: "normal" });
   }, [centerPreviewOnSheet, mode]);
   useCanvasModeKeyboardShortcuts({
@@ -204,6 +208,7 @@ export function CanvasPreview() {
       data-canvas-mode={mode.kind}
       data-development-preview="canvas"
       data-geometry-case={geometryCase?.name}
+      data-group-geometry-case={groupGeometryCase?.name}
       data-editing-sheet={
         mode.kind === "sheet-editing" ? mode.sheetId : undefined
       }
@@ -212,17 +217,18 @@ export function CanvasPreview() {
         projectId="canvas-visual-preview"
         mode={mode}
         composition={composition}
-        mediaPreviewUrls={geometryCase ? {
-          [geometryCase.frame.photo.mediaId]: geometryPhotoUrl,
-        } : undefined}
+        mediaPreviewUrls={Object.fromEntries((geometryFrames ?? []).flatMap((frame) =>
+          frame.photo ? [[frame.photo.mediaId, geometryPhotoUrl]] : []))}
         sheetBarMetadata={sheetBarMetadata}
         technicalGuides={previewTechnicalGuides}
         continuousCanvasLayout={layout}
-        selectedFrameId={selectedFrameId}
+        selectedFrameIds={selectedFrameIds}
         focusedSheetId={focusedSheetId}
         centeredSheetId={centeredSheetId}
         viewport={viewport}
-        onSelectFrame={setSelectedFrameId}
+        onSelectFrame={(id, toggle) => setSelectedFrameIds((current) =>
+          id === null ? [] : toggle ? current.includes(id)
+            ? current.filter((selected) => selected !== id) : [...current, id] : [id])}
         onEditSheet={enterSheetEditing}
         onFocusSheet={setFocusedSheetId}
         onCenteredSheetChange={setCenteredSheetId}

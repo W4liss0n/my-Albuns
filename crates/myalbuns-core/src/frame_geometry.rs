@@ -8,9 +8,15 @@ use crate::{ProjectRect, RectUm};
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct FrameGeometryEdit {
+    pub frames: Vec<FrameGeometryTarget>,
+    pub gesture: FrameGeometryGesture,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FrameGeometryTarget {
     pub frame_id: String,
     pub expected_rect: RectUm,
-    pub gesture: FrameGeometryGesture,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
@@ -67,10 +73,87 @@ impl FrameResizeHandle {
 // Legacy smaller Frames can retain their size and grow, without shrinking further.
 const MIN_FRAME_EDGE_UM: u64 = 12_000;
 
-pub(crate) fn edited_rect(
+pub(crate) fn edited_rects(
+    rects: &[ProjectRect],
+    surface_width: u64,
+    surface_height: u64,
+    gesture: &FrameGeometryGesture,
+) -> Vec<ProjectRect> {
+    let x = rects
+        .iter()
+        .map(|rect| rect.x())
+        .min()
+        .expect("nonempty selection");
+    let y = rects
+        .iter()
+        .map(|rect| rect.y())
+        .min()
+        .expect("nonempty selection");
+    let right = rects
+        .iter()
+        .map(|rect| rect.x() + rect.width())
+        .max()
+        .unwrap();
+    let bottom = rects
+        .iter()
+        .map(|rect| rect.y() + rect.height())
+        .max()
+        .unwrap();
+    let bounds = ProjectRect::new(x, y, right - x, bottom - y);
+    let minimum_width = minimum_group_axis(bounds.width(), rects.iter().map(|rect| rect.width()));
+    let minimum_height =
+        minimum_group_axis(bounds.height(), rects.iter().map(|rect| rect.height()));
+    let resized = edited_rect(
+        bounds,
+        surface_width,
+        surface_height,
+        minimum_width,
+        minimum_height,
+        gesture,
+    );
+    rects
+        .iter()
+        .map(|rect| {
+            let left = scaled_offset(rect.x() - x, bounds.width(), resized.width());
+            let top = scaled_offset(rect.y() - y, bounds.height(), resized.height());
+            let right = scaled_offset(rect.x() + rect.width() - x, bounds.width(), resized.width());
+            let bottom = scaled_offset(
+                rect.y() + rect.height() - y,
+                bounds.height(),
+                resized.height(),
+            );
+            ProjectRect::new(
+                resized.x() + left,
+                resized.y() + top,
+                right - left,
+                bottom - top,
+            )
+        })
+        .collect()
+}
+
+fn scaled_offset(offset: u64, original: u64, resized: u64) -> u64 {
+    ((u128::from(offset) * u128::from(resized) + u128::from(original / 2)) / u128::from(original))
+        as u64
+}
+
+fn minimum_group_axis(bounds_size: u64, member_sizes: impl Iterator<Item = u64>) -> u64 {
+    member_sizes
+        .map(|size| {
+            let numerator = u128::from(bounds_size) * u128::from(MIN_FRAME_EDGE_UM.min(size));
+            let denominator = u128::from(size);
+            (numerator / denominator + u128::from(numerator % denominator != 0)) as u64
+        })
+        .max()
+        .expect("nonempty selection")
+}
+
+fn edited_rect(
     rect: ProjectRect,
     surface_width: u64,
     surface_height: u64,
+    minimum_width: u64,
+    minimum_height: u64,
     gesture: &FrameGeometryGesture,
 ) -> ProjectRect {
     match *gesture {
@@ -95,6 +178,7 @@ pub(crate) fn edited_rect(
                 rect.x(),
                 rect.width(),
                 surface_width,
+                minimum_width,
                 horizontal,
                 from_center,
             );
@@ -102,6 +186,7 @@ pub(crate) fn edited_rect(
                 rect.y(),
                 rect.height(),
                 surface_height,
+                minimum_height,
                 vertical,
                 from_center,
             );
@@ -143,7 +228,14 @@ struct ResizeAxis {
 }
 
 impl ResizeAxis {
-    fn new(start: u64, size: u64, limit: u64, direction: i8, from_center: bool) -> Self {
+    fn new(
+        start: u64,
+        size: u64,
+        limit: u64,
+        minimum_size: u64,
+        direction: i8,
+        from_center: bool,
+    ) -> Self {
         let anchor_ratio = if from_center {
             0.5
         } else if direction < 0 {
@@ -166,11 +258,7 @@ impl ResizeAxis {
             anchor,
             anchor_ratio,
             delta_multiplier: f64::from(direction) * if from_center { 2.0 } else { 1.0 },
-            minimum: if direction == 0 {
-                size
-            } else {
-                MIN_FRAME_EDGE_UM.min(size)
-            } as f64,
+            minimum: if direction == 0 { size } else { minimum_size } as f64,
             maximum,
             limit,
         }

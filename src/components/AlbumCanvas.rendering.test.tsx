@@ -1269,7 +1269,7 @@ test("keeps the materialized Pixi scene stable across view-only updates", async 
       composition={interactiveComposition}
       sheetBarMetadata={[]}
       continuousCanvasLayout={layout}
-      selectedFrameId={selectedFrameId}
+      selectedFrameIds={selectedFrameId ? [selectedFrameId] : []}
       focusedSheetId="sheet-001"
       centeredSheetId="sheet-001"
       viewport={{ offsetX }}
@@ -1571,7 +1571,7 @@ test("materializes and releases only the viewport margin while navigating a long
       sheetBarMetadata={[]}
       mediaPreviewUrls={mediaPreviewUrls}
       continuousCanvasLayout={layout}
-      selectedFrameId={null}
+      selectedFrameIds={[]}
       focusedSheetId={focusedSheetId}
       centeredSheetId={focusedSheetId}
       viewport={{
@@ -1653,7 +1653,7 @@ test("reconciles only the composed sheet that changed", async () => {
     projectId: "project-spike-001",
     mode: { kind: "normal" } as const,
     sheetBarMetadata: [],
-    selectedFrameId: null,
+    selectedFrameIds: [],
     focusedSheetId: "sheet-001",
     centeredSheetId: "sheet-001",
     viewport: { offsetX: 42 },
@@ -1915,7 +1915,7 @@ test("slides intermediate Pixi Sheets while the dragged Sheet yields to the plac
       threeSheetComposition.sheets,
     ),
     sheetBarMetadata: [],
-    selectedFrameId: null,
+    selectedFrameIds: [],
     focusedSheetId: "sheet-001",
     centeredSheetId: "sheet-001",
     viewport: { offsetX: 42 },

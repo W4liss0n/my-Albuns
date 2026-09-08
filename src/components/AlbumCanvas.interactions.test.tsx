@@ -499,7 +499,7 @@ test("cancels pending Pan and Zoom gestures when the Project changes", async () 
     continuousCanvasLayout: createContinuousCanvasLayout(
       interactiveComposition.sheets,
     ),
-    selectedFrameId: null,
+    selectedFrameIds: [],
     focusedSheetId: "sheet-001",
     centeredSheetId: "sheet-001",
     viewport: { offsetX: 42 },

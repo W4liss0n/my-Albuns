@@ -9,7 +9,9 @@ mod project_recovery;
 mod project_store;
 mod validation;
 
-pub use frame_geometry::{FrameGeometryEdit, FrameGeometryGesture, FrameResizeHandle};
+pub use frame_geometry::{
+    FrameGeometryEdit, FrameGeometryGesture, FrameGeometryTarget, FrameResizeHandle,
+};
 
 pub use model::{
     AlbumSnapshot, ComposedBackground, ComposedColor, ComposedDecorative, ComposedFrame,

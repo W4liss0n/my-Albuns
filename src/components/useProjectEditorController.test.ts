@@ -56,7 +56,7 @@ function deferredValue<Value>() {
 beforeEach(() => {
   useEditorView.setState({
     projectId: representativeProjection.state.projectId,
-    selectedFrameId: null,
+    selectedFrameIds: [],
     focusedSheetId: "sheet-001",
     centeredSheetId: "sheet-001",
     editingSheetId: null,
@@ -81,10 +81,10 @@ test.each(["success", "failure"])("a pending Frame edit followed by Save uses th
       runProjectMutation, onProjectionChange });
   });
   const edit: FrameGeometryEdit = {
-    frameId: "frame-001", expectedRect: representativeProjection.state.album.sheets[0].frames[0].rect,
+    frames: [{ frameId: "frame-001", expectedRect: representativeProjection.state.album.sheets[0].frames[0].rect }],
     gesture: { kind: "move", deltaXUm: 30_000, deltaYUm: 20_000 },
   };
-  let finished!: Promise<ComposedFrame | null>;
+  let finished!: Promise<ComposedFrame[] | null>;
   act(() => {
     finished = view.result.current.canvasProps.frameGeometry!.commit(edit);
     view.result.current.save();
@@ -97,7 +97,7 @@ test.each(["success", "failure"])("a pending Frame edit followed by Save uses th
     await finished;
   });
   if (outcome === "success") {
-    expect(await finished).toEqual(changed.composition.sheets[0].frames[0]);
+    expect(await finished).toEqual([changed.composition.sheets[0].frames[0]]);
     expect(save).toHaveBeenCalledWith(changed.state.revision);
     expect(onProjectionChange).toHaveBeenCalledWith(changed);
   } else {

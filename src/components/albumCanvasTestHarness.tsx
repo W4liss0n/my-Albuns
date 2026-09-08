@@ -407,6 +407,7 @@ export function renderCanvas({
     },
   ],
   selectedFrameId = null,
+  selectedFrameIds = selectedFrameId ? [selectedFrameId] : [],
   mediaPreviewUrls,
   technicalGuides,
   frameGeometry,
@@ -438,12 +439,13 @@ export function renderCanvas({
   compositionPlan?: CompositionPlan;
   sheetBarMetadata?: readonly SheetBarMetadata[];
   selectedFrameId?: string | null;
+  selectedFrameIds?: readonly string[];
   mediaPreviewUrls?: Readonly<Record<string, string>>;
   technicalGuides?: CanvasTechnicalGuides;
   frameGeometry?: AlbumCanvasProps["frameGeometry"];
   sheetReorder?: CanvasSheetReorder;
   onCanvasMetricsChange?: (metrics: CanvasMetrics) => void;
-  onSelectFrame?: (frameId: string | null) => void;
+  onSelectFrame?: (frameId: string | null, toggle?: boolean) => void;
   onEditSheet?: (sheetId: string) => void;
   onFocusSheet?: (sheetId: string) => void;
   onCenteredSheetChange?: (sheetId: string) => void;
@@ -495,7 +497,7 @@ export function renderCanvas({
               )
             : createContinuousCanvasLayout(compositionPlan.sheets)
         }
-        selectedFrameId={selectedFrameId}
+        selectedFrameIds={selectedFrameIds}
         focusedSheetId="sheet-001"
         centeredSheetId="sheet-001"
         viewport={{ offsetX: 42 }}

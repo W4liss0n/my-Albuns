@@ -790,45 +790,61 @@ impl ProjectDocument {
     pub(crate) fn frame_geometry_edit(
         &self,
         edit: &crate::FrameGeometryEdit,
-    ) -> Result<(Uuid, ProjectRect), crate::CoreError> {
-        let missing = || crate::CoreError::FrameNotFound(edit.frame_id.clone());
-        let id = Uuid::parse_str(&edit.frame_id).map_err(|_| missing())?;
-        let (sheet, frame) = self
+    ) -> Result<Vec<(Uuid, ProjectRect)>, crate::CoreError> {
+        let first = edit
+            .frames
+            .first()
+            .ok_or(crate::CoreError::InvalidFrameGeometrySelection)?;
+        let first_id = Uuid::parse_str(&first.frame_id)
+            .map_err(|_| crate::CoreError::FrameNotFound(first.frame_id.clone()))?;
+        let sheet = self
             .sheets
             .iter()
-            .find_map(|sheet| {
-                sheet
-                    .frames
-                    .iter()
-                    .find(|frame| frame.id == id)
-                    .map(|frame| (sheet, frame))
-            })
-            .ok_or_else(missing)?;
-        if crate::RectUm::from(frame.rect) != edit.expected_rect {
-            return Err(crate::CoreError::FrameGeometryChanged);
+            .find(|sheet| sheet.frames.iter().any(|frame| frame.id == first_id))
+            .ok_or_else(|| crate::CoreError::FrameNotFound(first.frame_id.clone()))?;
+        let mut ids = Vec::with_capacity(edit.frames.len());
+        let mut rects = Vec::with_capacity(edit.frames.len());
+        for target in &edit.frames {
+            let id = Uuid::parse_str(&target.frame_id)
+                .map_err(|_| crate::CoreError::FrameNotFound(target.frame_id.clone()))?;
+            if ids.contains(&id) {
+                return Err(crate::CoreError::InvalidFrameGeometrySelection);
+            }
+            let frame = sheet
+                .frames
+                .iter()
+                .find(|frame| frame.id == id)
+                .ok_or(crate::CoreError::InvalidFrameGeometrySelection)?;
+            if crate::RectUm::from(frame.rect) != target.expected_rect {
+                return Err(crate::CoreError::FrameGeometryChanged);
+            }
+            ids.push(id);
+            rects.push(frame.rect);
         }
-        let rect = crate::frame_geometry::edited_rect(
-            frame.rect,
+        let rects = crate::frame_geometry::edited_rects(
+            &rects,
             active_surface_width(sheet, self.document.sheet_width_um),
             self.document.sheet_height_um,
             &edit.gesture,
         );
-        Ok((id, rect))
+        Ok(ids.into_iter().zip(rects).collect())
     }
 
     pub(crate) fn with_edited_frame_geometry(
         &self,
         edit: &crate::FrameGeometryEdit,
     ) -> Result<Self, crate::CoreError> {
-        let (id, rect) = self.frame_geometry_edit(edit)?;
+        let edits = self.frame_geometry_edit(edit)?;
         let mut candidate = self.clone();
-        let frame = candidate
+        for frame in candidate
             .sheets
             .iter_mut()
             .flat_map(|sheet| &mut sheet.frames)
-            .find(|frame| frame.id == id)
-            .expect("the geometry edit resolved an existing Frame");
-        frame.rect = rect;
+        {
+            if let Some((_, rect)) = edits.iter().find(|(id, _)| *id == frame.id) {
+                frame.rect = *rect;
+            }
+        }
         Ok(candidate)
     }
 

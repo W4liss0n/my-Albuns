@@ -232,13 +232,13 @@ export function useProjectMutations({
     )) !== null;
   }
 
-  async function commitFrameGeometry(edit: FrameGeometryEdit): Promise<ComposedFrame | null> {
+  async function commitFrameGeometry(edit: FrameGeometryEdit): Promise<ComposedFrame[] | null> {
     const committed = await commitProjection((port) =>
       imageProcessing.run((publish) => port.apply({ kind: "editFrameGeometry", edit }, publish)),
     );
     return committed?.composition.sheets
       .flatMap((sheet) => sheet.frames)
-      .find((frame) => frame.frameId === edit.frameId) ?? null;
+      .filter((frame) => edit.frames.some((target) => target.frameId === frame.frameId)) ?? null;
   }
 
   async function commitProjectSettingsDraft<Value, Delta>(

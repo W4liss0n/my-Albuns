@@ -14,21 +14,27 @@ import { useProjectMutationRunner } from "./useProjectMutationRunner";
 
 setupAlbumCanvasTestHarness();
 
-test("releasing a Frame and immediately undoing presents the latest history and permits another gesture", async () => {
+test.each([1, 2])("releasing %i Frames and immediately undoing presents the latest history and permits another gesture", async (count) => {
   const initial = structuredClone(representativeProjection);
   initial.composition.sheets[0].frames[0].photo = null;
   initial.state.album.sheets[0].frames[0].photo = null;
+  if (count === 2) {
+    initial.composition.sheets[0].frames.push({ ...initial.composition.sheets[0].frames[0], frameId: "frame-002",
+      clipRect: { x: 200_000, y: 60_000, width: 80_000, height: 100_000 } });
+    initial.state.album.sheets[0].frames.push({ ...initial.state.album.sheets[0].frames[0], id: "frame-002",
+      rect: { x: 200_000, y: 60_000, width: 80_000, height: 100_000 } });
+  }
   const changed = structuredClone(initial);
   changed.state.revision += 1;
-  changed.composition.sheets[0].frames[0].clipRect.x += 40_000;
-  changed.state.album.sheets[0].frames[0].rect.x += 40_000;
+  for (const frame of changed.composition.sheets[0].frames) frame.clipRect.x += 40_000;
+  for (const frame of changed.state.album.sheets[0].frames) frame.rect.x += 40_000;
   const undone = structuredClone(initial);
   // The Core restores the historical revision number on Undo.
   undone.state.canRedo = true;
   let resolveEdit!: (projection: EditorProjection) => void;
   const pendingEdit = new Promise<EditorProjection>((resolve) => { resolveEdit = resolve; });
   const unsupported = async (): Promise<never> => { throw new Error("Unsupported in this Frame/history test."); };
-  const preview = vi.fn(async () => changed.composition.sheets[0].frames[0]);
+  const preview = vi.fn(async () => changed.composition.sheets[0].frames);
   const undo = vi.fn(async () => undone);
   const port: ProjectCorePort = {
     load: async () => initial, apply: async () => pendingEdit,
@@ -39,7 +45,7 @@ test("releasing a Frame and immediately undoing presents the latest history and 
   };
   useEditorView.setState({
     projectId: initial.state.projectId, editingSheetId: "sheet-001",
-    selectedFrameId: "frame-001", focusedSheetId: "sheet-001", centeredSheetId: "sheet-001",
+    selectedFrameIds: initial.state.album.sheets[0].frames.map((frame) => frame.id), focusedSheetId: "sheet-001", centeredSheetId: "sheet-001",
     viewport: { offsetX: 0 },
   });
   const presentedRevisions: number[] = [];
@@ -84,6 +90,9 @@ test("releasing a Frame and immediately undoing presents the latest history and 
   expect(undo).toHaveBeenCalledOnce();
   expect(presentedRevisions).toEqual([initial.state.revision, undone.state.revision]);
   expect(frame().position.x).toBe(20);
+  expect(useEditorView.getState().selectedFrameIds).toEqual(count === 2 ? ["frame-001", "frame-002"] : ["frame-001"]);
+  if (count === 2) expect(getPixiLifecycle().displays
+    .filter((item) => item.label === "canvas-frame-frame-002").slice(-1)[0]!.position.x).toBe(200);
   preview.mockClear();
   press();
   fireEvent.pointerMove(window, { pointerId: 7, clientX: 145, clientY: 100 });

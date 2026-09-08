@@ -6,12 +6,12 @@ export type { ViewportState } from "./viewport";
 
 interface EditorViewState {
   projectId: string | null;
-  selectedFrameId: string | null;
+  selectedFrameIds: readonly string[];
   focusedSheetId: string | null;
   centeredSheetId: string | null;
   editingSheetId: string | null;
   viewport: ViewportState;
-  selectFrame(frameId: string | null): void;
+  selectFrame(frameId: string | null, toggle?: boolean): void;
   focusSheet(sheetId: string): void;
   centerSheet(sheetId: string): void;
   enterSheetEdit(sheetId: string, preserveSelectedFrame?: boolean): void;
@@ -26,14 +26,20 @@ interface EditorViewState {
 
 export const useEditorView = create<EditorViewState>((set) => ({
   projectId: null,
-  selectedFrameId: null,
+  selectedFrameIds: [],
   focusedSheetId: null,
   centeredSheetId: null,
   editingSheetId: null,
   viewport: {
     offsetX: 0,
   },
-  selectFrame: (selectedFrameId) => set({ selectedFrameId }),
+  selectFrame: (frameId, toggle = false) => set((state) => ({
+    selectedFrameIds: frameId === null ? [] : toggle && state.editingSheetId !== null
+      ? state.selectedFrameIds.includes(frameId)
+        ? state.selectedFrameIds.filter((id) => id !== frameId)
+        : [...state.selectedFrameIds, frameId]
+      : [frameId],
+  })),
   focusSheet: (focusedSheetId) => set({ focusedSheetId }),
   centerSheet: (centeredSheetId) => set({ centeredSheetId }),
   enterSheetEdit: (editingSheetId, preserveSelectedFrame = false) =>
@@ -41,10 +47,10 @@ export const useEditorView = create<EditorViewState>((set) => ({
       editingSheetId,
       focusedSheetId: editingSheetId,
       centeredSheetId: editingSheetId,
-      selectedFrameId: preserveSelectedFrame ? state.selectedFrameId : null,
+      selectedFrameIds: preserveSelectedFrame ? state.selectedFrameIds : [],
     })),
   exitSheetEdit: () =>
-    set({ editingSheetId: null, selectedFrameId: null }),
+    set({ editingSheetId: null, selectedFrameIds: [] }),
   setViewport: (viewport) => set({ viewport }),
   synchronizeProject: (projectId, sheetIds, frameIds) =>
     set((state) => {
@@ -52,7 +58,7 @@ export const useEditorView = create<EditorViewState>((set) => ({
       if (state.projectId !== projectId) {
         return {
           projectId,
-          selectedFrameId: null,
+          selectedFrameIds: [],
           focusedSheetId: firstSheetId,
           centeredSheetId: firstSheetId,
           editingSheetId: null,
@@ -60,12 +66,10 @@ export const useEditorView = create<EditorViewState>((set) => ({
         };
       }
 
+      const selectedFrameIds = state.selectedFrameIds.filter((id) => frameIds.includes(id));
       return {
-        selectedFrameId:
-          state.selectedFrameId &&
-          frameIds.includes(state.selectedFrameId)
-            ? state.selectedFrameId
-            : null,
+        selectedFrameIds: selectedFrameIds.length === state.selectedFrameIds.length
+          ? state.selectedFrameIds : selectedFrameIds,
         focusedSheetId:
           state.focusedSheetId &&
           sheetIds.includes(state.focusedSheetId)

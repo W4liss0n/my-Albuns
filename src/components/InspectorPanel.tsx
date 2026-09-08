@@ -68,6 +68,7 @@ const ALBUM_DESIGN_FORM_ID = "album-design-settings";
 export type InspectorContext =
   | { kind: "album" }
   | { kind: "sheet"; sheet: ComposedSheet }
+  | { kind: "multiple-frames"; frames: readonly FrameSnapshot[]; editingSheet: ComposedSheet }
   | {
       kind: "frame";
       frame: FrameSnapshot;
@@ -301,7 +302,7 @@ export function InspectorPanel({
   const editingSheet =
     context.kind === "sheet"
       ? context.sheet
-      : context.kind === "frame"
+      : context.kind === "frame" || context.kind === "multiple-frames"
         ? context.editingSheet ?? null
         : null;
   const selectedSheetScope = editingSheet
@@ -316,6 +317,10 @@ export function InspectorPanel({
   useEffect(() => {
     if (!editingSheet) setSheetScopeSelection(null);
   }, [editingSheet]);
+  const selectedPhotoCount = context.kind === "multiple-frames"
+    ? context.frames.filter((frame) => frame.photo !== null).length : 0;
+  const selectedPlaceholderCount = context.kind === "multiple-frames"
+    ? context.frames.length - selectedPhotoCount : 0;
 
   return (
     <aside
@@ -324,7 +329,17 @@ export function InspectorPanel({
       aria-label="Painel contextual"
     >
       <div className="inspector-scroll">
-        {context.kind === "frame" ? (
+        {context.kind === "multiple-frames" ? (
+          <div className="context-heading">
+            <span>Seleção múltipla</span>
+            <h2>{context.frames.length} Frames selecionados</h2>
+            <p>
+              {selectedPhotoCount} {selectedPhotoCount === 1 ? "Foto" : "Fotos"}
+              {" · "}
+              {selectedPlaceholderCount} {selectedPlaceholderCount === 1 ? "placeholder" : "placeholders"}
+            </p>
+          </div>
+        ) : context.kind === "frame" ? (
           <>
             <div className="context-heading">
               <span>Frame selecionado</span>

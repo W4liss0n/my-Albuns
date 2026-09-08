@@ -293,7 +293,7 @@ async function invokeImageProcessing<T>(
 
 export const tauriProjectCorePort: ProjectCorePort = {
   readFrameDragThreshold: () => invoke<PointerDragThreshold>("frame_drag_threshold"),
-  previewFrameGeometry: (edit) => invoke<ComposedFrame>("preview_frame_geometry", { edit }),
+  previewFrameGeometry: (edit) => invoke<ComposedFrame[]>("preview_frame_geometry", { edit }),
   load: (operationId) =>
     invoke<EditorProjection>("project_state", { operationId }),
   validateAlbumInformation: (information: AlbumInformation) =>

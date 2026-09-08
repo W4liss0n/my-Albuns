@@ -93,13 +93,20 @@ const projectWindowPort: ProjectWindowPort = {
 };
 
 test("derives Album, Sheet and Frame Inspector contexts from the editing state", () => {
+  const projection = structuredClone(representativeProjection);
+  projection.state.album.sheets[0].frames.push({
+    ...projection.state.album.sheets[0].frames[0], id: "frame-002", photo: null,
+  });
+  projection.composition.sheets[0].frames.push({
+    ...projection.composition.sheets[0].frames[0], frameId: "frame-002", photo: null,
+  });
   render(
     <ProjectWorkspace
       exportPipelinePort={exportPipelinePort}
       projectDialogPort={projectDialogPort}
       projectCorePort={projectCorePort}
       projectWindowPort={projectWindowPort}
-      projection={representativeProjection}
+      projection={projection}
       mediaPreviews={{}}
       onGraphicsUnavailable={() => undefined}
       onMediaDemandChange={() => undefined}
@@ -127,6 +134,15 @@ test("derives Album, Sheet and Frame Inspector contexts from the editing state",
   ).not.toBeInTheDocument();
 
   act(() => canvasHarness.props?.onSelectFrame("frame-001"));
+  expect(screen.getByText("Frame selecionado")).toBeInTheDocument();
+
+  act(() => canvasHarness.props?.onSelectFrame("frame-002", true));
+  expect(screen.getByRole("heading", { name: "2 Frames selecionados" })).toBeInTheDocument();
+  expect(screen.getByText("1 Foto · 1 placeholder")).toBeInTheDocument();
+  expect(screen.queryByRole("slider", { name: "Zoom da Foto" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Design da Lâmina" })).not.toBeInTheDocument();
+  expect(canvasHarness.props?.selectedFrameIds).toEqual(["frame-001", "frame-002"]);
+  act(() => canvasHarness.props?.onSelectFrame("frame-002", true));
   expect(screen.getByText("Frame selecionado")).toBeInTheDocument();
 
   act(() => canvasHarness.props?.onSelectFrame(null));

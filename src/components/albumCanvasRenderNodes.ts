@@ -82,6 +82,8 @@ export interface SheetRenderNode {
   placeholderLabels: Text[];
   inactiveSideGradient: FillGradient | null;
   frameSelections: Map<string, FrameSelectionRenderNode>;
+  frameSelectionLayer: Container;
+  frameGroupSelection: { signature: string; node: FrameSelectionRenderNode } | null;
   frameDropOutlines: Map<string, Graphics>;
   focusOutline: Graphics;
   sheetDropOutline: Graphics;
@@ -94,7 +96,7 @@ interface SheetRenderNodeCallbacks {
   previewTextureFor: (mediaId: string) => Texture | undefined;
   onSheetTap: (sheetId: string) => void;
   onSheetDoubleTap: (sheetId: string) => void;
-  onFrameTap: (sheetId: string, frameId: string) => void;
+  onFrameTap: (sheetId: string, frameId: string, toggle: boolean) => void;
   onFrameGeometryStart: (
     frameId: string,
     handle: FrameResizeHandle | null,
@@ -139,7 +141,7 @@ export function createSheetRenderNode(
     modePolicy.masksBleed,
   );
   const dispatchSheetDoubleTap = (event: FederatedPointerEvent) => {
-    if (!(event.detail >= 2)) return false;
+    if (modePolicy.editingSheetId !== null || !(event.detail >= 2)) return false;
     callbacks.onSheetDoubleTap(sheet.sheetId);
     return true;
   };
@@ -373,7 +375,7 @@ export function createSheetRenderNode(
       event.stopPropagation();
       if (dispatchSheetDoubleTap(event)) return;
       if (!event.altKey || modePolicy.showsFrameResizeHandles) {
-        callbacks.onFrameTap(sheet.sheetId, frame.frameId);
+        callbacks.onFrameTap(sheet.sheetId, frame.frameId, modePolicy.showsFrameResizeHandles && event.ctrlKey);
       }
     });
     frameContainer.on("pointerdown", (event: FederatedPointerEvent) => {
@@ -517,6 +519,8 @@ export function createSheetRenderNode(
     placeholderLabels,
     inactiveSideGradient: inactiveSide?.gradient ?? null,
     frameSelections,
+    frameSelectionLayer,
+    frameGroupSelection: null,
     frameDropOutlines,
     focusOutline,
     sheetDropOutline,

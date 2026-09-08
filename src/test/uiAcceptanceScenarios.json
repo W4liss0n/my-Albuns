@@ -989,6 +989,108 @@
       "readySelector": "[data-geometry-case=\"minimum\"] canvas", "actions": []
     },
     {
+      "id": "canvas-frame-group-selected",
+      "title": "Seleção múltipla — contornos individuais e caixa única",
+      "implementationPath": "/canvas-preview.html?acceptance=editor&groupGeometry=selected",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-group-geometry",
+        "implementationCaptureSelector": ".canvas-preview",
+        "reason": "A seleção múltipla segue o design 0001, posterior à referência vigente. A composição é produzida e verificada pelo ProjectCore."
+      },
+      "viewport": {
+        "width": 1600,
+        "height": 900
+      },
+      "readySelector": "[data-group-geometry-case=\"selected\"] canvas",
+      "actions": []
+    },
+    {
+      "id": "canvas-frame-group-moved",
+      "title": "Seleção múltipla — movimento conjunto",
+      "implementationPath": "/canvas-preview.html?acceptance=editor&groupGeometry=moved",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-group-geometry",
+        "implementationCaptureSelector": ".canvas-preview",
+        "reason": "A seleção múltipla segue o design 0001, posterior à referência vigente. A composição é produzida e verificada pelo ProjectCore."
+      },
+      "viewport": {
+        "width": 1600,
+        "height": 900
+      },
+      "readySelector": "[data-group-geometry-case=\"moved\"] canvas",
+      "actions": []
+    },
+    {
+      "id": "canvas-frame-group-resized",
+      "title": "Seleção múltipla — posições e dimensões redimensionadas",
+      "implementationPath": "/canvas-preview.html?acceptance=editor&groupGeometry=resized",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-group-geometry",
+        "implementationCaptureSelector": ".canvas-preview",
+        "reason": "A seleção múltipla segue o design 0001, posterior à referência vigente. A composição é produzida e verificada pelo ProjectCore."
+      },
+      "viewport": {
+        "width": 1600,
+        "height": 900
+      },
+      "readySelector": "[data-group-geometry-case=\"resized\"] canvas",
+      "actions": []
+    },
+    {
+      "id": "canvas-frame-group-proportional-centered",
+      "title": "Seleção múltipla — proporção e centro preservados",
+      "implementationPath": "/canvas-preview.html?acceptance=editor&groupGeometry=proportional-centered",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-group-geometry",
+        "implementationCaptureSelector": ".canvas-preview",
+        "reason": "A seleção múltipla segue o design 0001, posterior à referência vigente. A composição é produzida e verificada pelo ProjectCore."
+      },
+      "viewport": {
+        "width": 1600,
+        "height": 900
+      },
+      "readySelector": "[data-group-geometry-case=\"proportional-centered\"] canvas",
+      "actions": []
+    },
+    {
+      "id": "canvas-frame-group-minimum",
+      "title": "Seleção múltipla — limite do menor membro",
+      "implementationPath": "/canvas-preview.html?acceptance=editor&groupGeometry=minimum",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-group-geometry",
+        "implementationCaptureSelector": ".canvas-preview",
+        "reason": "A seleção múltipla segue o design 0001, posterior à referência vigente. A composição é produzida e verificada pelo ProjectCore."
+      },
+      "viewport": {
+        "width": 1600,
+        "height": 900
+      },
+      "readySelector": "[data-group-geometry-case=\"minimum\"] canvas",
+      "actions": []
+    },
+    {
+      "id": "workspace-frame-group",
+      "title": "Painel contextual — seleção de Foto e placeholder",
+      "implementationPath": "/workspace-preview.html?frame=multiple",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-group-inspector",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "O design 0001 define uma seleção transitória e a contagem dos Frames, Fotos e placeholders; a referência vigente antecede esse estado."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".app-shell:has(.context-heading p):has(.canvas-host canvas) .context-heading h2",
+      "actions": []
+    },
+    {
       "id": "canvas-sheet-editing",
       "title": "Canvas — entrada na Edição da Lâmina",
       "implementationPath": "/canvas-preview.html?acceptance=editor",

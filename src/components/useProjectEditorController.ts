@@ -112,14 +112,14 @@ export function useProjectEditorController({
       window.removeEventListener("resize", readThreshold);
     };
   }, [navigation.editingSheetId, projection.state.projectId, projectCorePort, reportInteractionError]);
-  const selectedFrame = useMemo(
+  const selectedFrames = useMemo(
     () =>
       projection.state.album.sheets
         .flatMap((sheet) => sheet.frames)
-        .find((frame) => frame.id === navigation.selectedFrameId) ??
-      null,
-    [projection.state.album.sheets, navigation.selectedFrameId],
+        .filter((frame) => navigation.selectedFrameIds.includes(frame.id)),
+    [projection.state.album.sheets, navigation.selectedFrameIds],
   );
+  const selectedFrame = selectedFrames.length === 1 ? selectedFrames[0] : null;
   const selectedComposedPhoto = useMemo(
     () =>
       projection.composition.sheets
@@ -191,7 +191,7 @@ export function useProjectEditorController({
       layoutLocked: false,
     })),
     continuousCanvasLayout: navigation.canvasLayout,
-    selectedFrameId: navigation.selectedFrameId,
+    selectedFrameIds: navigation.selectedFrameIds,
     focusedSheetId: navigation.focusedSheetId,
     centeredSheetId: navigation.centeredSheetId,
     viewport: navigation.viewport,
@@ -293,6 +293,7 @@ export function useProjectEditorController({
     dismissPhotoImportResult: mutations.dismissPhotoImportResult,
     selectedFrame,
     selectedComposedPhoto,
+    selectedFrames,
     displayedPhotoZoom: photoGestures.displayedPhotoZoom,
     displayedPhotoPanX: photoGestures.displayedPhotoPanX,
     zoomCommitting: photoGestures.zoomCommitting,
