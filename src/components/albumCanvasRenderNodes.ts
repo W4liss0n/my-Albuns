@@ -296,6 +296,9 @@ export function createSheetRenderNode(
         frameId: frame.frameId,
         createDragPreview: () => {
           const preview = createClippedPhotoPreview({ ...previewOptions, label: "photo-drag-preview" }, frameWidth, frameHeight);
+          // Include a visible Pan/Zoom preview that has not settled into the Core yet.
+          preview.layer.position.set(photoLayer.x, photoLayer.y);
+          preview.layer.scale.set(photoLayer.scale.x, photoLayer.scale.y);
           const container = new Container();
           container.addChild(preview.viewport, preview.clip);
           return container;
