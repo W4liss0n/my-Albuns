@@ -175,7 +175,9 @@ vi.mock("pixi.js", () => {
       return children[0];
     }
 
-    destroy() {
+    destroy(options?: { children?: boolean }) {
+      if (options?.children) for (const child of this.children) child.destroy(options);
+      this.emit("destroyed", undefined);
       this.children = [];
       this.handlers.clear();
     }
@@ -379,6 +381,12 @@ vi.mock("pixi.js", () => {
 
   return {
     Application,
+    AlphaFilter: class {
+      alpha: number;
+      destroyed = false;
+      constructor(options: { alpha: number }) { this.alpha = options.alpha; }
+      destroy() { this.destroyed = true; }
+    },
     Assets: {
       setPreferences: vi.fn(),
       load: vi.fn(

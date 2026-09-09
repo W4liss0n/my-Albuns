@@ -121,8 +121,9 @@ fn validate_composed_content(
                 &frame.frame_id,
                 CoreError::InvalidSnapshot,
             )?;
+            validate_frame_border(&frame.border, CoreError::InvalidSnapshot)?;
             if frame.border_fill_rects
-                != compose_frame_border_fill_rects(&frame.clip_rect, frame_border)
+                != compose_frame_border_fill_rects(&frame.clip_rect, &frame.border)
             {
                 return Err(CoreError::InvalidSnapshot(format!(
                     "plano de Borda inválido para o Frame {}",

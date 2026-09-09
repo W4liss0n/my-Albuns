@@ -428,6 +428,8 @@ fn export_snapshot() -> (ProductiveExportFixture, RenderSnapshot, String) {
     let sheet = &mut snapshot.composition.sheets[0];
     let draw_rect = sheet.base.draw_rect.clone();
     sheet.frames = vec![ComposedFrame {
+        border: myalbuns_core::ProjectedFrameBorder::None,
+        opacity_byte: 255,
         frame_id: "recovery-frame".into(),
         clip_rect: draw_rect.clone(),
         border_fill_rects: Vec::new(),

@@ -38,7 +38,8 @@ function harness() {
   const undo = vi.fn(async () => first);
   const port: ProjectCorePort = {
     load: async () => initial, apply, applyWithOutcome: unsupported, save, undo, redo: async () => second,
-    readFrameDragThreshold: async () => ({ x: 5, y: 5 }), readPhotoAngleDoubleClickTime: async () => 900,
+    readFrameDragThreshold: async () => ({ x: 5, y: 5 }), readSliderDoubleClickTime: async () => 900,
+    previewFrameStyle: async () => { throw new Error("Frame style preview is not configured in this fixture."); },
     previewPhotoAngle: preview, previewFrameGeometry: unsupported, saveAs: unsupported,
     validateAlbumInformation: unsupported, importPhoto: unsupported, resolvePhotoDropTarget: unsupported, relink: unsupported,
   };

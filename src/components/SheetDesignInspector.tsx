@@ -3,7 +3,6 @@ import { useState, type CSSProperties } from "react";
 import type { VisualScope } from "../application/scopedValues";
 import type {
   ComposedSheet,
-  ProjectedFrameBorder,
 } from "../domain/project";
 import { ActionButton } from "../ui";
 import { SheetPreview } from "./SheetPreview";
@@ -13,7 +12,6 @@ import "./SheetDesignInspector.css";
 export type SheetDesignScope = VisualScope;
 
 interface SheetDesignInspectorProps {
-  frameBorder: ProjectedFrameBorder;
   mediaPreviewUrls: Readonly<Record<string, string>>;
   scope: SheetDesignScope;
   sheet: ComposedSheet;
@@ -21,7 +19,6 @@ interface SheetDesignInspectorProps {
 }
 
 export function SheetDesignInspector({
-  frameBorder,
   mediaPreviewUrls,
   scope,
   sheet,
@@ -36,7 +33,6 @@ export function SheetDesignInspector({
   return (
     <div className="sheet-design-inspector">
       <SheetScopePreview
-        frameBorder={frameBorder}
         hoveredScope={hoveredScope}
         mediaPreviewUrls={mediaPreviewUrls}
         scope={scope}
@@ -80,7 +76,6 @@ export function SheetDesignInspector({
 }
 
 function SheetScopePreview({
-  frameBorder,
   hoveredScope,
   mediaPreviewUrls,
   scope,
@@ -88,7 +83,6 @@ function SheetScopePreview({
   onHoveredScopeChange,
   onScopeChange,
 }: {
-  frameBorder: ProjectedFrameBorder;
   hoveredScope: SheetDesignScope | null;
   mediaPreviewUrls: Readonly<Record<string, string>>;
   scope: SheetDesignScope;
@@ -122,7 +116,6 @@ function SheetScopePreview({
       onMouseLeave={() => onHoveredScopeChange(null)}
     >
       <SheetPreview
-        frameBorder={frameBorder}
         mediaPreviewUrls={mediaPreviewUrls}
         sheet={sheet}
       />

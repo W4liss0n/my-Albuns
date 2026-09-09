@@ -13,7 +13,7 @@ const PROJECT_V1_MIGRATION_INPUT: &[u8] =
 const PROJECT_V2_MIGRATION_EXPECTED: &[u8] =
     include_bytes!("fixtures/project_document_v2_migration_expected.myalbuns");
 const PROJECT_V6_MIGRATION_EXPECTED: &[u8] =
-    include_bytes!("fixtures/project_document_v6_migration_expected.myalbuns");
+    include_bytes!("fixtures/project_document_v7_migration_expected.myalbuns");
 
 const PROJECT_WITH_PHOTO_AND_DECORATIVE_V2: &str = r##"{
   "documentType": "myalbuns.project",
@@ -154,7 +154,7 @@ fn v2_rejects_a_photo_as_background_or_overlay() {
 }
 
 #[test]
-fn an_authorized_editable_v2_project_promotes_to_v6_and_keeps_opaque_identity_authority() {
+fn an_authorized_editable_v2_project_promotes_to_v7_and_keeps_opaque_identity_authority() {
     let root = tempfile::tempdir().expect("temporary editable v2 Project");
     let project_path = root.path().join("Projeto tracer.myalbuns");
     fs::write(&project_path, PROJECT_WITH_PHOTO_AND_DECORATIVE_V2)
@@ -182,7 +182,7 @@ fn an_authorized_editable_v2_project_promotes_to_v6_and_keeps_opaque_identity_au
     let persisted: serde_json::Value =
         serde_json::from_slice(&fs::read(&project_path).expect("the saved v2 Project is readable"))
             .expect("the saved v2 Project remains JSON");
-    assert_eq!(persisted["schemaVersion"], 6);
+    assert_eq!(persisted["schemaVersion"], 7);
     assert_eq!(persisted["project"]["media"][0]["kind"], "photo");
     assert_eq!(persisted["project"]["media"][1]["kind"], "decorative");
 }
@@ -349,7 +349,7 @@ fn the_v1_to_v2_golden_step_remains_exact_and_publicly_readable() {
 }
 
 #[test]
-fn explicit_save_promotes_an_open_v1_project_to_the_versioned_v6_golden_result() {
+fn explicit_save_promotes_an_open_v1_project_to_the_versioned_v7_golden_result() {
     let root = tempfile::tempdir().expect("temporary editable migration Project");
     let project_path = root.path().join("Projeto legado.myalbuns");
     fs::write(&project_path, PROJECT_V1_MIGRATION_INPUT).expect("the v1 fixture is written");

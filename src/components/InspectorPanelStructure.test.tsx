@@ -538,7 +538,6 @@ function props(): ComponentProps<typeof InspectorPanel> {
     displayedPhotoZoom: 1,
     document: projection.state.document,
     focusedSheetId: projection.state.album.sheets[0].id,
-    frameBorder: projection.composition.frameBorder,
     mediaItems: projection.state.album.media,
     mediaPreviews: {},
     onApplyAlbumDesign: vi.fn(),

@@ -31,6 +31,9 @@
           },
           "frames": [
             {
+              "border": {
+                "kind": "none"
+              },
               "borderFillRects": [],
               "clipRect": {
                 "height": 120000,
@@ -39,6 +42,7 @@
                 "y": 50000
               },
               "frameId": "side-frame-0-0",
+              "opacityByte": 255,
               "photo": {
                 "blackAndWhite": false,
                 "drawRect": {
@@ -106,6 +110,9 @@
               "zIndex": 0
             },
             {
+              "border": {
+                "kind": "none"
+              },
               "borderFillRects": [],
               "clipRect": {
                 "height": 150000,
@@ -114,6 +121,7 @@
                 "y": 100000
               },
               "frameId": "side-frame-0-1",
+              "opacityByte": 255,
               "photo": {
                 "blackAndWhite": false,
                 "drawRect": {
@@ -181,6 +189,9 @@
               "zIndex": 1
             },
             {
+              "border": {
+                "kind": "none"
+              },
               "borderFillRects": [],
               "clipRect": {
                 "height": 100000,
@@ -189,10 +200,14 @@
                 "y": 50000
               },
               "frameId": "side-frame-0-2",
+              "opacityByte": 255,
               "photo": null,
               "zIndex": 2
             },
             {
+              "border": {
+                "kind": "none"
+              },
               "borderFillRects": [],
               "clipRect": {
                 "height": 60000,
@@ -201,6 +216,7 @@
                 "y": 210000
               },
               "frameId": "side-frame-0-3",
+              "opacityByte": 255,
               "photo": null,
               "zIndex": 3
             }
@@ -236,6 +252,9 @@
           },
           "frames": [
             {
+              "border": {
+                "kind": "none"
+              },
               "borderFillRects": [],
               "clipRect": {
                 "height": 120000,
@@ -244,10 +263,14 @@
                 "y": 80000
               },
               "frameId": "side-frame-1-0",
+              "opacityByte": 255,
               "photo": null,
               "zIndex": 0
             },
             {
+              "border": {
+                "kind": "none"
+              },
               "borderFillRects": [],
               "clipRect": {
                 "height": 160000,
@@ -256,6 +279,7 @@
                 "y": 60000
               },
               "frameId": "side-frame-1-1",
+              "opacityByte": 255,
               "photo": null,
               "zIndex": 1
             }
@@ -330,6 +354,12 @@
                   "x": 30000,
                   "y": 50000
                 },
+                "style": {
+                  "borderRgb": "#000000",
+                  "borderWidthUm": 0,
+                  "opacityPercent": 100,
+                  "source": "album"
+                },
                 "zIndex": 0
               },
               {
@@ -352,6 +382,12 @@
                   "x": 400000,
                   "y": 100000
                 },
+                "style": {
+                  "borderRgb": "#000000",
+                  "borderWidthUm": 0,
+                  "opacityPercent": 100,
+                  "source": "album"
+                },
                 "zIndex": 1
               },
               {
@@ -363,6 +399,12 @@
                   "x": 260000,
                   "y": 50000
                 },
+                "style": {
+                  "borderRgb": "#000000",
+                  "borderWidthUm": 0,
+                  "opacityPercent": 100,
+                  "source": "album"
+                },
                 "zIndex": 2
               },
               {
@@ -373,6 +415,12 @@
                   "width": 100000,
                   "x": 200000,
                   "y": 210000
+                },
+                "style": {
+                  "borderRgb": "#000000",
+                  "borderWidthUm": 0,
+                  "opacityPercent": 100,
+                  "source": "album"
                 },
                 "zIndex": 3
               }
@@ -399,6 +447,12 @@
                   "x": 40000,
                   "y": 80000
                 },
+                "style": {
+                  "borderRgb": "#000000",
+                  "borderWidthUm": 0,
+                  "opacityPercent": 100,
+                  "source": "album"
+                },
                 "zIndex": 0
               },
               {
@@ -409,6 +463,12 @@
                   "width": 140000,
                   "x": 370000,
                   "y": 60000
+                },
+                "style": {
+                  "borderRgb": "#000000",
+                  "borderWidthUm": 0,
+                  "opacityPercent": 100,
+                  "source": "album"
                 },
                 "zIndex": 1
               }
@@ -492,6 +552,9 @@
               },
               "frames": [
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 120000,
@@ -500,6 +563,7 @@
                     "y": 50000
                   },
                   "frameId": "side-frame-0-0",
+                  "opacityByte": 255,
                   "photo": {
                     "blackAndWhite": false,
                     "drawRect": {
@@ -567,6 +631,9 @@
                   "zIndex": 0
                 },
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 150000,
@@ -575,6 +642,7 @@
                     "y": 100000
                   },
                   "frameId": "side-frame-0-1",
+                  "opacityByte": 255,
                   "photo": {
                     "blackAndWhite": false,
                     "drawRect": {
@@ -642,6 +710,9 @@
                   "zIndex": 1
                 },
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 100000,
@@ -650,10 +721,14 @@
                     "y": 50000
                   },
                   "frameId": "side-frame-0-2",
+                  "opacityByte": 255,
                   "photo": null,
                   "zIndex": 2
                 },
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 60000,
@@ -662,6 +737,7 @@
                     "y": 210000
                   },
                   "frameId": "side-frame-0-3",
+                  "opacityByte": 255,
                   "photo": null,
                   "zIndex": 3
                 }
@@ -697,6 +773,9 @@
               },
               "frames": [
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 120000,
@@ -705,10 +784,14 @@
                     "y": 80000
                   },
                   "frameId": "side-frame-1-0",
+                  "opacityByte": 255,
                   "photo": null,
                   "zIndex": 0
                 },
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 160000,
@@ -717,6 +800,7 @@
                     "y": 60000
                   },
                   "frameId": "side-frame-1-1",
+                  "opacityByte": 255,
                   "photo": null,
                   "zIndex": 1
                 }
@@ -791,6 +875,12 @@
                       "x": 330000,
                       "y": 50000
                     },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
                     "zIndex": 0
                   },
                   {
@@ -813,6 +903,12 @@
                       "x": 100000,
                       "y": 100000
                     },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
                     "zIndex": 1
                   },
                   {
@@ -824,6 +920,12 @@
                       "x": 260000,
                       "y": 50000
                     },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
                     "zIndex": 2
                   },
                   {
@@ -834,6 +936,12 @@
                       "width": 100000,
                       "x": 500000,
                       "y": 210000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
                     },
                     "zIndex": 3
                   }
@@ -860,6 +968,12 @@
                       "x": 40000,
                       "y": 80000
                     },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
                     "zIndex": 0
                   },
                   {
@@ -870,6 +984,12 @@
                       "width": 140000,
                       "x": 370000,
                       "y": 60000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
                     },
                     "zIndex": 1
                   }
@@ -956,6 +1076,9 @@
               },
               "frames": [
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 120000,
@@ -964,6 +1087,7 @@
                     "y": 50000
                   },
                   "frameId": "side-frame-0-0",
+                  "opacityByte": 255,
                   "photo": {
                     "blackAndWhite": false,
                     "drawRect": {
@@ -1031,6 +1155,9 @@
                   "zIndex": 0
                 },
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 150000,
@@ -1039,6 +1166,7 @@
                     "y": 100000
                   },
                   "frameId": "side-frame-0-1",
+                  "opacityByte": 255,
                   "photo": {
                     "blackAndWhite": false,
                     "drawRect": {
@@ -1106,6 +1234,9 @@
                   "zIndex": 1
                 },
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 100000,
@@ -1114,10 +1245,14 @@
                     "y": 50000
                   },
                   "frameId": "side-frame-0-2",
+                  "opacityByte": 255,
                   "photo": null,
                   "zIndex": 2
                 },
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 60000,
@@ -1126,6 +1261,7 @@
                     "y": 210000
                   },
                   "frameId": "side-frame-0-3",
+                  "opacityByte": 255,
                   "photo": null,
                   "zIndex": 3
                 }
@@ -1161,6 +1297,9 @@
               },
               "frames": [
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 120000,
@@ -1169,10 +1308,14 @@
                     "y": 80000
                   },
                   "frameId": "side-frame-1-0",
+                  "opacityByte": 255,
                   "photo": null,
                   "zIndex": 0
                 },
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 160000,
@@ -1181,6 +1324,7 @@
                     "y": 60000
                   },
                   "frameId": "side-frame-1-1",
+                  "opacityByte": 255,
                   "photo": null,
                   "zIndex": 1
                 }
@@ -1255,6 +1399,12 @@
                       "x": 30000,
                       "y": 50000
                     },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
                     "zIndex": 0
                   },
                   {
@@ -1277,6 +1427,12 @@
                       "x": 400000,
                       "y": 100000
                     },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
                     "zIndex": 1
                   },
                   {
@@ -1288,6 +1444,12 @@
                       "x": 260000,
                       "y": 50000
                     },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
                     "zIndex": 2
                   },
                   {
@@ -1298,6 +1460,12 @@
                       "width": 100000,
                       "x": 200000,
                       "y": 210000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
                     },
                     "zIndex": 3
                   }
@@ -1324,6 +1492,12 @@
                       "x": 340000,
                       "y": 80000
                     },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
                     "zIndex": 0
                   },
                   {
@@ -1334,6 +1508,12 @@
                       "width": 140000,
                       "x": 70000,
                       "y": 60000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
                     },
                     "zIndex": 1
                   }
@@ -1695,6 +1875,9 @@
               },
               "frames": [
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 160000,
@@ -1703,6 +1886,7 @@
                     "y": 70000
                   },
                   "frameId": "side-frame-0-0",
+                  "opacityByte": 255,
                   "photo": null,
                   "zIndex": 0
                 }
@@ -1761,6 +1945,12 @@
                       "width": 240000,
                       "x": 180000,
                       "y": 70000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
                     },
                     "zIndex": 0
                   }
@@ -1855,6 +2045,9 @@
               },
               "frames": [
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 160000,
@@ -1863,6 +2056,7 @@
                     "y": 70000
                   },
                   "frameId": "side-frame-0-0",
+                  "opacityByte": 255,
                   "photo": null,
                   "zIndex": 0
                 }
@@ -1921,6 +2115,12 @@
                       "width": 240000,
                       "x": 180000,
                       "y": 70000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
                     },
                     "zIndex": 0
                   }

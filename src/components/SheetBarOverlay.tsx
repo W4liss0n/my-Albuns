@@ -6,7 +6,6 @@ import {
 
 import type {
   ComposedSheet,
-  ProjectedFrameBorder,
 } from "../domain/project";
 import { projectCommandDescriptor } from "../application/projectCommandCatalog";
 import type { ViewportState } from "../state/viewport";
@@ -44,7 +43,6 @@ export interface SheetBarOverlayProps {
   readonly metrics: CanvasMetrics | null;
   readonly bleedUm?: number;
   readonly focusedSheetId?: string | null;
-  readonly frameBorder?: ProjectedFrameBorder;
   readonly mediaPreviewUrls?: Readonly<Record<string, string>>;
   readonly sheetBarMetadata?: readonly SheetBarMetadata[];
   readonly viewport: ViewportState;
@@ -358,7 +356,6 @@ export function SheetBarOverlay(
         >
           <SheetPreviewShell
             className="sheet-bar-overlay__ghost-visual"
-            frameBorder={props.frameBorder}
             mediaPreviewUrls={props.mediaPreviewUrls}
             sheet={ghostSheet}
             viewport={sheetPreviewViewport(

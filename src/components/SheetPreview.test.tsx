@@ -29,6 +29,7 @@ const photoSheet: ComposedSheet = {
   frames: [
     {
       frameId: "frame-001",
+      border: { kind: "none" }, opacityByte: 255,
       clipRect: {
         x: 20_000,
         y: 20_000,
@@ -100,6 +101,7 @@ const placeholderSheet: ComposedSheet = {
         width: 250_000,
         height: 220_000,
       },
+      border: { kind: "none" as const }, opacityByte: 255,
       borderFillRects: [],
       zIndex: 0,
       photo: null,
@@ -217,8 +219,9 @@ test("preserves the canonical visual stack supplied by CompositionCore", () => {
 test("renders the persisted solid Frame border on top of Frame content", () => {
   render(
     <SheetPreview
-      frameBorder={{ kind: "solid", rgb: "#A0B0C0", widthUm: 1_250 }}
-      sheet={photoSheet}
+      sheet={{ ...photoSheet, frames: photoSheet.frames.map((frame) => ({ ...frame,
+        border: { kind: "solid", rgb: "#A0B0C0", widthUm: 1_250 },
+      })) }}
     />,
   );
 
@@ -234,6 +237,18 @@ test("renders the persisted solid Frame border on top of Frame content", () => {
   expect(segments[0]).toHaveAttribute("height", "1250");
   expect(segments[3]).toHaveAttribute("x", "298750");
   expect(segments[3]).toHaveAttribute("width", "1250");
+});
+
+test("groups Photo and Border under one opacity while the Frame outline remains visible", () => {
+  render(<SheetPreview sheet={{ ...photoSheet, frames: photoSheet.frames.map((frame) => ({ ...frame,
+    opacityByte: 128, border: { kind: "solid", rgb: "#205070", widthUm: 1_250 },
+  })) }} />);
+  const svg = screen.getByRole("img", { name: /01/ });
+  const content = svg.querySelector('[data-preview-frame-content-id="frame-001"]');
+  expect(content).toHaveAttribute("opacity", String(128 / 255));
+  expect(content?.querySelector('[data-preview-photo-id="media-001"]')).toBeInTheDocument();
+  expect(content?.querySelector('[data-preview-frame-border-id="frame-001"]')).toBeInTheDocument();
+  expect(content?.querySelector('[data-preview-frame-id="frame-001"]')).toBeNull();
 });
 
 test("keeps preview strokes aligned with Canvas units at other sheet heights", () => {

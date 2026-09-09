@@ -103,6 +103,7 @@ test("matches the reference Canvas surface, cut-area crop and empty Frame treatm
       ...sheet,
       frames: [
         {
+          border: { kind: "none" as const }, opacityByte: 255,
           borderFillRects: [],
           clipRect: {
             x: 24_000,
@@ -1519,6 +1520,7 @@ test("materializes the persisted Frame border in the Canvas scene", async () => 
         ...sheet,
         frames: sheet.frames.map((frame) => ({
           ...frame,
+          border: { kind: "solid", rgb: "#A0B0C0", widthUm: 1_250 },
           borderFillRects: [
             { x: 0, y: 0, width: 300_000, height: 1_250 },
             { x: 0, y: 198_750, width: 300_000, height: 1_250 },
@@ -1551,6 +1553,24 @@ test("materializes the persisted Frame border in the Canvas scene", async () => 
   expect(border.fillStyles).toContainEqual(
     expect.objectContaining({ color: 0xa0b0c0 }),
   );
+});
+
+test("Frame opacity groups content without fading selection or disabling a transparent Frame", async () => {
+  const view = renderCanvas({
+    mode: { kind: "sheet-editing", sheetId: "sheet-001" },
+    selectedFrameIds: ["frame-001"],
+    compositionPlan: { ...interactiveComposition, sheets: interactiveComposition.sheets.map((sheet) => ({
+      ...sheet, frames: sheet.frames.map((frame) => ({ ...frame, opacityByte: 0 })),
+    })) },
+  });
+  await finishPixiInitialization();
+  const group = displayWithLabel("frame-content-frame-001");
+  expect(group).toMatchObject({ filters: [expect.objectContaining({ alpha: 0 })] });
+  expect(displayWithLabel("canvas-frame-frame-001")).toMatchObject({ eventMode: "static", alpha: 1 });
+  expect(displayWithLabel("frame-outline-frame-001")).toMatchObject({ alpha: 1 });
+  const filter = group?.filters[0] as { destroyed: boolean };
+  view.unmount();
+  expect(filter.destroyed).toBe(true);
 });
 
 test("materializes and releases only the viewport margin while navigating a long Album", async () => {
@@ -1748,6 +1768,7 @@ test("reconciles only the composed sheet that changed", async () => {
                   width: 200_000,
                   height: 200_000,
                 },
+                border: { kind: "none" as const }, opacityByte: 255,
                 borderFillRects: [],
                 zIndex: 0,
                 photo: null,

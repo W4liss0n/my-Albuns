@@ -3,6 +3,7 @@ import type { ComponentProps } from "react";
 import { beforeEach, expect, test, vi } from "vitest";
 
 import { representativeProjection } from "../test/projectFixtures";
+import { frameStyleCorpus } from "../test/frameStylePreview";
 import {
   InspectorPanel,
   type InspectorContext,
@@ -20,7 +21,6 @@ function inspectorProps(
     displayedPhotoZoom: 1,
     document: representativeProjection.state.document,
     focusedSheetId: composedSheet.sheetId,
-    frameBorder: representativeProjection.composition.frameBorder,
     mediaItems: representativeProjection.state.album.media,
     mediaPreviews: {},
     onApplyAlbumDesign: vi.fn(),
@@ -53,6 +53,31 @@ function sheetContext(): InspectorContext {
 }
 
 beforeEach(() => localStorage.clear());
+
+test("Frame style keeps mixed values neutral and lets an explicit color or restoration affect the selection", () => {
+  const state = frameStyleCorpus.states["single-custom"];
+  const frames = state.state.album.sheets[0].frames;
+  const onCommit = vi.fn();
+  const actions = { disabled: false, scopeKey: "styles", doubleClickTimeMs: 500,
+    dragThreshold: { x: 5, y: 5 }, onPreview: vi.fn(), onCommit, onCancel: vi.fn() };
+  const props = inspectorProps({ kind: "multiple-frames", frames, editingSheet: state.composition.sheets[0] });
+  const view = render(<InspectorPanel {...props} frameStyle={actions} />);
+  expect(screen.getByRole("spinbutton", { name: "Opacidade em porcentagem" })).toHaveValue("");
+  expect(screen.getByRole("spinbutton", { name: "Espessura da Borda em mm" })).toHaveValue("");
+  const color = screen.getByRole("button", { name: "Cor da Borda" });
+  expect(color).toHaveAttribute("data-mixed", "true");
+  expect(onCommit).not.toHaveBeenCalled();
+  fireEvent.click(color);
+  fireEvent.click(screen.getByRole("button", { name: "Aplicar cor" }));
+  expect(onCommit).toHaveBeenCalledExactlyOnceWith({ kind: "borderColor", rgb: "#000000" });
+  fireEvent.click(screen.getByRole("button", { name: "Voltar ao design do álbum" }));
+  expect(onCommit).toHaveBeenLastCalledWith({ kind: "restoreAlbum" });
+  view.rerender(<InspectorPanel {...props} context={{ kind: "multiple-frames",
+    frames: frames.map((frame) => ({ ...frame, photo: null })), editingSheet: state.composition.sheets[0],
+  }} frameStyle={actions} />);
+  expect(screen.getByRole("slider", { name: "Opacidade do Frame" })).toBeEnabled();
+  expect(screen.queryByRole("button", { name: "Ajustes e Efeitos" })).not.toBeInTheDocument();
+});
 
 test("Black and white has its own Effects section and exposes the mixed Photo state", () => {
   const frames = [structuredClone(sheetState.frames[0]), { ...structuredClone(sheetState.frames[0]), id: "second-photo" }];

@@ -76,6 +76,7 @@ pub(crate) async fn apply_project_intent(
         ProjectIntent::TransformPhoto { .. } => "transform_photo",
         ProjectIntent::OrientPhotos { .. } => "orient_photos",
         ProjectIntent::SetPhotoAngle { .. } => "set_photo_angle",
+        ProjectIntent::SetFrameStyle { .. } => "set_frame_style",
         ProjectIntent::TogglePhotoBlackAndWhite { .. } => "toggle_photo_black_and_white",
         ProjectIntent::AddPhoto { .. } => "add_photo",
         ProjectIntent::DropPhoto { .. } => "drop_photo",
@@ -207,9 +208,21 @@ pub(crate) async fn preview_photo_angle(
 }
 
 #[tauri::command]
-pub(crate) fn photo_angle_double_click_time(window: WebviewWindow) -> Result<u32, String> {
+pub(crate) async fn preview_frame_style(
+    edit: myalbuns_core::FrameStyleEdit,
+    window: WebviewWindow,
+    state: State<'_, ProjectHost>,
+) -> Result<Vec<myalbuns_core::ComposedFrame>, String> {
     if window.label() != PROJECT_WINDOW_LABEL {
-        return Err("O Ângulo só está disponível na Janela do Projeto.".into());
+        return Err("O estilo do Frame só pode ser consultado na Janela do Projeto.".into());
+    }
+    state.preview_frame_style(&edit)
+}
+
+#[tauri::command]
+pub(crate) fn slider_double_click_time(window: WebviewWindow) -> Result<u32, String> {
+    if window.label() != PROJECT_WINDOW_LABEL {
+        return Err("O intervalo de dois cliques só está disponível na Janela do Projeto.".into());
     }
     #[cfg(windows)]
     {
@@ -217,7 +230,7 @@ pub(crate) fn photo_angle_double_click_time(window: WebviewWindow) -> Result<u32
         Ok(unsafe { windows::Win32::UI::Input::KeyboardAndMouse::GetDoubleClickTime() })
     }
     #[cfg(not(windows))]
-    Err("A edição de Fotos requer a plataforma Windows suportada.".into())
+    Err("Os controles deslizantes requerem a plataforma Windows suportada.".into())
 }
 
 #[tauri::command]

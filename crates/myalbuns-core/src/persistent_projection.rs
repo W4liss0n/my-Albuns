@@ -76,6 +76,7 @@ pub(crate) fn editor_state(
                         .enumerate()
                         .map(|(z_index, frame)| FrameSnapshot {
                             id: frame.id().hyphenated().to_string(),
+                            style: frame.projected_style(project.visual_defaults()),
                             rect: RectUm {
                                 x: i64::try_from(frame.rect().x())
                                     .expect("validated Frame x fits i64"),

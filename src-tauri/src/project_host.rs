@@ -507,6 +507,15 @@ impl ProjectHost {
             .map_err(|error| error.to_string())
     }
 
+    pub(crate) fn preview_frame_style(
+        &self,
+        edit: &myalbuns_core::FrameStyleEdit,
+    ) -> Result<Vec<myalbuns_core::ComposedFrame>, String> {
+        self.project()?
+            .preview_frame_style(edit)
+            .map_err(|error| error.to_string())
+    }
+
     pub(crate) fn preview_frame_geometry(
         &self,
         edit: &myalbuns_core::FrameGeometryEdit,

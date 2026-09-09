@@ -113,7 +113,9 @@ test("keeps the photo inside a stationary frame mask throughout pan", async () =
   await finishPixiInitialization();
 
   const frame = displayWithHandler("pointerdown");
-  const maskedViewport = frame.children.find(
+  const maskedViewport = displayWithLabel(
+    frame.label.replace("canvas-frame-", "frame-content-"),
+  ).children.find(
     (child) => (child as { mask?: unknown }).mask,
   ) as
     | {
@@ -232,7 +234,9 @@ test("keeps every frame corner covered while panning a rotated photo", async () 
   await finishPixiInitialization();
 
   const frame = displayWithHandler("pointerdown");
-  const maskedViewport = frame.children.find(
+  const maskedViewport = displayWithLabel(
+    frame.label.replace("canvas-frame-", "frame-content-"),
+  ).children.find(
     (child) => (child as { mask?: unknown }).mask,
   ) as { children: unknown[] };
   const photoLayer = maskedViewport.children.find(
@@ -305,7 +309,9 @@ test("does not reset an active Pan preview when wheel Zoom starts", async () => 
   await finishPixiInitialization();
 
   const frame = displayWithHandler("pointerdown");
-  const maskedViewport = frame.children.find(
+  const maskedViewport = displayWithLabel(
+    frame.label.replace("canvas-frame-", "frame-content-"),
+  ).children.find(
     (child) => (child as { mask?: unknown }).mask,
   ) as { children: unknown[] };
   const photoLayer = maskedViewport.children.find(
@@ -371,7 +377,9 @@ test("previews a smooth wheel zoom and commits the sequence once", async () => {
   await finishPixiInitialization();
 
   const frame = displayWithHandler("wheel");
-  const maskedDisplay = frame.children.find(
+  const maskedDisplay = displayWithLabel(
+    frame.label.replace("canvas-frame-", "frame-content-"),
+  ).children.find(
     (child) => (child as { mask?: unknown }).mask,
   ) as {
     children: unknown[];

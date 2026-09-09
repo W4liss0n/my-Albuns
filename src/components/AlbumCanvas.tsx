@@ -570,7 +570,6 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
             bleedUm={props.technicalGuides?.bleedUm}
             disabled={props.sheetReorder.disabled}
             focusedSheetId={props.focusedSheetId}
-            frameBorder={props.composition.frameBorder}
             layout={props.continuousCanvasLayout}
             mediaPreviewUrls={props.mediaPreviewUrls}
             metrics={canvasMetrics}

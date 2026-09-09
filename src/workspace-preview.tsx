@@ -23,6 +23,9 @@ import {
 import type { CanvasGraphicsDiagnosticProbe } from "./components/canvasGraphicsDiagnosticProbeContext";
 import type {
   EditorProjection,
+  ComposedFrame,
+  FrameSnapshot,
+  FrameStyleEdit,
   PhotoAngleEdit,
   ProjectIntent,
   ProjectMutationOutcome,
@@ -37,6 +40,7 @@ import { frameContentSwapCorpus } from "./test/frameContentSwapPreview";
 import { frameClipboardCorpus } from "./test/frameClipboardPreview";
 import { sheetSideSwapCorpus } from "./test/sheetSideSwapPreview";
 import { photoOrientationCorpus } from "./test/photoOrientationPreview";
+import { frameStyleCorpus } from "./test/frameStylePreview";
 import { continuousCanvasScale, createCanvasSheetPresentation } from "./components/canvasGeometry";
 import { createCanvasSheetViewGeometry, createNormalCanvasLayout } from "./components/canvasSheetViewGeometry";
 import "./ui/theme.css";
@@ -128,6 +132,18 @@ if (frameContext === "orientation") {
   useEditorView.subscribe(exposePhotoOrientationState);
 }
 
+if (frameContext === "style") {
+  const sheetId = projection.state.album.sheets[0].id;
+  const selection = previewParameters.get("selection") ?? "single";
+  useEditorView.setState({ projectId: projection.state.projectId,
+    editingSheetId: previewParameters.get("mode") === "normal" ? null : sheetId,
+    focusedSheetId: sheetId, centeredSheetId: sheetId,
+    selectedFrameIds: selection === "none" ? [] : selection === "group" ? frameStyleCorpus.group
+      : selection === "placeholders" ? frameStyleCorpus.placeholders : frameStyleCorpus.single });
+  exposeFrameStyleState();
+  useEditorView.subscribe(exposeFrameStyleState);
+}
+
 const projectCorePort: ProjectCorePort = {
   load: async () => projection,
   validateAlbumInformation: async () => ({
@@ -142,7 +158,14 @@ const projectCorePort: ProjectCorePort = {
   applyWithOutcome: async (intent) => applyPreviewIntent(intent),
   importPhoto: async () => ({ kind: "cancelled", projection }),
   readFrameDragThreshold: async () => ({ x: 5, y: 5 }),
-  readPhotoAngleDoubleClickTime: async () => 500,
+  readSliderDoubleClickTime: async () => 500,
+  previewFrameStyle: async (edit) => {
+    const sample = frameStyleCorpus.previews.find((item) =>
+      item.from === frameStyleStateName() && sameFrameStyleEdit(item.edit, edit));
+    if (frameContext !== "style" || !sample) throw new Error("Estilo fora do corpus desta prévia.");
+    document.body.dataset.frameStylePreview = JSON.stringify(edit.change);
+    return structuredClone(sample.frames);
+  },
   previewPhotoAngle: async (edit) => {
     const sample = photoOrientationCorpus.anglePreviews.find((item) =>
       item.from === photoOrientationStateName() && sameAngleEdit(item.edit, edit));
@@ -181,9 +204,9 @@ const projectCorePort: ProjectCorePort = {
 
 const mediaPreviewPort: MediaPreviewPort = {
   prepareMediaPreviews: async () =>
-    frameContext === "orientation" && previewParameters.get("preview") === "palette"
+    (frameContext === "orientation" || frameContext === "style") && previewParameters.get("preview") === "palette"
       ? projection.state.album.media.map((media) => ({ mediaId: media.id, state: "unavailable" as const, url: null }))
-      : frameContext === "orientation" ? projection.state.album.media.map((media) => ({
+      : frameContext === "orientation" || frameContext === "style" ? projection.state.album.media.map((media) => ({
       mediaId: media.id, state: "ready" as const,
       url: `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400"><path fill="#e63f35" d="M0 0h300v200H0z"/><path fill="#329858" d="M300 0h300v200H300z"/><path fill="#376dcc" d="M0 200h300v200H0z"/><path fill="#e3b634" d="M300 200h300v200H300z"/><g font-family="sans-serif" font-size="80" fill="white" text-anchor="middle"><text x="150" y="130">A</text><text x="450" y="130">B</text><text x="150" y="330">C</text><text x="450" y="330">D</text></g></svg>')}`,
     })) : decorativeContext === "unavailable"
@@ -294,6 +317,7 @@ function createPreviewProjection(
   decorativeMode: string | null,
   structureMode: string | null,
 ): EditorProjection {
+  if (frameMode === "style") return structuredClone(frameStyleCorpus.states[previewParameters.get("style") ?? "album"]);
   if (frameMode === "orientation") return structuredClone(photoOrientationCorpus.states[previewParameters.get("orientation") ?? "neutral"]);
   if (frameMode === "side-swap") return structuredClone(sideSwapCase.before ?? sheetSideSwapCorpus.before);
   if (frameMode === "clipboard") return structuredClone(frameClipboardCase.before ?? frameClipboardCorpus.before);
@@ -370,10 +394,7 @@ function setPreviewFrames(preview: EditorProjection, frames: typeof stackCorpus.
     ...original, id: frame.frameId, rect: frame.clipRect, zIndex: frame.zIndex,
     photo: frame.photo ? original.photo : null,
   }));
-  preview.composition.sheets[0].frames = frames.map((frame) => ({ ...frame,
-    photo: frame.photo ? { ...frame.photo,
-      palette: [frame.photo.palette[0], frame.photo.palette[1], frame.photo.palette[2]] } : null,
-  }));
+  preview.composition.sheets[0].frames = structuredClone(frames) as unknown as ComposedFrame[];
 }
 
 function configurePhysicalPreview(
@@ -421,6 +442,14 @@ function configurePhysicalPreview(
 }
 
 function applyPreviewIntent(intent: ProjectIntent): ProjectMutationOutcome {
+  if (intent.kind === "setFrameStyle") {
+    const transition = frameStyleCorpus.transitions.find((item) =>
+      item.from === frameStyleStateName() && sameFrameStyleEdit(item.edit, intent.edit));
+    if (frameContext !== "style" || !transition) throw new Error("Comando fora do corpus de estilo desta prévia.");
+    projection = finalizePhysicalPreviewMutation(structuredClone(frameStyleCorpus.states[transition.to]), structuredClone(projection));
+    exposeFrameStyleState();
+    return { projection, affectedFrameId: null, affectedSheetId: null };
+  }
   if (intent.kind === "setPhotoAngle") {
     const current = photoOrientationStateName();
     const selected = projection.state.album.sheets.flatMap((sheet) => sheet.frames)
@@ -513,8 +542,8 @@ function applyPreviewIntent(intent: ProjectIntent): ProjectMutationOutcome {
     }
     const before = structuredClone(projection);
     const next = structuredClone(projection);
-    next.state.album.sheets.find((item) => item.id === intent.sheetId)!.frames = [structuredClone(manualFrameCase.frame)];
-    next.composition.sheets.find((item) => item.sheetId === intent.sheetId)!.frames = [structuredClone(manualFrameCase.composedFrame)];
+    next.state.album.sheets.find((item) => item.id === intent.sheetId)!.frames = [structuredClone(manualFrameCase.frame) as unknown as FrameSnapshot];
+    next.composition.sheets.find((item) => item.sheetId === intent.sheetId)!.frames = [structuredClone(manualFrameCase.composedFrame) as unknown as ComposedFrame];
     projection = finalizePhysicalPreviewMutation(next, before);
     exposeManualFrameState();
     return { projection, affectedFrameId: manualFrameCase.frame.id, affectedSheetId: null };
@@ -683,6 +712,7 @@ function restorePreviewHistory(
   if (frameContext === "clipboard") exposeFrameClipboardState();
   if (frameContext === "side-swap") exposeSheetSideSwapState();
   if (frameContext === "orientation") exposePhotoOrientationState();
+  if (frameContext === "style") exposeFrameStyleState();
   return projection;
 }
 
@@ -716,6 +746,22 @@ function exposeSheetSideSwapState() {
 function photoOrientationStateName() {
   return Object.entries(photoOrientationCorpus.states).find(([, state]) =>
     JSON.stringify(state.state.album) === JSON.stringify(projection.state.album))?.[0] ?? "unknown";
+}
+
+function frameStyleStateName() {
+  return Object.entries(frameStyleCorpus.states).find(([, state]) =>
+    JSON.stringify(state.state.album) === JSON.stringify(projection.state.album))?.[0] ?? "unknown";
+}
+
+function sameFrameStyleEdit(left: FrameStyleEdit, right: FrameStyleEdit) {
+  return [...left.frameIds].sort().join() === [...right.frameIds].sort().join() &&
+    JSON.stringify(left.change) === JSON.stringify(right.change);
+}
+
+function exposeFrameStyleState() {
+  document.body.dataset.frameStyle = frameStyleStateName();
+  document.body.dataset.frameStyleHistory = `${undoStack.length},${redoStack.length}`;
+  delete document.body.dataset.frameStylePreview;
 }
 
 function sameAngleEdit(left: PhotoAngleEdit, right: PhotoAngleEdit) {

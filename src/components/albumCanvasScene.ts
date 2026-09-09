@@ -499,7 +499,6 @@ export class AlbumCanvasScene {
         JSON.stringify([
           sheet,
           sheetBarMetadata.get(sheet.sheetId) ?? null,
-          this.input.composition.frameBorder,
           this.input.technicalGuides ?? null,
           albumCanvasModePolicy(this.input.mode),
           previewStates,
@@ -669,7 +668,6 @@ export class AlbumCanvasScene {
     const node = createSheetRenderNode(
       sheet,
       sheetBarMetadata,
-      this.input?.composition.frameBorder ?? { kind: "none" },
       this.input?.technicalGuides,
       albumCanvasModePolicy(
         this.input?.mode ?? { kind: "normal" },

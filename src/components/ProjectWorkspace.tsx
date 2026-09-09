@@ -697,6 +697,7 @@ export function ProjectWorkspace({
 
         {workspacePanels.panels.inspector.visible && <InspectorPanel
           key={projectId}
+          frameStyle={controller.frameStyle}
           photoOrientation={{ disabled: !controller.canOrientPhotos,
             onAction: (action) => { void controller.orientPhotos(action); }, angle: controller.photoAngle }}
           photoEffects={{ disabled: !controller.canApplyPhotoEffects,
@@ -710,7 +711,6 @@ export function ProjectWorkspace({
           mediaItems={projection.state.album.media}
           sheetStates={projection.state.album.sheets}
           sheets={controller.canvasProps.composition.sheets}
-          frameBorder={projection.composition.frameBorder}
           visualDefaults={projection.state.album.visualDefaults}
           focusedSheetId={controller.canvasProps.focusedSheetId}
           mediaPreviews={mediaPreviews}

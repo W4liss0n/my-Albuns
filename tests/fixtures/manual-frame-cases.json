@@ -178,6 +178,9 @@
         }
       },
       "composedFrame": {
+        "border": {
+          "kind": "none"
+        },
         "borderFillRects": [],
         "clipRect": {
           "height": 160000,
@@ -186,6 +189,7 @@
           "y": 70000
         },
         "frameId": "manual-frame",
+        "opacityByte": 255,
         "photo": null,
         "zIndex": 0
       },
@@ -197,6 +201,12 @@
           "width": 240000,
           "x": 180000,
           "y": 70000
+        },
+        "style": {
+          "borderRgb": "#000000",
+          "borderWidthUm": 0,
+          "opacityPercent": 100,
+          "source": "album"
         },
         "zIndex": 0
       },
@@ -381,6 +391,9 @@
         }
       },
       "composedFrame": {
+        "border": {
+          "kind": "none"
+        },
         "borderFillRects": [],
         "clipRect": {
           "height": 80000,
@@ -389,6 +402,7 @@
           "y": 110000
         },
         "frameId": "manual-frame",
+        "opacityByte": 255,
         "photo": null,
         "zIndex": 0
       },
@@ -400,6 +414,12 @@
           "width": 120000,
           "x": 90000,
           "y": 110000
+        },
+        "style": {
+          "borderRgb": "#000000",
+          "borderWidthUm": 0,
+          "opacityPercent": 100,
+          "source": "album"
         },
         "zIndex": 0
       },
@@ -584,6 +604,9 @@
         }
       },
       "composedFrame": {
+        "border": {
+          "kind": "none"
+        },
         "borderFillRects": [],
         "clipRect": {
           "height": 80000,
@@ -592,6 +615,7 @@
           "y": 110000
         },
         "frameId": "manual-frame",
+        "opacityByte": 255,
         "photo": null,
         "zIndex": 0
       },
@@ -603,6 +627,12 @@
           "width": 120000,
           "x": 90000,
           "y": 110000
+        },
+        "style": {
+          "borderRgb": "#000000",
+          "borderWidthUm": 0,
+          "opacityPercent": 100,
+          "source": "album"
         },
         "zIndex": 0
       },
@@ -787,6 +817,9 @@
         }
       },
       "composedFrame": {
+        "border": {
+          "kind": "none"
+        },
         "borderFillRects": [],
         "clipRect": {
           "height": 100000,
@@ -795,6 +828,7 @@
           "y": 0
         },
         "frameId": "manual-frame",
+        "opacityByte": 255,
         "photo": null,
         "zIndex": 0
       },
@@ -806,6 +840,12 @@
           "width": 150000,
           "x": 525000,
           "y": 0
+        },
+        "style": {
+          "borderRgb": "#000000",
+          "borderWidthUm": 0,
+          "opacityPercent": 100,
+          "source": "album"
         },
         "zIndex": 0
       },

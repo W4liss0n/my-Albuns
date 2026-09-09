@@ -1,4 +1,5 @@
 import {
+  AlphaFilter,
   Container,
   type FederatedPointerEvent,
   type FederatedWheelEvent,
@@ -13,7 +14,6 @@ import type {
   ComposedSheet,
   FrameResizeHandle,
   NormalizedPan,
-  ProjectedFrameBorder,
 } from "../domain/project";
 import type {
   CanvasTechnicalGuides,
@@ -132,7 +132,6 @@ interface PhotoPreviewLayerOptions {
 export function createSheetRenderNode(
   sheet: ComposedSheet,
   sheetBarMetadata: SheetBarMetadata | undefined,
-  frameBorder: ProjectedFrameBorder,
   technicalGuides: CanvasTechnicalGuides | undefined,
   modePolicy: AlbumCanvasModePolicy,
   signature: string,
@@ -254,6 +253,15 @@ export function createSheetRenderNode(
     frameContainer.hitArea = new Rectangle(0, 0, frameWidth, frameHeight);
     frameContainer.cursor = modePolicy.showsFrameResizeHandles && !sheetBarMetadata?.layoutLocked
       ? "move" : "default";
+    const frameContent = new Container();
+    frameContent.label = `frame-content-${frame.frameId}`;
+    frameContent.eventMode = "none";
+    if (frame.opacityByte < 255) {
+      const opacity = new AlphaFilter({ alpha: frame.opacityByte / 255 });
+      frameContent.filters = [opacity];
+      // AlphaFilter uses cached programs shared with other Frames.
+      frameContent.on("destroyed", () => opacity.destroy());
+    }
 
     let photoNode: PhotoRenderNode | null = null;
     let emptyPlaceholder: ReturnType<
@@ -288,10 +296,10 @@ export function createSheetRenderNode(
       const thirdsGuides = createThirdsGuides(frameWidth, frameHeight);
       frameContainer.addChild(
         outsidePhotoLayer,
-        photoViewport,
-        clip,
+        frameContent,
         thirdsGuides,
       );
+      frameContent.addChild(photoViewport, clip);
 
       const baseZoom = frame.photo.placement.currentZoom;
       photoNode = {
@@ -324,7 +332,8 @@ export function createSheetRenderNode(
         frameWidth,
         frameHeight,
       );
-      frameContainer.addChild(emptyPlaceholder.container);
+      frameContent.addChild(emptyPlaceholder.fill);
+      frameContainer.addChild(frameContent, emptyPlaceholder.container);
       framePlaceholders.push(emptyPlaceholder);
     }
 
@@ -340,6 +349,7 @@ export function createSheetRenderNode(
     outline.label = `frame-outline-${frame.frameId}`;
     outline.eventMode = "none";
     let persistedBorder: Graphics | null = null;
+    const frameBorder = frame.border;
     if (frameBorder.kind === "solid" && frame.borderFillRects.length > 0) {
       persistedBorder = new Graphics();
       for (const rect of frame.borderFillRects) {
@@ -359,10 +369,8 @@ export function createSheetRenderNode(
       persistedBorder.label = `frame-persisted-border-${frame.frameId}`;
       persistedBorder.eventMode = "none";
     }
-    frameContainer.addChild(
-      outline,
-      ...(persistedBorder ? [persistedBorder] : []),
-    );
+    if (persistedBorder) frameContent.addChild(persistedBorder);
+    frameContainer.addChild(outline);
 
     const frameSelection = createFrameSelectionRenderNode(
       frame.frameId,
