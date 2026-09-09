@@ -505,7 +505,7 @@
       "viewport": { "width": 1440, "height": 900 },
       "readySelector": ".app-shell:has(.canvas-host[data-centered-sheet-id=\"sheet-001\"][data-viewport-offset-x=\"0\"]):has([role=\"menu\"][aria-label=\"Ações da Lâmina 01\"] button:nth-of-type(1):disabled):has([role=\"menu\"][aria-label=\"Ações da Lâmina 01\"] button:nth-of-type(4):disabled)",
       "actions": [
-        { "type": "context-click", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-001\"]" }
+        { "type": "context-click", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-001\"]", "offsetX": -40 }
       ]
     },
     {
@@ -560,7 +560,7 @@
         { "type": "focus", "selector": ".canvas-host canvas" },
         { "type": "key", "key": "ArrowRight" },
         { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-003\"][data-viewport-offset-x]:not([data-viewport-offset-x=\"0\"])" },
-        { "type": "pointer-click", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]" },
+        { "type": "pointer-click", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "offsetX": -40 },
         { "type": "assert", "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"] .sheet-tile[aria-current=\"true\"]" },
         { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-003\"][data-viewport-offset-x]:not([data-viewport-offset-x=\"0\"])" }
       ]
@@ -578,9 +578,9 @@
       "viewport": { "width": 1440, "height": 600 },
       "readySelector": ".app-shell:has(.canvas-host[data-centered-sheet-id=\"sheet-002\"]):not(:has([role=\"menu\"][aria-label^=\"Ações da Lâmina\"]))",
       "actions": [
-        { "type": "context-click", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]" },
+        { "type": "context-click", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "offsetX": -40 },
         { "type": "assert", "selector": "[role=\"menu\"][aria-label=\"Ações da Lâmina 02\"]" },
-        { "type": "pointer-click", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-001\"]" },
+        { "type": "pointer-click", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-001\"]", "offsetX": -40 },
         { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-002\"]" }
       ]
     },
@@ -1369,7 +1369,7 @@
         { "type": "focus", "selector": ".canvas-host canvas" },
         { "type": "key", "key": "ArrowRight" },
         { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-003\"]" },
-        { "type": "drag", "gesture": "pointer", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-003\"]", "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "phase": "escape" }
+        { "type": "drag", "gesture": "pointer", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-003\"]", "sourceXRatio": 0.25, "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "phase": "escape" }
       ]
     },
     {

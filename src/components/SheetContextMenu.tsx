@@ -81,7 +81,7 @@ export function SheetContextMenu({
           title={
             availability.canConvertEdge
               ? undefined
-              : "Disponível somente para uma extremidade vazia"
+              : "Disponível somente para uma extremidade"
           }
           type="button"
           onClick={() => invoke(onConvertEdge)}

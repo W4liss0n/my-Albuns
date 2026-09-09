@@ -895,8 +895,16 @@ test("keeps the Layout button and its Bar visible while the DOM action has focus
   vi.useFakeTimers();
   const currentBarNode = (label: string) => [...pixiLifecycle.displays].reverse().find((node) => node.label === label)!;
   const onToggle = vi.fn();
-  renderCanvas({ sheetLayouts: { disabled: false, activeSheetId: "sheet-001", onToggle } });
+  const view = renderCanvas();
   await finishPixiInitialization();
+  view.rerenderCanvas({
+    sheetLayouts: { disabled: false, activeSheetId: "sheet-001", onToggle },
+    sheetReorder: {
+      disabled: false, status: "idle",
+      representation: { ghost: null, placeholderIndex: null, order: ["sheet-001"] },
+      onCancel: vi.fn(), onDrop: vi.fn(), onSelect: vi.fn(), onPreview: vi.fn(),
+    },
+  });
   const button = screen.getByRole("button", { name: "Layouts da Lâmina 01" });
   fireEvent.focus(button);
   fireEvent.pointerLeave(button);
