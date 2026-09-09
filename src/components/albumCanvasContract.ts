@@ -105,6 +105,11 @@ export interface AlbumCanvasProps {
     disabled: boolean;
     onSwap(sheetId: string): void;
   };
+  sheetLayouts?: {
+    disabled: boolean;
+    activeSheetId: string | null;
+    onToggle(sheetId: string): void;
+  };
   photoDropHighlight?: PhotoDropTarget | null;
   photoZoomPreview?: PhotoZoomPreview | null;
   frameGeometry?: CanvasFrameGeometry;

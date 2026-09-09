@@ -332,7 +332,7 @@ fn opacity_personalizes_the_whole_style_and_restoration_resumes_album_inheritanc
 }
 
 #[test]
-fn saving_and_reopening_preserves_custom_frame_style_in_schema_v7() {
+fn saving_and_reopening_preserves_custom_frame_style_in_the_current_schema() {
     let root = tempfile::tempdir().unwrap();
     let mut project = project(root.path());
     let id = project.projection().state.album.sheets[0].frames[0]
@@ -351,7 +351,7 @@ fn saving_and_reopening_preserves_custom_frame_style_in_schema_v7() {
     let path = project.project_path().to_path_buf();
     let document: serde_json::Value =
         serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
-    assert_eq!(document["schemaVersion"], 7);
+    assert_eq!(document["schemaVersion"], 8);
     assert_eq!(
         document["project"]["sheets"][0]["frames"][0]["style"],
         serde_json::json!({

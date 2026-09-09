@@ -541,17 +541,6 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
         onDrop={handlePhotoDrop}
         onContextMenu={handleSheetContextMenu}
       >
-        <div
-          aria-label="Ações da Barra da Lâmina"
-          className="ui-visually-hidden"
-          role="group"
-        >
-          <button
-            aria-label="Abrir Painel de Layouts — indisponível nesta versão"
-            disabled
-            type="button"
-          />
-        </div>
         {graphicsState === "initializing" && (
           <span className="canvas-loading">Iniciando WebGL2…</span>
         )}
@@ -582,8 +571,10 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
             onEditSheet={props.onEditSheet}
             onSelect={props.sheetReorder.onSelect}
             onSwapSides={props.sheetSideSwap?.onSwap}
+            layouts={props.sheetLayouts}
             onBarHover={(sheetId, hovered, swapHovered) => sceneRef.current?.handleSheetBarHover(sheetId, hovered, swapHovered)}
-            onSwapFocus={(sheetId, focused) => sceneRef.current?.handleSheetBarSwapFocus(sheetId, focused)}
+            onSwapFocus={(sheetId, focused) => sceneRef.current?.handleSheetBarActionFocus(sheetId, "swap", focused)}
+            onLayoutFocus={(sheetId, focused) => sceneRef.current?.handleSheetBarActionFocus(sheetId, "layout", focused)}
             onPreview={props.sheetReorder.onPreview}
             representation={props.sheetReorder.representation}
             sheetBarMetadata={sheetBarMetadata}

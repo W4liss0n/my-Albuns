@@ -6,6 +6,7 @@ import type {
   AlbumInformationValidation,
   EditorProjection,
   ComposedFrame,
+  LayoutQueryResult,
   PhotoDropTarget,
   ProjectIntent,
   ProjectMutationOutcome,
@@ -296,6 +297,8 @@ export const tauriProjectCorePort: ProjectCorePort = {
   readSliderDoubleClickTime: () => invoke<number>("slider_double_click_time"),
   previewPhotoAngle: (edit) => invoke<ComposedFrame[]>("preview_photo_angle", { edit }),
   previewFrameStyle: (edit) => invoke<ComposedFrame[]>("preview_frame_style", { edit }),
+  queryLayouts: (sheetId) => invoke<LayoutQueryResult>("query_layouts", { sheetId }),
+  previewLayout: (selection) => invoke<ComposedFrame[]>("preview_layout", { selection }),
   previewFrameGeometry: (edit) => invoke<ComposedFrame[]>("preview_frame_geometry", { edit }),
   load: (operationId) =>
     invoke<EditorProjection>("project_state", { operationId }),

@@ -30,7 +30,7 @@ import {
   albumCanvasModePolicy,
   sheetsForCanvasMode,
 } from "./albumCanvasMode";
-import { applySheetBarScale, setSheetBarOverlayHovered, setSheetBarSwapFocused } from "./sheetBarRenderNode";
+import { applySheetBarScale, setSheetBarOverlayHovered, setSheetBarActionFocused } from "./sheetBarRenderNode";
 import { PhotoInteractionSession } from "./photoInteractionSession";
 import { FrameInteractionSession } from "./frameInteractionSession";
 import { FrameContentDragSession } from "./frameContentDragSession";
@@ -56,7 +56,7 @@ export class AlbumCanvasScene {
   private readonly world = new Container();
   private readonly sheetNodes = new Map<string, SheetRenderNode>();
   private hoveredBar: { sheetId: string; swapHovered: boolean } | null = null;
-  private focusedBarSheetId: string | null = null;
+  private focusedBarAction: { sheetId: string; action: "swap" | "layout" } | null = null;
   private readonly photoNodes = new Map<string, PhotoRenderNode>();
   private input: AlbumCanvasProps | null = null;
   private projectId: string | null = null;
@@ -133,10 +133,10 @@ export class AlbumCanvasScene {
     if (node) setSheetBarOverlayHovered(node.sheetBar, hovered, swapHovered);
   }
 
-  handleSheetBarSwapFocus(sheetId: string, focused: boolean) {
-    this.focusedBarSheetId = focused ? sheetId : null;
+  handleSheetBarActionFocus(sheetId: string, action: "swap" | "layout", focused: boolean) {
+    this.focusedBarAction = focused ? { sheetId, action } : null;
     const node = this.sheetNodes.get(sheetId);
-    if (node) setSheetBarSwapFocused(node.sheetBar, focused);
+    if (node) setSheetBarActionFocused(node.sheetBar, action, focused);
   }
 
   update(input: AlbumCanvasProps, hostHeight: number) {
@@ -375,7 +375,7 @@ export class AlbumCanvasScene {
 
   private resetTransientInteractions() {
     this.hoveredBar = null;
-    this.focusedBarSheetId = null;
+    this.focusedBarAction = null;
     this.photoInteractions.reset();
     this.frameInteractions.reset();
     this.frameContentDrag.reset();
@@ -536,8 +536,8 @@ export class AlbumCanvasScene {
       if (this.hoveredBar?.sheetId === sheet.sheetId) {
         setSheetBarOverlayHovered(node.sheetBar, true, this.hoveredBar.swapHovered);
       }
-      if (this.focusedBarSheetId === sheet.sheetId) {
-        setSheetBarSwapFocused(node.sheetBar, true);
+      if (this.focusedBarAction?.sheetId === sheet.sheetId) {
+        setSheetBarActionFocused(node.sheetBar, this.focusedBarAction.action, true);
       }
       applyPlaceholderLabelScale(node, scale);
       for (const selection of node.frameSelections.values()) {

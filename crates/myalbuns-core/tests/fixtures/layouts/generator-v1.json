@@ -1,0 +1,3395 @@
+{
+  "schemaVersion": 1,
+  "contract": "docs/design/0026-contrato-do-gerador-e-da-aplicacao-de-layouts.md",
+  "reference": {
+    "branch": "codex/prototype-layout-generator",
+    "commit": "6a3d68f",
+    "algorithm": "aligned-families-prototype-9",
+    "presentation": {
+      "groupMirrors": true
+    },
+    "coordinateUnit": "um",
+    "comparisonToleranceUm": 1
+  },
+  "examples": [
+    {
+      "id": "one-vertical-single",
+      "query": {
+        "surface": {
+          "type": "singlePage",
+          "widthUm": 210000,
+          "heightUm": 300000
+        },
+        "frameOrientations": [
+          "vertical"
+        ],
+        "permission": "pagesOnly",
+        "marginUm": 15000,
+        "gapUm": 5000,
+        "minimumSideUm": 20000
+      },
+      "layouts": [
+        {
+          "scope": "page",
+          "positions": [
+            {
+              "x": 15000,
+              "y": 15000,
+              "width": 180000,
+              "height": 270000
+            }
+          ],
+          "referenceFamily": "Frame único"
+        }
+      ]
+    },
+    {
+      "id": "square-single",
+      "query": {
+        "surface": {
+          "type": "singlePage",
+          "widthUm": 300000,
+          "heightUm": 300000
+        },
+        "frameOrientations": [
+          "square"
+        ],
+        "permission": "pagesOnly",
+        "marginUm": 15000,
+        "gapUm": 5000,
+        "minimumSideUm": 20000
+      },
+      "layouts": [
+        {
+          "scope": "page",
+          "positions": [
+            {
+              "x": 15000,
+              "y": 15000,
+              "width": 270000,
+              "height": 270000
+            }
+          ],
+          "referenceFamily": "Frame único"
+        }
+      ]
+    },
+    {
+      "id": "three-verticals-portrait",
+      "query": {
+        "surface": {
+          "type": "singlePage",
+          "widthUm": 200000,
+          "heightUm": 300000
+        },
+        "frameOrientations": [
+          "vertical",
+          "vertical",
+          "vertical"
+        ],
+        "permission": "pagesOnly",
+        "marginUm": 15000,
+        "gapUm": 5000,
+        "minimumSideUm": 20000
+      },
+      "layouts": [
+        {
+          "scope": "page",
+          "positions": [
+            {
+              "x": 71111,
+              "y": 15000,
+              "width": 57778,
+              "height": 86667
+            },
+            {
+              "x": 71111,
+              "y": 106667,
+              "width": 57778,
+              "height": 86666
+            },
+            {
+              "x": 71111,
+              "y": 198333,
+              "width": 57778,
+              "height": 86667
+            }
+          ],
+          "referenceFamily": "Trio alinhado"
+        },
+        {
+          "scope": "page",
+          "positions": [
+            {
+              "x": 15000,
+              "y": 110000,
+              "width": 53333,
+              "height": 80000
+            },
+            {
+              "x": 73333,
+              "y": 110000,
+              "width": 53334,
+              "height": 80000
+            },
+            {
+              "x": 131667,
+              "y": 110000,
+              "width": 53333,
+              "height": 80000
+            }
+          ],
+          "referenceFamily": "Trio alinhado"
+        }
+      ]
+    },
+    {
+      "id": "four-verticals-complete",
+      "query": {
+        "surface": {
+          "type": "singlePage",
+          "widthUm": 300000,
+          "heightUm": 240000
+        },
+        "frameOrientations": [
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical"
+        ],
+        "permission": "pagesOnly",
+        "marginUm": 15000,
+        "gapUm": 5000,
+        "minimumSideUm": 20000
+      },
+      "layouts": [
+        {
+          "scope": "page",
+          "positions": [
+            {
+              "x": 15000,
+              "y": 15000,
+              "width": 104498,
+              "height": 210000
+            },
+            {
+              "x": 124498,
+              "y": 15000,
+              "width": 104497,
+              "height": 210000
+            },
+            {
+              "x": 233995,
+              "y": 15000,
+              "width": 51005,
+              "height": 102500
+            },
+            {
+              "x": 233995,
+              "y": 122500,
+              "width": 51005,
+              "height": 102500
+            }
+          ],
+          "referenceFamily": "Colunas com tamanhos graduados"
+        }
+      ]
+    },
+    {
+      "id": "three-frames-pages-only",
+      "query": {
+        "surface": {
+          "type": "doubleSheet",
+          "widthUm": 600000,
+          "heightUm": 240000
+        },
+        "frameOrientations": [
+          "vertical",
+          "vertical",
+          "horizontal"
+        ],
+        "permission": "pagesOnly",
+        "marginUm": 15000,
+        "gapUm": 5000,
+        "minimumSideUm": 20000
+      },
+      "layouts": [
+        {
+          "scope": "page",
+          "positions": [
+            {
+              "x": 315000,
+              "y": 20625,
+              "width": 132500,
+              "height": 198750
+            },
+            {
+              "x": 452500,
+              "y": 20625,
+              "width": 132500,
+              "height": 198750
+            },
+            {
+              "x": 15000,
+              "y": 30000,
+              "width": 270000,
+              "height": 180000
+            }
+          ],
+          "referenceFamily": "Por Página · 1 + 2"
+        }
+      ]
+    },
+    {
+      "id": "three-frames-both-types",
+      "query": {
+        "surface": {
+          "type": "doubleSheet",
+          "widthUm": 600000,
+          "heightUm": 240000
+        },
+        "frameOrientations": [
+          "vertical",
+          "vertical",
+          "horizontal"
+        ],
+        "permission": "pagesAndSheet",
+        "marginUm": 15000,
+        "gapUm": 5000,
+        "minimumSideUm": 20000
+      },
+      "layouts": [
+        {
+          "scope": "sheet",
+          "positions": [
+            {
+              "x": 316471,
+              "y": 21176,
+              "width": 131764,
+              "height": 197648
+            },
+            {
+              "x": 453235,
+              "y": 21176,
+              "width": 131765,
+              "height": 197648
+            },
+            {
+              "x": 15000,
+              "y": 21176,
+              "width": 296471,
+              "height": 197648
+            }
+          ],
+          "referenceFamily": "Colunas alinhadas"
+        },
+        {
+          "scope": "page",
+          "positions": [
+            {
+              "x": 315000,
+              "y": 20625,
+              "width": 132500,
+              "height": 198750
+            },
+            {
+              "x": 452500,
+              "y": 20625,
+              "width": 132500,
+              "height": 198750
+            },
+            {
+              "x": 15000,
+              "y": 30000,
+              "width": 270000,
+              "height": 180000
+            }
+          ],
+          "referenceFamily": "Por Página · 1 + 2"
+        },
+        {
+          "scope": "sheet",
+          "positions": [
+            {
+              "x": 15000,
+              "y": 21176,
+              "width": 131765,
+              "height": 197648
+            },
+            {
+              "x": 453235,
+              "y": 21176,
+              "width": 131765,
+              "height": 197648
+            },
+            {
+              "x": 151765,
+              "y": 21176,
+              "width": 296470,
+              "height": 197648
+            }
+          ],
+          "referenceFamily": "Colunas alinhadas"
+        },
+        {
+          "scope": "sheet",
+          "positions": [
+            {
+              "x": 359000,
+              "y": 15000,
+              "width": 110500,
+              "height": 210000
+            },
+            {
+              "x": 474500,
+              "y": 15000,
+              "width": 110500,
+              "height": 210000
+            },
+            {
+              "x": 15000,
+              "y": 15000,
+              "width": 339000,
+              "height": 210000
+            }
+          ],
+          "referenceFamily": "Destaque à esquerda"
+        }
+      ]
+    },
+    {
+      "id": "five-mixed-pages",
+      "query": {
+        "surface": {
+          "type": "doubleSheet",
+          "widthUm": 600000,
+          "heightUm": 300000
+        },
+        "frameOrientations": [
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal",
+          "horizontal"
+        ],
+        "permission": "pagesOnly",
+        "marginUm": 15000,
+        "gapUm": 5000,
+        "minimumSideUm": 20000
+      },
+      "layouts": [
+        {
+          "scope": "page",
+          "positions": [
+            {
+              "x": 315000,
+              "y": 50625,
+              "width": 132500,
+              "height": 198750
+            },
+            {
+              "x": 15000,
+              "y": 108333,
+              "width": 270000,
+              "height": 176667
+            },
+            {
+              "x": 452500,
+              "y": 50625,
+              "width": 132500,
+              "height": 198750
+            },
+            {
+              "x": 15000,
+              "y": 15000,
+              "width": 132500,
+              "height": 88333
+            },
+            {
+              "x": 152500,
+              "y": 15000,
+              "width": 132500,
+              "height": 88333
+            }
+          ],
+          "referenceFamily": "Por Página · 3 + 2"
+        },
+        {
+          "scope": "page",
+          "positions": [
+            {
+              "x": 315000,
+              "y": 195519,
+              "width": 61176,
+              "height": 89481
+            },
+            {
+              "x": 15000,
+              "y": 60000,
+              "width": 270000,
+              "height": 180000
+            },
+            {
+              "x": 381176,
+              "y": 195519,
+              "width": 61177,
+              "height": 89481
+            },
+            {
+              "x": 315000,
+              "y": 15000,
+              "width": 270000,
+              "height": 175519
+            },
+            {
+              "x": 447353,
+              "y": 195519,
+              "width": 137647,
+              "height": 89481
+            }
+          ],
+          "referenceFamily": "Por Página · 1 + 4"
+        }
+      ]
+    },
+    {
+      "id": "eight-mixed-pages",
+      "query": {
+        "surface": {
+          "type": "doubleSheet",
+          "widthUm": 600000,
+          "heightUm": 240000
+        },
+        "frameOrientations": [
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal",
+          "horizontal",
+          "vertical",
+          "vertical",
+          "vertical"
+        ],
+        "permission": "pagesOnly",
+        "marginUm": 15000,
+        "gapUm": 5000,
+        "minimumSideUm": 20000
+      },
+      "layouts": [
+        {
+          "scope": "page",
+          "positions": [
+            {
+              "x": 15000,
+              "y": 15000,
+              "width": 66660,
+              "height": 102500
+            },
+            {
+              "x": 86660,
+              "y": 15000,
+              "width": 149984,
+              "height": 102500
+            },
+            {
+              "x": 15000,
+              "y": 122500,
+              "width": 66660,
+              "height": 102500
+            },
+            {
+              "x": 86660,
+              "y": 122500,
+              "width": 149984,
+              "height": 102500
+            },
+            {
+              "x": 315000,
+              "y": 30000,
+              "width": 270000,
+              "height": 180000
+            },
+            {
+              "x": 241644,
+              "y": 15000,
+              "width": 43356,
+              "height": 66667
+            },
+            {
+              "x": 241644,
+              "y": 86667,
+              "width": 43356,
+              "height": 66666
+            },
+            {
+              "x": 241644,
+              "y": 158333,
+              "width": 43356,
+              "height": 66667
+            }
+          ],
+          "referenceFamily": "Por Página · 7 + 1"
+        },
+        {
+          "scope": "page",
+          "positions": [
+            {
+              "x": 469984,
+              "y": 15000,
+              "width": 66660,
+              "height": 102500
+            },
+            {
+              "x": 15000,
+              "y": 30000,
+              "width": 270000,
+              "height": 180000
+            },
+            {
+              "x": 469984,
+              "y": 122500,
+              "width": 66660,
+              "height": 102500
+            },
+            {
+              "x": 315000,
+              "y": 15000,
+              "width": 149984,
+              "height": 102500
+            },
+            {
+              "x": 315000,
+              "y": 122500,
+              "width": 149984,
+              "height": 102500
+            },
+            {
+              "x": 541644,
+              "y": 15000,
+              "width": 43356,
+              "height": 66667
+            },
+            {
+              "x": 541644,
+              "y": 86667,
+              "width": 43356,
+              "height": 66666
+            },
+            {
+              "x": 541644,
+              "y": 158333,
+              "width": 43356,
+              "height": 66667
+            }
+          ],
+          "referenceFamily": "Por Página · 1 + 7"
+        }
+      ]
+    },
+    {
+      "id": "eight-mixed-both-types",
+      "query": {
+        "surface": {
+          "type": "doubleSheet",
+          "widthUm": 600000,
+          "heightUm": 240000
+        },
+        "frameOrientations": [
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal",
+          "horizontal",
+          "vertical",
+          "vertical",
+          "vertical"
+        ],
+        "permission": "pagesAndSheet",
+        "marginUm": 15000,
+        "gapUm": 5000,
+        "minimumSideUm": 20000
+      },
+      "layouts": [
+        {
+          "scope": "sheet",
+          "positions": [
+            {
+              "x": 108400,
+              "y": 15000,
+              "width": 132600,
+              "height": 210000
+            },
+            {
+              "x": 15000,
+              "y": 15000,
+              "width": 88400,
+              "height": 63077
+            },
+            {
+              "x": 15000,
+              "y": 83077,
+              "width": 88400,
+              "height": 141923
+            },
+            {
+              "x": 390902,
+              "y": 161923,
+              "width": 94549,
+              "height": 63077
+            },
+            {
+              "x": 490451,
+              "y": 161923,
+              "width": 94549,
+              "height": 63077
+            },
+            {
+              "x": 246000,
+              "y": 15000,
+              "width": 139902,
+              "height": 210000
+            },
+            {
+              "x": 390902,
+              "y": 15000,
+              "width": 94549,
+              "height": 141923
+            },
+            {
+              "x": 490451,
+              "y": 15000,
+              "width": 94549,
+              "height": 141923
+            }
+          ],
+          "referenceFamily": "Grupos lado a lado com tamanhos variados"
+        },
+        {
+          "scope": "page",
+          "positions": [
+            {
+              "x": 15000,
+              "y": 15000,
+              "width": 66660,
+              "height": 102500
+            },
+            {
+              "x": 86660,
+              "y": 15000,
+              "width": 149984,
+              "height": 102500
+            },
+            {
+              "x": 15000,
+              "y": 122500,
+              "width": 66660,
+              "height": 102500
+            },
+            {
+              "x": 86660,
+              "y": 122500,
+              "width": 149984,
+              "height": 102500
+            },
+            {
+              "x": 315000,
+              "y": 30000,
+              "width": 270000,
+              "height": 180000
+            },
+            {
+              "x": 241644,
+              "y": 15000,
+              "width": 43356,
+              "height": 66667
+            },
+            {
+              "x": 241644,
+              "y": 86667,
+              "width": 43356,
+              "height": 66666
+            },
+            {
+              "x": 241644,
+              "y": 158333,
+              "width": 43356,
+              "height": 66667
+            }
+          ],
+          "referenceFamily": "Por Página · 7 + 1"
+        }
+      ]
+    },
+    {
+      "id": "twelve-mixed-pages",
+      "query": {
+        "surface": {
+          "type": "doubleSheet",
+          "widthUm": 600000,
+          "heightUm": 300000
+        },
+        "frameOrientations": [
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal"
+        ],
+        "permission": "pagesOnly",
+        "marginUm": 15000,
+        "gapUm": 5000,
+        "minimumSideUm": 20000
+      },
+      "layouts": [
+        {
+          "scope": "page",
+          "positions": [
+            {
+              "x": 15000,
+              "y": 15000,
+              "width": 58071,
+              "height": 86667
+            },
+            {
+              "x": 78071,
+              "y": 15000,
+              "width": 130660,
+              "height": 86667
+            },
+            {
+              "x": 15000,
+              "y": 106667,
+              "width": 58071,
+              "height": 86666
+            },
+            {
+              "x": 78071,
+              "y": 106667,
+              "width": 130660,
+              "height": 86666
+            },
+            {
+              "x": 15000,
+              "y": 198333,
+              "width": 58071,
+              "height": 86667
+            },
+            {
+              "x": 78071,
+              "y": 198333,
+              "width": 130660,
+              "height": 86667
+            },
+            {
+              "x": 213731,
+              "y": 15000,
+              "width": 71269,
+              "height": 106364
+            },
+            {
+              "x": 213731,
+              "y": 237727,
+              "width": 71269,
+              "height": 47273
+            },
+            {
+              "x": 213731,
+              "y": 126364,
+              "width": 71269,
+              "height": 106363
+            },
+            {
+              "x": 315000,
+              "y": 126000,
+              "width": 270000,
+              "height": 159000
+            },
+            {
+              "x": 315000,
+              "y": 15000,
+              "width": 81538,
+              "height": 106000
+            },
+            {
+              "x": 401538,
+              "y": 15000,
+              "width": 183462,
+              "height": 106000
+            }
+          ],
+          "referenceFamily": "Por Página · 9 + 3"
+        },
+        {
+          "scope": "page",
+          "positions": [
+            {
+              "x": 15000,
+              "y": 78071,
+              "width": 47273,
+              "height": 71269
+            },
+            {
+              "x": 15000,
+              "y": 15000,
+              "width": 86667,
+              "height": 58071
+            },
+            {
+              "x": 15000,
+              "y": 154340,
+              "width": 86667,
+              "height": 130660
+            },
+            {
+              "x": 106667,
+              "y": 15000,
+              "width": 86666,
+              "height": 58071
+            },
+            {
+              "x": 106667,
+              "y": 154340,
+              "width": 86666,
+              "height": 130660
+            },
+            {
+              "x": 198333,
+              "y": 15000,
+              "width": 86667,
+              "height": 58071
+            },
+            {
+              "x": 198333,
+              "y": 154340,
+              "width": 86667,
+              "height": 130660
+            },
+            {
+              "x": 67273,
+              "y": 78071,
+              "width": 106363,
+              "height": 71269
+            },
+            {
+              "x": 426000,
+              "y": 15000,
+              "width": 159000,
+              "height": 270000
+            },
+            {
+              "x": 178636,
+              "y": 78071,
+              "width": 106364,
+              "height": 71269
+            },
+            {
+              "x": 315000,
+              "y": 101538,
+              "width": 106000,
+              "height": 183462
+            },
+            {
+              "x": 315000,
+              "y": 15000,
+              "width": 106000,
+              "height": 81538
+            }
+          ],
+          "referenceFamily": "Por Página · 9 + 3"
+        }
+      ]
+    },
+    {
+      "id": "fifteen-mixed-pages",
+      "query": {
+        "surface": {
+          "type": "doubleSheet",
+          "widthUm": 600000,
+          "heightUm": 300000
+        },
+        "frameOrientations": [
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal",
+          "vertical"
+        ],
+        "permission": "pagesOnly",
+        "marginUm": 15000,
+        "gapUm": 5000,
+        "minimumSideUm": 20000
+      },
+      "layouts": [
+        {
+          "scope": "page",
+          "positions": [
+            {
+              "x": 15000,
+              "y": 15000,
+              "width": 86667,
+              "height": 129683
+            },
+            {
+              "x": 15000,
+              "y": 149683,
+              "width": 86667,
+              "height": 57637
+            },
+            {
+              "x": 106667,
+              "y": 15000,
+              "width": 86666,
+              "height": 129683
+            },
+            {
+              "x": 106667,
+              "y": 149683,
+              "width": 86666,
+              "height": 57637
+            },
+            {
+              "x": 198333,
+              "y": 15000,
+              "width": 86667,
+              "height": 129683
+            },
+            {
+              "x": 198333,
+              "y": 149683,
+              "width": 86667,
+              "height": 57637
+            },
+            {
+              "x": 15000,
+              "y": 212320,
+              "width": 48571,
+              "height": 72680
+            },
+            {
+              "x": 175714,
+              "y": 212320,
+              "width": 109286,
+              "height": 72680
+            },
+            {
+              "x": 68571,
+              "y": 212320,
+              "width": 48572,
+              "height": 72680
+            },
+            {
+              "x": 315000,
+              "y": 19236,
+              "width": 86667,
+              "height": 57778
+            },
+            {
+              "x": 122143,
+              "y": 212320,
+              "width": 48571,
+              "height": 72680
+            },
+            {
+              "x": 406667,
+              "y": 19236,
+              "width": 86666,
+              "height": 57778
+            },
+            {
+              "x": 315000,
+              "y": 82014,
+              "width": 132500,
+              "height": 198750
+            },
+            {
+              "x": 498333,
+              "y": 19236,
+              "width": 86667,
+              "height": 57778
+            },
+            {
+              "x": 452500,
+              "y": 82014,
+              "width": 132500,
+              "height": 198750
+            }
+          ],
+          "referenceFamily": "Por Página · 10 + 5"
+        },
+        {
+          "scope": "page",
+          "positions": [
+            {
+              "x": 15000,
+              "y": 116549,
+              "width": 61176,
+              "height": 100299
+            },
+            {
+              "x": 15000,
+              "y": 15000,
+              "width": 132500,
+              "height": 96549
+            },
+            {
+              "x": 81176,
+              "y": 116549,
+              "width": 61177,
+              "height": 100299
+            },
+            {
+              "x": 152500,
+              "y": 15000,
+              "width": 132500,
+              "height": 96549
+            },
+            {
+              "x": 315000,
+              "y": 15000,
+              "width": 118472,
+              "height": 183462
+            },
+            {
+              "x": 147353,
+              "y": 116549,
+              "width": 137647,
+              "height": 100299
+            },
+            {
+              "x": 438472,
+              "y": 15000,
+              "width": 85562,
+              "height": 132500
+            },
+            {
+              "x": 15000,
+              "y": 221848,
+              "width": 86667,
+              "height": 63152
+            },
+            {
+              "x": 438472,
+              "y": 152500,
+              "width": 85562,
+              "height": 132500
+            },
+            {
+              "x": 106667,
+              "y": 221848,
+              "width": 86666,
+              "height": 63152
+            },
+            {
+              "x": 529034,
+              "y": 15000,
+              "width": 55966,
+              "height": 86667
+            },
+            {
+              "x": 198333,
+              "y": 221848,
+              "width": 86667,
+              "height": 63152
+            },
+            {
+              "x": 529034,
+              "y": 106667,
+              "width": 55966,
+              "height": 86666
+            },
+            {
+              "x": 315000,
+              "y": 203462,
+              "width": 118472,
+              "height": 81538
+            },
+            {
+              "x": 529034,
+              "y": 198333,
+              "width": 55966,
+              "height": 86667
+            }
+          ],
+          "referenceFamily": "Por Página · 8 + 7"
+        }
+      ]
+    },
+    {
+      "id": "twenty-mixed-pages",
+      "query": {
+        "surface": {
+          "type": "doubleSheet",
+          "widthUm": 600000,
+          "heightUm": 300000
+        },
+        "frameOrientations": [
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal"
+        ],
+        "permission": "pagesOnly",
+        "marginUm": 15000,
+        "gapUm": 5000,
+        "minimumSideUm": 20000
+      },
+      "layouts": [
+        {
+          "scope": "page",
+          "positions": [
+            {
+              "x": 15000,
+              "y": 15000,
+              "width": 57637,
+              "height": 86667
+            },
+            {
+              "x": 77637,
+              "y": 15000,
+              "width": 129683,
+              "height": 86667
+            },
+            {
+              "x": 15000,
+              "y": 106667,
+              "width": 57637,
+              "height": 86666
+            },
+            {
+              "x": 77637,
+              "y": 106667,
+              "width": 129683,
+              "height": 86666
+            },
+            {
+              "x": 15000,
+              "y": 198333,
+              "width": 57637,
+              "height": 86667
+            },
+            {
+              "x": 77637,
+              "y": 198333,
+              "width": 129683,
+              "height": 86667
+            },
+            {
+              "x": 212320,
+              "y": 15000,
+              "width": 72680,
+              "height": 109286
+            },
+            {
+              "x": 212320,
+              "y": 129286,
+              "width": 72680,
+              "height": 48571
+            },
+            {
+              "x": 315000,
+              "y": 15000,
+              "width": 86667,
+              "height": 129683
+            },
+            {
+              "x": 212320,
+              "y": 182857,
+              "width": 72680,
+              "height": 48572
+            },
+            {
+              "x": 406667,
+              "y": 15000,
+              "width": 86666,
+              "height": 129683
+            },
+            {
+              "x": 212320,
+              "y": 236429,
+              "width": 72680,
+              "height": 48571
+            },
+            {
+              "x": 498333,
+              "y": 15000,
+              "width": 86667,
+              "height": 129683
+            },
+            {
+              "x": 315000,
+              "y": 149683,
+              "width": 86667,
+              "height": 57637
+            },
+            {
+              "x": 315000,
+              "y": 212320,
+              "width": 48571,
+              "height": 72680
+            },
+            {
+              "x": 406667,
+              "y": 149683,
+              "width": 86666,
+              "height": 57637
+            },
+            {
+              "x": 368571,
+              "y": 212320,
+              "width": 48572,
+              "height": 72680
+            },
+            {
+              "x": 498333,
+              "y": 149683,
+              "width": 86667,
+              "height": 57637
+            },
+            {
+              "x": 422143,
+              "y": 212320,
+              "width": 48571,
+              "height": 72680
+            },
+            {
+              "x": 475714,
+              "y": 212320,
+              "width": 109286,
+              "height": 72680
+            }
+          ],
+          "referenceFamily": "Por Página · 10 + 10"
+        },
+        {
+          "scope": "page",
+          "positions": [
+            {
+              "x": 15000,
+              "y": 77637,
+              "width": 86667,
+              "height": 129683
+            },
+            {
+              "x": 15000,
+              "y": 15000,
+              "width": 86667,
+              "height": 57637
+            },
+            {
+              "x": 106667,
+              "y": 77637,
+              "width": 86666,
+              "height": 129683
+            },
+            {
+              "x": 106667,
+              "y": 15000,
+              "width": 86666,
+              "height": 57637
+            },
+            {
+              "x": 198333,
+              "y": 77637,
+              "width": 86667,
+              "height": 129683
+            },
+            {
+              "x": 198333,
+              "y": 15000,
+              "width": 86667,
+              "height": 57637
+            },
+            {
+              "x": 15000,
+              "y": 212320,
+              "width": 48571,
+              "height": 72680
+            },
+            {
+              "x": 175714,
+              "y": 212320,
+              "width": 109286,
+              "height": 72680
+            },
+            {
+              "x": 68571,
+              "y": 212320,
+              "width": 48572,
+              "height": 72680
+            },
+            {
+              "x": 315000,
+              "y": 237727,
+              "width": 70976,
+              "height": 47273
+            },
+            {
+              "x": 122143,
+              "y": 212320,
+              "width": 48571,
+              "height": 72680
+            },
+            {
+              "x": 390976,
+              "y": 15000,
+              "width": 130122,
+              "height": 86667
+            },
+            {
+              "x": 315000,
+              "y": 15000,
+              "width": 70976,
+              "height": 106364
+            },
+            {
+              "x": 390976,
+              "y": 106667,
+              "width": 130122,
+              "height": 86666
+            },
+            {
+              "x": 315000,
+              "y": 126364,
+              "width": 70976,
+              "height": 106363
+            },
+            {
+              "x": 390976,
+              "y": 198333,
+              "width": 130122,
+              "height": 86667
+            },
+            {
+              "x": 526098,
+              "y": 15000,
+              "width": 58902,
+              "height": 88269
+            },
+            {
+              "x": 526098,
+              "y": 201538,
+              "width": 58902,
+              "height": 39231
+            },
+            {
+              "x": 526098,
+              "y": 108269,
+              "width": 58902,
+              "height": 88269
+            },
+            {
+              "x": 526098,
+              "y": 245769,
+              "width": 58902,
+              "height": 39231
+            }
+          ],
+          "referenceFamily": "Por Página · 10 + 10"
+        }
+      ]
+    },
+    {
+      "id": "thirty-mixed-pages",
+      "query": {
+        "surface": {
+          "type": "doubleSheet",
+          "widthUm": 600000,
+          "heightUm": 300000
+        },
+        "frameOrientations": [
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal"
+        ],
+        "permission": "pagesOnly",
+        "marginUm": 15000,
+        "gapUm": 5000,
+        "minimumSideUm": 20000
+      },
+      "layouts": [
+        {
+          "scope": "page",
+          "positions": [
+            {
+              "x": 15000,
+              "y": 15000,
+              "width": 47273,
+              "height": 69157
+            },
+            {
+              "x": 67273,
+              "y": 15000,
+              "width": 106363,
+              "height": 69157
+            },
+            {
+              "x": 15000,
+              "y": 89157,
+              "width": 39231,
+              "height": 57393
+            },
+            {
+              "x": 178636,
+              "y": 15000,
+              "width": 106364,
+              "height": 69157
+            },
+            {
+              "x": 59231,
+              "y": 89157,
+              "width": 39231,
+              "height": 57393
+            },
+            {
+              "x": 103462,
+              "y": 89157,
+              "width": 88269,
+              "height": 57393
+            },
+            {
+              "x": 15000,
+              "y": 151550,
+              "width": 39231,
+              "height": 57393
+            },
+            {
+              "x": 196731,
+              "y": 89157,
+              "width": 88269,
+              "height": 57393
+            },
+            {
+              "x": 59231,
+              "y": 151550,
+              "width": 39231,
+              "height": 57393
+            },
+            {
+              "x": 103462,
+              "y": 151550,
+              "width": 88269,
+              "height": 57393
+            },
+            {
+              "x": 15000,
+              "y": 213943,
+              "width": 48571,
+              "height": 71057
+            },
+            {
+              "x": 196731,
+              "y": 151550,
+              "width": 88269,
+              "height": 57393
+            },
+            {
+              "x": 68571,
+              "y": 213943,
+              "width": 48572,
+              "height": 71057
+            },
+            {
+              "x": 175714,
+              "y": 213943,
+              "width": 109286,
+              "height": 71057
+            },
+            {
+              "x": 122143,
+              "y": 213943,
+              "width": 48571,
+              "height": 71057
+            },
+            {
+              "x": 315000,
+              "y": 237727,
+              "width": 69157,
+              "height": 47273
+            },
+            {
+              "x": 315000,
+              "y": 15000,
+              "width": 69157,
+              "height": 106364
+            },
+            {
+              "x": 389157,
+              "y": 129286,
+              "width": 71058,
+              "height": 48571
+            },
+            {
+              "x": 315000,
+              "y": 126364,
+              "width": 69157,
+              "height": 106363
+            },
+            {
+              "x": 389157,
+              "y": 182857,
+              "width": 71058,
+              "height": 48572
+            },
+            {
+              "x": 389157,
+              "y": 15000,
+              "width": 71058,
+              "height": 109286
+            },
+            {
+              "x": 389157,
+              "y": 236429,
+              "width": 71058,
+              "height": 48571
+            },
+            {
+              "x": 465215,
+              "y": 15000,
+              "width": 57392,
+              "height": 88269
+            },
+            {
+              "x": 465215,
+              "y": 201538,
+              "width": 57392,
+              "height": 39231
+            },
+            {
+              "x": 465215,
+              "y": 108269,
+              "width": 57392,
+              "height": 88269
+            },
+            {
+              "x": 465215,
+              "y": 245769,
+              "width": 57392,
+              "height": 39231
+            },
+            {
+              "x": 527607,
+              "y": 15000,
+              "width": 57393,
+              "height": 88269
+            },
+            {
+              "x": 527607,
+              "y": 201538,
+              "width": 57393,
+              "height": 39231
+            },
+            {
+              "x": 527607,
+              "y": 108269,
+              "width": 57393,
+              "height": 88269
+            },
+            {
+              "x": 527607,
+              "y": 245769,
+              "width": 57393,
+              "height": 39231
+            }
+          ],
+          "referenceFamily": "Por Página · 15 + 15"
+        },
+        {
+          "scope": "page",
+          "positions": [
+            {
+              "x": 15000,
+              "y": 15000,
+              "width": 59330,
+              "height": 86667
+            },
+            {
+              "x": 79330,
+              "y": 129286,
+              "width": 74815,
+              "height": 48571
+            },
+            {
+              "x": 15000,
+              "y": 106667,
+              "width": 59330,
+              "height": 86666
+            },
+            {
+              "x": 79330,
+              "y": 182857,
+              "width": 74815,
+              "height": 48572
+            },
+            {
+              "x": 15000,
+              "y": 198333,
+              "width": 59330,
+              "height": 86667
+            },
+            {
+              "x": 79330,
+              "y": 236429,
+              "width": 74815,
+              "height": 48571
+            },
+            {
+              "x": 79330,
+              "y": 15000,
+              "width": 74815,
+              "height": 109286
+            },
+            {
+              "x": 159145,
+              "y": 201538,
+              "width": 60428,
+              "height": 39231
+            },
+            {
+              "x": 159145,
+              "y": 15000,
+              "width": 60428,
+              "height": 88269
+            },
+            {
+              "x": 159145,
+              "y": 245769,
+              "width": 60428,
+              "height": 39231
+            },
+            {
+              "x": 159145,
+              "y": 108269,
+              "width": 60428,
+              "height": 88269
+            },
+            {
+              "x": 224573,
+              "y": 201538,
+              "width": 60427,
+              "height": 39231
+            },
+            {
+              "x": 224573,
+              "y": 15000,
+              "width": 60427,
+              "height": 88269
+            },
+            {
+              "x": 224573,
+              "y": 245769,
+              "width": 60427,
+              "height": 39231
+            },
+            {
+              "x": 224573,
+              "y": 108269,
+              "width": 60427,
+              "height": 88269
+            },
+            {
+              "x": 315000,
+              "y": 15000,
+              "width": 86667,
+              "height": 59330
+            },
+            {
+              "x": 315000,
+              "y": 79330,
+              "width": 39231,
+              "height": 60428
+            },
+            {
+              "x": 406667,
+              "y": 15000,
+              "width": 86666,
+              "height": 59330
+            },
+            {
+              "x": 359231,
+              "y": 79330,
+              "width": 39231,
+              "height": 60428
+            },
+            {
+              "x": 498333,
+              "y": 15000,
+              "width": 86667,
+              "height": 59330
+            },
+            {
+              "x": 315000,
+              "y": 144758,
+              "width": 39231,
+              "height": 60427
+            },
+            {
+              "x": 403462,
+              "y": 79330,
+              "width": 88269,
+              "height": 60428
+            },
+            {
+              "x": 359231,
+              "y": 144758,
+              "width": 39231,
+              "height": 60427
+            },
+            {
+              "x": 496731,
+              "y": 79330,
+              "width": 88269,
+              "height": 60428
+            },
+            {
+              "x": 315000,
+              "y": 210185,
+              "width": 48571,
+              "height": 74815
+            },
+            {
+              "x": 403462,
+              "y": 144758,
+              "width": 88269,
+              "height": 60427
+            },
+            {
+              "x": 368571,
+              "y": 210185,
+              "width": 48572,
+              "height": 74815
+            },
+            {
+              "x": 496731,
+              "y": 144758,
+              "width": 88269,
+              "height": 60427
+            },
+            {
+              "x": 422143,
+              "y": 210185,
+              "width": 48571,
+              "height": 74815
+            },
+            {
+              "x": 475714,
+              "y": 210185,
+              "width": 109286,
+              "height": 74815
+            }
+          ],
+          "referenceFamily": "Por Página · 15 + 15"
+        }
+      ]
+    },
+    {
+      "id": "thirty-vertical-pages",
+      "query": {
+        "surface": {
+          "type": "doubleSheet",
+          "widthUm": 600000,
+          "heightUm": 300000
+        },
+        "frameOrientations": [
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical"
+        ],
+        "permission": "pagesOnly",
+        "marginUm": 15000,
+        "gapUm": 5000,
+        "minimumSideUm": 20000
+      },
+      "layouts": [
+        {
+          "scope": "page",
+          "positions": [
+            {
+              "x": 15000,
+              "y": 15000,
+              "width": 97962,
+              "height": 132500
+            },
+            {
+              "x": 15000,
+              "y": 152500,
+              "width": 97962,
+              "height": 132500
+            },
+            {
+              "x": 117962,
+              "y": 15000,
+              "width": 97962,
+              "height": 132500
+            },
+            {
+              "x": 117962,
+              "y": 152500,
+              "width": 97962,
+              "height": 132500
+            },
+            {
+              "x": 220924,
+              "y": 15000,
+              "width": 64076,
+              "height": 86667
+            },
+            {
+              "x": 220924,
+              "y": 106667,
+              "width": 64076,
+              "height": 86666
+            },
+            {
+              "x": 220924,
+              "y": 198333,
+              "width": 64076,
+              "height": 86667
+            },
+            {
+              "x": 315000,
+              "y": 15000,
+              "width": 50000,
+              "height": 72808
+            },
+            {
+              "x": 370000,
+              "y": 15000,
+              "width": 50000,
+              "height": 72808
+            },
+            {
+              "x": 425000,
+              "y": 15000,
+              "width": 50000,
+              "height": 72808
+            },
+            {
+              "x": 480000,
+              "y": 15000,
+              "width": 50000,
+              "height": 72808
+            },
+            {
+              "x": 535000,
+              "y": 15000,
+              "width": 50000,
+              "height": 72808
+            },
+            {
+              "x": 315000,
+              "y": 92808,
+              "width": 50000,
+              "height": 72807
+            },
+            {
+              "x": 370000,
+              "y": 92808,
+              "width": 50000,
+              "height": 72807
+            },
+            {
+              "x": 425000,
+              "y": 92808,
+              "width": 50000,
+              "height": 72807
+            },
+            {
+              "x": 480000,
+              "y": 92808,
+              "width": 50000,
+              "height": 72807
+            },
+            {
+              "x": 535000,
+              "y": 92808,
+              "width": 50000,
+              "height": 72807
+            },
+            {
+              "x": 315000,
+              "y": 170615,
+              "width": 40833,
+              "height": 59460
+            },
+            {
+              "x": 360833,
+              "y": 170615,
+              "width": 40834,
+              "height": 59460
+            },
+            {
+              "x": 406667,
+              "y": 170615,
+              "width": 40833,
+              "height": 59460
+            },
+            {
+              "x": 452500,
+              "y": 170615,
+              "width": 40833,
+              "height": 59460
+            },
+            {
+              "x": 498333,
+              "y": 170615,
+              "width": 40834,
+              "height": 59460
+            },
+            {
+              "x": 544167,
+              "y": 170615,
+              "width": 40833,
+              "height": 59460
+            },
+            {
+              "x": 315000,
+              "y": 235075,
+              "width": 34286,
+              "height": 49925
+            },
+            {
+              "x": 354286,
+              "y": 235075,
+              "width": 34285,
+              "height": 49925
+            },
+            {
+              "x": 393571,
+              "y": 235075,
+              "width": 34286,
+              "height": 49925
+            },
+            {
+              "x": 432857,
+              "y": 235075,
+              "width": 34286,
+              "height": 49925
+            },
+            {
+              "x": 472143,
+              "y": 235075,
+              "width": 34286,
+              "height": 49925
+            },
+            {
+              "x": 511429,
+              "y": 235075,
+              "width": 34285,
+              "height": 49925
+            },
+            {
+              "x": 550714,
+              "y": 235075,
+              "width": 34286,
+              "height": 49925
+            }
+          ],
+          "referenceFamily": "Por Página · 7 + 23"
+        },
+        {
+          "scope": "page",
+          "positions": [
+            {
+              "x": 15000,
+              "y": 15000,
+              "width": 63750,
+              "height": 107224
+            },
+            {
+              "x": 83750,
+              "y": 15000,
+              "width": 63750,
+              "height": 107224
+            },
+            {
+              "x": 152500,
+              "y": 15000,
+              "width": 63750,
+              "height": 107224
+            },
+            {
+              "x": 221250,
+              "y": 15000,
+              "width": 63750,
+              "height": 107224
+            },
+            {
+              "x": 15000,
+              "y": 127224,
+              "width": 50000,
+              "height": 84097
+            },
+            {
+              "x": 70000,
+              "y": 127224,
+              "width": 50000,
+              "height": 84097
+            },
+            {
+              "x": 125000,
+              "y": 127224,
+              "width": 50000,
+              "height": 84097
+            },
+            {
+              "x": 180000,
+              "y": 127224,
+              "width": 50000,
+              "height": 84097
+            },
+            {
+              "x": 235000,
+              "y": 127224,
+              "width": 50000,
+              "height": 84097
+            },
+            {
+              "x": 15000,
+              "y": 216321,
+              "width": 40833,
+              "height": 68679
+            },
+            {
+              "x": 60833,
+              "y": 216321,
+              "width": 40834,
+              "height": 68679
+            },
+            {
+              "x": 106667,
+              "y": 216321,
+              "width": 40833,
+              "height": 68679
+            },
+            {
+              "x": 152500,
+              "y": 216321,
+              "width": 40833,
+              "height": 68679
+            },
+            {
+              "x": 198333,
+              "y": 216321,
+              "width": 40834,
+              "height": 68679
+            },
+            {
+              "x": 244167,
+              "y": 216321,
+              "width": 40833,
+              "height": 68679
+            },
+            {
+              "x": 315000,
+              "y": 15000,
+              "width": 63750,
+              "height": 107224
+            },
+            {
+              "x": 383750,
+              "y": 15000,
+              "width": 63750,
+              "height": 107224
+            },
+            {
+              "x": 452500,
+              "y": 15000,
+              "width": 63750,
+              "height": 107224
+            },
+            {
+              "x": 521250,
+              "y": 15000,
+              "width": 63750,
+              "height": 107224
+            },
+            {
+              "x": 315000,
+              "y": 127224,
+              "width": 50000,
+              "height": 84097
+            },
+            {
+              "x": 370000,
+              "y": 127224,
+              "width": 50000,
+              "height": 84097
+            },
+            {
+              "x": 425000,
+              "y": 127224,
+              "width": 50000,
+              "height": 84097
+            },
+            {
+              "x": 480000,
+              "y": 127224,
+              "width": 50000,
+              "height": 84097
+            },
+            {
+              "x": 535000,
+              "y": 127224,
+              "width": 50000,
+              "height": 84097
+            },
+            {
+              "x": 315000,
+              "y": 216321,
+              "width": 40833,
+              "height": 68679
+            },
+            {
+              "x": 360833,
+              "y": 216321,
+              "width": 40834,
+              "height": 68679
+            },
+            {
+              "x": 406667,
+              "y": 216321,
+              "width": 40833,
+              "height": 68679
+            },
+            {
+              "x": 452500,
+              "y": 216321,
+              "width": 40833,
+              "height": 68679
+            },
+            {
+              "x": 498333,
+              "y": 216321,
+              "width": 40834,
+              "height": 68679
+            },
+            {
+              "x": 544167,
+              "y": 216321,
+              "width": 40833,
+              "height": 68679
+            }
+          ],
+          "referenceFamily": "Por Página · 15 + 15"
+        }
+      ]
+    },
+    {
+      "id": "thirty-horizontal-pages",
+      "query": {
+        "surface": {
+          "type": "doubleSheet",
+          "widthUm": 600000,
+          "heightUm": 300000
+        },
+        "frameOrientations": [
+          "horizontal",
+          "horizontal",
+          "horizontal",
+          "horizontal",
+          "horizontal",
+          "horizontal",
+          "horizontal",
+          "horizontal",
+          "horizontal",
+          "horizontal",
+          "horizontal",
+          "horizontal",
+          "horizontal",
+          "horizontal",
+          "horizontal",
+          "horizontal",
+          "horizontal",
+          "horizontal",
+          "horizontal",
+          "horizontal",
+          "horizontal",
+          "horizontal",
+          "horizontal",
+          "horizontal",
+          "horizontal",
+          "horizontal",
+          "horizontal",
+          "horizontal",
+          "horizontal",
+          "horizontal"
+        ],
+        "permission": "pagesOnly",
+        "marginUm": 15000,
+        "gapUm": 5000,
+        "minimumSideUm": 20000
+      },
+      "layouts": [
+        {
+          "scope": "page",
+          "positions": [
+            {
+              "x": 15000,
+              "y": 15000,
+              "width": 72808,
+              "height": 50000
+            },
+            {
+              "x": 15000,
+              "y": 70000,
+              "width": 72808,
+              "height": 50000
+            },
+            {
+              "x": 15000,
+              "y": 125000,
+              "width": 72808,
+              "height": 50000
+            },
+            {
+              "x": 15000,
+              "y": 180000,
+              "width": 72808,
+              "height": 50000
+            },
+            {
+              "x": 15000,
+              "y": 235000,
+              "width": 72808,
+              "height": 50000
+            },
+            {
+              "x": 92808,
+              "y": 15000,
+              "width": 72807,
+              "height": 50000
+            },
+            {
+              "x": 92808,
+              "y": 70000,
+              "width": 72807,
+              "height": 50000
+            },
+            {
+              "x": 92808,
+              "y": 125000,
+              "width": 72807,
+              "height": 50000
+            },
+            {
+              "x": 92808,
+              "y": 180000,
+              "width": 72807,
+              "height": 50000
+            },
+            {
+              "x": 92808,
+              "y": 235000,
+              "width": 72807,
+              "height": 50000
+            },
+            {
+              "x": 170615,
+              "y": 15000,
+              "width": 59460,
+              "height": 40833
+            },
+            {
+              "x": 170615,
+              "y": 60833,
+              "width": 59460,
+              "height": 40834
+            },
+            {
+              "x": 170615,
+              "y": 106667,
+              "width": 59460,
+              "height": 40833
+            },
+            {
+              "x": 170615,
+              "y": 152500,
+              "width": 59460,
+              "height": 40833
+            },
+            {
+              "x": 170615,
+              "y": 198333,
+              "width": 59460,
+              "height": 40834
+            },
+            {
+              "x": 170615,
+              "y": 244167,
+              "width": 59460,
+              "height": 40833
+            },
+            {
+              "x": 235075,
+              "y": 15000,
+              "width": 49925,
+              "height": 34286
+            },
+            {
+              "x": 235075,
+              "y": 54286,
+              "width": 49925,
+              "height": 34285
+            },
+            {
+              "x": 235075,
+              "y": 93571,
+              "width": 49925,
+              "height": 34286
+            },
+            {
+              "x": 235075,
+              "y": 132857,
+              "width": 49925,
+              "height": 34286
+            },
+            {
+              "x": 235075,
+              "y": 172143,
+              "width": 49925,
+              "height": 34286
+            },
+            {
+              "x": 235075,
+              "y": 211429,
+              "width": 49925,
+              "height": 34285
+            },
+            {
+              "x": 235075,
+              "y": 250714,
+              "width": 49925,
+              "height": 34286
+            },
+            {
+              "x": 315000,
+              "y": 15000,
+              "width": 132500,
+              "height": 97962
+            },
+            {
+              "x": 452500,
+              "y": 15000,
+              "width": 132500,
+              "height": 97962
+            },
+            {
+              "x": 315000,
+              "y": 117962,
+              "width": 132500,
+              "height": 97962
+            },
+            {
+              "x": 452500,
+              "y": 117962,
+              "width": 132500,
+              "height": 97962
+            },
+            {
+              "x": 315000,
+              "y": 220924,
+              "width": 86667,
+              "height": 64076
+            },
+            {
+              "x": 406667,
+              "y": 220924,
+              "width": 86666,
+              "height": 64076
+            },
+            {
+              "x": 498333,
+              "y": 220924,
+              "width": 86667,
+              "height": 64076
+            }
+          ],
+          "referenceFamily": "Por Página · 23 + 7"
+        },
+        {
+          "scope": "page",
+          "positions": [
+            {
+              "x": 15000,
+              "y": 15000,
+              "width": 66412,
+              "height": 40833
+            },
+            {
+              "x": 15000,
+              "y": 60833,
+              "width": 66412,
+              "height": 40834
+            },
+            {
+              "x": 15000,
+              "y": 106667,
+              "width": 66412,
+              "height": 40833
+            },
+            {
+              "x": 15000,
+              "y": 152500,
+              "width": 66412,
+              "height": 40833
+            },
+            {
+              "x": 15000,
+              "y": 198333,
+              "width": 66412,
+              "height": 40834
+            },
+            {
+              "x": 15000,
+              "y": 244167,
+              "width": 66412,
+              "height": 40833
+            },
+            {
+              "x": 86412,
+              "y": 15000,
+              "width": 66413,
+              "height": 40833
+            },
+            {
+              "x": 86412,
+              "y": 60833,
+              "width": 66413,
+              "height": 40834
+            },
+            {
+              "x": 86412,
+              "y": 106667,
+              "width": 66413,
+              "height": 40833
+            },
+            {
+              "x": 86412,
+              "y": 152500,
+              "width": 66413,
+              "height": 40833
+            },
+            {
+              "x": 86412,
+              "y": 198333,
+              "width": 66413,
+              "height": 40834
+            },
+            {
+              "x": 86412,
+              "y": 244167,
+              "width": 66413,
+              "height": 40833
+            },
+            {
+              "x": 157825,
+              "y": 15000,
+              "width": 66412,
+              "height": 40833
+            },
+            {
+              "x": 157825,
+              "y": 60833,
+              "width": 66412,
+              "height": 40834
+            },
+            {
+              "x": 157825,
+              "y": 106667,
+              "width": 66412,
+              "height": 40833
+            },
+            {
+              "x": 157825,
+              "y": 152500,
+              "width": 66412,
+              "height": 40833
+            },
+            {
+              "x": 157825,
+              "y": 198333,
+              "width": 66412,
+              "height": 40834
+            },
+            {
+              "x": 157825,
+              "y": 244167,
+              "width": 66412,
+              "height": 40833
+            },
+            {
+              "x": 229237,
+              "y": 15000,
+              "width": 55763,
+              "height": 34286
+            },
+            {
+              "x": 229237,
+              "y": 54286,
+              "width": 55763,
+              "height": 34285
+            },
+            {
+              "x": 229237,
+              "y": 93571,
+              "width": 55763,
+              "height": 34286
+            },
+            {
+              "x": 229237,
+              "y": 132857,
+              "width": 55763,
+              "height": 34286
+            },
+            {
+              "x": 229237,
+              "y": 172143,
+              "width": 55763,
+              "height": 34286
+            },
+            {
+              "x": 229237,
+              "y": 211429,
+              "width": 55763,
+              "height": 34285
+            },
+            {
+              "x": 229237,
+              "y": 250714,
+              "width": 55763,
+              "height": 34286
+            },
+            {
+              "x": 315000,
+              "y": 15000,
+              "width": 160209,
+              "height": 132500
+            },
+            {
+              "x": 315000,
+              "y": 152500,
+              "width": 160209,
+              "height": 132500
+            },
+            {
+              "x": 480209,
+              "y": 15000,
+              "width": 104791,
+              "height": 86667
+            },
+            {
+              "x": 480209,
+              "y": 106667,
+              "width": 104791,
+              "height": 86666
+            },
+            {
+              "x": 480209,
+              "y": 198333,
+              "width": 104791,
+              "height": 86667
+            }
+          ],
+          "referenceFamily": "Por Página · 25 + 5"
+        }
+      ]
+    },
+    {
+      "id": "decimal-measurements",
+      "query": {
+        "surface": {
+          "type": "doubleSheet",
+          "widthUm": 500500,
+          "heightUm": 250500
+        },
+        "frameOrientations": [
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal",
+          "horizontal",
+          "vertical",
+          "vertical",
+          "vertical"
+        ],
+        "permission": "pagesOnly",
+        "marginUm": 15000,
+        "gapUm": 7500,
+        "minimumSideUm": 20000
+      },
+      "layouts": [
+        {
+          "scope": "page",
+          "positions": [
+            {
+              "x": 15000,
+              "y": 18913,
+              "width": 106375,
+              "height": 159563
+            },
+            {
+              "x": 15000,
+              "y": 185976,
+              "width": 68417,
+              "height": 45611
+            },
+            {
+              "x": 128875,
+              "y": 18913,
+              "width": 106375,
+              "height": 159563
+            },
+            {
+              "x": 90917,
+              "y": 185976,
+              "width": 68416,
+              "height": 45611
+            },
+            {
+              "x": 166833,
+              "y": 185976,
+              "width": 68417,
+              "height": 45611
+            },
+            {
+              "x": 343667,
+              "y": 15000,
+              "width": 141833,
+              "height": 220500
+            },
+            {
+              "x": 265250,
+              "y": 15000,
+              "width": 70917,
+              "height": 106500
+            },
+            {
+              "x": 265250,
+              "y": 129000,
+              "width": 70917,
+              "height": 106500
+            }
+          ],
+          "referenceFamily": "Por Página · 5 + 3"
+        },
+        {
+          "scope": "page",
+          "positions": [
+            {
+              "x": 15000,
+              "y": 15000,
+              "width": 48294,
+              "height": 71000
+            },
+            {
+              "x": 15000,
+              "y": 93500,
+              "width": 220250,
+              "height": 142000
+            },
+            {
+              "x": 70794,
+              "y": 15000,
+              "width": 48294,
+              "height": 71000
+            },
+            {
+              "x": 126588,
+              "y": 15000,
+              "width": 108662,
+              "height": 71000
+            },
+            {
+              "x": 426776,
+              "y": 198136,
+              "width": 58724,
+              "height": 37364
+            },
+            {
+              "x": 265250,
+              "y": 15000,
+              "width": 154026,
+              "height": 220500
+            },
+            {
+              "x": 426776,
+              "y": 15000,
+              "width": 58724,
+              "height": 84068
+            },
+            {
+              "x": 426776,
+              "y": 106568,
+              "width": 58724,
+              "height": 84068
+            }
+          ],
+          "referenceFamily": "Por Página · 4 + 4"
+        }
+      ]
+    },
+    {
+      "id": "portrait-pages",
+      "query": {
+        "surface": {
+          "type": "doubleSheet",
+          "widthUm": 400000,
+          "heightUm": 300000
+        },
+        "frameOrientations": [
+          "vertical",
+          "vertical",
+          "vertical",
+          "horizontal",
+          "horizontal",
+          "horizontal"
+        ],
+        "permission": "pagesOnly",
+        "marginUm": 15000,
+        "gapUm": 5000,
+        "minimumSideUm": 20000
+      },
+      "layouts": [
+        {
+          "scope": "page",
+          "positions": [
+            {
+              "x": 134231,
+              "y": 15000,
+              "width": 50769,
+              "height": 77000
+            },
+            {
+              "x": 134231,
+              "y": 97000,
+              "width": 50769,
+              "height": 77000
+            },
+            {
+              "x": 215000,
+              "y": 22500,
+              "width": 170000,
+              "height": 255000
+            },
+            {
+              "x": 15000,
+              "y": 179000,
+              "width": 170000,
+              "height": 106000
+            },
+            {
+              "x": 15000,
+              "y": 15000,
+              "width": 114231,
+              "height": 77000
+            },
+            {
+              "x": 15000,
+              "y": 97000,
+              "width": 114231,
+              "height": 77000
+            }
+          ],
+          "referenceFamily": "Por Página · 5 + 1"
+        },
+        {
+          "scope": "page",
+          "positions": [
+            {
+              "x": 15000,
+              "y": 67016,
+              "width": 170000,
+              "height": 217984
+            },
+            {
+              "x": 215000,
+              "y": 28958,
+              "width": 82500,
+              "height": 123750
+            },
+            {
+              "x": 302500,
+              "y": 28958,
+              "width": 82500,
+              "height": 123750
+            },
+            {
+              "x": 15000,
+              "y": 15000,
+              "width": 82500,
+              "height": 47016
+            },
+            {
+              "x": 102500,
+              "y": 15000,
+              "width": 82500,
+              "height": 47016
+            },
+            {
+              "x": 215000,
+              "y": 157708,
+              "width": 170000,
+              "height": 113334
+            }
+          ],
+          "referenceFamily": "Por Página · 3 + 3"
+        }
+      ]
+    },
+    {
+      "id": "landscape-pages",
+      "query": {
+        "surface": {
+          "type": "doubleSheet",
+          "widthUm": 600000,
+          "heightUm": 200000
+        },
+        "frameOrientations": [
+          "vertical",
+          "vertical",
+          "vertical",
+          "horizontal",
+          "horizontal",
+          "horizontal"
+        ],
+        "permission": "pagesOnly",
+        "marginUm": 15000,
+        "gapUm": 5000,
+        "minimumSideUm": 20000
+      },
+      "layouts": [
+        {
+          "scope": "page",
+          "positions": [
+            {
+              "x": 15000,
+              "y": 15000,
+              "width": 106000,
+              "height": 170000
+            },
+            {
+              "x": 126000,
+              "y": 15000,
+              "width": 77000,
+              "height": 114231
+            },
+            {
+              "x": 208000,
+              "y": 15000,
+              "width": 77000,
+              "height": 114231
+            },
+            {
+              "x": 126000,
+              "y": 134231,
+              "width": 77000,
+              "height": 50769
+            },
+            {
+              "x": 208000,
+              "y": 134231,
+              "width": 77000,
+              "height": 50769
+            },
+            {
+              "x": 322500,
+              "y": 15000,
+              "width": 255000,
+              "height": 170000
+            }
+          ],
+          "referenceFamily": "Por Página · 5 + 1"
+        },
+        {
+          "scope": "page",
+          "positions": [
+            {
+              "x": 15000,
+              "y": 27273,
+              "width": 46818,
+              "height": 70227
+            },
+            {
+              "x": 15000,
+              "y": 102500,
+              "width": 46818,
+              "height": 70227
+            },
+            {
+              "x": 457708,
+              "y": 15000,
+              "width": 113334,
+              "height": 170000
+            },
+            {
+              "x": 66818,
+              "y": 27273,
+              "width": 218182,
+              "height": 145454
+            },
+            {
+              "x": 328958,
+              "y": 15000,
+              "width": 123750,
+              "height": 82500
+            },
+            {
+              "x": 328958,
+              "y": 102500,
+              "width": 123750,
+              "height": 82500
+            }
+          ],
+          "referenceFamily": "Por Página · 3 + 3"
+        }
+      ]
+    }
+  ],
+  "invalidExamples": [
+    {
+      "id": "noncrossing-blocks-not-centered",
+      "query": {
+        "surface": {
+          "type": "doubleSheet",
+          "widthUm": 600000,
+          "heightUm": 240000
+        },
+        "frameOrientations": [
+          "vertical",
+          "horizontal",
+          "vertical",
+          "horizontal",
+          "horizontal",
+          "vertical",
+          "vertical",
+          "vertical"
+        ],
+        "permission": "pagesAndSheet",
+        "marginUm": 15000,
+        "gapUm": 5000,
+        "minimumSideUm": 20000
+      },
+      "layout": {
+        "scope": "page",
+        "positions": [
+          {
+            "x": 15000,
+            "y": 15000,
+            "width": 125929,
+            "height": 210000
+          },
+          {
+            "x": 212394,
+            "y": 161923,
+            "width": 85106,
+            "height": 63077
+          },
+          {
+            "x": 145929,
+            "y": 15000,
+            "width": 61465,
+            "height": 102500
+          },
+          {
+            "x": 439755,
+            "y": 15000,
+            "width": 145245,
+            "height": 102500
+          },
+          {
+            "x": 439755,
+            "y": 122500,
+            "width": 145245,
+            "height": 102500
+          },
+          {
+            "x": 145929,
+            "y": 122500,
+            "width": 61465,
+            "height": 102500
+          },
+          {
+            "x": 212394,
+            "y": 15000,
+            "width": 85106,
+            "height": 141923
+          },
+          {
+            "x": 302500,
+            "y": 15000,
+            "width": 132255,
+            "height": 210000
+          }
+        ],
+        "referenceFamily": "Grupos lado a lado com tamanhos variados"
+      },
+      "expectedViolations": [
+        "pageCentering",
+        "pageMargin"
+      ],
+      "sourceCommit": "6a3d68f"
+    },
+    {
+      "id": "incomplete-support-grid",
+      "query": {
+        "surface": {
+          "type": "singlePage",
+          "widthUm": 300000,
+          "heightUm": 240000
+        },
+        "frameOrientations": [
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical"
+        ],
+        "permission": "pagesOnly",
+        "marginUm": 15000,
+        "gapUm": 5000,
+        "minimumSideUm": 20000
+      },
+      "layout": {
+        "scope": "page",
+        "positions": [
+          {
+            "x": 152500,
+            "y": 15000,
+            "width": 132500,
+            "height": 210000
+          },
+          {
+            "x": 15000,
+            "y": 15000,
+            "width": 63750,
+            "height": 102500
+          },
+          {
+            "x": 83750,
+            "y": 15000,
+            "width": 63750,
+            "height": 102500
+          },
+          {
+            "x": 15000,
+            "y": 122500,
+            "width": 63750,
+            "height": 102500
+          }
+        ],
+        "referenceFamily": "Destaque à direita"
+      },
+      "expectedViolations": [
+        "internalVacancy"
+      ],
+      "sourceCommit": "8a7a47f"
+    },
+    {
+      "id": "crossing-in-pages-only",
+      "query": {
+        "surface": {
+          "type": "doubleSheet",
+          "widthUm": 600000,
+          "heightUm": 240000
+        },
+        "frameOrientations": [
+          "vertical",
+          "vertical",
+          "horizontal"
+        ],
+        "permission": "pagesOnly",
+        "marginUm": 15000,
+        "gapUm": 5000,
+        "minimumSideUm": 20000
+      },
+      "layout": {
+        "scope": "sheet",
+        "positions": [
+          {
+            "x": 316471,
+            "y": 21176,
+            "width": 131764,
+            "height": 197648
+          },
+          {
+            "x": 453235,
+            "y": 21176,
+            "width": 131765,
+            "height": 197648
+          },
+          {
+            "x": 15000,
+            "y": 21176,
+            "width": 296471,
+            "height": 197648
+          }
+        ],
+        "referenceFamily": "Colunas alinhadas"
+      },
+      "expectedViolations": [
+        "crossingForbidden"
+      ],
+      "sourceCommit": "6a3d68f"
+    },
+    {
+      "id": "orientation-does-not-match-slot",
+      "query": {
+        "surface": {
+          "type": "doubleSheet",
+          "widthUm": 600000,
+          "heightUm": 240000
+        },
+        "frameOrientations": [
+          "horizontal",
+          "vertical",
+          "horizontal"
+        ],
+        "permission": "pagesAndSheet",
+        "marginUm": 15000,
+        "gapUm": 5000,
+        "minimumSideUm": 20000
+      },
+      "layout": {
+        "scope": "sheet",
+        "positions": [
+          {
+            "x": 316471,
+            "y": 21176,
+            "width": 131764,
+            "height": 197648
+          },
+          {
+            "x": 453235,
+            "y": 21176,
+            "width": 131765,
+            "height": 197648
+          },
+          {
+            "x": 15000,
+            "y": 21176,
+            "width": 296471,
+            "height": 197648
+          }
+        ],
+        "referenceFamily": "Colunas alinhadas"
+      },
+      "expectedViolations": [
+        "orientation"
+      ],
+      "sourceCommit": "6a3d68f"
+    }
+  ],
+  "queryCases": [
+    {
+      "id": "zero-frames",
+      "query": {
+        "surface": {
+          "type": "doubleSheet",
+          "widthUm": 600000,
+          "heightUm": 300000
+        },
+        "frameOrientations": [],
+        "permission": "pagesOnly",
+        "marginUm": 15000,
+        "gapUm": 5000,
+        "minimumSideUm": 20000
+      },
+      "expectedResult": "empty"
+    },
+    {
+      "id": "thirty-one-frames",
+      "query": {
+        "surface": {
+          "type": "doubleSheet",
+          "widthUm": 600000,
+          "heightUm": 300000
+        },
+        "frameOrientations": [
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical",
+          "vertical"
+        ],
+        "permission": "pagesOnly",
+        "marginUm": 15000,
+        "gapUm": 5000,
+        "minimumSideUm": 20000
+      },
+      "expectedResult": "outsideCoverage"
+    },
+    {
+      "id": "no-room",
+      "query": {
+        "surface": {
+          "type": "doubleSheet",
+          "widthUm": 40000,
+          "heightUm": 40000
+        },
+        "frameOrientations": [
+          "vertical",
+          "vertical",
+          "horizontal",
+          "horizontal"
+        ],
+        "permission": "pagesOnly",
+        "marginUm": 15000,
+        "gapUm": 5000,
+        "minimumSideUm": 20000
+      },
+      "expectedResult": "noCandidates"
+    },
+    {
+      "id": "negative-gap",
+      "query": {
+        "surface": {
+          "type": "doubleSheet",
+          "widthUm": 600000,
+          "heightUm": 300000
+        },
+        "frameOrientations": [
+          "vertical",
+          "vertical",
+          "horizontal"
+        ],
+        "permission": "pagesOnly",
+        "marginUm": 15000,
+        "gapUm": -1000,
+        "minimumSideUm": 20000
+      },
+      "expectedResult": "invalidQuery"
+    },
+    {
+      "id": "zero-minimum",
+      "query": {
+        "surface": {
+          "type": "doubleSheet",
+          "widthUm": 600000,
+          "heightUm": 300000
+        },
+        "frameOrientations": [
+          "vertical",
+          "vertical",
+          "horizontal"
+        ],
+        "permission": "pagesOnly",
+        "marginUm": 15000,
+        "gapUm": 5000,
+        "minimumSideUm": 0
+      },
+      "expectedResult": "invalidQuery"
+    }
+  ]
+}

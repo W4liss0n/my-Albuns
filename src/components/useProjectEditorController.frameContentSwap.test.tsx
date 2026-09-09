@@ -30,6 +30,8 @@ function swapHarness() {
     load: async () => initial, apply, save, undo, redo,
     readFrameDragThreshold: async () => ({ x: 5, y: 5 }),
     readSliderDoubleClickTime: async () => 500,
+    queryLayouts: async () => { throw new Error("Layouts are not configured in this fixture."); },
+    previewLayout: async () => { throw new Error("Layouts are not configured in this fixture."); },
     previewFrameStyle: async () => { throw new Error("Frame style preview is not configured in this fixture."); },
     previewPhotoAngle: async () => { throw new Error("Photo angle preview is not configured in this fixture."); },
     previewFrameGeometry: unsupported, saveAs: unsupported,

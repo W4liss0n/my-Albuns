@@ -441,6 +441,7 @@ test("the manifest captures rendered structural command surfaces at the physical
       type: "context-click",
       selector:
         '[data-reorder-surface="bar"] [data-sheet-id="sheet-001"]',
+      offsetX: -40,
     },
   ]);
   assert.match(contextMenu.readySelector, /Ações da Lâmina 01/u);

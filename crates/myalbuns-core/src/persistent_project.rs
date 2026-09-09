@@ -474,6 +474,30 @@ impl EditableProject {
         )
     }
 
+    pub fn query_layouts(&mut self, sheet_id: &str) -> Result<crate::LayoutQueryResult, CoreError> {
+        if !self.session_valid {
+            return Err(CoreError::EditableSessionInvalidated);
+        }
+        self.session.query_layouts(sheet_id)
+    }
+
+    pub fn preview_layout(
+        &self,
+        selection: &crate::LayoutSelection,
+    ) -> Result<Vec<crate::ComposedFrame>, CoreError> {
+        if !self.session_valid {
+            return Err(CoreError::EditableSessionInvalidated);
+        }
+        let (sheet_id, patch) = self.session.checked_layout_patch(selection)?;
+        let candidate = self.project().with_layout_patch(sheet_id, patch)?;
+        let ids = patch
+            .frame_ids()
+            .iter()
+            .map(|id| id.to_string())
+            .collect::<Vec<_>>();
+        Ok(self.preview_frame_composition(candidate, &ids))
+    }
+
     /// Composes a transient Frame with the same constraints and fill calculation
     /// as the committed gesture, without touching the Session or its History.
     pub fn preview_frame_geometry(

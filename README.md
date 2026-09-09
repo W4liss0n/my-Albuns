@@ -12,6 +12,7 @@ O glossário é normativo apenas para o significado dos termos. As pesquisas sã
 
 - [Especificação funcional](docs/specs/programa-de-diagramacao-de-albuns.md) — fonte canônica do comportamento observável do produto.
 - [Glossário do domínio](CONTEXT.md) — nomes e significados dos conceitos; não especifica fluxos, algoritmos, interface ou critérios de aceite.
+- [Contrato do Gerador e da aplicação de Layouts](docs/design/0026-contrato-do-gerador-e-da-aplicacao-de-layouts.md) — base V9 aprovada, consulta, critérios geométricos e integração futura com prévia e Histórico.
 
 ## Decisões arquiteturais
 
@@ -24,6 +25,7 @@ O glossário é normativo apenas para o significado dos termos. As pesquisas sã
 - [ADR 0007 — Caminhos Windows e identidade física](docs/adr/0007-tratar-caminhos-windows-e-identidade-fisica.md) · aceito
 - [ADR 0008 — Arranjo de reserva de Layout](docs/adr/0008-garantir-layout-compativel-por-arranjo-de-reserva.md) · aceito
 - [ADR 0009 — Arquivo `.myalbuns` JSON versionado](docs/adr/0009-adotar-arquivo-myalbuns-json-versionado.md) · aceito
+- [ADR 0010 — Gerador de Layouts por composições determinísticas](docs/adr/0010-gerar-layouts-por-composicoes-deterministicas.md) · aceito
 
 ## Designs
 

@@ -119,16 +119,13 @@ test("marks composed dimension changes as owned by the safe transformation flow"
   }
 });
 
-test("marks composed edge conversions as owned by the complete conversion flow", () => {
+test("enables composed edge conversion through the Core Layout flow", () => {
   renderForm({ sheetStates: representativeProjection.state.album.sheets });
 
   for (const label of ["Primeira Lâmina", "Última Lâmina"]) {
     const select = screen.getByRole("combobox", { name: label });
-    expect(select).toBeDisabled();
-    expect(select.closest(".album-information-field")).toHaveAttribute(
-      "data-placeholder-feature",
-      "convert-composed-edge",
-    );
+    expect(select).toBeEnabled();
+    expect(select.closest(".album-information-field")).not.toHaveAttribute("data-placeholder-feature");
   }
 });
 
@@ -582,7 +579,7 @@ test("lets a pending edge conversion be restored when edge content arrives", asy
   );
   expect(
     screen.getByRole("combobox", { name: "Primeira Lâmina" }),
-  ).toBeDisabled();
+  ).toBeEnabled();
   fireEvent.click(
     screen.getByRole("button", { name: "Restaurar Primeira Lâmina" }),
   );

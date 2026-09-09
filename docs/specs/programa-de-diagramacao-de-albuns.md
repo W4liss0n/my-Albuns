@@ -2,7 +2,7 @@
 status: ready-for-agent
 document: product-spec
 implementation-readiness: decision-tickets-required
-updated: 2026-09-05
+updated: 2026-09-09
 ---
 
 # Programa de Diagramação de Álbuns
@@ -274,7 +274,7 @@ A saída final será uma Exportação JPEG, PNG ou PDF, `Por lâmina` ou `Por p�
 1. Como pessoa diagramadora, quero favoritar um Layout como cópia estável no Projeto, para priorizá-lo somente naquele Álbum.
 1. Como pessoa diagramadora, quero favoritar ou desfavoritar sem confirmação e com Undo/Redo, para controlar rapidamente a prioridade sem perder a ação anterior.
 1. Como pessoa diagramadora, quero conservar um favorito mesmo se sua origem global mudar ou desaparecer, para não perder uma organização local.
-1. Como pessoa diagramadora, quero que o Gerador de Layouts sempre forneça ao menos uma opção compatível, para que operações automáticas nunca fiquem sem solução.
+1. Como pessoa diagramadora, quero que operações automáticas sempre encontrem uma organização compatível, usando o arranjo de reserva quando necessário, para nunca ficarem sem solução.
 
 ### Painel de imagens e vínculos
 
@@ -875,6 +875,10 @@ validação das superfícies descritas nesta seção.
 - Dentro de cada seção, a ordem é: Último Layout aplicado, quando pertencer à categoria; Favoritos do Projeto; e demais candidatos. Uma definição possui somente uma preview, mesmo quando é simultaneamente a última aplicada e favorita.
 - Para aplicação automática, a prioridade global é: Último Layout aplicado compatível, primeiro Favorito do Projeto, primeiro Layout personalizado global e primeiro Layout do sistema. Dentro de cada grupo, prevalece a ordem exibida em sua seção.
 - Layouts do sistema são produzidos pelo Gerador de Layouts.
+- O Gerador considera quantidade, orientações dos Frames, formato e dimensões da superfície, margem e intervalo. Cada sugestão conserva as orientações vertical, horizontal ou quadrada dos Frames consultados, podendo variar tamanhos, proporções dentro da orientação e posições espaciais sem reordenar a Pilha visual.
+- Uma consulta do Gerador oferece até dez sugestões de qualidade e estrutura diferentes, sem completar a lista com variações quase iguais. As composições seguem padrões de alinhamento, espaçamento uniforme e grupos completos; não deixam células vazias dentro dos grupos.
+- Uma sugestão por Página não é descartada como repetição de outra que atravessa o centro apenas por suas posições serem parecidas. A diversidade é comparada dentro do mesmo escopo efetivo; não há quantidade fixa de sugestões de cada tipo.
+- A cobertura inicial do Gerador é de um a trinta Frames. Uma consulta fora dessa cobertura ou sem padrões adequados não elimina Frames nem impede o uso de Layouts de outras origens ou do arranjo de reserva. Esse teto não limita a quantidade de Frames editáveis no Projeto.
 - A existência de ao menos uma organização compatível é garantida para qualquer quantidade suportada de Frames, formato de superfície e escopo. Quando nenhum candidato do catálogo, dos Favoritos ou do Gerador servir, o aplicativo usa um arranjo de reserva derivado apenas da quantidade de Frames e da superfície ativa. Esse arranjo não aparece como preview no Painel de Layouts e não pode ser favoritado.
 - Layouts personalizados são salvos imediatamente no catálogo global a partir da geometria e da ordem atuais dos Frames, no Modo de edição da Lâmina, pelo botão em `Design da Lâmina` ou pelo comando equivalente no menu `Editar`.
 - A criação não pede nome nem abre modal; a preview geométrica identifica o item, o escopo é inferido automaticamente e a ação não sai do Modo de edição, aplica outra geometria ou trava a composição.
@@ -893,6 +897,8 @@ validação das superfícies descritas nesta seção.
 - Layouts copiados para um Projeto acompanham Cópias de Projeto e Geração de Projetos em lote.
 - Layout por Lâmina pode permitir Travessia central.
 - Layout por Página produz uma organização global formada por Blocos de Frames centralizados nas Páginas e nunca permite que um Frame atravesse o centro.
+- Um Projeto que permite Travessia central admite Layouts por Lâmina e por Página. Essa permissão amplia os candidatos compatíveis; não exige que uma sugestão atravesse o centro.
+- Um Projeto explicitamente restrito a Layouts por Página não oferece nem aplica Layouts com Travessia central. Essa restrição vale para candidatos do Gerador, personalizados, Favoritos e Último Layout aplicado, além dos demais critérios de compatibilidade.
 - Ao salvar um Layout personalizado, a existência de qualquer Travessia central determina escopo por Lâmina; se todos os Frames estiverem integralmente em um dos lados, o escopo é por Página.
 - Compatibilidade exige o mesmo tipo de superfície e a mesma proporção. Diferenças de tamanho físico, Unidade ou DPI são acomodadas por escala proporcional.
 - Converter uma Lâmina de extremidade entre dupla e página única preserva Fotos, placeholders e estilos, descarta a geometria anterior e destrava a organização. Se houver Frames, aplica o primeiro Layout compatível; se não houver, mantém a Lâmina sem Layout.
@@ -1122,7 +1128,7 @@ validação das superfícies descritas nesta seção.
 - Herança visual e de Frame deve ser testada como transições entre `default`, `custom`, herança parcial, ausência personalizada, restauração e mudança posterior do padrão.
 - Frames e Fotos devem ser exercitados em diferentes proporções, rotações, espelhamento, Pan, Zoom, redimensionamento, troca de conteúdo com Foto ou placeholder e cópia/colagem simples ou múltipla na mesma Lâmina, entre Lâminas equivalentes e nos dois sentidos entre Lâmina dupla e Página única, verificando Preenchimento do Frame, deslocamento de colagem limitado, fallback sem deslocamento, mapeamento proporcional, preservação do lado lógico, reutilização dos vínculos, isolamento entre Projetos, ausência de Caixa de seleção e atomicidade do Histórico.
 - Layouts devem ser testados por compatibilidade, prioridade, identidade com sequência ordenada, atualização do catálogo ao abrir/focalizar/atualizar, mapeamento pela Pilha visual, preservação de conteúdo e estilo, criação de placeholders, travamento, `Delete` que preserva Frames travados, destravamento e diferenças entre modo normal e Modo de edição.
-- Enquanto o algoritmo do Gerador de Layouts estiver adiado, seus testes devem fixar apenas o contrato: sempre produzir ao menos uma opção compatível e respeitar escopo e limites.
+- Os testes do Gerador verificam determinismo, quantidade, orientações, limites físicos, alinhamento, grupos completos, diversidade e escopo, conforme o [contrato de geração e aplicação](../design/0026-contrato-do-gerador-e-da-aplicacao-de-layouts.md). A garantia de ao menos uma organização para as automações é testada separadamente em `LayoutRules`, com todas as fontes vazias e uso do arranjo de reserva.
 - Persistência e identidade devem cobrir Salvar, `Salvar como`, Cópia externa gravável e somente leitura, movimentação, Bloqueio de abertura, bloqueio órfão, isolamento, Undo/Redo em sessão e Recuperação consolidada que reinicia com Histórico vazio.
 - Cenários com arquivos temporários reais devem verificar vínculos externos, substituição no mesmo caminho, Arquivo ausente, Arquivo indisponível, religação independente, duplicação entre abas e remoção de itens usados.
 - Caminhos devem ser exercitados como local absoluto, UNC, unidade mapeada, verbatim local, verbatim UNC, caminho longo, relativo inválido, namespace de dispositivo, curinga, fluxo alternativo e componente reservado. Os testes também cobrem arquivo no lugar de diretório e o inverso, criação sob pai validado, aliases do mesmo Projeto, `Same`/`Different`/`Indeterminate` com política no chamador, rede indisponível e recuperada, transporte do mesmo plano imutável de bindings por IPC, bindings fixos até o estado terminal, nova captura em `Tentar novamente` ou retomada após reinício e abertura individual de cada original.
@@ -1175,7 +1181,8 @@ O [glossário do domínio](../../CONTEXT.md) é normativo somente para o signifi
 - [Publicar Exportações com transação limitada](../adr/0006-publicar-exportacao-com-transacao-limitada.md);
 - [Tratar caminhos Windows como valores nativos e separá-los da identidade física](../adr/0007-tratar-caminhos-windows-e-identidade-fisica.md);
 - [Garantir sempre um Layout compatível por arranjo de reserva](../adr/0008-garantir-layout-compativel-por-arranjo-de-reserva.md);
-- [Adotar `.myalbuns` como arquivo JSON versionado de Projeto](../adr/0009-adotar-arquivo-myalbuns-json-versionado.md).
+- [Adotar `.myalbuns` como arquivo JSON versionado de Projeto](../adr/0009-adotar-arquivo-myalbuns-json-versionado.md);
+- [Gerar Layouts por composições determinísticas](../adr/0010-gerar-layouts-por-composicoes-deterministicas.md).
 
 A organização reversível de dados locais e o contrato técnico do Cache estão em [Armazenamento local e Cache](../design/0010-armazenamento-local-e-cache.md). O módulo compartilhado, as formas aceitas e os bindings temporários de cada operação estão em [Resolução e política de caminhos](../design/0011-resolucao-e-politica-de-caminhos.md). A propriedade do estado e os módulos de trabalho estão em [Propriedade de estado e módulos do núcleo](../design/0012-propriedade-de-estado-e-modulos-do-nucleo.md). Composição canônica, JPEG, PNG, PDF, captura dos Originais, numeração e corpus dourado estão no [Contrato do Renderizador final](../design/0019-contrato-do-renderizador-final.md).
 
@@ -1189,7 +1196,6 @@ A garantia de Publicação é deliberadamente limitada: todas as saídas são pr
 
 As funcionalidades abaixo permanecem no produto, mas seus detalhes foram deliberadamente adiados e exigem decisões próprias antes da implementação correspondente:
 
-- algoritmo do Gerador de Layouts, diversidade e ordenação de candidatos e distribuição dos Blocos de Frames;
 - limite numérico da Mudança dimensional segura e eventual ponto focal adicional;
 - formato e resolução da representação visual reduzida, representação concreta dos identificadores de geração/versão, algoritmo de fingerprint e eventual adoção de tiles depois do spike;
 - eventual paralelismo entre itens de lote, somente se medições demonstrarem ganho e preservarem o contrato serial observável;

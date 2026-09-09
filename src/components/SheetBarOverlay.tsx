@@ -11,6 +11,7 @@ import { projectCommandDescriptor } from "../application/projectCommandCatalog";
 import type { ViewportState } from "../state/viewport";
 import type {
   CanvasMetrics,
+  AlbumCanvasProps,
   SheetBarMetadata,
 } from "./albumCanvasContract";
 import {
@@ -55,8 +56,10 @@ export interface SheetBarOverlayProps {
   readonly onEditSheet: (sheetId: string) => void;
   readonly onSelect: (sheetId: string) => void;
   readonly onSwapSides?: (sheetId: string) => void;
+  readonly layouts?: AlbumCanvasProps["sheetLayouts"];
   readonly onBarHover?: (sheetId: string, hovered: boolean, swapHovered?: boolean) => void;
   readonly onSwapFocus?: (sheetId: string, focused: boolean) => void;
+  readonly onLayoutFocus?: (sheetId: string, focused: boolean) => void;
   readonly onContextMenu: (
     sheetId: string,
     position: { x: number; y: number },
@@ -326,6 +329,38 @@ export function SheetBarOverlay(
               onFocus={() => props.onSwapFocus?.(sheet.sheetId, true)}
               onBlur={() => props.onSwapFocus?.(sheet.sheetId, false)}
               title={projectCommandDescriptor("swap-sheet-sides").label}
+              type="button"
+            />
+          </span>,
+          <span
+            className="sheet-bar-overlay__layouts"
+            key={`${sheet.sheetId}-layouts`}
+            onPointerEnter={() => props.onBarHover?.(sheet.sheetId, true)}
+            onPointerLeave={() => props.onBarHover?.(sheet.sheetId, false)}
+            onPointerDown={(event) => event.stopPropagation()}
+            onDoubleClick={(event) => event.stopPropagation()}
+            onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); }}
+            style={{
+              height: `${SHEET_VISUAL_STYLE.sheetBar.actionSizePx}px`,
+              width: `${SHEET_VISUAL_STYLE.sheetBar.actionSizePx}px`,
+              left: `${entry.left * scale + props.viewport.offsetX + (fullWidth - SHEET_VISUAL_STYLE.sheetBar.actionSizePx) / 2}px`,
+              top: `${sheetBounds.top + (SHEET_VISUAL_STYLE.sheetBar.heightPx - SHEET_VISUAL_STYLE.sheetBar.actionSizePx) / 2}px`,
+            }}
+          >
+            <button
+              aria-label={`Layouts da Lâmina ${String(sheet.number).padStart(2, "0")}`}
+              aria-expanded={props.layouts?.activeSheetId === sheet.sheetId}
+              aria-controls="layout-panel"
+              disabled={!props.layouts || props.layouts.disabled}
+              onClick={(event) => { event.stopPropagation(); props.layouts?.onToggle(sheet.sheetId); }}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter" && event.key !== " ") return;
+                event.stopPropagation();
+                if (event.repeat) event.preventDefault();
+              }}
+              onFocus={() => props.onLayoutFocus?.(sheet.sheetId, true)}
+              onBlur={() => props.onLayoutFocus?.(sheet.sheetId, false)}
+              title="Abrir Painel de Layouts"
               type="button"
             />
           </span>,

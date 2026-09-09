@@ -25,6 +25,7 @@ import { mergeMediaPreviewDemands, renderableMediaPreviewUrls } from "../applica
 import type { DisplayUnit, EditorProjection } from "../domain/project";
 import { ApplicationHeader } from "../ui";
 import { AlbumCanvas } from "./AlbumCanvas";
+import { LayoutPanel } from "./LayoutPanel";
 import { ApplicationMenuBar } from "./ApplicationMenuBar";
 import {
   ExportPreviewControl,
@@ -534,7 +535,7 @@ export function ProjectWorkspace({
     frameClipboardActive: canvasMode.kind === "sheet-editing" && draggedPhotoId === null && sheetContextMenu === null && frameContextMenu === null,
     deleteFrames: () => { void controller.deleteFrames(); },
     arrangeFrames: (action) => { void controller.arrangeFrames(action); },
-    frameCommandsActive: controller.canArrangeFrames && draggedPhotoId === null && sheetContextMenu === null && frameContextMenu === null,
+    frameCommandsActive: controller.canDeleteFrames && draggedPhotoId === null && sheetContextMenu === null && frameContextMenu === null,
     canDeleteSheet: implicitSheetAvailability.canDelete,
     canRedo: projection.state.canRedo,
     canUndo: projection.state.canUndo,
@@ -643,9 +644,13 @@ export function ProjectWorkspace({
       >
         <section
           id="continuous-canvas"
-          className="canvas-section"
+          className={`canvas-section${controller.layoutPanel.visible ? " canvas-section--layouts" : ""}`}
           aria-label="Área de composição"
         >
+          {controller.layoutPanel.visible && <LayoutPanel controller={controller.layoutPanel}
+            sheet={projection.composition.sheets.find((sheet) => sheet.sheetId === controller.layoutPanel.sheetId)!}
+            presentationUnit={presentationUnit}
+            mediaPreviewUrls={mediaPreviewUrls} />}
           <AlbumCanvas
             {...controller.canvasProps}
             onOpenFrameContextMenu={openFrameContextMenu}

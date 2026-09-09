@@ -1,4 +1,9 @@
 export type { AlbumSnapshot } from "./generated/AlbumSnapshot";
+export type { LayoutQueryResult } from "./generated/LayoutQueryResult";
+export type { LayoutSelection } from "./generated/LayoutSelection";
+export type { LayoutSettings } from "./generated/LayoutSettings";
+export type { LayoutCandidate } from "./generated/LayoutCandidate";
+export type { LayoutDefinition } from "./generated/LayoutDefinition";
 export type { AlbumInformation } from "./generated/AlbumInformation";
 export type { AlbumInformationImpact } from "./generated/AlbumInformationImpact";
 export type { AlbumInformationValidation } from "./generated/AlbumInformationValidation";

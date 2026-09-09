@@ -27,6 +27,8 @@ function deletionHarness() {
     load: async () => initial, apply, save, undo, redo,
     readFrameDragThreshold: async () => ({ x: 5, y: 5 }),
     readSliderDoubleClickTime: async () => 500,
+    queryLayouts: async () => { throw new Error("Layouts are not configured in this fixture."); },
+    previewLayout: async () => { throw new Error("Layouts are not configured in this fixture."); },
     previewFrameStyle: async () => { throw new Error("Frame style preview is not configured in this fixture."); },
     previewPhotoAngle: async () => { throw new Error("Photo angle preview is not configured in this fixture."); },
     previewFrameGeometry: unsupported, saveAs: unsupported,
@@ -61,7 +63,7 @@ test.each([false, true])("deletion followed by Save and Undo respects the queue 
     else harness.resolve(deleted);
     await completion;
   });
-  expect(apply.mock.calls[0][0]).toEqual({ kind: "deleteFrames", frameIds: ["delete-frame-1", "delete-frame-2"] });
+  expect(apply.mock.calls[0][0]).toEqual({ kind: "deleteFrames", frameIds: ["delete-frame-1", "delete-frame-2"], mode: "edit" });
   if (fails) {
     expect(save).not.toHaveBeenCalled();
     expect(undo).not.toHaveBeenCalled();
@@ -90,8 +92,8 @@ test("deletion clears removed selection and Undo/Redo do not select restored Fra
   expect(useEditorView.getState().selectedFrameIds).toEqual([]);
 });
 
-test("deletion is unavailable outside editing, without selection, and during blocked interaction", async () => {
-  const { view, apply } = deletionHarness();
+test("deletion rejects blocked or empty selection and works in normal mode", async () => {
+  const { view, apply, resolve, deleted } = deletionHarness();
   view.rerender({ blocked: true });
   await act(async () => { expect(await view.result.current.deleteFrames()).toBe(false); });
   view.rerender({ blocked: false });
@@ -101,6 +103,11 @@ test("deletion is unavailable outside editing, without selection, and during blo
     useEditorView.getState().exitSheetEdit();
     useEditorView.getState().selectFrame("delete-frame-0");
   });
-  await act(async () => { expect(await view.result.current.deleteFrames()).toBe(false); });
   expect(apply).not.toHaveBeenCalled();
+  await act(async () => {
+    const completion = view.result.current.deleteFrames();
+    resolve(deleted);
+    expect(await completion).toBe(true);
+  });
+  expect(apply.mock.calls[0][0]).toEqual({ kind: "deleteFrames", frameIds: ["delete-frame-0"], mode: "normal" });
 });

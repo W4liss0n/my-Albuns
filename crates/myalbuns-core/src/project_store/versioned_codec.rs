@@ -13,6 +13,7 @@ use uuid::{Uuid, Version};
 
 use super::{DecodeFailure, DocumentFailure, PathFailure};
 use crate::MediaKind;
+mod layouts_v8;
 use crate::project_document::{
     ActiveSides, Background, BackgroundContent, DisplayUnit, DocumentSettings, FrameBorder,
     FrameBorderValues, FrameStyle, MAX_SAFE_INTEGER, MediaRef, Overlay, OverlayContent,
@@ -20,6 +21,7 @@ use crate::project_document::{
     ProjectRevision, ProjectSheet, Rgb, VisualDefaults, frame_border_width_is_valid,
     validate_project_state,
 };
+use layouts_v8::ProjectDocumentV8;
 
 const DOCUMENT_TYPE: &str = "myalbuns.project";
 const SCHEMA_VERSION_V1: u32 = 1;
@@ -29,6 +31,7 @@ pub(super) const SCHEMA_VERSION_V4: u32 = 4;
 pub(super) const SCHEMA_VERSION_V5: u32 = 5;
 pub(super) const SCHEMA_VERSION_V6: u32 = 6;
 pub(super) const SCHEMA_VERSION_V7: u32 = 7;
+pub(super) const SCHEMA_VERSION_V8: u32 = 8;
 const UTF8_BOM: &[u8] = &[0xEF, 0xBB, 0xBF];
 
 pub(super) struct DecodedProjectRevision {
@@ -41,6 +44,14 @@ pub(super) fn decode(bytes: &[u8]) -> Result<DecodedProjectRevision, DecodeFailu
         return Err(document_failure(DocumentFailure::InvalidProjectDocument));
     }
     let schema_version = classify_header(bytes)?;
+    if schema_version == SCHEMA_VERSION_V8 {
+        let document: ProjectDocumentV8 = serde_json::from_slice(bytes)
+            .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))?;
+        return Ok(DecodedProjectRevision {
+            revision: document.into_domain()?,
+            source_schema_version: schema_version,
+        });
+    }
     let document = if schema_version == SCHEMA_VERSION_V7 {
         serde_json::from_slice::<ProjectDocumentV7>(bytes)
             .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))?
@@ -90,7 +101,7 @@ pub(super) fn encode(revision: &ProjectRevision) -> Result<Vec<u8>, DecodeFailur
     if revision.revision > MAX_SAFE_INTEGER {
         return Err(document_failure(DocumentFailure::InvalidProjectDocument));
     }
-    let dto = ProjectDocumentV7::from_domain(revision)?;
+    let dto = ProjectDocumentV8::from_domain(revision)?;
     let mut bytes = serde_json::to_vec_pretty(&dto)
         .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))?;
     bytes.push(b'\n');
@@ -104,6 +115,12 @@ pub(super) fn rewrite_project_id(
     let source = decode(bytes)?;
     let project_id = project_id.hyphenated().to_string();
     let mut rewritten = match source.source_schema_version {
+        SCHEMA_VERSION_V8 => {
+            let mut document: ProjectDocumentV8 = serde_json::from_slice(bytes)
+                .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))?;
+            document.project_id = project_id;
+            serde_json::to_vec_pretty(&document)
+        }
         SCHEMA_VERSION_V1 => {
             let mut document: ProjectDocumentV1 = serde_json::from_slice(bytes)
                 .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))?;
@@ -170,7 +187,9 @@ fn classify_header(bytes: &[u8]) -> Result<u32, DecodeFailure> {
     };
     match version {
         SCHEMA_VERSION_V1 | SCHEMA_VERSION_V2 | SCHEMA_VERSION_V3 | SCHEMA_VERSION_V4
-        | SCHEMA_VERSION_V5 | SCHEMA_VERSION_V6 | SCHEMA_VERSION_V7 => Ok(version),
+        | SCHEMA_VERSION_V5 | SCHEMA_VERSION_V6 | SCHEMA_VERSION_V7 | SCHEMA_VERSION_V8 => {
+            Ok(version)
+        }
         0 => Err(document_failure(DocumentFailure::UnsupportedLegacySchema {
             version,
         })),
@@ -203,6 +222,8 @@ fn map_document(document: ProjectDocumentV7) -> Result<ProjectRevision, DecodeFa
         .into_iter()
         .map(map_sheet)
         .collect::<Result<Vec<_>, _>>()?;
+    // The v7 -> v8 migration preserves every existing Frame and defaults to
+    // allowing Pages and Sheet. No Last Layout is inferred from manual geometry.
     let project = ProjectDocument::new(settings, visual_defaults, media, sheets);
     validate_project_state(&project)
         .map_err(|_| document_failure(DocumentFailure::InvalidProjectState))?;

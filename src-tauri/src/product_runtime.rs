@@ -219,6 +219,8 @@ pub(crate) fn run(
             crate::project_commands::preview_frame_geometry,
             crate::project_commands::preview_photo_angle,
             crate::project_commands::preview_frame_style,
+            crate::project_commands::query_layouts,
+            crate::project_commands::preview_layout,
             crate::project_commands::slider_double_click_time,
             crate::project_commands::frame_drag_threshold,
             crate::project_commands::relink_media,
