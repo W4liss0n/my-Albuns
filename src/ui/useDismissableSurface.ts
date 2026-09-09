@@ -7,6 +7,7 @@ export type SurfaceDismissal =
 
 interface DismissableSurfaceOptions {
   enabled: boolean;
+  capturePointerOutside?: boolean;
   includeFocusOutside?: boolean;
   rootRef: RefObject<HTMLElement | null>;
   onDismiss(dismissal: SurfaceDismissal): void;
@@ -18,6 +19,7 @@ interface DismissableSurfaceOptions {
  */
 export function useDismissableSurface({
   enabled,
+  capturePointerOutside = false,
   includeFocusOutside = false,
   rootRef,
   onDismiss,
@@ -45,15 +47,15 @@ export function useDismissableSurface({
       }
     };
 
-    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("pointerdown", onPointerDown, capturePointerOutside);
     document.addEventListener("keydown", onKeyDown);
     if (includeFocusOutside) document.addEventListener("focusin", onFocusIn);
     return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("pointerdown", onPointerDown, capturePointerOutside);
       document.removeEventListener("keydown", onKeyDown);
       if (includeFocusOutside) {
         document.removeEventListener("focusin", onFocusIn);
       }
     };
-  }, [enabled, includeFocusOutside, rootRef]);
+  }, [enabled, capturePointerOutside, includeFocusOutside, rootRef]);
 }

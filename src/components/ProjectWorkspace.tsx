@@ -648,9 +648,7 @@ export function ProjectWorkspace({
           aria-label="Área de composição"
         >
           {controller.layoutPanel.visible && <LayoutPanel controller={controller.layoutPanel}
-            sheet={projection.composition.sheets.find((sheet) => sheet.sheetId === controller.layoutPanel.sheetId)!}
-            presentationUnit={presentationUnit}
-            mediaPreviewUrls={mediaPreviewUrls} />}
+            sheet={projection.composition.sheets.find((sheet) => sheet.sheetId === controller.layoutPanel.sheetId)!} />}
           <AlbumCanvas
             {...controller.canvasProps}
             onOpenFrameContextMenu={openFrameContextMenu}

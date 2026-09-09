@@ -854,7 +854,9 @@ validação das superfícies descritas nesta seção.
 - O Painel de Layouts é aberto exclusivamente pelo controle central da Barra de uma Lâmina no modo normal e permanece associado a esse alvo explícito até ser fechado ou redirecionado por outra Barra. Não pode ser aberto nem utilizado no Modo de edição.
 - A entrada no Modo de edição oculta temporariamente uma faixa aberta sem perder seu alvo. A saída restaura a faixa e recalcula seus Layouts compatíveis antes de exibi-la.
 - O Painel de Layouts possui duas seções horizontais: `Automáticos` contém Layouts produzidos pelo Gerador de Layouts e `Personalizados` contém Layouts criados pelo usuário e disponíveis no catálogo global.
-- O hover sobre uma preview executa um Mapeamento transitório e renderiza os próprios Frames da Lâmina alvo nas posições/dimensões candidatas, preservando Fotos, placeholders, estilos, ordem e ajustes.
+- O cabeçalho contém somente o seletor de quantidade de Frames. Clicar fora do Painel o fecha; o controle da Barra continua responsável por alternar ou redirecionar o Painel. Não há botão de fechar nem formulário de ajustes no cabeçalho.
+- As miniaturas de Layout são representações genéricas de sua geometria, sem Fotos, estilos, Background, Overlay ou legenda abaixo. Os títulos verticais das seções mantêm espaçamento nas extremidades.
+- O hover sobre uma preview executa um Mapeamento transitório e renderiza no Canvas os próprios Frames da Lâmina alvo nas posições/dimensões candidatas, preservando Fotos, placeholders, estilos, ordem e ajustes.
 - Em candidatos de travamento com posições excedentes, o hover mostra essas posições como placeholders vazios transitórios, com o Padrão de Frame herdado, sem criá-los no Projeto; o corpo da preview não os aplica, e somente o cadeado pode confirmar a operação.
 - O enquadramento das Fotos é recalculado com o mesmo caminho da aplicação real. A prévia não modifica Projeto, estado de Salvamento ou Undo/Redo.
 - Sair da preview restaura a geometria anterior; passar para outra substitui a representação. Clicar confirma exatamente o resultado mostrado, e clicar no cadeado confirma, cria os placeholders excedentes e trava, cada um como uma única ação.
@@ -871,6 +873,7 @@ validação das superfícies descritas nesta seção.
 - Clicar no cadeado fechado da preview destacada destrava imediatamente, sem confirmação, reabilita as outras previews e preserva Frames, Fotos, placeholders, estilos, ajustes, ordem e geometria.
 - Enquanto a organização estiver travada, nenhuma ação pode aplicar outra geometria de Layout; o usuário deve destravá-la antes de trocar de organização.
 - Travar e destravar constituem ações de Undo/Redo.
+- Ao confirmar um Layout, a faixa mantém as miniaturas visíveis enquanto atualiza a consulta do mesmo alvo. As ações dessas miniaturas ficam indisponíveis até a consulta vigente estar pronta, sem esvaziar nem piscar o Painel.
 - O último Layout aplicado é uma cópia local de sua geometria original e de sua categoria de origem. Permanece primeiro dentro dessa seção enquanto compatível e pode ser reaplicado depois de edições manuais ou da remoção da origem global.
 - Dentro de cada seção, a ordem é: Último Layout aplicado, quando pertencer à categoria; Favoritos do Projeto; e demais candidatos. Uma definição possui somente uma preview, mesmo quando é simultaneamente a última aplicada e favorita.
 - Para aplicação automática, a prioridade global é: Último Layout aplicado compatível, primeiro Favorito do Projeto, primeiro Layout personalizado global e primeiro Layout do sistema. Dentro de cada grupo, prevalece a ordem exibida em sua seção.

@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ProjectCorePort } from "../application/projectPorts";
-import type { ComposedFrame, EditorProjection, FrameOrientation, LayoutQueryResult, LayoutSettings, ProjectIntent } from "../domain/project";
+import type { ComposedFrame, EditorProjection, LayoutQueryResult, ProjectIntent } from "../domain/project";
 import type { ProjectMutationRunner } from "./useProjectMutationRunner";
 
 interface LayoutPanelInput {
@@ -31,14 +31,13 @@ export function useLayoutPanel(input: LayoutPanelInput) {
   const visible = sheetId !== null && !editing;
   const sheet = projection.state.album.sheets.find((sheet) => sheet.id === sheetId);
   const frameCount = sheet?.frames.length ?? 0;
-  const [requestedPositions, setRequestedPositions] = useState<{ projectId: string; sheetId: string; count: number; orientation: FrameOrientation } | null>(null);
+  const [requestedPositions, setRequestedPositions] = useState<{ projectId: string; sheetId: string; count: number } | null>(null);
   const request = requestedPositions?.projectId === projectId && requestedPositions.sheetId === sheetId ? requestedPositions : null;
   const positionCount = sheet?.layoutLocked ? frameCount : Math.max(frameCount, request?.count ?? frameCount);
-  const newFrameOrientation = request?.orientation ?? "horizontal";
   const additionalPositions = positionCount - frameCount;
   const [refresh, setRefresh] = useState(0);
   const scope = useMemo(() => ({ active: false }),
-    [projectId, projection.state.revision, projection.composition, sheetId, editing, disabled, input.port.queryLayouts, refresh, additionalPositions, newFrameOrientation]);
+    [projectId, projection.state.revision, projection.composition, sheetId, editing, disabled, input.port.queryLayouts, refresh, additionalPositions]);
   const [prepared, setPrepared] = useState<PreparedLayouts | null>(null);
   const [hover, setHover] = useState<{ scope: object; index: number } | null>(null);
   const [error, setError] = useState<{ scope: object; message: string } | null>(null);
@@ -60,7 +59,7 @@ export function useLayoutPanel(input: LayoutPanelInput) {
       const outcome = await latest.current.runner.waitForIdle();
       if (!current() || outcome?.status === "obsolete") return null;
       if (outcome?.status === "failed") throw outcome.error;
-      return additionalPositions > 0 ? latest.current.port.queryLayouts(sheetId, { additionalPositions, orientation: newFrameOrientation })
+      return additionalPositions > 0 ? latest.current.port.queryLayouts(sheetId, { additionalPositions, orientation: "horizontal" })
         : latest.current.port.queryLayouts(sheetId);
     });
     queries.current = task;
@@ -77,9 +76,13 @@ export function useLayoutPanel(input: LayoutPanelInput) {
       latest.current.onError(message);
     });
     return () => { active = false; };
-  }, [scope, visible, disabled, sheetId, projectId, additionalPositions, newFrameOrientation]);
+  }, [scope, visible, disabled, sheetId, projectId, additionalPositions]);
 
   const data = visible && !disabled && prepared?.scope === scope ? prepared : null;
+  // Keep the last thumbnails painted while this same target refreshes. Only
+  // current-scope data may preview or commit; another target never reuses it.
+  const displayData = visible && prepared?.query.projectId === projectId &&
+    prepared.query.sheetId === sheetId && error?.scope !== scope ? prepared : null;
   const previewFrames = hover?.scope === scope && data ? data.previews[hover.index] : null;
   const composition = useMemo(() => previewFrames ? {
     ...projection.composition,
@@ -104,9 +107,10 @@ export function useLayoutPanel(input: LayoutPanelInput) {
   }
 
   return {
-    visible, sheetId, composition, committing, positionCount, newFrameOrientation,
+    visible, sheetId, composition, committing, positionCount,
     query: data?.query ?? null,
-    previews: data?.previews ?? [],
+    displayQuery: displayData?.query ?? null,
+    previews: displayData?.previews ?? [],
     error: error?.scope === scope ? error.message : null,
     toggle(nextSheetId: string) {
       if (disabled || editing) return;
@@ -114,10 +118,10 @@ export function useLayoutPanel(input: LayoutPanelInput) {
       setTarget(sheetId === nextSheetId ? null : { projectId, sheetId: nextSheetId });
     },
     close() { setHover(null); setTarget(null); },
-    configurePositions(count: number, orientation: FrameOrientation) {
+    configurePositions(count: number) {
       if (!sheetId || disabled || committingRef.current || sheet?.layoutLocked || !Number.isSafeInteger(count) || count < frameCount || count > 30) return;
       setHover(null);
-      setRequestedPositions({ projectId, sheetId, count, orientation });
+      setRequestedPositions({ projectId, sheetId, count });
     },
     preview(index: number) {
       if (data?.previews[index] && !data.query.locked && !committingRef.current) setHover({ scope, index });
@@ -135,7 +139,6 @@ export function useLayoutPanel(input: LayoutPanelInput) {
       if (!data?.query.locked) return Promise.resolve(false);
       return commit({ kind: "unlockLayout", sheetId: data.query.sheetId });
     },
-    updateSettings(settings: LayoutSettings) { return commit({ kind: "setLayoutSettings", settings }); },
   };
 }
 

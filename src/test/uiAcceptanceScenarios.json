@@ -5025,7 +5025,7 @@
       "comparison": {
         "kind": "implementation-only",
         "surface": "layout-panel",
-        "reason": "O contrato 0026 define Gerador, consulta por Lâmina, prévia sem mutação e aplicação exata. As imagens e geometrias são produzidas pelo ProjectCore; o painel segue a referência visual vigente."
+        "reason": "O contrato 0026 define a consulta por Lâmina e a aplicação exata. As miniaturas mostram somente a geometria fornecida pelo Core; o hover usa as Fotos apenas no Canvas."
       },
       "viewport": {
         "width": 1440,
@@ -5058,7 +5058,7 @@
       "comparison": {
         "kind": "implementation-only",
         "surface": "layout-panel",
-        "reason": "O contrato 0026 define Gerador, consulta por Lâmina, prévia sem mutação e aplicação exata. As imagens e geometrias são produzidas pelo ProjectCore; o painel segue a referência visual vigente."
+        "reason": "O contrato 0026 define a consulta por Lâmina e a aplicação exata. As miniaturas mostram somente a geometria fornecida pelo Core; o hover usa as Fotos apenas no Canvas."
       },
       "viewport": {
         "width": 1440,
@@ -5095,7 +5095,7 @@
       "comparison": {
         "kind": "implementation-only",
         "surface": "layout-panel",
-        "reason": "O contrato 0026 define Gerador, consulta por Lâmina, prévia sem mutação e aplicação exata. As imagens e geometrias são produzidas pelo ProjectCore; o painel segue a referência visual vigente."
+        "reason": "O contrato 0026 define a consulta por Lâmina e a aplicação exata. As miniaturas mostram somente a geometria fornecida pelo Core; o hover usa as Fotos apenas no Canvas."
       },
       "viewport": {
         "width": 1440,
@@ -5124,7 +5124,7 @@
       "comparison": {
         "kind": "implementation-only",
         "surface": "layout-panel",
-        "reason": "O contrato 0026 define Gerador, consulta por Lâmina, prévia sem mutação e aplicação exata. As imagens e geometrias são produzidas pelo ProjectCore; o painel segue a referência visual vigente."
+        "reason": "O contrato 0026 define a consulta por Lâmina e a aplicação exata. As miniaturas mostram somente a geometria fornecida pelo Core; o hover usa as Fotos apenas no Canvas."
       },
       "viewport": {
         "width": 1440,
@@ -5149,7 +5149,7 @@
       "comparison": {
         "kind": "implementation-only",
         "surface": "layout-panel",
-        "reason": "O contrato 0026 define Gerador, consulta por Lâmina, prévia sem mutação e aplicação exata. As imagens e geometrias são produzidas pelo ProjectCore; o painel segue a referência visual vigente."
+        "reason": "O contrato 0026 define a consulta por Lâmina e a aplicação exata. As miniaturas mostram somente a geometria fornecida pelo Core; o hover usa as Fotos apenas no Canvas."
       },
       "viewport": {
         "width": 1440,
@@ -5168,19 +5168,19 @@
       ]
     },
     {
-      "id": "workspace-layout-settings",
-      "title": "Layouts — permissão e medidas",
+      "id": "workspace-layout-dismiss-outside",
+      "title": "Layouts — clique fora fecha o Painel",
       "implementationPath": "/workspace-preview.html?frame=layouts",
       "comparison": {
         "kind": "implementation-only",
         "surface": "layout-panel",
-        "reason": "O contrato 0026 define Gerador, consulta por Lâmina, prévia sem mutação e aplicação exata. As imagens e geometrias são produzidas pelo ProjectCore; o painel segue a referência visual vigente."
+        "reason": "O clique fora fecha o Painel de Layouts e restaura o espaço do Canvas, conforme a decisão aceita de simplificar a faixa."
       },
       "viewport": {
         "width": 1440,
         "height": 800
       },
-      "readySelector": ".layout-panel__settings",
+      "readySelector": "body:not(:has(.layout-panel)):has(.canvas-host canvas)",
       "actions": [
         {
           "type": "assert",
@@ -5195,28 +5195,9 @@
           "selector": ".layout-panel__candidate"
         },
         {
-          "type": "click-text",
-          "text": "Ajustes"
+          "type": "click",
+          "selector": ".pixi-canvas"
         }
-      ]
-    },
-    {
-      "id": "workspace-layout-settings-invalid",
-      "title": "Layouts — medida inválida com Tooltip compartilhado",
-      "implementationPath": "/workspace-preview.html?frame=layouts",
-      "comparison": {
-        "kind": "implementation-only",
-        "surface": "layout-panel",
-        "reason": "A validação compartilhada aceita exige indicação imediata no controle, descrição acessível e Tooltip sem ocupar espaço no formulário."
-      },
-      "viewport": { "width": 1440, "height": 800 },
-      "readySelector": ".layout-panel:has(input[aria-label=\"Menor lado (mm)\"][aria-invalid=\"true\"]):has([role=\"tooltip\"])",
-      "actions": [
-        { "type": "assert", "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))" },
-        { "type": "click", "selector": "button[aria-label=\"Layouts da Lâmina 01\"]" },
-        { "type": "assert", "selector": ".layout-panel__candidate" },
-        { "type": "click-text", "text": "Ajustes" },
-        { "type": "input", "selector": "input[aria-label=\"Menor lado (mm)\"]", "value": "0" }
       ]
     },
     {
@@ -5226,7 +5207,7 @@
       "comparison": {
         "kind": "implementation-only",
         "surface": "layout-panel",
-        "reason": "O contrato 0026 define Gerador, consulta por Lâmina, prévia sem mutação e aplicação exata. As imagens e geometrias são produzidas pelo ProjectCore; o painel segue a referência visual vigente."
+        "reason": "O contrato 0026 define a consulta por Lâmina e a aplicação exata. As miniaturas mostram somente a geometria fornecida pelo Core; o hover usa as Fotos apenas no Canvas."
       },
       "viewport": {
         "width": 1440,
@@ -5263,7 +5244,7 @@
       "comparison": {
         "kind": "implementation-only",
         "surface": "layout-panel",
-        "reason": "O contrato 0026 define Gerador, consulta por Lâmina, prévia sem mutação e aplicação exata. As imagens e geometrias são produzidas pelo ProjectCore; o painel segue a referência visual vigente."
+        "reason": "O contrato 0026 define a consulta por Lâmina e a aplicação exata. As miniaturas mostram somente a geometria fornecida pelo Core; o hover usa as Fotos apenas no Canvas."
       },
       "viewport": {
         "width": 1440,
@@ -5304,7 +5285,7 @@
       "comparison": {
         "kind": "implementation-only",
         "surface": "layout-panel",
-        "reason": "O contrato 0026 define Gerador, consulta por Lâmina, prévia sem mutação e aplicação exata. As imagens e geometrias são produzidas pelo ProjectCore; o painel segue a referência visual vigente."
+        "reason": "O contrato 0026 define a consulta por Lâmina e a aplicação exata. As miniaturas mostram somente a geometria fornecida pelo Core; o hover usa as Fotos apenas no Canvas."
       },
       "viewport": {
         "width": 1800,
@@ -5333,7 +5314,7 @@
       "comparison": {
         "kind": "implementation-only",
         "surface": "layout-panel",
-        "reason": "O contrato 0026 define Gerador, consulta por Lâmina, prévia sem mutação e aplicação exata. As imagens e geometrias são produzidas pelo ProjectCore; o painel segue a referência visual vigente."
+        "reason": "O contrato 0026 define a consulta por Lâmina e a aplicação exata. As miniaturas mostram somente a geometria fornecida pelo Core; o hover usa as Fotos apenas no Canvas."
       },
       "viewport": {
         "width": 2160,
@@ -5458,7 +5439,10 @@
           "type": "assert",
           "selector": ".layout-panel__candidate"
         },
-        { "type": "hover", "selector": ".layout-panel__candidate:first-child" },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__candidate:first-child"
+        },
         {
           "type": "click",
           "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
@@ -5467,8 +5451,22 @@
           "type": "assert",
           "selector": ".layout-panel__candidate--locked"
         },
-        { "type": "click-text", "text": "Editar" },
-        { "type": "click", "selector": "[role=\"menuitem\"][aria-label=\"Desfazer\"]" }
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Desfazer\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]:not(:disabled)"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        }
       ]
     },
     {
@@ -5496,7 +5494,7 @@
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Posições do Layout\"]"
+          "selector": "select[aria-label=\"Quantidade de Frames\"]"
         },
         {
           "type": "key",
@@ -5545,7 +5543,7 @@
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Posições do Layout\"]"
+          "selector": "select[aria-label=\"Quantidade de Frames\"]"
         },
         {
           "type": "key",
@@ -5595,7 +5593,7 @@
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Posições do Layout\"]"
+          "selector": "select[aria-label=\"Quantidade de Frames\"]"
         },
         {
           "type": "key",
@@ -5644,7 +5642,7 @@
         },
         {
           "type": "focus",
-          "selector": "select[aria-label=\"Posições do Layout\"]"
+          "selector": "select[aria-label=\"Quantidade de Frames\"]"
         },
         {
           "type": "key",

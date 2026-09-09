@@ -87,6 +87,7 @@ test("late queries and previews cannot replace a newer target or revision", asyn
   await waitFor(() => expect(previewLayout).toHaveBeenCalledOnce());
   const other = initial.state.album.sheets[1].id;
   act(() => view.result.current.panel.toggle(other));
+  expect(view.result.current.panel.displayQuery).toBeNull();
   await waitFor(() => expect(queryLayouts).toHaveBeenCalledWith(other));
   await act(async () => { delayed.resolve(frames); });
   await waitFor(() => expect(view.result.current.panel.query?.sheetId).toBe(other));
@@ -101,10 +102,10 @@ test("changing extra positions discards a late query and its preview", async () 
   queryLayouts.mockImplementationOnce(() => delayed.promise);
   act(() => view.result.current.panel.toggle(sheetId));
   await waitFor(() => expect(queryLayouts).toHaveBeenCalledOnce());
-  act(() => view.result.current.panel.configurePositions(frames.length + 2, "vertical"));
+  act(() => view.result.current.panel.configurePositions(frames.length + 2));
   expect(view.result.current.panel.query).toBeNull();
   await act(async () => { delayed.resolve(query("obsolete")); });
-  await waitFor(() => expect(queryLayouts).toHaveBeenLastCalledWith(sheetId, { additionalPositions: 2, orientation: "vertical" }));
+  await waitFor(() => expect(queryLayouts).toHaveBeenLastCalledWith(sheetId, { additionalPositions: 2, orientation: "horizontal" }));
   await waitFor(() => expect(view.result.current.panel.query?.queryId).toBe(`query-${sheetId}`));
   expect(view.result.current.panel.composition).toBe(initial.composition);
 });

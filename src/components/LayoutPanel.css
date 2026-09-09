@@ -10,21 +10,10 @@
   flex-wrap: wrap;
   min-height: 32px;
   align-items: center;
-  gap: 9px;
+  justify-content: flex-end;
   padding: 0 10px 0 12px;
   border-bottom: 1px solid var(--ui-border);
 }
-.layout-panel__header strong { font-size: var(--ui-font-size-control); font-weight: 600; }
-.layout-panel__header > span { flex: 1; color: var(--ui-text-muted); }
-.layout-panel__header button {
-  border: 0;
-  padding: 3px 5px;
-  background: transparent;
-  color: var(--ui-text-muted);
-  font: inherit;
-  cursor: pointer;
-}
-.layout-panel__header .layout-panel__close { font-size: 19px; line-height: 20px; }
 .layout-panel button:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: -1px; }
 .layout-panel__section { display: flex; border-bottom: 1px solid var(--ui-border); }
 .layout-panel__section:last-child { border-bottom: 0; }
@@ -34,6 +23,8 @@
   align-items: center;
   justify-content: center;
   margin: 0;
+  min-height: 110px;
+  padding: 12px 0;
   border-left: 1px solid var(--ui-border);
   background: var(--ui-surface-muted);
   color: var(--ui-text-muted);
@@ -59,7 +50,6 @@
   display: flex;
   flex: 0 0 104px;
   flex-direction: column;
-  gap: 5px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -85,7 +75,9 @@
 .layout-panel__candidate--locked .sheet-preview-shell {
   box-shadow: 0 0 0 2px var(--ui-accent);
 }
-.layout-panel__candidate > span:last-child { font-size: var(--ui-font-size-micro); }
+.layout-panel__surface { fill: var(--ui-surface); }
+.layout-panel__frame { fill: var(--ui-border); }
+.layout-panel__center-line { stroke: var(--ui-border); stroke-width: .5px; }
 .layout-panel__candidate--locked { color: var(--ui-accent); }
 .layout-panel__candidate--unavailable { opacity: .4; cursor: default; }
 .layout-panel__lock {
@@ -112,24 +104,3 @@
 .layout-panel__lock:hover:not(:disabled) { color: var(--ui-accent); }
 .layout-panel__positions { display: flex; align-items: center; gap: 5px; color: var(--ui-text-muted); }
 .layout-panel__positions select { min-height: 24px; border: 1px solid var(--ui-border); border-radius: 2px; background: var(--ui-surface); color: var(--ui-text); font: inherit; }
-.layout-panel__settings {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  gap: 10px;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--ui-border);
-}
-.layout-panel__settings label { position: relative; display: grid; gap: 4px; color: var(--ui-text-muted); }
-.layout-panel__settings input { width: 72px; }
-.layout-panel__settings .ui-field-validation-auto-tooltip { right: auto; width: 240px; }
-.layout-panel__settings input,
-.layout-panel__settings select,
-.layout-panel__settings button {
-  min-height: 26px;
-  border: 1px solid var(--ui-border);
-  border-radius: 2px;
-  background: var(--ui-surface);
-  color: var(--ui-text);
-  font: inherit;
-}

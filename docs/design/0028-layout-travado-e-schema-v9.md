@@ -21,13 +21,27 @@ Undo/Redo e passam pela fila compartilhada de mutações, inclusive quando
 Salvar ou Desfazer chegam enquanto uma confirmação está pendente.
 
 Por padrão, as sugestões usam a quantidade e as orientações dos Frames
-existentes. O controle `Posições` permite pedir uma quantidade maior, até o
-limite de 30 posições do Gerador. `Novas posições` informa explicitamente a
-orientação das posições adicionais. Elas só podem ser confirmadas pelo
+existentes. O seletor de quantidade de Frames permite pedir uma quantidade
+maior, até o limite de 30 posições do Gerador. As posições adicionais adotam
+a orientação horizontal padrão. Elas só podem ser confirmadas pelo
 cadeado; clicar no corpo de uma preview não cria estruturas adicionais.
 Os IDs dos placeholders são reservados na consulta e reutilizados pela prévia
 e pelo comando. Seu estilo é herdado do Álbum. Nenhuma Foto, estilo ou ajuste
 dos Frames existentes é descartado.
+
+O cabeçalho contém somente a quantidade de Frames. As miniaturas mostram
+retângulos genéricos e não reproduzem Fotos, estilos ou Decorativos, nem
+exibem legendas abaixo. A composição com Fotos permanece na prévia do Canvas.
+Os títulos verticais das seções têm espaço nas duas extremidades.
+
+Clicar fora do Painel o fecha. O controle da Barra conserva a alternância
+e o redirecionamento de alvo, sem reabrir o Painel por efeito do mesmo clique.
+Os demais controles externos continuam recebendo sua ação normal.
+
+Enquanto uma confirmação atualiza a consulta do mesmo alvo, a faixa conserva
+suas miniaturas, com ações indisponíveis. Somente a consulta vigente autoriza
+prévia ou confirmação. Outra Lâmina ou Projeto nunca recebe essas miniaturas
+temporariamente conservadas.
 
 ## Estrutura e conteúdo
 
