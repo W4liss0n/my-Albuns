@@ -42,6 +42,7 @@ export interface SheetBarOverlayProps {
   readonly sheets: readonly ComposedSheet[];
   readonly layout: ContinuousCanvasLayout;
   readonly metrics: CanvasMetrics | null;
+  readonly offsetY?: number;
   readonly bleedUm?: number;
   readonly focusedSheetId?: string | null;
   readonly mediaPreviewUrls?: Readonly<Record<string, string>>;
@@ -99,6 +100,7 @@ export function SheetBarOverlay(
           props.sheets[0],
           scale,
           props.bleedUm,
+          props.offsetY,
         );
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const ghostAnchorRef = useRef<GhostAnchor | null>(null);
@@ -136,7 +138,7 @@ export function SheetBarOverlay(
   const placeholderBounds =
     scale === null || !ghostSheet
       ? null
-      : visibleSheetBounds(ghostSheet, scale, props.bleedUm);
+      : visibleSheetBounds(ghostSheet, scale, props.bleedUm, props.offsetY);
   const ghostBounds = placeholderBounds;
   const ghostPageNumbers = ghostSheet
     ? sheetBarMetadataById.get(ghostSheet.sheetId)?.pageNumbers ?? []
@@ -238,6 +240,7 @@ export function SheetBarOverlay(
           sheet,
           scale,
           props.bleedUm,
+          props.offsetY,
         );
         const style = {
           height: `${SHEET_VISUAL_STYLE.sheetBar.heightPx}px`,
@@ -535,6 +538,7 @@ function visibleSheetBounds(
   sheet: ComposedSheet,
   scale: number,
   bleedUm: number | undefined,
+  offsetY = CANVAS_VERTICAL_MARGIN_PX,
 ) {
   const geometry = createCanvasSheetViewGeometry(
     sheet,
@@ -544,7 +548,7 @@ function visibleSheetBounds(
   ).visibleOuterBounds;
   return {
     height: geometry.height * scale,
-    top: CANVAS_VERTICAL_MARGIN_PX + geometry.y * scale,
+    top: offsetY + geometry.y * scale,
   };
 }
 

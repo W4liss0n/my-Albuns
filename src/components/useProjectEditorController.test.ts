@@ -235,6 +235,7 @@ test("targets the edited Sheet when leaving Sheet Edit Mode", () => {
   act(() => {
     view.result.current.canvasProps.onCanvasMetricsChange?.({
       width: 1_000,
+      height: 500,
       scale: 0.5,
     });
     view.result.current.canvasProps.onEditSheet("sheet-002");
@@ -246,6 +247,7 @@ test("targets the edited Sheet when leaving Sheet Edit Mode", () => {
   act(() => {
     view.result.current.canvasProps.onCanvasMetricsChange?.({
       width: 1_000,
+      height: 500,
       scale: 0.8,
     });
   });

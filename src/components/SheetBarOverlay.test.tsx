@@ -737,7 +737,7 @@ function props(
   return {
     disabled: false,
     layout,
-    metrics: { scale: 0.5, width: 640 },
+    metrics: { scale: 0.5, width: 640, height: 500 },
     onAutoScrollVelocity: vi.fn(),
     onCancel: vi.fn(),
     onContextMenu: vi.fn(),

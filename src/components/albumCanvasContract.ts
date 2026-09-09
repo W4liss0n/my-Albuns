@@ -35,6 +35,7 @@ export interface PhotoTransformDelta {
 
 export interface CanvasMetrics {
   width: number;
+  height: number;
   /** Dimensionless scene scale; Canvas coordinates use 1 unit per 1,000 µm. */
   scale: number;
 }
@@ -62,7 +63,7 @@ export interface CanvasSheetReorder {
 }
 
 export type AlbumCanvasMode =
-  | { kind: "normal" }
+  | { kind: "normal"; isolatedSheetId?: string }
   | { kind: "sheet-editing"; sheetId: string };
 
 export interface CanvasPhotoDropPoint {

@@ -24,6 +24,9 @@ import type {
 } from "./albumCanvasContract";
 import { CanvasHorizontalScrollbar } from "./CanvasHorizontalScrollbar";
 import { SheetBarOverlay } from "./SheetBarOverlay";
+import { albumCanvasModePolicy, sheetsForCanvasMode } from "./albumCanvasMode";
+import { createNormalCanvasLayout } from "./canvasSheetViewGeometry";
+import { MICROMETER_TO_CANVAS_PIXEL } from "./canvasGeometry";
 import {
   useCanvasGraphicsDiagnosticProbe,
 } from "./canvasGraphicsDiagnosticProbeContext";
@@ -69,12 +72,23 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
     setCanvasMetrics((current) =>
       current &&
       Math.abs(current.width - metrics.width) < 0.0001 &&
+      Math.abs(current.height - metrics.height) < 0.0001 &&
       Math.abs(current.scale - metrics.scale) < 0.0001
         ? current
         : metrics,
     );
     externalMetricsCallbackRef.current?.(metrics);
   }, []);
+  const isolated = props.mode.kind === "normal" && Boolean(props.mode.isolatedSheetId);
+  const visibleSheets = sheetsForCanvasMode(props.composition.sheets, albumCanvasModePolicy(props.mode));
+  const barLayout = isolated ? createNormalCanvasLayout(visibleSheets, props.technicalGuides?.bleedUm)
+    : props.continuousCanvasLayout;
+  const barViewport = isolated && canvasMetrics && visibleSheets[0]
+    ? { ...props.viewport, offsetX: barLayout.centeredOffset(visibleSheets[0].sheetId, canvasMetrics.scale, canvasMetrics.width) ?? 0 }
+    : props.viewport;
+  const barOffsetY = isolated && canvasMetrics && visibleSheets[0]
+    ? (canvasMetrics.height - visibleSheets[0].heightUm * MICROMETER_TO_CANVAS_PIXEL * canvasMetrics.scale) / 2
+    : undefined;
   const doubleSheetIds = new Set(props.composition.sheets
     .filter((sheet) => sheet.activeSides === "both")
     .map((sheet) => sheet.sheetId));
@@ -88,6 +102,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
   }));
   const sceneProps = {
     ...props,
+    sheetReorder: props.sheetReorder && isolated ? { ...props.sheetReorder, disabled: true } : props.sheetReorder,
     sheetBarMetadata,
     photoDropHighlight: resolvedPhotoDrop?.target ?? null,
     onCanvasMetricsChange: handleCanvasMetricsChange,
@@ -530,10 +545,11 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
   }
 
   return (
-    <div className="canvas-shell">
+    <div className={`canvas-shell${isolated ? " canvas-shell--isolated" : ""}`}>
       <div
         className="canvas-host"
         data-centered-sheet-id={props.centeredSheetId ?? undefined}
+        data-isolated-sheet-id={props.mode.kind === "normal" ? props.mode.isolatedSheetId : undefined}
         data-viewport-offset-x={props.viewport.offsetX}
         ref={hostRef}
         onDragLeave={handlePhotoDragLeave}
@@ -557,11 +573,12 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
         {props.mode.kind === "normal" && props.sheetReorder ? (
           <SheetBarOverlay
             bleedUm={props.technicalGuides?.bleedUm}
-            disabled={props.sheetReorder.disabled}
+            disabled={props.sheetReorder.disabled || isolated}
             focusedSheetId={props.focusedSheetId}
-            layout={props.continuousCanvasLayout}
+            layout={barLayout}
             mediaPreviewUrls={props.mediaPreviewUrls}
             metrics={canvasMetrics}
+            offsetY={barOffsetY}
             onAutoScrollVelocity={setSheetAutoScrollVelocity}
             onCancel={props.sheetReorder.onCancel}
             onContextMenu={(sheetId, position) =>
@@ -576,15 +593,16 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
             onSwapFocus={(sheetId, focused) => sceneRef.current?.handleSheetBarActionFocus(sheetId, "swap", focused)}
             onLayoutFocus={(sheetId, focused) => sceneRef.current?.handleSheetBarActionFocus(sheetId, "layout", focused)}
             onPreview={props.sheetReorder.onPreview}
-            representation={props.sheetReorder.representation}
+            representation={isolated ? { ghost: null, placeholderIndex: null, order: visibleSheets.map((sheet) => sheet.sheetId) }
+              : props.sheetReorder.representation}
             sheetBarMetadata={sheetBarMetadata}
-            sheets={props.composition.sheets}
+            sheets={visibleSheets}
             status={props.sheetReorder.status}
-            viewport={props.viewport}
+            viewport={barViewport}
           />
         ) : null}
       </div>
-      <CanvasHorizontalScrollbar
+      {!isolated && <CanvasHorizontalScrollbar
         centeredSheetId={props.centeredSheetId}
         layout={props.continuousCanvasLayout}
         metrics={canvasMetrics}
@@ -592,7 +610,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
         onCenteredSheetChange={props.onCenteredSheetChange}
         onViewportChange={props.onViewportChange}
         viewport={props.viewport}
-      />
+      />}
     </div>
   );
 }

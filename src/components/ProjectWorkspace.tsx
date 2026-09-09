@@ -299,12 +299,14 @@ export function ProjectWorkspace({
     [projectId],
   );
   const sheetEditing = controller.canvasProps.mode.kind === "sheet-editing";
+  const mediaPanelVisible = workspacePanels.panels.media.visible && !controller.layoutPanel.visible;
   const mediaPanelHeight = sheetEditing
     ? SHEET_EDITING_MEDIA_PANEL_HEIGHT
     : workspacePanels.panels.media.size;
   const workspaceStyle = {
     ...workspacePanels.style,
-    "--media-panel-height": workspacePanels.panels.media.visible
+    ...(!mediaPanelVisible ? { "--media-splitter-size": "0px" } : {}),
+    "--media-panel-height": mediaPanelVisible
       ? `${mediaPanelHeight}px`
       : "0px",
   };
@@ -679,7 +681,7 @@ export function ProjectWorkspace({
           />
         </section>
 
-        {workspacePanels.panels.media.visible && (
+        {mediaPanelVisible && (
           <WorkspacePanelSplitter
             disabled={sheetEditing}
             panel="media"
@@ -752,6 +754,7 @@ export function ProjectWorkspace({
         />}
 
         {workspacePanels.panels.media.visible && <MediaPanel
+          hidden={controller.layoutPanel.visible}
           ref={mediaPanelRef}
           mediaItems={projection.state.album.media}
           mediaUsage={projection.mediaUsage}

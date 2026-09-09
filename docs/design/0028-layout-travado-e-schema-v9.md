@@ -33,6 +33,17 @@ O cabeçalho contém somente a quantidade de Frames. As miniaturas mostram
 retângulos genéricos e não reproduzem Fotos, estilos ou Decorativos, nem
 exibem legendas abaixo. A composição com Fotos permanece na prévia do Canvas.
 Os títulos verticais das seções têm espaço nas duas extremidades.
+As miniaturas ocupam 176 × 88 px na escala padrão, com margens verticais
+compactas dentro das faixas.
+
+Abrir o Painel centraliza sua Lâmina alvo nos dois eixos, enquadra sua largura
+e altura e oculta as demais Lâminas do Canvas. O Painel de imagens e seu
+divisor ficam ocultos durante essa apresentação. Sua busca e preferências
+permanecem conservadas. Ao fechar, o Canvas volta à sequência navegável
+centrada na Lâmina alvo, e o Painel de imagens recupera a visibilidade e
+altura anteriores. A roda e a rolagem horizontal ficam suspensas enquanto
+o alvo está isolado. Essa apresentação continua no modo normal e não
+habilita edição estrutural de Frames nem cria Histórico.
 
 Clicar fora do Painel o fecha. O controle da Barra conserva a alternância
 e o redirecionamento de alvo, sem reabrir o Painel por efeito do mesmo clique.

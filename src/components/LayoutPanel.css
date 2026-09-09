@@ -1,4 +1,5 @@
 .layout-panel {
+  --layout-thumbnail-width: 176px;
   min-width: 0;
   overflow: hidden;
   border-bottom: 1px solid var(--ui-border);
@@ -48,7 +49,7 @@
 .layout-panel__candidate {
   position: relative;
   display: flex;
-  flex: 0 0 104px;
+  flex: 0 0 var(--layout-thumbnail-width);
   flex-direction: column;
   padding: 0;
   border: 0;
@@ -59,15 +60,15 @@
 }
 .layout-panel__preview {
   display: block;
-  width: 104px;
+  width: var(--layout-thumbnail-width);
   padding: 0;
   border: 0;
   background: transparent;
   cursor: pointer;
 }
 .layout-panel__preview > .sheet-preview-shell {
-  width: 104px;
-  height: 52px;
+  width: var(--layout-thumbnail-width);
+  height: 88px;
   box-shadow: 0 0 0 1px var(--ui-border);
 }
 .layout-panel__candidate:not(.layout-panel__candidate--unavailable):hover .sheet-preview-shell,

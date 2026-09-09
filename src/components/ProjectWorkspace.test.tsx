@@ -42,6 +42,7 @@ import type {
 } from "../domain/project";
 import { useEditorView } from "../state/editorView";
 import { frameContentSwapCorpus } from "../test/frameContentSwapPreview";
+import { layoutPanelCorpus } from "../test/layoutPanelPreview";
 import type { ProjectIntent } from "../domain/project";
 import {
   createEmptyProjection,
@@ -69,6 +70,7 @@ type ProjectSessionPort = ProjectCorePort;
 const canvasHarness = vi.hoisted(() => ({
   props: null as null | {
     mode: AlbumCanvasMode;
+    sheetLayouts?: { onToggle(sheetId: string): void };
     continuousCanvasLayout: ContinuousCanvasLayout;
     focusedSheetId: string | null;
     centeredSheetId: string | null;
@@ -921,6 +923,7 @@ test("opens and dismisses an explicit Sheet context menu without navigating the 
   act(() => {
     canvasHarness.props?.onCanvasMetricsChange?.({
       width: 1_000,
+      height: 500,
       scale: 0.5,
     });
   });
@@ -1003,6 +1006,7 @@ test("selects a Sheet through the Bar seam without navigating the Canvas", () =>
   act(() => {
     canvasHarness.props?.onCanvasMetricsChange?.({
       width: 1_000,
+      height: 500,
       scale: 0.5,
     });
   });
@@ -1755,6 +1759,48 @@ test("hydrates and publishes machine-local Inspector and media density preferenc
       size: 126,
     }),
   );
+});
+
+test("Layout focus temporarily hides media and restores the mounted panel with its search", async () => {
+  const sample = layoutPanelCorpus.cases.mixed.before;
+  const sheetId = sample.projection.state.album.sheets[0].id;
+  const port = projectCorePortWithApply(async () => sample.projection);
+  port.queryLayouts = async (target) => sample.queries[target].query;
+  port.previewLayout = async (selection) => sample.queries[sheetId].previews[selection.candidateIndex];
+  render(<ProjectWorkspace projection={sample.projection} projectCorePort={port} onProjectionChange={() => undefined} />);
+  const media = screen.getByRole("region", { name: "Painel de imagens" });
+  const search = within(media).getByRole("searchbox", { name: "Buscar Fotos" });
+  const initialHeight = (document.querySelector(".workspace-grid") as HTMLElement).style.getPropertyValue("--media-panel-height");
+  fireEvent.change(search, { target: { value: "Minha busca" } });
+  act(() => canvasHarness.props?.sheetLayouts?.onToggle(sheetId));
+  await screen.findByRole("region", { name: "Painel de Layouts" });
+  expect(canvasHarness.props?.mode).toEqual({ kind: "normal", isolatedSheetId: sheetId });
+  expect(media).not.toBeVisible();
+  expect(screen.queryByRole("separator", { name: "Redimensionar Painel de imagens" })).not.toBeInTheDocument();
+  expect(document.querySelector(".workspace-grid")).toHaveStyle({ "--media-panel-height": "0px", "--media-splitter-size": "0px" });
+  fireEvent.pointerDown(screen.getByTestId("album-canvas"));
+  expect(screen.queryByRole("region", { name: "Painel de Layouts" })).not.toBeInTheDocument();
+  expect(canvasHarness.props?.mode).toEqual({ kind: "normal" });
+  expect(screen.getByRole("region", { name: "Painel de imagens" })).toBe(media);
+  expect(media).toBeVisible();
+  expect(search).toHaveValue("Minha busca");
+  expect(document.querySelector(".workspace-grid")).toHaveStyle({ "--media-panel-height": initialHeight });
+});
+
+test("closing Layouts keeps a previously hidden media panel hidden", async () => {
+  const sample = layoutPanelCorpus.cases.mixed.before;
+  const sheetId = sample.projection.state.album.sheets[0].id;
+  const port = projectCorePortWithApply(async () => sample.projection);
+  port.queryLayouts = async (target) => sample.queries[target].query;
+  port.previewLayout = async (selection) => sample.queries[sheetId].previews[selection.candidateIndex];
+  render(<ProjectWorkspace projection={sample.projection} projectCorePort={port} onProjectionChange={() => undefined} />);
+  fireEvent.click(getApplicationCommand("Exibir", "Painel de imagens"));
+  expect(screen.queryByRole("region", { name: "Painel de imagens" })).not.toBeInTheDocument();
+  act(() => canvasHarness.props?.sheetLayouts?.onToggle(sheetId));
+  await screen.findByRole("region", { name: "Painel de Layouts" });
+  fireEvent.pointerDown(screen.getByTestId("album-canvas"));
+  expect(screen.queryByRole("region", { name: "Painel de imagens" })).not.toBeInTheDocument();
+  expect(document.querySelector(".workspace-grid")).toHaveStyle({ "--media-panel-height": "0px" });
 });
 
 test("toggles canonical panel commands and persists visibility with the current size", async () => {
@@ -5825,6 +5871,7 @@ test("centers a Grade navigation target in the visible Canvas", () => {
   act(() => {
     canvasHarness.props?.onCanvasMetricsChange?.({
       width: 1_000,
+      height: 500,
       scale: 0.5,
     });
   });
@@ -5851,6 +5898,7 @@ test("centers the previous and next physical Sheet with ArrowLeft and ArrowRight
   act(() => {
     canvasHarness.props?.onCanvasMetricsChange?.({
       width: 1_000,
+      height: 500,
       scale: 0.5,
     });
   });
@@ -5899,6 +5947,7 @@ test("completes Grade navigation requested before Canvas metrics exist", () => {
   act(() => {
     canvasHarness.props?.onCanvasMetricsChange?.({
       width: 1_000,
+      height: 500,
       scale: 0.5,
     });
   });

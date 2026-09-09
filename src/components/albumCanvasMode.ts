@@ -4,7 +4,8 @@ import type { AlbumCanvasMode } from "./albumCanvasContract";
 export type AlbumCanvasModePolicy =
   | {
       editingSheetId: null;
-      enablesContinuousNavigation: true;
+      isolatedSheetId: string | null;
+      enablesContinuousNavigation: boolean;
       enablesPhotoTransform: true;
       masksBleed: true;
       showsFrameResizeHandles: false;
@@ -13,6 +14,7 @@ export type AlbumCanvasModePolicy =
     }
   | {
       editingSheetId: string;
+      isolatedSheetId: string;
       enablesContinuousNavigation: false;
       enablesPhotoTransform: false;
       masksBleed: false;
@@ -23,6 +25,7 @@ export type AlbumCanvasModePolicy =
 
 const NORMAL_MODE_POLICY: AlbumCanvasModePolicy = {
   editingSheetId: null,
+  isolatedSheetId: null,
   enablesContinuousNavigation: true,
   enablesPhotoTransform: true,
   masksBleed: true,
@@ -34,9 +37,12 @@ const NORMAL_MODE_POLICY: AlbumCanvasModePolicy = {
 export function albumCanvasModePolicy(
   mode: AlbumCanvasMode,
 ): AlbumCanvasModePolicy {
-  if (mode.kind === "normal") return NORMAL_MODE_POLICY;
+  if (mode.kind === "normal") return mode.isolatedSheetId
+    ? { ...NORMAL_MODE_POLICY, isolatedSheetId: mode.isolatedSheetId, enablesContinuousNavigation: false }
+    : NORMAL_MODE_POLICY;
   return {
     editingSheetId: mode.sheetId,
+    isolatedSheetId: mode.sheetId,
     enablesContinuousNavigation: false,
     enablesPhotoTransform: false,
     masksBleed: false,
@@ -52,6 +58,6 @@ export function sheetsForCanvasMode(
 ) {
   if (policy.enablesContinuousNavigation) return sheets;
   return sheets.filter(
-    (sheet) => sheet.sheetId === policy.editingSheetId,
+    (sheet) => sheet.sheetId === policy.isolatedSheetId,
   );
 }

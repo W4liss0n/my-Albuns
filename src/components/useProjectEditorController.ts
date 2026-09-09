@@ -260,7 +260,7 @@ export function useProjectEditorController({
   );
 
   useCanvasModeKeyboardShortcuts({
-    implicitSheetId: navigation.implicitSheetId,
+    implicitSheetId: layoutPanel.visible ? layoutPanel.sheetId : navigation.implicitSheetId,
     interactionBlocked,
     mode: canvasMode,
     onEnterSheetEditing: enterSheetEditing,
@@ -278,7 +278,8 @@ export function useProjectEditorController({
 
   const canvasProps: AlbumCanvasProps = {
     projectId: projection.state.projectId,
-    mode: canvasMode,
+    mode: canvasMode.kind === "normal" && layoutPanel.visible && layoutPanel.sheetId
+      ? { kind: "normal", isolatedSheetId: layoutPanel.sheetId } : canvasMode,
     composition: layoutPanel.composition !== projection.composition ? layoutPanel.composition
       : frameStyle.composition !== projection.composition ? frameStyle.composition : photoAngle.composition,
     sheetBarMetadata: projection.state.album.sheets.map((sheet) => ({
