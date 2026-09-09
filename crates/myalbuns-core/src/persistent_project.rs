@@ -524,26 +524,7 @@ impl EditableProject {
             return Err(CoreError::EditableSessionInvalidated);
         }
         let candidate = self.project().with_frame_style(edit)?;
-        let transient = PersistentProjectSession::from_persisted(
-            crate::project_document::ProjectRevision::new(
-                self.session.project_id(),
-                self.revision(),
-                candidate,
-            ),
-            false,
-        );
-        Ok(persistent_projection::editor_projection(
-            &transient,
-            false,
-            &project_name_from_path(self.project_path()),
-            &self.photo_sources,
-        )
-        .composition
-        .sheets
-        .into_iter()
-        .flat_map(|sheet| sheet.frames)
-        .filter(|frame| edit.frame_ids.contains(&frame.frame_id))
-        .collect())
+        Ok(self.preview_frame_composition(candidate, &edit.frame_ids))
     }
 
     /// Resolves a Photo-angle draft through the productive document and composer.
@@ -556,6 +537,14 @@ impl EditableProject {
             return Err(CoreError::EditableSessionInvalidated);
         }
         let candidate = self.project().with_photo_angle(edit)?;
+        Ok(self.preview_frame_composition(candidate, &edit.frame_ids))
+    }
+
+    fn preview_frame_composition(
+        &self,
+        candidate: ProjectDocument,
+        frame_ids: &[String],
+    ) -> Vec<crate::ComposedFrame> {
         let transient = PersistentProjectSession::from_persisted(
             crate::project_document::ProjectRevision::new(
                 self.session.project_id(),
@@ -564,7 +553,7 @@ impl EditableProject {
             ),
             false,
         );
-        Ok(persistent_projection::editor_projection(
+        persistent_projection::editor_projection(
             &transient,
             false,
             &project_name_from_path(self.project_path()),
@@ -574,8 +563,8 @@ impl EditableProject {
         .sheets
         .into_iter()
         .flat_map(|sheet| sheet.frames)
-        .filter(|frame| edit.frame_ids.contains(&frame.frame_id))
-        .collect())
+        .filter(|frame| frame_ids.contains(&frame.frame_id))
+        .collect()
     }
 
     /// Freezes one resolved editor projection and only the exact linked
