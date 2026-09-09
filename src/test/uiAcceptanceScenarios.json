@@ -316,7 +316,7 @@
         "referenceCaptureSelector": "body"
       },
       "viewport": { "width": 1440, "height": 900 },
-      "readySelector": ".app-shell:has(.workspace-grid canvas):has(#contextual-panel button[aria-label=\"Informações do Álbum\"][aria-expanded=\"true\"])",
+      "readySelector": ".app-shell:has(.workspace-grid canvas.pixi-canvas):has(#contextual-panel button[aria-label=\"Informações do Álbum\"][aria-expanded=\"true\"])",
       "referenceReadySelector": "[data-l=\"2\"]",
       "actions": [],
       "referenceActions": []
@@ -415,7 +415,7 @@
       "viewport": { "width": 1440, "height": 900 },
       "readySelector": "#contextual-panel button[aria-label=\"Design da Lâmina\"][aria-expanded=\"true\"]",
       "actions": [
-        { "type": "focus", "selector": ".workspace-grid canvas" },
+        { "type": "focus", "selector": ".workspace-grid canvas.pixi-canvas" },
         { "type": "key", "key": "Enter" }
       ]
     },
@@ -432,9 +432,9 @@
       "viewport": { "width": 1440, "height": 900 },
       "readySelector": "#contextual-panel [aria-label=\"Zoom da Foto\"]",
       "actions": [
-        { "type": "focus", "selector": ".workspace-grid canvas" },
+        { "type": "focus", "selector": ".workspace-grid canvas.pixi-canvas" },
         { "type": "key", "key": "Enter" },
-        { "type": "click", "selector": ".workspace-grid canvas" }
+        { "type": "click", "selector": ".workspace-grid canvas.pixi-canvas" }
       ]
     },
     {
@@ -450,9 +450,9 @@
       "viewport": { "width": 1440, "height": 900 },
       "readySelector": "#contextual-panel:has(.context-heading):not(:has([aria-label=\"Zoom da Foto\"])) .context-heading h2",
       "actions": [
-        { "type": "focus", "selector": ".workspace-grid canvas" },
+        { "type": "focus", "selector": ".workspace-grid canvas.pixi-canvas" },
         { "type": "key", "key": "Enter" },
-        { "type": "click", "selector": ".workspace-grid canvas" }
+        { "type": "click", "selector": ".workspace-grid canvas.pixi-canvas" }
       ]
     },
     {

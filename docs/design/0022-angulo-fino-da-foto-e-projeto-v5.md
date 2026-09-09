@@ -30,16 +30,19 @@ em um décimo de grau.
 Durante um arraste, cada amostra consulta a composição no Core sem editar o
 Projeto. Soltar confirma uma única ação. Uma sequência de repetição de tecla
 no slider também confirma uma vez, ao soltar a tecla. Cancelamento de ponteiro,
-perda inesperada da captura, troca de seleção, bloqueio da interface ou saída
-da janela descartam o rascunho. A liberação normal da captura depois de soltar
-o ponteiro não cancela a edição.
+perda inesperada da captura, bloqueio da interface ou saída da janela descartam
+o rascunho. Uma mudança externa da seleção, sem conclusão prévia do controle,
+também descarta o rascunho restante. A liberação normal da captura depois de
+soltar o ponteiro não cancela a edição.
 
 Dois cliques no slider retornam a zero como uma única ação de Undo/Redo, sem
 botão adicional. Para distinguir o primeiro clique de um clique duplo, a
 confirmação de um clique sem arraste aguarda o intervalo configurado no Windows.
 A aplicação lê `GetDoubleClickTime`, sem alterar a preferência. Um arraste real
 usa o limiar de movimento do Windows e confirma ao soltar. Sair do controle ou
-acionar outro comando confirma antes de enfileirar a próxima operação.
+acionar outro comando confirma antes de enfileirar a próxima operação. Clicar
+outro Frame conclui a edição antes de mudar a seleção; essa confirmação tem
+precedência sobre a invalidação do contexto anterior.
 
 Na seleção múltipla, o valor comum é apresentado; divergências mostram `—`,
 sem posicionar visualmente o indicador do slider em um valor inventado. A
