@@ -253,6 +253,9 @@ Organização reutilizável de geometrias de Frames para uma quantidade e um Esc
 **Escopo do Layout**:
 Classificação de um Layout como Layout de Lâmina ou Layout de Página.
 
+**Permissão de Layouts**:
+Escolha do Projeto que admite somente Layouts de Página ou também Layouts de Lâmina. Não se confunde com o modo de Exportação.
+
 **Layout de Lâmina**:
 Layout cuja organização considera a superfície conjunta da Lâmina e pode incluir Travessia central.
 
@@ -269,7 +272,7 @@ Correspondência entre um Layout e a quantidade de Frames, o formato da Lâmina 
 Layout disponibilizado pelo Gerador de Layouts e compartilhado pelo aplicativo.
 
 **Gerador de Layouts**:
-Componente conceitual responsável por produzir Layouts do sistema; seu algoritmo pertence a uma definição futura.
+Responsável por produzir sugestões de Layouts do sistema adequadas à quantidade e às orientações dos Frames, à superfície e à permissão de Layouts do Projeto.
 
 **Layout personalizado**:
 Layout incluído pelo usuário no Catálogo global de Layouts. Sua identidade considera escopo, quantidade, geometria e sequência ordenada dos Frames.

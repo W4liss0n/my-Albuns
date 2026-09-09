@@ -1,7 +1,7 @@
 ---
 status: accepted
 document: design
-updated: 2026-09-01
+updated: 2026-09-09
 ---
 
 # Propriedade de estado e módulos do núcleo
@@ -32,6 +32,7 @@ Este documento detalha a direção aceita no [ADR 0005](../adr/0005-adotar-tauri
 | `ProjectIdentityRegistry` | última Localização autorizada por Identidade, schema e substituição atômica do registro local que sobrevive à Sessão | documento de Projeto, Identidade física eterna, Sessão viva, Projetos recentes, Cache ou Recuperação |
 | `CompositionCore` | recortes, preenchimento, transformações, ordem de desenho, travessia central, divisão por Página e plano determinístico de composição | I/O, codecs, PixiJS, documento bruto, estado mutável ou publicação |
 | `LayoutRules` | compatibilidade, Mapeamento, escopo inferido, identidade de Layout personalizado, prioridade de candidatos, produção de `LayoutPatch` e a garantia de ao menos um candidato compatível | confirmação do patch, catálogo persistido, Undo/Redo, estado da interface ou o algoritmo do Gerador |
+| Gerador de Layouts | busca finita por composições, classificação, diversidade e ordem estável de sugestões | confirmação, catálogo persistido, Histórico, enquadramento da Foto ou garantia das automações |
 | `MediaResolver` | inspeção autoritativa de arquivos, validação de formato, busca de Religação e produção de observações ou propostas imutáveis | mutação direta do Projeto, estado observado da sessão, Undo/Redo, Cache persistido ou canonicalização textual como identidade |
 | `MediaRuntime` | registro da disponibilidade observada por sessão, última observação, fingerprint conhecido e estado do monitor | I/O de inspeção, caminho canônico, decisões do usuário, estado salvo ou mudanças pendentes |
 | `MediaMonitor` | eventos de mudança agrupados e pedidos de nova inspeção | verdade autoritativa sobre existência, ausência ou conteúdo |
@@ -98,7 +99,7 @@ O Zoom de preenchimento é derivado pelo `CompositionCore`; o Zoom do usuário p
 
 O editor e a Exportação usam a mesma regra de composição por meio dessa interface. PixiJS adapta o plano à cena interativa; o Processador de Imagens adapta o mesmo contrato à rasterização final com os originais.
 
-As regras de Layout pertencem a `LayoutRules`, inicialmente dentro desse núcleo. Consultar ou pré-visualizar um Layout produz um `LayoutPatch` imutável; somente `ProjectSession` pode confirmá-lo como um único comando de Undo/Redo. Um `LayoutEngine` separado só será justificado quando o futuro Gerador exigir busca, ranqueamento, diversidade, sementes ou orçamento de tempo próprios.
+As regras de Layout pertencem a `LayoutRules`, dentro desse núcleo. Consultar ou pré-visualizar um Layout produz um `LayoutPatch` imutável; somente `ProjectSession` pode confirmá-lo como um único comando de Undo/Redo. A busca finita, a classificação e a diversidade aprovadas para o Gerador justificam um módulo puro próprio dentro de `myalbuns-core`, conforme o [ADR 0010](../adr/0010-gerar-layouts-por-composicoes-deterministicas.md). Sua única consulta fornece geometrias a `LayoutRules`; não expõe famílias ou subdivisões como interfaces públicas e não cria outro proprietário do Projeto.
 
 `LayoutRules` possui a garantia de que existe sempre ao menos um candidato compatível para a quantidade atual de Frames, o formato da superfície e o escopo aplicável. A garantia é absoluta: quando nenhum candidato do catálogo ou do Gerador servir, `LayoutRules` produz um arranjo de reserva determinístico, derivado apenas da quantidade de Frames e da superfície ativa.
 
@@ -220,7 +221,6 @@ Testes não dependem da quantidade final de crates nem atravessam seams internos
 - nomes finais, crates e visibilidade pública das subdivisões internas;
 - codificação física, framing e materialização do adapter de IPC, sem alterar os campos e invariantes semânticos do envelope fechado pelo design 0019;
 - formato concreto de `RenderSnapshot`, `CompositionPlan` e patches;
-- algoritmo do Gerador de Layouts;
 - biblioteca concreta de codecs/PDF e otimizações internas que preservem o contrato aceito do renderizador;
 - quantidade futura de workers ou paralelismo entre Álbuns;
 - qualquer ampliação do `CommandCatalog` para remapeamento;
