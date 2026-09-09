@@ -581,7 +581,7 @@ fn composed_album_requires_the_safe_dimension_change_owner() {
 }
 
 #[test]
-fn composed_edge_requires_the_complete_conversion_owner() {
+fn composed_edge_conversion_uses_layout_rules() {
     let root = tempfile::tempdir().expect("temporary composed edge root");
     let project_path = root.path().join("Extremidade composta.myalbuns");
     let photo_path = root.path().join("Foto da extremidade.jpg");
@@ -621,15 +621,17 @@ fn composed_edge_requires_the_complete_conversion_owner() {
     };
     let validation = project.validate_album_information(&information);
 
-    assert_eq!(
-        validation.errors,
-        [ValidationError::FirstSheetConversionRequiresContentReorganization]
+    assert!(validation.errors.is_empty());
+    assert!(validation.impact.is_some());
+    assert!(
+        project
+            .apply(ProjectIntent::SetAlbumInformation { information })
+            .is_ok()
     );
-    assert_eq!(validation.impact, None);
 }
 
 #[test]
-fn composed_final_edge_requires_the_complete_conversion_owner() {
+fn composed_final_edge_conversion_uses_layout_rules() {
     let root = tempfile::tempdir().expect("temporary composed final edge root");
     let project_path = root.path().join("Extremidade final composta.myalbuns");
     let photo_path = root.path().join("Foto da extremidade final.jpg");
@@ -677,11 +679,13 @@ fn composed_final_edge_requires_the_complete_conversion_owner() {
     };
     let validation = project.validate_album_information(&information);
 
-    assert_eq!(
-        validation.errors,
-        [ValidationError::LastSheetConversionRequiresContentReorganization]
+    assert!(validation.errors.is_empty());
+    assert!(validation.impact.is_some());
+    assert!(
+        project
+            .apply(ProjectIntent::SetAlbumInformation { information })
+            .is_ok()
     );
-    assert_eq!(validation.impact, None);
 }
 
 #[test]

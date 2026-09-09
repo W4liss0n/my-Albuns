@@ -392,11 +392,6 @@ export function AlbumInformationForm({
   const dimensionChangeRequiresSafeTransformation = sheetStates.some(
     (sheet) => sheet.frames.length > 0,
   );
-  // PLACEHOLDER UI: #32 owns reorganization of composed edge content.
-  const firstSheetConversionRequiresCompleteFlow =
-    (sheetStates[0]?.frames.length ?? 0) > 0;
-  const lastSheetConversionRequiresCompleteFlow =
-    (sheetStates[sheetStates.length - 1]?.frames.length ?? 0) > 0;
 
   return (
     <form
@@ -412,24 +407,20 @@ export function AlbumInformationForm({
         <h3>Estrutura</h3>
         <div className="inspector-readout-grid">
           <SelectField
-            disabled={firstSheetConversionRequiresCompleteFlow}
             error={firstError(errors.firstSheet)}
             field="firstSheet"
             label="Primeira Lâmina"
             onReset={endSheetResetAction("firstSheet")}
-            placeholderFeature="convert-composed-edge"
             validationTooltip={validationTooltip}
             value={draft.firstSheet}
             options={END_SHEET_OPTIONS}
             onChange={(value) => setField("firstSheet", value as EndSheetFormat)}
           />
           <SelectField
-            disabled={lastSheetConversionRequiresCompleteFlow}
             error={firstError(errors.lastSheet)}
             field="lastSheet"
             label="Última Lâmina"
             onReset={endSheetResetAction("lastSheet")}
-            placeholderFeature="convert-composed-edge"
             validationTooltip={validationTooltip}
             value={draft.lastSheet}
             options={END_SHEET_OPTIONS}

@@ -18,6 +18,7 @@ use crate::model::{
 pub(crate) const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
 
 mod frame_clipboard;
+mod layouts;
 pub(crate) use frame_clipboard::FrameClipboard;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
@@ -505,6 +506,7 @@ pub struct ProjectSheet {
     id: Uuid,
     active_sides: ActiveSides,
     frames: Vec<ProjectFrame>,
+    last_layout: Option<crate::StoredLayout>,
 }
 
 impl ProjectSheet {
@@ -525,6 +527,7 @@ impl ProjectSheet {
             id,
             active_sides,
             frames: Vec::new(),
+            last_layout: None,
         }
     }
 
@@ -537,6 +540,7 @@ impl ProjectSheet {
             id,
             active_sides,
             frames,
+            last_layout: None,
         }
     }
 }
@@ -547,6 +551,7 @@ pub struct ProjectDocument {
     visual_defaults: VisualDefaults,
     media: Vec<MediaRef>,
     sheets: Vec<ProjectSheet>,
+    layout_settings: crate::LayoutSettings,
 }
 
 impl ProjectDocument {
@@ -577,6 +582,7 @@ impl ProjectDocument {
             visual_defaults,
             media,
             sheets,
+            layout_settings: crate::LayoutSettings::default(),
         }
     }
 
@@ -659,9 +665,6 @@ impl ProjectDocument {
             .ok_or(())?;
         let last_index = candidate.sheets.len() - 1;
         let sheet = &mut candidate.sheets[sheet_index];
-        if !sheet.frames.is_empty() {
-            return Err(());
-        }
         sheet.active_sides = match (sheet_index, sheet.active_sides) {
             (0, ActiveSides::Both) => ActiveSides::Right,
             (0, ActiveSides::Right) => ActiveSides::Both,
@@ -669,6 +672,7 @@ impl ProjectDocument {
             (index, ActiveSides::Left) if index == last_index => ActiveSides::Both,
             _ => return Err(()),
         };
+        candidate.reorganize_sheet(sheet_id).map_err(|_| ())?;
         validate_project_state(&candidate)?;
         Ok(candidate)
     }
@@ -739,21 +743,6 @@ impl ProjectDocument {
                 ProjectConfigurationValidationError::SheetDimensionsRequireContentTransformation,
             );
         }
-        if information.first_sheet.active_sides(true) != self.sheets[0].active_sides
-            && !self.sheets[0].frames.is_empty()
-        {
-            errors.push(
-                ProjectConfigurationValidationError::FirstSheetConversionRequiresContentReorganization,
-            );
-        }
-        let last_index = self.sheets.len() - 1;
-        if information.last_sheet.active_sides(false) != self.sheets[last_index].active_sides
-            && !self.sheets[last_index].frames.is_empty()
-        {
-            errors.push(
-                ProjectConfigurationValidationError::LastSheetConversionRequiresContentReorganization,
-            );
-        }
         let impact = errors
             .is_empty()
             .then(|| album_information_impact(information))
@@ -785,8 +774,15 @@ impl ProjectDocument {
                 .map_err(|_| vec![ProjectConfigurationValidationError::SafetyNegative])?,
         );
         let last_index = candidate.sheets.len() - 1;
-        candidate.sheets[0].active_sides = information.first_sheet.active_sides(true);
-        candidate.sheets[last_index].active_sides = information.last_sheet.active_sides(false);
+        for (index, sides, error) in [
+            (0, information.first_sheet.active_sides(true), ProjectConfigurationValidationError::FirstSheetConversionRequiresContentReorganization),
+            (last_index, information.last_sheet.active_sides(false), ProjectConfigurationValidationError::LastSheetConversionRequiresContentReorganization),
+        ] {
+            if candidate.sheets[index].active_sides != sides {
+                candidate.sheets[index].active_sides = sides;
+                candidate.reorganize_sheet(candidate.sheets[index].id).map_err(|_| vec![error])?;
+            }
+        }
         validate_project_state(&candidate).map_err(|()| validation.errors)?;
         Ok(candidate)
     }
@@ -850,6 +846,11 @@ impl ProjectDocument {
                     None,
                 )?
             };
+        if mode == PhotoPlacementMode::Normal
+            && candidate.sheets[sheet_index].frames.len() != self.sheets[sheet_index].frames.len()
+        {
+            candidate.reorganize_sheet(sheet_id).map_err(|_| ())?;
+        }
         validate_project_state(&candidate)?;
         Ok((candidate, affected))
     }
@@ -896,6 +897,11 @@ impl ProjectDocument {
             )?,
             PhotoDropTarget::Invalid => return Err(()),
         };
+        if mode == PhotoPlacementMode::Normal
+            && candidate.sheets[sheet_index].frames.len() != self.sheets[sheet_index].frames.len()
+        {
+            candidate.reorganize_sheet(sheet_id).map_err(|_| ())?;
+        }
         validate_project_state(&candidate)?;
         Ok((candidate, affected))
     }
@@ -1168,6 +1174,7 @@ impl ProjectDocument {
     pub(crate) fn with_deleted_frames(
         &self,
         frame_ids: &[String],
+        mode: PhotoPlacementMode,
     ) -> Result<Self, crate::CoreError> {
         let (sheet_index, selected) = self
             .frame_selection(frame_ids)
@@ -1176,6 +1183,9 @@ impl ProjectDocument {
         candidate.sheets[sheet_index]
             .frames
             .retain(|frame| !selected.contains(&frame.id));
+        if mode == PhotoPlacementMode::Normal {
+            candidate.reorganize_sheet(candidate.sheets[sheet_index].id)?;
+        }
         Ok(candidate)
     }
 
@@ -1331,23 +1341,12 @@ fn add_frame(
     point: Option<(i64, i64)>,
 ) -> Result<Uuid, ()> {
     let id = Uuid::new_v4();
-    let rect = match mode {
-        PhotoPlacementMode::Normal => {
-            sheet.frames.push(ProjectFrame::new(
-                id,
-                ProjectRect::new(0, 0, 1, 1),
-                Some(ProjectPhoto::new(
-                    media_id,
-                    ProjectPhotoTransform::default(),
-                )),
-            ));
-            apply_first_compatible_layout(sheet, sheet_width_um, sheet_height_um)?;
-            return Ok(id);
-        }
-        PhotoPlacementMode::Edit => {
-            proportional_frame_rect(sheet, sheet_width_um, sheet_height_um, point)?
-        }
+    let initial_point = if mode == PhotoPlacementMode::Edit {
+        point
+    } else {
+        None
     };
+    let rect = proportional_frame_rect(sheet, sheet_width_um, sheet_height_um, initial_point)?;
     sheet.frames.push(ProjectFrame::new(
         id,
         rect,
@@ -1407,44 +1406,6 @@ fn centered_inside_rect(
         frame_width,
         frame_height,
     ))
-}
-
-/// Deterministic candidate zero of the generated Layout catalog.
-fn apply_first_compatible_layout(
-    sheet: &mut ProjectSheet,
-    sheet_width_um: u64,
-    sheet_height_um: u64,
-) -> Result<(), ()> {
-    let count = sheet.frames.len();
-    if count == 0 {
-        return Ok(());
-    }
-    let width = active_surface_width(sheet, sheet_width_um);
-    let columns = (count as f64).sqrt().ceil() as usize;
-    let rows = count.div_ceil(columns);
-    let gap = (width.min(sheet_height_um) / 30).max(1);
-    let usable_width = width
-        .checked_sub(gap.saturating_mul(columns as u64 + 1))
-        .ok_or(())?;
-    let usable_height = sheet_height_um
-        .checked_sub(gap.saturating_mul(rows as u64 + 1))
-        .ok_or(())?;
-    let cell_width = usable_width / columns as u64;
-    let cell_height = usable_height / rows as u64;
-    if cell_width == 0 || cell_height == 0 {
-        return Err(());
-    }
-    for (index, frame) in sheet.frames.iter_mut().enumerate() {
-        let column = (index % columns) as u64;
-        let row = (index / columns) as u64;
-        frame.rect = ProjectRect::new(
-            gap + column * (cell_width + gap),
-            gap + row * (cell_height + gap),
-            cell_width,
-            cell_height,
-        );
-    }
-    Ok(())
 }
 
 fn photo_drop_target(
@@ -1955,6 +1916,9 @@ impl ProjectRevision {
 }
 
 pub(crate) fn validate_project_state(project: &ProjectDocument) -> Result<(), ()> {
+    if !project.layout_state_is_valid() {
+        return Err(());
+    }
     let settings = project.document();
     let configuration = InitialProjectConfiguration::new(
         settings.display_unit(),

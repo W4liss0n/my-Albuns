@@ -785,7 +785,7 @@ test("materializes the integrated Sheet Bar instead of a loose sheet label", asy
     "sheet-bar-swap-sheet-001",
   );
   const layoutAction = displayWithLabel(
-    "placeholder-sheet-bar-layout-sheet-001",
+    "sheet-bar-layout-sheet-001",
   );
   expect(swapAction).toMatchObject({
     alpha: 0.35,
@@ -794,14 +794,12 @@ test("materializes the integrated Sheet Bar instead of a loose sheet label", asy
   });
   expect(layoutAction).toMatchObject({
     alpha: 0.8,
-    eventMode: "static",
+    eventMode: "none",
     tint: 0x403b35,
   });
-  expect(
-    screen.getByRole("button", {
-      name: "Abrir Painel de Layouts — indisponível nesta versão",
-    }),
-  ).toBeDisabled();
+  expect(screen.queryByRole("button", {
+    name: "Abrir Painel de Layouts — indisponível nesta versão",
+  })).not.toBeInTheDocument();
   expect(displayWithLabel("sheet-bar-number-sheet-001")).toMatchObject({
     text: "L01",
   });
@@ -823,13 +821,6 @@ test("materializes the integrated Sheet Bar instead of a loose sheet label", asy
     await vi.advanceTimersByTimeAsync(160);
   });
   expect(sheetBar.alpha).toBe(1);
-
-  for (const action of [layoutAction]) {
-    action.emit("pointerenter", {});
-    expect(action).toMatchObject({ alpha: 1, tint: 0x2c2924 });
-    action.emit("pointerleave", {});
-    expect(action).toMatchObject({ alpha: 0.8, tint: 0x403b35 });
-  }
 
   sheetBar.emit("pointerleave", {});
   await act(async () => {
@@ -898,6 +889,26 @@ test("shares side swap availability and hover between the DOM button and Pixi Ba
   expect(button).toBeEnabled();
   view.rerenderCanvas({ ...options, mode: { kind: "sheet-editing", sheetId: "sheet-001" } });
   expect(screen.queryByRole("button", { name: "Trocar lados da Lâmina 01" })).not.toBeInTheDocument();
+});
+
+test("keeps the Layout button and its Bar visible while the DOM action has focus", async () => {
+  vi.useFakeTimers();
+  const currentBarNode = (label: string) => [...pixiLifecycle.displays].reverse().find((node) => node.label === label)!;
+  const onToggle = vi.fn();
+  renderCanvas({ sheetLayouts: { disabled: false, activeSheetId: "sheet-001", onToggle } });
+  await finishPixiInitialization();
+  const button = screen.getByRole("button", { name: "Layouts da Lâmina 01" });
+  fireEvent.focus(button);
+  fireEvent.pointerLeave(button);
+  currentBarNode("canvas-sheet-sheet-001").emit("pointerleave", {});
+  await act(async () => { await vi.advanceTimersByTimeAsync(160); });
+  expect(currentBarNode("sheet-bar-sheet-001").alpha).toBe(1);
+  expect(currentBarNode("sheet-bar-layout-sheet-001").alpha).toBe(1);
+  fireEvent.click(button);
+  expect(onToggle).toHaveBeenCalledExactlyOnceWith("sheet-001");
+  fireEvent.blur(button);
+  await act(async () => { await vi.advanceTimersByTimeAsync(160); });
+  expect(currentBarNode("sheet-bar-sheet-001").alpha).toBe(0);
 });
 
 test("enters Sheet Edit Mode on the second pointer tap of a Sheet", async () => {

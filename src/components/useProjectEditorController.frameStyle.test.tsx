@@ -37,6 +37,8 @@ function harness() {
   const port: ProjectCorePort = {
     load: async () => initial, apply, applyWithOutcome: unsupported, save, undo, redo: async () => second,
     readFrameDragThreshold: async () => ({ x: 5, y: 5 }), readSliderDoubleClickTime: async () => 500,
+    queryLayouts: async () => { throw new Error("Layouts are not configured in this fixture."); },
+    previewLayout: async () => { throw new Error("Layouts are not configured in this fixture."); },
     previewFrameStyle: preview, previewPhotoAngle: unsupported, previewFrameGeometry: unsupported, saveAs: unsupported,
     validateAlbumInformation: unsupported, importPhoto: unsupported, resolvePhotoDropTarget: unsupported, relink: unsupported,
   };

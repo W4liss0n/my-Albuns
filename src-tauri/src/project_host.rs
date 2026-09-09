@@ -507,6 +507,24 @@ impl ProjectHost {
             .map_err(|error| error.to_string())
     }
 
+    pub(crate) fn query_layouts(
+        &self,
+        sheet_id: &str,
+    ) -> Result<myalbuns_core::LayoutQueryResult, String> {
+        self.project()?
+            .query_layouts(sheet_id)
+            .map_err(|error| error.to_string())
+    }
+
+    pub(crate) fn preview_layout(
+        &self,
+        selection: &myalbuns_core::LayoutSelection,
+    ) -> Result<Vec<myalbuns_core::ComposedFrame>, String> {
+        self.project()?
+            .preview_layout(selection)
+            .map_err(|error| error.to_string())
+    }
+
     pub(crate) fn preview_frame_style(
         &self,
         edit: &myalbuns_core::FrameStyleEdit,
@@ -1945,6 +1963,20 @@ mod tests {
             let affected_frame_id = placed
                 .affected_frame_id
                 .expect("the added Frame is returned to the UI boundary");
+            let layouts = host.query_layouts(&sheet_id).unwrap();
+            let selection = myalbuns_core::LayoutSelection {
+                query_id: layouts.query_id,
+                candidate_index: layouts.listing.candidates.len() - 1,
+            };
+            let layout_preview = host.preview_layout(&selection).unwrap();
+            assert_eq!(host.projection().unwrap(), placed.projection);
+            let laid_out = host
+                .apply_with_outcome(ProjectIntent::ApplyLayout { selection })
+                .expect("the prepared Layout is applied through the native Host");
+            assert_eq!(
+                laid_out.projection.composition.sheets[1].frames,
+                layout_preview
+            );
             let transformed = host
                 .apply_with_outcome(ProjectIntent::TransformPhoto {
                     frame_id: affected_frame_id.clone(),

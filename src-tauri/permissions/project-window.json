@@ -15,6 +15,8 @@
           "preview_frame_geometry",
           "preview_photo_angle",
           "preview_frame_style",
+          "query_layouts",
+          "preview_layout",
           "slider_double_click_time",
           "frame_drag_threshold",
           "relink_media",

@@ -18,6 +18,7 @@ import { useSliderDoubleClickTime } from "./useSliderDoubleClickTime";
 import { useProjectMutations } from "./useProjectMutations";
 import type { ProjectMutationRunner } from "./useProjectMutationRunner";
 import { useProjectNavigation } from "./useProjectNavigation";
+import { useLayoutPanel } from "./useLayoutPanel";
 
 interface ProjectEditorControllerInput {
   interactionBlocked?: boolean;
@@ -154,6 +155,11 @@ export function useProjectEditorController({
     onError: reportInteractionError,
   });
   const flushPropertyDrafts = () => { void photoAngle.commit(); void frameStyle.commit(); };
+  const layoutPanel = useLayoutPanel({
+    projection, editing: canvasMode.kind === "sheet-editing", disabled: interactionBlocked,
+    port: projectCorePort, runner: runProjectMutation, commit: mutations.applyIntent,
+    onError: reportInteractionError,
+  });
   const orientPhotos = (action: PhotoOrientationAction) => {
     if (!canOrientPhotos) return Promise.resolve(false);
     flushPropertyDrafts();
@@ -165,7 +171,7 @@ export function useProjectEditorController({
     flushPropertyDrafts();
     return mutations.togglePhotoBlackAndWhite([...navigation.selectedFrameIds]);
   };
-  const canDeleteFrames = canArrangeFrames;
+  const canDeleteFrames = selectedFrames.length > 0 && !interactionBlocked;
   const canCopyFrames = canArrangeFrames;
   const canPasteFrames = canAddFrame && (projection.canPasteFrames || mutations.frameCopyPending);
   const copyFrames = () => {
@@ -193,7 +199,8 @@ export function useProjectEditorController({
   };
   const deleteFrames = () => {
     if (!canDeleteFrames) return Promise.resolve(false);
-    return mutations.applyIntent({ kind: "deleteFrames", frameIds: [...navigation.selectedFrameIds] });
+    return mutations.applyIntent({ kind: "deleteFrames", frameIds: [...navigation.selectedFrameIds],
+      mode: canvasMode.kind === "sheet-editing" ? "edit" : "normal" });
   };
   const arrangeFrames = (action: FrameStackAction) => {
     if (!canArrangeFrames) return Promise.resolve(false);
@@ -269,7 +276,8 @@ export function useProjectEditorController({
   const canvasProps: AlbumCanvasProps = {
     projectId: projection.state.projectId,
     mode: canvasMode,
-    composition: frameStyle.composition !== projection.composition ? frameStyle.composition : photoAngle.composition,
+    composition: layoutPanel.composition !== projection.composition ? layoutPanel.composition
+      : frameStyle.composition !== projection.composition ? frameStyle.composition : photoAngle.composition,
     sheetBarMetadata: projection.state.album.sheets.map((sheet) => ({
       sheetId: sheet.id,
       pageNumbers: sheet.pageNumbers,
@@ -286,6 +294,11 @@ export function useProjectEditorController({
     sheetSideSwap: {
       disabled: structuralCommandsDisabled || structuralMutationPending,
       onSwap: (sheetId) => { void swapSheetSides(sheetId); },
+    },
+    sheetLayouts: {
+      disabled: structuralCommandsDisabled || structuralMutationPending,
+      activeSheetId: layoutPanel.visible ? layoutPanel.sheetId : null,
+      onToggle: (sheetId) => { flushPropertyDrafts(); layoutPanel.toggle(sheetId); },
     },
     frameGeometry: {
       disabled: interactionBlocked,
@@ -382,6 +395,7 @@ export function useProjectEditorController({
   };
 
   return {
+    layoutPanel,
     frameStyle: {
       disabled: !canEditFrameStyle,
       scopeKey: frameStyle.scopeKey,

@@ -1,0 +1,198 @@
+use myalbuns_core::{
+    EditableProject, FrameStyleChange, FrameStyleEdit, LayoutSelection, OpenProjectRequest,
+    PhotoSourceMetadata, ProjectCore, ProjectIntent,
+};
+use serde_json::{Value, json};
+use std::{collections::BTreeMap, fs, path::Path};
+
+fn fixture_project(root: &Path, count: usize) -> EditableProject {
+    let mut document: Value = serde_json::from_str(include_str!(
+        "../fixtures/project_document_v6_photo_migration_expected.myalbuns"
+    ))
+    .unwrap();
+    let source = document["project"]["sheets"][0]["frames"][0].clone();
+    document["project"]["sheets"][0]["frames"] = json!(
+        (0..count)
+            .map(|i| {
+                let mut frame = source.clone();
+                frame["id"] = json!(format!("00000000-0000-4000-8000-{:012}", 101 + i));
+                frame["rect"] = json!(match i % 4 {
+                    0 => json!({"x":30000,"y":40000,"width":100000,"height":150000}),
+                    1 => json!({"x":320000,"y":60000,"width":150000,"height":100000}),
+                    2 => json!({"x":360000,"y":170000,"width":90000,"height":90000}),
+                    _ => json!({"x":180000,"y":170000,"width":150000,"height":100000}),
+                });
+                if i % 2 == 1 {
+                    frame["photo"] = Value::Null;
+                }
+                frame
+            })
+            .collect::<Vec<_>>()
+    );
+    let path = root.join("Layouts.myalbuns");
+    fs::write(&path, serde_json::to_vec(&document).unwrap()).unwrap();
+    let mut project = ProjectCore::new()
+        .with_identity_storage_roots(root.join("leases"), root.join("identities"))
+        .open_editable(OpenProjectRequest::new(super::location(&path)))
+        .unwrap();
+    let before = project.projection();
+    project
+        .observe_photo_source(
+            before.state.album.media[0].id,
+            PhotoSourceMetadata::new(
+                600,
+                400,
+                ["#C22C24", "#248044", "#2454C2"].map(String::from),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    if let Some(frame) = before.state.album.sheets[0].frames.first() {
+        for change in [
+            FrameStyleChange::Opacity {
+                opacity_percent: 60,
+            },
+            FrameStyleChange::BorderColor {
+                rgb: "#205070".into(),
+            },
+            FrameStyleChange::BorderWidth { width_um: 2000 },
+        ] {
+            project
+                .apply(ProjectIntent::SetFrameStyle {
+                    edit: FrameStyleEdit {
+                        frame_ids: vec![frame.id.clone()],
+                        change,
+                    },
+                })
+                .unwrap();
+        }
+    }
+    project
+}
+
+fn record(project: &mut EditableProject, name: &str) -> Value {
+    let projection = project.projection();
+    let mut queries = serde_json::Map::new();
+    for sheet in &projection.state.album.sheets {
+        let query = project.query_layouts(&sheet.id).unwrap();
+        let previews: Vec<_> = (0..query.listing.candidates.len())
+            .map(|index| {
+                project
+                    .preview_layout(&LayoutSelection {
+                        query_id: query.query_id.clone(),
+                        candidate_index: index,
+                    })
+                    .unwrap()
+            })
+            .collect();
+        let mut query = serde_json::to_value(query).unwrap();
+        query["queryId"] = json!(format!("{name}-{}", sheet.id));
+        queries.insert(sheet.id.clone(), json!({"query":query,"previews":previews}));
+    }
+    assert_eq!(
+        project.projection(),
+        projection,
+        "querying and composing never touch history"
+    );
+    json!({"projection":projection,"queries":queries})
+}
+
+#[test]
+fn layout_panel_corpus_is_produced_by_the_public_core() {
+    let mut cases = serde_json::Map::new();
+    for (name, count) in [("mixed", 4), ("single", 4), ("empty", 0), ("outside", 31)] {
+        let root = tempfile::tempdir().unwrap();
+        let mut project = fixture_project(root.path(), count);
+        let sheet = project.projection().state.album.sheets[0].id.clone();
+        if name == "single" {
+            project
+                .apply(ProjectIntent::ConvertEdgeSheet {
+                    sheet_id: sheet.clone(),
+                })
+                .unwrap();
+        }
+        let before = record(&mut project, name);
+        let query = project.query_layouts(&sheet).unwrap();
+        let applied = if query.listing.candidates.is_empty() {
+            Value::Null
+        } else {
+            let preview = project
+                .preview_layout(&LayoutSelection {
+                    query_id: query.query_id.clone(),
+                    candidate_index: 0,
+                })
+                .unwrap();
+            let previous = project.projection();
+            project
+                .apply(ProjectIntent::ApplyLayout {
+                    selection: LayoutSelection {
+                        query_id: query.query_id,
+                        candidate_index: 0,
+                    },
+                })
+                .unwrap();
+            let applied = project.projection();
+            assert_eq!(applied.composition.sheets[0].frames, preview);
+            for (a, b) in previous.state.album.sheets[0]
+                .frames
+                .iter()
+                .zip(&applied.state.album.sheets[0].frames)
+            {
+                assert_eq!(
+                    (&a.id, a.z_index, &a.photo, &a.style),
+                    (&b.id, b.z_index, &b.photo, &b.style)
+                );
+            }
+            record(&mut project, &format!("{name}-applied"))
+        };
+        cases.insert(name.into(), json!({"before":before,"applied":applied}));
+    }
+    let mut value = json!({"cases":cases});
+    let before = &value["cases"]["mixed"]["before"]["projection"];
+    let ids: BTreeMap<String, String> = before["state"]["album"]["sheets"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .enumerate()
+        .map(|(i, sheet)| {
+            (
+                sheet["id"].as_str().unwrap().to_owned(),
+                format!("sheet-{:03}", i + 1),
+            )
+        })
+        .collect();
+    normalize(&mut value, &ids);
+    let serialized = format!("{}\n", serde_json::to_string_pretty(&value).unwrap());
+    let path =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/layout-panel-cases.json");
+    if std::env::var_os("MYALBUNS_UPDATE_LAYOUT_FIXTURE").is_some() {
+        fs::write(&path, &serialized).unwrap();
+    }
+    assert_eq!(
+        serialized,
+        fs::read_to_string(path).unwrap().replace("\r\n", "\n")
+    );
+}
+
+fn normalize(value: &mut Value, ids: &BTreeMap<String, String>) {
+    match value {
+        Value::String(text) => {
+            for (id, replacement) in ids {
+                *text = text.replace(id, replacement);
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                normalize(item, ids);
+            }
+        }
+        Value::Object(fields) => {
+            let previous = std::mem::take(fields);
+            for (key, mut value) in previous {
+                normalize(&mut value, ids);
+                fields.insert(ids.get(&key).cloned().unwrap_or(key), value);
+            }
+        }
+        _ => {}
+    }
+}

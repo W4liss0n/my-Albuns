@@ -9,8 +9,8 @@ ticket: 28
 
 Este contrato consolida a base visual e comportamental aprovada na versão 9
 do protótipo. Define a consulta do Gerador e o que a aplicação precisa
-preservar ao consumir uma sugestão. Não afirma que o algoritmo ou o Painel
-de Layouts já estejam implementados no aplicativo.
+preservar ao consumir uma sugestão. A primeira integração no aplicativo e
+o formato persistido estão registrados no [design 0027](0027-integracao-dos-layouts-e-schema-v8.md).
 
 A decisão é do [ADR 0010](../adr/0010-gerar-layouts-por-composicoes-deterministicas.md).
 A [SPEC](../specs/programa-de-diagramacao-de-albuns.md#layouts) possui o
@@ -303,16 +303,15 @@ precisa acompanhar o Projeto. Projetos anteriores preservam a capacidade de
 usar ambos os tipos na migração. Alterar a permissão muda as opções elegíveis,
 sem reorganizar silenciosamente uma composição já existente.
 
-A próxima implementação deve substituir a chamada privada
-`apply_first_compatible_layout` em `project_document.rs`, que hoje constrói
-uma grade diretamente, por uma consulta a `LayoutRules`. A transição exige
-testar inserção normal, exclusão, conversão de extremidade e Histórico.
-Não basta portar a função JavaScript e chamá-la do frontend.
+A integração substitui a antiga chamada privada `apply_first_compatible_layout`
+em `project_document.rs`, que construía uma grade diretamente, por uma consulta
+a `LayoutRules`. Os testes públicos cobrem inserção normal, exclusão, conversão
+de extremidade e Histórico; o frontend consome composições produzidas no núcleo.
 
-O formato persistido para Último Layout, Favoritos e permissão deve ser
-introduzido em uma versão própria de schema, com migração e reabertura
-verificadas pelos testes públicos de `ProjectCore`. O schema atual não é
-alterado por este documento.
+O [schema v8](0027-integracao-dos-layouts-e-schema-v8.md) introduz Último Layout,
+permissão e parâmetros físicos, com migração e reabertura verificadas pelos
+testes públicos de `ProjectCore`. A persistência de Favoritos permanece na
+entrega do seu catálogo.
 
 ## Evidência preservada e critérios de integração
 

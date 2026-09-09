@@ -6,6 +6,8 @@ import type {
   FrameGeometryEdit,
   PhotoAngleEdit,
   FrameStyleEdit,
+  LayoutQueryResult,
+  LayoutSelection,
   PhotoDropTarget,
   ProjectIntent,
   ProjectMutationOutcome,
@@ -242,6 +244,8 @@ export interface ProjectCorePort {
   readSliderDoubleClickTime(): Promise<number>;
   previewPhotoAngle(edit: PhotoAngleEdit): Promise<ComposedFrame[]>;
   previewFrameStyle(edit: FrameStyleEdit): Promise<ComposedFrame[]>;
+  queryLayouts(sheetId: string): Promise<LayoutQueryResult>;
+  previewLayout(selection: LayoutSelection): Promise<ComposedFrame[]>;
   previewFrameGeometry(edit: FrameGeometryEdit): Promise<ComposedFrame[]>;
   load(operationId: string): Promise<EditorProjection>;
   validateAlbumInformation(

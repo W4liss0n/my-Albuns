@@ -13,9 +13,11 @@ export interface SheetBarRenderNode {
   directlyHovered: boolean;
   sheetHovered: boolean;
   swapFocused: boolean;
+  layoutFocused: boolean;
   swapHovered: boolean;
   sheetNumber: Text;
   swapAction: Container;
+  layoutAction: Container;
   canSwapSides: boolean;
   transitionTimer: ReturnType<typeof setTimeout> | null;
   width: number;
@@ -95,9 +97,10 @@ export function createSheetBarRenderNode(
     x: style.swapActionCenterPx,
     y: style.heightPx / 2,
   });
-  const layoutPlaceholder = createSheetBarAction({
-    label: `placeholder-sheet-bar-layout-${sheet.sheetId}`,
-    visual: createLayoutPlaceholder(sheet.sheetId),
+  const layoutAction = createSheetBarAction({
+    hoverable: false,
+    label: `sheet-bar-layout-${sheet.sheetId}`,
+    visual: createLayoutIcon(sheet.sheetId),
     x: width / 2,
     y: style.heightPx / 2,
   });
@@ -112,10 +115,10 @@ export function createSheetBarRenderNode(
     fontWeight: "500",
     letterSpacing: 1,
   });
-  bar.addChild(swapAction, layoutPlaceholder, sheetNumber);
+  bar.addChild(swapAction, layoutAction, sheetNumber);
   horizontallyFixedElements.push(
     swapAction,
-    layoutPlaceholder,
+    layoutAction,
     sheetNumber,
   );
   const node: SheetBarRenderNode = {
@@ -124,9 +127,11 @@ export function createSheetBarRenderNode(
     directlyHovered: false,
     sheetHovered: false,
     swapFocused: false,
+    layoutFocused: false,
     swapHovered: false,
     sheetNumber,
     swapAction,
+    layoutAction,
     canSwapSides: metadata?.canSwapSides ?? false,
     transitionTimer: null,
     width,
@@ -151,12 +156,14 @@ export function setSheetBarOverlayHovered(node: SheetBarRenderNode, hovered: boo
   updateSheetBarSwapAppearance(node);
 }
 
-export function setSheetBarSwapFocused(node: SheetBarRenderNode, focused: boolean) {
-  if (node.swapFocused !== focused) {
-    node.swapFocused = focused;
+export function setSheetBarActionFocused(node: SheetBarRenderNode, action: "swap" | "layout", focused: boolean) {
+  const key = action === "swap" ? "swapFocused" : "layoutFocused";
+  if (node[key] !== focused) {
+    node[key] = focused;
     transitionSheetBarOpacity(node);
   }
   updateSheetBarSwapAppearance(node);
+  setSheetBarActionHovered(node.layoutAction, node.layoutFocused);
 }
 
 function updateSheetBarSwapAppearance(node: SheetBarRenderNode) {
@@ -184,7 +191,7 @@ function transitionSheetBarOpacity(node: SheetBarRenderNode) {
   stopSheetBarTransition(node);
   const style = SHEET_VISUAL_STYLE.sheetBar;
   const initialOpacity = node.container.alpha;
-  const targetOpacity = node.swapFocused
+  const targetOpacity = node.swapFocused || node.layoutFocused
     ? style.directHoverOpacity
     : !node.sheetHovered
     ? 0
@@ -360,7 +367,7 @@ function setSheetBarActionHovered(action: Container, hovered: boolean) {
   action.tint = pixiColor(hovered ? style.actionHover : style.action);
 }
 
-function createLayoutPlaceholder(sheetId: string) {
+function createLayoutIcon(sheetId: string) {
   const color = 0xffffff;
   const icon = new Graphics();
   const size = 4.5;
@@ -378,7 +385,7 @@ function createLayoutPlaceholder(sheetId: string) {
     }
   }
   icon.stroke({ color, width: 1.15, alpha: 1 });
-  icon.label = `placeholder-sheet-bar-layout-glyph-${sheetId}`;
+  icon.label = `sheet-bar-layout-glyph-${sheetId}`;
   icon.eventMode = "none";
   return icon;
 }

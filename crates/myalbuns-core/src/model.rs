@@ -107,7 +107,7 @@ impl<'de> Deserialize<'de> for MediaId {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct RectUm {
     pub x: i64,
@@ -832,6 +832,12 @@ pub enum FrameStackAction {
 )]
 #[ts(tag = "kind")]
 pub enum ProjectIntent {
+    ApplyLayout {
+        selection: crate::LayoutSelection,
+    },
+    SetLayoutSettings {
+        settings: crate::LayoutSettings,
+    },
     CopyFrames {
         frame_ids: Vec<String>,
     },
@@ -844,6 +850,7 @@ pub enum ProjectIntent {
     },
     DeleteFrames {
         frame_ids: Vec<String>,
+        mode: PhotoPlacementMode,
     },
     SwapFrameContents {
         frame_ids: Vec<String>,
@@ -955,6 +962,12 @@ pub enum FrameStyleChange {
 
 #[derive(Debug, Error, PartialEq)]
 pub enum CoreError {
+    #[error("As medidas para gerar Layouts não são válidas")]
+    InvalidLayoutQuery,
+    #[error("O Layout não é compatível com esta Lâmina")]
+    IncompatibleLayout,
+    #[error("A prévia do Layout está desatualizada; escolha novamente")]
+    StaleLayoutPreview,
     #[error("A Borda do Frame exige uma cor RGB canônica e espessura física válida")]
     InvalidFrameBorder,
     #[error("Selecione Frames distintos de uma única Lâmina para alterar seu estilo")]
@@ -1009,7 +1022,7 @@ pub enum CoreError {
     InvalidSheetInsertion,
     #[error("O Álbum precisa manter ao menos duas Lâminas")]
     MinimumSheetCount,
-    #[error("A extremidade não pode ser convertida sem reorganizar seu conteúdo")]
+    #[error("Esta Lâmina não é uma extremidade compatível com a conversão")]
     InvalidEdgeConversion,
     #[error("A Lâmina não pode ser movida para essa posição")]
     InvalidSheetReorder,

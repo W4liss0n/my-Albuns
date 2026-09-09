@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-08-03
-updated: 2026-08-21
+updated: 2026-09-09
 ---
 
 # Contrato do Arquivo de Projeto v1
@@ -12,7 +12,7 @@ updated: 2026-08-21
 Definir o envelope público, a fronteira persistente e o ciclo de evolução do Arquivo de Projeto sem levar JSON, I/O ou versões antigas ao `ProjectDomain`. Este design detalha o [ADR 0009](../adr/0009-adotar-arquivo-myalbuns-json-versionado.md) e incorpora o codec nativo comprovado para caminhos Windows.
 
 Este documento permanece o contrato fechado da v1. A versão pública atual é a
-[v3](0017-contrato-da-primeira-composicao-com-foto.md); o leitor conserva v1 e
+[v8](0027-integracao-dos-layouts-e-schema-v8.md); o leitor conserva v1 e
 a migra sequencialmente apenas em memória.
 
 ## Documento público

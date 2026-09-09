@@ -1,5 +1,6 @@
 mod composition;
 mod frame_geometry;
+mod layouts;
 mod model;
 mod persistent_project;
 mod persistent_projection;
@@ -11,6 +12,12 @@ mod validation;
 
 pub use frame_geometry::{
     FrameGeometryEdit, FrameGeometryGesture, FrameGeometryTarget, FrameResizeHandle,
+};
+pub use layouts::{
+    FrameOrientation, GeneratedLayout, LayoutCandidate, LayoutDefinition, LayoutGeneration,
+    LayoutGenerationStatus, LayoutListing, LayoutOrigin, LayoutParameters, LayoutPatch,
+    LayoutPermission, LayoutQuery, LayoutQueryResult, LayoutRules, LayoutScope, LayoutSelection,
+    LayoutSettings, LayoutSurface, LayoutSurfaceKind, StoredLayout, generate_layouts,
 };
 
 pub use model::{

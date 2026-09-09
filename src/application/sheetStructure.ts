@@ -44,7 +44,7 @@ export function sheetStructureAvailability(
     canAddAfter:
       index < sheets.length - 1 || sheet.activeSides === "both",
     canConvertEdge:
-      (index === 0 || index === sheets.length - 1) && sheet.frames.length === 0,
+      index === 0 || index === sheets.length - 1,
     canDelete: sheets.length > 2,
   };
 }

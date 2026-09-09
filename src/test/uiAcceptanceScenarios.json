@@ -4976,5 +4976,365 @@
         }
       ]
     }
+    ,
+    {
+      "id": "workspace-layout-panel",
+      "title": "Layouts — painel horizontal aberto",
+      "implementationPath": "/workspace-preview.html?frame=layouts",
+      "comparison": {
+        "kind": "paired",
+        "surface": "layout-panel",
+        "implementationCaptureSelector": ".layout-panel",
+        "referenceCaptureSelector": "div:has(> div > [data-tagstrip=\"1\"])"
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__candidate",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate"
+        }
+      ],
+      "referencePath": "/docs/references/ui-programa-diagramacao/myalbuns.dc.html",
+      "referenceActions": [
+        {
+          "type": "hover",
+          "selector": "[data-l=\"1\"]"
+        },
+        {
+          "type": "click",
+          "selector": "[data-l=\"1\"] button[title=\"Layout da lâmina\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-hover",
+      "title": "Layouts — hover com Foto, placeholder, Borda e Opacidade",
+      "implementationPath": "/workspace-preview.html?frame=layouts",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "O contrato 0026 define Gerador, consulta por Lâmina, prévia sem mutação e aplicação exata. As imagens e geometrias são produzidas pelo ProjectCore; o painel segue a referência visual vigente."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__candidate",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__candidate:first-child"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-applied",
+      "title": "Layouts — último Layout aplicado",
+      "implementationPath": "/workspace-preview.html?frame=layouts",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "O contrato 0026 define Gerador, consulta por Lâmina, prévia sem mutação e aplicação exata. As imagens e geometrias são produzidas pelo ProjectCore; o painel segue a referência visual vigente."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__candidate[aria-label*=\"último aplicado\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate"
+        },
+        {
+          "type": "click",
+          "selector": ".layout-panel__candidate:first-child"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__header"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-single",
+      "title": "Layouts — Página única",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=single",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "O contrato 0026 define Gerador, consulta por Lâmina, prévia sem mutação e aplicação exata. As imagens e geometrias são produzidas pelo ProjectCore; o painel segue a referência visual vigente."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__candidate",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-empty",
+      "title": "Layouts — Lâmina vazia",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=empty",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "O contrato 0026 define Gerador, consulta por Lâmina, prévia sem mutação e aplicação exata. As imagens e geometrias são produzidas pelo ProjectCore; o painel segue a referência visual vigente."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__strip [role=\"status\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-outside",
+      "title": "Layouts — quantidade acima da cobertura",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=outside",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "O contrato 0026 define Gerador, consulta por Lâmina, prévia sem mutação e aplicação exata. As imagens e geometrias são produzidas pelo ProjectCore; o painel segue a referência visual vigente."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__strip [role=\"status\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-settings",
+      "title": "Layouts — permissão e medidas",
+      "implementationPath": "/workspace-preview.html?frame=layouts",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "O contrato 0026 define Gerador, consulta por Lâmina, prévia sem mutação e aplicação exata. As imagens e geometrias são produzidas pelo ProjectCore; o painel segue a referência visual vigente."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__settings",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate"
+        },
+        {
+          "type": "click-text",
+          "text": "Ajustes"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-edit",
+      "title": "Layouts — painel recolhido durante a edição",
+      "implementationPath": "/workspace-preview.html?frame=layouts",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "O contrato 0026 define Gerador, consulta por Lâmina, prévia sem mutação e aplicação exata. As imagens e geometrias são produzidas pelo ProjectCore; o painel segue a referência visual vigente."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "body:not(:has(.layout-panel)):has(canvas[aria-label*=\"edição\"])",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate"
+        },
+        {
+          "type": "focus",
+          "selector": ".pixi-canvas"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-restored",
+      "title": "Layouts — alvo restaurado ao sair da edição",
+      "implementationPath": "/workspace-preview.html?frame=layouts",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "O contrato 0026 define Gerador, consulta por Lâmina, prévia sem mutação e aplicação exata. As imagens e geometrias são produzidas pelo ProjectCore; o painel segue a referência visual vigente."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__candidate",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate"
+        },
+        {
+          "type": "focus",
+          "selector": ".pixi-canvas"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "key",
+          "key": "Escape"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-scale-125",
+      "title": "Layouts — painel a 125%",
+      "implementationPath": "/workspace-preview.html?frame=layouts&scale=1.25",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "O contrato 0026 define Gerador, consulta por Lâmina, prévia sem mutação e aplicação exata. As imagens e geometrias são produzidas pelo ProjectCore; o painel segue a referência visual vigente."
+      },
+      "viewport": {
+        "width": 1800,
+        "height": 1000
+      },
+      "readySelector": ".layout-panel__candidate",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-scale-150",
+      "title": "Layouts — painel a 150%",
+      "implementationPath": "/workspace-preview.html?frame=layouts&scale=1.5",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "O contrato 0026 define Gerador, consulta por Lâmina, prévia sem mutação e aplicação exata. As imagens e geometrias são produzidas pelo ProjectCore; o painel segue a referência visual vigente."
+      },
+      "viewport": {
+        "width": 2160,
+        "height": 1200
+      },
+      "readySelector": ".layout-panel__candidate",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate"
+        }
+      ]
+    }
   ]
 }

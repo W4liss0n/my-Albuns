@@ -167,7 +167,7 @@ fn imported_photo_adds_one_filled_frame_and_persists_only_the_external_link() {
     let persisted_bytes = fs::read(&project_path).expect("the v3 Project is readable");
     let persisted: serde_json::Value =
         serde_json::from_slice(&persisted_bytes).expect("the v3 Project is JSON");
-    assert_eq!(persisted["schemaVersion"], 7);
+    assert_eq!(persisted["schemaVersion"], 8);
     assert_eq!(persisted["project"]["media"][0]["kind"], "photo");
     assert_eq!(
         persisted["project"]["sheets"][0]["frames"]

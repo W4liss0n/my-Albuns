@@ -104,6 +104,7 @@ fn deleting_a_mixed_selection_preserves_remaining_frames_media_and_frozen_export
     let deleted = project
         .apply(ProjectIntent::DeleteFrames {
             frame_ids: vec![frames[2].id.clone(), frames[1].id.clone()],
+            mode: PhotoPlacementMode::Edit,
         })
         .unwrap();
     assert_eq!(deleted.state.revision, before.state.revision + 1);
@@ -160,7 +161,10 @@ fn deleting_the_last_frames_keeps_the_sheet_and_imported_photo_available() {
         .map(|frame| frame.id.clone())
         .collect();
     let deleted = project
-        .apply(ProjectIntent::DeleteFrames { frame_ids: ids })
+        .apply(ProjectIntent::DeleteFrames {
+            frame_ids: ids,
+            mode: PhotoPlacementMode::Edit,
+        })
         .unwrap();
     assert_eq!(
         deleted.state.album.sheets.len(),
@@ -199,6 +203,7 @@ fn invalid_deletion_never_removes_part_of_a_selection_or_discards_redo() {
     project
         .apply(ProjectIntent::DeleteFrames {
             frame_ids: vec![id.clone()],
+            mode: PhotoPlacementMode::Edit,
         })
         .unwrap();
     project.undo().unwrap();
@@ -211,7 +216,10 @@ fn invalid_deletion_never_removes_part_of_a_selection_or_discards_redo() {
         vec![id, "invalid".into()],
     ] {
         assert_eq!(
-            project.apply(ProjectIntent::DeleteFrames { frame_ids }),
+            project.apply(ProjectIntent::DeleteFrames {
+                frame_ids,
+                mode: PhotoPlacementMode::Edit
+            }),
             Err(CoreError::InvalidFrameDeletionSelection)
         );
         assert_eq!(project.projection(), before);
@@ -241,6 +249,7 @@ fn deleting_the_top_frame_exposes_the_remaining_photo_drop_target() {
     project
         .apply(ProjectIntent::DeleteFrames {
             frame_ids: vec![ids[3].clone()],
+            mode: PhotoPlacementMode::Edit,
         })
         .unwrap();
     assert_eq!(
@@ -308,6 +317,7 @@ fn deletion_preview_corpus_matches_the_core() {
         let after = project
             .apply(ProjectIntent::DeleteFrames {
                 frame_ids: selected.iter().map(|index| ids[*index].clone()).collect(),
+                mode: PhotoPlacementMode::Edit,
             })
             .unwrap();
         cases.push(serde_json::json!({"name": name, "selectedFrameIds": selected.iter().map(|index| format!("delete-frame-{index}")).collect::<Vec<_>>(), "after": normalize(&after)}));

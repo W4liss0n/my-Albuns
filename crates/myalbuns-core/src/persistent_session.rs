@@ -21,6 +21,16 @@ pub(crate) struct PersistentProjectSession {
     undo: Vec<ProjectRevision>,
     redo: Vec<ProjectRevision>,
     frame_clipboard: Option<FrameClipboard>,
+    prepared_layout_query: Option<PreparedLayoutQuery>,
+}
+
+#[derive(Clone, Debug)]
+struct PreparedLayoutQuery {
+    id: String,
+    revision: u64,
+    sheet_id: Uuid,
+    frame_ids: Vec<Uuid>,
+    patches: Vec<crate::LayoutPatch>,
 }
 
 impl PersistentProjectSession {
@@ -36,6 +46,7 @@ impl PersistentProjectSession {
             undo: Vec::new(),
             redo: Vec::new(),
             frame_clipboard: None,
+            prepared_layout_query: None,
         }
     }
 
@@ -50,6 +61,7 @@ impl PersistentProjectSession {
             undo: Vec::new(),
             redo: Vec::new(),
             frame_clipboard: None,
+            prepared_layout_query: None,
         }
     }
 
@@ -98,6 +110,22 @@ impl PersistentProjectSession {
         intent: ProjectIntent,
     ) -> Result<ProjectIntentOutcome, CoreError> {
         let mut outcome = ProjectIntentOutcome::default();
+        if let ProjectIntent::ApplyLayout { selection } = &intent {
+            let (sheet_id, patch) = self.checked_layout_patch(selection)?;
+            let next = self.project().with_layout_patch(sheet_id, patch)?;
+            if next != *self.project() {
+                self.commit_edit(|_| Ok(next))?;
+            }
+            outcome.affected_sheet_id = Some(sheet_id);
+            return Ok(outcome);
+        }
+        if let ProjectIntent::SetLayoutSettings { settings } = &intent {
+            let next = self.project().with_layout_settings(settings.clone())?;
+            if next != *self.project() {
+                self.commit_edit(|_| Ok(next))?;
+            }
+            return Ok(outcome);
+        }
         if let ProjectIntent::SetFrameStyle { edit } = &intent {
             let next = self.project().with_frame_style(edit)?;
             if next != *self.project() {
@@ -173,6 +201,9 @@ impl PersistentProjectSession {
             }
         }
         self.commit_edit(|project| match intent {
+            ProjectIntent::ApplyLayout { .. } | ProjectIntent::SetLayoutSettings { .. } => {
+                unreachable!("Layout commands validate the captured query before committing")
+            }
             ProjectIntent::SetFrameStyle { .. } => {
                 unreachable!("Frame style handles unchanged selections before committing")
             }
@@ -194,7 +225,9 @@ impl PersistentProjectSession {
             ProjectIntent::SwapFrameContents { frame_ids } => {
                 project.with_swapped_frame_contents(&frame_ids)
             }
-            ProjectIntent::DeleteFrames { frame_ids } => project.with_deleted_frames(&frame_ids),
+            ProjectIntent::DeleteFrames { frame_ids, mode } => {
+                project.with_deleted_frames(&frame_ids, mode)
+            }
             ProjectIntent::ArrangeFrames { frame_ids, action } => {
                 project.with_arranged_frames(&frame_ids, action)
             }
@@ -335,6 +368,85 @@ impl PersistentProjectSession {
                 CoreError::InvalidProject("o vínculo externo da Foto não é válido".into())
             })
         })
+    }
+
+    pub(crate) fn query_layouts(
+        &mut self,
+        sheet_id: &str,
+    ) -> Result<crate::LayoutQueryResult, CoreError> {
+        let parsed = parse_uuid(sheet_id).map_err(|_| CoreError::SheetNotFound(sheet_id.into()))?;
+        let query = self.project().layout_query(parsed)?;
+        let sheet = self
+            .project()
+            .sheets()
+            .iter()
+            .find(|s| s.id() == parsed)
+            .unwrap();
+        let ids: Vec<_> = sheet.frames().iter().map(|f| f.id()).collect();
+        let listing = crate::LayoutRules::list(&query, sheet.last_layout());
+        let patches = listing
+            .candidates
+            .iter()
+            .map(|candidate| {
+                crate::LayoutRules::resolve(
+                    &candidate.layout,
+                    &query.surface,
+                    &ids,
+                    query.permission,
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let id = Uuid::new_v4().to_string();
+        self.prepared_layout_query = Some(PreparedLayoutQuery {
+            id: id.clone(),
+            revision: self.revision(),
+            sheet_id: parsed,
+            frame_ids: ids,
+            patches,
+        });
+        Ok(crate::LayoutQueryResult {
+            query_id: id,
+            project_id: self.project_id().to_string(),
+            revision: self.revision(),
+            sheet_id: sheet_id.into(),
+            frame_count: query.frame_orientations.len(),
+            settings: self.project().layout_settings().clone(),
+            listing,
+        })
+    }
+
+    pub(crate) fn checked_layout_patch(
+        &self,
+        selection: &crate::LayoutSelection,
+    ) -> Result<(Uuid, &crate::LayoutPatch), CoreError> {
+        let prepared = self
+            .prepared_layout_query
+            .as_ref()
+            .ok_or(CoreError::StaleLayoutPreview)?;
+        if prepared.id != selection.query_id || prepared.revision != self.revision() {
+            return Err(CoreError::StaleLayoutPreview);
+        }
+        let sheet = self
+            .project()
+            .sheets()
+            .iter()
+            .find(|s| s.id() == prepared.sheet_id)
+            .ok_or(CoreError::StaleLayoutPreview)?;
+        if !sheet
+            .frames()
+            .iter()
+            .map(|f| f.id())
+            .eq(prepared.frame_ids.iter().copied())
+        {
+            return Err(CoreError::StaleLayoutPreview);
+        }
+        Ok((
+            prepared.sheet_id,
+            prepared
+                .patches
+                .get(selection.candidate_index)
+                .ok_or(CoreError::StaleLayoutPreview)?,
+        ))
     }
 
     pub(crate) fn relink_media(&mut self, command: RelinkMedia) -> Result<(), CoreError> {

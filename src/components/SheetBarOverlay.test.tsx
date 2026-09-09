@@ -10,6 +10,23 @@ import { SheetBarOverlay } from "./SheetBarOverlay";
 const sheets = [sheet("sheet-1", 1), sheet("sheet-2", 2)];
 const layout = createContinuousCanvasLayout(sheets);
 
+test("the central Layout control opens its own Sheet without starting reorder or editing", () => {
+  const onToggle = vi.fn();
+  const callbacks = props({ layouts: { disabled: false, activeSheetId: "sheet-2", onToggle } });
+  const onKey = vi.fn();
+  render(<div onKeyDown={onKey}><SheetBarOverlay {...callbacks} /></div>);
+  const button = screen.getByRole("button", { name: "Layouts da Lâmina 02" });
+  expect(button).toHaveAttribute("aria-expanded", "true");
+  fireEvent.keyDown(button, { key: "Enter" });
+  fireEvent.pointerDown(button, { button: 0, pointerId: 1, clientX: 220, clientY: 40 });
+  fireEvent.click(button);
+  fireEvent.doubleClick(button);
+  expect(onToggle).toHaveBeenCalledExactlyOnceWith("sheet-2");
+  expect(onKey).not.toHaveBeenCalled();
+  expect(callbacks.onPreview).not.toHaveBeenCalled();
+  expect(callbacks.onEditSheet).not.toHaveBeenCalled();
+});
+
 test("the swap hotspot targets its Sheet and owns pointer, double-click and context-menu input", () => {
   const callbacks = props({
     onSwapSides: vi.fn(),

@@ -26,6 +26,7 @@ import type {
   ComposedFrame,
   FrameSnapshot,
   FrameStyleEdit,
+  LayoutQueryResult,
   PhotoAngleEdit,
   ProjectIntent,
   ProjectMutationOutcome,
@@ -41,6 +42,7 @@ import { frameClipboardCorpus } from "./test/frameClipboardPreview";
 import { sheetSideSwapCorpus } from "./test/sheetSideSwapPreview";
 import { photoOrientationCorpus } from "./test/photoOrientationPreview";
 import { frameStyleCorpus } from "./test/frameStylePreview";
+import { layoutPanelCorpus } from "./test/layoutPanelPreview";
 import { continuousCanvasScale, createCanvasSheetPresentation } from "./components/canvasGeometry";
 import { createCanvasSheetViewGeometry, createNormalCanvasLayout } from "./components/canvasSheetViewGeometry";
 import "./ui/theme.css";
@@ -48,6 +50,9 @@ import "./ui/ui.css";
 
 const previewParameters = new URLSearchParams(window.location.search);
 const frameContext = previewParameters.get("frame");
+const layoutCase = layoutPanelCorpus.cases[previewParameters.get("layouts") ?? "mixed"];
+let preparedLayoutQuery: { query: LayoutQueryResult; previews: ComposedFrame[][] } | null = null;
+let layoutQuerySequence = 0;
 const sideSwapCase = sheetSideSwapCorpus.cases.find((item) => item.name === (previewParameters.get("side-swap") ?? "mixed"))!;
 const frameClipboardCase = frameClipboardCorpus.cases.find((item) => item.name === (previewParameters.get("clipboard") ?? "same-group"))!;
 const manualFrameCase = manualFrameCorpus.cases.find((item) => item.name === (previewParameters.get("surface") ?? "double"));
@@ -145,6 +150,22 @@ if (frameContext === "style") {
 }
 
 const projectCorePort: ProjectCorePort = {
+  queryLayouts: async (sheetId) => {
+    const sample = [layoutCase.before, layoutCase.applied].find((state) => state &&
+      JSON.stringify(state.projection.state.album) === JSON.stringify(projection.state.album));
+    const prepared = sample?.queries[sheetId];
+    if (frameContext !== "layouts" || !prepared) throw new Error("Consulta fora do corpus de Layouts.");
+    preparedLayoutQuery = { ...structuredClone(prepared), query: { ...structuredClone(prepared.query),
+      queryId: `layout-preview-${++layoutQuerySequence}`, revision: projection.state.revision } };
+    return preparedLayoutQuery.query;
+  },
+  previewLayout: async (selection) => {
+    if (!preparedLayoutQuery || selection.queryId !== preparedLayoutQuery.query.queryId ||
+        projection.state.revision !== preparedLayoutQuery.query.revision || !preparedLayoutQuery.previews[selection.candidateIndex]) {
+      throw new Error("Esta prévia de Layout expirou.");
+    }
+    return structuredClone(preparedLayoutQuery.previews[selection.candidateIndex]);
+  },
   load: async () => projection,
   validateAlbumInformation: async () => ({
     errors: [],
@@ -204,9 +225,9 @@ const projectCorePort: ProjectCorePort = {
 
 const mediaPreviewPort: MediaPreviewPort = {
   prepareMediaPreviews: async () =>
-    (frameContext === "orientation" || frameContext === "style") && previewParameters.get("preview") === "palette"
+    (frameContext === "orientation" || frameContext === "style" || frameContext === "layouts") && previewParameters.get("preview") === "palette"
       ? projection.state.album.media.map((media) => ({ mediaId: media.id, state: "unavailable" as const, url: null }))
-      : frameContext === "orientation" || frameContext === "style" ? projection.state.album.media.map((media) => ({
+      : frameContext === "orientation" || frameContext === "style" || frameContext === "layouts" ? projection.state.album.media.map((media) => ({
       mediaId: media.id, state: "ready" as const,
       url: `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400"><path fill="#e63f35" d="M0 0h300v200H0z"/><path fill="#329858" d="M300 0h300v200H300z"/><path fill="#376dcc" d="M0 200h300v200H0z"/><path fill="#e3b634" d="M300 200h300v200H300z"/><g font-family="sans-serif" font-size="80" fill="white" text-anchor="middle"><text x="150" y="130">A</text><text x="450" y="130">B</text><text x="150" y="330">C</text><text x="450" y="330">D</text></g></svg>')}`,
     })) : decorativeContext === "unavailable"
@@ -317,6 +338,7 @@ function createPreviewProjection(
   decorativeMode: string | null,
   structureMode: string | null,
 ): EditorProjection {
+  if (frameMode === "layouts") return structuredClone(layoutCase.before.projection);
   if (frameMode === "style") return structuredClone(frameStyleCorpus.states[previewParameters.get("style") ?? "album"]);
   if (frameMode === "orientation") return structuredClone(photoOrientationCorpus.states[previewParameters.get("orientation") ?? "neutral"]);
   if (frameMode === "side-swap") return structuredClone(sideSwapCase.before ?? sheetSideSwapCorpus.before);
@@ -442,6 +464,15 @@ function configurePhysicalPreview(
 }
 
 function applyPreviewIntent(intent: ProjectIntent): ProjectMutationOutcome {
+  if (intent.kind === "applyLayout") {
+    if (frameContext !== "layouts" || !layoutCase.applied || !preparedLayoutQuery ||
+        intent.selection.queryId !== preparedLayoutQuery.query.queryId ||
+        projection.state.revision !== preparedLayoutQuery.query.revision || intent.selection.candidateIndex !== 0) {
+      throw new Error("Aplicação fora do corpus de Layouts desta prévia.");
+    }
+    projection = finalizePhysicalPreviewMutation(structuredClone(layoutCase.applied.projection), structuredClone(projection));
+    return { projection, affectedFrameId: null, affectedSheetId: preparedLayoutQuery.query.sheetId };
+  }
   if (intent.kind === "setFrameStyle") {
     const transition = frameStyleCorpus.transitions.find((item) =>
       item.from === frameStyleStateName() && sameFrameStyleEdit(item.edit, intent.edit));

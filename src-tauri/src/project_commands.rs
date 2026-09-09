@@ -59,6 +59,8 @@ pub(crate) async fn apply_project_intent(
     let previous = state.projection()?;
     let intent_kind = match &intent {
         ProjectIntent::CopyFrames { .. } => "copy_frames",
+        ProjectIntent::ApplyLayout { .. } => "apply_layout",
+        ProjectIntent::SetLayoutSettings { .. } => "set_layout_settings",
         ProjectIntent::PasteFrames { .. } => "paste_frames",
         ProjectIntent::AddFrame { .. } => "add_frame",
         ProjectIntent::DeleteFrames { .. } => "delete_frames",
@@ -205,6 +207,30 @@ pub(crate) async fn preview_photo_angle(
         return Err("O Ângulo da Foto só pode ser consultada na Janela do Projeto.".into());
     }
     state.preview_photo_angle(&edit)
+}
+
+#[tauri::command]
+pub(crate) async fn query_layouts(
+    sheet_id: String,
+    window: WebviewWindow,
+    state: State<'_, ProjectHost>,
+) -> Result<myalbuns_core::LayoutQueryResult, String> {
+    if window.label() != PROJECT_WINDOW_LABEL {
+        return Err("Os Layouts só podem ser consultados na Janela do Projeto.".into());
+    }
+    state.query_layouts(&sheet_id)
+}
+
+#[tauri::command]
+pub(crate) async fn preview_layout(
+    selection: myalbuns_core::LayoutSelection,
+    window: WebviewWindow,
+    state: State<'_, ProjectHost>,
+) -> Result<Vec<myalbuns_core::ComposedFrame>, String> {
+    if window.label() != PROJECT_WINDOW_LABEL {
+        return Err("A prévia de Layout só está disponível na Janela do Projeto.".into());
+    }
+    state.preview_layout(&selection)
 }
 
 #[tauri::command]

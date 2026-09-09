@@ -55,7 +55,7 @@ describe("physical Album structure projection", () => {
     ).toMatchObject({ canDelete: false });
   });
 
-  test("offers edge conversion only for empty eligible targets", () => {
+  test("offers edge conversion for eligible targets with or without Frames", () => {
     expect(sheetStructureAvailability(physicalAlbum, "initial")).toMatchObject({
       canConvertEdge: true,
     });
@@ -84,7 +84,7 @@ describe("physical Album structure projection", () => {
         ],
         "initial",
       ),
-    ).toMatchObject({ canConvertEdge: false });
+    ).toMatchObject({ canConvertEdge: true });
   });
 
   test("previews a valid final order without mutating the opposite surface", () => {
