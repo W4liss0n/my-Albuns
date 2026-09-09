@@ -1,7 +1,8 @@
 import { useState } from "react";
-import type { ComposedSheet, DisplayUnit, LayoutSettings } from "../domain/project";
+import { LockKeyhole, LockKeyholeOpen } from "lucide-react";
+import type { ComposedSheet, DisplayUnit, FrameOrientation, LayoutSettings } from "../domain/project";
 import { createPhysicalFieldDraft, displayUnitLabel, editPhysicalFieldDraft } from "../application/physicalMeasurements";
-import { FieldValidationAutoTooltip, FieldValidationTooltip, TextInput,
+import { AppIcon, FieldValidationAutoTooltip, FieldValidationTooltip, TextInput,
   fieldValidationTooltipAttributes, useFieldValidationTooltip } from "../ui";
 import { SheetPreviewShell } from "./SheetPreview";
 import type { LayoutPanelController } from "./useLayoutPanel";
@@ -19,7 +20,7 @@ export function LayoutPanel({ controller, sheet, mediaPreviewUrls, presentationU
   const { query } = controller;
   const count = query?.frameCount ?? sheet.frames.length;
   const emptyMessage = query?.listing.generationStatus === "empty"
-    ? "Adicione Frames para ver sugestões de Layout."
+    ? "Escolha a quantidade de posições para preparar um Layout travado."
     : query?.listing.generationStatus === "outsideCoverage"
       ? "As sugestões automáticas atendem de 1 a 30 Frames."
       : "Nenhuma sugestão atende às medidas atuais.";
@@ -31,6 +32,20 @@ export function LayoutPanel({ controller, sheet, mediaPreviewUrls, presentationU
       <div className="layout-panel__header">
         <strong>Layouts</strong>
         <span>Lâmina {String(sheet.number).padStart(2, "0")} · {count} {count === 1 ? "Frame" : "Frames"}</span>
+        <label className="layout-panel__positions">Posições
+          <select aria-label="Posições do Layout" value={controller.positionCount}
+            disabled={controller.committing || query?.locked || count > 30}
+            onChange={(event) => controller.configurePositions(Number(event.target.value), controller.newFrameOrientation)}>
+            {Array.from({ length: Math.max(1, 31 - count) }, (_, index) => count + index).map((value) =>
+              <option key={value} value={value}>{value}</option>)}
+          </select>
+        </label>
+        {controller.positionCount > count && <label className="layout-panel__positions">Novas posições
+          <select aria-label="Orientação das novas posições" value={controller.newFrameOrientation} disabled={controller.committing}
+            onChange={(event) => controller.configurePositions(controller.positionCount, event.target.value as FrameOrientation)}>
+            <option value="horizontal">Horizontais</option><option value="vertical">Verticais</option><option value="square">Quadradas</option>
+          </select>
+        </label>}
         <button aria-expanded={settingsOpen} disabled={!query || controller.committing} type="button"
           onClick={() => setSettingsOpen((value) => !value)}>Ajustes</button>
         <button aria-label="Fechar Painel de Layouts" className="layout-panel__close" type="button"
@@ -46,18 +61,32 @@ export function LayoutPanel({ controller, sheet, mediaPreviewUrls, presentationU
         return <div className="layout-panel__section" key={origin}>
           <h3>{origin === "automatic" ? "Automáticos" : "Personalizados"}</h3>
           <div className="layout-panel__strip" onPointerLeave={controller.cancelPreview}>
-            {candidates.map(({ candidate, index }) => <button
+            {candidates.map(({ candidate, index }) => {
+              const locked = query!.locked && index === 0;
+              const unavailable = query!.locked && !locked;
+              const extraPositions = candidate.layout.definition.positions.length - count;
+              const caption = locked ? "Layout travado" : extraPositions > 0 ? `${candidate.layout.definition.positions.length} posições · travar`
+                : candidate.isLastApplied ? "Último aplicado" : candidate.layout.definition.scope === "page" ? "Por Página" : "Por Lâmina";
+              return <div className={`layout-panel__candidate${locked ? " layout-panel__candidate--locked" : ""}${unavailable ? " layout-panel__candidate--unavailable" : ""}`}
+                key={`${query!.queryId}-${index}`} onPointerEnter={() => controller.preview(index)}>
+              <button
               aria-label={`Aplicar Layout ${index + 1}${candidate.isLastApplied ? " — último aplicado" : ""}`}
-              className="layout-panel__candidate" disabled={controller.committing}
-              key={`${query!.queryId}-${index}`} type="button"
-              onPointerEnter={() => controller.preview(index)}
+              className="layout-panel__preview" disabled={controller.committing || query!.locked || extraPositions > 0} type="button"
               onFocus={() => controller.preview(index)} onBlur={controller.cancelPreview}
               onClick={() => { void controller.apply(index); }}
-              title={`${candidate.layout.definition.scope === "page" ? "Por Página" : "Por Lâmina"}${candidate.isLastApplied ? " · Último aplicado" : ""}`}>
+              title={extraPositions > 0 ? "Use o cadeado para aplicar e criar as posições adicionais." : `${candidate.layout.definition.scope === "page" ? "Por Página" : "Por Lâmina"}${candidate.isLastApplied ? " · Último aplicado" : ""}`}>
               <SheetPreviewShell sheet={{ ...sheet, frames: controller.previews[index] }}
                 mediaPreviewUrls={mediaPreviewUrls} />
-              <span>{candidate.isLastApplied ? "Último aplicado" : candidate.layout.definition.scope === "page" ? "Por Página" : "Por Lâmina"}</span>
-            </button>)}
+              </button>
+              <button className="layout-panel__lock" type="button" disabled={controller.committing || unavailable}
+                aria-label={locked ? `Destravar Layout da Lâmina ${String(sheet.number).padStart(2, "0")}` : `Aplicar e travar Layout ${index + 1}`}
+                title={locked ? "Destravar Layout" : "Aplicar e travar Layout"}
+                onFocus={() => controller.preview(index)} onBlur={controller.cancelPreview}
+                onClick={() => { void (locked ? controller.unlock() : controller.lock(index)); }}>
+                <AppIcon icon={locked ? LockKeyhole : LockKeyholeOpen} size={12} />
+              </button>
+              <span>{caption}</span>
+            </div>; })}
             {candidates.length === 0 && <p role="status">{origin === "custom" ? "Nenhum Layout personalizado."
               : controller.error ?? (query ? emptyMessage : "Consultando Layouts…")}</p>}
           </div>

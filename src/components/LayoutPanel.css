@@ -7,6 +7,7 @@
 }
 .layout-panel__header {
   display: flex;
+  flex-wrap: wrap;
   min-height: 32px;
   align-items: center;
   gap: 9px;
@@ -54,6 +55,7 @@
 }
 .layout-panel__strip p { margin: 0; color: var(--ui-text-muted); }
 .layout-panel__candidate {
+  position: relative;
   display: flex;
   flex: 0 0 104px;
   flex-direction: column;
@@ -65,16 +67,51 @@
   font: inherit;
   cursor: pointer;
 }
-.layout-panel__candidate > .sheet-preview-shell {
+.layout-panel__preview {
+  display: block;
+  width: 104px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.layout-panel__preview > .sheet-preview-shell {
   width: 104px;
   height: 52px;
   box-shadow: 0 0 0 1px var(--ui-border);
 }
-.layout-panel__candidate:hover > .sheet-preview-shell,
-.layout-panel__candidate:focus-visible > .sheet-preview-shell {
+.layout-panel__candidate:not(.layout-panel__candidate--unavailable):hover .sheet-preview-shell,
+.layout-panel__candidate:focus-within .sheet-preview-shell,
+.layout-panel__candidate--locked .sheet-preview-shell {
   box-shadow: 0 0 0 2px var(--ui-accent);
 }
 .layout-panel__candidate > span:last-child { font-size: var(--ui-font-size-micro); }
+.layout-panel__candidate--locked { color: var(--ui-accent); }
+.layout-panel__candidate--unavailable { opacity: .4; cursor: default; }
+.layout-panel__lock {
+  opacity: 0;
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  color: inherit;
+  background: var(--ui-surface);
+  cursor: pointer;
+}
+.layout-panel__candidate:hover .layout-panel__lock,
+.layout-panel__candidate:focus-within .layout-panel__lock,
+.layout-panel__candidate--locked .layout-panel__lock { opacity: 1; }
+.layout-panel button:disabled { cursor: default; }
+.layout-panel__lock:hover:not(:disabled) { color: var(--ui-accent); }
+.layout-panel__positions { display: flex; align-items: center; gap: 5px; color: var(--ui-text-muted); }
+.layout-panel__positions select { min-height: 24px; border: 1px solid var(--ui-border); border-radius: 2px; background: var(--ui-surface); color: var(--ui-text); font: inherit; }
 .layout-panel__settings {
   display: flex;
   flex-wrap: wrap;

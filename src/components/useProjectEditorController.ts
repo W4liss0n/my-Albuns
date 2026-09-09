@@ -128,7 +128,9 @@ export function useProjectEditorController({
     [projection.state.album.sheets, navigation.selectedFrameIds],
   );
   const selectedFrame = selectedFrames.length === 1 ? selectedFrames[0] : null;
-  const canAddFrame = canvasMode.kind === "sheet-editing" && !interactionBlocked;
+  const editingSheetLocked = canvasMode.kind === "sheet-editing" &&
+    projection.state.album.sheets.find((sheet) => sheet.id === canvasMode.sheetId)?.layoutLocked === true;
+  const canAddFrame = canvasMode.kind === "sheet-editing" && !editingSheetLocked && !interactionBlocked;
   const addFrame = () => {
     if (!canAddFrame || canvasMode.kind !== "sheet-editing") return Promise.resolve(false);
     return mutations.applyWithOutcome({ kind: "addFrame", sheetId: canvasMode.sheetId });
@@ -267,6 +269,7 @@ export function useProjectEditorController({
 
   const swapSheetSides = (sheetId: string) => {
     if (structuralCommandsDisabled || structuralMutationPendingRef.current ||
+        projection.state.album.sheets.find((sheet) => sheet.id === sheetId)?.layoutLocked ||
         projection.state.album.sheets.find((sheet) => sheet.id === sheetId)?.activeSides !== "both") {
       return Promise.resolve(false);
     }
@@ -281,9 +284,7 @@ export function useProjectEditorController({
     sheetBarMetadata: projection.state.album.sheets.map((sheet) => ({
       sheetId: sheet.id,
       pageNumbers: sheet.pageNumbers,
-      // UI placeholder: the current projection does not expose per-Sheet
-      // Layout locking to the renderer yet.
-      layoutLocked: false,
+      layoutLocked: sheet.layoutLocked,
     })),
     continuousCanvasLayout: navigation.canvasLayout,
     selectedFrameIds: navigation.selectedFrameIds,

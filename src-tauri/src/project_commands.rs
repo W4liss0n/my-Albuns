@@ -60,6 +60,8 @@ pub(crate) async fn apply_project_intent(
     let intent_kind = match &intent {
         ProjectIntent::CopyFrames { .. } => "copy_frames",
         ProjectIntent::ApplyLayout { .. } => "apply_layout",
+        ProjectIntent::LockLayout { .. } => "lock_layout",
+        ProjectIntent::UnlockLayout { .. } => "unlock_layout",
         ProjectIntent::SetLayoutSettings { .. } => "set_layout_settings",
         ProjectIntent::PasteFrames { .. } => "paste_frames",
         ProjectIntent::AddFrame { .. } => "add_frame",
@@ -212,13 +214,14 @@ pub(crate) async fn preview_photo_angle(
 #[tauri::command]
 pub(crate) async fn query_layouts(
     sheet_id: String,
+    expansion: Option<myalbuns_core::LayoutExpansion>,
     window: WebviewWindow,
     state: State<'_, ProjectHost>,
 ) -> Result<myalbuns_core::LayoutQueryResult, String> {
     if window.label() != PROJECT_WINDOW_LABEL {
         return Err("Os Layouts só podem ser consultados na Janela do Projeto.".into());
     }
-    state.query_layouts(&sheet_id)
+    state.query_layouts(&sheet_id, expansion)
 }
 
 #[tauri::command]

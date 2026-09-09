@@ -78,6 +78,11 @@ if (frameContext === "multiple" || frameContext === "stack") {
     selectedFrameIds: frameContext === "stack" ? stackCase!.selectedFrameIds :
       projection.state.album.sheets[0].frames.map((frame) => frame.id) });
 }
+if (frameContext === "layouts" && previewParameters.get("mode") === "edit") {
+  const sheet = projection.state.album.sheets[0];
+  useEditorView.setState({ projectId: projection.state.projectId, editingSheetId: sheet.id,
+    focusedSheetId: sheet.id, centeredSheetId: sheet.id, selectedFrameIds: sheet.frames.map((frame) => frame.id) });
+}
 if (frameContext === "stack") {
   const exposeSelection = () => { document.body.dataset.stackSelection = useEditorView.getState().selectedFrameIds.join(","); };
   exposeSelection();
@@ -150,8 +155,9 @@ if (frameContext === "style") {
 }
 
 const projectCorePort: ProjectCorePort = {
-  queryLayouts: async (sheetId) => {
-    const sample = [layoutCase.before, layoutCase.applied].find((state) => state &&
+  queryLayouts: async (sheetId, expansion) => {
+    const samples = expansion ? [layoutCase.lockReady] : [layoutCase.before, layoutCase.applied, layoutCase.locked, layoutCase.unlocked, layoutCase.filled, layoutCase.cleared];
+    const sample = samples.find((state) => state &&
       JSON.stringify(state.projection.state.album) === JSON.stringify(projection.state.album));
     const prepared = sample?.queries[sheetId];
     if (frameContext !== "layouts" || !prepared) throw new Error("Consulta fora do corpus de Layouts.");
@@ -338,7 +344,11 @@ function createPreviewProjection(
   decorativeMode: string | null,
   structureMode: string | null,
 ): EditorProjection {
-  if (frameMode === "layouts") return structuredClone(layoutCase.before.projection);
+  if (frameMode === "layouts") {
+    const stage = previewParameters.get("layout-state");
+    const sample = stage === "locked" ? layoutCase.locked : stage === "filled" ? layoutCase.filled : stage === "cleared" ? layoutCase.cleared : layoutCase.before;
+    return structuredClone(sample!.projection);
+  }
   if (frameMode === "style") return structuredClone(frameStyleCorpus.states[previewParameters.get("style") ?? "album"]);
   if (frameMode === "orientation") return structuredClone(photoOrientationCorpus.states[previewParameters.get("orientation") ?? "neutral"]);
   if (frameMode === "side-swap") return structuredClone(sideSwapCase.before ?? sheetSideSwapCorpus.before);
@@ -441,6 +451,7 @@ function configurePhysicalPreview(
     return {
       id,
       number: index + 1,
+      layoutLocked: false,
       role:
         index === 0
           ? "initial"
@@ -464,13 +475,21 @@ function configurePhysicalPreview(
 }
 
 function applyPreviewIntent(intent: ProjectIntent): ProjectMutationOutcome {
-  if (intent.kind === "applyLayout") {
-    if (frameContext !== "layouts" || !layoutCase.applied || !preparedLayoutQuery ||
+  if (intent.kind === "unlockLayout") {
+    if (frameContext !== "layouts" || !layoutCase.unlocked || !projection.state.album.sheets.find((sheet) => sheet.id === intent.sheetId)?.layoutLocked) {
+      throw new Error("Comando fora do corpus de travamento desta prévia.");
+    }
+    projection = finalizePhysicalPreviewMutation(structuredClone(layoutCase.unlocked.projection), structuredClone(projection));
+    return { projection, affectedFrameId: null, affectedSheetId: intent.sheetId };
+  }
+  if (intent.kind === "applyLayout" || intent.kind === "lockLayout") {
+    const result = intent.kind === "lockLayout" ? layoutCase.locked : layoutCase.applied;
+    if (frameContext !== "layouts" || !result || !preparedLayoutQuery ||
         intent.selection.queryId !== preparedLayoutQuery.query.queryId ||
         projection.state.revision !== preparedLayoutQuery.query.revision || intent.selection.candidateIndex !== 0) {
       throw new Error("Aplicação fora do corpus de Layouts desta prévia.");
     }
-    projection = finalizePhysicalPreviewMutation(structuredClone(layoutCase.applied.projection), structuredClone(projection));
+    projection = finalizePhysicalPreviewMutation(structuredClone(result.projection), structuredClone(projection));
     return { projection, affectedFrameId: null, affectedSheetId: preparedLayoutQuery.query.sheetId };
   }
   if (intent.kind === "setFrameStyle") {
@@ -628,6 +647,7 @@ function applyPreviewIntent(intent: ProjectIntent): ProjectMutationOutcome {
       role: "internal" as const,
       activeSides: "both" as const,
       pageNumbers: [] as number[],
+      layoutLocked: false,
       widthUm: next.state.document.sheetWidthUm,
       heightUm: next.state.document.sheetHeightUm,
       frames: [],

@@ -58,6 +58,7 @@ pub(crate) fn editor_state(
 
                 SheetSnapshot {
                     id: sheet.id().hyphenated().to_string(),
+                    layout_locked: sheet.layout_locked(),
                     number: index + 1,
                     role: if index == 0 {
                         SheetRole::Initial

@@ -72,6 +72,10 @@ pub enum ProjectDialogState {
         message: String,
         retry_disabled: bool,
     },
+    ExportProblems {
+        project_name: String,
+        problems: Vec<myalbuns_core::LayoutExportProblem>,
+    },
     ExportSuccess {
         message: String,
     },
@@ -94,6 +98,7 @@ pub enum ProjectDialogAction {
     ConfirmAlbumInformation,
     CloseProjectAfterGraphicsFailure,
     DismissExport,
+    OpenExportProject,
     DismissProjectCloseFailure,
     DismissProjectOperationFailure,
     DismissImageProcessingProblems,
@@ -400,6 +405,7 @@ pub enum CancelDisposition {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]
 #[serde(rename_all = "snake_case")]
 pub enum ExportCommandErrorCode {
+    UnfilledLayoutPositions,
     Cancelled,
     Conflict,
     ExportConflict,
@@ -440,6 +446,8 @@ pub struct ExportCommandError {
     pub(crate) media_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) path_code: Option<ExportPathCode>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) layout_problems: Option<Vec<myalbuns_core::LayoutExportProblem>>,
 }
 
 #[derive(Serialize, TS)]

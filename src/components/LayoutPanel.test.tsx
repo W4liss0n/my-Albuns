@@ -5,7 +5,7 @@ import { layoutPanelCorpus } from "../test/layoutPanelPreview";
 import { LayoutPanel } from "./LayoutPanel";
 import type { LayoutPanelController } from "./useLayoutPanel";
 
-function panel(unit: DisplayUnit) {
+function panel(unit: DisplayUnit, overrides: Partial<LayoutPanelController> = {}, settingsOpen = true) {
   const sample = layoutPanelCorpus.cases.mixed.before;
   const sheet = sample.projection.composition.sheets[0];
   const prepared = sample.queries[sheet.sheetId];
@@ -15,11 +15,39 @@ function panel(unit: DisplayUnit) {
     committing: false, query: prepared.query, previews: prepared.previews, error: null,
     toggle: vi.fn(), close: vi.fn(), preview: vi.fn(), cancelPreview: vi.fn(),
     apply: vi.fn(async () => true), updateSettings,
+    lock: vi.fn(async () => true), unlock: vi.fn(async () => true),
+    positionCount: sheet.frames.length, newFrameOrientation: "horizontal", configurePositions: vi.fn(),
+    ...overrides,
   };
   render(<LayoutPanel controller={controller} sheet={sheet} mediaPreviewUrls={{}} presentationUnit={unit} />);
-  fireEvent.click(screen.getByRole("button", { name: "Ajustes" }));
-  return { updateSettings };
+  if (settingsOpen) fireEvent.click(screen.getByRole("button", { name: "Ajustes" }));
+  return { updateSettings, controller };
 }
+
+test("the lock remains actionable when extra positions disable the preview body", () => {
+  const prepared = structuredClone(layoutPanelCorpus.cases.mixed.before.queries["sheet-001"].query);
+  prepared.frameCount -= 1;
+  const { controller } = panel("mm", { query: prepared }, false);
+  expect(screen.getByRole("button", { name: /^Aplicar Layout 1$/ })).toBeDisabled();
+  const lock = screen.getByRole("button", { name: "Aplicar e travar Layout 1" });
+  expect(lock).toBeEnabled();
+  fireEvent.click(lock);
+  expect(controller.lock).toHaveBeenCalledExactlyOnceWith(0);
+  expect(controller.apply).not.toHaveBeenCalled();
+});
+
+test("the highlighted closed lock unlocks directly while other candidates stay disabled", () => {
+  const prepared = structuredClone(layoutPanelCorpus.cases.mixed.before.queries["sheet-001"].query);
+  prepared.locked = true;
+  prepared.listing.candidates[0].isLastApplied = true;
+  const { controller } = panel("mm", { query: prepared }, false);
+  for (const candidate of screen.getAllByRole("button", { name: /^Aplicar/ })) expect(candidate).toBeDisabled();
+  const unlock = screen.getByRole("button", { name: "Destravar Layout da Lâmina 01" });
+  expect(unlock).toBeEnabled();
+  fireEvent.click(unlock);
+  expect(controller.unlock).toHaveBeenCalledOnce();
+  expect(controller.lock).not.toHaveBeenCalled();
+});
 
 test.each([
   ["mm", "Margem (mm)", "25", 25000],

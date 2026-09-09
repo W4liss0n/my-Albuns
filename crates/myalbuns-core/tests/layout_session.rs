@@ -28,6 +28,554 @@ fn project(root: &Path) -> myalbuns_core::EditableProject {
 }
 
 #[test]
+fn locked_photo_content_can_be_filled_replaced_and_cleared_while_export_reports_each_selected_placeholder()
+ {
+    use myalbuns_core::{CoreError, ImportPhoto, PhotoPlacementMode, PhotoSourceMetadata};
+    let directory = tempfile::tempdir().unwrap();
+    let mut project = project(directory.path());
+    let sheet = project.projection().state.album.sheets[0].id.clone();
+    let other = project.projection().state.album.sheets[1].id.clone();
+    for _ in 0..2 {
+        project
+            .apply(ProjectIntent::AddFrame {
+                sheet_id: sheet.clone(),
+            })
+            .unwrap();
+    }
+    let path = directory.path().join("Foto.jpg");
+    std::fs::write(&path, b"original").unwrap();
+    let media = project
+        .import_photo(ImportPhoto::new(
+            path,
+            PhotoSourceMetadata::new(
+                600,
+                400,
+                ["#112233".into(), "#223344".into(), "#334455".into()],
+            )
+            .unwrap(),
+        ))
+        .unwrap()
+        .media_id;
+    let query = project.query_layouts(&sheet).unwrap();
+    project
+        .apply(ProjectIntent::LockLayout {
+            selection: LayoutSelection {
+                query_id: query.query_id,
+                candidate_index: 0,
+            },
+        })
+        .unwrap();
+    let before = project.projection();
+    let frozen = project.freeze_rendering();
+    let problems = frozen.validate_export_sheets(&[sheet.clone()]).unwrap();
+    assert_eq!(problems.len(), 2);
+    assert_eq!(
+        problems[0].frame_id,
+        before.state.album.sheets[0].frames[0].id
+    );
+    assert_eq!(problems[1].frame_number, 2);
+    assert!(matches!(
+        frozen.clone().into_sheet(&sheet),
+        Err(CoreError::UnfilledLayoutPositions { .. })
+    ));
+    assert!(
+        frozen.into_sheet(&other).is_ok(),
+        "placeholders outside the selection do not block it"
+    );
+    for _ in 0..2 {
+        project
+            .apply(ProjectIntent::AddPhoto {
+                sheet_id: sheet.clone(),
+                media_id: media,
+                mode: PhotoPlacementMode::Normal,
+            })
+            .unwrap();
+    }
+    let filled = project.projection();
+    assert!(project.freeze_rendering().into_sheet(&sheet).is_ok());
+    assert_eq!(
+        project.apply(ProjectIntent::AddPhoto {
+            sheet_id: sheet.clone(),
+            media_id: media,
+            mode: PhotoPlacementMode::Edit
+        }),
+        Err(CoreError::LockedLayoutHasNoPlaceholder)
+    );
+    assert_eq!(project.projection(), filled);
+    assert!(
+        project
+            .apply(ProjectIntent::DropPhoto {
+                sheet_id: sheet.clone(),
+                media_id: media,
+                x_um: 0,
+                y_um: 0,
+                mode: PhotoPlacementMode::Normal
+            })
+            .is_err()
+    );
+    assert_eq!(project.projection(), filled);
+    let first = &filled.state.album.sheets[0].frames[0];
+    project
+        .apply(ProjectIntent::DropPhoto {
+            sheet_id: sheet.clone(),
+            media_id: media,
+            x_um: first.rect.x + 1,
+            y_um: first.rect.y + 1,
+            mode: PhotoPlacementMode::Edit,
+        })
+        .unwrap();
+    project
+        .apply(ProjectIntent::TransformPhoto {
+            frame_id: first.id.clone(),
+            delta_pan_x: 0.02,
+            delta_pan_y: 0.0,
+            delta_zoom: 0.1,
+        })
+        .unwrap();
+    for change in [
+        myalbuns_core::FrameStyleChange::BorderColor {
+            rgb: "#336699".into(),
+        },
+        myalbuns_core::FrameStyleChange::BorderWidth { width_um: 2_000 },
+        myalbuns_core::FrameStyleChange::Opacity {
+            opacity_percent: 60,
+        },
+    ] {
+        project
+            .apply(ProjectIntent::SetFrameStyle {
+                edit: myalbuns_core::FrameStyleEdit {
+                    frame_ids: vec![first.id.clone()],
+                    change,
+                },
+            })
+            .unwrap();
+    }
+    for action in [
+        myalbuns_core::PhotoOrientationAction::RotateCounterClockwise,
+        myalbuns_core::PhotoOrientationAction::ToggleHorizontalMirror,
+    ] {
+        project
+            .apply(ProjectIntent::OrientPhotos {
+                frame_ids: vec![first.id.clone()],
+                action,
+            })
+            .unwrap();
+    }
+    project
+        .apply(ProjectIntent::SetPhotoAngle {
+            edit: myalbuns_core::PhotoAngleEdit {
+                frame_ids: vec![first.id.clone()],
+                angle_tenths: 123,
+            },
+        })
+        .unwrap();
+    project
+        .apply(ProjectIntent::TogglePhotoBlackAndWhite {
+            frame_ids: vec![first.id.clone()],
+        })
+        .unwrap();
+    let content = project.projection();
+    assert_ne!(content.state.album.sheets[0].frames[0].style, first.style);
+    let transform = &content.state.album.sheets[0].frames[0]
+        .photo
+        .as_ref()
+        .unwrap()
+        .transform;
+    assert!(transform.black_and_white && transform.mirror_x);
+    assert_eq!(transform.fine_rotation_degrees, 12.3);
+    for (original, current) in before.state.album.sheets[0]
+        .frames
+        .iter()
+        .zip(&content.state.album.sheets[0].frames)
+    {
+        assert_eq!(original.rect, current.rect);
+        assert_eq!(original.id, current.id);
+    }
+    project
+        .apply(ProjectIntent::DeleteFrames {
+            frame_ids: content.state.album.sheets[0]
+                .frames
+                .iter()
+                .map(|frame| frame.id.clone())
+                .collect(),
+            mode: PhotoPlacementMode::Normal,
+        })
+        .unwrap();
+    let mut expected_placeholders = content.state.album.sheets[0].frames.clone();
+    for frame in &mut expected_placeholders {
+        frame.photo = None;
+    }
+    assert_eq!(
+        project.projection().state.album.sheets[0].frames,
+        expected_placeholders
+    );
+    assert!(project.project().sheets()[0].layout_locked());
+    project.undo().unwrap();
+    assert_eq!(
+        project.projection().state.album.sheets[0].frames,
+        content.state.album.sheets[0].frames
+    );
+    assert!(project.freeze_rendering().into_sheet(&sheet).is_ok());
+}
+
+#[test]
+fn the_locked_preview_tracks_frame_order_and_remains_available_after_permission_changes() {
+    use myalbuns_core::{CoreError, FrameStackAction, LayoutPermission, LayoutSettings};
+    let directory = tempfile::tempdir().unwrap();
+    let mut project = project(directory.path());
+    let sheet = project.projection().state.album.sheets[0].id.clone();
+    for _ in 0..3 {
+        project
+            .apply(ProjectIntent::AddFrame {
+                sheet_id: sheet.clone(),
+            })
+            .unwrap();
+    }
+    let query = project.query_layouts(&sheet).unwrap();
+    project
+        .apply(ProjectIntent::LockLayout {
+            selection: LayoutSelection {
+                query_id: query.query_id,
+                candidate_index: 0,
+            },
+        })
+        .unwrap();
+    let id = project.projection().state.album.sheets[0].frames[0]
+        .id
+        .clone();
+    project
+        .apply(ProjectIntent::ArrangeFrames {
+            frame_ids: vec![id],
+            action: FrameStackAction::BringToFront,
+        })
+        .unwrap();
+    project
+        .apply(ProjectIntent::SetLayoutSettings {
+            settings: LayoutSettings {
+                permission: LayoutPermission::PagesOnly,
+                ..Default::default()
+            },
+        })
+        .unwrap();
+    let before = project.projection();
+    let query = project.query_layouts(&sheet).unwrap();
+    assert!(query.locked);
+    assert!(query.listing.candidates[0].is_last_applied);
+    let selection = LayoutSelection {
+        query_id: query.query_id,
+        candidate_index: 0,
+    };
+    assert_eq!(
+        project.preview_layout(&selection).unwrap(),
+        before.composition.sheets[0].frames
+    );
+    assert_eq!(
+        project.apply(ProjectIntent::ApplyLayout { selection }),
+        Err(CoreError::LayoutLocked)
+    );
+    assert_eq!(project.projection(), before);
+    project
+        .apply(ProjectIntent::UnlockLayout { sheet_id: sheet })
+        .unwrap();
+    assert_eq!(project.projection().composition, before.composition);
+}
+
+#[test]
+fn expanded_preview_creates_inherited_placeholders_only_when_confirmed_by_the_lock() {
+    use myalbuns_core::{CoreError, FrameOrientation, FrameStyleSource, LayoutExpansion};
+    let directory = tempfile::tempdir().unwrap();
+    let mut project = project(directory.path());
+    let sheet = project.projection().state.album.sheets[0].id.clone();
+    project
+        .apply(ProjectIntent::AddFrame {
+            sheet_id: sheet.clone(),
+        })
+        .unwrap();
+    let before = project.projection();
+    let query = project
+        .query_layouts_with_expansion(
+            &sheet,
+            Some(LayoutExpansion {
+                additional_positions: 2,
+                orientation: FrameOrientation::Horizontal,
+            }),
+        )
+        .unwrap();
+    assert_eq!(query.frame_count, 1);
+    assert!(
+        query.listing.candidates.iter().all(|candidate| candidate
+            .layout
+            .definition
+            .positions
+            .len()
+            == 3)
+    );
+    let selection = LayoutSelection {
+        query_id: query.query_id,
+        candidate_index: 0,
+    };
+    let preview = project.preview_layout(&selection).unwrap();
+    assert_eq!(preview.len(), 3);
+    assert!(preview.iter().all(|frame| frame.photo.is_none()));
+    assert_eq!(project.projection(), before);
+    assert_eq!(
+        project.apply(ProjectIntent::ApplyLayout {
+            selection: selection.clone()
+        }),
+        Err(CoreError::LayoutRequiresLock)
+    );
+    assert_eq!(project.projection(), before);
+    let applied = project
+        .apply(ProjectIntent::LockLayout { selection })
+        .unwrap();
+    assert_eq!(applied.composition.sheets[0].frames, preview);
+    assert_eq!(applied.state.revision, before.state.revision + 1);
+    assert_eq!(
+        applied.state.album.sheets[0].frames[0].id,
+        before.state.album.sheets[0].frames[0].id
+    );
+    assert!(
+        applied.state.album.sheets[0]
+            .frames
+            .iter()
+            .all(|frame| frame.style.source == FrameStyleSource::Album)
+    );
+    project.undo().unwrap();
+    assert_eq!(project.projection().state.album, before.state.album);
+    assert_eq!(project.projection().composition, before.composition);
+    assert_eq!(project.redo().unwrap(), applied);
+}
+
+#[test]
+fn saving_a_locked_layout_requires_v9_and_migrates_v8_without_inventing_a_lock() {
+    use myalbuns_core::OpenProjectRequest;
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    let mut project = project(root);
+    let sheet = project.projection().state.album.sheets[0].id.clone();
+    project
+        .apply(ProjectIntent::AddFrame {
+            sheet_id: sheet.clone(),
+        })
+        .unwrap();
+    let query = project.query_layouts(&sheet).unwrap();
+    project
+        .apply(ProjectIntent::LockLayout {
+            selection: LayoutSelection {
+                query_id: query.query_id,
+                candidate_index: 0,
+            },
+        })
+        .unwrap();
+    let expected = project.project().clone();
+    project.save(project.revision()).unwrap();
+    drop(project);
+    let path = root.join("Layouts.myalbuns");
+    let mut saved: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+    assert_eq!(saved["schemaVersion"], 9);
+    assert_eq!(saved["project"]["sheets"][0]["layoutLocked"], true);
+    let core = ProjectCore::new()
+        .with_identity_storage_roots(root.join("leases"), root.join("identities"));
+    let reopened = core
+        .open_editable(OpenProjectRequest::new(location(&path)))
+        .unwrap();
+    assert_eq!(reopened.project(), &expected);
+    drop(reopened);
+    for sheet in saved["project"]["sheets"].as_array_mut().unwrap() {
+        sheet.as_object_mut().unwrap().remove("layoutLocked");
+    }
+    std::fs::write(&path, serde_json::to_vec(&saved).unwrap()).unwrap();
+    assert!(
+        core.open_editable(OpenProjectRequest::new(location(&path)))
+            .is_err(),
+        "v9 cannot silently default a missing lock"
+    );
+    saved["schemaVersion"] = 8.into();
+    let legacy = serde_json::to_vec(&saved).unwrap();
+    std::fs::write(&path, &legacy).unwrap();
+    let mut migrated = core
+        .open_editable(OpenProjectRequest::new(location(&path)))
+        .unwrap();
+    assert!(
+        migrated
+            .project()
+            .sheets()
+            .iter()
+            .all(|sheet| !sheet.layout_locked())
+    );
+    assert_eq!(std::fs::read(&path).unwrap(), legacy);
+    migrated.save(migrated.revision()).unwrap();
+    let upgraded: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+    assert_eq!(upgraded["schemaVersion"], 9);
+    assert_eq!(upgraded["project"]["sheets"][0]["layoutLocked"], false);
+}
+
+#[test]
+fn locked_structure_rejects_geometry_creation_and_paste_but_keeps_selection_order_and_placeholders()
+{
+    use myalbuns_core::{
+        CoreError, FrameGeometryEdit, FrameGeometryGesture, FrameGeometryTarget, FrameResizeHandle,
+        FrameStackAction, PhotoDropTarget, PhotoPlacementMode,
+    };
+    let directory = tempfile::tempdir().unwrap();
+    let mut project = project(directory.path());
+    let sheet = project.projection().state.album.sheets[0].id.clone();
+    for _ in 0..3 {
+        project
+            .apply(ProjectIntent::AddFrame {
+                sheet_id: sheet.clone(),
+            })
+            .unwrap();
+    }
+    let query = project.query_layouts(&sheet).unwrap();
+    project
+        .apply(ProjectIntent::LockLayout {
+            selection: LayoutSelection {
+                query_id: query.query_id,
+                candidate_index: 0,
+            },
+        })
+        .unwrap();
+    let before = project.projection();
+    let first = &before.state.album.sheets[0].frames[0];
+    project
+        .apply(ProjectIntent::CopyFrames {
+            frame_ids: vec![first.id.clone()],
+        })
+        .unwrap();
+    let before = project.projection();
+    for intent in [
+        ProjectIntent::AddFrame {
+            sheet_id: sheet.clone(),
+        },
+        ProjectIntent::SwapSheetSides {
+            sheet_id: sheet.clone(),
+        },
+        ProjectIntent::PasteFrames {
+            sheet_id: sheet.clone(),
+            desired_offset_um: 5_000,
+        },
+    ] {
+        assert_eq!(project.apply(intent), Err(CoreError::LayoutLocked));
+        assert_eq!(project.projection(), before);
+    }
+    for gesture in [
+        FrameGeometryGesture::Move {
+            delta_x_um: 10_000,
+            delta_y_um: 0,
+        },
+        FrameGeometryGesture::Resize {
+            handle: FrameResizeHandle::BottomRight,
+            delta_x_um: -10_000,
+            delta_y_um: -10_000,
+            preserve_aspect_ratio: false,
+            from_center: false,
+        },
+    ] {
+        let edit = FrameGeometryEdit {
+            frames: vec![FrameGeometryTarget {
+                frame_id: first.id.clone(),
+                expected_rect: first.rect.clone(),
+            }],
+            gesture,
+        };
+        assert_eq!(
+            project.preview_frame_geometry(&edit),
+            Err(CoreError::LayoutLocked)
+        );
+        assert_eq!(
+            project.apply(ProjectIntent::EditFrameGeometry { edit }),
+            Err(CoreError::LayoutLocked)
+        );
+        assert_eq!(project.projection(), before);
+    }
+    assert_eq!(
+        project.photo_drop_target(&sheet, 0, 0).unwrap(),
+        PhotoDropTarget::Invalid
+    );
+    project
+        .apply(ProjectIntent::DeleteFrames {
+            frame_ids: vec![first.id.clone()],
+            mode: PhotoPlacementMode::Normal,
+        })
+        .unwrap();
+    assert_eq!(
+        project.projection(),
+        before,
+        "Delete on placeholders is a no-op"
+    );
+    project
+        .apply(ProjectIntent::ArrangeFrames {
+            frame_ids: vec![first.id.clone()],
+            action: FrameStackAction::BringToFront,
+        })
+        .unwrap();
+    let reordered = project.projection();
+    assert_eq!(
+        reordered.state.album.sheets[0].frames.last().unwrap().id,
+        first.id
+    );
+    assert_eq!(
+        reordered.state.album.sheets[0].frames.last().unwrap().rect,
+        first.rect
+    );
+    assert!(project.project().sheets()[0].layout_locked());
+}
+
+#[test]
+fn locking_commits_the_preview_and_unlocking_preserves_it_with_undo_redo() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut project = project(directory.path());
+    let sheet = project.projection().state.album.sheets[0].id.clone();
+    for _ in 0..3 {
+        project
+            .apply(ProjectIntent::AddFrame {
+                sheet_id: sheet.clone(),
+            })
+            .unwrap();
+    }
+    let before = project.project().clone();
+    let revision = project.revision();
+    let query = project.query_layouts(&sheet).unwrap();
+    let selection = LayoutSelection {
+        query_id: query.query_id,
+        candidate_index: 0,
+    };
+    let preview = project.preview_layout(&selection).unwrap();
+    let applied = project
+        .apply(ProjectIntent::LockLayout { selection })
+        .unwrap();
+    assert_eq!(applied.composition.sheets[0].frames, preview);
+    assert!(project.project().sheets()[0].layout_locked());
+    assert_eq!(project.revision(), revision + 1);
+    let locked = project.project().clone();
+    project.undo().unwrap();
+    assert_eq!(project.project(), &before);
+    project.redo().unwrap();
+    assert_eq!(project.project(), &locked);
+    project
+        .apply(ProjectIntent::UnlockLayout {
+            sheet_id: sheet.clone(),
+        })
+        .unwrap();
+    assert!(!project.project().sheets()[0].layout_locked());
+    assert_eq!(
+        project.project().sheets()[0].frames(),
+        locked.sheets()[0].frames()
+    );
+    assert_eq!(
+        project.project().sheets()[0].last_layout(),
+        locked.sheets()[0].last_layout()
+    );
+    project.undo().unwrap();
+    assert_eq!(project.project(), &locked);
+    project.redo().unwrap();
+    assert!(!project.project().sheets()[0].layout_locked());
+}
+
+#[test]
 fn preview_is_transient_and_commit_matches_it_in_one_undo_action() {
     let directory = tempfile::tempdir().unwrap();
     let mut project = project(directory.path());
@@ -157,11 +705,11 @@ fn saving_and_reopening_preserves_last_layout_and_generation_settings() {
     assert!(query.listing.candidates[0].is_last_applied);
     let bytes = std::fs::read(root.join("Layouts.myalbuns")).unwrap();
     let persisted: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
-    assert_eq!(persisted["schemaVersion"], 8);
+    assert_eq!(persisted["schemaVersion"], 9);
 }
 
 #[test]
-fn v8_requires_complete_layout_payloads_and_rejects_corrupt_geometry() {
+fn current_schema_requires_complete_layout_payloads_and_rejects_corrupt_geometry() {
     use myalbuns_core::{DocumentFailure, LoadProjectError, LoadProjectRequest};
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path();
@@ -328,6 +876,15 @@ fn converting_a_populated_extremity_keeps_content_styles_and_one_undo_action() {
             delta_zoom: 0.5,
         })
         .unwrap();
+    let query = project.query_layouts(&sheet).unwrap();
+    project
+        .apply(ProjectIntent::LockLayout {
+            selection: LayoutSelection {
+                query_id: query.query_id,
+                candidate_index: 0,
+            },
+        })
+        .unwrap();
     let before = project.projection();
     let document = project.project().clone();
     let converted = project
@@ -340,6 +897,7 @@ fn converting_a_populated_extremity_keeps_content_styles_and_one_undo_action() {
         myalbuns_core::ProjectedActiveSides::Right
     );
     assert_eq!(converted.state.album.sheets[0].frames.len(), 3);
+    assert!(!converted.state.album.sheets[0].layout_locked);
     for (a, b) in before.state.album.sheets[0]
         .frames
         .iter()
@@ -369,6 +927,15 @@ fn album_information_converts_both_populated_edges_in_one_history_action() {
         project
             .apply(ProjectIntent::AddFrame {
                 sheet_id: sheet.id.clone(),
+            })
+            .unwrap();
+        let query = project.query_layouts(&sheet.id).unwrap();
+        project
+            .apply(ProjectIntent::LockLayout {
+                selection: LayoutSelection {
+                    query_id: query.query_id,
+                    candidate_index: 0,
+                },
             })
             .unwrap();
     }
@@ -403,6 +970,7 @@ fn album_information_converts_both_populated_edges_in_one_history_action() {
         ProjectedActiveSides::Left
     );
     for sheet in &after.state.album.sheets {
+        assert!(!sheet.layout_locked);
         assert!(
             sheet
                 .frames

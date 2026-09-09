@@ -16,6 +16,7 @@ import {
 } from "./projectDialogContract";
 
 const states: readonly ProjectDialogState[] = [
+  { kind: "exportProblems", projectName: "Álbum", problems: [{ sheetId: "sheet-001", sheetNumber: 1, frameId: "frame-002", frameNumber: 2 }] },
   { kind: "imageProcessingProgress", progress: { kind: "determinate", completed: 5, total: 12, status: "5 de 12" } },
   { kind: "imageProcessingProblems", importedCount: 2, problems: [{ fileName: "ruim.jpg", reason: "JPEG corrompido" }] },
   {
@@ -55,6 +56,7 @@ const actions: readonly ProjectDialogAction[] = [
   "closeProjectAfterGraphicsFailure",
   "discardAndClose",
   "dismissExport",
+  "openExportProject",
   "dismissProjectCloseFailure",
   "dismissProjectOperationFailure",
   "dismissImageProcessingProblems",

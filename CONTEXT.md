@@ -293,7 +293,7 @@ Identidade informativa da última organização escolhida para uma Lâmina.
 Correspondência entre os Frames existentes e as posições ordenadas definidas por um Layout.
 
 **Layout travado**:
-Estado da Lâmina que protege posição e dimensões dos Frames de alterações diretas, sem congelar Fotos ou estilos.
+Estado da Lâmina que protege quantidade, posição e dimensões dos Frames de alterações diretas, sem congelar Fotos ou estilos. Sua aplicação e persistência seguem o [design 0028](docs/design/0028-layout-travado-e-schema-v9.md).
 
 ## Superfícies de trabalho
 

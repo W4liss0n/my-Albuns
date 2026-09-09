@@ -33,6 +33,7 @@ const initialSheetStates: readonly SheetSnapshot[] = renumberSheetStates(
       id: `sheet-${String(number).padStart(3, "0")}`,
       number,
       pageNumbers: [],
+      layoutLocked: false,
       role: roleFor(number),
       widthUm: activeSides === "both" ? 600_000 : 300_000,
     };

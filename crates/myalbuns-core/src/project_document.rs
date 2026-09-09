@@ -507,6 +507,7 @@ pub struct ProjectSheet {
     active_sides: ActiveSides,
     frames: Vec<ProjectFrame>,
     last_layout: Option<crate::StoredLayout>,
+    layout_locked: bool,
 }
 
 impl ProjectSheet {
@@ -528,6 +529,7 @@ impl ProjectSheet {
             active_sides,
             frames: Vec::new(),
             last_layout: None,
+            layout_locked: false,
         }
     }
 
@@ -541,6 +543,7 @@ impl ProjectSheet {
             active_sides,
             frames,
             last_layout: None,
+            layout_locked: false,
         }
     }
 }
@@ -672,6 +675,7 @@ impl ProjectDocument {
             (index, ActiveSides::Left) if index == last_index => ActiveSides::Both,
             _ => return Err(()),
         };
+        sheet.layout_locked = false;
         candidate.reorganize_sheet(sheet_id).map_err(|_| ())?;
         validate_project_state(&candidate)?;
         Ok(candidate)
@@ -780,6 +784,7 @@ impl ProjectDocument {
         ] {
             if candidate.sheets[index].active_sides != sides {
                 candidate.sheets[index].active_sides = sides;
+                candidate.sheets[index].layout_locked = false;
                 candidate.reorganize_sheet(candidate.sheets[index].id).map_err(|_| vec![error])?;
             }
         }
@@ -1129,6 +1134,9 @@ impl ProjectDocument {
             .iter()
             .position(|sheet| sheet.id == id)
             .ok_or_else(|| crate::CoreError::SheetNotFound(sheet_id.into()))?;
+        if self.sheets[sheet_index].layout_locked {
+            return Err(crate::CoreError::LayoutLocked);
+        }
         if self.sheets[sheet_index].active_sides != ActiveSides::Both {
             return Err(crate::CoreError::InvalidSheetSideSwap);
         }
@@ -1180,6 +1188,14 @@ impl ProjectDocument {
             .frame_selection(frame_ids)
             .map_err(|()| crate::CoreError::InvalidFrameDeletionSelection)?;
         let mut candidate = self.clone();
+        if candidate.sheets[sheet_index].layout_locked {
+            for frame in &mut candidate.sheets[sheet_index].frames {
+                if selected.contains(&frame.id) {
+                    frame.photo = None;
+                }
+            }
+            return Ok(candidate);
+        }
         candidate.sheets[sheet_index]
             .frames
             .retain(|frame| !selected.contains(&frame.id));
@@ -1252,6 +1268,9 @@ impl ProjectDocument {
             .iter()
             .find(|sheet| sheet.frames.iter().any(|frame| frame.id == first_id))
             .ok_or_else(|| crate::CoreError::FrameNotFound(first.frame_id.clone()))?;
+        if sheet.layout_locked {
+            return Err(crate::CoreError::LayoutLocked);
+        }
         let mut ids = Vec::with_capacity(edit.frames.len());
         let mut rects = Vec::with_capacity(edit.frames.len());
         for target in &edit.frames {
@@ -1434,6 +1453,9 @@ fn photo_drop_target(
         return PhotoDropTarget::Frame {
             frame_id: frame.id.hyphenated().to_string(),
         };
+    }
+    if sheet.layout_locked {
+        return PhotoDropTarget::Invalid;
     }
     PhotoDropTarget::Sheet {
         sheet_id: sheet.id.hyphenated().to_string(),

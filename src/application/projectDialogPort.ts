@@ -1,4 +1,5 @@
 import type { ImageProcessingProblem } from "./projectPorts";
+import type { LayoutExportProblem } from "../domain/project";
 
 export type ProjectDialogProgress =
   | {
@@ -18,6 +19,7 @@ export interface ProjectDialogDetail {
 }
 
 export type ProjectDialogState =
+  | { kind: "exportProblems"; projectName: string; problems: readonly LayoutExportProblem[] }
   | { kind: "imageProcessingProgress"; progress: ProjectDialogProgress }
   | {
       kind: "imageProcessingProblems";
@@ -70,6 +72,7 @@ export type ProjectDialogAction =
   | "confirmAlbumInformation"
   | "closeProjectAfterGraphicsFailure"
   | "dismissExport"
+  | "openExportProject"
   | "dismissProjectCloseFailure"
   | "dismissProjectOperationFailure"
   | "dismissImageProcessingProblems"

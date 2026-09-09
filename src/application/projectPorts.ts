@@ -7,6 +7,8 @@ import type {
   PhotoAngleEdit,
   FrameStyleEdit,
   LayoutQueryResult,
+  LayoutExpansion,
+  LayoutExportProblem,
   LayoutSelection,
   PhotoDropTarget,
   ProjectIntent,
@@ -63,6 +65,13 @@ export class MediaPreviewError extends Error {
 export interface ExportResult {
   widthPx: number;
   heightPx: number;
+}
+
+export class LayoutExportBlockedError extends Error {
+  constructor(readonly problems: LayoutExportProblem[]) {
+    super("Preencha as posições sem Foto antes de exportar o Layout travado.");
+    this.name = "LayoutExportBlockedError";
+  }
 }
 
 export type ExportProgressStage =
@@ -244,7 +253,7 @@ export interface ProjectCorePort {
   readSliderDoubleClickTime(): Promise<number>;
   previewPhotoAngle(edit: PhotoAngleEdit): Promise<ComposedFrame[]>;
   previewFrameStyle(edit: FrameStyleEdit): Promise<ComposedFrame[]>;
-  queryLayouts(sheetId: string): Promise<LayoutQueryResult>;
+  queryLayouts(sheetId: string, expansion?: LayoutExpansion): Promise<LayoutQueryResult>;
   previewLayout(selection: LayoutSelection): Promise<ComposedFrame[]>;
   previewFrameGeometry(edit: FrameGeometryEdit): Promise<ComposedFrame[]>;
   load(operationId: string): Promise<EditorProjection>;

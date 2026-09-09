@@ -323,6 +323,45 @@ pub struct FrozenSheetRendering {
 }
 
 impl FrozenProjectRendering {
+    pub fn validate_export_sheets(
+        &self,
+        sheet_ids: &[String],
+    ) -> Result<Vec<crate::LayoutExportProblem>, CoreError> {
+        for id in sheet_ids {
+            if !self
+                .projection
+                .state
+                .album
+                .sheets
+                .iter()
+                .any(|sheet| sheet.id == *id)
+            {
+                return Err(CoreError::SheetNotFound(id.clone()));
+            }
+        }
+        Ok(self
+            .projection
+            .state
+            .album
+            .sheets
+            .iter()
+            .filter(|sheet| sheet.layout_locked && sheet_ids.contains(&sheet.id))
+            .flat_map(|sheet| {
+                sheet
+                    .frames
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, frame)| frame.photo.is_none())
+                    .map(|(index, frame)| crate::LayoutExportProblem {
+                        sheet_id: sheet.id.clone(),
+                        sheet_number: sheet.number,
+                        frame_id: frame.id.clone(),
+                        frame_number: index + 1,
+                    })
+            })
+            .collect())
+    }
+
     pub fn projection(&self) -> &EditorProjection {
         &self.projection
     }
@@ -339,6 +378,10 @@ impl FrozenProjectRendering {
     }
 
     pub fn into_sheet(self, sheet_id: &str) -> Result<FrozenSheetRendering, CoreError> {
+        let problems = self.validate_export_sheets(&[sheet_id.into()])?;
+        if !problems.is_empty() {
+            return Err(CoreError::UnfilledLayoutPositions { problems });
+        }
         let render_snapshot = RenderSnapshot::from_resolved(
             RenderSnapshotMetadata::from(&self.projection.state),
             self.projection.composition,
@@ -475,10 +518,18 @@ impl EditableProject {
     }
 
     pub fn query_layouts(&mut self, sheet_id: &str) -> Result<crate::LayoutQueryResult, CoreError> {
+        self.query_layouts_with_expansion(sheet_id, None)
+    }
+
+    pub fn query_layouts_with_expansion(
+        &mut self,
+        sheet_id: &str,
+        expansion: Option<crate::LayoutExpansion>,
+    ) -> Result<crate::LayoutQueryResult, CoreError> {
         if !self.session_valid {
             return Err(CoreError::EditableSessionInvalidated);
         }
-        self.session.query_layouts(sheet_id)
+        self.session.query_layouts(sheet_id, expansion)
     }
 
     pub fn preview_layout(
@@ -489,10 +540,11 @@ impl EditableProject {
             return Err(CoreError::EditableSessionInvalidated);
         }
         let (sheet_id, patch) = self.session.checked_layout_patch(selection)?;
-        let candidate = self.project().with_layout_patch(sheet_id, patch)?;
+        let candidate = self.project().with_layout_preview(sheet_id, patch)?;
         let ids = patch
             .frame_ids()
             .iter()
+            .chain(patch.placeholder_ids().iter())
             .map(|id| id.to_string())
             .collect::<Vec<_>>();
         Ok(self.preview_frame_composition(candidate, &ids))

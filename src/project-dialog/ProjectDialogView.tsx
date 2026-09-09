@@ -5,6 +5,7 @@ import type {
   ProjectDialogState,
 } from "../application/projectDialogPort";
 import {
+  ActionButton,
   ConfirmationDialog,
   MessageDialog,
   ProgressDialog,
@@ -30,6 +31,14 @@ export function ProjectDialogView({
   }, [state.kind]);
 
   switch (state.kind) {
+    case "exportProblems":
+      return <ProblemsDialog title="Problemas na Exportação"
+        description="Preencha as posições sem Foto para exportar a seleção."
+        columns={["Projeto", "Motivo", "Ação"]}
+        rows={state.problems.map((problem) => [state.projectName,
+          `Lâmina ${String(problem.sheetNumber).padStart(2, "0")}, posição ${problem.frameNumber} sem Foto em Layout travado.`,
+          <ActionButton onClick={() => onAction("openExportProject")}>Abrir Projeto</ActionButton>])}
+        onClose={() => onAction("dismissExport")} />;
     case "imageProcessingProgress":
       return <ProgressDialog title="Processando Imagens" progress={state.progress} />;
     case "imageProcessingProblems": {

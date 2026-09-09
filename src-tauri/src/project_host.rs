@@ -510,9 +510,10 @@ impl ProjectHost {
     pub(crate) fn query_layouts(
         &self,
         sheet_id: &str,
+        expansion: Option<myalbuns_core::LayoutExpansion>,
     ) -> Result<myalbuns_core::LayoutQueryResult, String> {
         self.project()?
-            .query_layouts(sheet_id)
+            .query_layouts_with_expansion(sheet_id, expansion)
             .map_err(|error| error.to_string())
     }
 
@@ -859,6 +860,16 @@ impl ProjectHost {
             output_unit,
             sources,
         })
+    }
+
+    pub(crate) fn validate_sheet_export(
+        &self,
+        sheet_id: &str,
+    ) -> Result<Vec<myalbuns_core::LayoutExportProblem>, String> {
+        self.project()?
+            .freeze_rendering()
+            .validate_export_sheets(&[sheet_id.into()])
+            .map_err(|error| error.to_string())
     }
 
     fn project(&self) -> Result<ActiveProject<'_>, String> {
@@ -1963,7 +1974,7 @@ mod tests {
             let affected_frame_id = placed
                 .affected_frame_id
                 .expect("the added Frame is returned to the UI boundary");
-            let layouts = host.query_layouts(&sheet_id).unwrap();
+            let layouts = host.query_layouts(&sheet_id, None).unwrap();
             let selection = myalbuns_core::LayoutSelection {
                 query_id: layouts.query_id,
                 candidate_index: layouts.listing.candidates.len() - 1,
@@ -2020,7 +2031,41 @@ mod tests {
                 host.redo().unwrap().state.album,
                 resized.projection.state.album
             );
-            host.save(resized.projection.state.revision)
+            let lock_query = host
+                .query_layouts(
+                    &sheet_id,
+                    Some(myalbuns_core::LayoutExpansion {
+                        additional_positions: 1,
+                        orientation: myalbuns_core::FrameOrientation::Horizontal,
+                    }),
+                )
+                .unwrap();
+            let lock_selection = myalbuns_core::LayoutSelection {
+                query_id: lock_query.query_id,
+                candidate_index: 0,
+            };
+            let locked_preview = host.preview_layout(&lock_selection).unwrap();
+            let locked = host
+                .apply_with_outcome(ProjectIntent::LockLayout {
+                    selection: lock_selection,
+                })
+                .unwrap();
+            assert_eq!(
+                locked.projection.composition.sheets[1].frames,
+                locked_preview
+            );
+            assert_eq!(host.validate_sheet_export(&sheet_id).unwrap().len(), 1);
+            assert!(host.freeze_sheet_export(&sheet_id).is_err());
+            let filled = host
+                .apply_with_outcome(ProjectIntent::AddPhoto {
+                    sheet_id: sheet_id.clone(),
+                    media_id: imported_media_id,
+                    mode: PhotoPlacementMode::Normal,
+                })
+                .unwrap();
+            assert!(host.validate_sheet_export(&sheet_id).unwrap().is_empty());
+            assert!(filled.projection.state.album.sheets[1].layout_locked);
+            host.save(filled.projection.state.revision)
                 .expect("the Photo composition is saved before reopening");
             assert_eq!(
                 host.begin_close(),
@@ -2038,7 +2083,8 @@ mod tests {
                 "the initial and visible noninitial Lâminas must be semantically distinguishable"
             );
             let reopened_frame = &dirty.composition.sheets[1].frames[0];
-            assert_eq!(reopened_frame.clip_rect, preview.clip_rect);
+            assert_eq!(reopened_frame.clip_rect, locked_preview[0].clip_rect);
+            assert!(dirty.state.album.sheets[1].layout_locked);
             let reopened_photo = reopened_frame
                 .photo
                 .as_ref()

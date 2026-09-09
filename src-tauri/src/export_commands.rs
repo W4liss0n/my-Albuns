@@ -107,6 +107,7 @@ impl ExportCommandError {
             message: "A Exportação foi cancelada.".into(),
             media_id: None,
             path_code: None,
+            layout_problems: None,
         }
     }
 
@@ -116,6 +117,7 @@ impl ExportCommandError {
             message: message.into(),
             media_id: None,
             path_code: None,
+            layout_problems: None,
         }
     }
 
@@ -126,12 +128,14 @@ impl ExportCommandError {
                 message: "Outra operação exclusiva já está em andamento. Aguarde sua conclusão e tente novamente.".into(),
                 media_id: None,
                 path_code: None,
+                layout_problems: None,
             },
             OperationGateError::Unavailable { reason } => Self {
                 code: ExportCommandErrorCode::Failed,
                 message: format!("Não foi possível reservar a Exportação: {reason}"),
                 media_id: None,
                 path_code: None,
+                layout_problems: None,
             },
         }
     }
@@ -143,6 +147,7 @@ impl ExportCommandError {
                 message: failure.message,
                 media_id: processor.media_id,
                 path_code: processor.path_code.map(Into::into),
+                layout_problems: None,
             };
         }
         match failure.stage {
@@ -152,12 +157,14 @@ impl ExportCommandError {
                 message: failure.message,
                 media_id: None,
                 path_code: None,
+                layout_problems: None,
             },
             export_pipeline::ExportFailureStage::Publish { .. } => Self {
                 code: ExportCommandErrorCode::PublicationFailed,
                 message: failure.message,
                 media_id: None,
                 path_code: None,
+                layout_problems: None,
             },
             _ => Self::failed(failure.message),
         }
@@ -324,6 +331,18 @@ pub(crate) async fn export_sheet(
     processor: State<'_, ImagingProcessor>,
     attempts: State<'_, ExportAttempts>,
 ) -> Result<ExportResult, ExportCommandError> {
+    let problems = state
+        .validate_sheet_export(&sheet_id)
+        .map_err(ExportCommandError::failed)?;
+    if !problems.is_empty() {
+        return Err(ExportCommandError {
+            code: ExportCommandErrorCode::UnfilledLayoutPositions,
+            message: "Preencha as posições sem Foto antes de exportar o Layout travado.".into(),
+            media_id: None,
+            path_code: None,
+            layout_problems: Some(problems),
+        });
+    }
     let suggested_filename = suggested_export_filename(&project_name, sheet_number);
     let destination = native_project_dialog::choose_export_destination(&window, suggested_filename)
         .await

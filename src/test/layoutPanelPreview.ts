@@ -1,4 +1,4 @@
-import type { ComposedFrame, EditorProjection, LayoutQueryResult } from "../domain/project";
+import type { ComposedFrame, EditorProjection, LayoutExportProblem, LayoutQueryResult } from "../domain/project";
 import corpus from "../../tests/fixtures/layout-panel-cases.json";
 
 interface LayoutPanelSample {
@@ -8,5 +8,7 @@ interface LayoutPanelSample {
 
 // This visual adapter replays the public Core corpus; it never computes Layout geometry.
 export const layoutPanelCorpus = corpus as unknown as {
-  cases: Record<string, { before: LayoutPanelSample; applied: LayoutPanelSample | null }>;
+  cases: Record<string, { before: LayoutPanelSample; applied: LayoutPanelSample | null;
+    lockReady?: LayoutPanelSample; locked?: LayoutPanelSample; unlocked?: LayoutPanelSample;
+    filled?: LayoutPanelSample; cleared?: LayoutPanelSample; exportProblems?: LayoutExportProblem[] }>;
 };

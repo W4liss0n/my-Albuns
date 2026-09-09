@@ -26,6 +26,7 @@ export function defaultProjectDialogCloseAction(
         ? "cancelExport"
         : null;
     case "exportFailure":
+    case "exportProblems":
     case "exportSuccess":
       return "dismissExport";
   }
