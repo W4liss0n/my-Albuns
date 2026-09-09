@@ -293,8 +293,9 @@ async function invokeImageProcessing<T>(
 
 export const tauriProjectCorePort: ProjectCorePort = {
   readFrameDragThreshold: () => invoke<PointerDragThreshold>("frame_drag_threshold"),
-  readPhotoAngleDoubleClickTime: () => invoke<number>("photo_angle_double_click_time"),
+  readSliderDoubleClickTime: () => invoke<number>("slider_double_click_time"),
   previewPhotoAngle: (edit) => invoke<ComposedFrame[]>("preview_photo_angle", { edit }),
+  previewFrameStyle: (edit) => invoke<ComposedFrame[]>("preview_frame_style", { edit }),
   previewFrameGeometry: (edit) => invoke<ComposedFrame[]>("preview_frame_geometry", { edit }),
   load: (operationId) =>
     invoke<EditorProjection>("project_state", { operationId }),

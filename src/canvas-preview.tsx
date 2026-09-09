@@ -36,10 +36,9 @@ const geometryCase = geometryCorpus.cases.find((item) =>
   item.name === new URLSearchParams(window.location.search).get("geometry"));
 const groupGeometryCase = groupGeometryCorpus.cases.find((item) =>
   item.name === new URLSearchParams(window.location.search).get("groupGeometry"));
-const geometryFrames = (groupGeometryCase?.frames ?? (geometryCase ? [geometryCase.frame] : undefined))
-  ?.map((frame): ComposedFrame => ({ ...frame, photo: frame.photo ? {
-    ...frame.photo, palette: [frame.photo.palette[0], frame.photo.palette[1], frame.photo.palette[2]],
-  } : null }));
+// This corpus is generated and checked at the public Core boundary.
+const geometryFrames = (groupGeometryCase?.frames ?? (geometryCase ? [geometryCase.frame] : undefined)) as
+  unknown as ComposedFrame[] | undefined;
 
 const previewGraphicsDiagnosticProbe: CanvasGraphicsDiagnosticProbe = () => ({
   supported: true,
@@ -280,6 +279,7 @@ function placeholder(
   height: number,
 ): ComposedFrame {
   return {
+    border: { kind: "none" as const }, opacityByte: 255,
     borderFillRects: [],
     clipRect: { x, y, width, height },
     frameId,

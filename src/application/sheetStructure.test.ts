@@ -73,6 +73,7 @@ describe("physical Album structure projection", () => {
             frames: [
               {
                 id: "frame-on-edge",
+                style: { source: "album", borderRgb: "#000000", borderWidthUm: 0, opacityPercent: 100 },
                 rect: { x: 0, y: 0, width: 10_000, height: 10_000 },
                 zIndex: 0,
                 photo: null,

@@ -4489,6 +4489,492 @@
       },
       "readySelector": "body[data-photo-orientation=\"single-angle\"]",
       "actions": []
+    },
+    {
+      "id": "workspace-frame-style-inherited",
+      "title": "Borda e Opacidade — estilo herdado do álbum",
+      "implementationPath": "/workspace-preview.html?frame=style",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-style",
+        "reason": "Os designs aceitos 0001, 0019 e 0024 definem Borda interna e Opacidade por Frame, herança do álbum, seleção mista e restauração. O corpus usa estados e composições gerados e verificados no ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".frame-style-controls",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-style-opacity",
+      "title": "Borda e Opacidade — Opacidade individual de 50%",
+      "implementationPath": "/workspace-preview.html?frame=style&mode=normal",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-style",
+        "reason": "Os designs aceitos 0001, 0019 e 0024 definem Borda interna e Opacidade por Frame, herança do álbum, seleção mista e restauração. O corpus usa estados e composições gerados e verificados no ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "body[data-frame-style=\"single-opacity\"][data-frame-style-history=\"1,0\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "input",
+          "selector": "[aria-label=\"Opacidade em porcentagem\"]",
+          "value": "50"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-style-border",
+      "title": "Borda e Opacidade — Borda interna de 5 mm",
+      "implementationPath": "/workspace-preview.html?frame=style&style=single-opacity",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-style",
+        "reason": "Os designs aceitos 0001, 0019 e 0024 definem Borda interna e Opacidade por Frame, herança do álbum, seleção mista e restauração. O corpus usa estados e composições gerados e verificados no ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "body[data-frame-style=\"single-border\"][data-frame-style-history=\"1,0\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "input",
+          "selector": "[aria-label=\"Espessura da Borda em mm\"]",
+          "value": "5"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-style-color",
+      "title": "Borda e Opacidade — cor personalizada da Borda",
+      "implementationPath": "/workspace-preview.html?frame=style&style=single-border",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-style",
+        "reason": "Os designs aceitos 0001, 0019 e 0024 definem Borda interna e Opacidade por Frame, herança do álbum, seleção mista e restauração. O corpus usa estados e composições gerados e verificados no ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "body[data-frame-style=\"single-custom\"][data-frame-style-history=\"1,0\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Cor da Borda\"]"
+        },
+        {
+          "type": "input",
+          "selector": "[aria-label=\"Cor hexadecimal da Borda\"]",
+          "value": "#205070"
+        },
+        {
+          "type": "click-text",
+          "text": "Aplicar cor"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-style-color-cancel",
+      "title": "Borda e Opacidade — cancelamento da prévia de cor",
+      "implementationPath": "/workspace-preview.html?frame=style&style=single-border",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-style",
+        "reason": "Os designs aceitos 0001, 0019 e 0024 definem Borda interna e Opacidade por Frame, herança do álbum, seleção mista e restauração. O corpus usa estados e composições gerados e verificados no ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "body[data-frame-style=\"single-border\"][data-frame-style-history=\"0,0\"]:not(:has([role=\"dialog\"][aria-label=\"Escolher cor da Borda\"]))",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Cor da Borda\"]"
+        },
+        {
+          "type": "input",
+          "selector": "[aria-label=\"Cor hexadecimal da Borda\"]",
+          "value": "#205070"
+        },
+        {
+          "type": "key",
+          "key": "Escape"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-style-mixed",
+      "title": "Borda e Opacidade — Borda, cor e Opacidade mistas",
+      "implementationPath": "/workspace-preview.html?frame=style&style=single-custom&selection=group",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-style",
+        "reason": "Os designs aceitos 0001, 0019 e 0024 definem Borda interna e Opacidade por Frame, herança do álbum, seleção mista e restauração. O corpus usa estados e composições gerados e verificados no ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "[aria-label=\"Cor da Borda\"][data-mixed=\"true\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-style-group",
+      "title": "Borda e Opacidade — Opacidade absoluta inclui placeholder",
+      "implementationPath": "/workspace-preview.html?frame=style&style=single-custom&selection=group",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-style",
+        "reason": "Os designs aceitos 0001, 0019 e 0024 definem Borda interna e Opacidade por Frame, herança do álbum, seleção mista e restauração. O corpus usa estados e composições gerados e verificados no ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "body[data-frame-style=\"group-opacity\"][data-frame-style-history=\"1,0\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "input",
+          "selector": "[aria-label=\"Opacidade em porcentagem\"]",
+          "value": "50"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-style-placeholder",
+      "title": "Borda e Opacidade — controles disponíveis no Frame vazio",
+      "implementationPath": "/workspace-preview.html?frame=style&style=group-style&selection=placeholders",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-style",
+        "reason": "Os designs aceitos 0001, 0019 e 0024 definem Borda interna e Opacidade por Frame, herança do álbum, seleção mista e restauração. O corpus usa estados e composições gerados e verificados no ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".frame-style-controls",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-style-zero",
+      "title": "Borda e Opacidade — Frames invisíveis continuam selecionados",
+      "implementationPath": "/workspace-preview.html?frame=style&style=invisible&selection=group",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-style",
+        "reason": "Os designs aceitos 0001, 0019 e 0024 definem Borda interna e Opacidade por Frame, herança do álbum, seleção mista e restauração. O corpus usa estados e composições gerados e verificados no ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "body[data-frame-style=\"invisible\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-style-restore",
+      "title": "Borda e Opacidade — restauração do design do álbum",
+      "implementationPath": "/workspace-preview.html?frame=style&style=invisible&selection=group",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-style",
+        "reason": "Os designs aceitos 0001, 0019 e 0024 definem Borda interna e Opacidade por Frame, herança do álbum, seleção mista e restauração. O corpus usa estados e composições gerados e verificados no ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "body[data-frame-style=\"album\"][data-frame-style-history=\"1,0\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click-text",
+          "text": "Voltar ao design do álbum"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-style-invalid",
+      "title": "Borda e Opacidade — valor inválido não altera o Projeto",
+      "implementationPath": "/workspace-preview.html?frame=style",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-style",
+        "reason": "Os designs aceitos 0001, 0019 e 0024 definem Borda interna e Opacidade por Frame, herança do álbum, seleção mista e restauração. O corpus usa estados e composições gerados e verificados no ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "body[data-frame-style=\"album\"][data-frame-style-history=\"0,0\"] [aria-label=\"Opacidade em porcentagem\"][aria-invalid=\"true\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "input",
+          "selector": "[aria-label=\"Opacidade em porcentagem\"]",
+          "value": "101"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-style-cancel",
+      "title": "Borda e Opacidade — Esc descarta a Opacidade em edição",
+      "implementationPath": "/workspace-preview.html?frame=style",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-style",
+        "reason": "Os designs aceitos 0001, 0019 e 0024 definem Borda interna e Opacidade por Frame, herança do álbum, seleção mista e restauração. O corpus usa estados e composições gerados e verificados no ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "body[data-frame-style=\"album\"][data-frame-style-history=\"0,0\"] [aria-label=\"Opacidade em porcentagem\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "input",
+          "selector": "[aria-label=\"Opacidade em porcentagem\"]",
+          "value": "50"
+        },
+        {
+          "type": "key",
+          "key": "Escape"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-style-history",
+      "title": "Borda e Opacidade — Desfazer e Refazer restauram o estilo",
+      "implementationPath": "/workspace-preview.html?frame=style",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-style",
+        "reason": "Os designs aceitos 0001, 0019 e 0024 definem Borda interna e Opacidade por Frame, herança do álbum, seleção mista e restauração. O corpus usa estados e composições gerados e verificados no ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "body[data-frame-style=\"single-opacity\"][data-frame-style-history=\"1,0\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "input",
+          "selector": "[aria-label=\"Opacidade em porcentagem\"]",
+          "value": "50"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Desfazer\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-frame-style=\"album\"][data-frame-style-history=\"0,1\"]"
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Refazer\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-style-sheet-preview",
+      "title": "Borda e Opacidade — prévia SVG com estilo por Frame",
+      "implementationPath": "/workspace-preview.html?frame=style&style=single-custom&selection=none",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-style",
+        "reason": "Os designs aceitos 0001, 0019 e 0024 definem Borda interna e Opacidade por Frame, herança do álbum, seleção mista e restauração. O corpus usa estados e composições gerados e verificados no ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "[data-preview-frame-content-id][opacity=\"0.5019607843137255\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-style-thumbnails",
+      "title": "Borda e Opacidade — Grade com Borda e Opacidade",
+      "implementationPath": "/workspace-preview.html?frame=style&style=single-custom&selection=none&mode=normal",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-style",
+        "reason": "Os designs aceitos 0001, 0019 e 0024 definem Borda interna e Opacidade por Frame, herança do álbum, seleção mista e restauração. O corpus usa estados e composições gerados e verificados no ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "[data-preview-frame-content-id][opacity=\"0.5019607843137255\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click-text",
+          "text": "Informações do Álbum"
+        },
+        {
+          "type": "click-text",
+          "text": "Design do Álbum"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-style-palette",
+      "title": "Borda e Opacidade — prévia por paleta respeita Opacidade",
+      "implementationPath": "/workspace-preview.html?frame=style&style=single-custom&preview=palette",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-style",
+        "reason": "Os designs aceitos 0001, 0019 e 0024 definem Borda interna e Opacidade por Frame, herança do álbum, seleção mista e restauração. O corpus usa estados e composições gerados e verificados no ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "body[data-frame-style=\"single-custom\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-style-scale-125",
+      "title": "Borda e Opacidade — seleção mista a 125%",
+      "implementationPath": "/workspace-preview.html?frame=style&style=single-custom&selection=group&scale=1.25",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-style",
+        "reason": "Os designs aceitos 0001, 0019 e 0024 definem Borda interna e Opacidade por Frame, herança do álbum, seleção mista e restauração. O corpus usa estados e composições gerados e verificados no ProjectCore."
+      },
+      "viewport": {
+        "width": 1800,
+        "height": 1000
+      },
+      "readySelector": ".frame-style-controls",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-style-scale-150",
+      "title": "Borda e Opacidade — Frame com estilo próprio a 150%",
+      "implementationPath": "/workspace-preview.html?frame=style&style=single-custom&scale=1.5",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-style",
+        "reason": "Os designs aceitos 0001, 0019 e 0024 definem Borda interna e Opacidade por Frame, herança do álbum, seleção mista e restauração. O corpus usa estados e composições gerados e verificados no ProjectCore."
+      },
+      "viewport": {
+        "width": 2160,
+        "height": 1200
+      },
+      "readySelector": ".frame-style-controls",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        }
+      ]
     }
   ]
 }

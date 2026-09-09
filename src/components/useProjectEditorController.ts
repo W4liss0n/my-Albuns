@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PointerDragThreshold, ProjectCorePort } from "../application/projectPorts";
 import type { PrepareImportedMedia } from "../application/mediaPreviews";
 import type { SheetStructureIntent } from "../application/sheetStructure";
-import type { EditorProjection, FrameStackAction, PhotoOrientationAction } from "../domain/project";
+import type { EditorProjection, FrameStackAction, FrameStyleChange, PhotoOrientationAction } from "../domain/project";
 import { useEditorView } from "../state/editorView";
 import { CANVAS_MICROMETERS_PER_PIXEL } from "./canvasGeometry";
 import type {
@@ -13,6 +13,8 @@ import type {
 import { useCanvasModeKeyboardShortcuts } from "./useCanvasModeKeyboardShortcuts";
 import { usePhotoGestures } from "./usePhotoGestures";
 import { usePhotoAngleEditing } from "./usePhotoAngleEditing";
+import { useFrameCompositionDraft } from "./useFrameCompositionDraft";
+import { useSliderDoubleClickTime } from "./useSliderDoubleClickTime";
 import { useProjectMutations } from "./useProjectMutations";
 import type { ProjectMutationRunner } from "./useProjectMutationRunner";
 import { useProjectNavigation } from "./useProjectNavigation";
@@ -141,15 +143,26 @@ export function useProjectEditorController({
     commit: mutations.commitPhotoAngle,
     onError: reportInteractionError,
   });
+  const doubleClickTimeMs = useSliderDoubleClickTime(projection.state.projectId, projectCorePort, reportInteractionError);
+  const canEditFrameStyle = selectedFrames.length > 0 && !interactionBlocked;
+  const frameStyle = useFrameCompositionDraft<FrameStyleChange>({
+    projection, frameIds: navigation.selectedFrameIds, disabled: !canEditFrameStyle,
+    session: projectCorePort, runner: runProjectMutation,
+    propertyKey: (change) => change.kind,
+    resolve: (frameIds, change) => projectCorePort.previewFrameStyle({ frameIds, change }),
+    commit: (frameIds, change) => mutations.commitFrameStyle({ frameIds, change }),
+    onError: reportInteractionError,
+  });
+  const flushPropertyDrafts = () => { void photoAngle.commit(); void frameStyle.commit(); };
   const orientPhotos = (action: PhotoOrientationAction) => {
     if (!canOrientPhotos) return Promise.resolve(false);
-    void photoAngle.commit();
+    flushPropertyDrafts();
     return mutations.orientPhotos([...navigation.selectedFrameIds], action);
   };
   const canApplyPhotoEffects = selectedFrames.some((frame) => frame.photo !== null) && !interactionBlocked;
   const togglePhotoBlackAndWhite = () => {
     if (!canApplyPhotoEffects) return Promise.resolve(false);
-    void photoAngle.commit();
+    flushPropertyDrafts();
     return mutations.togglePhotoBlackAndWhite([...navigation.selectedFrameIds]);
   };
   const canDeleteFrames = canArrangeFrames;
@@ -256,7 +269,7 @@ export function useProjectEditorController({
   const canvasProps: AlbumCanvasProps = {
     projectId: projection.state.projectId,
     mode: canvasMode,
-    composition: photoAngle.composition,
+    composition: frameStyle.composition !== projection.composition ? frameStyle.composition : photoAngle.composition,
     sheetBarMetadata: projection.state.album.sheets.map((sheet) => ({
       sheetId: sheet.id,
       pageNumbers: sheet.pageNumbers,
@@ -369,14 +382,24 @@ export function useProjectEditorController({
   };
 
   return {
+    frameStyle: {
+      disabled: !canEditFrameStyle,
+      scopeKey: frameStyle.scopeKey,
+      doubleClickTimeMs,
+      dragThreshold,
+      settlement: frameStyle.settlement,
+      onPreview: (change: FrameStyleChange) => { void photoAngle.commit(); frameStyle.preview(change); },
+      onCommit: (change?: FrameStyleChange) => { void photoAngle.commit(); void frameStyle.commit(change); },
+      onCancel: frameStyle.cancel,
+    },
     photoAngle: {
       disabled: !canOrientPhotos,
       scopeKey: photoAngle.scopeKey,
-      doubleClickTimeMs: photoAngle.doubleClickTimeMs,
+      doubleClickTimeMs,
       dragThreshold,
       settlement: photoAngle.settlement,
-      onPreview: photoAngle.preview,
-      onCommit: (angleTenths: number) => { void photoAngle.commit(angleTenths); },
+      onPreview: (angleTenths: number) => { void frameStyle.commit(); photoAngle.preview(angleTenths); },
+      onCommit: (angleTenths: number) => { void frameStyle.commit(); void photoAngle.commit(angleTenths); },
       onCancel: photoAngle.cancel,
     },
     canOrientPhotos,
@@ -429,10 +452,10 @@ export function useProjectEditorController({
     convertEdge,
     deleteSheet,
     reorderSheet,
-    save: () => { void photoAngle.commit(); return mutations.save(); },
-    saveAs: () => { void photoAngle.commit(); return mutations.saveAs(); },
-    undo: () => { void photoAngle.commit(); return mutations.undo(); },
-    redo: () => { void photoAngle.commit(); return mutations.redo(); },
+    save: () => { flushPropertyDrafts(); return mutations.save(); },
+    saveAs: () => { flushPropertyDrafts(); return mutations.saveAs(); },
+    undo: () => { flushPropertyDrafts(); return mutations.undo(); },
+    redo: () => { flushPropertyDrafts(); return mutations.redo(); },
     fillMedia: (mediaId: string) => {
       if (navigation.implicitSheetId) {
         void mutations.applyPhotoWithStatus({

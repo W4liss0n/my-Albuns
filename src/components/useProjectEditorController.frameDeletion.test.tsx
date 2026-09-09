@@ -26,7 +26,8 @@ function deletionHarness() {
   const port: ProjectCorePort = {
     load: async () => initial, apply, save, undo, redo,
     readFrameDragThreshold: async () => ({ x: 5, y: 5 }),
-    readPhotoAngleDoubleClickTime: async () => 500,
+    readSliderDoubleClickTime: async () => 500,
+    previewFrameStyle: async () => { throw new Error("Frame style preview is not configured in this fixture."); },
     previewPhotoAngle: async () => { throw new Error("Photo angle preview is not configured in this fixture."); },
     previewFrameGeometry: unsupported, saveAs: unsupported,
     validateAlbumInformation: unsupported, applyWithOutcome: unsupported,

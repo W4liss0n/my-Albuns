@@ -11,6 +11,7 @@ import type {
   FrameGeometryEdit,
   PhotoOrientationAction,
   PhotoAngleEdit,
+  FrameStyleEdit,
   ProjectIntent,
 } from "../domain/project";
 import {
@@ -159,6 +160,16 @@ export function useProjectMutations({
     let committed: EditorProjection | null = null;
     await runWithErrorFeedback(
       (port) => imageProcessing.run((publish) => port.apply({ kind: "setPhotoAngle", edit }, publish)),
+      true,
+      (next) => { committed = next; },
+    );
+    return committed;
+  }
+
+  async function commitFrameStyle(edit: FrameStyleEdit): Promise<EditorProjection | null> {
+    let committed: EditorProjection | null = null;
+    await runWithErrorFeedback(
+      (port) => imageProcessing.run((publish) => port.apply({ kind: "setFrameStyle", edit }, publish)),
       true,
       (next) => { committed = next; },
     );
@@ -438,6 +449,7 @@ export function useProjectMutations({
     orientPhotos,
     togglePhotoBlackAndWhite,
     commitPhotoAngle,
+    commitFrameStyle,
     applyAlbumInformation: commitAlbumInformation,
     applyAlbumDesign: (draft: AlbumDesignProjectDraft) =>
       commitProjectSettingsDraft(draft),

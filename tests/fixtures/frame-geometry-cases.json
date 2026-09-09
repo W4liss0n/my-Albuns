@@ -2,6 +2,9 @@
   "cases": [
     {
       "frame": {
+        "border": {
+          "kind": "none"
+        },
         "borderFillRects": [],
         "clipRect": {
           "height": 160000,
@@ -10,6 +13,7 @@
           "y": 70000
         },
         "frameId": "geometry-frame",
+        "opacityByte": 255,
         "photo": {
           "blackAndWhite": false,
           "drawRect": {
@@ -85,6 +89,9 @@
     },
     {
       "frame": {
+        "border": {
+          "kind": "none"
+        },
         "borderFillRects": [],
         "clipRect": {
           "height": 160000,
@@ -93,6 +100,7 @@
           "y": 40000
         },
         "frameId": "geometry-frame",
+        "opacityByte": 255,
         "photo": {
           "blackAndWhite": false,
           "drawRect": {
@@ -168,6 +176,9 @@
     },
     {
       "frame": {
+        "border": {
+          "kind": "none"
+        },
         "borderFillRects": [],
         "clipRect": {
           "height": 120000,
@@ -176,6 +187,7 @@
           "y": 70000
         },
         "frameId": "geometry-frame",
+        "opacityByte": 255,
         "photo": {
           "blackAndWhite": false,
           "drawRect": {
@@ -254,6 +266,9 @@
     },
     {
       "frame": {
+        "border": {
+          "kind": "none"
+        },
         "borderFillRects": [],
         "clipRect": {
           "height": 240000,
@@ -262,6 +277,7 @@
           "y": 30000
         },
         "frameId": "geometry-frame",
+        "opacityByte": 255,
         "photo": {
           "blackAndWhite": false,
           "drawRect": {
@@ -340,6 +356,9 @@
     },
     {
       "frame": {
+        "border": {
+          "kind": "none"
+        },
         "borderFillRects": [],
         "clipRect": {
           "height": 12000,
@@ -348,6 +367,7 @@
           "y": 218000
         },
         "frameId": "geometry-frame",
+        "opacityByte": 255,
         "photo": {
           "blackAndWhite": false,
           "drawRect": {

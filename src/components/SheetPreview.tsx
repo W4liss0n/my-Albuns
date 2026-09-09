@@ -5,7 +5,6 @@ import type {
   ComposedFrame,
   ComposedPhoto,
   ComposedSheet,
-  ProjectedFrameBorder,
 } from "../domain/project";
 import { CANVAS_MICROMETERS_PER_PIXEL } from "./canvasGeometry";
 import {
@@ -26,7 +25,6 @@ export interface SheetPreviewViewport {
 
 interface SheetPreviewProps {
   sheet: ComposedSheet;
-  frameBorder?: ProjectedFrameBorder;
   mediaPreviewUrls?: Readonly<Record<string, string>>;
   viewport?: SheetPreviewViewport;
 }
@@ -63,7 +61,6 @@ function sheetPreviewViewBox(
 export function SheetPreviewShell({
   children,
   className,
-  frameBorder,
   mediaPreviewUrls,
   sheet,
   viewport,
@@ -79,7 +76,6 @@ export function SheetPreviewShell({
       style={sheetPreviewShellStyle(sheet.activeSides)}
     >
       <SheetPreview
-        frameBorder={frameBorder}
         mediaPreviewUrls={mediaPreviewUrls}
         sheet={sheet}
         viewport={viewport}
@@ -91,7 +87,6 @@ export function SheetPreviewShell({
 
 export function SheetPreview({
   sheet,
-  frameBorder = { kind: "none" },
   mediaPreviewUrls = {},
   viewport,
 }: SheetPreviewProps) {
@@ -167,7 +162,6 @@ export function SheetPreview({
         <FramePreview
           clipId={clipId(instanceId, frame, index)}
           frame={frame}
-          frameBorder={frameBorder}
           key={frame.frameId}
           previewUrl={
             frame.photo
@@ -256,7 +250,6 @@ function BackgroundPreview({
 
 interface FramePreviewProps {
   frame: ComposedFrame;
-  frameBorder: ProjectedFrameBorder;
   clipId: string;
   previewUrl?: string;
   unit: number;
@@ -264,17 +257,17 @@ interface FramePreviewProps {
 
 function FramePreview({
   frame,
-  frameBorder,
   clipId: frameClipId,
   previewUrl,
   unit,
 }: FramePreviewProps) {
-  const { clipRect, photo } = frame;
+  const { clipRect, photo, border: frameBorder } = frame;
   const placeholderStyle = SHEET_VISUAL_STYLE.framePlaceholder;
   const outlineStyle = frameOutlineStyle(photo !== null);
 
   return (
     <g>
+      <g data-preview-frame-content-id={frame.frameId} opacity={frame.opacityByte / 255}>
       {photo ? (
         <g clipPath={`url(#${frameClipId})`}>
           <PhotoPreview
@@ -294,17 +287,6 @@ function FramePreview({
           />
         </g>
       )}
-      <rect
-        data-preview-frame-id={frame.frameId}
-        x={clipRect.x}
-        y={clipRect.y}
-        width={clipRect.width}
-        height={clipRect.height}
-        fill="none"
-        stroke={outlineStyle.outline}
-        strokeOpacity={outlineStyle.outlineOpacity}
-        strokeWidth={outlineStyle.outlineWidthPx * unit}
-      />
       {frameBorder.kind === "solid" && frame.borderFillRects.length > 0 ? (
         <g
           data-preview-frame-border-id={frame.frameId}
@@ -323,6 +305,18 @@ function FramePreview({
           ))}
         </g>
       ) : null}
+      </g>
+      <rect
+        data-preview-frame-id={frame.frameId}
+        x={clipRect.x}
+        y={clipRect.y}
+        width={clipRect.width}
+        height={clipRect.height}
+        fill="none"
+        stroke={outlineStyle.outline}
+        strokeOpacity={outlineStyle.outlineOpacity}
+        strokeWidth={outlineStyle.outlineWidthPx * unit}
+      />
     </g>
   );
 }

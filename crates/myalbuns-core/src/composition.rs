@@ -29,21 +29,34 @@ impl CompositionCore {
                     let mut frames = sheet
                         .frames
                         .iter()
-                        .map(|frame| ComposedFrame {
-                            frame_id: frame.id.clone(),
-                            clip_rect: frame.rect.clone(),
-                            border_fill_rects: compose_frame_border_fill_rects(
-                                &frame.rect,
-                                &album.visual_defaults.frame_border,
-                            ),
-                            z_index: frame.z_index,
-                            photo: frame.photo.as_ref().map(|photo| {
-                                let media = media_by_id
-                                    .get(&photo.media_id)
-                                    .copied()
-                                    .expect("validated Frame media reference");
-                                compose_photo(&frame.rect, photo, media)
-                            }),
+                        .map(|frame| {
+                            let border = if frame.style.border_width_um == 0 {
+                                ProjectedFrameBorder::None
+                            } else {
+                                ProjectedFrameBorder::Solid {
+                                    rgb: frame.style.border_rgb.clone(),
+                                    width_um: frame.style.border_width_um,
+                                }
+                            };
+                            ComposedFrame {
+                                frame_id: frame.id.clone(),
+                                clip_rect: frame.rect.clone(),
+                                opacity_byte: ((u16::from(frame.style.opacity_percent) * 255 + 50)
+                                    / 100) as u8,
+                                border_fill_rects: compose_frame_border_fill_rects(
+                                    &frame.rect,
+                                    &border,
+                                ),
+                                border,
+                                z_index: frame.z_index,
+                                photo: frame.photo.as_ref().map(|photo| {
+                                    let media = media_by_id
+                                        .get(&photo.media_id)
+                                        .copied()
+                                        .expect("validated Frame media reference");
+                                    compose_photo(&frame.rect, photo, media)
+                                }),
+                            }
                         })
                         .collect::<Vec<_>>();
                     frames.sort_by(|left, right| {
@@ -91,40 +104,40 @@ pub(crate) fn compose_frame_border_fill_rects(
     let ProjectedFrameBorder::Solid { width_um, .. } = border else {
         return Vec::new();
     };
-    let stroke = i64::try_from(*width_um)
-        .unwrap_or(i64::MAX)
-        .min(frame.width)
-        .min(frame.height);
-    if stroke <= 0 {
-        return Vec::new();
-    }
+    let stroke = i64::try_from(*width_um).unwrap_or(i64::MAX);
+    let inset_x = stroke.min(frame.width / 2);
+    let inset_y = stroke.min(frame.height / 2);
+    let inner_height = frame.height - inset_y * 2;
 
     vec![
         RectUm {
             x: frame.x,
             y: frame.y,
             width: frame.width,
-            height: stroke,
+            height: inset_y,
         },
         RectUm {
             x: frame.x,
-            y: frame.y + frame.height - stroke,
+            y: frame.y + frame.height - inset_y,
             width: frame.width,
-            height: stroke,
+            height: inset_y,
         },
         RectUm {
             x: frame.x,
-            y: frame.y,
-            width: stroke,
-            height: frame.height,
+            y: frame.y + inset_y,
+            width: inset_x,
+            height: inner_height,
         },
         RectUm {
-            x: frame.x + frame.width - stroke,
-            y: frame.y,
-            width: stroke,
-            height: frame.height,
+            x: frame.x + frame.width - inset_x,
+            y: frame.y + inset_y,
+            width: inset_x,
+            height: inner_height,
         },
     ]
+    .into_iter()
+    .filter(|rect| rect.width > 0 && rect.height > 0)
+    .collect()
 }
 
 fn derive_media_usage(album: &AlbumSnapshot, composition: &CompositionPlan) -> Vec<MediaUsage> {
@@ -452,25 +465,13 @@ mod frame_border_tests {
                     x: 10,
                     y: 20,
                     width: 100,
-                    height: 60,
+                    height: 30,
                 },
                 RectUm {
                     x: 10,
-                    y: 20,
+                    y: 50,
                     width: 100,
-                    height: 60,
-                },
-                RectUm {
-                    x: 10,
-                    y: 20,
-                    width: 60,
-                    height: 60,
-                },
-                RectUm {
-                    x: 50,
-                    y: 20,
-                    width: 60,
-                    height: 60,
+                    height: 30,
                 },
             ],
         );

@@ -20,7 +20,6 @@ import type {
   DocumentSnapshot,
   FrameSnapshot,
   MediaCatalogItem,
-  ProjectedFrameBorder,
   ProjectedVisualDefaults,
   SheetSnapshot,
 } from "../domain/project";
@@ -36,6 +35,7 @@ import { AlbumInformationForm } from "./AlbumInformationForm";
 import { SheetPreviewShell } from "./SheetPreview";
 import { PhotoOrientationControls, type PhotoOrientationControlActions } from "./PhotoOrientationControls";
 import { PhotoEffectsControls, type PhotoEffectsControlActions } from "./PhotoEffectsControls";
+import { FrameStyleControls, type FrameStyleControlActions } from "./FrameStyleControls";
 import {
   SheetDesignInspector,
   type SheetDesignScope,
@@ -87,6 +87,7 @@ export type InspectorSectionState =
   | { kind: "local" };
 
 export interface InspectorPanelProps {
+  frameStyle?: FrameStyleControlActions;
   photoEffects?: PhotoEffectsControlActions;
   photoOrientation?: PhotoOrientationControlActions;
   context: InspectorContext;
@@ -98,7 +99,6 @@ export interface InspectorPanelProps {
   mediaItems: readonly MediaCatalogItem[];
   sheetStates: readonly SheetSnapshot[];
   sheets: readonly ComposedSheet[];
-  frameBorder: ProjectedFrameBorder;
   visualDefaults: ProjectedVisualDefaults;
   focusedSheetId: string | null;
   mediaPreviews: Readonly<Record<string, MediaPreview>>;
@@ -134,6 +134,7 @@ export interface InspectorPanelProps {
 }
 
 export function InspectorPanel({
+  frameStyle,
   photoOrientation,
   photoEffects,
   context,
@@ -145,7 +146,6 @@ export function InspectorPanel({
   mediaItems,
   sheetStates,
   sheets,
-  frameBorder,
   visualDefaults,
   focusedSheetId,
   mediaPreviews,
@@ -346,7 +346,7 @@ export function InspectorPanel({
                 {selectedPlaceholderCount} {selectedPlaceholderCount === 1 ? "placeholder" : "placeholders"}
               </p>
             </div>
-            {photoOrientation && selectedPhotoCount > 0 && (
+            {(frameStyle || (photoOrientation && selectedPhotoCount > 0)) && (
               <InspectorSection
                 key="frame-photo-design"
                 title="Design"
@@ -354,7 +354,8 @@ export function InspectorPanel({
                 sectionState={sectionState}
                 defaultOpen
               >
-                <PhotoOrientationControls frames={context.frames} {...photoOrientation} />
+                {photoOrientation && <PhotoOrientationControls frames={context.frames} {...photoOrientation} />}
+                {frameStyle && <FrameStyleControls key={`${frameStyle.scopeKey}:${presentationUnit}`} frames={context.frames} unit={presentationUnit} {...frameStyle} />}
               </InspectorSection>
             )}
             {photoEffects && selectedPhotoCount > 0 && (
@@ -381,10 +382,10 @@ export function InspectorPanel({
                 label="Frame"
                 value={context.frame.id.replace("frame-", "").toUpperCase()}
               />
-              <PropertyRow
+              {context.frame.photo && <PropertyRow
                 label="Pan horizontal"
                 value={`${Math.round(displayedPhotoPanX * 100)}%`}
-              />
+              />}
               {context.frame.photo && context.composedPhoto && (
                 <label className="photo-zoom-control">
                   <span className="photo-zoom-label">
@@ -426,6 +427,7 @@ export function InspectorPanel({
                 </label>
               )}
               {photoOrientation && <PhotoOrientationControls frames={[context.frame]} {...photoOrientation} />}
+              {frameStyle && <FrameStyleControls key={`${frameStyle.scopeKey}:${presentationUnit}`} frames={[context.frame]} unit={presentationUnit} {...frameStyle} />}
             </InspectorSection>
             {photoEffects && context.frame.photo && (
               <InspectorSection key="frame-photo-effects" title="Ajustes e Efeitos"
@@ -444,7 +446,6 @@ export function InspectorPanel({
             defaultOpen
           >
             <SheetDesignInspector
-              frameBorder={frameBorder}
               mediaPreviewUrls={mediaPreviewUrls}
               scope={selectedSheetScope}
               sheet={context.sheet}
@@ -622,7 +623,6 @@ export function InspectorPanel({
                         onPress={() => onNavigateToSheet(sheet.sheetId)}
                       >
                         <SheetPreviewShell
-                          frameBorder={frameBorder}
                           sheet={sheet}
                           mediaPreviewUrls={mediaPreviewUrls}
                         >
@@ -655,7 +655,6 @@ export function InspectorPanel({
                       )}
                     >
                       <SheetPreviewShell
-                        frameBorder={frameBorder}
                         mediaPreviewUrls={mediaPreviewUrls}
                         sheet={reorderGhostSheet}
                       >

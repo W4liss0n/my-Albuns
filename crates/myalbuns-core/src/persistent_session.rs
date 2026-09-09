@@ -98,6 +98,13 @@ impl PersistentProjectSession {
         intent: ProjectIntent,
     ) -> Result<ProjectIntentOutcome, CoreError> {
         let mut outcome = ProjectIntentOutcome::default();
+        if let ProjectIntent::SetFrameStyle { edit } = &intent {
+            let next = self.project().with_frame_style(edit)?;
+            if next != *self.project() {
+                self.commit_edit(|_| Ok(next))?;
+            }
+            return Ok(outcome);
+        }
         if let ProjectIntent::TogglePhotoBlackAndWhite { frame_ids } = &intent {
             let next = self
                 .project()
@@ -166,6 +173,9 @@ impl PersistentProjectSession {
             }
         }
         self.commit_edit(|project| match intent {
+            ProjectIntent::SetFrameStyle { .. } => {
+                unreachable!("Frame style handles unchanged selections before committing")
+            }
             ProjectIntent::TogglePhotoBlackAndWhite { .. } => {
                 unreachable!("Photo effects handle unchanged selections before committing")
             }

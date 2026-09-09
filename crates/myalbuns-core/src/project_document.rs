@@ -397,6 +397,22 @@ pub struct ProjectFrame {
     id: Uuid,
     rect: ProjectRect,
     photo: Option<ProjectPhoto>,
+    style: FrameStyle,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum FrameStyle {
+    Album,
+    Custom {
+        border: FrameBorderValues,
+        opacity_percent: u8,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct FrameBorderValues {
+    pub(crate) rgb: Rgb,
+    pub(crate) width_um: u64,
 }
 
 impl ProjectFrame {
@@ -413,7 +429,56 @@ impl ProjectFrame {
     }
 
     pub(crate) const fn new(id: Uuid, rect: ProjectRect, photo: Option<ProjectPhoto>) -> Self {
-        Self { id, rect, photo }
+        Self {
+            id,
+            rect,
+            photo,
+            style: FrameStyle::Album,
+        }
+    }
+
+    fn resolved_style(&self, defaults: &VisualDefaults) -> (FrameBorderValues, u8) {
+        match &self.style {
+            FrameStyle::Album => (
+                match defaults.frame_border() {
+                    FrameBorder::None => FrameBorderValues {
+                        rgb: Rgb::new([0, 0, 0]),
+                        width_um: 0,
+                    },
+                    FrameBorder::Solid { rgb, width_um } => FrameBorderValues {
+                        rgb: *rgb,
+                        width_um: *width_um,
+                    },
+                },
+                100,
+            ),
+            FrameStyle::Custom {
+                border,
+                opacity_percent,
+            } => (*border, *opacity_percent),
+        }
+    }
+
+    pub(crate) fn style(&self) -> &FrameStyle {
+        &self.style
+    }
+
+    pub(crate) fn with_style(mut self, style: FrameStyle) -> Self {
+        self.style = style;
+        self
+    }
+
+    pub(crate) fn projected_style(&self, defaults: &VisualDefaults) -> crate::ProjectedFrameStyle {
+        let (border, opacity_percent) = self.resolved_style(defaults);
+        crate::ProjectedFrameStyle {
+            source: match self.style {
+                FrameStyle::Album => crate::FrameStyleSource::Album,
+                FrameStyle::Custom { .. } => crate::FrameStyleSource::Custom,
+            },
+            border_rgb: border.rgb.canonical_hex(),
+            border_width_um: border.width_um,
+            opacity_percent,
+        }
     }
 }
 
@@ -905,6 +970,53 @@ impl ProjectDocument {
             return Err(());
         }
         Ok((sheet_index, selected))
+    }
+
+    pub(crate) fn with_frame_style(
+        &self,
+        edit: &crate::FrameStyleEdit,
+    ) -> Result<Self, crate::CoreError> {
+        let (sheet_index, selected) = self
+            .frame_selection(&edit.frame_ids)
+            .map_err(|()| crate::CoreError::InvalidFrameStyleSelection)?;
+        match &edit.change {
+            crate::FrameStyleChange::Opacity { opacity_percent } if *opacity_percent > 100 => {
+                return Err(crate::CoreError::InvalidFrameOpacity);
+            }
+            crate::FrameStyleChange::BorderWidth { width_um } if *width_um > MAX_SAFE_INTEGER => {
+                return Err(crate::CoreError::InvalidFrameBorder);
+            }
+            crate::FrameStyleChange::BorderColor { rgb } if Rgb::parse_canonical(rgb).is_none() => {
+                return Err(crate::CoreError::InvalidFrameBorder);
+            }
+            _ => {}
+        }
+        let mut candidate = self.clone();
+        for frame in candidate.sheets[sheet_index]
+            .frames
+            .iter_mut()
+            .filter(|frame| selected.contains(&frame.id))
+        {
+            let (mut border, mut opacity_percent) = frame.resolved_style(&self.visual_defaults);
+            match &edit.change {
+                crate::FrameStyleChange::RestoreAlbum => {
+                    frame.style = FrameStyle::Album;
+                    continue;
+                }
+                crate::FrameStyleChange::Opacity {
+                    opacity_percent: value,
+                } => opacity_percent = *value,
+                crate::FrameStyleChange::BorderWidth { width_um } => border.width_um = *width_um,
+                crate::FrameStyleChange::BorderColor { rgb } => {
+                    border.rgb = Rgb::parse_canonical(rgb).expect("validated Frame border color")
+                }
+            }
+            frame.style = FrameStyle::Custom {
+                border,
+                opacity_percent,
+            };
+        }
+        Ok(candidate)
     }
 
     pub(crate) fn with_oriented_photos(
@@ -1899,6 +2011,14 @@ pub(crate) fn validate_project_state(project: &ProjectDocument) -> Result<(), ()
         }
         let surface_width = active_surface_width(sheet, settings.sheet_width_um());
         for frame in sheet.frames() {
+            if let FrameStyle::Custom {
+                border,
+                opacity_percent,
+            } = frame.style()
+                && (border.width_um > MAX_SAFE_INTEGER || *opacity_percent > 100)
+            {
+                return Err(());
+            }
             let rect = frame.rect();
             if !frame_ids.insert(frame.id())
                 || rect.width() == 0

@@ -3,6 +3,9 @@
     {
       "frames": [
         {
+          "border": {
+            "kind": "none"
+          },
           "borderFillRects": [],
           "clipRect": {
             "height": 160000,
@@ -11,6 +14,7 @@
             "y": 60000
           },
           "frameId": "group-frame-0",
+          "opacityByte": 255,
           "photo": {
             "blackAndWhite": false,
             "drawRect": {
@@ -78,6 +82,9 @@
           "zIndex": 0
         },
         {
+          "border": {
+            "kind": "none"
+          },
           "borderFillRects": [],
           "clipRect": {
             "height": 140000,
@@ -86,6 +93,7 @@
             "y": 120000
           },
           "frameId": "group-frame-1",
+          "opacityByte": 255,
           "photo": null,
           "zIndex": 1
         }
@@ -100,6 +108,9 @@
     {
       "frames": [
         {
+          "border": {
+            "kind": "none"
+          },
           "borderFillRects": [],
           "clipRect": {
             "height": 160000,
@@ -108,6 +119,7 @@
             "y": 30000
           },
           "frameId": "group-frame-0",
+          "opacityByte": 255,
           "photo": {
             "blackAndWhite": false,
             "drawRect": {
@@ -175,6 +187,9 @@
           "zIndex": 0
         },
         {
+          "border": {
+            "kind": "none"
+          },
           "borderFillRects": [],
           "clipRect": {
             "height": 140000,
@@ -183,6 +198,7 @@
             "y": 90000
           },
           "frameId": "group-frame-1",
+          "opacityByte": 255,
           "photo": null,
           "zIndex": 1
         }
@@ -197,6 +213,9 @@
     {
       "frames": [
         {
+          "border": {
+            "kind": "none"
+          },
           "borderFillRects": [],
           "clipRect": {
             "height": 128000,
@@ -205,6 +224,7 @@
             "y": 60000
           },
           "frameId": "group-frame-0",
+          "opacityByte": 255,
           "photo": {
             "blackAndWhite": false,
             "drawRect": {
@@ -272,6 +292,9 @@
           "zIndex": 0
         },
         {
+          "border": {
+            "kind": "none"
+          },
           "borderFillRects": [],
           "clipRect": {
             "height": 112000,
@@ -280,6 +303,7 @@
             "y": 108000
           },
           "frameId": "group-frame-1",
+          "opacityByte": 255,
           "photo": null,
           "zIndex": 1
         }
@@ -297,6 +321,9 @@
     {
       "frames": [
         {
+          "border": {
+            "kind": "none"
+          },
           "borderFillRects": [],
           "clipRect": {
             "height": 192000,
@@ -305,6 +332,7 @@
             "y": 40000
           },
           "frameId": "group-frame-0",
+          "opacityByte": 255,
           "photo": {
             "blackAndWhite": false,
             "drawRect": {
@@ -372,6 +400,9 @@
           "zIndex": 0
         },
         {
+          "border": {
+            "kind": "none"
+          },
           "borderFillRects": [],
           "clipRect": {
             "height": 168000,
@@ -380,6 +411,7 @@
             "y": 112000
           },
           "frameId": "group-frame-1",
+          "opacityByte": 255,
           "photo": null,
           "zIndex": 1
         }
@@ -397,6 +429,9 @@
     {
       "frames": [
         {
+          "border": {
+            "kind": "none"
+          },
           "borderFillRects": [],
           "clipRect": {
             "height": 19200,
@@ -405,6 +440,7 @@
             "y": 60000
           },
           "frameId": "group-frame-0",
+          "opacityByte": 255,
           "photo": {
             "blackAndWhite": false,
             "drawRect": {
@@ -472,6 +508,9 @@
           "zIndex": 0
         },
         {
+          "border": {
+            "kind": "none"
+          },
           "borderFillRects": [],
           "clipRect": {
             "height": 16800,
@@ -480,6 +519,7 @@
             "y": 67200
           },
           "frameId": "group-frame-1",
+          "opacityByte": 255,
           "photo": null,
           "zIndex": 1
         }

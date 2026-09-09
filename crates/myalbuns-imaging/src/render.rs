@@ -94,8 +94,7 @@ pub(crate) fn render_request(
     let composition_units = frame_count.max(1);
     progress(ImagingProgressStage::Composing, 0, composition_units)?;
     for (index, frame) in sheet.frames.iter().enumerate() {
-        draw_frame(&mut image, frame, pixels_per_micrometer, &sources)?;
-        draw_frame_border(&mut image, frame, &request.unit.frame_border, raster)?;
+        draw_frame(&mut image, frame, pixels_per_micrometer, raster, &sources)?;
         progress(
             ImagingProgressStage::Composing,
             u32::try_from(index + 1).map_err(|_| "a Lâmina contém Frames demais".to_string())?,
@@ -255,22 +254,27 @@ fn draw_frame(
     image: &mut RgbaImage,
     frame: &ComposedFrame,
     pixels_per_micrometer: f64,
+    raster: RasterPlan,
     sources: &HashMap<MediaId, RgbaImage>,
-) -> Result<(), String> {
-    let left = to_pixels_signed(frame.clip_rect.x, pixels_per_micrometer).max(0) as u32;
-    let top = to_pixels_signed(frame.clip_rect.y, pixels_per_micrometer).max(0) as u32;
-    let right = to_pixels_signed(
-        frame.clip_rect.x + frame.clip_rect.width,
-        pixels_per_micrometer,
-    )
-    .max(0) as u32;
-    let bottom = to_pixels_signed(
-        frame.clip_rect.y + frame.clip_rect.height,
-        pixels_per_micrometer,
-    )
-    .max(0) as u32;
-    let right = right.min(image.width());
-    let bottom = bottom.min(image.height());
+) -> Result<(), RenderFailure> {
+    if frame.opacity_byte == 0 {
+        return Ok(());
+    }
+    let (left, top, right, bottom) = raster_rect(image, &frame.clip_rect, raster)?;
+    let border = match &frame.border {
+        ProjectedFrameBorder::None => None,
+        ProjectedFrameBorder::Solid { rgb, .. } => Some(opaque_rgb(rgb)),
+    };
+    let border_bounds = frame
+        .border_fill_rects
+        .iter()
+        .map(|rect| raster_rect(image, rect, raster))
+        .collect::<Result<Vec<_>, _>>()?;
+    let in_border = |x, y| {
+        border_bounds
+            .iter()
+            .any(|&(l, t, r, b)| x >= l && x < r && y >= t && y < b)
+    };
 
     if let Some(photo) = &frame.photo {
         let source = sources
@@ -288,6 +292,12 @@ fn draw_frame(
 
         for y in top..bottom {
             for x in left..right {
+                if in_border(x, y)
+                    && let Some(color) = border
+                {
+                    blend_frame_pixel(image, x, y, color, frame.opacity_byte);
+                    continue;
+                }
                 let mut delta_x = x as f64 + 0.5 - draw_center_x;
                 let delta_y = y as f64 + 0.5 - draw_center_y;
                 // Invert horizontal mirroring before inverting the Photo's rotation.
@@ -306,14 +316,26 @@ fn draw_frame(
                             as u8;
                     pixel = Rgba([luminance, luminance, luminance, alpha]);
                 }
-                image.put_pixel(x, y, pixel);
+                blend_frame_pixel(image, x, y, pixel, frame.opacity_byte);
             }
         }
     } else {
-        fill_rect(image, left, top, right, bottom, Rgba([214, 207, 194, 255]));
+        for y in top..bottom {
+            for x in left..right {
+                let pixel = if in_border(x, y) { border } else { None }
+                    .unwrap_or(Rgba([214, 207, 194, 255]));
+                blend_frame_pixel(image, x, y, pixel, frame.opacity_byte);
+            }
+        }
     }
 
     Ok(())
+}
+
+fn blend_frame_pixel(image: &mut RgbaImage, x: u32, y: u32, mut pixel: Rgba<u8>, opacity: u8) {
+    // The ring replaces the Photo in the transparent Frame group; alpha is applied once.
+    pixel[3] = ((u16::from(pixel[3]) * u16::from(opacity) + 127) / 255) as u8;
+    blend_pixel(image, x, y, pixel);
 }
 
 fn sample_bilinear(image: &RgbaImage, horizontal: f32, vertical: f32) -> Rgba<u8> {
@@ -394,66 +416,6 @@ fn raster_rect(
     ))
 }
 
-fn draw_frame_border(
-    image: &mut RgbaImage,
-    frame: &ComposedFrame,
-    border: &ProjectedFrameBorder,
-    raster: RasterPlan,
-) -> Result<(), RenderFailure> {
-    let ProjectedFrameBorder::Solid { rgb, .. } = border else {
-        return Ok(());
-    };
-    let color = opaque_rgb(rgb);
-    let frame_bounds = raster_rect(image, &frame.clip_rect, raster)?;
-    let edges = [
-        FrameBorderEdge::Top,
-        FrameBorderEdge::Bottom,
-        FrameBorderEdge::Left,
-        FrameBorderEdge::Right,
-    ];
-    for (draw_rect, edge) in frame.border_fill_rects.iter().zip(edges) {
-        let mut bounds = raster_rect(image, draw_rect, raster)?;
-        preserve_positive_border_pixel(&mut bounds, frame_bounds, edge);
-        fill_rect(image, bounds.0, bounds.1, bounds.2, bounds.3, color);
-    }
-    Ok(())
-}
-
-#[derive(Clone, Copy)]
-enum FrameBorderEdge {
-    Top,
-    Bottom,
-    Left,
-    Right,
-}
-
-fn preserve_positive_border_pixel(
-    bounds: &mut (u32, u32, u32, u32),
-    frame: (u32, u32, u32, u32),
-    edge: FrameBorderEdge,
-) {
-    let (frame_left, frame_top, frame_right, frame_bottom) = frame;
-    match edge {
-        FrameBorderEdge::Top if bounds.3 <= bounds.1 && frame_bottom > frame_top => {
-            bounds.1 = frame_top;
-            bounds.3 = frame_top + 1;
-        }
-        FrameBorderEdge::Bottom if bounds.3 <= bounds.1 && frame_bottom > frame_top => {
-            bounds.1 = frame_bottom - 1;
-            bounds.3 = frame_bottom;
-        }
-        FrameBorderEdge::Left if bounds.2 <= bounds.0 && frame_right > frame_left => {
-            bounds.0 = frame_left;
-            bounds.2 = frame_left + 1;
-        }
-        FrameBorderEdge::Right if bounds.2 <= bounds.0 && frame_right > frame_left => {
-            bounds.0 = frame_right - 1;
-            bounds.2 = frame_right;
-        }
-        _ => {}
-    }
-}
-
 fn opaque_rgb(value: &str) -> Rgba<u8> {
     let channel = |start| {
         u8::from_str_radix(&value[start..start + 2], 16)
@@ -471,14 +433,23 @@ fn fill_rect(image: &mut RgbaImage, left: u32, top: u32, right: u32, bottom: u32
 }
 
 fn blend_pixel(image: &mut RgbaImage, x: u32, y: u32, foreground: Rgba<u8>) {
+    if foreground[3] == 0 {
+        return;
+    }
+    if foreground[3] == 255 {
+        image.put_pixel(x, y, foreground);
+        return;
+    }
     let background = *image.get_pixel(x, y);
-    let alpha = foreground[3] as f32 / 255.0;
-    let blended = Rgba([
-        (foreground[0] as f32 * alpha + background[0] as f32 * (1.0 - alpha)) as u8,
-        (foreground[1] as f32 * alpha + background[1] as f32 * (1.0 - alpha)) as u8,
-        (foreground[2] as f32 * alpha + background[2] as f32 * (1.0 - alpha)) as u8,
-        255,
-    ]);
+    // The Sheet starts opaque and every source-over operation preserves that invariant.
+    let alpha = u32::from(foreground[3]);
+    let channel = |index| {
+        ((u32::from(foreground[index]) * alpha
+            + u32::from(background[index]) * (255 - alpha)
+            + 127)
+            / 255) as u8
+    };
+    let blended = Rgba([channel(0), channel(1), channel(2), 255]);
     image.put_pixel(x, y, blended);
 }
 
@@ -490,10 +461,6 @@ fn blend(from: Rgba<u8>, to: Rgba<u8>, amount: f32) -> Rgba<u8> {
         (from[2] as f32 + (to[2] as f32 - from[2] as f32) * amount) as u8,
         (from[3] as f32 + (to[3] as f32 - from[3] as f32) * amount) as u8,
     ])
-}
-
-fn to_pixels_signed(value_um: i64, pixels_per_micrometer: f64) -> i64 {
-    (value_um as f64 * pixels_per_micrometer).round() as i64
 }
 
 fn to_pixels_precise(value_um: i64, pixels_per_micrometer: f64) -> f64 {

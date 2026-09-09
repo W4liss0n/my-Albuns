@@ -992,6 +992,7 @@ fn processor_renders_linked_original_pixels_and_only_the_configured_frame_border
         rgb: "#00FF00".into(),
         width_um: 1,
     };
+    snapshot.composition.sheets[0].frames[0].border = snapshot.composition.frame_border.clone();
     snapshot.composition.sheets[0].frames[0].border_fill_rects = vec![
         RectUm {
             x: 0,
@@ -1007,15 +1008,15 @@ fn processor_renders_linked_original_pixels_and_only_the_configured_frame_border
         },
         RectUm {
             x: 0,
-            y: 0,
+            y: 1,
             width: 1,
-            height: 12_700,
+            height: 12_698,
         },
         RectUm {
             x: 25_399,
-            y: 0,
+            y: 1,
             width: 1,
-            height: 12_700,
+            height: 12_698,
         },
     ];
     let bordered_output_path = output_dir.path().join("real-sheet-with-border.jpg");
@@ -1036,9 +1037,8 @@ fn processor_renders_linked_original_pixels_and_only_the_configured_frame_border
         .to_rgb8();
     let border = bordered.get_pixel(0, 25);
     assert!(
-        u16::from(border[1]) > u16::from(border[0]) * 3
-            && u16::from(border[1]) > u16::from(border[2]) * 3,
-        "the persisted Frame border remains green"
+        u16::from(border[0]) > u16::from(border[2]) * 3,
+        "a positive physical border may rasterize to zero pixels without covering the Photo"
     );
 }
 
@@ -1972,6 +1972,7 @@ fn processor_applies_black_and_white_per_occurrence_before_the_colored_border() 
         rgb: "#00FF00".into(),
         width_um: 1270,
     };
+    snapshot.composition.sheets[0].frames[0].border = snapshot.composition.frame_border.clone();
     let sheet = &mut snapshot.composition.sheets[0];
     sheet.width_um = 50800;
     sheet.height_um = 12700;
@@ -2003,15 +2004,15 @@ fn processor_applies_black_and_white_per_occurrence_before_the_colored_border() 
         },
         RectUm {
             x: 0,
-            y: 0,
+            y: 1270,
             width: 1270,
-            height: 12700,
+            height: 10160,
         },
         RectUm {
             x: 24130,
-            y: 0,
+            y: 1270,
             width: 1270,
-            height: 12700,
+            height: 10160,
         },
     ];
     let photo = frame.photo.as_mut().unwrap();
@@ -2069,6 +2070,103 @@ fn processor_applies_black_and_white_per_occurrence_before_the_colored_border() 
         border[1] > 220 && border[0] < 30 && border[2] < 30,
         "border: {border:?}"
     );
+    assert_eq!(std::fs::read(source_path).unwrap(), original);
+}
+
+#[test]
+fn processor_applies_opacity_once_to_photo_and_border_above_the_lower_frame() {
+    let root = tempfile::tempdir().unwrap();
+    let source_path = root.path().join("opacity.jpg");
+    RgbImage::from_pixel(100, 50, Rgb([240, 16, 16]))
+        .save_with_format(&source_path, ImageFormat::Jpeg)
+        .unwrap();
+    let original = std::fs::read(&source_path).unwrap();
+    for (opacity_byte, photo_color, border_color) in [
+        (0, [63, 63, 63], [63, 63, 63]),
+        (128, [152, 40, 40], [31, 159, 31]),
+        (255, [240, 16, 16], [0, 255, 0]),
+    ] {
+        let mut snapshot = adjusted_photo_snapshot(&source_path, None, &[], 0, true);
+        let sheet = &mut snapshot.composition.sheets[0];
+        sheet.width_um = 25_400;
+        sheet.height_um = 12_700;
+        sheet.backgrounds.clear();
+        sheet.base.draw_rect = RectUm {
+            x: 0,
+            y: 0,
+            width: 25_400,
+            height: 12_700,
+        };
+        let lower = &mut sheet.frames[0];
+        lower.clip_rect = sheet.base.draw_rect.clone();
+        lower.photo.as_mut().unwrap().draw_rect = lower.clip_rect.clone();
+        let media_id = lower.photo.as_ref().unwrap().media_id;
+        let mut upper = lower.clone();
+        upper.frame_id = "upper-opacity".into();
+        upper.z_index = 1;
+        upper.photo.as_mut().unwrap().black_and_white = false;
+        upper.opacity_byte = opacity_byte;
+        upper.border = ProjectedFrameBorder::Solid {
+            rgb: "#00FF00".into(),
+            width_um: 2_540,
+        };
+        upper.border_fill_rects = vec![
+            RectUm {
+                x: 0,
+                y: 0,
+                width: 25_400,
+                height: 2_540,
+            },
+            RectUm {
+                x: 0,
+                y: 10_160,
+                width: 25_400,
+                height: 2_540,
+            },
+            RectUm {
+                x: 0,
+                y: 2_540,
+                width: 2_540,
+                height: 7_620,
+            },
+            RectUm {
+                x: 22_860,
+                y: 2_540,
+                width: 2_540,
+                height: 7_620,
+            },
+        ];
+        sheet.frames.push(upper);
+        let output = root.path().join(format!("opacity-{opacity_byte}.jpg"));
+        let result = invoke_real_processor(
+            snapshot,
+            &output,
+            "frame-opacity",
+            100,
+            vec![RenderSource::new(media_id, source_path.clone()).unwrap()],
+        );
+        assert!(
+            result.status.success(),
+            "{}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+        let rendered = image::open(output).unwrap().to_rgb8();
+        for ((x, y), expected) in [
+            ((50, 25), photo_color),
+            ((5, 5), border_color),
+            ((5, 25), border_color),
+        ] {
+            let actual = rendered.get_pixel(x, y);
+            assert!(
+                actual
+                    .0
+                    .iter()
+                    .zip(expected)
+                    .all(|(a, e)| a.abs_diff(e) <= 3),
+                "opacity {opacity_byte}, pixel {x},{y}: {actual:?}, expected {expected:?}"
+            );
+        }
+    }
     assert_eq!(std::fs::read(source_path).unwrap(), original);
 }
 

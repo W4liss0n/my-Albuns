@@ -165,9 +165,10 @@ export function createCanvasFramePlaceholder(
   label.anchor.set(0.5);
   label.position.set(frameWidth / 2, frameHeight / 2);
   label.eventMode = "none";
-  placeholder.addChild(base, label);
+  placeholder.addChild(label);
   return {
     container: placeholder,
+    fill: base,
     applyCanvasScale(canvasScale: number) {
       const inverseScale = 1 / Math.max(canvasScale, Number.EPSILON);
       label.scale.set(inverseScale);

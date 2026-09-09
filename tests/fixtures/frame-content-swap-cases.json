@@ -31,6 +31,9 @@
           },
           "frames": [
             {
+              "border": {
+                "kind": "none"
+              },
               "borderFillRects": [],
               "clipRect": {
                 "height": 100000,
@@ -39,6 +42,7 @@
                 "y": 90000
               },
               "frameId": "swap-frame-0",
+              "opacityByte": 255,
               "photo": {
                 "blackAndWhite": false,
                 "drawRect": {
@@ -106,6 +110,9 @@
               "zIndex": 0
             },
             {
+              "border": {
+                "kind": "none"
+              },
               "borderFillRects": [],
               "clipRect": {
                 "height": 200000,
@@ -114,6 +121,7 @@
                 "y": 40000
               },
               "frameId": "swap-frame-1",
+              "opacityByte": 255,
               "photo": {
                 "blackAndWhite": false,
                 "drawRect": {
@@ -181,6 +189,9 @@
               "zIndex": 1
             },
             {
+              "border": {
+                "kind": "none"
+              },
               "borderFillRects": [],
               "clipRect": {
                 "height": 100000,
@@ -189,10 +200,14 @@
                 "y": 100000
               },
               "frameId": "swap-frame-2",
+              "opacityByte": 255,
               "photo": null,
               "zIndex": 2
             },
             {
+              "border": {
+                "kind": "none"
+              },
               "borderFillRects": [],
               "clipRect": {
                 "height": 100000,
@@ -201,6 +216,7 @@
                 "y": 100000
               },
               "frameId": "swap-frame-3",
+              "opacityByte": 255,
               "photo": null,
               "zIndex": 3
             }
@@ -236,6 +252,9 @@
           },
           "frames": [
             {
+              "border": {
+                "kind": "none"
+              },
               "borderFillRects": [],
               "clipRect": {
                 "height": 160000,
@@ -244,6 +263,7 @@
                 "y": 90000
               },
               "frameId": "swap-frame-4",
+              "opacityByte": 255,
               "photo": {
                 "blackAndWhite": false,
                 "drawRect": {
@@ -311,6 +331,9 @@
               "zIndex": 0
             },
             {
+              "border": {
+                "kind": "none"
+              },
               "borderFillRects": [],
               "clipRect": {
                 "height": 160000,
@@ -319,6 +342,7 @@
                 "y": 90000
               },
               "frameId": "swap-frame-5",
+              "opacityByte": 255,
               "photo": null,
               "zIndex": 1
             }
@@ -393,6 +417,12 @@
                   "x": 30000,
                   "y": 90000
                 },
+                "style": {
+                  "borderRgb": "#000000",
+                  "borderWidthUm": 0,
+                  "opacityPercent": 100,
+                  "source": "album"
+                },
                 "zIndex": 0
               },
               {
@@ -415,6 +445,12 @@
                   "x": 210000,
                   "y": 40000
                 },
+                "style": {
+                  "borderRgb": "#000000",
+                  "borderWidthUm": 0,
+                  "opacityPercent": 100,
+                  "source": "album"
+                },
                 "zIndex": 1
               },
               {
@@ -426,6 +462,12 @@
                   "x": 330000,
                   "y": 100000
                 },
+                "style": {
+                  "borderRgb": "#000000",
+                  "borderWidthUm": 0,
+                  "opacityPercent": 100,
+                  "source": "album"
+                },
                 "zIndex": 2
               },
               {
@@ -436,6 +478,12 @@
                   "width": 100000,
                   "x": 470000,
                   "y": 100000
+                },
+                "style": {
+                  "borderRgb": "#000000",
+                  "borderWidthUm": 0,
+                  "opacityPercent": 100,
+                  "source": "album"
                 },
                 "zIndex": 3
               }
@@ -473,6 +521,12 @@
                   "x": 90000,
                   "y": 90000
                 },
+                "style": {
+                  "borderRgb": "#000000",
+                  "borderWidthUm": 0,
+                  "opacityPercent": 100,
+                  "source": "album"
+                },
                 "zIndex": 0
               },
               {
@@ -483,6 +537,12 @@
                   "width": 240000,
                   "x": 360000,
                   "y": 90000
+                },
+                "style": {
+                  "borderRgb": "#000000",
+                  "borderWidthUm": 0,
+                  "opacityPercent": 100,
+                  "source": "album"
                 },
                 "zIndex": 1
               }
@@ -566,6 +626,9 @@
               },
               "frames": [
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 100000,
@@ -574,6 +637,7 @@
                     "y": 90000
                   },
                   "frameId": "swap-frame-0",
+                  "opacityByte": 255,
                   "photo": {
                     "blackAndWhite": false,
                     "drawRect": {
@@ -641,6 +705,9 @@
                   "zIndex": 0
                 },
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 200000,
@@ -649,6 +716,7 @@
                     "y": 40000
                   },
                   "frameId": "swap-frame-1",
+                  "opacityByte": 255,
                   "photo": {
                     "blackAndWhite": false,
                     "drawRect": {
@@ -716,6 +784,9 @@
                   "zIndex": 1
                 },
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 100000,
@@ -724,10 +795,14 @@
                     "y": 100000
                   },
                   "frameId": "swap-frame-2",
+                  "opacityByte": 255,
                   "photo": null,
                   "zIndex": 2
                 },
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 100000,
@@ -736,6 +811,7 @@
                     "y": 100000
                   },
                   "frameId": "swap-frame-3",
+                  "opacityByte": 255,
                   "photo": null,
                   "zIndex": 3
                 }
@@ -771,6 +847,9 @@
               },
               "frames": [
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 160000,
@@ -779,6 +858,7 @@
                     "y": 90000
                   },
                   "frameId": "swap-frame-4",
+                  "opacityByte": 255,
                   "photo": {
                     "blackAndWhite": false,
                     "drawRect": {
@@ -846,6 +926,9 @@
                   "zIndex": 0
                 },
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 160000,
@@ -854,6 +937,7 @@
                     "y": 90000
                   },
                   "frameId": "swap-frame-5",
+                  "opacityByte": 255,
                   "photo": null,
                   "zIndex": 1
                 }
@@ -928,6 +1012,12 @@
                       "x": 30000,
                       "y": 90000
                     },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
                     "zIndex": 0
                   },
                   {
@@ -950,6 +1040,12 @@
                       "x": 210000,
                       "y": 40000
                     },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
                     "zIndex": 1
                   },
                   {
@@ -961,6 +1057,12 @@
                       "x": 330000,
                       "y": 100000
                     },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
                     "zIndex": 2
                   },
                   {
@@ -971,6 +1073,12 @@
                       "width": 100000,
                       "x": 470000,
                       "y": 100000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
                     },
                     "zIndex": 3
                   }
@@ -1008,6 +1116,12 @@
                       "x": 90000,
                       "y": 90000
                     },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
                     "zIndex": 0
                   },
                   {
@@ -1018,6 +1132,12 @@
                       "width": 240000,
                       "x": 360000,
                       "y": 90000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
                     },
                     "zIndex": 1
                   }
@@ -1106,6 +1226,9 @@
               },
               "frames": [
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 100000,
@@ -1114,10 +1237,14 @@
                     "y": 90000
                   },
                   "frameId": "swap-frame-0",
+                  "opacityByte": 255,
                   "photo": null,
                   "zIndex": 0
                 },
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 200000,
@@ -1126,6 +1253,7 @@
                     "y": 40000
                   },
                   "frameId": "swap-frame-1",
+                  "opacityByte": 255,
                   "photo": {
                     "blackAndWhite": false,
                     "drawRect": {
@@ -1193,6 +1321,9 @@
                   "zIndex": 1
                 },
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 100000,
@@ -1201,6 +1332,7 @@
                     "y": 100000
                   },
                   "frameId": "swap-frame-2",
+                  "opacityByte": 255,
                   "photo": {
                     "blackAndWhite": false,
                     "drawRect": {
@@ -1268,6 +1400,9 @@
                   "zIndex": 2
                 },
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 100000,
@@ -1276,6 +1411,7 @@
                     "y": 100000
                   },
                   "frameId": "swap-frame-3",
+                  "opacityByte": 255,
                   "photo": null,
                   "zIndex": 3
                 }
@@ -1311,6 +1447,9 @@
               },
               "frames": [
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 160000,
@@ -1319,6 +1458,7 @@
                     "y": 90000
                   },
                   "frameId": "swap-frame-4",
+                  "opacityByte": 255,
                   "photo": {
                     "blackAndWhite": false,
                     "drawRect": {
@@ -1386,6 +1526,9 @@
                   "zIndex": 0
                 },
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 160000,
@@ -1394,6 +1537,7 @@
                     "y": 90000
                   },
                   "frameId": "swap-frame-5",
+                  "opacityByte": 255,
                   "photo": null,
                   "zIndex": 1
                 }
@@ -1457,6 +1601,12 @@
                       "x": 30000,
                       "y": 90000
                     },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
                     "zIndex": 0
                   },
                   {
@@ -1478,6 +1628,12 @@
                       "width": 90000,
                       "x": 210000,
                       "y": 40000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
                     },
                     "zIndex": 1
                   },
@@ -1501,6 +1657,12 @@
                       "x": 330000,
                       "y": 100000
                     },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
                     "zIndex": 2
                   },
                   {
@@ -1511,6 +1673,12 @@
                       "width": 100000,
                       "x": 470000,
                       "y": 100000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
                     },
                     "zIndex": 3
                   }
@@ -1548,6 +1716,12 @@
                       "x": 90000,
                       "y": 90000
                     },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
                     "zIndex": 0
                   },
                   {
@@ -1558,6 +1732,12 @@
                       "width": 240000,
                       "x": 360000,
                       "y": 90000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
                     },
                     "zIndex": 1
                   }
@@ -1646,6 +1826,9 @@
               },
               "frames": [
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 100000,
@@ -1654,6 +1837,7 @@
                     "y": 90000
                   },
                   "frameId": "swap-frame-0",
+                  "opacityByte": 255,
                   "photo": {
                     "blackAndWhite": false,
                     "drawRect": {
@@ -1721,6 +1905,9 @@
                   "zIndex": 0
                 },
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 200000,
@@ -1729,6 +1916,7 @@
                     "y": 40000
                   },
                   "frameId": "swap-frame-1",
+                  "opacityByte": 255,
                   "photo": {
                     "blackAndWhite": false,
                     "drawRect": {
@@ -1796,6 +1984,9 @@
                   "zIndex": 1
                 },
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 100000,
@@ -1804,10 +1995,14 @@
                     "y": 100000
                   },
                   "frameId": "swap-frame-2",
+                  "opacityByte": 255,
                   "photo": null,
                   "zIndex": 2
                 },
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 100000,
@@ -1816,6 +2011,7 @@
                     "y": 100000
                   },
                   "frameId": "swap-frame-3",
+                  "opacityByte": 255,
                   "photo": null,
                   "zIndex": 3
                 }
@@ -1851,6 +2047,9 @@
               },
               "frames": [
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 160000,
@@ -1859,6 +2058,7 @@
                     "y": 90000
                   },
                   "frameId": "swap-frame-4",
+                  "opacityByte": 255,
                   "photo": {
                     "blackAndWhite": false,
                     "drawRect": {
@@ -1926,6 +2126,9 @@
                   "zIndex": 0
                 },
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 160000,
@@ -1934,6 +2137,7 @@
                     "y": 90000
                   },
                   "frameId": "swap-frame-5",
+                  "opacityByte": 255,
                   "photo": null,
                   "zIndex": 1
                 }
@@ -2008,6 +2212,12 @@
                       "x": 30000,
                       "y": 90000
                     },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
                     "zIndex": 0
                   },
                   {
@@ -2030,6 +2240,12 @@
                       "x": 210000,
                       "y": 40000
                     },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
                     "zIndex": 1
                   },
                   {
@@ -2041,6 +2257,12 @@
                       "x": 330000,
                       "y": 100000
                     },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
                     "zIndex": 2
                   },
                   {
@@ -2051,6 +2273,12 @@
                       "width": 100000,
                       "x": 470000,
                       "y": 100000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
                     },
                     "zIndex": 3
                   }
@@ -2088,6 +2316,12 @@
                       "x": 90000,
                       "y": 90000
                     },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
                     "zIndex": 0
                   },
                   {
@@ -2098,6 +2332,12 @@
                       "width": 240000,
                       "x": 360000,
                       "y": 90000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
                     },
                     "zIndex": 1
                   }
@@ -2186,6 +2426,9 @@
               },
               "frames": [
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 100000,
@@ -2194,10 +2437,14 @@
                     "y": 90000
                   },
                   "frameId": "swap-frame-0",
+                  "opacityByte": 255,
                   "photo": null,
                   "zIndex": 0
                 },
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 200000,
@@ -2206,6 +2453,7 @@
                     "y": 40000
                   },
                   "frameId": "swap-frame-1",
+                  "opacityByte": 255,
                   "photo": {
                     "blackAndWhite": false,
                     "drawRect": {
@@ -2273,6 +2521,9 @@
                   "zIndex": 1
                 },
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 100000,
@@ -2281,10 +2532,14 @@
                     "y": 100000
                   },
                   "frameId": "swap-frame-2",
+                  "opacityByte": 255,
                   "photo": null,
                   "zIndex": 2
                 },
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 100000,
@@ -2293,6 +2548,7 @@
                     "y": 100000
                   },
                   "frameId": "swap-frame-3",
+                  "opacityByte": 255,
                   "photo": null,
                   "zIndex": 3
                 }
@@ -2328,6 +2584,9 @@
               },
               "frames": [
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 160000,
@@ -2336,6 +2595,7 @@
                     "y": 90000
                   },
                   "frameId": "swap-frame-4",
+                  "opacityByte": 255,
                   "photo": {
                     "blackAndWhite": false,
                     "drawRect": {
@@ -2403,6 +2663,9 @@
                   "zIndex": 0
                 },
                 {
+                  "border": {
+                    "kind": "none"
+                  },
                   "borderFillRects": [],
                   "clipRect": {
                     "height": 160000,
@@ -2411,6 +2674,7 @@
                     "y": 90000
                   },
                   "frameId": "swap-frame-5",
+                  "opacityByte": 255,
                   "photo": {
                     "blackAndWhite": false,
                     "drawRect": {
@@ -2537,6 +2801,12 @@
                       "x": 30000,
                       "y": 90000
                     },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
                     "zIndex": 0
                   },
                   {
@@ -2559,6 +2829,12 @@
                       "x": 210000,
                       "y": 40000
                     },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
                     "zIndex": 1
                   },
                   {
@@ -2570,6 +2846,12 @@
                       "x": 330000,
                       "y": 100000
                     },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
                     "zIndex": 2
                   },
                   {
@@ -2580,6 +2862,12 @@
                       "width": 100000,
                       "x": 470000,
                       "y": 100000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
                     },
                     "zIndex": 3
                   }
@@ -2617,6 +2905,12 @@
                       "x": 90000,
                       "y": 90000
                     },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
                     "zIndex": 0
                   },
                   {
@@ -2638,6 +2932,12 @@
                       "width": 240000,
                       "x": 360000,
                       "y": 90000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
                     },
                     "zIndex": 1
                   }

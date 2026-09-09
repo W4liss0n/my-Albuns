@@ -218,6 +218,23 @@ pub struct FrameSnapshot {
     pub rect: RectUm,
     pub z_index: u32,
     pub photo: Option<PhotoSnapshot>,
+    pub style: ProjectedFrameStyle,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum FrameStyleSource {
+    Album,
+    Custom,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectedFrameStyle {
+    pub source: FrameStyleSource,
+    pub border_rgb: String,
+    pub border_width_um: u64,
+    pub opacity_percent: u8,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
@@ -451,6 +468,8 @@ pub struct ComposedFrame {
     pub frame_id: String,
     pub clip_rect: RectUm,
     pub border_fill_rects: Vec<RectUm>,
+    pub border: ProjectedFrameBorder,
+    pub opacity_byte: u8,
     pub z_index: u32,
     pub photo: Option<ComposedPhoto>,
 }
@@ -869,6 +888,9 @@ pub enum ProjectIntent {
     SetPhotoAngle {
         edit: PhotoAngleEdit,
     },
+    SetFrameStyle {
+        edit: FrameStyleEdit,
+    },
     TogglePhotoBlackAndWhite {
         frame_ids: Vec<String>,
     },
@@ -909,8 +931,36 @@ pub struct PhotoAngleEdit {
     pub angle_tenths: i16,
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FrameStyleEdit {
+    pub frame_ids: Vec<String>,
+    pub change: FrameStyleChange,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+#[ts(tag = "kind")]
+pub enum FrameStyleChange {
+    BorderColor { rgb: String },
+    BorderWidth { width_um: u64 },
+    Opacity { opacity_percent: u8 },
+    RestoreAlbum,
+}
+
 #[derive(Debug, Error, PartialEq)]
 pub enum CoreError {
+    #[error("A Borda do Frame exige uma cor RGB canônica e espessura física válida")]
+    InvalidFrameBorder,
+    #[error("Selecione Frames distintos de uma única Lâmina para alterar seu estilo")]
+    InvalidFrameStyleSelection,
+    #[error("A Opacidade do Frame deve estar entre 0% e 100%")]
+    InvalidFrameOpacity,
     #[error("Selecione Frames distintos de uma única Lâmina para aplicar Efeitos às Fotos")]
     InvalidPhotoEffectSelection,
     #[error("O Ângulo da Foto deve estar entre -45° e +45°, em décimos de grau")]

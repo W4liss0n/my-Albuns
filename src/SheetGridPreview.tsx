@@ -118,7 +118,6 @@ export function SheetGridPreview() {
         displayedPhotoZoom={1}
         document={document}
         presentationUnit={presentationUnit}
-        frameBorder={visualDefaults.frameBorder}
         focusedSheetId={focusedSheetId}
         mediaItems={mediaItems}
         mediaPreviews={

@@ -1,6 +1,9 @@
 {
   "before": [
     {
+      "border": {
+        "kind": "none"
+      },
       "borderFillRects": [],
       "clipRect": {
         "height": 220000,
@@ -9,6 +12,7 @@
         "y": 40000
       },
       "frameId": "stack-frame-0",
+      "opacityByte": 255,
       "photo": {
         "blackAndWhite": false,
         "drawRect": {
@@ -76,6 +80,9 @@
       "zIndex": 0
     },
     {
+      "border": {
+        "kind": "none"
+      },
       "borderFillRects": [],
       "clipRect": {
         "height": 180000,
@@ -84,10 +91,14 @@
         "y": 80000
       },
       "frameId": "stack-frame-1",
+      "opacityByte": 255,
       "photo": null,
       "zIndex": 1
     },
     {
+      "border": {
+        "kind": "none"
+      },
       "borderFillRects": [],
       "clipRect": {
         "height": 100000,
@@ -96,6 +107,7 @@
         "y": 100000
       },
       "frameId": "stack-frame-2",
+      "opacityByte": 255,
       "photo": {
         "blackAndWhite": false,
         "drawRect": {
@@ -168,6 +180,9 @@
       "action": "bringToFront",
       "frames": [
         {
+          "border": {
+            "kind": "none"
+          },
           "borderFillRects": [],
           "clipRect": {
             "height": 100000,
@@ -176,6 +191,7 @@
             "y": 100000
           },
           "frameId": "stack-frame-2",
+          "opacityByte": 255,
           "photo": {
             "blackAndWhite": false,
             "drawRect": {
@@ -243,6 +259,9 @@
           "zIndex": 0
         },
         {
+          "border": {
+            "kind": "none"
+          },
           "borderFillRects": [],
           "clipRect": {
             "height": 220000,
@@ -251,6 +270,7 @@
             "y": 40000
           },
           "frameId": "stack-frame-0",
+          "opacityByte": 255,
           "photo": {
             "blackAndWhite": false,
             "drawRect": {
@@ -318,6 +338,9 @@
           "zIndex": 1
         },
         {
+          "border": {
+            "kind": "none"
+          },
           "borderFillRects": [],
           "clipRect": {
             "height": 180000,
@@ -326,6 +349,7 @@
             "y": 80000
           },
           "frameId": "stack-frame-1",
+          "opacityByte": 255,
           "photo": null,
           "zIndex": 2
         }
@@ -339,6 +363,9 @@
       "action": "advance",
       "frames": [
         {
+          "border": {
+            "kind": "none"
+          },
           "borderFillRects": [],
           "clipRect": {
             "height": 220000,
@@ -347,6 +374,7 @@
             "y": 40000
           },
           "frameId": "stack-frame-0",
+          "opacityByte": 255,
           "photo": {
             "blackAndWhite": false,
             "drawRect": {
@@ -414,6 +442,9 @@
           "zIndex": 0
         },
         {
+          "border": {
+            "kind": "none"
+          },
           "borderFillRects": [],
           "clipRect": {
             "height": 100000,
@@ -422,6 +453,7 @@
             "y": 100000
           },
           "frameId": "stack-frame-2",
+          "opacityByte": 255,
           "photo": {
             "blackAndWhite": false,
             "drawRect": {
@@ -489,6 +521,9 @@
           "zIndex": 1
         },
         {
+          "border": {
+            "kind": "none"
+          },
           "borderFillRects": [],
           "clipRect": {
             "height": 180000,
@@ -497,6 +532,7 @@
             "y": 80000
           },
           "frameId": "stack-frame-1",
+          "opacityByte": 255,
           "photo": null,
           "zIndex": 2
         }
@@ -509,6 +545,9 @@
       "action": "recede",
       "frames": [
         {
+          "border": {
+            "kind": "none"
+          },
           "borderFillRects": [],
           "clipRect": {
             "height": 180000,
@@ -517,10 +556,14 @@
             "y": 80000
           },
           "frameId": "stack-frame-1",
+          "opacityByte": 255,
           "photo": null,
           "zIndex": 0
         },
         {
+          "border": {
+            "kind": "none"
+          },
           "borderFillRects": [],
           "clipRect": {
             "height": 220000,
@@ -529,6 +572,7 @@
             "y": 40000
           },
           "frameId": "stack-frame-0",
+          "opacityByte": 255,
           "photo": {
             "blackAndWhite": false,
             "drawRect": {
@@ -596,6 +640,9 @@
           "zIndex": 1
         },
         {
+          "border": {
+            "kind": "none"
+          },
           "borderFillRects": [],
           "clipRect": {
             "height": 100000,
@@ -604,6 +651,7 @@
             "y": 100000
           },
           "frameId": "stack-frame-2",
+          "opacityByte": 255,
           "photo": {
             "blackAndWhite": false,
             "drawRect": {
@@ -679,6 +727,9 @@
       "action": "sendToBack",
       "frames": [
         {
+          "border": {
+            "kind": "none"
+          },
           "borderFillRects": [],
           "clipRect": {
             "height": 180000,
@@ -687,10 +738,14 @@
             "y": 80000
           },
           "frameId": "stack-frame-1",
+          "opacityByte": 255,
           "photo": null,
           "zIndex": 0
         },
         {
+          "border": {
+            "kind": "none"
+          },
           "borderFillRects": [],
           "clipRect": {
             "height": 100000,
@@ -699,6 +754,7 @@
             "y": 100000
           },
           "frameId": "stack-frame-2",
+          "opacityByte": 255,
           "photo": {
             "blackAndWhite": false,
             "drawRect": {
@@ -766,6 +822,9 @@
           "zIndex": 1
         },
         {
+          "border": {
+            "kind": "none"
+          },
           "borderFillRects": [],
           "clipRect": {
             "height": 220000,
@@ -774,6 +833,7 @@
             "y": 40000
           },
           "frameId": "stack-frame-0",
+          "opacityByte": 255,
           "photo": {
             "blackAndWhite": false,
             "drawRect": {
