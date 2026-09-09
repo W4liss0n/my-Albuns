@@ -75,6 +75,7 @@ pub(crate) async fn apply_project_intent(
         ProjectIntent::ReorderSheet { .. } => "reorder_sheet",
         ProjectIntent::TransformPhoto { .. } => "transform_photo",
         ProjectIntent::OrientPhotos { .. } => "orient_photos",
+        ProjectIntent::SetPhotoAngle { .. } => "set_photo_angle",
         ProjectIntent::AddPhoto { .. } => "add_photo",
         ProjectIntent::DropPhoto { .. } => "drop_photo",
     };
@@ -190,6 +191,32 @@ pub(crate) fn photo_drop_target(
         return Err("O alvo da Foto só pode ser consultado na Janela do Projeto.".into());
     }
     state.project_photo_drop_target(&sheet_id, x_um, y_um)
+}
+
+#[tauri::command]
+pub(crate) async fn preview_photo_angle(
+    edit: myalbuns_core::PhotoAngleEdit,
+    window: WebviewWindow,
+    state: State<'_, ProjectHost>,
+) -> Result<Vec<myalbuns_core::ComposedFrame>, String> {
+    if window.label() != PROJECT_WINDOW_LABEL {
+        return Err("O Ângulo da Foto só pode ser consultada na Janela do Projeto.".into());
+    }
+    state.preview_photo_angle(&edit)
+}
+
+#[tauri::command]
+pub(crate) fn photo_angle_double_click_time(window: WebviewWindow) -> Result<u32, String> {
+    if window.label() != PROJECT_WINDOW_LABEL {
+        return Err("O Ângulo só está disponível na Janela do Projeto.".into());
+    }
+    #[cfg(windows)]
+    {
+        // Read the user's actual Windows double-click interval, without changing it.
+        Ok(unsafe { windows::Win32::UI::Input::KeyboardAndMouse::GetDoubleClickTime() })
+    }
+    #[cfg(not(windows))]
+    Err("A edição de Fotos requer a plataforma Windows suportada.".into())
 }
 
 #[tauri::command]

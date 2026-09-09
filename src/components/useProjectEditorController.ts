@@ -12,6 +12,7 @@ import type {
 } from "./albumCanvasContract";
 import { useCanvasModeKeyboardShortcuts } from "./useCanvasModeKeyboardShortcuts";
 import { usePhotoGestures } from "./usePhotoGestures";
+import { usePhotoAngleEditing } from "./usePhotoAngleEditing";
 import { useProjectMutations } from "./useProjectMutations";
 import type { ProjectMutationRunner } from "./useProjectMutationRunner";
 import { useProjectNavigation } from "./useProjectNavigation";
@@ -131,8 +132,18 @@ export function useProjectEditorController({
   };
   const canArrangeFrames = canvasMode.kind === "sheet-editing" && selectedFrames.length > 0 && !interactionBlocked;
   const canOrientPhotos = selectedFrames.some((frame) => frame.photo !== null) && !interactionBlocked;
+  const photoAngle = usePhotoAngleEditing({
+    projection,
+    frameIds: navigation.selectedFrameIds,
+    disabled: !canOrientPhotos,
+    port: projectCorePort,
+    runner: runProjectMutation,
+    commit: mutations.commitPhotoAngle,
+    onError: reportInteractionError,
+  });
   const orientPhotos = (action: PhotoOrientationAction) => {
     if (!canOrientPhotos) return Promise.resolve(false);
+    void photoAngle.commit();
     return mutations.orientPhotos([...navigation.selectedFrameIds], action);
   };
   const canDeleteFrames = canArrangeFrames;
@@ -239,7 +250,7 @@ export function useProjectEditorController({
   const canvasProps: AlbumCanvasProps = {
     projectId: projection.state.projectId,
     mode: canvasMode,
-    composition: projection.composition,
+    composition: photoAngle.composition,
     sheetBarMetadata: projection.state.album.sheets.map((sheet) => ({
       sheetId: sheet.id,
       pageNumbers: sheet.pageNumbers,
@@ -352,6 +363,16 @@ export function useProjectEditorController({
   };
 
   return {
+    photoAngle: {
+      disabled: !canOrientPhotos,
+      scopeKey: photoAngle.scopeKey,
+      doubleClickTimeMs: photoAngle.doubleClickTimeMs,
+      dragThreshold,
+      settlement: photoAngle.settlement,
+      onPreview: photoAngle.preview,
+      onCommit: (angleTenths: number) => { void photoAngle.commit(angleTenths); },
+      onCancel: photoAngle.cancel,
+    },
     canOrientPhotos,
     orientPhotos,
     addFrame,
@@ -400,10 +421,10 @@ export function useProjectEditorController({
     convertEdge,
     deleteSheet,
     reorderSheet,
-    save: mutations.save,
-    saveAs: mutations.saveAs,
-    undo: mutations.undo,
-    redo: mutations.redo,
+    save: () => { void photoAngle.commit(); return mutations.save(); },
+    saveAs: () => { void photoAngle.commit(); return mutations.saveAs(); },
+    undo: () => { void photoAngle.commit(); return mutations.undo(); },
+    redo: () => { void photoAngle.commit(); return mutations.redo(); },
     fillMedia: (mediaId: string) => {
       if (navigation.implicitSheetId) {
         void mutations.applyPhotoWithStatus({

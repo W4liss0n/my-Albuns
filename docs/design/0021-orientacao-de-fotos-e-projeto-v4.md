@@ -46,7 +46,8 @@ da ocorrência existente.
 O Core continua proprietário do Preenchimento do Frame e dos limites de Pan.
 A ordem é Giro, Espelhamento horizontal, Zoom de preenchimento, Zoom do usuário
 e Pan, preservando o espaço reservado ao Ângulo fino entre Giro e Espelhamento.
-Esse Ângulo continua pertencendo a um recorte posterior da issue #22.
+O recorte seguinte da issue #22 entrega esse controle no
+[design 0022](0022-angulo-fino-da-foto-e-projeto-v5.md).
 
 O Espelhamento inverte a horizontal da Foto já girada. Canvas, miniaturas e
 Exportação obedecem à mesma ordem. No Pixi, cujo `scale` atua nos eixos locais,

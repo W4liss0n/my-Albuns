@@ -10,6 +10,7 @@ import type {
   EditorProjection,
   FrameGeometryEdit,
   PhotoOrientationAction,
+  PhotoAngleEdit,
   ProjectIntent,
 } from "../domain/project";
 import {
@@ -144,6 +145,16 @@ export function useProjectMutations({
         port.apply({ kind: "orientPhotos", frameIds, action }, publish)),
       true,
     );
+  }
+
+  async function commitPhotoAngle(edit: PhotoAngleEdit): Promise<EditorProjection | null> {
+    let committed: EditorProjection | null = null;
+    await runWithErrorFeedback(
+      (port) => imageProcessing.run((publish) => port.apply({ kind: "setPhotoAngle", edit }, publish)),
+      true,
+      (next) => { committed = next; },
+    );
+    return committed;
   }
 
   async function copyFrames(frameIds: string[]) {
@@ -417,6 +428,7 @@ export function useProjectMutations({
     swapFrameContentsAtPoint,
     swapSheetSides,
     orientPhotos,
+    commitPhotoAngle,
     applyAlbumInformation: commitAlbumInformation,
     applyAlbumDesign: (draft: AlbumDesignProjectDraft) =>
       commitProjectSettingsDraft(draft),

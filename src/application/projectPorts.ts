@@ -4,6 +4,7 @@ import type {
   EditorProjection,
   ComposedFrame,
   FrameGeometryEdit,
+  PhotoAngleEdit,
   PhotoDropTarget,
   ProjectIntent,
   ProjectMutationOutcome,
@@ -237,6 +238,8 @@ export interface PhotoImportCompletion {
 
 export interface ProjectCorePort {
   readFrameDragThreshold(): Promise<PointerDragThreshold>;
+  readPhotoAngleDoubleClickTime(): Promise<number>;
+  previewPhotoAngle(edit: PhotoAngleEdit): Promise<ComposedFrame[]>;
   previewFrameGeometry(edit: FrameGeometryEdit): Promise<ComposedFrame[]>;
   load(operationId: string): Promise<EditorProjection>;
   validateAlbumInformation(

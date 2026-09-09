@@ -308,7 +308,7 @@ fn compose_overlay(
 
 fn compose_photo(frame: &RectUm, photo: &PhotoSnapshot, media: &MediaCatalogItem) -> ComposedPhoto {
     let rotation_degrees =
-        photo.transform.quarter_turns as f32 * 90.0 + photo.transform.fine_rotation_degrees;
+        photo.transform.quarter_turns as f32 * 90.0 - photo.transform.fine_rotation_degrees;
     let radians = (rotation_degrees as f64).to_radians();
     let cosine = radians.cos();
     let sine = radians.sin();
@@ -333,10 +333,20 @@ fn compose_photo(frame: &RectUm, photo: &PhotoSnapshot, media: &MediaCatalogItem
         x: frame_width / 2.0,
         y: frame_height / 2.0,
     };
-    let horizontal_direction = VectorUm { x: cosine, y: sine };
+    // Horizontal mirroring reflects the fine angle's axes. Keep the quarter-turn
+    // direction used by legacy projects, so mirroring never reverses Pan controls.
+    let pan_radians = if photo.transform.mirror_x {
+        f64::from(photo.transform.quarter_turns) * std::f64::consts::PI - radians
+    } else {
+        radians
+    };
+    let horizontal_direction = VectorUm {
+        x: pan_radians.cos(),
+        y: pan_radians.sin(),
+    };
     let vertical_direction = VectorUm {
-        x: -sine,
-        y: cosine,
+        x: -pan_radians.sin(),
+        y: pan_radians.cos(),
     };
     let horizontal_span = (draw_width_at_fill * current_zoom - required_width).max(0.0);
     let vertical_span = (draw_height_at_fill * current_zoom - required_height).max(0.0);

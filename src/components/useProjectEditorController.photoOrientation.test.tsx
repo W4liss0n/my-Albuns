@@ -30,7 +30,9 @@ function harness() {
   const undo = vi.fn(async () => rotated);
   const port: ProjectCorePort = {
     load: async () => initial, apply, applyWithOutcome: unsupported, save, undo, redo: async () => mirrored,
-    readFrameDragThreshold: async () => ({ x: 5, y: 5 }), previewFrameGeometry: unsupported,
+    readFrameDragThreshold: async () => ({ x: 5, y: 5 }), readPhotoAngleDoubleClickTime: async () => 500,
+    previewPhotoAngle: async () => { throw new Error("Photo angle preview is not configured in this fixture."); },
+    previewFrameGeometry: unsupported,
     saveAs: unsupported, validateAlbumInformation: unsupported, importPhoto: unsupported,
     resolvePhotoDropTarget: unsupported, relink: unsupported,
   };

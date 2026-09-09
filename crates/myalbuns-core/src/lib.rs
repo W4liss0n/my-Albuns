@@ -19,7 +19,7 @@ pub use model::{
     EditorProjection, EditorState, FrameSnapshot, FrameStackAction, ImportPhoto,
     ImportPhotoDisposition, ImportPhotoOutcome, ImportPhotosOutcome, Matrix2, MediaCatalogItem,
     MediaId, MediaKind, MediaTransform, MediaUsage, NormalizedPan, NumberRange, ParseMediaIdError,
-    PhotoDropTarget, PhotoOrientationAction, PhotoPlacement, PhotoPlacementMode,
+    PhotoAngleEdit, PhotoDropTarget, PhotoOrientationAction, PhotoPlacement, PhotoPlacementMode,
     PhotoPlacementPlan, PhotoSnapshot, PhotoSourceMetadata, ProjectIntent, ProjectMutationOutcome,
     ProjectedActiveSides, ProjectedBackground, ProjectedBackgroundContent, ProjectedDisplayUnit,
     ProjectedFrameBorder, ProjectedOverlay, ProjectedOverlayContent, ProjectedVisualDefaults,

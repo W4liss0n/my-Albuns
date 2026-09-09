@@ -2,17 +2,19 @@ import { FlipHorizontal2, RotateCcw } from "lucide-react";
 import type { FrameSnapshot, PhotoOrientationAction } from "../domain/project";
 import { projectCommandDescriptor } from "../application/projectCommandCatalog";
 import { ActionButton } from "../ui";
+import { PhotoAngleControl, type PhotoAngleControlActions } from "./PhotoAngleControl";
 
 export interface PhotoOrientationControlActions {
   disabled: boolean;
   onAction(action: PhotoOrientationAction): void;
+  angle?: PhotoAngleControlActions;
 }
 
 interface PhotoOrientationControlsProps extends PhotoOrientationControlActions {
   frames: readonly FrameSnapshot[];
 }
 
-export function PhotoOrientationControls({ frames, disabled, onAction }: PhotoOrientationControlsProps) {
+export function PhotoOrientationControls({ frames, disabled, onAction, angle }: PhotoOrientationControlsProps) {
   const photos = frames.flatMap((frame) => frame.photo ? [frame.photo] : []);
   if (photos.length === 0) return null;
   const first = photos[0].transform;
@@ -20,6 +22,8 @@ export function PhotoOrientationControls({ frames, disabled, onAction }: PhotoOr
     ? first.quarterTurns : null;
   const mirrored = photos.every((photo) => photo.transform.mirrorX === first.mirrorX)
     ? first.mirrorX : "mixed";
+  const angleTenths = photos.every((photo) => photo.transform.fineRotationDegrees === first.fineRotationDegrees)
+    ? Math.round(first.fineRotationDegrees * 10) : null;
   const rotate = projectCommandDescriptor("rotate-photo-counterclockwise");
   const reset = projectCommandDescriptor("reset-photo-rotation");
   const mirror = projectCommandDescriptor("mirror-photo-horizontal");
@@ -52,6 +56,7 @@ export function PhotoOrientationControls({ frames, disabled, onAction }: PhotoOr
           0°
         </ActionButton>
       </div>
+      {angle && <PhotoAngleControl key={angle.scopeKey} value={angleTenths} {...angle} />}
       <ActionButton
         className="photo-mirror-control"
         density="compact"

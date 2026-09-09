@@ -863,6 +863,9 @@ pub enum ProjectIntent {
         frame_ids: Vec<String>,
         action: PhotoOrientationAction,
     },
+    SetPhotoAngle {
+        edit: PhotoAngleEdit,
+    },
     TransformPhoto {
         frame_id: String,
         delta_pan_x: f32,
@@ -893,8 +896,17 @@ pub enum PhotoOrientationAction {
     ToggleHorizontalMirror,
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PhotoAngleEdit {
+    pub frame_ids: Vec<String>,
+    pub angle_tenths: i16,
+}
+
 #[derive(Debug, Error, PartialEq)]
 pub enum CoreError {
+    #[error("O Ângulo da Foto deve estar entre -45° e +45°, em décimos de grau")]
+    InvalidPhotoAngle,
     #[error("Selecione Frames distintos de uma única Lâmina para orientar as Fotos")]
     InvalidPhotoOrientationSelection,
     #[error("A Troca de lados exige uma Lâmina dupla")]

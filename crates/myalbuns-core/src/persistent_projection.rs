@@ -95,7 +95,9 @@ pub(crate) fn editor_state(
                                     pan_y: photo.transform().pan_y(),
                                     user_zoom: photo.transform().user_zoom(),
                                     quarter_turns: photo.transform().quarter_turns(),
-                                    fine_rotation_degrees: 0.0,
+                                    fine_rotation_degrees: photo
+                                        .transform()
+                                        .fine_rotation_degrees(),
                                     mirror_x: photo.transform().mirror_x(),
                                 },
                             }),

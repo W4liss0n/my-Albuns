@@ -316,7 +316,7 @@
         "referenceCaptureSelector": "body"
       },
       "viewport": { "width": 1440, "height": 900 },
-      "readySelector": ".app-shell:has(.workspace-grid canvas):has(#contextual-panel button[aria-label=\"Informações do Álbum\"][aria-expanded=\"true\"])",
+      "readySelector": ".app-shell:has(.workspace-grid canvas.pixi-canvas):has(#contextual-panel button[aria-label=\"Informações do Álbum\"][aria-expanded=\"true\"])",
       "referenceReadySelector": "[data-l=\"2\"]",
       "actions": [],
       "referenceActions": []
@@ -415,7 +415,7 @@
       "viewport": { "width": 1440, "height": 900 },
       "readySelector": "#contextual-panel button[aria-label=\"Design da Lâmina\"][aria-expanded=\"true\"]",
       "actions": [
-        { "type": "focus", "selector": ".workspace-grid canvas" },
+        { "type": "focus", "selector": ".workspace-grid canvas.pixi-canvas" },
         { "type": "key", "key": "Enter" }
       ]
     },
@@ -432,9 +432,9 @@
       "viewport": { "width": 1440, "height": 900 },
       "readySelector": "#contextual-panel [aria-label=\"Zoom da Foto\"]",
       "actions": [
-        { "type": "focus", "selector": ".workspace-grid canvas" },
+        { "type": "focus", "selector": ".workspace-grid canvas.pixi-canvas" },
         { "type": "key", "key": "Enter" },
-        { "type": "click", "selector": ".workspace-grid canvas" }
+        { "type": "click", "selector": ".workspace-grid canvas.pixi-canvas" }
       ]
     },
     {
@@ -450,9 +450,9 @@
       "viewport": { "width": 1440, "height": 900 },
       "readySelector": "#contextual-panel:has(.context-heading):not(:has([aria-label=\"Zoom da Foto\"])) .context-heading h2",
       "actions": [
-        { "type": "focus", "selector": ".workspace-grid canvas" },
+        { "type": "focus", "selector": ".workspace-grid canvas.pixi-canvas" },
         { "type": "key", "key": "Enter" },
-        { "type": "click", "selector": ".workspace-grid canvas" }
+        { "type": "click", "selector": ".workspace-grid canvas.pixi-canvas" }
       ]
     },
     {
@@ -4087,6 +4087,297 @@
       "comparison": { "kind": "implementation-only", "surface": "photo-orientation", "reason": "Os novos controles usam a tipografia e os componentes da referência vigente, mantendo o Giro e o Espelhamento legíveis na escala de 150%." },
       "viewport": { "width": 2160, "height": 1200 },
       "readySelector": ".photo-mirror-control[aria-pressed=\"true\"]",
+      "actions": []
+    },
+    {
+      "id": "workspace-photo-angle-preview",
+      "title": "Ângulo — prévia contínua sem alterar o Histórico",
+      "implementationPath": "/workspace-preview.html?frame=orientation",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "photo-angle",
+        "reason": "O design 0001 define o Ângulo de −45° a 45°, seleção múltipla e restauração com dois cliques. O design 0022 detalha a edição e a prévia; os estados e Frames compostos deste cenário são produzidos e verificados no ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "body[data-photo-orientation=\"neutral\"][data-photo-orientation-history=\"0,0\"][data-photo-angle-preview=\"123\"]",
+      "actions": [
+        {
+          "type": "input",
+          "selector": "[aria-label=\"Ângulo em graus\"]",
+          "value": "12,3"
+        }
+      ]
+    },
+    {
+      "id": "workspace-photo-angle-numeric",
+      "title": "Ângulo — confirmação de 12,3° no campo numérico",
+      "implementationPath": "/workspace-preview.html?frame=orientation",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "photo-angle",
+        "reason": "O design 0001 define o Ângulo de −45° a 45°, seleção múltipla e restauração com dois cliques. O design 0022 detalha a edição e a prévia; os estados e Frames compostos deste cenário são produzidos e verificados no ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "body[data-photo-orientation=\"single-angle\"][data-photo-orientation-history=\"1,0\"]",
+      "actions": [
+        {
+          "type": "input",
+          "selector": "[aria-label=\"Ângulo em graus\"]",
+          "value": "12,3"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        }
+      ]
+    },
+    {
+      "id": "workspace-photo-angle-minimum",
+      "title": "Ângulo — limite de −45°",
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-angle-max",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "photo-angle",
+        "reason": "O design 0001 define o Ângulo de −45° a 45°, seleção múltipla e restauração com dois cliques. O design 0022 detalha a edição e a prévia; os estados e Frames compostos deste cenário são produzidos e verificados no ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "body[data-photo-orientation=\"single-angle-min\"][data-photo-orientation-history=\"1,0\"]",
+      "actions": [
+        {
+          "type": "input",
+          "selector": "[aria-label=\"Ângulo em graus\"]",
+          "value": "-45"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        }
+      ]
+    },
+    {
+      "id": "workspace-photo-angle-invalid",
+      "title": "Ângulo — valor fora do intervalo permanece sem gravação",
+      "implementationPath": "/workspace-preview.html?frame=orientation",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "photo-angle",
+        "reason": "O design 0001 define o Ângulo de −45° a 45°, seleção múltipla e restauração com dois cliques. O design 0022 detalha a edição e a prévia; os estados e Frames compostos deste cenário são produzidos e verificados no ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "body[data-photo-orientation=\"neutral\"][data-photo-orientation-history=\"0,0\"] [aria-label=\"Ângulo em graus\"][aria-invalid=\"true\"]",
+      "actions": [
+        {
+          "type": "input",
+          "selector": "[aria-label=\"Ângulo em graus\"]",
+          "value": "45,1"
+        }
+      ]
+    },
+    {
+      "id": "workspace-photo-angle-mixed",
+      "title": "Ângulo — valores mistos entre Fotos e placeholder",
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-angle-both&selection=group",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "photo-angle",
+        "reason": "O design 0001 define o Ângulo de −45° a 45°, seleção múltipla e restauração com dois cliques. O design 0022 detalha a edição e a prévia; os estados e Frames compostos deste cenário são produzidos e verificados no ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "[aria-label=\"Ângulo da Foto\"][data-mixed=\"true\"]",
+      "actions": []
+    },
+    {
+      "id": "workspace-photo-angle-group",
+      "title": "Ângulo — valor absoluto para as Fotos da seleção",
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-angle-both&selection=group",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "photo-angle",
+        "reason": "O design 0001 define o Ângulo de −45° a 45°, seleção múltipla e restauração com dois cliques. O design 0022 detalha a edição e a prévia; os estados e Frames compostos deste cenário são produzidos e verificados no ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "body[data-photo-orientation=\"group-angle\"][data-photo-orientation-history=\"1,0\"]",
+      "actions": [
+        {
+          "type": "input",
+          "selector": "[aria-label=\"Ângulo em graus\"]",
+          "value": "-23,4"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        }
+      ]
+    },
+    {
+      "id": "workspace-photo-angle-reset",
+      "title": "Ângulo — dois cliques restauram zero como uma ação",
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-angle",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "photo-angle",
+        "reason": "O design 0001 define o Ângulo de −45° a 45°, seleção múltipla e restauração com dois cliques. O design 0022 detalha a edição e a prévia; os estados e Frames compostos deste cenário são produzidos e verificados no ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "body[data-photo-orientation=\"neutral\"][data-photo-orientation-history=\"1,0\"]",
+      "actions": [
+        {
+          "type": "pointer-click",
+          "selector": "[aria-label=\"Ângulo da Foto\"]"
+        },
+        {
+          "type": "pointer-click",
+          "selector": "[aria-label=\"Ângulo da Foto\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-photo-angle-group-reset",
+      "title": "Ângulo — restauração coletiva preserva Giro e Espelhamento",
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=group-angle&selection=group",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "photo-angle",
+        "reason": "O design 0001 define o Ângulo de −45° a 45°, seleção múltipla e restauração com dois cliques. O design 0022 detalha a edição e a prévia; os estados e Frames compostos deste cenário são produzidos e verificados no ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "body[data-photo-orientation=\"single-both\"][data-photo-orientation-history=\"1,0\"]",
+      "actions": [
+        {
+          "type": "pointer-click",
+          "selector": "[aria-label=\"Ângulo da Foto\"]"
+        },
+        {
+          "type": "pointer-click",
+          "selector": "[aria-label=\"Ângulo da Foto\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-photo-angle-keyboard",
+      "title": "Ângulo — ajuste de 0,1° pelo teclado",
+      "implementationPath": "/workspace-preview.html?frame=orientation",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "photo-angle",
+        "reason": "O design 0001 define o Ângulo de −45° a 45°, seleção múltipla e restauração com dois cliques. O design 0022 detalha a edição e a prévia; os estados e Frames compostos deste cenário são produzidos e verificados no ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "body[data-photo-orientation=\"keyboard-angle\"][data-photo-orientation-history=\"1,0\"]",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": "[aria-label=\"Ângulo da Foto\"]"
+        },
+        {
+          "type": "key",
+          "key": "ArrowRight"
+        }
+      ]
+    },
+    {
+      "id": "workspace-photo-angle-history",
+      "title": "Ângulo — Desfazer e Refazer restauram a composição",
+      "implementationPath": "/workspace-preview.html?frame=orientation",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "photo-angle",
+        "reason": "O design 0001 define o Ângulo de −45° a 45°, seleção múltipla e restauração com dois cliques. O design 0022 detalha a edição e a prévia; os estados e Frames compostos deste cenário são produzidos e verificados no ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "body[data-photo-orientation=\"single-angle\"][data-photo-orientation-history=\"1,0\"]",
+      "actions": [
+        {
+          "type": "input",
+          "selector": "[aria-label=\"Ângulo em graus\"]",
+          "value": "12,3"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Desfazer\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-photo-orientation=\"neutral\"][data-photo-orientation-history=\"0,1\"]"
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Refazer\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-photo-angle-scale-125",
+      "title": "Ângulo — seleção múltipla a 125%",
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-angle-both&selection=group&scale=1.25",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "photo-angle",
+        "reason": "O design 0001 define o Ângulo de −45° a 45°, seleção múltipla e restauração com dois cliques. O design 0022 detalha a edição e a prévia; os estados e Frames compostos deste cenário são produzidos e verificados no ProjectCore."
+      },
+      "viewport": {
+        "width": 1800,
+        "height": 1000
+      },
+      "readySelector": "[aria-label=\"Ângulo da Foto\"][data-mixed=\"true\"]",
+      "actions": []
+    },
+    {
+      "id": "workspace-photo-angle-scale-150",
+      "title": "Ângulo — Foto inclinada a 150%",
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-angle&scale=1.5",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "photo-angle",
+        "reason": "O design 0001 define o Ângulo de −45° a 45°, seleção múltipla e restauração com dois cliques. O design 0022 detalha a edição e a prévia; os estados e Frames compostos deste cenário são produzidos e verificados no ProjectCore."
+      },
+      "viewport": {
+        "width": 2160,
+        "height": 1200
+      },
+      "readySelector": "body[data-photo-orientation=\"single-angle\"]",
       "actions": []
     }
   ]

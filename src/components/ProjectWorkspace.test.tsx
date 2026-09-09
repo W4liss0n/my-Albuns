@@ -347,6 +347,8 @@ function projectCorePortWithApply(
     }),
     importPhoto: async () => ({ kind: "cancelled", projection }),
     readFrameDragThreshold: async () => ({ x: 5, y: 5 }),
+    readPhotoAngleDoubleClickTime: async () => 500,
+    previewPhotoAngle: async () => { throw new Error("Photo angle preview is not configured in this fixture."); },
     previewFrameGeometry: async () => { throw new Error("Frame geometry preview is not configured in this fixture."); },
     resolvePhotoDropTarget: async () => ({ kind: "invalid" }),
     relink: async () => projection,

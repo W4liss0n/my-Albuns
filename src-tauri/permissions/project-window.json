@@ -13,6 +13,8 @@
           "import_photo",
           "photo_drop_target",
           "preview_frame_geometry",
+          "preview_photo_angle",
+          "photo_angle_double_click_time",
           "frame_drag_threshold",
           "relink_media",
           "retry_unavailable_media",
