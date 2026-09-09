@@ -810,7 +810,7 @@ validação das superfícies descritas nesta seção.
 - A área de transferência de Frames é exclusiva da Janela do Projeto: uma cópia não pode ser colada em outro Projeto aberto.
 - Em Layout travado, copiar permanece permitido e colar fica indisponível porque a criação mudaria a quantidade de Frames.
 - Uma Foto sempre existe dentro de um Frame. O mesmo Arquivo vinculado pode aparecer em vários Frames com ajustes independentes.
-- Um Frame vazio intencional é um Frame placeholder. Qualquer Exportação que inclua sua Lâmina é bloqueada.
+- Um Frame vazio intencional é um Frame placeholder. Qualquer Exportação que inclua sua Lâmina é bloqueada. O aviso identifica o Frame vazio, independentemente de o Layout estar travado ou destravado.
 - Uma Lâmina sem Frames é válida e exportável.
 - A criação manual de um Frame placeholder ocorre somente no Modo de edição da Lâmina por `Editar > Adicionar Frame` ou pelo menu de contexto da área vazia do Canvas.
 - O comando cria imediatamente um único Frame centralizado, selecionado e com dimensões proporcionais à superfície ativa, sem modo de desenho nem ferramenta persistente.

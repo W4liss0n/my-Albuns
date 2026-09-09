@@ -60,7 +60,8 @@ preservados após destravar. Uma Lâmina sem Frames continua exportável.
 O Host executa essa validação
 antes de abrir o destino e o Core a repete ao preparar a saída. O diálogo
 compartilhado apresenta `Projeto`, `Motivo` e `Abrir Projeto`; a ação devolve
-o foco à Janela do Projeto. Preencher as posições libera a mesma seleção.
+o foco à Janela do Projeto. O motivo informa `Frame vazio`, independentemente
+do estado de travamento do Layout. Preencher os Frames libera a mesma seleção.
 A composição física usada pelo Canvas permanece a fonte da Exportação JPEG.
 
 ## Verificação

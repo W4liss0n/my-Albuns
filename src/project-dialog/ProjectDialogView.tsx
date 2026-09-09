@@ -33,10 +33,10 @@ export function ProjectDialogView({
   switch (state.kind) {
     case "exportProblems":
       return <ProblemsDialog title="Problemas na Exportação"
-        description="Preencha as posições sem Foto para exportar a seleção."
+        description="Preencha os Frames vazios para exportar a seleção."
         columns={["Projeto", "Motivo", "Ação"]}
         rows={state.problems.map((problem) => [state.projectName,
-          `Lâmina ${String(problem.sheetNumber).padStart(2, "0")}, posição ${problem.frameNumber} sem Foto.`,
+          `Lâmina ${String(problem.sheetNumber).padStart(2, "0")}, posição ${problem.frameNumber}: Frame vazio.`,
           <ActionButton onClick={() => onAction("openExportProject")}>Abrir Projeto</ActionButton>])}
         onClose={() => onAction("dismissExport")} />;
     case "imageProcessingProgress":

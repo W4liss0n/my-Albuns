@@ -981,7 +981,7 @@ pub enum CoreError {
         "Não há posição vazia neste Layout travado. Arraste a Foto para um Frame existente para substituí-la."
     )]
     LockedLayoutHasNoPlaceholder,
-    #[error("A seleção contém posições sem Foto.")]
+    #[error("A seleção contém Frames vazios.")]
     UnfilledLayoutPositions {
         problems: Vec<crate::LayoutExportProblem>,
     },

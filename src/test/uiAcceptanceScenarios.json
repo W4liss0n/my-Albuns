@@ -5813,7 +5813,7 @@
     },
     {
       "id": "layout-export-problems",
-      "title": "Layout travado — problemas por posição e Abrir Projeto",
+      "title": "Exportação — Frames vazios e Abrir Projeto",
       "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportProblems%22%2C%22projectName%22%3A%22Layouts%22%2C%22problems%22%3A%5B%7B%22frameId%22%3A%2200000000-0000-4000-8000-000000000102%22%2C%22frameNumber%22%3A2%2C%22sheetId%22%3A%22sheet-001%22%2C%22sheetNumber%22%3A1%7D%2C%7B%22frameId%22%3A%2200000000-0000-4000-8000-000000000104%22%2C%22frameNumber%22%3A4%2C%22sheetId%22%3A%22sheet-001%22%2C%22sheetNumber%22%3A1%7D%2C%7B%22frameId%22%3A%22lock-placeholder-5%22%2C%22frameNumber%22%3A5%2C%22sheetId%22%3A%22sheet-001%22%2C%22sheetNumber%22%3A1%7D%2C%7B%22frameId%22%3A%22lock-placeholder-6%22%2C%22frameNumber%22%3A6%2C%22sheetId%22%3A%22sheet-001%22%2C%22sheetNumber%22%3A1%7D%5D%7D",
       "comparison": {
         "kind": "implementation-only",

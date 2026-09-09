@@ -337,7 +337,7 @@ pub(crate) async fn export_sheet(
     if !problems.is_empty() {
         return Err(ExportCommandError {
             code: ExportCommandErrorCode::UnfilledLayoutPositions,
-            message: "Preencha as posições sem Foto antes de exportar a seleção.".into(),
+            message: "Preencha os Frames vazios antes de exportar a seleção.".into(),
             media_id: None,
             path_code: None,
             layout_problems: Some(problems),
