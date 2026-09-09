@@ -36,7 +36,7 @@ export function ProjectDialogView({
         description="Preencha as posições sem Foto para exportar a seleção."
         columns={["Projeto", "Motivo", "Ação"]}
         rows={state.problems.map((problem) => [state.projectName,
-          `Lâmina ${String(problem.sheetNumber).padStart(2, "0")}, posição ${problem.frameNumber} sem Foto em Layout travado.`,
+          `Lâmina ${String(problem.sheetNumber).padStart(2, "0")}, posição ${problem.frameNumber} sem Foto.`,
           <ActionButton onClick={() => onAction("openExportProject")}>Abrir Projeto</ActionButton>])}
         onClose={() => onAction("dismissExport")} />;
     case "imageProcessingProgress":

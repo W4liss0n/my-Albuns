@@ -223,9 +223,10 @@ impl PersistentProjectSession {
         }
         if let ProjectIntent::DeleteFrames { frame_ids, mode } = &intent {
             let next = self.project().with_deleted_frames(frame_ids, *mode)?;
-            if next == *self.project() {
-                return Ok(outcome);
+            if next != *self.project() {
+                self.commit_edit(|_| Ok(next))?;
             }
+            return Ok(outcome);
         }
         if let ProjectIntent::EditFrameGeometry { edit } = &intent {
             let rects = self.project().frame_geometry_edit(edit)?;
@@ -265,8 +266,8 @@ impl PersistentProjectSession {
             ProjectIntent::SwapFrameContents { frame_ids } => {
                 project.with_swapped_frame_contents(&frame_ids)
             }
-            ProjectIntent::DeleteFrames { frame_ids, mode } => {
-                project.with_deleted_frames(&frame_ids, mode)
+            ProjectIntent::DeleteFrames { .. } => {
+                unreachable!("Frame deletion commits its prepared document once")
             }
             ProjectIntent::ArrangeFrames { frame_ids, action } => {
                 project.with_arranged_frames(&frame_ids, action)

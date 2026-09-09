@@ -28,6 +28,83 @@ fn project(root: &Path) -> myalbuns_core::EditableProject {
 }
 
 #[test]
+fn export_rejects_placeholders_after_unlock_and_on_manual_frames() {
+    for lock_then_unlock in [true, false] {
+        let root = tempfile::tempdir().unwrap();
+        let mut project = project(root.path());
+        let sheet = project.projection().state.album.sheets[0].id.clone();
+        project
+            .apply(ProjectIntent::AddFrame {
+                sheet_id: sheet.clone(),
+            })
+            .unwrap();
+        if lock_then_unlock {
+            let query = project
+                .query_layouts_with_expansion(
+                    &sheet,
+                    Some(myalbuns_core::LayoutExpansion {
+                        additional_positions: 2,
+                        orientation: myalbuns_core::FrameOrientation::Horizontal,
+                    }),
+                )
+                .unwrap();
+            project
+                .apply(ProjectIntent::LockLayout {
+                    selection: LayoutSelection {
+                        query_id: query.query_id,
+                        candidate_index: 0,
+                    },
+                })
+                .unwrap();
+            project
+                .apply(ProjectIntent::UnlockLayout {
+                    sheet_id: sheet.clone(),
+                })
+                .unwrap();
+        }
+        let frozen = project.freeze_rendering();
+        assert_eq!(
+            frozen
+                .validate_export_sheets(std::slice::from_ref(&sheet))
+                .unwrap()
+                .len(),
+            if lock_then_unlock { 3 } else { 1 }
+        );
+        assert!(matches!(
+            frozen.into_sheet(&sheet),
+            Err(myalbuns_core::CoreError::UnfilledLayoutPositions { .. })
+        ));
+        let path = root.path().join("Foto.jpg");
+        std::fs::write(&path, b"linked original").unwrap();
+        let media_id = project
+            .import_photo(myalbuns_core::ImportPhoto::new(
+                path,
+                myalbuns_core::PhotoSourceMetadata::new(
+                    600,
+                    400,
+                    ["#112233".into(), "#223344".into(), "#334455".into()],
+                )
+                .unwrap(),
+            ))
+            .unwrap()
+            .media_id;
+        for _ in 0..if lock_then_unlock { 3 } else { 1 } {
+            project
+                .apply(ProjectIntent::AddPhoto {
+                    sheet_id: sheet.clone(),
+                    media_id,
+                    mode: myalbuns_core::PhotoPlacementMode::Normal,
+                })
+                .unwrap();
+        }
+        assert!(
+            project.freeze_rendering().into_sheet(&sheet).is_ok(),
+            "filling the same selection releases Export"
+        );
+    }
+}
+
+#[test]
 fn locked_photo_content_can_be_filled_replaced_and_cleared_while_export_reports_each_selected_placeholder()
  {
     use myalbuns_core::{CoreError, ImportPhoto, PhotoPlacementMode, PhotoSourceMetadata};

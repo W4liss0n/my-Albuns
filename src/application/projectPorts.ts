@@ -69,7 +69,7 @@ export interface ExportResult {
 
 export class LayoutExportBlockedError extends Error {
   constructor(readonly problems: LayoutExportProblem[]) {
-    super("Preencha as posições sem Foto antes de exportar o Layout travado.");
+    super("Preencha as posições sem Foto antes de exportar a seleção.");
     this.name = "LayoutExportBlockedError";
   }
 }

@@ -345,7 +345,7 @@ impl FrozenProjectRendering {
             .album
             .sheets
             .iter()
-            .filter(|sheet| sheet.layout_locked && sheet_ids.contains(&sheet.id))
+            .filter(|sheet| sheet_ids.contains(&sheet.id))
             .flat_map(|sheet| {
                 sheet
                     .frames

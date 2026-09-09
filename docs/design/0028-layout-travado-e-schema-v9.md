@@ -55,7 +55,9 @@ fechados: v1 a v8 abrem destravados, sem reescrever o original. Somente Salvar
 publica a migração; uma correção de identidade preserva o schema original.
 
 A validação do snapshot congelado recebe a seleção de Lâminas e identifica
-cada placeholder travado por Lâmina e posição. O Host executa essa validação
+cada placeholder por Lâmina e posição, inclusive os criados manualmente e os
+preservados após destravar. Uma Lâmina sem Frames continua exportável.
+O Host executa essa validação
 antes de abrir o destino e o Core a repete ao preparar a saída. O diálogo
 compartilhado apresenta `Projeto`, `Motivo` e `Abrir Projeto`; a ação devolve
 o foco à Janela do Projeto. Preencher as posições libera a mesma seleção.

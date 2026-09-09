@@ -277,7 +277,7 @@ test("export placeholders list the Project, exact position and Open Project acti
     problems: [{ sheetId: "sheet-001", sheetNumber: 1, frameId: "frame-003", frameNumber: 3 }] }} />);
   const dialog = screen.getByRole("dialog", { name: "Problemas na Exportação" });
   expect(within(dialog).getByRole("columnheader", { name: "Projeto" })).toBeInTheDocument();
-  expect(within(dialog).getByRole("row", { name: "Álbum da turma Lâmina 01, posição 3 sem Foto em Layout travado. Abrir Projeto" })).toBeInTheDocument();
+  expect(within(dialog).getByRole("row", { name: "Álbum da turma Lâmina 01, posição 3 sem Foto. Abrir Projeto" })).toBeInTheDocument();
   await user.click(within(dialog).getByRole("button", { name: "Abrir Projeto" }));
   expect(onAction).toHaveBeenCalledExactlyOnceWith("openExportProject");
 });
