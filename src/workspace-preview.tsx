@@ -122,7 +122,7 @@ if (frameContext === "orientation") {
   useEditorView.setState({ projectId: projection.state.projectId,
     editingSheetId: previewParameters.get("mode") === "normal" ? null : "sheet-001",
     focusedSheetId: "sheet-001", centeredSheetId: "sheet-001",
-    selectedFrameIds: selection === "group" ? photoOrientationCorpus.group
+    selectedFrameIds: selection === "none" ? [] : selection === "group" ? photoOrientationCorpus.group
       : selection === "placeholders" ? photoOrientationCorpus.placeholders : photoOrientationCorpus.single });
   exposePhotoOrientationState();
   useEditorView.subscribe(exposePhotoOrientationState);
@@ -181,7 +181,9 @@ const projectCorePort: ProjectCorePort = {
 
 const mediaPreviewPort: MediaPreviewPort = {
   prepareMediaPreviews: async () =>
-    frameContext === "orientation" ? projection.state.album.media.map((media) => ({
+    frameContext === "orientation" && previewParameters.get("preview") === "palette"
+      ? projection.state.album.media.map((media) => ({ mediaId: media.id, state: "unavailable" as const, url: null }))
+      : frameContext === "orientation" ? projection.state.album.media.map((media) => ({
       mediaId: media.id, state: "ready" as const,
       url: `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400"><path fill="#e63f35" d="M0 0h300v200H0z"/><path fill="#329858" d="M300 0h300v200H300z"/><path fill="#376dcc" d="M0 200h300v200H0z"/><path fill="#e3b634" d="M300 200h300v200H300z"/><g font-family="sans-serif" font-size="80" fill="white" text-anchor="middle"><text x="150" y="130">A</text><text x="450" y="130">B</text><text x="150" y="330">C</text><text x="450" y="330">D</text></g></svg>')}`,
     })) : decorativeContext === "unavailable"
@@ -429,6 +431,15 @@ function applyPreviewIntent(intent: ProjectIntent): ProjectMutationOutcome {
     const transition = photoOrientationCorpus.angleTransitions.find((item) =>
       item.from === current && sameAngleEdit(item.edit, intent.edit));
     if (frameContext !== "orientation" || !transition) throw new Error("Comando fora do corpus de Ângulo desta prévia.");
+    projection = finalizePhysicalPreviewMutation(structuredClone(photoOrientationCorpus.states[transition.to]), structuredClone(projection));
+    exposePhotoOrientationState();
+    return { projection, affectedFrameId: null, affectedSheetId: null };
+  }
+  if (intent.kind === "togglePhotoBlackAndWhite") {
+    const current = photoOrientationStateName();
+    const transition = photoOrientationCorpus.effectTransitions.find((item) => item.from === current &&
+      [...item.frameIds].sort().join() === [...intent.frameIds].sort().join());
+    if (frameContext !== "orientation" || !transition) throw new Error("Comando fora do corpus de Efeitos desta prévia.");
     projection = finalizePhysicalPreviewMutation(structuredClone(photoOrientationCorpus.states[transition.to]), structuredClone(projection));
     exposePhotoOrientationState();
     return { projection, affectedFrameId: null, affectedSheetId: null };

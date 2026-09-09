@@ -254,6 +254,7 @@ pub struct ProjectPhotoTransform {
     quarter_turns: i8,
     mirror_x: bool,
     angle: PhotoFineAngle,
+    black_and_white: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -299,6 +300,15 @@ impl ProjectPhotoTransform {
         self.angle.0
     }
 
+    pub const fn black_and_white(&self) -> bool {
+        self.black_and_white
+    }
+
+    pub(crate) fn with_black_and_white(mut self, enabled: bool) -> Self {
+        self.black_and_white = enabled;
+        self
+    }
+
     pub fn fine_rotation_degrees(&self) -> f32 {
         self.angle.0 as f32 / 10.0
     }
@@ -338,6 +348,7 @@ impl ProjectPhotoTransform {
             quarter_turns: 0,
             mirror_x: false,
             angle: PhotoFineAngle::default(),
+            black_and_white: false,
         })
     }
 
@@ -353,6 +364,7 @@ impl ProjectPhotoTransform {
         next.quarter_turns = self.quarter_turns;
         next.mirror_x = self.mirror_x;
         next.angle = self.angle;
+        next.black_and_white = self.black_and_white;
         Ok(next)
     }
 }
@@ -938,6 +950,31 @@ impl ProjectDocument {
                     photo.transform.mirror_x = next_mirror
                 }
             }
+        }
+        Ok(candidate)
+    }
+
+    pub(crate) fn with_toggled_photo_black_and_white(
+        &self,
+        frame_ids: &[String],
+    ) -> Result<Self, crate::CoreError> {
+        let (sheet_index, selected) = self
+            .frame_selection(frame_ids)
+            .map_err(|()| crate::CoreError::InvalidPhotoEffectSelection)?;
+        let enabled = !self.sheets[sheet_index]
+            .frames
+            .iter()
+            .filter(|frame| selected.contains(&frame.id))
+            .filter_map(|frame| frame.photo.as_ref())
+            .all(|photo| photo.transform.black_and_white);
+        let mut candidate = self.clone();
+        for photo in candidate.sheets[sheet_index]
+            .frames
+            .iter_mut()
+            .filter(|frame| selected.contains(&frame.id))
+            .filter_map(|frame| frame.photo.as_mut())
+        {
+            photo.transform.black_and_white = enabled;
         }
         Ok(candidate)
     }

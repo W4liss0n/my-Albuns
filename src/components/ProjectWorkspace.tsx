@@ -699,6 +699,8 @@ export function ProjectWorkspace({
           key={projectId}
           photoOrientation={{ disabled: !controller.canOrientPhotos,
             onAction: (action) => { void controller.orientPhotos(action); }, angle: controller.photoAngle }}
+          photoEffects={{ disabled: !controller.canApplyPhotoEffects,
+            onToggleBlackAndWhite: () => { void controller.togglePhotoBlackAndWhite(); } }}
           context={inspectorContext}
           displayedPhotoZoom={displayedPhotoZoom}
           displayedPhotoPanX={displayedPhotoPanX}

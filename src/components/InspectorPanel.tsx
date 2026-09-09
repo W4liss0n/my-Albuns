@@ -35,6 +35,7 @@ import { AlbumDesignForm } from "./AlbumDesignForm";
 import { AlbumInformationForm } from "./AlbumInformationForm";
 import { SheetPreviewShell } from "./SheetPreview";
 import { PhotoOrientationControls, type PhotoOrientationControlActions } from "./PhotoOrientationControls";
+import { PhotoEffectsControls, type PhotoEffectsControlActions } from "./PhotoEffectsControls";
 import {
   SheetDesignInspector,
   type SheetDesignScope,
@@ -86,6 +87,7 @@ export type InspectorSectionState =
   | { kind: "local" };
 
 export interface InspectorPanelProps {
+  photoEffects?: PhotoEffectsControlActions;
   photoOrientation?: PhotoOrientationControlActions;
   context: InspectorContext;
   displayedPhotoZoom: number;
@@ -133,6 +135,7 @@ export interface InspectorPanelProps {
 
 export function InspectorPanel({
   photoOrientation,
+  photoEffects,
   context,
   displayedPhotoZoom,
   displayedPhotoPanX,
@@ -354,6 +357,12 @@ export function InspectorPanel({
                 <PhotoOrientationControls frames={context.frames} {...photoOrientation} />
               </InspectorSection>
             )}
+            {photoEffects && selectedPhotoCount > 0 && (
+              <InspectorSection key="frame-photo-effects" title="Ajustes e Efeitos"
+                preferenceKey="frame-photo.effects" sectionState={sectionState} defaultOpen>
+                <PhotoEffectsControls frames={context.frames} {...photoEffects} />
+              </InspectorSection>
+            )}
           </>
         ) : context.kind === "frame" ? (
           <>
@@ -418,6 +427,12 @@ export function InspectorPanel({
               )}
               {photoOrientation && <PhotoOrientationControls frames={[context.frame]} {...photoOrientation} />}
             </InspectorSection>
+            {photoEffects && context.frame.photo && (
+              <InspectorSection key="frame-photo-effects" title="Ajustes e Efeitos"
+                preferenceKey="frame-photo.effects" sectionState={sectionState} defaultOpen>
+                <PhotoEffectsControls frames={[context.frame]} {...photoEffects} />
+              </InspectorSection>
+            )}
           </>
         ) : context.kind === "sheet" && selectedSheetScope ? (
           <InspectorSection

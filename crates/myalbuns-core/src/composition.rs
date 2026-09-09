@@ -400,6 +400,7 @@ fn compose_photo(frame: &RectUm, photo: &PhotoSnapshot, media: &MediaCatalogItem
         placement,
         rotation_degrees,
         mirror_x: photo.transform.mirror_x,
+        black_and_white: photo.transform.black_and_white,
         palette: media.palette.clone().expect("validated Photo palette"),
     }
 }

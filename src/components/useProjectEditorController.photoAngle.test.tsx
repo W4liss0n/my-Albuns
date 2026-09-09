@@ -108,18 +108,21 @@ test("a pending preview uses the latest response, creates no history and is disc
   expect(h.apply).not.toHaveBeenCalled();
 });
 
-test("a draft is flushed before an adjacent orientation command and the preview waits for pending edits", async () => {
+test.each(["orientation", "black-and-white"])("a draft is flushed before an adjacent %s command and the preview waits for pending edits", async (command) => {
   const h = harness();
   const view = renderHook(() => h.useHarness());
   act(() => {
     view.result.current.photoAngle.onPreview(123);
-    void view.result.current.orientPhotos("rotateCounterClockwise");
+    if (command === "orientation") void view.result.current.orientPhotos("rotateCounterClockwise");
+    else void view.result.current.togglePhotoBlackAndWhite();
   });
   expect(h.apply).toHaveBeenCalledExactlyOnceWith({ kind: "setPhotoAngle", edit: { frameIds: corpus.single, angleTenths: 123 } }, expect.any(Function));
   await act(async () => view.result.current.photoAngle.onPreview(450));
   expect(h.preview).not.toHaveBeenCalled();
   await act(async () => { h.pending.resolve(h.first); await view.result.current.runner.waitForIdle(); });
-  expect(h.apply).toHaveBeenNthCalledWith(2, { kind: "orientPhotos", frameIds: corpus.single, action: "rotateCounterClockwise" }, expect.any(Function));
+  expect(h.apply).toHaveBeenNthCalledWith(2, command === "orientation"
+    ? { kind: "orientPhotos", frameIds: corpus.single, action: "rotateCounterClockwise" }
+    : { kind: "togglePhotoBlackAndWhite", frameIds: corpus.single }, expect.any(Function));
   expect(h.preview).toHaveBeenCalledWith({ frameIds: corpus.single, angleTenths: 450 });
 });
 

@@ -29,6 +29,7 @@ import {
   type CanvasBounds,
 } from "./canvasSheetViewGeometry";
 import { pixiColor } from "./pixiColor";
+import { createPhotoBlackAndWhiteFilter } from "./photoBlackAndWhite";
 import {
   createPhotoGeometry,
   type CanvasPhotoPlacement,
@@ -123,6 +124,7 @@ interface PhotoPreviewLayerOptions {
   center: CanvasPoint;
   rotationDegrees: number;
   mirrorX: boolean;
+  blackAndWhite: boolean;
   palette: readonly string[];
   previewTexture?: Texture;
 }
@@ -268,6 +270,7 @@ export function createSheetRenderNode(
         center: geometry.current.center,
         rotationDegrees: frame.photo.rotationDegrees,
         mirrorX: frame.photo.mirrorX,
+        blackAndWhite: frame.photo.blackAndWhite,
         palette: frame.photo.palette,
         previewTexture: callbacks.previewTextureFor(frame.photo.mediaId),
       };
@@ -300,7 +303,7 @@ export function createSheetRenderNode(
           return {
             container: createPhotoPreviewLayer({ ...previewOptions, label: "photo-drag-preview",
               drawWidth: width, drawHeight: height, center: { x: width / 2, y: height / 2 },
-              rotationDegrees: 0, mirrorX: false }),
+              rotationDegrees: 0, mirrorX: false, blackAndWhite: false }),
             bounds: new Rectangle(0, 0, width, height),
           };
         },
@@ -634,6 +637,7 @@ function createPhotoPreviewLayer({
   center,
   rotationDegrees,
   mirrorX,
+  blackAndWhite,
   palette,
   previewTexture,
 }: PhotoPreviewLayerOptions) {
@@ -644,6 +648,11 @@ function createPhotoPreviewLayer({
   // Pixi scales in local coordinates: reverse the angle to mirror after rotation.
   photoLayer.rotation = ((mirrorX ? -rotationDegrees : rotationDegrees) * Math.PI) / 180;
   photoLayer.scale.set(mirrorX ? -1 : 1, 1);
+  if (blackAndWhite) {
+    const filter = createPhotoBlackAndWhiteFilter();
+    photoLayer.filters = [filter];
+    photoLayer.once("destroyed", () => filter.destroy(true));
+  }
 
   if (previewTexture) {
     const sprite = new Sprite({

@@ -147,6 +147,14 @@ export function useProjectMutations({
     );
   }
 
+  function togglePhotoBlackAndWhite(frameIds: string[]) {
+    return runWithErrorFeedback(
+      (port) => imageProcessing.run((publish) =>
+        port.apply({ kind: "togglePhotoBlackAndWhite", frameIds }, publish)),
+      true,
+    );
+  }
+
   async function commitPhotoAngle(edit: PhotoAngleEdit): Promise<EditorProjection | null> {
     let committed: EditorProjection | null = null;
     await runWithErrorFeedback(
@@ -428,6 +436,7 @@ export function useProjectMutations({
     swapFrameContentsAtPoint,
     swapSheetSides,
     orientPhotos,
+    togglePhotoBlackAndWhite,
     commitPhotoAngle,
     applyAlbumInformation: commitAlbumInformation,
     applyAlbumDesign: (draft: AlbumDesignProjectDraft) =>

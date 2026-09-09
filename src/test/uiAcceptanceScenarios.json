@@ -4001,6 +4001,116 @@
       ]
     },
     {
+      "id": "workspace-photo-black-white-single",
+      "title": "Preto e branco — Foto individual no modo normal",
+      "implementationPath": "/workspace-preview.html?frame=orientation&mode=normal",
+      "comparison": { "kind": "implementation-only", "surface": "photo-effects", "reason": "O design 0001 situa Preto e branco em Ajustes e Efeitos. A alteração é por Foto e aparece no Canvas e nas miniaturas; os estados são produzidos pelo ProjectCore." },
+      "viewport": { "width": 1440, "height": 800 },
+      "readySelector": "body[data-photo-orientation=\"single-black-white\"] .photo-effect-control[aria-pressed=\"true\"]",
+      "actions": [{ "type": "click", "selector": ".photo-effect-control" }]
+    },
+    {
+      "id": "workspace-photo-black-white-sheet-preview",
+      "title": "Preto e branco — prévia da Lâmina em SVG e Canvas",
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-black-white&selection=none",
+      "comparison": { "kind": "implementation-only", "surface": "photo-effects", "reason": "A prévia da Lâmina usa o mesmo plano do Canvas. O filtro SVG aplica luminância em sRGB apenas à Foto que possui o efeito, preservando a outra colocação da mesma mídia." },
+      "viewport": { "width": 1440, "height": 800 },
+      "readySelector": ".sheet-design-preview [data-preview-photo-id][filter]",
+      "actions": []
+    },
+    {
+      "id": "workspace-photo-black-white-thumbnails",
+      "title": "Preto e branco — miniaturas das Lâminas no Painel contextual",
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-black-white&selection=none&mode=normal",
+      "comparison": { "kind": "implementation-only", "surface": "photo-effects", "reason": "A grade de Lâminas reflete o estado composto das Fotos. Cada miniatura possui IDs próprios para seus filtros SVG, sem afetar as miniaturas de Originais no Painel de imagens." },
+      "viewport": { "width": 1440, "height": 800 },
+      "readySelector": ".sheet-tile [data-preview-photo-id][filter]",
+      "actions": [
+        { "type": "click-text", "text": "Informações do Álbum" },
+        { "type": "click-text", "text": "Design do Álbum" }
+      ]
+    },
+    {
+      "id": "workspace-photo-black-white-mixed",
+      "title": "Preto e branco — seleção com valores divergentes e placeholder",
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-both-black-white&selection=group",
+      "comparison": { "kind": "implementation-only", "surface": "photo-effects", "reason": "O design 0001 exige estado neutro nos valores divergentes e explicita quantas Fotos serão afetadas. Giro e Espelhamento permanecem independentes do efeito." },
+      "viewport": { "width": 1440, "height": 800 },
+      "readySelector": ".photo-effect-control[aria-pressed=\"mixed\"]",
+      "actions": []
+    },
+    {
+      "id": "workspace-photo-black-white-group",
+      "title": "Preto e branco — primeira escolha absoluta da seleção mista",
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-black-white&selection=group",
+      "comparison": { "kind": "implementation-only", "surface": "photo-effects", "reason": "A primeira escolha ativa Preto e branco em todas as Fotos compatíveis e mantém o placeholder, em uma ação do Histórico, conforme o design 0001." },
+      "viewport": { "width": 1440, "height": 800 },
+      "readySelector": "body[data-photo-orientation=\"group-black-white\"][data-photo-orientation-history=\"1,0\"] .photo-effect-control[aria-pressed=\"true\"]",
+      "actions": [{ "type": "click", "selector": ".photo-effect-control" }]
+    },
+    {
+      "id": "workspace-photo-black-white-restore-color",
+      "title": "Preto e branco — desativar conserva Giro e Espelhamento",
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=group-both-black-white&selection=group",
+      "comparison": { "kind": "implementation-only", "surface": "photo-effects", "reason": "O efeito é reversível e independente das outras propriedades da Foto. Desativá-lo restaura as cores sem mudar os enquadramentos." },
+      "viewport": { "width": 1440, "height": 800 },
+      "readySelector": "body[data-photo-orientation=\"single-both\"] .photo-effect-control[aria-pressed=\"false\"]",
+      "actions": [{ "type": "click", "selector": ".photo-effect-control" }]
+    },
+    {
+      "id": "workspace-photo-black-white-keyboard-history",
+      "title": "Preto e branco — teclado, Desfazer e Refazer",
+      "implementationPath": "/workspace-preview.html?frame=orientation",
+      "comparison": { "kind": "implementation-only", "surface": "photo-effects", "reason": "O controle usa a ação acessível real e o Histórico restaura o efeito sem mudar a seleção, conforme a especificação aceita." },
+      "viewport": { "width": 1440, "height": 800 },
+      "readySelector": "body[data-photo-orientation=\"single-black-white\"][data-photo-orientation-history=\"1,0\"]",
+      "actions": [
+        { "type": "focus", "selector": ".photo-effect-control" },
+        { "type": "key", "key": "Space" },
+        { "type": "click-text", "text": "Editar" },
+        { "type": "click", "selector": "[role=\"menuitem\"][aria-label=\"Desfazer\"]" },
+        { "type": "assert", "selector": "body[data-photo-orientation=\"neutral\"] .photo-effect-control[aria-pressed=\"false\"]" },
+        { "type": "click-text", "text": "Editar" },
+        { "type": "click", "selector": "[role=\"menuitem\"][aria-label=\"Refazer\"]" }
+      ]
+    },
+    {
+      "id": "workspace-photo-black-white-collapsed",
+      "title": "Preto e branco — seção recolhida independente de Design",
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-black-white",
+      "comparison": { "kind": "implementation-only", "surface": "photo-effects", "reason": "As seções Design e Ajustes e Efeitos são recolhíveis de forma independente. Recolher os controles não altera o estado criativo." },
+      "viewport": { "width": 1440, "height": 800 },
+      "readySelector": "body[data-photo-orientation=\"single-black-white\"]:not(:has(.photo-effect-control)) .photo-orientation-controls",
+      "actions": [{ "type": "click-text", "text": "Ajustes e Efeitos" }]
+    },
+    {
+      "id": "workspace-photo-black-white-scale-125",
+      "title": "Preto e branco — seleção mista a 125%",
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-black-white&selection=group&scale=1.25",
+      "comparison": { "kind": "implementation-only", "surface": "photo-effects", "reason": "A seção Ajustes e Efeitos e sua indicação de escopo mantêm a tipografia e os componentes da referência vigente na escala de 125%." },
+      "viewport": { "width": 1800, "height": 1000 },
+      "readySelector": ".photo-effect-control[aria-pressed=\"mixed\"]",
+      "actions": []
+    },
+    {
+      "id": "workspace-photo-black-white-scale-150",
+      "title": "Preto e branco — Foto individual a 150%",
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-both-black-white&scale=1.5",
+      "comparison": { "kind": "implementation-only", "surface": "photo-effects", "reason": "A Foto com Giro, Espelhamento e Preto e branco permanece coerente no Canvas e nas miniaturas, com o painel legível na escala de 150%." },
+      "viewport": { "width": 2160, "height": 1200 },
+      "readySelector": ".photo-effect-control[aria-pressed=\"true\"]",
+      "actions": []
+    },
+    {
+      "id": "workspace-photo-black-white-palette",
+      "title": "Preto e branco — prévia por paleta enquanto a imagem está indisponível",
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-black-white&preview=palette",
+      "comparison": { "kind": "implementation-only", "surface": "photo-effects", "reason": "As representações por paleta também refletem o efeito da Foto; a indisponibilidade da prévia não descarta seu estado criativo." },
+      "viewport": { "width": 1440, "height": 800 },
+      "readySelector": ".photo-effect-control[aria-pressed=\"true\"]",
+      "actions": []
+    },
+    {
       "id": "workspace-photo-orientation-single",
       "title": "Orientação da Foto — giro e espelhamento no Modo normal",
       "implementationPath": "/workspace-preview.html?frame=orientation&mode=normal",
@@ -4068,7 +4178,7 @@
       "implementationPath": "/workspace-preview.html?frame=orientation&selection=placeholders",
       "comparison": { "kind": "implementation-only", "surface": "photo-orientation", "reason": "Controles exclusivos de Foto ficam ocultos quando a seleção contém somente placeholders, conforme o contexto múltiplo e individual do design 0001." },
       "viewport": { "width": 1440, "height": 800 },
-      "readySelector": "body[data-photo-orientation=\"neutral\"]:not(:has(.photo-orientation-controls))",
+      "readySelector": "body[data-photo-orientation=\"neutral\"]:not(:has(.photo-orientation-controls)):not(:has(.photo-effects-controls))",
       "actions": []
     },
     {

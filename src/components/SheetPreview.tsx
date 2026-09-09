@@ -15,6 +15,7 @@ import {
   SHEET_VISUAL_STYLE,
 } from "./sheetVisualStyle";
 import "./SheetPreview.css";
+import { PHOTO_BLACK_AND_WHITE_SVG_MATRIX } from "./photoBlackAndWhite";
 
 export interface SheetPreviewViewport {
   readonly xUm: number;
@@ -337,6 +338,7 @@ function PhotoPreview({
   previewUrl,
   unit,
 }: PhotoPreviewProps) {
+  const effectId = `photo-black-white-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const { drawRect } = photo;
   const photoStyle = SHEET_VISUAL_STYLE.photo;
   const centerX = drawRect.x + drawRect.width / 2;
@@ -352,7 +354,15 @@ function PhotoPreview({
     <g
       data-preview-photo-id={photo.mediaId}
       transform={transform}
+      filter={photo.blackAndWhite ? `url(#${effectId})` : undefined}
     >
+      {photo.blackAndWhite && (
+        <defs>
+          <filter id={effectId} colorInterpolationFilters="sRGB">
+            <feColorMatrix type="matrix" values={PHOTO_BLACK_AND_WHITE_SVG_MATRIX} />
+          </filter>
+        </defs>
+      )}
       {previewUrl ? (
         <image
           href={previewUrl}

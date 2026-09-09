@@ -298,7 +298,14 @@ fn draw_frame(
                 let source_y = (-sine * delta_x + cosine * delta_y) / draw_height;
                 let horizontal = (source_x + 0.5).clamp(0.0, 1.0) as f32;
                 let vertical = (source_y + 0.5).clamp(0.0, 1.0) as f32;
-                let pixel = sample_bilinear(source, horizontal, vertical);
+                let mut pixel = sample_bilinear(source, horizontal, vertical);
+                if photo.black_and_white {
+                    let [r, g, b, alpha] = pixel.0;
+                    let luminance =
+                        ((54 * u32::from(r) + 183 * u32::from(g) + 19 * u32::from(b) + 128) / 256)
+                            as u8;
+                    pixel = Rgba([luminance, luminance, luminance, alpha]);
+                }
                 image.put_pixel(x, y, pixel);
             }
         }

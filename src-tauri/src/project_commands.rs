@@ -76,6 +76,7 @@ pub(crate) async fn apply_project_intent(
         ProjectIntent::TransformPhoto { .. } => "transform_photo",
         ProjectIntent::OrientPhotos { .. } => "orient_photos",
         ProjectIntent::SetPhotoAngle { .. } => "set_photo_angle",
+        ProjectIntent::TogglePhotoBlackAndWhite { .. } => "toggle_photo_black_and_white",
         ProjectIntent::AddPhoto { .. } => "add_photo",
         ProjectIntent::DropPhoto { .. } => "drop_photo",
     };

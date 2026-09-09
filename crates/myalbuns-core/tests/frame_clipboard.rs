@@ -149,6 +149,20 @@ fn paste(
 fn copy_is_session_only_preserves_redo_and_paste_is_one_persisted_history_action() {
     let root = tempfile::tempdir().unwrap();
     let mut project = project_with_frames(root.path());
+    let photo_id = project.projection().state.album.sheets[1].frames[0]
+        .id
+        .clone();
+    project
+        .apply(ProjectIntent::TogglePhotoBlackAndWhite {
+            frame_ids: vec![photo_id.clone()],
+        })
+        .unwrap();
+    project
+        .apply(ProjectIntent::OrientPhotos {
+            frame_ids: vec![photo_id],
+            action: myalbuns_core::PhotoOrientationAction::RotateCounterClockwise,
+        })
+        .unwrap();
     project.undo().unwrap();
     project.save(project.revision()).unwrap();
     let before = project.projection();

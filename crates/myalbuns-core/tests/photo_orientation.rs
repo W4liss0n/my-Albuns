@@ -62,6 +62,85 @@ fn orient(project: &mut EditableProject, frame_ids: Vec<String>, action: PhotoOr
 }
 
 #[test]
+fn black_and_white_is_per_photo_and_mixed_selection_makes_one_reversible_choice() {
+    let root = tempfile::tempdir().unwrap();
+    let mut project = mixed_project(root.path());
+    let ids: Vec<_> = project.projection().state.album.sheets[0]
+        .frames
+        .iter()
+        .map(|frame| frame.id.clone())
+        .collect();
+    let original = project.projection();
+    project
+        .apply(ProjectIntent::TogglePhotoBlackAndWhite {
+            frame_ids: vec![ids[0].clone()],
+        })
+        .unwrap();
+    let mixed = project.projection();
+    assert!(
+        mixed.state.album.sheets[0].frames[0]
+            .photo
+            .as_ref()
+            .unwrap()
+            .transform
+            .black_and_white
+    );
+    assert!(
+        !mixed.state.album.sheets[0].frames[1]
+            .photo
+            .as_ref()
+            .unwrap()
+            .transform
+            .black_and_white
+    );
+    project
+        .apply(ProjectIntent::TogglePhotoBlackAndWhite {
+            frame_ids: ids.clone(),
+        })
+        .unwrap();
+    let enabled = project.projection();
+    assert_eq!(enabled.state.revision, mixed.state.revision + 1);
+    for (old, new) in mixed.state.album.sheets[0]
+        .frames
+        .iter()
+        .zip(&enabled.state.album.sheets[0].frames)
+    {
+        let mut expected = old.clone();
+        if let Some(photo) = &mut expected.photo {
+            photo.transform.black_and_white = true;
+        }
+        assert_eq!(&expected, new);
+    }
+    assert!(
+        enabled.composition.sheets[0]
+            .frames
+            .iter()
+            .filter_map(|frame| frame.photo.as_ref())
+            .all(|photo| photo.black_and_white)
+    );
+    assert_eq!(project.undo().unwrap().state.album, mixed.state.album);
+    assert_eq!(project.redo().unwrap().state.album, enabled.state.album);
+    project
+        .apply(ProjectIntent::TogglePhotoBlackAndWhite {
+            frame_ids: ids.clone(),
+        })
+        .unwrap();
+    assert_eq!(project.projection().state.album, original.state.album);
+    project.undo().unwrap();
+    let before_placeholder = project.projection();
+    project
+        .apply(ProjectIntent::TogglePhotoBlackAndWhite {
+            frame_ids: vec![ids[2].clone()],
+        })
+        .unwrap();
+    assert_eq!(project.projection(), before_placeholder);
+    assert_eq!(
+        fs::read(root.path().join("Foto.jpg")).unwrap(),
+        b"original unchanged"
+    );
+}
+
+#[test]
 fn fine_angle_preview_and_commit_share_the_same_composition_and_one_history_step() {
     use myalbuns_core::PhotoAngleEdit;
     let root = tempfile::tempdir().unwrap();
@@ -221,7 +300,7 @@ fn v4_angle_migration_preserves_orientation_and_adds_only_neutral_angle_on_save(
     let path = root.path().join("Legado.myalbuns");
     let input = include_bytes!("fixtures/project_document_v4_angle_migration_input.myalbuns");
     let expected: serde_json::Value = serde_json::from_slice(include_bytes!(
-        "fixtures/project_document_v5_angle_migration_expected.myalbuns"
+        "fixtures/project_document_v6_angle_migration_expected.myalbuns"
     ))
     .unwrap();
     fs::write(&path, input).unwrap();
@@ -294,6 +373,76 @@ fn v5_requires_an_integer_angle_in_range_and_keeps_legacy_dtos_closed() {
     let root = tempfile::tempdir().unwrap();
     for (index, value) in cases.into_iter().enumerate() {
         let path = root.path().join(format!("Invalid-{index}.myalbuns"));
+        let bytes = serde_json::to_vec(&value).unwrap();
+        fs::write(&path, &bytes).unwrap();
+        assert!(matches!(
+            core(root.path()).load_persisted_revision(LoadProjectRequest::new(location(&path))),
+            Err(LoadProjectError::Document(
+                DocumentFailure::InvalidProjectDocument
+            ))
+        ));
+        assert_eq!(fs::read(path).unwrap(), bytes);
+    }
+}
+
+#[test]
+fn v5_migration_preserves_photo_adjustments_and_v6_requires_a_boolean_effect() {
+    use myalbuns_core::{DocumentFailure, LoadProjectError, LoadProjectRequest};
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("Efeito.myalbuns");
+    let input = include_bytes!("fixtures/project_document_v5_effect_migration_input.myalbuns");
+    let expected: serde_json::Value = serde_json::from_slice(include_bytes!(
+        "fixtures/project_document_v6_effect_migration_expected.myalbuns"
+    ))
+    .unwrap();
+    fs::write(&path, input).unwrap();
+    let mut project = core(root.path())
+        .open_editable(OpenProjectRequest::new(location(&path)))
+        .unwrap();
+    let before = project.projection();
+    let photo = before.state.album.sheets[0].frames[0]
+        .photo
+        .as_ref()
+        .unwrap();
+    assert!(!photo.transform.black_and_white);
+    assert_eq!(photo.transform.fine_rotation_degrees, -12.3);
+    assert!(!before.state.can_undo);
+    assert!(!project.has_unsaved_changes());
+    assert_eq!(fs::read(&path).unwrap(), input);
+    project.save(9).unwrap();
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&fs::read(&path).unwrap()).unwrap(),
+        expected
+    );
+    assert_eq!(project.projection(), before);
+    drop(project);
+    let transform = "/project/sheets/0/frames/0/photo/transform";
+    let mut cases = Vec::new();
+    for value in [
+        serde_json::json!(1),
+        serde_json::json!("true"),
+        serde_json::Value::Null,
+    ] {
+        let mut invalid = expected.clone();
+        invalid.pointer_mut(transform).unwrap()["blackAndWhite"] = value;
+        cases.push(invalid);
+    }
+    let mut missing = expected.clone();
+    missing
+        .pointer_mut(transform)
+        .unwrap()
+        .as_object_mut()
+        .unwrap()
+        .remove("blackAndWhite");
+    cases.push(missing);
+    let mut legacy = expected.clone();
+    legacy["schemaVersion"] = serde_json::json!(5);
+    cases.push(legacy);
+    let mut unknown = expected.clone();
+    unknown.pointer_mut(transform).unwrap()["saturation"] = serde_json::json!(0);
+    cases.push(unknown);
+    for (index, value) in cases.into_iter().enumerate() {
+        let path = root.path().join(format!("Invalid-effect-{index}.myalbuns"));
         let bytes = serde_json::to_vec(&value).unwrap();
         fs::write(&path, &bytes).unwrap();
         assert!(matches!(
@@ -495,12 +644,17 @@ fn rotates_and_mirrors_only_selected_photos_as_one_reversible_edit() {
 }
 
 #[test]
-fn orientation_survives_pan_zoom_save_reopen_and_export_without_writing_originals() {
+fn photo_adjustments_survive_pan_zoom_save_reopen_and_export_without_writing_originals() {
     let root = tempfile::tempdir().unwrap();
     let mut project = mixed_project(root.path());
     let initial = project.projection();
     let id = initial.state.album.sheets[0].frames[0].id.clone();
     let frozen = project.render_snapshot();
+    project
+        .apply(ProjectIntent::TogglePhotoBlackAndWhite {
+            frame_ids: vec![id.clone()],
+        })
+        .unwrap();
     orient(
         &mut project,
         vec![id.clone()],
@@ -534,12 +688,17 @@ fn orientation_survives_pan_zoom_save_reopen_and_export_without_writing_original
         .unwrap();
     assert_eq!(photo.transform.quarter_turns, 3);
     assert!(photo.transform.mirror_x);
+    assert!(photo.transform.black_and_white);
     assert_eq!(frozen.composition, initial.composition);
     assert_eq!(project.render_snapshot().composition, expected.composition);
     project.save(project.revision()).unwrap();
     let bytes = fs::read(root.path().join("Orientação.myalbuns")).unwrap();
     let dto: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
-    assert_eq!(dto["schemaVersion"], 5);
+    assert_eq!(dto["schemaVersion"], 6);
+    assert_eq!(
+        dto["project"]["sheets"][0]["frames"][0]["photo"]["transform"]["blackAndWhite"],
+        true
+    );
     assert_eq!(
         dto["project"]["sheets"][0]["frames"][0]["photo"]["transform"]["angleTenths"],
         -123
@@ -630,10 +789,15 @@ fn mixed_values_take_one_absolute_orientation_and_invalid_selections_are_atomic(
     ] {
         assert_eq!(
             project.apply(ProjectIntent::OrientPhotos {
-                frame_ids: invalid,
+                frame_ids: invalid.clone(),
                 action: PhotoOrientationAction::RotateCounterClockwise
             }),
             Err(CoreError::InvalidPhotoOrientationSelection)
+        );
+        assert_eq!(project.projection(), before);
+        assert_eq!(
+            project.apply(ProjectIntent::TogglePhotoBlackAndWhite { frame_ids: invalid }),
+            Err(CoreError::InvalidPhotoEffectSelection)
         );
         assert_eq!(project.projection(), before);
     }
@@ -661,12 +825,12 @@ fn mixed_values_take_one_absolute_orientation_and_invalid_selections_are_atomic(
 }
 
 #[test]
-fn v3_migrates_only_in_memory_and_explicit_save_matches_the_v5_golden_file() {
+fn v3_migrates_only_in_memory_and_explicit_save_matches_the_v6_golden_file() {
     let root = tempfile::tempdir().unwrap();
     let path = root.path().join("Legado.myalbuns");
     let input = include_bytes!("fixtures/project_document_v3_photo_migration_input.myalbuns");
     let expected: serde_json::Value = serde_json::from_slice(include_bytes!(
-        "fixtures/project_document_v5_photo_migration_expected.myalbuns"
+        "fixtures/project_document_v6_photo_migration_expected.myalbuns"
     ))
     .unwrap();
     fs::write(&path, input).unwrap();
@@ -745,7 +909,7 @@ fn v4_rejects_unknown_missing_invalid_orientation_and_future_schemas_without_wri
         assert_eq!(fs::read(path).unwrap(), bytes);
     }
     let mut future = valid.clone();
-    future["schemaVersion"] = serde_json::json!(6);
+    future["schemaVersion"] = serde_json::json!(7);
     let path = root.path().join("future.myalbuns");
     let bytes = serde_json::to_vec(&future).unwrap();
     fs::write(&path, &bytes).unwrap();
@@ -753,7 +917,7 @@ fn v4_rejects_unknown_missing_invalid_orientation_and_future_schemas_without_wri
         core(root.path())
             .load_persisted_revision(LoadProjectRequest::new(location(&path)))
             .unwrap_err(),
-        LoadProjectError::Document(DocumentFailure::UnsupportedFutureSchema { version: 6 })
+        LoadProjectError::Document(DocumentFailure::UnsupportedFutureSchema { version: 7 })
     );
     assert_eq!(fs::read(path).unwrap(), bytes);
 }
@@ -949,9 +1113,52 @@ fn public_orientation_projections_match_the_visual_corpus() {
         angle_transitions.push(serde_json::json!({ "from": from, "to": to, "edit": edit }));
         record_angle_previews(to, &project, &ids, &mut angle_previews);
     }
+    let mut effect_transitions = Vec::new();
+    for (from, to, selected) in [
+        ("single-both", "single-both-black-white", &single),
+        ("single-both-black-white", "group-both-black-white", &ids),
+        ("group-both-black-white", "single-both", &ids),
+    ] {
+        project
+            .apply(ProjectIntent::TogglePhotoBlackAndWhite {
+                frame_ids: selected.clone(),
+            })
+            .unwrap();
+        let next = serde_json::to_value(project.projection()).unwrap();
+        if let Some(existing) = states.get(to) {
+            assert_eq!(existing["state"]["album"], next["state"]["album"]);
+        } else {
+            states.insert(to.into(), next);
+        }
+        effect_transitions
+            .push(serde_json::json!({ "from": from, "to": to, "frameIds": selected }));
+    }
+    orient(&mut project, single.clone(), Reset);
+    orient(&mut project, single.clone(), Mirror);
+    for (from, to, selected) in [
+        ("neutral", "single-black-white", &single),
+        ("single-black-white", "group-black-white", &ids),
+        ("group-black-white", "neutral", &ids),
+        ("neutral", "group-black-white", &ids),
+    ] {
+        project
+            .apply(ProjectIntent::TogglePhotoBlackAndWhite {
+                frame_ids: selected.clone(),
+            })
+            .unwrap();
+        let next = serde_json::to_value(project.projection()).unwrap();
+        if let Some(existing) = states.get(to) {
+            assert_eq!(existing["state"]["album"], next["state"]["album"]);
+        } else {
+            states.insert(to.into(), next);
+        }
+        effect_transitions
+            .push(serde_json::json!({ "from": from, "to": to, "frameIds": selected }));
+    }
     let mut text = serde_json::to_string(
         &serde_json::json!({"states": states, "transitions": transitions,
         "angleTransitions": angle_transitions, "anglePreviews": angle_previews,
+        "effectTransitions": effect_transitions,
         "single": single, "group": ids, "placeholders": [ids[2]]}),
     )
     .unwrap()

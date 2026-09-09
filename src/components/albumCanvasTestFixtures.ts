@@ -123,6 +123,7 @@ export const interactiveComposition: CompositionPlan = {
             placement: horizontalPlacementPlan,
             rotationDegrees: 0,
             mirrorX: false,
+            blackAndWhite: false,
             palette: ["#10202b", "#648493", "#dfa75e"],
           },
         },

@@ -146,6 +146,12 @@ export function useProjectEditorController({
     void photoAngle.commit();
     return mutations.orientPhotos([...navigation.selectedFrameIds], action);
   };
+  const canApplyPhotoEffects = selectedFrames.some((frame) => frame.photo !== null) && !interactionBlocked;
+  const togglePhotoBlackAndWhite = () => {
+    if (!canApplyPhotoEffects) return Promise.resolve(false);
+    void photoAngle.commit();
+    return mutations.togglePhotoBlackAndWhite([...navigation.selectedFrameIds]);
+  };
   const canDeleteFrames = canArrangeFrames;
   const canCopyFrames = canArrangeFrames;
   const canPasteFrames = canAddFrame && (projection.canPasteFrames || mutations.frameCopyPending);
@@ -375,6 +381,8 @@ export function useProjectEditorController({
     },
     canOrientPhotos,
     orientPhotos,
+    canApplyPhotoEffects,
+    togglePhotoBlackAndWhite,
     addFrame,
     canAddFrame,
     canDeleteFrames,

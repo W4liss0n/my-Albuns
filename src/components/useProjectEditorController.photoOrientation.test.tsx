@@ -17,10 +17,10 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-function harness() {
+function harness(effects = false) {
   const initial = structuredClone(corpus.states.neutral);
-  const rotated = structuredClone(corpus.states["single-rotated"]);
-  const mirrored = structuredClone(corpus.states["single-both"]);
+  const rotated = structuredClone(corpus.states[effects ? "group-black-white" : "single-rotated"]);
+  const mirrored = structuredClone(corpus.states[effects ? "neutral" : "single-both"]);
   const pending = deferred<EditorProjection>();
   const unsupported = async (): Promise<never> => { throw new Error("Unsupported by this orientation test."); };
   const apply = vi.fn<ProjectCorePort["apply"]>().mockImplementationOnce(() => pending.promise)
@@ -37,7 +37,7 @@ function harness() {
     resolvePhotoDropTarget: unsupported, relink: unsupported,
   };
   useEditorView.setState({ projectId: initial.state.projectId, editingSheetId: "sheet-001",
-    focusedSheetId: "sheet-001", centeredSheetId: "sheet-001", selectedFrameIds: corpus.single });
+    focusedSheetId: "sheet-001", centeredSheetId: "sheet-001", selectedFrameIds: effects ? corpus.group : corpus.single });
   const view = renderHook(({ blocked }) => {
     const [projection, setProjection] = useState(initial);
     const runner = useProjectMutationRunner(initial.state.projectId, port);
@@ -80,13 +80,47 @@ test.each(["success", "failure"])("orientation, adjacent orientation, Save and U
   expect(useEditorView.getState().selectedFrameIds).toEqual(corpus.placeholders);
 });
 
+test.each(["success", "failure"])("black and white, repeated toggle, Save and Undo share the queue: %s", async (outcome) => {
+  const h = harness(true);
+  act(() => {
+    void h.view.result.current.togglePhotoBlackAndWhite();
+    void h.view.result.current.togglePhotoBlackAndWhite();
+    h.view.result.current.save();
+    h.view.result.current.undo();
+  });
+  expect(h.apply).toHaveBeenCalledOnce();
+  expect(h.save).not.toHaveBeenCalled();
+  act(() => useEditorView.getState().selectFrames(corpus.placeholders));
+  await act(async () => {
+    if (outcome === "success") h.pending.resolve(h.rotated);
+    else h.pending.reject(new Error("Falha ao aplicar Preto e branco."));
+    await h.view.result.current.runner.waitForIdle();
+  });
+  if (outcome === "success") {
+    expect(h.apply).toHaveBeenCalledTimes(2);
+    for (const call of h.apply.mock.calls) expect(call[0]).toEqual({ kind: "togglePhotoBlackAndWhite", frameIds: corpus.group });
+    expect(h.save).toHaveBeenCalledWith(h.mirrored.state.revision);
+    expect(h.undo).toHaveBeenCalledOnce();
+  } else {
+    expect(h.apply).toHaveBeenCalledOnce();
+    expect(h.save).not.toHaveBeenCalled();
+    expect(h.undo).not.toHaveBeenCalled();
+    expect(h.view.result.current.projection).toEqual(h.initial);
+    expect(h.view.result.current.message).toBe("Falha ao aplicar Preto e branco.");
+  }
+  expect(useEditorView.getState().selectedFrameIds).toEqual(corpus.placeholders);
+});
+
 test("orientation is unavailable with no Photos or blocked interactions, and works in normal mode", async () => {
   const h = harness();
   h.view.rerender({ blocked: true });
   await act(async () => expect(await h.view.result.current.orientPhotos("rotateCounterClockwise")).toBe(false));
+  await act(async () => expect(await h.view.result.current.togglePhotoBlackAndWhite()).toBe(false));
   h.view.rerender({ blocked: false });
   act(() => useEditorView.getState().selectFrames(corpus.placeholders));
   expect(h.view.result.current.canOrientPhotos).toBe(false);
+  expect(h.view.result.current.canApplyPhotoEffects).toBe(false);
+  await act(async () => expect(await h.view.result.current.togglePhotoBlackAndWhite()).toBe(false));
   await act(async () => expect(await h.view.result.current.orientPhotos("toggleHorizontalMirror")).toBe(false));
   expect(h.apply).not.toHaveBeenCalled();
   act(() => useEditorView.setState({ editingSheetId: null, selectedFrameIds: corpus.single }));

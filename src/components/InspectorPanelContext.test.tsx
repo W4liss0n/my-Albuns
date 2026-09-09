@@ -54,6 +54,33 @@ function sheetContext(): InspectorContext {
 
 beforeEach(() => localStorage.clear());
 
+test("Black and white has its own Effects section and exposes the mixed Photo state", () => {
+  const frames = [structuredClone(sheetState.frames[0]), { ...structuredClone(sheetState.frames[0]), id: "second-photo" }];
+  frames[0].photo!.transform.blackAndWhite = true;
+  frames[1].photo!.transform.blackAndWhite = false;
+  frames.push({ ...structuredClone(frames[0]), id: "placeholder", photo: null });
+  const onToggleBlackAndWhite = vi.fn();
+  const photoEffects = { disabled: false, onToggleBlackAndWhite };
+  const props = inspectorProps({ kind: "multiple-frames", frames, editingSheet: composedSheet });
+  const view = render(<InspectorPanel {...props} photoEffects={photoEffects} />);
+  const section = screen.getByRole("button", { name: "Ajustes e Efeitos" });
+  expect(section).toHaveAttribute("aria-expanded", "true");
+  const effect = screen.getByRole("button", { name: "Preto e branco" });
+  expect(effect).toHaveAttribute("aria-pressed", "mixed");
+  expect(screen.getByText("Aplicado a 2 Fotos de 3 Frames")).toBeInTheDocument();
+  fireEvent.click(effect);
+  expect(onToggleBlackAndWhite).toHaveBeenCalledOnce();
+  fireEvent.click(section);
+  expect(screen.queryByRole("button", { name: "Preto e branco" })).not.toBeInTheDocument();
+  fireEvent.click(section);
+  view.rerender(<InspectorPanel {...props} photoEffects={{ ...photoEffects, disabled: true }} />);
+  expect(screen.getByRole("button", { name: "Preto e branco" })).toBeDisabled();
+  view.rerender(<InspectorPanel {...inspectorProps({ kind: "frame", frame: frames[2], composedPhoto: null })} photoEffects={photoEffects} />);
+  expect(screen.queryByRole("button", { name: "Ajustes e Efeitos" })).not.toBeInTheDocument();
+  view.rerender(<InspectorPanel {...inspectorProps({ kind: "frame", frame: frames[0], composedPhoto: composedSheet.frames[0].photo })} photoEffects={photoEffects} />);
+  expect(screen.getByRole("button", { name: "Preto e branco" })).toHaveAttribute("aria-pressed", "true");
+});
+
 test("Photo orientation controls show mixed values and target compatible Photos", () => {
   const frames = [structuredClone(sheetState.frames[0]), { ...structuredClone(sheetState.frames[0]), id: "second-photo" }];
   frames[0].photo!.transform.quarterTurns = 3;

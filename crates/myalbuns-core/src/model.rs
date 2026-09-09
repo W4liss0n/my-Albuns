@@ -186,6 +186,7 @@ pub struct MediaTransform {
     pub quarter_turns: i8,
     pub fine_rotation_degrees: f32,
     pub mirror_x: bool,
+    pub black_and_white: bool,
 }
 
 impl Default for MediaTransform {
@@ -197,6 +198,7 @@ impl Default for MediaTransform {
             quarter_turns: 0,
             fine_rotation_degrees: 0.0,
             mirror_x: false,
+            black_and_white: false,
         }
     }
 }
@@ -439,6 +441,7 @@ pub struct ComposedPhoto {
     pub placement: PhotoPlacementPlan,
     pub rotation_degrees: f32,
     pub mirror_x: bool,
+    pub black_and_white: bool,
     pub palette: [String; 3],
 }
 
@@ -866,6 +869,9 @@ pub enum ProjectIntent {
     SetPhotoAngle {
         edit: PhotoAngleEdit,
     },
+    TogglePhotoBlackAndWhite {
+        frame_ids: Vec<String>,
+    },
     TransformPhoto {
         frame_id: String,
         delta_pan_x: f32,
@@ -905,6 +911,8 @@ pub struct PhotoAngleEdit {
 
 #[derive(Debug, Error, PartialEq)]
 pub enum CoreError {
+    #[error("Selecione Frames distintos de uma única Lâmina para aplicar Efeitos às Fotos")]
+    InvalidPhotoEffectSelection,
     #[error("O Ângulo da Foto deve estar entre -45° e +45°, em décimos de grau")]
     InvalidPhotoAngle,
     #[error("Selecione Frames distintos de uma única Lâmina para orientar as Fotos")]

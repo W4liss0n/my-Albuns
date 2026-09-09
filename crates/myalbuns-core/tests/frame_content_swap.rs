@@ -312,6 +312,14 @@ fn swapping_photos_or_a_placeholder_preserves_frame_identity_history_and_saved_e
 fn two_occurrences_of_one_media_keep_their_independent_adjustments_and_swap_back() {
     let root = tempfile::tempdir().unwrap();
     let mut project = project_with_frames(root.path(), true);
+    let first_id = project.projection().state.album.sheets[0].frames[0]
+        .id
+        .clone();
+    project
+        .apply(ProjectIntent::TogglePhotoBlackAndWhite {
+            frame_ids: vec![first_id],
+        })
+        .unwrap();
     let before = project.projection();
     let frames = &before.state.album.sheets[0].frames;
     let selected = vec![frames[0].id.clone(), frames[1].id.clone()];

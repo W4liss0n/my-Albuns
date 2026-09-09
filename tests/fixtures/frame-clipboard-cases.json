@@ -40,6 +40,7 @@
               },
               "frameId": "clipboard-frame-0-0",
               "photo": {
+                "blackAndWhite": false,
                 "drawRect": {
                   "height": 120000,
                   "width": 180000,
@@ -157,6 +158,7 @@
               },
               "frameId": "clipboard-frame-1-0",
               "photo": {
+                "blackAndWhite": false,
                 "drawRect": {
                   "height": 240000,
                   "width": 360000,
@@ -274,6 +276,7 @@
               },
               "frameId": "clipboard-frame-2-0",
               "photo": {
+                "blackAndWhite": false,
                 "drawRect": {
                   "height": 240000,
                   "width": 360000,
@@ -391,6 +394,7 @@
               },
               "frameId": "clipboard-frame-3-0",
               "photo": {
+                "blackAndWhite": false,
                 "drawRect": {
                   "height": 120000,
                   "width": 180000,
@@ -507,6 +511,7 @@
                 "photo": {
                   "mediaId": "00000000-0000-4000-8000-000000000001",
                   "transform": {
+                    "blackAndWhite": false,
                     "fineRotationDegrees": 0.0,
                     "mirrorX": false,
                     "panX": 0.20000000298023224,
@@ -552,6 +557,7 @@
                 "photo": {
                   "mediaId": "00000000-0000-4000-8000-000000000001",
                   "transform": {
+                    "blackAndWhite": false,
                     "fineRotationDegrees": 0.0,
                     "mirrorX": false,
                     "panX": 0.20000000298023224,
@@ -598,6 +604,7 @@
                 "photo": {
                   "mediaId": "00000000-0000-4000-8000-000000000001",
                   "transform": {
+                    "blackAndWhite": false,
                     "fineRotationDegrees": 0.0,
                     "mirrorX": false,
                     "panX": 0.20000000298023224,
@@ -644,6 +651,7 @@
                 "photo": {
                   "mediaId": "00000000-0000-4000-8000-000000000001",
                   "transform": {
+                    "blackAndWhite": false,
                     "fineRotationDegrees": 0.0,
                     "mirrorX": false,
                     "panX": 0.20000000298023224,
@@ -759,6 +767,7 @@
                   },
                   "frameId": "clipboard-frame-0-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 120000,
                       "width": 180000,
@@ -876,6 +885,7 @@
                   },
                   "frameId": "clipboard-frame-1-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 240000,
                       "width": 360000,
@@ -962,6 +972,7 @@
                   },
                   "frameId": "pasted-frame-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 240000,
                       "width": 360000,
@@ -1079,6 +1090,7 @@
                   },
                   "frameId": "clipboard-frame-2-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 240000,
                       "width": 360000,
@@ -1196,6 +1208,7 @@
                   },
                   "frameId": "clipboard-frame-3-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 120000,
                       "width": 180000,
@@ -1312,6 +1325,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -1357,6 +1371,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -1389,6 +1404,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -1435,6 +1451,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -1481,6 +1498,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -1608,6 +1626,7 @@
                   },
                   "frameId": "clipboard-frame-0-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 120000,
                       "width": 180000,
@@ -1725,6 +1744,7 @@
                   },
                   "frameId": "clipboard-frame-1-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 240000,
                       "width": 360000,
@@ -1811,6 +1831,7 @@
                   },
                   "frameId": "pasted-frame-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 240000,
                       "width": 360000,
@@ -1916,6 +1937,7 @@
                   },
                   "frameId": "clipboard-frame-2-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 240000,
                       "width": 360000,
@@ -2033,6 +2055,7 @@
                   },
                   "frameId": "clipboard-frame-3-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 120000,
                       "width": 180000,
@@ -2149,6 +2172,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -2194,6 +2218,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -2226,6 +2251,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -2261,6 +2287,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -2307,6 +2334,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -2432,6 +2460,7 @@
                   },
                   "frameId": "clipboard-frame-0-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 120000,
                       "width": 180000,
@@ -2549,6 +2578,7 @@
                   },
                   "frameId": "clipboard-frame-1-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 240000,
                       "width": 360000,
@@ -2666,6 +2696,7 @@
                   },
                   "frameId": "clipboard-frame-2-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 240000,
                       "width": 360000,
@@ -2752,6 +2783,7 @@
                   },
                   "frameId": "pasted-frame-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 240000,
                       "width": 360000,
@@ -2869,6 +2901,7 @@
                   },
                   "frameId": "clipboard-frame-3-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 120000,
                       "width": 180000,
@@ -2985,6 +3018,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -3030,6 +3064,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -3076,6 +3111,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -3108,6 +3144,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -3154,6 +3191,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -3281,6 +3319,7 @@
                   },
                   "frameId": "clipboard-frame-0-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 120000,
                       "width": 180000,
@@ -3367,6 +3406,7 @@
                   },
                   "frameId": "pasted-frame-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 240000,
                       "width": 360000,
@@ -3484,6 +3524,7 @@
                   },
                   "frameId": "clipboard-frame-1-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 240000,
                       "width": 360000,
@@ -3601,6 +3642,7 @@
                   },
                   "frameId": "clipboard-frame-2-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 240000,
                       "width": 360000,
@@ -3718,6 +3760,7 @@
                   },
                   "frameId": "clipboard-frame-3-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 120000,
                       "width": 180000,
@@ -3834,6 +3877,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -3866,6 +3910,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -3911,6 +3956,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -3957,6 +4003,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -4003,6 +4050,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -4130,6 +4178,7 @@
                   },
                   "frameId": "clipboard-frame-0-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 120000,
                       "width": 180000,
@@ -4247,6 +4296,7 @@
                   },
                   "frameId": "clipboard-frame-1-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 240000,
                       "width": 360000,
@@ -4364,6 +4414,7 @@
                   },
                   "frameId": "clipboard-frame-2-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 240000,
                       "width": 360000,
@@ -4481,6 +4532,7 @@
                   },
                   "frameId": "clipboard-frame-3-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 120000,
                       "width": 180000,
@@ -4567,6 +4619,7 @@
                   },
                   "frameId": "pasted-frame-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 240000,
                       "width": 360000,
@@ -4683,6 +4736,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -4728,6 +4782,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -4774,6 +4829,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -4820,6 +4876,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -4852,6 +4909,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -4979,6 +5037,7 @@
                   },
                   "frameId": "clipboard-frame-0-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 120000,
                       "width": 180000,
@@ -5096,6 +5155,7 @@
                   },
                   "frameId": "clipboard-frame-1-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 240000,
                       "width": 360000,
@@ -5182,6 +5242,7 @@
                   },
                   "frameId": "pasted-frame-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 120000,
                       "width": 180000,
@@ -5299,6 +5360,7 @@
                   },
                   "frameId": "clipboard-frame-2-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 240000,
                       "width": 360000,
@@ -5416,6 +5478,7 @@
                   },
                   "frameId": "clipboard-frame-3-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 120000,
                       "width": 180000,
@@ -5532,6 +5595,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -5577,6 +5641,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -5609,6 +5674,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -5655,6 +5721,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -5701,6 +5768,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -5828,6 +5896,7 @@
                   },
                   "frameId": "clipboard-frame-0-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 120000,
                       "width": 180000,
@@ -5945,6 +6014,7 @@
                   },
                   "frameId": "clipboard-frame-1-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 240000,
                       "width": 360000,
@@ -6031,6 +6101,7 @@
                   },
                   "frameId": "pasted-frame-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 120000,
                       "width": 180000,
@@ -6148,6 +6219,7 @@
                   },
                   "frameId": "clipboard-frame-2-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 240000,
                       "width": 360000,
@@ -6265,6 +6337,7 @@
                   },
                   "frameId": "clipboard-frame-3-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 120000,
                       "width": 180000,
@@ -6381,6 +6454,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -6426,6 +6500,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -6458,6 +6533,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -6504,6 +6580,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -6550,6 +6627,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -6677,6 +6755,7 @@
                   },
                   "frameId": "clipboard-frame-0-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 120000,
                       "width": 180000,
@@ -6794,6 +6873,7 @@
                   },
                   "frameId": "clipboard-frame-1-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 240000,
                       "width": 360000,
@@ -6880,6 +6960,7 @@
                   },
                   "frameId": "pasted-frame-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 240000,
                       "width": 360000,
@@ -6997,6 +7078,7 @@
                   },
                   "frameId": "clipboard-frame-2-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 240000,
                       "width": 360000,
@@ -7114,6 +7196,7 @@
                   },
                   "frameId": "clipboard-frame-3-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 120000,
                       "width": 180000,
@@ -7230,6 +7313,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -7275,6 +7359,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -7307,6 +7392,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -7353,6 +7439,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -7399,6 +7486,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -7512,6 +7600,7 @@
                   },
                   "frameId": "clipboard-frame-0-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 120000,
                       "width": 180000,
@@ -7629,6 +7718,7 @@
                   },
                   "frameId": "clipboard-frame-1-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 240000,
                       "width": 360000,
@@ -7746,6 +7836,7 @@
                   },
                   "frameId": "clipboard-frame-2-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 240000,
                       "width": 360000,
@@ -7863,6 +7954,7 @@
                   },
                   "frameId": "clipboard-frame-3-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 120000,
                       "width": 180000,
@@ -7979,6 +8071,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -8024,6 +8117,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -8070,6 +8164,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -8116,6 +8211,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -8229,6 +8325,7 @@
                   },
                   "frameId": "clipboard-frame-0-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 120000,
                       "width": 180000,
@@ -8346,6 +8443,7 @@
                   },
                   "frameId": "clipboard-frame-1-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 240000,
                       "width": 360000,
@@ -8463,6 +8561,7 @@
                   },
                   "frameId": "clipboard-frame-2-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 240000,
                       "width": 360000,
@@ -8580,6 +8679,7 @@
                   },
                   "frameId": "clipboard-frame-3-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 120000,
                       "width": 180000,
@@ -8696,6 +8796,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -8741,6 +8842,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -8787,6 +8889,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -8833,6 +8936,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.20000000298023224,
@@ -8960,6 +9064,7 @@
               },
               "frameId": "clipboard-frame-0-0",
               "photo": {
+                "blackAndWhite": false,
                 "drawRect": {
                   "height": 120000,
                   "width": 180000,
@@ -9077,6 +9182,7 @@
               },
               "frameId": "clipboard-frame-1-0",
               "photo": {
+                "blackAndWhite": false,
                 "drawRect": {
                   "height": 240000,
                   "width": 360000,
@@ -9194,6 +9300,7 @@
               },
               "frameId": "clipboard-frame-2-0",
               "photo": {
+                "blackAndWhite": false,
                 "drawRect": {
                   "height": 240000,
                   "width": 360000,
@@ -9311,6 +9418,7 @@
               },
               "frameId": "clipboard-frame-3-0",
               "photo": {
+                "blackAndWhite": false,
                 "drawRect": {
                   "height": 120000,
                   "width": 180000,
@@ -9427,6 +9535,7 @@
                 "photo": {
                   "mediaId": "00000000-0000-4000-8000-000000000001",
                   "transform": {
+                    "blackAndWhite": false,
                     "fineRotationDegrees": 0.0,
                     "mirrorX": false,
                     "panX": 0.20000000298023224,
@@ -9472,6 +9581,7 @@
                 "photo": {
                   "mediaId": "00000000-0000-4000-8000-000000000001",
                   "transform": {
+                    "blackAndWhite": false,
                     "fineRotationDegrees": 0.0,
                     "mirrorX": false,
                     "panX": 0.20000000298023224,
@@ -9518,6 +9628,7 @@
                 "photo": {
                   "mediaId": "00000000-0000-4000-8000-000000000001",
                   "transform": {
+                    "blackAndWhite": false,
                     "fineRotationDegrees": 0.0,
                     "mirrorX": false,
                     "panX": 0.20000000298023224,
@@ -9564,6 +9675,7 @@
                 "photo": {
                   "mediaId": "00000000-0000-4000-8000-000000000001",
                   "transform": {
+                    "blackAndWhite": false,
                     "fineRotationDegrees": 0.0,
                     "mirrorX": false,
                     "panX": 0.20000000298023224,

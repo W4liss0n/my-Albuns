@@ -483,6 +483,7 @@ fn export_snapshot() -> (ProductiveExportFixture, RenderSnapshot, String) {
             },
             rotation_degrees: 0.0,
             mirror_x: false,
+            black_and_white: false,
             palette: ["#112233".into(), "#445566".into(), "#778899".into()],
         }),
     }];
