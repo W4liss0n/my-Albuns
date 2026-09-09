@@ -83,8 +83,9 @@
   padding: 10px 12px;
   border-bottom: 1px solid var(--ui-border);
 }
-.layout-panel__settings label { display: grid; gap: 4px; color: var(--ui-text-muted); }
+.layout-panel__settings label { position: relative; display: grid; gap: 4px; color: var(--ui-text-muted); }
 .layout-panel__settings input { width: 72px; }
+.layout-panel__settings .ui-field-validation-auto-tooltip { right: auto; width: 240px; }
 .layout-panel__settings input,
 .layout-panel__settings select,
 .layout-panel__settings button {

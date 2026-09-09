@@ -1,6 +1,8 @@
 import { useState } from "react";
 import type { ComposedSheet, DisplayUnit, LayoutSettings } from "../domain/project";
 import { createPhysicalFieldDraft, displayUnitLabel, editPhysicalFieldDraft } from "../application/physicalMeasurements";
+import { FieldValidationAutoTooltip, FieldValidationTooltip, TextInput,
+  fieldValidationTooltipAttributes, useFieldValidationTooltip } from "../ui";
 import { SheetPreviewShell } from "./SheetPreview";
 import type { LayoutPanelController } from "./useLayoutPanel";
 import "./LayoutPanel.css";
@@ -77,14 +79,22 @@ function LayoutSettingsForm({ settings, disabled, onApply, unit }: {
     gapUm: createPhysicalFieldDraft(settings.gapUm, unit),
     minimumSideUm: createPhysicalFieldDraft(settings.minimumSideUm, unit),
   });
-  const [invalid, setInvalid] = useState(false);
+  const entries = ([
+    ["marginUm", "Margem"], ["gapUm", "Intervalo"], ["minimumSideUm", "Menor lado"],
+  ] as const).map(([field, label]) => ({ field, label, messages:
+    !fields[field].hasExactValue || fields[field].valueUm < 0
+      ? ["Informe uma medida válida, maior ou igual a zero."]
+      : field === "minimumSideUm" && fields[field].valueUm === 0
+        ? ["O menor lado deve ser maior que zero."] : [],
+  }));
+  const tooltip = useFieldValidationTooltip("layout-settings-validation-summary", entries);
+  const valid = entries.every(({ messages }) => messages.length === 0);
   return <form className="layout-panel__settings" onSubmit={(event) => {
     event.preventDefault();
-    const valid = Object.values(fields).every((field) => field.hasExactValue && field.valueUm >= 0) && fields.minimumSideUm.valueUm > 0;
-    setInvalid(!valid);
     if (valid) void onApply({ permission, marginUm: fields.marginUm.valueUm,
       gapUm: fields.gapUm.valueUm, minimumSideUm: fields.minimumSideUm.valueUm });
   }}>
+    <FieldValidationTooltip tooltip={tooltip} />
     <label>Permitir
       <select disabled={disabled} value={permission} onChange={(event) =>
         setPermission(event.target.value as LayoutSettings["permission"])}>
@@ -92,14 +102,14 @@ function LayoutSettingsForm({ settings, disabled, onApply, unit }: {
         <option value="pagesAndSheet">Por Página e por Lâmina</option>
       </select>
     </label>
-    {([
-      ["marginUm", "Margem"], ["gapUm", "Intervalo"], ["minimumSideUm", "Menor lado"],
-    ] as const).map(([field, label]) => <label key={field}>{label} ({displayUnitLabel(unit)})
-      <input disabled={disabled} type="text" inputMode="decimal" required
+    {entries.map(({ field, label, messages }) => <label key={field}>{label} ({displayUnitLabel(unit)})
+      <TextInput aria-label={`${label} (${displayUnitLabel(unit)})`} className="ui-field-control"
+        {...fieldValidationTooltipAttributes(field, messages[0], tooltip)}
+        disabled={disabled} type="text" inputMode="decimal"
         value={fields[field].text} onChange={(event) => setFields({ ...fields,
           [field]: editPhysicalFieldDraft(fields[field], event.target.value, unit) })} />
+      <FieldValidationAutoTooltip field={field} tooltip={tooltip} />
     </label>)}
-    <button disabled={disabled} type="submit">Atualizar sugestões</button>
-    {invalid && <span role="alert">Use medidas válidas; o menor lado deve ser maior que zero.</span>}
+    <button disabled={disabled || !valid} type="submit">Atualizar sugestões</button>
   </form>;
 }

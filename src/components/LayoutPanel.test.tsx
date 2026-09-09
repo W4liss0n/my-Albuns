@@ -34,10 +34,16 @@ test.each([
     gapUm: 5000, minimumSideUm: 20000 });
 });
 
-test("invalid or empty physical fields never send Layout settings", () => {
+test("invalid physical fields immediately expose the shared tooltip and never send settings", () => {
   const { updateSettings } = panel("mm");
-  fireEvent.change(screen.getByRole("textbox", { name: "Menor lado (mm)" }), { target: { value: "0" } });
+  const input = screen.getByRole("textbox", { name: "Menor lado (mm)" });
+  fireEvent.change(input, { target: { value: "0" } });
+  expect(input).toHaveAttribute("aria-invalid", "true");
+  expect(input).toHaveAccessibleDescription("O menor lado deve ser maior que zero.");
+  expect(screen.getByRole("tooltip")).toHaveTextContent("maior que zero");
   fireEvent.click(screen.getByRole("button", { name: "Atualizar sugestões" }));
-  expect(screen.getByRole("alert")).toHaveTextContent("maior que zero");
   expect(updateSettings).not.toHaveBeenCalled();
+  fireEvent.change(input, { target: { value: "20" } });
+  expect(input).not.toHaveAttribute("aria-invalid");
+  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
 });

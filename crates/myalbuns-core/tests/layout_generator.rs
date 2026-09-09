@@ -144,6 +144,12 @@ fn absence_and_invalid_constraints_are_explicit_without_truncating_the_query() {
             generate_layouts(&invalid).status,
             LayoutGenerationStatus::InvalidQuery
         );
+        invalid.surface.kind = myalbuns_core::LayoutSurfaceKind::DoubleSheet;
+        invalid.surface.width_um = 1;
+        assert_eq!(
+            generate_layouts(&invalid).status,
+            LayoutGenerationStatus::InvalidQuery
+        );
     }
 }
 

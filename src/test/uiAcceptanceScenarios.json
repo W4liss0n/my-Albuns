@@ -5201,6 +5201,25 @@
       ]
     },
     {
+      "id": "workspace-layout-settings-invalid",
+      "title": "Layouts — medida inválida com Tooltip compartilhado",
+      "implementationPath": "/workspace-preview.html?frame=layouts",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "A validação compartilhada aceita exige indicação imediata no controle, descrição acessível e Tooltip sem ocupar espaço no formulário."
+      },
+      "viewport": { "width": 1440, "height": 800 },
+      "readySelector": ".layout-panel:has(input[aria-label=\"Menor lado (mm)\"][aria-invalid=\"true\"]):has([role=\"tooltip\"])",
+      "actions": [
+        { "type": "assert", "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))" },
+        { "type": "click", "selector": "button[aria-label=\"Layouts da Lâmina 01\"]" },
+        { "type": "assert", "selector": ".layout-panel__candidate" },
+        { "type": "click-text", "text": "Ajustes" },
+        { "type": "input", "selector": "input[aria-label=\"Menor lado (mm)\"]", "value": "0" }
+      ]
+    },
+    {
       "id": "workspace-layout-edit",
       "title": "Layouts — painel recolhido durante a edição",
       "implementationPath": "/workspace-preview.html?frame=layouts",

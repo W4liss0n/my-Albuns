@@ -325,18 +325,7 @@ fn distance(a: &Candidate, b: &Candidate) -> f64 {
 }
 
 fn query_is_valid(query: &LayoutQuery) -> bool {
-    let p = &query.parameters;
-    let max = crate::project_document::MAX_SAFE_INTEGER as i64;
-    [
-        query.surface.width_um,
-        query.surface.height_um,
-        p.minimum_side_um,
-    ]
-    .iter()
-    .all(|n| (1..=max).contains(n))
-        && [p.margin_um, p.gap_um]
-            .iter()
-            .all(|n| (0..=max).contains(n))
+    query.surface.is_valid() && query.parameters.is_valid()
 }
 
 /// Pure, bounded generation. Positions always follow the caller's Frame order.
