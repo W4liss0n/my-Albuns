@@ -67,7 +67,9 @@ fn locked_photo_content_can_be_filled_replaced_and_cleared_while_export_reports_
         .unwrap();
     let before = project.projection();
     let frozen = project.freeze_rendering();
-    let problems = frozen.validate_export_sheets(&[sheet.clone()]).unwrap();
+    let problems = frozen
+        .validate_export_sheets(std::slice::from_ref(&sheet))
+        .unwrap();
     assert_eq!(problems.len(), 2);
     assert_eq!(
         problems[0].frame_id,

@@ -5064,7 +5064,7 @@
         "width": 1440,
         "height": 800
       },
-      "readySelector": ".layout-panel__candidate[aria-label*=\"último aplicado\"]",
+      "readySelector": ".layout-panel__preview[aria-label*=\"último aplicado\"]",
       "actions": [
         {
           "type": "assert",
@@ -5382,6 +5382,7 @@
           "type": "assert",
           "selector": ".layout-panel__candidate"
         },
+        { "type": "hover", "selector": ".layout-panel__candidate:first-child" },
         {
           "type": "click",
           "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
@@ -5415,6 +5416,7 @@
           "type": "assert",
           "selector": ".layout-panel__candidate"
         },
+        { "type": "hover", "selector": ".layout-panel__candidate:first-child" },
         {
           "type": "click",
           "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
@@ -5456,6 +5458,7 @@
           "type": "assert",
           "selector": ".layout-panel__candidate"
         },
+        { "type": "hover", "selector": ".layout-panel__candidate:first-child" },
         {
           "type": "click",
           "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
@@ -5560,6 +5563,7 @@
           "type": "assert",
           "selector": ".layout-panel__candidate"
         },
+        { "type": "hover", "selector": ".layout-panel__candidate:first-child" },
         {
           "type": "click",
           "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
@@ -5658,6 +5662,7 @@
           "type": "assert",
           "selector": ".layout-panel__candidate"
         },
+        { "type": "hover", "selector": ".layout-panel__candidate:first-child" },
         {
           "type": "click",
           "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
@@ -5691,6 +5696,7 @@
           "type": "assert",
           "selector": ".layout-panel__candidate"
         },
+        { "type": "hover", "selector": ".layout-panel__candidate:first-child" },
         {
           "type": "click",
           "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
@@ -5724,6 +5730,7 @@
           "type": "assert",
           "selector": ".layout-panel__candidate"
         },
+        { "type": "hover", "selector": ".layout-panel__candidate:first-child" },
         {
           "type": "click",
           "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
