@@ -1740,14 +1740,15 @@ fn productive_snapshot(initial: InitialProject) -> RenderSnapshot {
 }
 
 fn productive_photo_snapshot(photo_path: &Path, overlay_path: Option<&Path>) -> RenderSnapshot {
-    oriented_photo_snapshot(photo_path, overlay_path, &[], 0)
+    adjusted_photo_snapshot(photo_path, overlay_path, &[], 0, false)
 }
 
-fn oriented_photo_snapshot(
+fn adjusted_photo_snapshot(
     photo_path: &Path,
     overlay_path: Option<&Path>,
     actions: &[myalbuns_core::PhotoOrientationAction],
     angle_tenths: i16,
+    black_and_white: bool,
 ) -> RenderSnapshot {
     let initial =
         small_initial_project(100).with_personalization(InitialProjectPersonalization::new(
@@ -1795,6 +1796,13 @@ fn oriented_photo_snapshot(
             mode: PhotoPlacementMode::Normal,
         })
         .expect("the linked Photo creates one productive Frame");
+    if black_and_white {
+        project
+            .apply(ProjectIntent::TogglePhotoBlackAndWhite {
+                frame_ids: vec![added.affected_frame_id.clone().unwrap()],
+            })
+            .unwrap();
+    }
     for action in actions {
         project
             .apply(ProjectIntent::OrientPhotos {
@@ -1839,7 +1847,7 @@ fn processor_exports_quarter_turn_before_horizontal_mirroring() {
     .into_iter()
     .enumerate()
     {
-        let snapshot = oriented_photo_snapshot(&source_path, None, &actions, 0);
+        let snapshot = adjusted_photo_snapshot(&source_path, None, &actions, 0, false);
         let frame = snapshot.composition.sheets[0].frames[0].clone();
         let media_id = frame.photo.as_ref().unwrap().media_id;
         let output = root.path().join(format!("orientation-{index}.jpg"));
@@ -1905,7 +1913,7 @@ fn processor_exports_positive_fine_angle_counterclockwise_before_mirroring() {
     .into_iter()
     .enumerate()
     {
-        let snapshot = oriented_photo_snapshot(&source_path, None, &actions, angle);
+        let snapshot = adjusted_photo_snapshot(&source_path, None, &actions, angle, false);
         let frame = snapshot.composition.sheets[0].frames[0].clone();
         let output = root.path().join(format!("fine-angle-{index}.jpg"));
         let result = invoke_real_processor(
@@ -1945,6 +1953,122 @@ fn processor_exports_positive_fine_angle_counterclockwise_before_mirroring() {
             );
         }
     }
+    assert_eq!(std::fs::read(source_path).unwrap(), original);
+}
+
+#[test]
+fn processor_applies_black_and_white_per_occurrence_before_the_colored_border() {
+    let root = tempfile::tempdir().unwrap();
+    let source_path = root.path().join("effect-colors.jpg");
+    let colors = [[240, 16, 16], [16, 180, 32], [16, 32, 240], [240, 220, 16]];
+    RgbImage::from_fn(160, 80, |x, y| {
+        Rgb(colors[usize::from(x >= 80) + 2 * usize::from(y >= 40)])
+    })
+    .save_with_format(&source_path, ImageFormat::Jpeg)
+    .unwrap();
+    let original = std::fs::read(&source_path).unwrap();
+    let mut snapshot = adjusted_photo_snapshot(&source_path, None, &[], 0, true);
+    snapshot.composition.frame_border = ProjectedFrameBorder::Solid {
+        rgb: "#00FF00".into(),
+        width_um: 1270,
+    };
+    let sheet = &mut snapshot.composition.sheets[0];
+    sheet.width_um = 50800;
+    sheet.height_um = 12700;
+    sheet.base.draw_rect = RectUm {
+        x: 0,
+        y: 0,
+        width: 50800,
+        height: 12700,
+    };
+    let frame = &mut sheet.frames[0];
+    frame.clip_rect = RectUm {
+        x: 0,
+        y: 0,
+        width: 25400,
+        height: 12700,
+    };
+    frame.border_fill_rects = vec![
+        RectUm {
+            x: 0,
+            y: 0,
+            width: 25400,
+            height: 1270,
+        },
+        RectUm {
+            x: 0,
+            y: 11430,
+            width: 25400,
+            height: 1270,
+        },
+        RectUm {
+            x: 0,
+            y: 0,
+            width: 1270,
+            height: 12700,
+        },
+        RectUm {
+            x: 24130,
+            y: 0,
+            width: 1270,
+            height: 12700,
+        },
+    ];
+    let photo = frame.photo.as_mut().unwrap();
+    photo.draw_rect = frame.clip_rect.clone();
+    let media_id = photo.media_id;
+    let mut colored = frame.clone();
+    colored.frame_id = "second-occurrence".into();
+    colored.clip_rect.x = 25400;
+    for rect in &mut colored.border_fill_rects {
+        rect.x += 25400;
+    }
+    colored.photo.as_mut().unwrap().draw_rect.x = 25400;
+    colored.photo.as_mut().unwrap().black_and_white = false;
+    sheet.frames.push(colored);
+    let output = root.path().join("effect.jpg");
+    let result = invoke_real_processor(
+        snapshot,
+        &output,
+        "effect-pixels",
+        100,
+        vec![RenderSource::new(media_id, source_path.clone()).unwrap()],
+    );
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let rendered = image::open(output).unwrap().to_rgb8();
+    // Worked luminance examples from the normative integer sRGB coefficients.
+    for (((x, y), expected_gray), color) in [(25, 12), (75, 12), (25, 37), (75, 37)]
+        .into_iter()
+        .zip([63u8, 134, 44, 209])
+        .zip(colors)
+    {
+        let actual = rendered.get_pixel(x, y);
+        assert!(
+            actual
+                .0
+                .iter()
+                .all(|value| value.abs_diff(expected_gray) <= 3),
+            "gray: {actual:?}, expected {expected_gray}"
+        );
+        let actual_color = rendered.get_pixel(x + 100, y);
+        assert!(
+            actual_color
+                .0
+                .iter()
+                .zip(color)
+                .all(|(value, expected)| value.abs_diff(expected) <= 3),
+            "color: {actual_color:?}"
+        );
+    }
+    let border = rendered.get_pixel(2, 25);
+    assert!(
+        border[1] > 220 && border[0] < 30 && border[2] < 30,
+        "border: {border:?}"
+    );
     assert_eq!(std::fs::read(source_path).unwrap(), original);
 }
 

@@ -40,6 +40,7 @@
               },
               "frameId": "delete-frame-0",
               "photo": {
+                "blackAndWhite": false,
                 "drawRect": {
                   "height": 160000,
                   "width": 240000,
@@ -126,6 +127,7 @@
               },
               "frameId": "delete-frame-2",
               "photo": {
+                "blackAndWhite": false,
                 "drawRect": {
                   "height": 160000,
                   "width": 240000,
@@ -272,6 +274,7 @@
                 "photo": {
                   "mediaId": "00000000-0000-4000-8000-000000000001",
                   "transform": {
+                    "blackAndWhite": false,
                     "fineRotationDegrees": 0.0,
                     "mirrorX": false,
                     "panX": 0.0,
@@ -304,6 +307,7 @@
                 "photo": {
                   "mediaId": "00000000-0000-4000-8000-000000000001",
                   "transform": {
+                    "blackAndWhite": false,
                     "fineRotationDegrees": 0.0,
                     "mirrorX": false,
                     "panX": 0.0,
@@ -433,6 +437,7 @@
                   },
                   "frameId": "delete-frame-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 160000,
                       "width": 240000,
@@ -519,6 +524,7 @@
                   },
                   "frameId": "delete-frame-2",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 160000,
                       "width": 240000,
@@ -653,6 +659,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.0,
@@ -685,6 +692,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.0,
@@ -807,6 +815,7 @@
                   },
                   "frameId": "delete-frame-0",
                   "photo": {
+                    "blackAndWhite": false,
                     "drawRect": {
                       "height": 160000,
                       "width": 240000,
@@ -953,6 +962,7 @@
                     "photo": {
                       "mediaId": "00000000-0000-4000-8000-000000000001",
                       "transform": {
+                        "blackAndWhite": false,
                         "fineRotationDegrees": 0.0,
                         "mirrorX": false,
                         "panX": 0.0,

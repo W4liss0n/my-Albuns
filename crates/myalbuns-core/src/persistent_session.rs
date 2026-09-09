@@ -98,6 +98,15 @@ impl PersistentProjectSession {
         intent: ProjectIntent,
     ) -> Result<ProjectIntentOutcome, CoreError> {
         let mut outcome = ProjectIntentOutcome::default();
+        if let ProjectIntent::TogglePhotoBlackAndWhite { frame_ids } = &intent {
+            let next = self
+                .project()
+                .with_toggled_photo_black_and_white(frame_ids)?;
+            if next != *self.project() {
+                self.commit_edit(|_| Ok(next))?;
+            }
+            return Ok(outcome);
+        }
         if let ProjectIntent::SetPhotoAngle { edit } = &intent {
             let next = self.project().with_photo_angle(edit)?;
             if next != *self.project() {
@@ -157,6 +166,9 @@ impl PersistentProjectSession {
             }
         }
         self.commit_edit(|project| match intent {
+            ProjectIntent::TogglePhotoBlackAndWhite { .. } => {
+                unreachable!("Photo effects handle unchanged selections before committing")
+            }
             ProjectIntent::SetPhotoAngle { .. } => {
                 unreachable!("Photo angle handles unchanged compositions before committing")
             }

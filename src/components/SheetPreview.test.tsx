@@ -55,6 +55,7 @@ const photoSheet: ComposedSheet = {
           .expectedPlan as PhotoPlacementPlan,
         rotationDegrees: 12,
         mirrorX: true,
+        blackAndWhite: false,
         palette: ["#10202b", "#648493", "#dfa75e"],
       },
     },

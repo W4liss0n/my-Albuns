@@ -18,6 +18,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 125000,
               "width": 187500,
@@ -103,6 +104,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 125297,
               "width": 187945,
@@ -188,6 +190,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 125593,
               "width": 188389,
@@ -273,6 +276,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 127948,
               "width": 191922,
@@ -358,6 +362,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 157614,
               "width": 236421,
@@ -443,6 +448,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 158346,
               "width": 237519,
@@ -528,6 +534,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 136555,
               "width": 204832,
@@ -613,6 +620,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 208597,
               "width": 312895,
@@ -698,6 +706,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 136555,
               "width": 204832,
@@ -783,6 +792,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 208597,
               "width": 312895,
@@ -868,6 +878,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 130857,
               "width": 196286,
@@ -953,6 +964,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 181488,
               "width": 272232,
@@ -1038,6 +1050,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 182235,
               "width": 273352,
@@ -1123,6 +1136,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 125000,
               "width": 187500,
@@ -1208,6 +1222,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 125297,
               "width": 187945,
@@ -1293,6 +1308,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 125593,
               "width": 188389,
@@ -1378,6 +1394,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 127948,
               "width": 191922,
@@ -1463,6 +1480,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 157614,
               "width": 236421,
@@ -1548,6 +1566,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 158346,
               "width": 237519,
@@ -1633,6 +1652,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 136555,
               "width": 204832,
@@ -1718,6 +1738,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 208597,
               "width": 312895,
@@ -1803,6 +1824,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 136555,
               "width": 204832,
@@ -1888,6 +1910,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 208597,
               "width": 312895,
@@ -1973,6 +1996,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 130857,
               "width": 196286,
@@ -2058,6 +2082,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 181488,
               "width": 272232,
@@ -2143,6 +2168,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 182235,
               "width": 273352,
@@ -2228,6 +2254,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 125000,
               "width": 187500,
@@ -2313,6 +2340,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 125297,
               "width": 187945,
@@ -2398,6 +2426,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 125593,
               "width": 188389,
@@ -2483,6 +2512,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 127948,
               "width": 191922,
@@ -2568,6 +2598,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 157614,
               "width": 236421,
@@ -2653,6 +2684,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 158346,
               "width": 237519,
@@ -2738,6 +2770,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 136555,
               "width": 204832,
@@ -2823,6 +2856,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 208597,
               "width": 312895,
@@ -2908,6 +2942,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 136555,
               "width": 204832,
@@ -2993,6 +3028,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 208597,
               "width": 312895,
@@ -3078,6 +3114,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 130857,
               "width": 196286,
@@ -3163,6 +3200,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 181488,
               "width": 272232,
@@ -3248,6 +3286,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 182235,
               "width": 273352,
@@ -3333,6 +3372,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 125000,
               "width": 187500,
@@ -3418,6 +3458,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 125297,
               "width": 187945,
@@ -3503,6 +3544,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 125593,
               "width": 188389,
@@ -3588,6 +3630,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 127948,
               "width": 191922,
@@ -3673,6 +3716,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 157614,
               "width": 236421,
@@ -3758,6 +3802,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 158346,
               "width": 237519,
@@ -3843,6 +3888,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 136555,
               "width": 204832,
@@ -3928,6 +3974,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 208597,
               "width": 312895,
@@ -4013,6 +4060,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 136555,
               "width": 204832,
@@ -4098,6 +4146,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 208597,
               "width": 312895,
@@ -4183,6 +4232,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 130857,
               "width": 196286,
@@ -4268,6 +4318,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 181488,
               "width": 272232,
@@ -4353,6 +4404,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 182235,
               "width": 273352,
@@ -4440,6 +4492,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 170001,
               "width": 255001,
@@ -4514,6 +4567,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 190000,
               "width": 285000,
@@ -4613,6 +4667,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 170218,
               "width": 255327,
@@ -4687,6 +4742,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 190227,
               "width": 285340,
@@ -4786,6 +4842,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 170436,
               "width": 255653,
@@ -4860,6 +4917,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 190453,
               "width": 285679,
@@ -4959,6 +5017,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 172156,
               "width": 258234,
@@ -5033,6 +5092,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 192240,
               "width": 288360,
@@ -5132,6 +5192,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 192275,
               "width": 288412,
@@ -5206,6 +5267,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 212877,
               "width": 319315,
@@ -5305,6 +5367,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 192727,
               "width": 289090,
@@ -5379,6 +5442,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 213333,
               "width": 319999,
@@ -5478,6 +5542,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 178306,
               "width": 267459,
@@ -5552,6 +5617,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 198606,
               "width": 297909,
@@ -5651,6 +5717,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 208597,
               "width": 312895,
@@ -5725,6 +5792,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 226275,
               "width": 339412,
@@ -5824,6 +5892,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 178306,
               "width": 267459,
@@ -5898,6 +5967,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 198606,
               "width": 297909,
@@ -5997,6 +6067,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 208597,
               "width": 312895,
@@ -6071,6 +6142,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 226275,
               "width": 339412,
@@ -6170,6 +6242,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 174259,
               "width": 261389,
@@ -6244,6 +6317,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 194422,
               "width": 291632,
@@ -6343,6 +6417,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 205328,
               "width": 307991,
@@ -6417,6 +6492,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 225691,
               "width": 338537,
@@ -6516,6 +6592,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 205662,
               "width": 308493,
@@ -6590,6 +6667,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 226003,
               "width": 339004,
@@ -6689,6 +6767,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 170001,
               "width": 255001,
@@ -6763,6 +6842,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 190000,
               "width": 285000,
@@ -6862,6 +6942,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 170218,
               "width": 255327,
@@ -6936,6 +7017,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 190227,
               "width": 285340,
@@ -7035,6 +7117,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 170436,
               "width": 255653,
@@ -7109,6 +7192,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 190453,
               "width": 285679,
@@ -7208,6 +7292,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 172156,
               "width": 258234,
@@ -7282,6 +7367,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 192240,
               "width": 288360,
@@ -7381,6 +7467,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 192275,
               "width": 288412,
@@ -7455,6 +7542,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 212877,
               "width": 319315,
@@ -7554,6 +7642,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 192727,
               "width": 289090,
@@ -7628,6 +7717,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 213333,
               "width": 319999,
@@ -7727,6 +7817,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 178306,
               "width": 267459,
@@ -7801,6 +7892,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 198606,
               "width": 297909,
@@ -7900,6 +7992,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 208597,
               "width": 312895,
@@ -7974,6 +8067,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 226275,
               "width": 339412,
@@ -8073,6 +8167,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 178306,
               "width": 267459,
@@ -8147,6 +8242,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 198606,
               "width": 297909,
@@ -8246,6 +8342,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 208597,
               "width": 312895,
@@ -8320,6 +8417,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 226275,
               "width": 339412,
@@ -8419,6 +8517,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 174259,
               "width": 261389,
@@ -8493,6 +8592,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 194422,
               "width": 291632,
@@ -8592,6 +8692,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 205328,
               "width": 307991,
@@ -8666,6 +8767,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 225691,
               "width": 338537,
@@ -8765,6 +8867,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 205662,
               "width": 308493,
@@ -8839,6 +8942,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 226003,
               "width": 339004,
@@ -8938,6 +9042,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 170001,
               "width": 255001,
@@ -9012,6 +9117,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 190000,
               "width": 285000,
@@ -9111,6 +9217,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 170218,
               "width": 255327,
@@ -9185,6 +9292,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 190227,
               "width": 285340,
@@ -9284,6 +9392,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 170436,
               "width": 255653,
@@ -9358,6 +9467,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 190453,
               "width": 285679,
@@ -9457,6 +9567,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 172156,
               "width": 258234,
@@ -9531,6 +9642,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 192240,
               "width": 288360,
@@ -9630,6 +9742,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 192275,
               "width": 288412,
@@ -9704,6 +9817,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 212877,
               "width": 319315,
@@ -9803,6 +9917,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 192727,
               "width": 289090,
@@ -9877,6 +9992,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 213333,
               "width": 319999,
@@ -9976,6 +10092,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 178306,
               "width": 267459,
@@ -10050,6 +10167,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 198606,
               "width": 297909,
@@ -10149,6 +10267,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 208597,
               "width": 312895,
@@ -10223,6 +10342,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 226275,
               "width": 339412,
@@ -10322,6 +10442,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 178306,
               "width": 267459,
@@ -10396,6 +10517,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 198606,
               "width": 297909,
@@ -10495,6 +10617,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 208597,
               "width": 312895,
@@ -10569,6 +10692,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 226275,
               "width": 339412,
@@ -10668,6 +10792,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 174259,
               "width": 261389,
@@ -10742,6 +10867,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 194422,
               "width": 291632,
@@ -10841,6 +10967,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 205328,
               "width": 307991,
@@ -10915,6 +11042,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 225691,
               "width": 338537,
@@ -11014,6 +11142,7 @@
           },
           "frameId": "orientation-frame-0",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 205662,
               "width": 308493,
@@ -11088,6 +11217,7 @@
           },
           "frameId": "orientation-frame-1",
           "photo": {
+            "blackAndWhite": false,
             "drawRect": {
               "height": 226003,
               "width": 339004,
@@ -11254,6 +11384,67 @@
       "to": "single-both"
     }
   ],
+  "effectTransitions": [
+    {
+      "frameIds": [
+        "orientation-frame-0"
+      ],
+      "from": "single-both",
+      "to": "single-both-black-white"
+    },
+    {
+      "frameIds": [
+        "orientation-frame-0",
+        "orientation-frame-1",
+        "orientation-frame-2"
+      ],
+      "from": "single-both-black-white",
+      "to": "group-both-black-white"
+    },
+    {
+      "frameIds": [
+        "orientation-frame-0",
+        "orientation-frame-1",
+        "orientation-frame-2"
+      ],
+      "from": "group-both-black-white",
+      "to": "single-both"
+    },
+    {
+      "frameIds": [
+        "orientation-frame-0"
+      ],
+      "from": "neutral",
+      "to": "single-black-white"
+    },
+    {
+      "frameIds": [
+        "orientation-frame-0",
+        "orientation-frame-1",
+        "orientation-frame-2"
+      ],
+      "from": "single-black-white",
+      "to": "group-black-white"
+    },
+    {
+      "frameIds": [
+        "orientation-frame-0",
+        "orientation-frame-1",
+        "orientation-frame-2"
+      ],
+      "from": "group-black-white",
+      "to": "neutral"
+    },
+    {
+      "frameIds": [
+        "orientation-frame-0",
+        "orientation-frame-1",
+        "orientation-frame-2"
+      ],
+      "from": "neutral",
+      "to": "group-black-white"
+    }
+  ],
   "group": [
     "orientation-frame-0",
     "orientation-frame-1",
@@ -11307,6 +11498,7 @@
                 },
                 "frameId": "orientation-frame-0",
                 "photo": {
+                  "blackAndWhite": false,
                   "drawRect": {
                     "height": 205662,
                     "width": 308493,
@@ -11381,6 +11573,7 @@
                 },
                 "frameId": "orientation-frame-1",
                 "photo": {
+                  "blackAndWhite": false,
                   "drawRect": {
                     "height": 226003,
                     "width": 339004,
@@ -11527,6 +11720,7 @@
                   "photo": {
                     "mediaId": "00000000-0000-4000-8000-000000000001",
                     "transform": {
+                      "blackAndWhite": false,
                       "fineRotationDegrees": -23.399999618530273,
                       "mirrorX": true,
                       "panX": 0.0,
@@ -11548,6 +11742,7 @@
                   "photo": {
                     "mediaId": "00000000-0000-4000-8000-000000000001",
                     "transform": {
+                      "blackAndWhite": false,
                       "fineRotationDegrees": -23.399999618530273,
                       "mirrorX": false,
                       "panX": 0.0,
@@ -11634,6 +11829,378 @@
         "savedRevision": 10
       }
     },
+    "group-black-white": {
+      "canPasteFrames": false,
+      "composition": {
+        "frameBorder": {
+          "kind": "none"
+        },
+        "sheets": [
+          {
+            "activeSides": "both",
+            "backgrounds": [
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "kind": "color",
+                "rgb": "#FFFFFF"
+              }
+            ],
+            "base": {
+              "drawRect": {
+                "height": 300000,
+                "width": 600000,
+                "x": 0,
+                "y": 0
+              },
+              "rgb": "#FFFFFF"
+            },
+            "frames": [
+              {
+                "borderFillRects": [],
+                "clipRect": {
+                  "height": 125000,
+                  "width": 170000,
+                  "x": 35000,
+                  "y": 55000
+                },
+                "frameId": "orientation-frame-0",
+                "photo": {
+                  "blackAndWhite": true,
+                  "drawRect": {
+                    "height": 125000,
+                    "width": 187500,
+                    "x": 26250,
+                    "y": 55000
+                  },
+                  "mediaId": "00000000-0000-4000-8000-000000000001",
+                  "mirrorX": false,
+                  "name": "Foto.jpg",
+                  "palette": [
+                    "#C22C24",
+                    "#248044",
+                    "#2454C2"
+                  ],
+                  "placement": {
+                    "baseFillZoom": 312.5,
+                    "current": {
+                      "center": {
+                        "x": 85000.0,
+                        "y": 62500.0
+                      },
+                      "size": {
+                        "height": 125000.0,
+                        "width": 187500.0
+                      }
+                    },
+                    "currentPan": {
+                      "x": 0.0,
+                      "y": 0.0
+                    },
+                    "currentZoom": 1.0,
+                    "panOrigin": {
+                      "x": 85000.0,
+                      "y": 62500.0
+                    },
+                    "panRange": {
+                      "maximum": 1.0,
+                      "minimum": -1.0
+                    },
+                    "panToCenter": {
+                      "xx": 8750.0,
+                      "xy": -0.0,
+                      "yx": 0.0,
+                      "yy": 0.0
+                    },
+                    "panToCenterPerZoom": {
+                      "xx": 93750.0,
+                      "xy": -0.0,
+                      "yx": 0.0,
+                      "yy": 62500.0
+                    },
+                    "sizePerZoom": {
+                      "height": 125000.0,
+                      "width": 187500.0
+                    },
+                    "zoomRange": {
+                      "maximum": 4.0,
+                      "minimum": 1.0
+                    }
+                  },
+                  "rotationDegrees": 0.0
+                },
+                "zIndex": 0
+              },
+              {
+                "borderFillRects": [],
+                "clipRect": {
+                  "height": 190000,
+                  "width": 130000,
+                  "x": 350000,
+                  "y": 40000
+                },
+                "frameId": "orientation-frame-1",
+                "photo": {
+                  "blackAndWhite": true,
+                  "drawRect": {
+                    "height": 190000,
+                    "width": 285000,
+                    "x": 272500,
+                    "y": 40000
+                  },
+                  "mediaId": "00000000-0000-4000-8000-000000000001",
+                  "mirrorX": false,
+                  "name": "Foto.jpg",
+                  "palette": [
+                    "#C22C24",
+                    "#248044",
+                    "#2454C2"
+                  ],
+                  "placement": {
+                    "baseFillZoom": 475.0,
+                    "current": {
+                      "center": {
+                        "x": 65000.0,
+                        "y": 95000.0
+                      },
+                      "size": {
+                        "height": 190000.0,
+                        "width": 285000.0
+                      }
+                    },
+                    "currentPan": {
+                      "x": 0.0,
+                      "y": 0.0
+                    },
+                    "currentZoom": 1.0,
+                    "panOrigin": {
+                      "x": 65000.0,
+                      "y": 95000.0
+                    },
+                    "panRange": {
+                      "maximum": 1.0,
+                      "minimum": -1.0
+                    },
+                    "panToCenter": {
+                      "xx": 77500.0,
+                      "xy": -0.0,
+                      "yx": 0.0,
+                      "yy": 0.0
+                    },
+                    "panToCenterPerZoom": {
+                      "xx": 142500.0,
+                      "xy": -0.0,
+                      "yx": 0.0,
+                      "yy": 95000.0
+                    },
+                    "sizePerZoom": {
+                      "height": 190000.0,
+                      "width": 285000.0
+                    },
+                    "zoomRange": {
+                      "maximum": 4.0,
+                      "minimum": 1.0
+                    }
+                  },
+                  "rotationDegrees": 0.0
+                },
+                "zIndex": 1
+              },
+              {
+                "borderFillRects": [],
+                "clipRect": {
+                  "height": 65000,
+                  "width": 85000,
+                  "x": 235000,
+                  "y": 185000
+                },
+                "frameId": "orientation-frame-2",
+                "photo": null,
+                "zIndex": 2
+              }
+            ],
+            "heightUm": 300000,
+            "number": 1,
+            "overlays": [],
+            "sheetId": "sheet-001",
+            "widthUm": 600000
+          },
+          {
+            "activeSides": "both",
+            "backgrounds": [
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "kind": "color",
+                "rgb": "#FFFFFF"
+              }
+            ],
+            "base": {
+              "drawRect": {
+                "height": 300000,
+                "width": 600000,
+                "x": 0,
+                "y": 0
+              },
+              "rgb": "#FFFFFF"
+            },
+            "frames": [],
+            "heightUm": 300000,
+            "number": 2,
+            "overlays": [],
+            "sheetId": "sheet-002",
+            "widthUm": 600000
+          }
+        ]
+      },
+      "mediaUsage": [
+        {
+          "count": 2,
+          "mediaId": "00000000-0000-4000-8000-000000000001"
+        }
+      ],
+      "state": {
+        "album": {
+          "media": [
+            {
+              "id": "00000000-0000-4000-8000-000000000001",
+              "kind": "photo",
+              "name": "Foto.jpg",
+              "palette": [
+                "#C22C24",
+                "#248044",
+                "#2454C2"
+              ],
+              "sourceHeightPx": 400,
+              "sourceWidthPx": 600
+            }
+          ],
+          "sheets": [
+            {
+              "activeSides": "both",
+              "frames": [
+                {
+                  "id": "orientation-frame-0",
+                  "photo": {
+                    "mediaId": "00000000-0000-4000-8000-000000000001",
+                    "transform": {
+                      "blackAndWhite": true,
+                      "fineRotationDegrees": 0.0,
+                      "mirrorX": false,
+                      "panX": 0.0,
+                      "panY": 0.0,
+                      "quarterTurns": 0,
+                      "userZoom": 1.0
+                    }
+                  },
+                  "rect": {
+                    "height": 125000,
+                    "width": 170000,
+                    "x": 35000,
+                    "y": 55000
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "id": "orientation-frame-1",
+                  "photo": {
+                    "mediaId": "00000000-0000-4000-8000-000000000001",
+                    "transform": {
+                      "blackAndWhite": true,
+                      "fineRotationDegrees": 0.0,
+                      "mirrorX": false,
+                      "panX": 0.0,
+                      "panY": 0.0,
+                      "quarterTurns": 0,
+                      "userZoom": 1.0
+                    }
+                  },
+                  "rect": {
+                    "height": 190000,
+                    "width": 130000,
+                    "x": 350000,
+                    "y": 40000
+                  },
+                  "zIndex": 1
+                },
+                {
+                  "id": "orientation-frame-2",
+                  "photo": null,
+                  "rect": {
+                    "height": 65000,
+                    "width": 85000,
+                    "x": 235000,
+                    "y": 185000
+                  },
+                  "zIndex": 2
+                }
+              ],
+              "heightUm": 300000,
+              "id": "sheet-001",
+              "number": 1,
+              "pageNumbers": [
+                1,
+                2
+              ],
+              "role": "initial",
+              "widthUm": 600000
+            },
+            {
+              "activeSides": "both",
+              "frames": [],
+              "heightUm": 300000,
+              "id": "sheet-002",
+              "number": 2,
+              "pageNumbers": [
+                3,
+                4
+              ],
+              "role": "final",
+              "widthUm": 600000
+            }
+          ],
+          "visualDefaults": {
+            "background": {
+              "both": {
+                "kind": "color",
+                "rgb": "#FFFFFF"
+              },
+              "scope": "bothSides"
+            },
+            "frameBorder": {
+              "kind": "none"
+            },
+            "overlay": {
+              "both": null,
+              "scope": "bothSides"
+            }
+          }
+        },
+        "canRedo": false,
+        "canUndo": true,
+        "dirty": true,
+        "document": {
+          "bleedUm": 3000,
+          "displayUnit": "mm",
+          "dpi": 300,
+          "safetyUm": 3000,
+          "sheetHeightUm": 300000,
+          "sheetWidthUm": 600000
+        },
+        "projectId": "photo-orientation-project",
+        "projectName": "Orientação",
+        "revision": 38,
+        "savedRevision": 10
+      }
+    },
     "group-both": {
       "canPasteFrames": false,
       "composition": {
@@ -11675,6 +12242,7 @@
                 },
                 "frameId": "orientation-frame-0",
                 "photo": {
+                  "blackAndWhite": false,
                   "drawRect": {
                     "height": 170001,
                     "width": 255001,
@@ -11749,6 +12317,7 @@
                 },
                 "frameId": "orientation-frame-1",
                 "photo": {
+                  "blackAndWhite": false,
                   "drawRect": {
                     "height": 130001,
                     "width": 195001,
@@ -11895,6 +12464,7 @@
                   "photo": {
                     "mediaId": "00000000-0000-4000-8000-000000000001",
                     "transform": {
+                      "blackAndWhite": false,
                       "fineRotationDegrees": 0.0,
                       "mirrorX": true,
                       "panX": 0.0,
@@ -11916,6 +12486,7 @@
                   "photo": {
                     "mediaId": "00000000-0000-4000-8000-000000000001",
                     "transform": {
+                      "blackAndWhite": false,
                       "fineRotationDegrees": 0.0,
                       "mirrorX": true,
                       "panX": 0.0,
@@ -12002,6 +12573,378 @@
         "savedRevision": 10
       }
     },
+    "group-both-black-white": {
+      "canPasteFrames": false,
+      "composition": {
+        "frameBorder": {
+          "kind": "none"
+        },
+        "sheets": [
+          {
+            "activeSides": "both",
+            "backgrounds": [
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "kind": "color",
+                "rgb": "#FFFFFF"
+              }
+            ],
+            "base": {
+              "drawRect": {
+                "height": 300000,
+                "width": 600000,
+                "x": 0,
+                "y": 0
+              },
+              "rgb": "#FFFFFF"
+            },
+            "frames": [
+              {
+                "borderFillRects": [],
+                "clipRect": {
+                  "height": 125000,
+                  "width": 170000,
+                  "x": 35000,
+                  "y": 55000
+                },
+                "frameId": "orientation-frame-0",
+                "photo": {
+                  "blackAndWhite": true,
+                  "drawRect": {
+                    "height": 170001,
+                    "width": 255001,
+                    "x": -7500,
+                    "y": 32500
+                  },
+                  "mediaId": "00000000-0000-4000-8000-000000000001",
+                  "mirrorX": true,
+                  "name": "Foto.jpg",
+                  "palette": [
+                    "#C22C24",
+                    "#248044",
+                    "#2454C2"
+                  ],
+                  "placement": {
+                    "baseFillZoom": 425.00000000000006,
+                    "current": {
+                      "center": {
+                        "x": 85000.0,
+                        "y": 62500.0
+                      },
+                      "size": {
+                        "height": 170000.00000000003,
+                        "width": 255000.00000000003
+                      }
+                    },
+                    "currentPan": {
+                      "x": 0.0,
+                      "y": 0.0
+                    },
+                    "currentZoom": 1.0,
+                    "panOrigin": {
+                      "x": 85000.0,
+                      "y": 62500.0
+                    },
+                    "panRange": {
+                      "maximum": 1.0,
+                      "minimum": -1.0
+                    },
+                    "panToCenter": {
+                      "xx": -1.1940306291686691e-11,
+                      "xy": 0.0,
+                      "yx": -65000.0,
+                      "yy": -0.0
+                    },
+                    "panToCenterPerZoom": {
+                      "xx": -2.3421370033693132e-11,
+                      "xy": 85000.00000000001,
+                      "yx": -127500.0,
+                      "yy": -1.5614246689128754e-11
+                    },
+                    "sizePerZoom": {
+                      "height": 170000.00000000003,
+                      "width": 255000.00000000003
+                    },
+                    "zoomRange": {
+                      "maximum": 4.0,
+                      "minimum": 1.0
+                    }
+                  },
+                  "rotationDegrees": 270.0
+                },
+                "zIndex": 0
+              },
+              {
+                "borderFillRects": [],
+                "clipRect": {
+                  "height": 190000,
+                  "width": 130000,
+                  "x": 350000,
+                  "y": 40000
+                },
+                "frameId": "orientation-frame-1",
+                "photo": {
+                  "blackAndWhite": true,
+                  "drawRect": {
+                    "height": 190000,
+                    "width": 285000,
+                    "x": 272500,
+                    "y": 40000
+                  },
+                  "mediaId": "00000000-0000-4000-8000-000000000001",
+                  "mirrorX": false,
+                  "name": "Foto.jpg",
+                  "palette": [
+                    "#C22C24",
+                    "#248044",
+                    "#2454C2"
+                  ],
+                  "placement": {
+                    "baseFillZoom": 475.0,
+                    "current": {
+                      "center": {
+                        "x": 65000.0,
+                        "y": 95000.0
+                      },
+                      "size": {
+                        "height": 190000.0,
+                        "width": 285000.0
+                      }
+                    },
+                    "currentPan": {
+                      "x": 0.0,
+                      "y": 0.0
+                    },
+                    "currentZoom": 1.0,
+                    "panOrigin": {
+                      "x": 65000.0,
+                      "y": 95000.0
+                    },
+                    "panRange": {
+                      "maximum": 1.0,
+                      "minimum": -1.0
+                    },
+                    "panToCenter": {
+                      "xx": 77500.0,
+                      "xy": -0.0,
+                      "yx": 0.0,
+                      "yy": 0.0
+                    },
+                    "panToCenterPerZoom": {
+                      "xx": 142500.0,
+                      "xy": -0.0,
+                      "yx": 0.0,
+                      "yy": 95000.0
+                    },
+                    "sizePerZoom": {
+                      "height": 190000.0,
+                      "width": 285000.0
+                    },
+                    "zoomRange": {
+                      "maximum": 4.0,
+                      "minimum": 1.0
+                    }
+                  },
+                  "rotationDegrees": 0.0
+                },
+                "zIndex": 1
+              },
+              {
+                "borderFillRects": [],
+                "clipRect": {
+                  "height": 65000,
+                  "width": 85000,
+                  "x": 235000,
+                  "y": 185000
+                },
+                "frameId": "orientation-frame-2",
+                "photo": null,
+                "zIndex": 2
+              }
+            ],
+            "heightUm": 300000,
+            "number": 1,
+            "overlays": [],
+            "sheetId": "sheet-001",
+            "widthUm": 600000
+          },
+          {
+            "activeSides": "both",
+            "backgrounds": [
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "kind": "color",
+                "rgb": "#FFFFFF"
+              }
+            ],
+            "base": {
+              "drawRect": {
+                "height": 300000,
+                "width": 600000,
+                "x": 0,
+                "y": 0
+              },
+              "rgb": "#FFFFFF"
+            },
+            "frames": [],
+            "heightUm": 300000,
+            "number": 2,
+            "overlays": [],
+            "sheetId": "sheet-002",
+            "widthUm": 600000
+          }
+        ]
+      },
+      "mediaUsage": [
+        {
+          "count": 2,
+          "mediaId": "00000000-0000-4000-8000-000000000001"
+        }
+      ],
+      "state": {
+        "album": {
+          "media": [
+            {
+              "id": "00000000-0000-4000-8000-000000000001",
+              "kind": "photo",
+              "name": "Foto.jpg",
+              "palette": [
+                "#C22C24",
+                "#248044",
+                "#2454C2"
+              ],
+              "sourceHeightPx": 400,
+              "sourceWidthPx": 600
+            }
+          ],
+          "sheets": [
+            {
+              "activeSides": "both",
+              "frames": [
+                {
+                  "id": "orientation-frame-0",
+                  "photo": {
+                    "mediaId": "00000000-0000-4000-8000-000000000001",
+                    "transform": {
+                      "blackAndWhite": true,
+                      "fineRotationDegrees": 0.0,
+                      "mirrorX": true,
+                      "panX": 0.0,
+                      "panY": 0.0,
+                      "quarterTurns": 3,
+                      "userZoom": 1.0
+                    }
+                  },
+                  "rect": {
+                    "height": 125000,
+                    "width": 170000,
+                    "x": 35000,
+                    "y": 55000
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "id": "orientation-frame-1",
+                  "photo": {
+                    "mediaId": "00000000-0000-4000-8000-000000000001",
+                    "transform": {
+                      "blackAndWhite": true,
+                      "fineRotationDegrees": 0.0,
+                      "mirrorX": false,
+                      "panX": 0.0,
+                      "panY": 0.0,
+                      "quarterTurns": 0,
+                      "userZoom": 1.0
+                    }
+                  },
+                  "rect": {
+                    "height": 190000,
+                    "width": 130000,
+                    "x": 350000,
+                    "y": 40000
+                  },
+                  "zIndex": 1
+                },
+                {
+                  "id": "orientation-frame-2",
+                  "photo": null,
+                  "rect": {
+                    "height": 65000,
+                    "width": 85000,
+                    "x": 235000,
+                    "y": 185000
+                  },
+                  "zIndex": 2
+                }
+              ],
+              "heightUm": 300000,
+              "id": "sheet-001",
+              "number": 1,
+              "pageNumbers": [
+                1,
+                2
+              ],
+              "role": "initial",
+              "widthUm": 600000
+            },
+            {
+              "activeSides": "both",
+              "frames": [],
+              "heightUm": 300000,
+              "id": "sheet-002",
+              "number": 2,
+              "pageNumbers": [
+                3,
+                4
+              ],
+              "role": "final",
+              "widthUm": 600000
+            }
+          ],
+          "visualDefaults": {
+            "background": {
+              "both": {
+                "kind": "color",
+                "rgb": "#FFFFFF"
+              },
+              "scope": "bothSides"
+            },
+            "frameBorder": {
+              "kind": "none"
+            },
+            "overlay": {
+              "both": null,
+              "scope": "bothSides"
+            }
+          }
+        },
+        "canRedo": false,
+        "canUndo": true,
+        "dirty": true,
+        "document": {
+          "bleedUm": 3000,
+          "displayUnit": "mm",
+          "dpi": 300,
+          "safetyUm": 3000,
+          "sheetHeightUm": 300000,
+          "sheetWidthUm": 600000
+        },
+        "projectId": "photo-orientation-project",
+        "projectName": "Orientação",
+        "revision": 33,
+        "savedRevision": 10
+      }
+    },
     "group-mirrored": {
       "canPasteFrames": false,
       "composition": {
@@ -12043,6 +12986,7 @@
                 },
                 "frameId": "orientation-frame-0",
                 "photo": {
+                  "blackAndWhite": false,
                   "drawRect": {
                     "height": 125000,
                     "width": 187500,
@@ -12117,6 +13061,7 @@
                 },
                 "frameId": "orientation-frame-1",
                 "photo": {
+                  "blackAndWhite": false,
                   "drawRect": {
                     "height": 190000,
                     "width": 285000,
@@ -12263,6 +13208,7 @@
                   "photo": {
                     "mediaId": "00000000-0000-4000-8000-000000000001",
                     "transform": {
+                      "blackAndWhite": false,
                       "fineRotationDegrees": 0.0,
                       "mirrorX": true,
                       "panX": 0.0,
@@ -12284,6 +13230,7 @@
                   "photo": {
                     "mediaId": "00000000-0000-4000-8000-000000000001",
                     "transform": {
+                      "blackAndWhite": false,
                       "fineRotationDegrees": 0.0,
                       "mirrorX": true,
                       "panX": 0.0,
@@ -12411,6 +13358,7 @@
                 },
                 "frameId": "orientation-frame-0",
                 "photo": {
+                  "blackAndWhite": false,
                   "drawRect": {
                     "height": 170001,
                     "width": 255001,
@@ -12485,6 +13433,7 @@
                 },
                 "frameId": "orientation-frame-1",
                 "photo": {
+                  "blackAndWhite": false,
                   "drawRect": {
                     "height": 130001,
                     "width": 195001,
@@ -12631,6 +13580,7 @@
                   "photo": {
                     "mediaId": "00000000-0000-4000-8000-000000000001",
                     "transform": {
+                      "blackAndWhite": false,
                       "fineRotationDegrees": 0.0,
                       "mirrorX": true,
                       "panX": 0.0,
@@ -12652,6 +13602,7 @@
                   "photo": {
                     "mediaId": "00000000-0000-4000-8000-000000000001",
                     "transform": {
+                      "blackAndWhite": false,
                       "fineRotationDegrees": 0.0,
                       "mirrorX": false,
                       "panX": 0.0,
@@ -12779,6 +13730,7 @@
                 },
                 "frameId": "orientation-frame-0",
                 "photo": {
+                  "blackAndWhite": false,
                   "drawRect": {
                     "height": 125297,
                     "width": 187945,
@@ -12853,6 +13805,7 @@
                 },
                 "frameId": "orientation-frame-1",
                 "photo": {
+                  "blackAndWhite": false,
                   "drawRect": {
                     "height": 190000,
                     "width": 285000,
@@ -12999,6 +13952,7 @@
                   "photo": {
                     "mediaId": "00000000-0000-4000-8000-000000000001",
                     "transform": {
+                      "blackAndWhite": false,
                       "fineRotationDegrees": 0.10000000149011612,
                       "mirrorX": false,
                       "panX": 0.0,
@@ -13020,6 +13974,7 @@
                   "photo": {
                     "mediaId": "00000000-0000-4000-8000-000000000001",
                     "transform": {
+                      "blackAndWhite": false,
                       "fineRotationDegrees": 0.0,
                       "mirrorX": false,
                       "panX": 0.0,
@@ -13147,6 +14102,7 @@
                 },
                 "frameId": "orientation-frame-0",
                 "photo": {
+                  "blackAndWhite": false,
                   "drawRect": {
                     "height": 125000,
                     "width": 187500,
@@ -13221,6 +14177,7 @@
                 },
                 "frameId": "orientation-frame-1",
                 "photo": {
+                  "blackAndWhite": false,
                   "drawRect": {
                     "height": 190000,
                     "width": 285000,
@@ -13367,6 +14324,7 @@
                   "photo": {
                     "mediaId": "00000000-0000-4000-8000-000000000001",
                     "transform": {
+                      "blackAndWhite": false,
                       "fineRotationDegrees": 0.0,
                       "mirrorX": false,
                       "panX": 0.0,
@@ -13388,6 +14346,7 @@
                   "photo": {
                     "mediaId": "00000000-0000-4000-8000-000000000001",
                     "transform": {
+                      "blackAndWhite": false,
                       "fineRotationDegrees": 0.0,
                       "mirrorX": false,
                       "panX": 0.0,
@@ -13515,6 +14474,7 @@
                 },
                 "frameId": "orientation-frame-0",
                 "photo": {
+                  "blackAndWhite": false,
                   "drawRect": {
                     "height": 158346,
                     "width": 237519,
@@ -13589,6 +14549,7 @@
                 },
                 "frameId": "orientation-frame-1",
                 "photo": {
+                  "blackAndWhite": false,
                   "drawRect": {
                     "height": 190000,
                     "width": 285000,
@@ -13735,6 +14696,7 @@
                   "photo": {
                     "mediaId": "00000000-0000-4000-8000-000000000001",
                     "transform": {
+                      "blackAndWhite": false,
                       "fineRotationDegrees": 12.300000190734863,
                       "mirrorX": false,
                       "panX": 0.0,
@@ -13756,6 +14718,7 @@
                   "photo": {
                     "mediaId": "00000000-0000-4000-8000-000000000001",
                     "transform": {
+                      "blackAndWhite": false,
                       "fineRotationDegrees": 0.0,
                       "mirrorX": false,
                       "panX": 0.0,
@@ -13883,6 +14846,7 @@
                 },
                 "frameId": "orientation-frame-0",
                 "photo": {
+                  "blackAndWhite": false,
                   "drawRect": {
                     "height": 192727,
                     "width": 289090,
@@ -13957,6 +14921,7 @@
                 },
                 "frameId": "orientation-frame-1",
                 "photo": {
+                  "blackAndWhite": false,
                   "drawRect": {
                     "height": 190000,
                     "width": 285000,
@@ -14103,6 +15068,7 @@
                   "photo": {
                     "mediaId": "00000000-0000-4000-8000-000000000001",
                     "transform": {
+                      "blackAndWhite": false,
                       "fineRotationDegrees": 12.300000190734863,
                       "mirrorX": true,
                       "panX": 0.0,
@@ -14124,6 +15090,7 @@
                   "photo": {
                     "mediaId": "00000000-0000-4000-8000-000000000001",
                     "transform": {
+                      "blackAndWhite": false,
                       "fineRotationDegrees": 0.0,
                       "mirrorX": false,
                       "panX": 0.0,
@@ -14251,6 +15218,7 @@
                 },
                 "frameId": "orientation-frame-0",
                 "photo": {
+                  "blackAndWhite": false,
                   "drawRect": {
                     "height": 208597,
                     "width": 312895,
@@ -14325,6 +15293,7 @@
                 },
                 "frameId": "orientation-frame-1",
                 "photo": {
+                  "blackAndWhite": false,
                   "drawRect": {
                     "height": 190000,
                     "width": 285000,
@@ -14471,6 +15440,7 @@
                   "photo": {
                     "mediaId": "00000000-0000-4000-8000-000000000001",
                     "transform": {
+                      "blackAndWhite": false,
                       "fineRotationDegrees": 45.0,
                       "mirrorX": false,
                       "panX": 0.0,
@@ -14492,6 +15462,7 @@
                   "photo": {
                     "mediaId": "00000000-0000-4000-8000-000000000001",
                     "transform": {
+                      "blackAndWhite": false,
                       "fineRotationDegrees": 0.0,
                       "mirrorX": false,
                       "panX": 0.0,
@@ -14619,6 +15590,7 @@
                 },
                 "frameId": "orientation-frame-0",
                 "photo": {
+                  "blackAndWhite": false,
                   "drawRect": {
                     "height": 208597,
                     "width": 312895,
@@ -14693,6 +15665,7 @@
                 },
                 "frameId": "orientation-frame-1",
                 "photo": {
+                  "blackAndWhite": false,
                   "drawRect": {
                     "height": 190000,
                     "width": 285000,
@@ -14839,6 +15812,7 @@
                   "photo": {
                     "mediaId": "00000000-0000-4000-8000-000000000001",
                     "transform": {
+                      "blackAndWhite": false,
                       "fineRotationDegrees": -45.0,
                       "mirrorX": false,
                       "panX": 0.0,
@@ -14860,6 +15834,7 @@
                   "photo": {
                     "mediaId": "00000000-0000-4000-8000-000000000001",
                     "transform": {
+                      "blackAndWhite": false,
                       "fineRotationDegrees": 0.0,
                       "mirrorX": false,
                       "panX": 0.0,
@@ -14987,6 +15962,7 @@
                 },
                 "frameId": "orientation-frame-0",
                 "photo": {
+                  "blackAndWhite": false,
                   "drawRect": {
                     "height": 192727,
                     "width": 289090,
@@ -15061,6 +16037,7 @@
                 },
                 "frameId": "orientation-frame-1",
                 "photo": {
+                  "blackAndWhite": false,
                   "drawRect": {
                     "height": 190000,
                     "width": 285000,
@@ -15207,6 +16184,7 @@
                   "photo": {
                     "mediaId": "00000000-0000-4000-8000-000000000001",
                     "transform": {
+                      "blackAndWhite": false,
                       "fineRotationDegrees": 12.300000190734863,
                       "mirrorX": false,
                       "panX": 0.0,
@@ -15228,6 +16206,7 @@
                   "photo": {
                     "mediaId": "00000000-0000-4000-8000-000000000001",
                     "transform": {
+                      "blackAndWhite": false,
                       "fineRotationDegrees": 0.0,
                       "mirrorX": false,
                       "panX": 0.0,
@@ -15314,7 +16293,7 @@
         "savedRevision": 10
       }
     },
-    "single-both": {
+    "single-black-white": {
       "canPasteFrames": false,
       "composition": {
         "frameBorder": {
@@ -15355,14 +16334,15 @@
                 },
                 "frameId": "orientation-frame-0",
                 "photo": {
+                  "blackAndWhite": true,
                   "drawRect": {
-                    "height": 170001,
-                    "width": 255001,
-                    "x": -7500,
-                    "y": 32500
+                    "height": 125000,
+                    "width": 187500,
+                    "x": 26250,
+                    "y": 55000
                   },
                   "mediaId": "00000000-0000-4000-8000-000000000001",
-                  "mirrorX": true,
+                  "mirrorX": false,
                   "name": "Foto.jpg",
                   "palette": [
                     "#C22C24",
@@ -15370,15 +16350,15 @@
                     "#2454C2"
                   ],
                   "placement": {
-                    "baseFillZoom": 425.00000000000006,
+                    "baseFillZoom": 312.5,
                     "current": {
                       "center": {
                         "x": 85000.0,
                         "y": 62500.0
                       },
                       "size": {
-                        "height": 170000.00000000003,
-                        "width": 255000.00000000003
+                        "height": 125000.0,
+                        "width": 187500.0
                       }
                     },
                     "currentPan": {
@@ -15395,27 +16375,27 @@
                       "minimum": -1.0
                     },
                     "panToCenter": {
-                      "xx": -1.1940306291686691e-11,
-                      "xy": 0.0,
-                      "yx": -65000.0,
-                      "yy": -0.0
+                      "xx": 8750.0,
+                      "xy": -0.0,
+                      "yx": 0.0,
+                      "yy": 0.0
                     },
                     "panToCenterPerZoom": {
-                      "xx": -2.3421370033693132e-11,
-                      "xy": 85000.00000000001,
-                      "yx": -127500.0,
-                      "yy": -1.5614246689128754e-11
+                      "xx": 93750.0,
+                      "xy": -0.0,
+                      "yx": 0.0,
+                      "yy": 62500.0
                     },
                     "sizePerZoom": {
-                      "height": 170000.00000000003,
-                      "width": 255000.00000000003
+                      "height": 125000.0,
+                      "width": 187500.0
                     },
                     "zoomRange": {
                       "maximum": 4.0,
                       "minimum": 1.0
                     }
                   },
-                  "rotationDegrees": 270.0
+                  "rotationDegrees": 0.0
                 },
                 "zIndex": 0
               },
@@ -15429,6 +16409,7 @@
                 },
                 "frameId": "orientation-frame-1",
                 "photo": {
+                  "blackAndWhite": false,
                   "drawRect": {
                     "height": 190000,
                     "width": 285000,
@@ -15575,6 +16556,379 @@
                   "photo": {
                     "mediaId": "00000000-0000-4000-8000-000000000001",
                     "transform": {
+                      "blackAndWhite": true,
+                      "fineRotationDegrees": 0.0,
+                      "mirrorX": false,
+                      "panX": 0.0,
+                      "panY": 0.0,
+                      "quarterTurns": 0,
+                      "userZoom": 1.0
+                    }
+                  },
+                  "rect": {
+                    "height": 125000,
+                    "width": 170000,
+                    "x": 35000,
+                    "y": 55000
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "id": "orientation-frame-1",
+                  "photo": {
+                    "mediaId": "00000000-0000-4000-8000-000000000001",
+                    "transform": {
+                      "blackAndWhite": false,
+                      "fineRotationDegrees": 0.0,
+                      "mirrorX": false,
+                      "panX": 0.0,
+                      "panY": 0.0,
+                      "quarterTurns": 0,
+                      "userZoom": 1.0
+                    }
+                  },
+                  "rect": {
+                    "height": 190000,
+                    "width": 130000,
+                    "x": 350000,
+                    "y": 40000
+                  },
+                  "zIndex": 1
+                },
+                {
+                  "id": "orientation-frame-2",
+                  "photo": null,
+                  "rect": {
+                    "height": 65000,
+                    "width": 85000,
+                    "x": 235000,
+                    "y": 185000
+                  },
+                  "zIndex": 2
+                }
+              ],
+              "heightUm": 300000,
+              "id": "sheet-001",
+              "number": 1,
+              "pageNumbers": [
+                1,
+                2
+              ],
+              "role": "initial",
+              "widthUm": 600000
+            },
+            {
+              "activeSides": "both",
+              "frames": [],
+              "heightUm": 300000,
+              "id": "sheet-002",
+              "number": 2,
+              "pageNumbers": [
+                3,
+                4
+              ],
+              "role": "final",
+              "widthUm": 600000
+            }
+          ],
+          "visualDefaults": {
+            "background": {
+              "both": {
+                "kind": "color",
+                "rgb": "#FFFFFF"
+              },
+              "scope": "bothSides"
+            },
+            "frameBorder": {
+              "kind": "none"
+            },
+            "overlay": {
+              "both": null,
+              "scope": "bothSides"
+            }
+          }
+        },
+        "canRedo": false,
+        "canUndo": true,
+        "dirty": true,
+        "document": {
+          "bleedUm": 3000,
+          "displayUnit": "mm",
+          "dpi": 300,
+          "safetyUm": 3000,
+          "sheetHeightUm": 300000,
+          "sheetWidthUm": 600000
+        },
+        "projectId": "photo-orientation-project",
+        "projectName": "Orientação",
+        "revision": 37,
+        "savedRevision": 10
+      }
+    },
+    "single-both": {
+      "canPasteFrames": false,
+      "composition": {
+        "frameBorder": {
+          "kind": "none"
+        },
+        "sheets": [
+          {
+            "activeSides": "both",
+            "backgrounds": [
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "kind": "color",
+                "rgb": "#FFFFFF"
+              }
+            ],
+            "base": {
+              "drawRect": {
+                "height": 300000,
+                "width": 600000,
+                "x": 0,
+                "y": 0
+              },
+              "rgb": "#FFFFFF"
+            },
+            "frames": [
+              {
+                "borderFillRects": [],
+                "clipRect": {
+                  "height": 125000,
+                  "width": 170000,
+                  "x": 35000,
+                  "y": 55000
+                },
+                "frameId": "orientation-frame-0",
+                "photo": {
+                  "blackAndWhite": false,
+                  "drawRect": {
+                    "height": 170001,
+                    "width": 255001,
+                    "x": -7500,
+                    "y": 32500
+                  },
+                  "mediaId": "00000000-0000-4000-8000-000000000001",
+                  "mirrorX": true,
+                  "name": "Foto.jpg",
+                  "palette": [
+                    "#C22C24",
+                    "#248044",
+                    "#2454C2"
+                  ],
+                  "placement": {
+                    "baseFillZoom": 425.00000000000006,
+                    "current": {
+                      "center": {
+                        "x": 85000.0,
+                        "y": 62500.0
+                      },
+                      "size": {
+                        "height": 170000.00000000003,
+                        "width": 255000.00000000003
+                      }
+                    },
+                    "currentPan": {
+                      "x": 0.0,
+                      "y": 0.0
+                    },
+                    "currentZoom": 1.0,
+                    "panOrigin": {
+                      "x": 85000.0,
+                      "y": 62500.0
+                    },
+                    "panRange": {
+                      "maximum": 1.0,
+                      "minimum": -1.0
+                    },
+                    "panToCenter": {
+                      "xx": -1.1940306291686691e-11,
+                      "xy": 0.0,
+                      "yx": -65000.0,
+                      "yy": -0.0
+                    },
+                    "panToCenterPerZoom": {
+                      "xx": -2.3421370033693132e-11,
+                      "xy": 85000.00000000001,
+                      "yx": -127500.0,
+                      "yy": -1.5614246689128754e-11
+                    },
+                    "sizePerZoom": {
+                      "height": 170000.00000000003,
+                      "width": 255000.00000000003
+                    },
+                    "zoomRange": {
+                      "maximum": 4.0,
+                      "minimum": 1.0
+                    }
+                  },
+                  "rotationDegrees": 270.0
+                },
+                "zIndex": 0
+              },
+              {
+                "borderFillRects": [],
+                "clipRect": {
+                  "height": 190000,
+                  "width": 130000,
+                  "x": 350000,
+                  "y": 40000
+                },
+                "frameId": "orientation-frame-1",
+                "photo": {
+                  "blackAndWhite": false,
+                  "drawRect": {
+                    "height": 190000,
+                    "width": 285000,
+                    "x": 272500,
+                    "y": 40000
+                  },
+                  "mediaId": "00000000-0000-4000-8000-000000000001",
+                  "mirrorX": false,
+                  "name": "Foto.jpg",
+                  "palette": [
+                    "#C22C24",
+                    "#248044",
+                    "#2454C2"
+                  ],
+                  "placement": {
+                    "baseFillZoom": 475.0,
+                    "current": {
+                      "center": {
+                        "x": 65000.0,
+                        "y": 95000.0
+                      },
+                      "size": {
+                        "height": 190000.0,
+                        "width": 285000.0
+                      }
+                    },
+                    "currentPan": {
+                      "x": 0.0,
+                      "y": 0.0
+                    },
+                    "currentZoom": 1.0,
+                    "panOrigin": {
+                      "x": 65000.0,
+                      "y": 95000.0
+                    },
+                    "panRange": {
+                      "maximum": 1.0,
+                      "minimum": -1.0
+                    },
+                    "panToCenter": {
+                      "xx": 77500.0,
+                      "xy": -0.0,
+                      "yx": 0.0,
+                      "yy": 0.0
+                    },
+                    "panToCenterPerZoom": {
+                      "xx": 142500.0,
+                      "xy": -0.0,
+                      "yx": 0.0,
+                      "yy": 95000.0
+                    },
+                    "sizePerZoom": {
+                      "height": 190000.0,
+                      "width": 285000.0
+                    },
+                    "zoomRange": {
+                      "maximum": 4.0,
+                      "minimum": 1.0
+                    }
+                  },
+                  "rotationDegrees": 0.0
+                },
+                "zIndex": 1
+              },
+              {
+                "borderFillRects": [],
+                "clipRect": {
+                  "height": 65000,
+                  "width": 85000,
+                  "x": 235000,
+                  "y": 185000
+                },
+                "frameId": "orientation-frame-2",
+                "photo": null,
+                "zIndex": 2
+              }
+            ],
+            "heightUm": 300000,
+            "number": 1,
+            "overlays": [],
+            "sheetId": "sheet-001",
+            "widthUm": 600000
+          },
+          {
+            "activeSides": "both",
+            "backgrounds": [
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "kind": "color",
+                "rgb": "#FFFFFF"
+              }
+            ],
+            "base": {
+              "drawRect": {
+                "height": 300000,
+                "width": 600000,
+                "x": 0,
+                "y": 0
+              },
+              "rgb": "#FFFFFF"
+            },
+            "frames": [],
+            "heightUm": 300000,
+            "number": 2,
+            "overlays": [],
+            "sheetId": "sheet-002",
+            "widthUm": 600000
+          }
+        ]
+      },
+      "mediaUsage": [
+        {
+          "count": 2,
+          "mediaId": "00000000-0000-4000-8000-000000000001"
+        }
+      ],
+      "state": {
+        "album": {
+          "media": [
+            {
+              "id": "00000000-0000-4000-8000-000000000001",
+              "kind": "photo",
+              "name": "Foto.jpg",
+              "palette": [
+                "#C22C24",
+                "#248044",
+                "#2454C2"
+              ],
+              "sourceHeightPx": 400,
+              "sourceWidthPx": 600
+            }
+          ],
+          "sheets": [
+            {
+              "activeSides": "both",
+              "frames": [
+                {
+                  "id": "orientation-frame-0",
+                  "photo": {
+                    "mediaId": "00000000-0000-4000-8000-000000000001",
+                    "transform": {
+                      "blackAndWhite": false,
                       "fineRotationDegrees": 0.0,
                       "mirrorX": true,
                       "panX": 0.0,
@@ -15596,6 +16950,7 @@
                   "photo": {
                     "mediaId": "00000000-0000-4000-8000-000000000001",
                     "transform": {
+                      "blackAndWhite": false,
                       "fineRotationDegrees": 0.0,
                       "mirrorX": false,
                       "panX": 0.0,
@@ -15682,7 +17037,7 @@
         "savedRevision": 10
       }
     },
-    "single-mirrored": {
+    "single-both-black-white": {
       "canPasteFrames": false,
       "composition": {
         "frameBorder": {
@@ -15723,11 +17078,12 @@
                 },
                 "frameId": "orientation-frame-0",
                 "photo": {
+                  "blackAndWhite": true,
                   "drawRect": {
-                    "height": 125000,
-                    "width": 187500,
-                    "x": 26250,
-                    "y": 55000
+                    "height": 170001,
+                    "width": 255001,
+                    "x": -7500,
+                    "y": 32500
                   },
                   "mediaId": "00000000-0000-4000-8000-000000000001",
                   "mirrorX": true,
@@ -15738,15 +17094,15 @@
                     "#2454C2"
                   ],
                   "placement": {
-                    "baseFillZoom": 312.5,
+                    "baseFillZoom": 425.00000000000006,
                     "current": {
                       "center": {
                         "x": 85000.0,
                         "y": 62500.0
                       },
                       "size": {
-                        "height": 125000.0,
-                        "width": 187500.0
+                        "height": 170000.00000000003,
+                        "width": 255000.00000000003
                       }
                     },
                     "currentPan": {
@@ -15763,27 +17119,27 @@
                       "minimum": -1.0
                     },
                     "panToCenter": {
-                      "xx": 8750.0,
-                      "xy": -0.0,
-                      "yx": 0.0,
-                      "yy": 0.0
+                      "xx": -1.1940306291686691e-11,
+                      "xy": 0.0,
+                      "yx": -65000.0,
+                      "yy": -0.0
                     },
                     "panToCenterPerZoom": {
-                      "xx": 93750.0,
-                      "xy": -0.0,
-                      "yx": 0.0,
-                      "yy": 62500.0
+                      "xx": -2.3421370033693132e-11,
+                      "xy": 85000.00000000001,
+                      "yx": -127500.0,
+                      "yy": -1.5614246689128754e-11
                     },
                     "sizePerZoom": {
-                      "height": 125000.0,
-                      "width": 187500.0
+                      "height": 170000.00000000003,
+                      "width": 255000.00000000003
                     },
                     "zoomRange": {
                       "maximum": 4.0,
                       "minimum": 1.0
                     }
                   },
-                  "rotationDegrees": 0.0
+                  "rotationDegrees": 270.0
                 },
                 "zIndex": 0
               },
@@ -15797,6 +17153,7 @@
                 },
                 "frameId": "orientation-frame-1",
                 "photo": {
+                  "blackAndWhite": false,
                   "drawRect": {
                     "height": 190000,
                     "width": 285000,
@@ -15943,6 +17300,379 @@
                   "photo": {
                     "mediaId": "00000000-0000-4000-8000-000000000001",
                     "transform": {
+                      "blackAndWhite": true,
+                      "fineRotationDegrees": 0.0,
+                      "mirrorX": true,
+                      "panX": 0.0,
+                      "panY": 0.0,
+                      "quarterTurns": 3,
+                      "userZoom": 1.0
+                    }
+                  },
+                  "rect": {
+                    "height": 125000,
+                    "width": 170000,
+                    "x": 35000,
+                    "y": 55000
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "id": "orientation-frame-1",
+                  "photo": {
+                    "mediaId": "00000000-0000-4000-8000-000000000001",
+                    "transform": {
+                      "blackAndWhite": false,
+                      "fineRotationDegrees": 0.0,
+                      "mirrorX": false,
+                      "panX": 0.0,
+                      "panY": 0.0,
+                      "quarterTurns": 0,
+                      "userZoom": 1.0
+                    }
+                  },
+                  "rect": {
+                    "height": 190000,
+                    "width": 130000,
+                    "x": 350000,
+                    "y": 40000
+                  },
+                  "zIndex": 1
+                },
+                {
+                  "id": "orientation-frame-2",
+                  "photo": null,
+                  "rect": {
+                    "height": 65000,
+                    "width": 85000,
+                    "x": 235000,
+                    "y": 185000
+                  },
+                  "zIndex": 2
+                }
+              ],
+              "heightUm": 300000,
+              "id": "sheet-001",
+              "number": 1,
+              "pageNumbers": [
+                1,
+                2
+              ],
+              "role": "initial",
+              "widthUm": 600000
+            },
+            {
+              "activeSides": "both",
+              "frames": [],
+              "heightUm": 300000,
+              "id": "sheet-002",
+              "number": 2,
+              "pageNumbers": [
+                3,
+                4
+              ],
+              "role": "final",
+              "widthUm": 600000
+            }
+          ],
+          "visualDefaults": {
+            "background": {
+              "both": {
+                "kind": "color",
+                "rgb": "#FFFFFF"
+              },
+              "scope": "bothSides"
+            },
+            "frameBorder": {
+              "kind": "none"
+            },
+            "overlay": {
+              "both": null,
+              "scope": "bothSides"
+            }
+          }
+        },
+        "canRedo": false,
+        "canUndo": true,
+        "dirty": true,
+        "document": {
+          "bleedUm": 3000,
+          "displayUnit": "mm",
+          "dpi": 300,
+          "safetyUm": 3000,
+          "sheetHeightUm": 300000,
+          "sheetWidthUm": 600000
+        },
+        "projectId": "photo-orientation-project",
+        "projectName": "Orientação",
+        "revision": 32,
+        "savedRevision": 10
+      }
+    },
+    "single-mirrored": {
+      "canPasteFrames": false,
+      "composition": {
+        "frameBorder": {
+          "kind": "none"
+        },
+        "sheets": [
+          {
+            "activeSides": "both",
+            "backgrounds": [
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "kind": "color",
+                "rgb": "#FFFFFF"
+              }
+            ],
+            "base": {
+              "drawRect": {
+                "height": 300000,
+                "width": 600000,
+                "x": 0,
+                "y": 0
+              },
+              "rgb": "#FFFFFF"
+            },
+            "frames": [
+              {
+                "borderFillRects": [],
+                "clipRect": {
+                  "height": 125000,
+                  "width": 170000,
+                  "x": 35000,
+                  "y": 55000
+                },
+                "frameId": "orientation-frame-0",
+                "photo": {
+                  "blackAndWhite": false,
+                  "drawRect": {
+                    "height": 125000,
+                    "width": 187500,
+                    "x": 26250,
+                    "y": 55000
+                  },
+                  "mediaId": "00000000-0000-4000-8000-000000000001",
+                  "mirrorX": true,
+                  "name": "Foto.jpg",
+                  "palette": [
+                    "#C22C24",
+                    "#248044",
+                    "#2454C2"
+                  ],
+                  "placement": {
+                    "baseFillZoom": 312.5,
+                    "current": {
+                      "center": {
+                        "x": 85000.0,
+                        "y": 62500.0
+                      },
+                      "size": {
+                        "height": 125000.0,
+                        "width": 187500.0
+                      }
+                    },
+                    "currentPan": {
+                      "x": 0.0,
+                      "y": 0.0
+                    },
+                    "currentZoom": 1.0,
+                    "panOrigin": {
+                      "x": 85000.0,
+                      "y": 62500.0
+                    },
+                    "panRange": {
+                      "maximum": 1.0,
+                      "minimum": -1.0
+                    },
+                    "panToCenter": {
+                      "xx": 8750.0,
+                      "xy": -0.0,
+                      "yx": 0.0,
+                      "yy": 0.0
+                    },
+                    "panToCenterPerZoom": {
+                      "xx": 93750.0,
+                      "xy": -0.0,
+                      "yx": 0.0,
+                      "yy": 62500.0
+                    },
+                    "sizePerZoom": {
+                      "height": 125000.0,
+                      "width": 187500.0
+                    },
+                    "zoomRange": {
+                      "maximum": 4.0,
+                      "minimum": 1.0
+                    }
+                  },
+                  "rotationDegrees": 0.0
+                },
+                "zIndex": 0
+              },
+              {
+                "borderFillRects": [],
+                "clipRect": {
+                  "height": 190000,
+                  "width": 130000,
+                  "x": 350000,
+                  "y": 40000
+                },
+                "frameId": "orientation-frame-1",
+                "photo": {
+                  "blackAndWhite": false,
+                  "drawRect": {
+                    "height": 190000,
+                    "width": 285000,
+                    "x": 272500,
+                    "y": 40000
+                  },
+                  "mediaId": "00000000-0000-4000-8000-000000000001",
+                  "mirrorX": false,
+                  "name": "Foto.jpg",
+                  "palette": [
+                    "#C22C24",
+                    "#248044",
+                    "#2454C2"
+                  ],
+                  "placement": {
+                    "baseFillZoom": 475.0,
+                    "current": {
+                      "center": {
+                        "x": 65000.0,
+                        "y": 95000.0
+                      },
+                      "size": {
+                        "height": 190000.0,
+                        "width": 285000.0
+                      }
+                    },
+                    "currentPan": {
+                      "x": 0.0,
+                      "y": 0.0
+                    },
+                    "currentZoom": 1.0,
+                    "panOrigin": {
+                      "x": 65000.0,
+                      "y": 95000.0
+                    },
+                    "panRange": {
+                      "maximum": 1.0,
+                      "minimum": -1.0
+                    },
+                    "panToCenter": {
+                      "xx": 77500.0,
+                      "xy": -0.0,
+                      "yx": 0.0,
+                      "yy": 0.0
+                    },
+                    "panToCenterPerZoom": {
+                      "xx": 142500.0,
+                      "xy": -0.0,
+                      "yx": 0.0,
+                      "yy": 95000.0
+                    },
+                    "sizePerZoom": {
+                      "height": 190000.0,
+                      "width": 285000.0
+                    },
+                    "zoomRange": {
+                      "maximum": 4.0,
+                      "minimum": 1.0
+                    }
+                  },
+                  "rotationDegrees": 0.0
+                },
+                "zIndex": 1
+              },
+              {
+                "borderFillRects": [],
+                "clipRect": {
+                  "height": 65000,
+                  "width": 85000,
+                  "x": 235000,
+                  "y": 185000
+                },
+                "frameId": "orientation-frame-2",
+                "photo": null,
+                "zIndex": 2
+              }
+            ],
+            "heightUm": 300000,
+            "number": 1,
+            "overlays": [],
+            "sheetId": "sheet-001",
+            "widthUm": 600000
+          },
+          {
+            "activeSides": "both",
+            "backgrounds": [
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "kind": "color",
+                "rgb": "#FFFFFF"
+              }
+            ],
+            "base": {
+              "drawRect": {
+                "height": 300000,
+                "width": 600000,
+                "x": 0,
+                "y": 0
+              },
+              "rgb": "#FFFFFF"
+            },
+            "frames": [],
+            "heightUm": 300000,
+            "number": 2,
+            "overlays": [],
+            "sheetId": "sheet-002",
+            "widthUm": 600000
+          }
+        ]
+      },
+      "mediaUsage": [
+        {
+          "count": 2,
+          "mediaId": "00000000-0000-4000-8000-000000000001"
+        }
+      ],
+      "state": {
+        "album": {
+          "media": [
+            {
+              "id": "00000000-0000-4000-8000-000000000001",
+              "kind": "photo",
+              "name": "Foto.jpg",
+              "palette": [
+                "#C22C24",
+                "#248044",
+                "#2454C2"
+              ],
+              "sourceHeightPx": 400,
+              "sourceWidthPx": 600
+            }
+          ],
+          "sheets": [
+            {
+              "activeSides": "both",
+              "frames": [
+                {
+                  "id": "orientation-frame-0",
+                  "photo": {
+                    "mediaId": "00000000-0000-4000-8000-000000000001",
+                    "transform": {
+                      "blackAndWhite": false,
                       "fineRotationDegrees": 0.0,
                       "mirrorX": true,
                       "panX": 0.0,
@@ -15964,6 +17694,7 @@
                   "photo": {
                     "mediaId": "00000000-0000-4000-8000-000000000001",
                     "transform": {
+                      "blackAndWhite": false,
                       "fineRotationDegrees": 0.0,
                       "mirrorX": false,
                       "panX": 0.0,
@@ -16091,6 +17822,7 @@
                 },
                 "frameId": "orientation-frame-0",
                 "photo": {
+                  "blackAndWhite": false,
                   "drawRect": {
                     "height": 170001,
                     "width": 255001,
@@ -16165,6 +17897,7 @@
                 },
                 "frameId": "orientation-frame-1",
                 "photo": {
+                  "blackAndWhite": false,
                   "drawRect": {
                     "height": 190000,
                     "width": 285000,
@@ -16311,6 +18044,7 @@
                   "photo": {
                     "mediaId": "00000000-0000-4000-8000-000000000001",
                     "transform": {
+                      "blackAndWhite": false,
                       "fineRotationDegrees": 0.0,
                       "mirrorX": false,
                       "panX": 0.0,
@@ -16332,6 +18066,7 @@
                   "photo": {
                     "mediaId": "00000000-0000-4000-8000-000000000001",
                     "transform": {
+                      "blackAndWhite": false,
                       "fineRotationDegrees": 0.0,
                       "mirrorX": false,
                       "panX": 0.0,

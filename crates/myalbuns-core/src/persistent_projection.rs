@@ -99,6 +99,7 @@ pub(crate) fn editor_state(
                                         .transform()
                                         .fine_rotation_degrees(),
                                     mirror_x: photo.transform().mirror_x(),
+                                    black_and_white: photo.transform().black_and_white(),
                                 },
                             }),
                         })

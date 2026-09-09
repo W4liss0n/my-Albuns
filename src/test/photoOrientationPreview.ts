@@ -7,6 +7,7 @@ export const photoOrientationCorpus = corpus as unknown as {
   transitions: { from: string; to: string; frameIds: string[]; action: PhotoOrientationAction }[];
   angleTransitions: { from: string; to: string; edit: PhotoAngleEdit }[];
   anglePreviews: { from: string; edit: PhotoAngleEdit; frames: ComposedFrame[] }[];
+  effectTransitions: { from: string; to: string; frameIds: string[] }[];
   single: string[];
   group: string[];
   placeholders: string[];

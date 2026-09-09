@@ -167,7 +167,7 @@ fn imported_photo_adds_one_filled_frame_and_persists_only_the_external_link() {
     let persisted_bytes = fs::read(&project_path).expect("the v3 Project is readable");
     let persisted: serde_json::Value =
         serde_json::from_slice(&persisted_bytes).expect("the v3 Project is JSON");
-    assert_eq!(persisted["schemaVersion"], 5);
+    assert_eq!(persisted["schemaVersion"], 6);
     assert_eq!(persisted["project"]["media"][0]["kind"], "photo");
     assert_eq!(
         persisted["project"]["sheets"][0]["frames"]
@@ -338,6 +338,11 @@ fn edit_drop_uses_topmost_rectangle_and_invalid_targets_leave_no_revision() {
         },
         "the later Frame wins by stack order wherever rectangles overlap"
     );
+    project
+        .apply(ProjectIntent::TogglePhotoBlackAndWhite {
+            frame_ids: vec![second_frame.clone()],
+        })
+        .unwrap();
     let replaced = project
         .apply_with_outcome(ProjectIntent::DropPhoto {
             sheet_id: sheet_id.clone(),
@@ -350,6 +355,14 @@ fn edit_drop_uses_topmost_rectangle_and_invalid_targets_leave_no_revision() {
     assert_eq!(
         replaced.affected_frame_id.as_deref(),
         Some(second_frame.as_str())
+    );
+    assert!(
+        !replaced.projection.state.album.sheets[0].frames[1]
+            .photo
+            .as_ref()
+            .unwrap()
+            .transform
+            .black_and_white
     );
     assert_eq!(
         replaced.projection.state.album.sheets[0].frames[0].id,

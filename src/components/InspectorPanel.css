@@ -104,6 +104,11 @@
   margin-top: var(--ui-space-3);
 }
 
+.photo-effects-controls {
+  display: grid;
+  gap: var(--ui-space-2);
+}
+
 .photo-orientation-row {
   display: flex;
   align-items: center;
@@ -117,7 +122,8 @@
   color: var(--ui-text-secondary);
 }
 
-.photo-orientation-scope {
+.photo-orientation-scope,
+.photo-effects-scope {
   margin: 0;
   color: var(--ui-text-muted);
   font-size: var(--ui-font-size-micro);
@@ -171,7 +177,8 @@
   outline-offset: 2px;
 }
 
-.photo-mirror-control[aria-pressed="true"] {
+.photo-mirror-control[aria-pressed="true"],
+.photo-effect-control[aria-pressed="true"] {
   color: var(--ui-accent);
   border-color: var(--ui-accent);
   background: var(--ui-surface-muted);

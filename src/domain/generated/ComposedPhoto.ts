@@ -2,4 +2,4 @@
 import type { PhotoPlacementPlan } from "./PhotoPlacementPlan";
 import type { RectUm } from "./RectUm";
 
-export type ComposedPhoto = { mediaId: string, name: string, drawRect: RectUm, placement: PhotoPlacementPlan, rotationDegrees: number, mirrorX: boolean, palette: [string, string, string], };
+export type ComposedPhoto = { mediaId: string, name: string, drawRect: RectUm, placement: PhotoPlacementPlan, rotationDegrees: number, mirrorX: boolean, blackAndWhite: boolean, palette: [string, string, string], };

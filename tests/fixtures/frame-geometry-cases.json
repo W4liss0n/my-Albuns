@@ -11,6 +11,7 @@
         },
         "frameId": "geometry-frame",
         "photo": {
+          "blackAndWhite": false,
           "drawRect": {
             "height": 208000,
             "width": 312000,
@@ -93,6 +94,7 @@
         },
         "frameId": "geometry-frame",
         "photo": {
+          "blackAndWhite": false,
           "drawRect": {
             "height": 208000,
             "width": 312000,
@@ -175,6 +177,7 @@
         },
         "frameId": "geometry-frame",
         "photo": {
+          "blackAndWhite": false,
           "drawRect": {
             "height": 277334,
             "width": 416000,
@@ -260,6 +263,7 @@
         },
         "frameId": "geometry-frame",
         "photo": {
+          "blackAndWhite": false,
           "drawRect": {
             "height": 312000,
             "width": 468000,
@@ -345,6 +349,7 @@
         },
         "frameId": "geometry-frame",
         "photo": {
+          "blackAndWhite": false,
           "drawRect": {
             "height": 15600,
             "width": 23400,

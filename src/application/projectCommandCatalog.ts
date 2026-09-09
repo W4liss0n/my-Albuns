@@ -72,6 +72,12 @@ type ProjectCommandSourceDefinition<Id extends string> =
 
 const DEFINITIONS = [
   command({
+    id: "toggle-photo-black-and-white",
+    label: "Preto e branco",
+    description: "Alterna o efeito Preto e branco das Fotos selecionadas.",
+    kind: "domain", contexts: ["frame", "frame-photo"], availability: "implemented", shortcuts: [],
+  }),
+  command({
     id: "rotate-photo-counterclockwise",
     label: "Girar 90° à esquerda",
     description: "Gira as Fotos selecionadas 90° no sentido anti-horário.",
