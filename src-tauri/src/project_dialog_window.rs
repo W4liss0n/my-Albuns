@@ -22,6 +22,7 @@ const MAX_DIALOG_SESSION_ID_CHARS: usize = 128;
 impl ProjectDialogState {
     fn sanitized(self) -> Self {
         match self {
+            Self::LayoutDeletionConfirmation { busy } => Self::LayoutDeletionConfirmation { busy },
             Self::ExportProblems {
                 project_name,
                 problems,
@@ -102,7 +103,7 @@ impl ProjectDialogState {
                 520.0,
                 280.0 + native_dialog_window::OWNED_WINDOW_TITLEBAR_HEIGHT,
             ),
-            Self::ProjectCloseConfirmation { .. } => (
+            Self::LayoutDeletionConfirmation { .. } | Self::ProjectCloseConfirmation { .. } => (
                 520.0,
                 214.0 + native_dialog_window::OWNED_WINDOW_TITLEBAR_HEIGHT,
             ),

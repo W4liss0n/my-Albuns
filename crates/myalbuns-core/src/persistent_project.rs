@@ -517,6 +517,29 @@ impl EditableProject {
         )
     }
 
+    pub fn capture_custom_layout(
+        &self,
+        sheet_id: &str,
+    ) -> Result<crate::LayoutDefinition, CoreError> {
+        if !self.session_valid {
+            return Err(CoreError::EditableSessionInvalidated);
+        }
+        let parsed =
+            Uuid::parse_str(sheet_id).map_err(|_| CoreError::SheetNotFound(sheet_id.into()))?;
+        let current = self.project().current_layout(parsed)?.definition;
+        crate::LayoutRules::capture_custom(current.surface, current.positions)
+    }
+
+    pub fn refresh_layout_catalog(
+        &mut self,
+        snapshot: crate::LayoutCatalogSnapshot,
+    ) -> Result<bool, CoreError> {
+        if !self.session_valid {
+            return Err(CoreError::EditableSessionInvalidated);
+        }
+        self.session.refresh_layout_catalog(snapshot)
+    }
+
     pub fn query_layouts(&mut self, sheet_id: &str) -> Result<crate::LayoutQueryResult, CoreError> {
         self.query_layouts_with_expansion(sheet_id, None)
     }

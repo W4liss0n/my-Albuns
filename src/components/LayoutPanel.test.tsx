@@ -3,6 +3,7 @@ import { expect, test, vi } from "vitest";
 import { layoutPanelCorpus } from "../test/layoutPanelPreview";
 import { LayoutPanel } from "./LayoutPanel";
 import type { LayoutPanelController } from "./useLayoutPanel";
+import type { LayoutCatalogController } from "./useLayoutCatalog";
 
 function panel(overrides: Partial<LayoutPanelController> = {}, caseName = "mixed", stage: "before" | "lockReady" | "filled" = "before") {
   const sample = layoutPanelCorpus.cases[caseName][stage]!;
@@ -11,7 +12,7 @@ function panel(overrides: Partial<LayoutPanelController> = {}, caseName = "mixed
   const controller: LayoutPanelController = {
     visible: true, sheetId: sheet.sheetId, composition: sample.projection.composition,
     committing: false, query: prepared.query, displayQuery: overrides.query ?? prepared.query, previews: prepared.previews, error: null,
-    toggle: vi.fn(), close: vi.fn(), preview: vi.fn(), cancelPreview: vi.fn(),
+    toggle: vi.fn(), close: vi.fn(), refresh: vi.fn(), preview: vi.fn(), cancelPreview: vi.fn(),
     apply: vi.fn(async () => true),
     lock: vi.fn(async () => true), unlock: vi.fn(async () => true),
     positionCount: sheet.frames.length, configurePositions: vi.fn(),
@@ -69,4 +70,22 @@ test("filled Frames are represented by generic geometry without photo content or
   expect(thumbnail).toHaveAccessibleName("Layout com 4 Frames");
   expect(thumbnail.querySelectorAll("[data-preview-frame-id]")).toHaveLength(4);
   expect(thumbnail.querySelector("image, [data-preview-frame-content-id], [data-preview-frame-border-id]")).toBeNull();
+});
+
+test("a pending custom duplicate is consumed only by a compatible, current query and reveals its existing card", () => {
+  const sample = layoutPanelCorpus.cases.custom.before;
+  const sheet = sample.projection.composition.sheets[0];
+  const prepared = sample.queries[sheet.sheetId];
+  const { controller, view } = panel({ query: null, displayQuery: null });
+  const revealId = layoutPanelCorpus.cases.custom.saveResult!.layoutId;
+  const catalog: LayoutCatalogController = { revision: 1, busy: false, notice: null, revealId,
+    save: vi.fn(async () => undefined), refresh: vi.fn(async () => true), requestDelete: vi.fn(),
+    acknowledgeReveal: vi.fn(), dismissNotice: vi.fn() };
+  view.rerender(<LayoutPanel controller={controller} sheet={sheet} catalog={catalog} />);
+  expect(catalog.acknowledgeReveal).not.toHaveBeenCalled();
+  view.rerender(<LayoutPanel controller={{ ...controller, query: prepared.query, displayQuery: prepared.query, previews: prepared.previews }} sheet={sheet} catalog={catalog} />);
+  expect(catalog.acknowledgeReveal).toHaveBeenCalledOnce();
+  expect(document.querySelector(`[data-custom-layout-id="${revealId}"]`)).toHaveClass("layout-panel__candidate--revealed");
+  fireEvent.click(screen.getByRole("button", { name: "Excluir Layout personalizado 1" }));
+  expect(catalog.requestDelete).toHaveBeenCalledExactlyOnceWith(revealId);
 });

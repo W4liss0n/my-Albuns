@@ -31,6 +31,11 @@ export function ProjectDialogView({
   }, [state.kind]);
 
   switch (state.kind) {
+    case "layoutDeletionConfirmation":
+      return <ConfirmationDialog title="Excluir Layout personalizado?" tone="danger"
+        description="O Layout será removido do catálogo em todas as Janelas. As composições aplicadas e as cópias guardadas nos Projetos serão preservadas."
+        cancelAction={{ label: "Cancelar", disabled: state.busy, onClick: () => onAction("cancelLayoutDeletion") }}
+        confirmAction={{ label: state.busy ? "Excluindo…" : "Excluir", disabled: state.busy, onClick: () => onAction("confirmLayoutDeletion") }} />;
     case "exportProblems":
       return <ProblemsDialog title="Problemas na Exportação"
         description="Preencha os Frames vazios para exportar a seleção."

@@ -262,7 +262,10 @@ original, mesmo depois de uma edição manual dos Frames.
 
 Dentro de cada seção, a ordem é Último Layout compatível, Favoritos e demais
 candidatos. A nota do Gerador não ultrapassa essa prioridade. Uma definição
-tem uma única preview, mesmo quando veio de mais de uma origem.
+tem uma única preview dentro da mesma origem. Conforme decisão aceita em
+09/09/2026, a mesma geometria pode aparecer nas duas seções: salvar uma
+sugestão automática também a apresenta em Personalizados. A deduplicação
+não atravessa as origens, inclusive para cópias favoritas.
 
 A prioridade de aplicação automática é Último Layout, primeiro Favorito,
 primeiro Personalizado e primeira sugestão do Gerador. Sem opção nessas

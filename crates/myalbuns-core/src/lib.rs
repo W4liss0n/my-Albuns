@@ -14,11 +14,12 @@ pub use frame_geometry::{
     FrameGeometryEdit, FrameGeometryGesture, FrameGeometryTarget, FrameResizeHandle,
 };
 pub use layouts::{
-    FrameOrientation, GeneratedLayout, LayoutCandidate, LayoutDefinition, LayoutExpansion,
-    LayoutExportProblem, LayoutGeneration, LayoutGenerationStatus, LayoutListing, LayoutOrigin,
-    LayoutParameters, LayoutPatch, LayoutPermission, LayoutQuery, LayoutQueryResult, LayoutRules,
-    LayoutScope, LayoutSelection, LayoutSettings, LayoutSurface, LayoutSurfaceKind, StoredLayout,
-    generate_layouts,
+    CustomLayout, CustomLayoutId, FrameOrientation, GeneratedLayout, LayoutCandidate,
+    LayoutCatalogSnapshot, LayoutDefinition, LayoutExpansion, LayoutExportProblem,
+    LayoutGeneration, LayoutGenerationStatus, LayoutListing, LayoutOrigin, LayoutParameters,
+    LayoutPatch, LayoutPermission, LayoutQuery, LayoutQueryResult, LayoutRules, LayoutScope,
+    LayoutSelection, LayoutSettings, LayoutSources, LayoutSurface, LayoutSurfaceKind,
+    SaveCustomLayoutResult, StoredLayout, generate_layouts,
 };
 
 pub use model::{

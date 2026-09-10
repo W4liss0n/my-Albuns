@@ -12,6 +12,7 @@ import "./SheetDesignInspector.css";
 export type SheetDesignScope = VisualScope;
 
 interface SheetDesignInspectorProps {
+  saveLayout?: { enabled: boolean; onSave(): void };
   mediaPreviewUrls: Readonly<Record<string, string>>;
   scope: SheetDesignScope;
   sheet: ComposedSheet;
@@ -19,6 +20,7 @@ interface SheetDesignInspectorProps {
 }
 
 export function SheetDesignInspector({
+  saveLayout,
   mediaPreviewUrls,
   scope,
   sheet,
@@ -58,13 +60,13 @@ export function SheetDesignInspector({
       />
 
       <ActionButton
-        data-placeholder-feature="save-sheet-layout"
         density="compact"
-        disabled
+        disabled={!saveLayout?.enabled}
+        onClick={saveLayout?.onSave}
         title={
           sheet.frames.length === 0
             ? "Adicione ao menos um Frame para salvar um Layout."
-            : "Salvar disposição como Layout ainda não está disponível nesta versão."
+            : "Salvar a disposição dos Frames em Personalizados."
         }
         type="button"
         variant="secondary"

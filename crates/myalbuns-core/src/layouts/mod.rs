@@ -3,11 +3,13 @@ use ts_rs::TS;
 
 use crate::RectUm;
 
+mod catalog;
 mod generator;
 mod rules;
 
+pub use catalog::{CustomLayout, CustomLayoutId, LayoutCatalogSnapshot, SaveCustomLayoutResult};
 pub use generator::generate_layouts;
-pub use rules::{LayoutPatch, LayoutRules};
+pub use rules::{LayoutPatch, LayoutRules, LayoutSources};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -103,6 +105,7 @@ pub struct LayoutQueryResult {
     pub query_id: String,
     pub project_id: String,
     pub revision: u64,
+    pub catalog_revision: u64,
     pub sheet_id: String,
     pub frame_count: usize,
     pub locked: bool,
@@ -157,6 +160,7 @@ pub struct StoredLayout {
 pub struct LayoutCandidate {
     pub layout: StoredLayout,
     pub is_last_applied: bool,
+    pub custom_id: Option<CustomLayoutId>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]

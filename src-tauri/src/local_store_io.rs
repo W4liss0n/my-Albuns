@@ -18,7 +18,10 @@ use {
 
 pub(crate) fn write_atomically(target: &Path, bytes: &[u8], fallback_name: &str) -> io::Result<()> {
     let parent = target.parent().ok_or_else(|| {
-        io::Error::new(io::ErrorKind::InvalidInput, "preference path has no parent")
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "local store path has no parent",
+        )
     })?;
     fs::create_dir_all(parent)?;
     let temporary = sibling_temporary(target, fallback_name);
@@ -51,7 +54,7 @@ fn sibling_temporary(target: &Path, fallback_name: &str) -> PathBuf {
 }
 
 #[cfg(windows)]
-pub(crate) fn preference_mutex_name(namespace: &str, root: &Path) -> Vec<u16> {
+pub(crate) fn store_mutex_name(namespace: &str, root: &Path) -> Vec<u16> {
     let mut digest = Sha256::new();
     for unit in root.as_os_str().encode_wide() {
         digest.update(unit.to_le_bytes());
@@ -67,10 +70,10 @@ pub(crate) fn preference_mutex_name(namespace: &str, root: &Path) -> Vec<u16> {
 }
 
 #[cfg(windows)]
-pub(crate) struct CrossProcessPreferenceGuard(HANDLE);
+pub(crate) struct CrossProcessStoreGuard(HANDLE);
 
 #[cfg(windows)]
-impl CrossProcessPreferenceGuard {
+impl CrossProcessStoreGuard {
     pub(crate) fn acquire(name: &[u16], store_name: &str) -> io::Result<Self> {
         let handle = unsafe { CreateMutexW(std::ptr::null(), 0, name.as_ptr()) };
         if handle.is_null() {
@@ -101,7 +104,7 @@ impl CrossProcessPreferenceGuard {
 }
 
 #[cfg(windows)]
-impl Drop for CrossProcessPreferenceGuard {
+impl Drop for CrossProcessStoreGuard {
     fn drop(&mut self) {
         unsafe {
             ReleaseMutex(self.0);

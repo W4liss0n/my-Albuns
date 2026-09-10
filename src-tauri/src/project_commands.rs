@@ -217,10 +217,15 @@ pub(crate) async fn query_layouts(
     expansion: Option<myalbuns_core::LayoutExpansion>,
     window: WebviewWindow,
     state: State<'_, ProjectHost>,
+    catalog: State<'_, crate::layout_catalog_store::LayoutCatalogStore>,
 ) -> Result<myalbuns_core::LayoutQueryResult, String> {
     if window.label() != PROJECT_WINDOW_LABEL {
         return Err("Os Layouts só podem ser consultados na Janela do Projeto.".into());
     }
+    let snapshot = catalog
+        .load()
+        .map_err(|_| "Não foi possível ler os Layouts personalizados.".to_string())?;
+    state.refresh_layout_catalog(snapshot)?;
     state.query_layouts(&sheet_id, expansion)
 }
 

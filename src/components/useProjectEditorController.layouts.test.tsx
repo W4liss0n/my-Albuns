@@ -1,3 +1,4 @@
+import { emptyLayoutCatalogPort, unusedLayoutDialogPort } from "../test/layoutCatalogPorts";
 import { useState } from "react";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
@@ -47,6 +48,7 @@ function harness(pendingKind: "applyLayout" | "lockLayout" | "unlockLayout" | "s
   const undo = vi.fn(async () => { authoritative = initial; return initial; });
   const port: ProjectCorePort = {
     load: async () => initial, apply, save, undo, redo: async () => applied,
+    ...emptyLayoutCatalogPort,
     readFrameDragThreshold: async () => ({ x: 5, y: 5 }), readSliderDoubleClickTime: async () => 500,
     queryLayouts: async (target) => {
       const query = { ...structuredClone(sample.before.queries[target].query),
@@ -66,7 +68,7 @@ function harness(pendingKind: "applyLayout" | "lockLayout" | "unlockLayout" | "s
   const view = renderHook(() => {
     const [projection, setProjection] = useState<EditorProjection>(initial);
     const runner = useProjectMutationRunner(initial.state.projectId, port);
-    return useProjectEditorController({ projection, projectCorePort: port, runProjectMutation: runner,
+    return useProjectEditorController({ projectDialogPort: unusedLayoutDialogPort, projection, projectCorePort: port, runProjectMutation: runner,
       onProjectionChange: setProjection });
   });
   return { view, initial, applied, sheetId, apply, save, undo, resolve, reject };

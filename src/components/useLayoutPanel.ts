@@ -7,6 +7,7 @@ interface LayoutPanelInput {
   projection: EditorProjection;
   editing: boolean;
   disabled: boolean;
+  catalogRevision?: number;
   port: Pick<ProjectCorePort, "queryLayouts" | "previewLayout">;
   runner: ProjectMutationRunner;
   commit(intent: ProjectIntent): Promise<boolean>;
@@ -37,7 +38,7 @@ export function useLayoutPanel(input: LayoutPanelInput) {
   const additionalPositions = positionCount - frameCount;
   const [refresh, setRefresh] = useState(0);
   const scope = useMemo(() => ({ active: false }),
-    [projectId, projection.state.revision, projection.composition, sheetId, editing, disabled, input.port.queryLayouts, refresh, additionalPositions]);
+    [projectId, projection.state.revision, projection.composition, sheetId, editing, disabled, input.port.queryLayouts, input.catalogRevision, refresh, additionalPositions]);
   const [prepared, setPrepared] = useState<PreparedLayouts | null>(null);
   const [hover, setHover] = useState<{ scope: object; index: number } | null>(null);
   const [error, setError] = useState<{ scope: object; message: string } | null>(null);
@@ -82,7 +83,7 @@ export function useLayoutPanel(input: LayoutPanelInput) {
   // Keep the last thumbnails painted while this same target refreshes. Only
   // current-scope data may preview or commit; another target never reuses it.
   const displayData = visible && prepared?.query.projectId === projectId &&
-    prepared.query.sheetId === sheetId && error?.scope !== scope ? prepared : null;
+    prepared.query.sheetId === sheetId ? prepared : null;
   const previewFrames = hover?.scope === scope && data ? data.previews[hover.index] : null;
   const composition = useMemo(() => previewFrames ? {
     ...projection.composition,
@@ -118,6 +119,7 @@ export function useLayoutPanel(input: LayoutPanelInput) {
       setTarget(sheetId === nextSheetId ? null : { projectId, sheetId: nextSheetId });
     },
     close() { setHover(null); setTarget(null); },
+    refresh() { setHover(null); setRefresh((value) => value + 1); },
     configurePositions(count: number) {
       if (!sheetId || disabled || committingRef.current || sheet?.layoutLocked || !Number.isSafeInteger(count) || count < frameCount || count > 30) return;
       setHover(null);

@@ -1,19 +1,38 @@
-import { useRef } from "react";
-import { LockKeyhole, LockKeyholeOpen } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { LockKeyhole, LockKeyholeOpen, RefreshCw, Trash2 } from "lucide-react";
 import type { ComposedFrame, ComposedSheet } from "../domain/project";
 import { AppIcon } from "../ui";
 import { useDismissableSurface } from "../ui/useDismissableSurface";
 import { SheetPreviewSurface } from "./SheetPreview";
 import type { LayoutPanelController } from "./useLayoutPanel";
+import type { LayoutCatalogController } from "./useLayoutCatalog";
 import "./LayoutPanel.css";
 
 interface LayoutPanelProps {
   controller: LayoutPanelController;
   sheet: ComposedSheet;
+  catalog?: LayoutCatalogController;
 }
 
-export function LayoutPanel({ controller, sheet }: LayoutPanelProps) {
+export function LayoutPanel({ controller, sheet, catalog }: LayoutPanelProps) {
   const rootRef = useRef<HTMLElement>(null);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const revealId = catalog?.revealId;
+  const acknowledgeReveal = useRef(catalog?.acknowledgeReveal);
+  acknowledgeReveal.current = catalog?.acknowledgeReveal;
+  useEffect(() => {
+    if (!revealId || !controller.query?.listing.candidates.some((candidate) => candidate.customId === revealId)) return;
+    const card = rootRef.current?.querySelector(`[data-custom-layout-id="${revealId}"]`);
+    if (!card) return;
+    card.scrollIntoView?.({ block: "nearest", inline: "center" });
+    setHighlightId(revealId);
+    acknowledgeReveal.current?.();
+  }, [revealId, controller.query]);
+  useEffect(() => {
+    if (!highlightId) return;
+    const timeout = window.setTimeout(() => setHighlightId(null), 3000);
+    return () => window.clearTimeout(timeout);
+  }, [highlightId]);
   useDismissableSurface({ enabled: true, capturePointerOutside: true, rootRef,
     onDismiss({ reason, event }) {
       if (reason !== "pointerOutside") return;
@@ -52,7 +71,8 @@ export function LayoutPanel({ controller, sheet }: LayoutPanelProps) {
               const locked = query!.locked && index === 0;
               const unavailable = query!.locked && !locked;
               const extraPositions = candidate.layout.definition.positions.length - count;
-              return <div className={`layout-panel__candidate${locked ? " layout-panel__candidate--locked" : ""}${unavailable ? " layout-panel__candidate--unavailable" : ""}`}
+              return <div className={`layout-panel__candidate${locked ? " layout-panel__candidate--locked" : ""}${unavailable ? " layout-panel__candidate--unavailable" : ""}${candidate.customId && candidate.customId === highlightId ? " layout-panel__candidate--revealed" : ""}`}
+                data-custom-layout-id={candidate.customId ?? undefined}
                 key={JSON.stringify(candidate.layout)} onPointerEnter={() => controller.preview(index)}>
               <button
               aria-label={`Aplicar Layout ${index + 1}${candidate.isLastApplied ? " — último aplicado" : ""}`}
@@ -69,10 +89,18 @@ export function LayoutPanel({ controller, sheet }: LayoutPanelProps) {
                 onClick={() => { void (locked ? controller.unlock() : controller.lock(index)); }}>
                 <AppIcon icon={locked ? LockKeyhole : LockKeyholeOpen} size={12} />
               </button>
+              {catalog && candidate.customId && <button className="layout-panel__lock layout-panel__delete" type="button"
+                disabled={busy || catalog.busy} aria-label={`Excluir Layout personalizado ${index + 1}`} title="Excluir Layout personalizado"
+                onClick={() => { controller.cancelPreview(); catalog.requestDelete(candidate.customId!); }}>
+                <AppIcon icon={Trash2} size={12} />
+              </button>}
             </div>; })}
-            {candidates.length === 0 && <p role="status">{origin === "custom" ? "Nenhum Layout personalizado."
-              : controller.error ?? (query ? emptyMessage : "Consultando Layouts…")}</p>}
+            {candidates.length === 0 && <p role="status">{controller.error ?? (origin === "custom" && query ? "Nenhum Layout personalizado."
+              : query ? emptyMessage : "Consultando Layouts…")}</p>}
           </div>
+          {origin === "custom" && catalog && <button className="layout-panel__refresh" type="button"
+            title="Atualizar Personalizados" aria-label="Atualizar Personalizados" disabled={catalog.busy}
+            onClick={() => { void catalog.refresh().then((refreshed) => { if (refreshed) controller.refresh(); }); }}><AppIcon icon={RefreshCw} size={14} /></button>}
         </div>;
       })}
     </section>

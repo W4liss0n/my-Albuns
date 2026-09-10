@@ -22,6 +22,9 @@ mod imaging_processor;
 #[cfg(test)]
 mod imaging_recovery_integration;
 pub mod ipc_contract;
+mod layout_catalog_store;
+mod layout_commands;
+mod local_store_io;
 mod logging;
 mod media_preview_commands;
 mod media_runtime;
@@ -33,7 +36,6 @@ mod operation_gate;
 mod operation_lease;
 mod path_io;
 mod photo_import;
-mod preference_store_io;
 mod processor_lifetime;
 mod product_runtime;
 mod project_bootstrap;

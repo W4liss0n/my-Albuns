@@ -28,6 +28,81 @@ fn project(root: &Path) -> myalbuns_core::EditableProject {
 }
 
 #[test]
+fn catalog_refresh_is_independent_of_project_history_and_deletion_preserves_the_last_copy() {
+    use myalbuns_core::{CustomLayout, CustomLayoutId, LayoutCatalogSnapshot, LayoutOrigin};
+    let root = tempfile::tempdir().unwrap();
+    let mut project = project(root.path());
+    let sheet = project.projection().state.album.sheets[0].id.clone();
+    assert!(project.capture_custom_layout(&sheet).is_err());
+    project
+        .apply(ProjectIntent::AddFrame {
+            sheet_id: sheet.clone(),
+        })
+        .unwrap();
+    let captured = project.capture_custom_layout(&sheet).unwrap();
+    let before = project.projection();
+    let bytes = std::fs::read(root.path().join("Layouts.myalbuns")).unwrap();
+    let id = CustomLayoutId::generate();
+    let snapshot = LayoutCatalogSnapshot {
+        revision: 1,
+        entries: vec![CustomLayout {
+            id,
+            definition: captured.clone(),
+        }],
+    };
+    assert!(project.refresh_layout_catalog(snapshot.clone()).unwrap());
+    assert!(!project.refresh_layout_catalog(snapshot).unwrap());
+    assert_eq!(project.projection(), before);
+    assert_eq!(
+        std::fs::read(root.path().join("Layouts.myalbuns")).unwrap(),
+        bytes
+    );
+    let query = project.query_layouts(&sheet).unwrap();
+    assert_eq!(query.catalog_revision, 1);
+    let index = query
+        .listing
+        .candidates
+        .iter()
+        .position(|item| item.custom_id == Some(id))
+        .unwrap();
+    project
+        .apply(ProjectIntent::ApplyLayout {
+            selection: LayoutSelection {
+                query_id: query.query_id,
+                candidate_index: index,
+            },
+        })
+        .unwrap();
+    let applied = project.projection();
+    project
+        .refresh_layout_catalog(LayoutCatalogSnapshot {
+            revision: 2,
+            entries: vec![],
+        })
+        .unwrap();
+    assert_eq!(project.projection(), applied);
+    let query = project.query_layouts(&sheet).unwrap();
+    let last = &query.listing.candidates[0];
+    assert!(last.is_last_applied);
+    assert_eq!(last.layout.origin, LayoutOrigin::Custom);
+    assert_eq!(last.layout.definition, captured);
+    assert_eq!(last.custom_id, None);
+    project.undo().unwrap();
+    let mut undone = before;
+    undone.state.can_redo = true;
+    assert_eq!(project.projection(), undone);
+    assert!(
+        project
+            .query_layouts(&sheet)
+            .unwrap()
+            .listing
+            .candidates
+            .iter()
+            .all(|item| item.custom_id.is_none())
+    );
+}
+
+#[test]
 fn export_rejects_placeholders_after_unlock_and_on_manual_frames() {
     for lock_then_unlock in [true, false] {
         let root = tempfile::tempdir().unwrap();

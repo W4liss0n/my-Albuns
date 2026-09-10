@@ -53,6 +53,7 @@ const frameContext = previewParameters.get("frame");
 const layoutCase = layoutPanelCorpus.cases[previewParameters.get("layouts") ?? "mixed"];
 let preparedLayoutQuery: { query: LayoutQueryResult; previews: ComposedFrame[][] } | null = null;
 let layoutQuerySequence = 0;
+let layoutCatalogStage: "initial" | "saved" | "deleted" = "initial";
 const sideSwapCase = sheetSideSwapCorpus.cases.find((item) => item.name === (previewParameters.get("side-swap") ?? "mixed"))!;
 const frameClipboardCase = frameClipboardCorpus.cases.find((item) => item.name === (previewParameters.get("clipboard") ?? "same-group"))!;
 const manualFrameCase = manualFrameCorpus.cases.find((item) => item.name === (previewParameters.get("surface") ?? "double"));
@@ -81,7 +82,8 @@ if (frameContext === "multiple" || frameContext === "stack") {
 if (frameContext === "layouts" && previewParameters.get("mode") === "edit") {
   const sheet = projection.state.album.sheets[0];
   useEditorView.setState({ projectId: projection.state.projectId, editingSheetId: sheet.id,
-    focusedSheetId: sheet.id, centeredSheetId: sheet.id, selectedFrameIds: sheet.frames.map((frame) => frame.id) });
+    focusedSheetId: sheet.id, centeredSheetId: sheet.id,
+    selectedFrameIds: previewParameters.get("selection") === "none" ? [] : sheet.frames.map((frame) => frame.id) });
 }
 if (frameContext === "stack") {
   const exposeSelection = () => { document.body.dataset.stackSelection = useEditorView.getState().selectedFrameIds.join(","); };
@@ -155,8 +157,23 @@ if (frameContext === "style") {
 }
 
 const projectCorePort: ProjectCorePort = {
+  refreshLayoutCatalog: async () => layoutCatalogStage === "deleted" ? 2 : layoutCatalogStage === "saved" ? 1
+    : layoutCase.before.queries[layoutCase.before.projection.state.album.sheets[0].id].query.catalogRevision,
+  saveCustomLayout: async (sheetId) => {
+    if (frameContext !== "layouts" || !layoutCase.saveResult || sheetId !== projection.state.album.sheets[0].id) throw new Error("Captura de Layout fora do corpus.");
+    const result = { ...layoutCase.saveResult, created: layoutCatalogStage === "initial" && layoutCase.saveResult.created };
+    layoutCatalogStage = "saved";
+    return result;
+  },
+  deleteCustomLayout: async (layoutId) => {
+    if (frameContext !== "layouts" || layoutId !== layoutCase.saveResult?.layoutId || !layoutCase.catalogDeleted) throw new Error("Exclusão de Layout fora do corpus.");
+    layoutCatalogStage = "deleted";
+    return 2;
+  },
   queryLayouts: async (sheetId, expansion) => {
-    const samples = expansion ? [layoutCase.lockReady] : [layoutCase.before, layoutCase.applied, layoutCase.locked, layoutCase.unlocked, layoutCase.filled, layoutCase.cleared];
+    const samples = expansion ? [layoutCase.lockReady] : layoutCatalogStage === "saved" ? [layoutCase.catalogSaved]
+      : layoutCatalogStage === "deleted" ? [layoutCase.catalogDeleted]
+      : [layoutCase.before, layoutCase.applied, layoutCase.locked, layoutCase.unlocked, layoutCase.filled, layoutCase.cleared];
     const sample = samples.find((state) => state &&
       JSON.stringify(state.projection.state.album) === JSON.stringify(projection.state.album));
     const prepared = sample?.queries[sheetId];

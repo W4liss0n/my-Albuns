@@ -53,7 +53,7 @@ test("keeps displayed Project command shortcuts and accepted aliases in one cata
 });
 
 test("feeds the canonical shortcuts into the Project application menu", () => {
-  const groups = createProjectApplicationMenus({
+  const groups = createProjectApplicationMenus({ saveLayout: vi.fn(), canSaveLayout: true,
     copyFrames: vi.fn(), pasteFrames: vi.fn(), canCopyFrames: true, canPasteFrames: true,
     swapFrameContents: vi.fn(),
     canSwapFrameContents: true,
@@ -219,7 +219,7 @@ test("projects each Sheet structure command with its own availability and owner"
   const addSheetAfter = vi.fn();
   const deleteSheet = vi.fn();
   const convertEdge = vi.fn();
-  const groups = createProjectApplicationMenus({
+  const groups = createProjectApplicationMenus({ saveLayout: vi.fn(), canSaveLayout: true,
     copyFrames: vi.fn(), pasteFrames: vi.fn(), canCopyFrames: true, canPasteFrames: true,
     swapFrameContents: vi.fn(),
     canSwapFrameContents: true,
@@ -302,7 +302,7 @@ test("projects each Sheet structure command with its own availability and owner"
 });
 
 test("disables Sheet structure commands during editing without disabling global commands", () => {
-  const groups = createProjectApplicationMenus({
+  const groups = createProjectApplicationMenus({ saveLayout: vi.fn(), canSaveLayout: true,
     copyFrames: vi.fn(), pasteFrames: vi.fn(), canCopyFrames: true, canPasteFrames: true,
     swapFrameContents: vi.fn(),
     canSwapFrameContents: true,
@@ -364,7 +364,7 @@ test("projects every application-menu command from its canonical descriptor", ()
       (command) => [command.id as string, command] as const,
     ),
   );
-  const groups = createProjectApplicationMenus({
+  const groups = createProjectApplicationMenus({ saveLayout: vi.fn(), canSaveLayout: true,
     copyFrames: vi.fn(), pasteFrames: vi.fn(), canCopyFrames: true, canPasteFrames: true,
     swapFrameContents: vi.fn(),
     canSwapFrameContents: true,

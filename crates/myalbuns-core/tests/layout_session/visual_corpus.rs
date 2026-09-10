@@ -130,6 +130,8 @@ fn layout_panel_corpus_is_produced_by_the_public_core() {
         ("outside", 31),
         ("expanded", 4),
         ("empty-lock", 0),
+        ("custom", 4),
+        ("custom-save", 4),
     ] {
         let root = tempfile::tempdir().unwrap();
         let mut project = fixture_project(root.path(), count);
@@ -141,42 +143,92 @@ fn layout_panel_corpus_is_produced_by_the_public_core() {
                 })
                 .unwrap();
         }
+        let custom = if matches!(name, "custom" | "custom-save") {
+            let captured = project.capture_custom_layout(&sheet).unwrap();
+            let generated = project.query_layouts(&sheet).unwrap().listing.candidates[0]
+                .layout
+                .definition
+                .clone();
+            Some(myalbuns_core::LayoutCatalogSnapshot {
+                revision: 1,
+                entries: vec![
+                    myalbuns_core::CustomLayout {
+                        id: serde_json::from_value(json!("00000000-0000-4000-8000-000000000801"))
+                            .unwrap(),
+                        definition: captured,
+                    },
+                    myalbuns_core::CustomLayout {
+                        id: serde_json::from_value(json!("00000000-0000-4000-8000-000000000802"))
+                            .unwrap(),
+                        definition: generated,
+                    },
+                ],
+            })
+        } else {
+            None
+        };
+        if name == "custom" {
+            project
+                .refresh_layout_catalog(custom.clone().unwrap())
+                .unwrap();
+        }
         let before = record(&mut project, name);
         let query = project.query_layouts(&sheet).unwrap();
-        let applied =
-            if query.listing.candidates.is_empty() || matches!(name, "expanded" | "empty-lock") {
-                Value::Null
-            } else {
-                let preview = project
-                    .preview_layout(&LayoutSelection {
-                        query_id: query.query_id.clone(),
+        let applied = if query.listing.candidates.is_empty()
+            || matches!(name, "expanded" | "empty-lock" | "custom-save")
+        {
+            Value::Null
+        } else {
+            let preview = project
+                .preview_layout(&LayoutSelection {
+                    query_id: query.query_id.clone(),
+                    candidate_index: 0,
+                })
+                .unwrap();
+            let previous = project.projection();
+            project
+                .apply(ProjectIntent::ApplyLayout {
+                    selection: LayoutSelection {
+                        query_id: query.query_id,
                         candidate_index: 0,
-                    })
-                    .unwrap();
-                let previous = project.projection();
-                project
-                    .apply(ProjectIntent::ApplyLayout {
-                        selection: LayoutSelection {
-                            query_id: query.query_id,
-                            candidate_index: 0,
-                        },
-                    })
-                    .unwrap();
-                let applied = project.projection();
-                assert_eq!(applied.composition.sheets[0].frames, preview);
-                for (a, b) in previous.state.album.sheets[0]
-                    .frames
-                    .iter()
-                    .zip(&applied.state.album.sheets[0].frames)
-                {
-                    assert_eq!(
-                        (&a.id, a.z_index, &a.photo, &a.style),
-                        (&b.id, b.z_index, &b.photo, &b.style)
-                    );
-                }
-                record(&mut project, &format!("{name}-applied"))
-            };
+                    },
+                })
+                .unwrap();
+            let applied = project.projection();
+            assert_eq!(applied.composition.sheets[0].frames, preview);
+            for (a, b) in previous.state.album.sheets[0]
+                .frames
+                .iter()
+                .zip(&applied.state.album.sheets[0].frames)
+            {
+                assert_eq!(
+                    (&a.id, a.z_index, &a.photo, &a.style),
+                    (&b.id, b.z_index, &b.photo, &b.style)
+                );
+            }
+            record(&mut project, &format!("{name}-applied"))
+        };
         let mut entry = json!({"before":before,"applied":applied});
+        if let Some(custom) = custom {
+            if !entry["applied"].is_null() {
+                project.undo().unwrap();
+            }
+            project.refresh_layout_catalog(custom.clone()).unwrap();
+            entry["catalogSaved"] = record(&mut project, &format!("{name}-saved"));
+            entry["saveResult"] = serde_json::to_value(myalbuns_core::SaveCustomLayoutResult {
+                catalog_revision: custom.revision,
+                layout_id: custom.entries[0].id,
+                created: name == "custom-save",
+            })
+            .unwrap();
+            project
+                .refresh_layout_catalog(myalbuns_core::LayoutCatalogSnapshot {
+                    revision: 2,
+                    entries: vec![custom.entries[1].clone()],
+                })
+                .unwrap();
+            entry["catalogDeleted"] = record(&mut project, &format!("{name}-deleted"));
+        }
         if matches!(name, "mixed" | "expanded" | "empty-lock") {
             if !entry["applied"].is_null() {
                 project.undo().unwrap();

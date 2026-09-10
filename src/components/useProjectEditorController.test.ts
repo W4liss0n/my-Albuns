@@ -1,3 +1,4 @@
+import { emptyLayoutCatalogPort, unusedLayoutDialogPort } from "../test/layoutCatalogPorts";
 import { act, fireEvent, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 
@@ -28,6 +29,7 @@ function projectCorePort(): ProjectCorePort {
       kind: "cancelled",
       projection: representativeProjection,
     }),
+    ...emptyLayoutCatalogPort,
     readFrameDragThreshold: async () => ({ x: 5, y: 5 }),
     readSliderDoubleClickTime: async () => 500,
     queryLayouts: async () => { throw new Error("Layouts are not configured in this fixture."); },
@@ -82,7 +84,7 @@ test.each(["success", "failure"])("a pending Frame edit followed by Save uses th
   const onProjectionChange = vi.fn();
   const view = renderHook(() => {
     const runProjectMutation = useProjectMutationRunner(representativeProjection.state.projectId, port);
-    return useProjectEditorController({ projection: representativeProjection, projectCorePort: port,
+    return useProjectEditorController({ projectDialogPort: unusedLayoutDialogPort, projection: representativeProjection, projectCorePort: port,
       runProjectMutation, onProjectionChange });
   });
   const edit: FrameGeometryEdit = {
@@ -119,9 +121,9 @@ test("loads the platform drag threshold in both modes and ignores replies from t
   const currentReply = deferredValue<{ x: number; y: number }>();
   const read = vi.spyOn(port, "readFrameDragThreshold").mockReturnValueOnce(reply.promise)
     .mockReturnValueOnce(reply.promise).mockReturnValue(currentReply.promise);
-  const view = renderHook(() => useProjectEditorController({
+  const view = renderHook(() => useProjectEditorController({ projectDialogPort: unusedLayoutDialogPort,
     projection: representativeProjection, projectCorePort: port,
-    runProjectMutation: { run: vi.fn(), waitForIdle: async () => null }, onProjectionChange: vi.fn(),
+    runProjectMutation: { run: vi.fn(async () => ({ status: "obsolete" as const })), waitForIdle: async () => null }, onProjectionChange: vi.fn(),
   }));
   expect(read).toHaveBeenCalledOnce();
   act(() => view.result.current.canvasProps.onEditSheet("sheet-001"));
@@ -149,7 +151,7 @@ test("routes editor changes through the shared Project mutation runner", async (
     waitForIdle: async () => null,
   };
   const view = renderHook(() =>
-    useProjectEditorController({
+    useProjectEditorController({ projectDialogPort: unusedLayoutDialogPort,
       projection: representativeProjection,
       projectCorePort: port,
       runProjectMutation,
@@ -179,11 +181,11 @@ test("routes editor changes through the shared Project mutation runner", async (
 test("enters the centered Sheet Edit Mode with Enter and returns to normal mode with Escape", () => {
   const port = projectCorePort();
   const view = renderHook(() =>
-    useProjectEditorController({
+    useProjectEditorController({ projectDialogPort: unusedLayoutDialogPort,
       projection: representativeProjection,
       projectCorePort: port,
       runProjectMutation: {
-        run: vi.fn(),
+        run: vi.fn(async () => ({ status: "obsolete" as const })),
         waitForIdle: async () => null,
       },
       onProjectionChange: vi.fn(),
@@ -221,11 +223,11 @@ test("targets the edited Sheet when leaving Sheet Edit Mode", () => {
   const projection = createTwoSheetProjection();
   const port = projectCorePort();
   const view = renderHook(() =>
-    useProjectEditorController({
+    useProjectEditorController({ projectDialogPort: unusedLayoutDialogPort,
       projection,
       projectCorePort: port,
       runProjectMutation: {
-        run: vi.fn(),
+        run: vi.fn(async () => ({ status: "obsolete" as const })),
         waitForIdle: async () => null,
       },
       onProjectionChange: vi.fn(),
@@ -280,7 +282,7 @@ test("maps Sheet structure commands to explicit intents and falls back to the im
     waitForIdle: async () => null,
   };
   const view = renderHook(() =>
-    useProjectEditorController({
+    useProjectEditorController({ projectDialogPort: unusedLayoutDialogPort,
       projection,
       projectCorePort: port,
       runProjectMutation,
@@ -338,7 +340,7 @@ test.each(["completed", "failed"] as const)(
       waitForIdle: async () => null,
     };
     const view = renderHook(() =>
-      useProjectEditorController({
+      useProjectEditorController({ projectDialogPort: unusedLayoutDialogPort,
         projection,
         projectCorePort: port,
         runProjectMutation,
@@ -395,7 +397,7 @@ test("navigates to a newly affected Sheet after its projection becomes visible",
   const onProjectionChange = vi.fn();
   const view = renderHook(
     ({ visibleProjection }) =>
-      useProjectEditorController({
+      useProjectEditorController({ projectDialogPort: unusedLayoutDialogPort,
         projection: visibleProjection,
         projectCorePort: port,
         runProjectMutation,
@@ -423,11 +425,11 @@ test("disables structural commands while a Sheet is being edited", async () => {
   const port = projectCorePort();
   const applyWithOutcome = vi.spyOn(port, "applyWithOutcome");
   const view = renderHook(() =>
-    useProjectEditorController({
+    useProjectEditorController({ projectDialogPort: unusedLayoutDialogPort,
       projection: representativeProjection,
       projectCorePort: port,
       runProjectMutation: {
-        run: vi.fn(),
+        run: vi.fn(async () => ({ status: "obsolete" as const })),
         waitForIdle: async () => null,
       },
       onProjectionChange: vi.fn(),

@@ -105,3 +105,8 @@
 .layout-panel__lock:hover:not(:disabled) { color: var(--ui-accent); }
 .layout-panel__positions { display: flex; align-items: center; gap: 5px; color: var(--ui-text-muted); }
 .layout-panel__positions select { min-height: 24px; border: 1px solid var(--ui-border); border-radius: 2px; background: var(--ui-surface); color: var(--ui-text); font: inherit; }
+.layout-panel__delete { right: 24px; }
+.layout-panel__refresh { align-self: center; flex: 0 0 28px; height: 28px; margin: 0 6px; border: 1px solid var(--ui-border); border-radius: 2px; color: var(--ui-text-muted); background: var(--ui-surface); cursor: pointer; }
+.layout-panel__candidate--revealed .sheet-preview-shell { box-shadow: 0 0 0 3px var(--ui-accent); }
+.layout-catalog-notice { position: absolute; bottom: 14px; left: 14px; z-index: 8; max-width: min(440px, calc(100% - 28px)); }
+.layout-catalog-notice button { margin-left: 12px; border: 0; padding: 2px 4px; color: inherit; background: transparent; text-decoration: underline; cursor: pointer; }

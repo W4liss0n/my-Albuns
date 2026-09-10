@@ -14,6 +14,7 @@ export type ApplicationMenuCommand =
       checked?: boolean;
       context?: string;
       disabled?: boolean;
+      title?: string;
       id: string;
       label: string;
       onSelect(): void;
@@ -282,7 +283,7 @@ export function ApplicationMenuBar({
             ? "menuitemcheckbox"
             : "menuitem"
         }
-        title={placeholder ? PLACEHOLDER_TITLE : undefined}
+        title={item.availability === "placeholder" ? PLACEHOLDER_TITLE : item.title}
         type="button"
         onClick={() => {
           if (placeholder) return;

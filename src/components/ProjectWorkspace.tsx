@@ -23,7 +23,7 @@ import type { ProjectDialogPort } from "../application/projectDialogPort";
 import type { GraphicsDiagnostic } from "../application/graphics";
 import { mergeMediaPreviewDemands, renderableMediaPreviewUrls } from "../application/mediaPreviews";
 import type { DisplayUnit, EditorProjection } from "../domain/project";
-import { ApplicationHeader } from "../ui";
+import { ApplicationHeader, InlineNotice } from "../ui";
 import { AlbumCanvas } from "./AlbumCanvas";
 import { LayoutPanel } from "./LayoutPanel";
 import { ApplicationMenuBar } from "./ApplicationMenuBar";
@@ -217,6 +217,7 @@ export function ProjectWorkspace({
     projectDialogPort,
   });
   const controller = useProjectEditorController({
+    projectDialogPort,
     interactionBlocked:
       exportActive ||
       projectClose.interactionBlocked ||
@@ -558,6 +559,8 @@ export function ProjectWorkspace({
     undo: controller.undo,
   });
   const applicationMenus = createProjectApplicationMenus({
+    saveLayout: controller.saveLayout,
+    canSaveLayout: controller.canSaveLayout,
     copyFrames: () => { void controller.copyFrames(); },
     pasteFrames: () => { void controller.pasteFrames(); },
     canCopyFrames: controller.canCopyFrames,
@@ -650,7 +653,12 @@ export function ProjectWorkspace({
           aria-label="Área de composição"
         >
           {controller.layoutPanel.visible && <LayoutPanel controller={controller.layoutPanel}
+            catalog={controller.layoutCatalog}
             sheet={projection.composition.sheets.find((sheet) => sheet.sheetId === controller.layoutPanel.sheetId)!} />}
+          {controller.layoutCatalog.notice && <InlineNotice className="layout-catalog-notice" role="status">
+            {controller.layoutCatalog.notice}
+            <button type="button" onClick={controller.layoutCatalog.dismissNotice}>Fechar aviso</button>
+          </InlineNotice>}
           <AlbumCanvas
             {...controller.canvasProps}
             onOpenFrameContextMenu={openFrameContextMenu}
@@ -701,6 +709,7 @@ export function ProjectWorkspace({
         )}
 
         {workspacePanels.panels.inspector.visible && <InspectorPanel
+          saveLayout={{ enabled: controller.canSaveLayout, onSave: controller.saveLayout }}
           key={projectId}
           frameStyle={controller.frameStyle}
           photoOrientation={{ disabled: !controller.canOrientPhotos,

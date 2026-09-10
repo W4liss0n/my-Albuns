@@ -5,13 +5,13 @@ use serde::{Deserialize, Serialize};
 use tauri::State;
 
 #[cfg(windows)]
-use crate::preference_store_io::{CrossProcessPreferenceGuard, preference_mutex_name};
+use crate::local_store_io::{CrossProcessStoreGuard, store_mutex_name};
 use crate::{
     ipc_contract::{
         ApplicationSettings, MediaPanelSettings, MediaPanelTabSettings, MediaPreferenceKind,
         MediaSortDirection, MediaUsageFilter, SettingsPreferenceChange,
     },
-    preference_store_io::write_atomically,
+    local_store_io::write_atomically,
 };
 
 const SCHEMA_VERSION: u16 = 1;
@@ -48,7 +48,7 @@ pub(crate) struct SettingsStore {
 impl SettingsStore {
     pub(crate) fn new(app_paths: &AppPaths) -> Self {
         #[cfg(windows)]
-        let write_mutex_name = preference_mutex_name("Settings", app_paths.roaming_root());
+        let write_mutex_name = store_mutex_name("Settings", app_paths.roaming_root());
         Self {
             access: Mutex::new(()),
             file: app_paths.settings_file(),
@@ -75,7 +75,7 @@ impl SettingsStore {
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         #[cfg(windows)]
         let _cross_process =
-            CrossProcessPreferenceGuard::acquire(&self.write_mutex_name, "SettingsStore")?;
+            CrossProcessStoreGuard::acquire(&self.write_mutex_name, "SettingsStore")?;
         let mut settings = self.load_unlocked();
         match change {
             SettingsPreferenceChange::MediaPanelSortDirection {

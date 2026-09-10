@@ -29,29 +29,67 @@ impl LayoutPatch {
 
 pub struct LayoutRules;
 
-impl LayoutRules {
-    pub fn list_for_lock(query: &LayoutQuery, last: Option<&StoredLayout>) -> LayoutListing {
-        let mut listing = Self::list(query, last);
-        if listing.generation_status != LayoutGenerationStatus::InvalidQuery
-            && let Some(last) = last.filter(|last| {
-                last.definition.positions.len() > query.frame_orientations.len()
-                    && (query.permission == LayoutPermission::PagesAndSheet
-                        || last.definition.scope == LayoutScope::Page)
-                    && scaled_definition(&last.definition, &query.surface).is_some()
-            })
-        {
-            listing.candidates.insert(
-                0,
-                LayoutCandidate {
-                    layout: last.clone(),
-                    is_last_applied: true,
-                },
-            );
+#[derive(Clone, Copy, Default)]
+pub struct LayoutSources<'a> {
+    pub last: Option<&'a StoredLayout>,
+    pub custom: &'a [CustomLayout],
+}
+
+impl LayoutSources<'_> {
+    pub(crate) fn custom_id(&self, layout: &StoredLayout) -> Option<CustomLayoutId> {
+        if layout.origin != LayoutOrigin::Custom {
+            return None;
         }
-        listing
+        self.custom
+            .iter()
+            .find(|item| LayoutRules::same_definition(&item.definition, &layout.definition))
+            .map(|item| item.id)
+    }
+}
+
+impl LayoutRules {
+    /// Captures only ordered geometry. Page blocks are centered independently;
+    /// the source composition and its Frame mapping remain untouched.
+    pub fn capture_custom(
+        surface: LayoutSurface,
+        positions: Vec<crate::RectUm>,
+    ) -> Result<LayoutDefinition, CoreError> {
+        let crosses = surface.kind == LayoutSurfaceKind::DoubleSheet
+            && positions.iter().any(|r| {
+                2 * i128::from(r.x) < i128::from(surface.width_um)
+                    && 2 * (i128::from(r.x) + i128::from(r.width)) > i128::from(surface.width_um)
+            });
+        let mut definition = LayoutDefinition {
+            surface,
+            scope: if crosses {
+                LayoutScope::Sheet
+            } else {
+                LayoutScope::Page
+            },
+            positions,
+        };
+        if !Self::definition_is_valid(&definition) {
+            return Err(CoreError::IncompatibleLayout);
+        }
+        if definition.scope == LayoutScope::Page {
+            center_page_blocks(&mut definition);
+        }
+        Ok(definition)
     }
 
-    pub fn list(query: &LayoutQuery, last: Option<&StoredLayout>) -> LayoutListing {
+    pub fn list_for_lock(query: &LayoutQuery, sources: LayoutSources<'_>) -> LayoutListing {
+        Self::listing(query, sources, true)
+    }
+
+    pub fn list(query: &LayoutQuery, sources: LayoutSources<'_>) -> LayoutListing {
+        Self::listing(query, sources, false)
+    }
+
+    fn listing(
+        query: &LayoutQuery,
+        sources: LayoutSources<'_>,
+        allow_larger: bool,
+    ) -> LayoutListing {
         let generation = generate_layouts(query);
         let mut listing = LayoutListing {
             algorithm_version: generation.algorithm_version,
@@ -61,18 +99,46 @@ impl LayoutRules {
         if generation.status == LayoutGenerationStatus::InvalidQuery {
             return listing;
         }
-        if let Some(last) = last.filter(|last| compatible(&last.definition, query)) {
+        let accepts = |definition: &LayoutDefinition| {
+            compatible(definition, query)
+                || allow_larger
+                    && definition.positions.len() > query.frame_orientations.len()
+                    && (query.permission == LayoutPermission::PagesAndSheet
+                        || definition.scope == LayoutScope::Page)
+                    && scaled_definition(definition, &query.surface).is_some()
+        };
+        if let Some(last) = sources.last.filter(|last| accepts(&last.definition)) {
             listing.candidates.push(LayoutCandidate {
                 layout: last.clone(),
                 is_last_applied: true,
+                custom_id: sources.custom_id(last),
+            });
+        }
+        for custom in sources
+            .custom
+            .iter()
+            .filter(|item| accepts(&item.definition))
+        {
+            if listing.candidates.iter().any(|item| {
+                item.layout.origin == LayoutOrigin::Custom
+                    && Self::same_definition(&item.layout.definition, &custom.definition)
+            }) {
+                continue;
+            }
+            listing.candidates.push(LayoutCandidate {
+                layout: StoredLayout {
+                    definition: custom.definition.clone(),
+                    origin: LayoutOrigin::Custom,
+                },
+                is_last_applied: false,
+                custom_id: Some(custom.id),
             });
         }
         for candidate in generation.candidates {
-            if listing
-                .candidates
-                .iter()
-                .any(|item| Self::same_definition(&item.layout.definition, &candidate.definition))
-            {
+            if listing.candidates.iter().any(|item| {
+                item.layout.origin == LayoutOrigin::Automatic
+                    && Self::same_definition(&item.layout.definition, &candidate.definition)
+            }) {
                 continue;
             }
             listing.candidates.push(LayoutCandidate {
@@ -81,6 +147,7 @@ impl LayoutRules {
                     origin: LayoutOrigin::Automatic,
                 },
                 is_last_applied: false,
+                custom_id: None,
             });
         }
         listing
@@ -121,13 +188,13 @@ impl LayoutRules {
 
     pub fn automatic(
         query: &LayoutQuery,
-        last: Option<&StoredLayout>,
+        sources: LayoutSources<'_>,
         frame_ids: &[Uuid],
     ) -> Result<LayoutPatch, CoreError> {
         if query.frame_orientations.len() != frame_ids.len() {
             return Err(CoreError::IncompatibleLayout);
         }
-        let listing = Self::list(query, last);
+        let listing = Self::list(query, sources);
         if listing.generation_status == LayoutGenerationStatus::InvalidQuery {
             return Err(CoreError::InvalidLayoutQuery);
         }
@@ -235,6 +302,37 @@ impl LayoutRules {
             placeholder_ids: Vec::new(),
             last_layout: None,
         })
+    }
+}
+
+fn center_page_blocks(definition: &mut LayoutDefinition) {
+    let double = definition.surface.kind == LayoutSurfaceKind::DoubleSheet;
+    let width = definition.surface.width_um;
+    let page_width = if double { width / 2 } else { width };
+    for right in [false, true].into_iter().take(if double { 2 } else { 1 }) {
+        let on_page = |r: &&crate::RectUm| !double || (2 * r.x >= width) == right;
+        let frames = definition
+            .positions
+            .iter()
+            .filter(on_page)
+            .collect::<Vec<_>>();
+        let Some(min_x) = frames.iter().map(|r| r.x).min() else {
+            continue;
+        };
+        let min_y = frames.iter().map(|r| r.y).min().unwrap();
+        let max_x = frames.iter().map(|r| r.x + r.width).max().unwrap();
+        let max_y = frames.iter().map(|r| r.y + r.height).max().unwrap();
+        let page_x = if right { width - page_width } else { 0 };
+        let dx = page_x + (page_width - (max_x - min_x)) / 2 - min_x;
+        let dy = (definition.surface.height_um - (max_y - min_y)) / 2 - min_y;
+        for frame in definition
+            .positions
+            .iter_mut()
+            .filter(|r| !double || (2 * r.x >= width) == right)
+        {
+            frame.x += dx;
+            frame.y += dy;
+        }
     }
 }
 

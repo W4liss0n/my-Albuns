@@ -10,6 +10,8 @@ import type {
   LayoutExpansion,
   LayoutExportProblem,
   LayoutSelection,
+  CustomLayoutId,
+  SaveCustomLayoutResult,
   PhotoDropTarget,
   ProjectIntent,
   ProjectMutationOutcome,
@@ -249,6 +251,9 @@ export interface PhotoImportCompletion {
 }
 
 export interface ProjectCorePort {
+  refreshLayoutCatalog(): Promise<number>;
+  saveCustomLayout(sheetId: string): Promise<SaveCustomLayoutResult>;
+  deleteCustomLayout(layoutId: CustomLayoutId): Promise<number>;
   readFrameDragThreshold(): Promise<PointerDragThreshold>;
   readSliderDoubleClickTime(): Promise<number>;
   previewPhotoAngle(edit: PhotoAngleEdit): Promise<ComposedFrame[]>;

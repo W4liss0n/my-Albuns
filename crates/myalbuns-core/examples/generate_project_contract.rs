@@ -29,4 +29,6 @@ fn main() {
         .expect("Layout expansion bindings should be generated");
     myalbuns_core::LayoutExportProblem::export_all(&config)
         .expect("Layout export problem bindings should be generated");
+    myalbuns_core::SaveCustomLayoutResult::export_all(&config)
+        .expect("Custom Layout result bindings should be generated");
 }

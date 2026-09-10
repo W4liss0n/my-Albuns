@@ -507,6 +507,30 @@ impl ProjectHost {
             .map_err(|error| error.to_string())
     }
 
+    pub(crate) fn capture_custom_layout(
+        &self,
+        sheet_id: &str,
+    ) -> Result<myalbuns_core::LayoutDefinition, String> {
+        self.project()?
+            .capture_custom_layout(sheet_id)
+            .map_err(|error| error.to_string())
+    }
+
+    pub(crate) fn refresh_layout_catalog(
+        &self,
+        snapshot: myalbuns_core::LayoutCatalogSnapshot,
+    ) -> Result<bool, String> {
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_| SESSION_UNAVAILABLE_MESSAGE.to_string())?;
+        state
+            .session_mut()?
+            .project
+            .refresh_layout_catalog(snapshot)
+            .map_err(|error| error.to_string())
+    }
+
     pub(crate) fn query_layouts(
         &self,
         sheet_id: &str,

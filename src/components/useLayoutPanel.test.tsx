@@ -10,10 +10,10 @@ const initial = structuredClone(frameDeletionCorpus.before) as EditorProjection;
 const sheetId = initial.state.album.sheets[0].id;
 const frames = initial.composition.sheets[0].frames;
 function query(id: string, target = sheetId, revision = initial.state.revision): LayoutQueryResult {
-  return { queryId: id, projectId: initial.state.projectId, revision, sheetId: target,
+  return { queryId: id, projectId: initial.state.projectId, revision, catalogRevision: 0, sheetId: target,
     frameCount: frames.length, locked: false, settings: { permission: "pagesAndSheet", marginUm: 15000, gapUm: 5000, minimumSideUm: 20000 },
     listing: { algorithmVersion: 1, generationStatus: "candidates", candidates: [
-      { isLastApplied: false, layout: { origin: "automatic", definition: {
+      { isLastApplied: false, customId: null, layout: { origin: "automatic", definition: {
         surface: { type: "doubleSheet", widthUm: 600000, heightUm: 300000 }, scope: "page",
         positions: frames.map((frame) => frame.clipRect),
       } } },

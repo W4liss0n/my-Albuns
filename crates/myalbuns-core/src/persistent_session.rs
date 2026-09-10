@@ -22,6 +22,7 @@ pub(crate) struct PersistentProjectSession {
     redo: Vec<ProjectRevision>,
     frame_clipboard: Option<FrameClipboard>,
     prepared_layout_query: Option<PreparedLayoutQuery>,
+    layout_catalog: crate::LayoutCatalogSnapshot,
 }
 
 #[derive(Clone, Debug)]
@@ -47,6 +48,7 @@ impl PersistentProjectSession {
             redo: Vec::new(),
             frame_clipboard: None,
             prepared_layout_query: None,
+            layout_catalog: crate::LayoutCatalogSnapshot::default(),
         }
     }
 
@@ -62,6 +64,7 @@ impl PersistentProjectSession {
             redo: Vec::new(),
             frame_clipboard: None,
             prepared_layout_query: None,
+            layout_catalog: crate::LayoutCatalogSnapshot::default(),
         }
     }
 
@@ -222,7 +225,11 @@ impl PersistentProjectSession {
             }
         }
         if let ProjectIntent::DeleteFrames { frame_ids, mode } = &intent {
-            let next = self.project().with_deleted_frames(frame_ids, *mode)?;
+            let next = self.project().with_deleted_frames(
+                frame_ids,
+                *mode,
+                &self.layout_catalog.entries,
+            )?;
             if next != *self.project() {
                 self.commit_edit(|_| Ok(next))?;
             }
@@ -238,6 +245,7 @@ impl PersistentProjectSession {
                 return Ok(outcome);
             }
         }
+        let custom = self.layout_catalog.entries.clone();
         self.commit_edit(|project| match intent {
             ProjectIntent::ApplyLayout { .. }
             | ProjectIntent::LockLayout { .. }
@@ -274,7 +282,7 @@ impl PersistentProjectSession {
             }
             ProjectIntent::EditFrameGeometry { edit } => project.with_edited_frame_geometry(&edit),
             ProjectIntent::SetAlbumInformation { information } => project
-                .with_album_information(information)
+                .with_album_information(information, &custom)
                 .map_err(CoreError::InvalidAlbumInformation),
             ProjectIntent::SetVisualDefaults { visual_defaults } => project
                 .with_visual_defaults(visual_defaults)
@@ -319,7 +327,7 @@ impl PersistentProjectSession {
                     return Err(CoreError::SheetNotFound(sheet_id));
                 }
                 let next = project
-                    .with_converted_edge_sheet(parsed)
+                    .with_converted_edge_sheet(parsed, &custom)
                     .map_err(|()| CoreError::InvalidEdgeConversion)?;
                 outcome.affected_sheet_id = Some(parsed);
                 Ok(next)
@@ -370,7 +378,7 @@ impl PersistentProjectSession {
                 let parsed_sheet = parse_uuid(&sheet_id)
                     .map_err(|()| CoreError::SheetNotFound(sheet_id.clone()))?;
                 let (next, frame_id) = project
-                    .with_added_photo(parsed_sheet, media_id.into_uuid(), mode)
+                    .with_added_photo(parsed_sheet, media_id.into_uuid(), mode, &custom)
                     .map_err(|()| {
                         CoreError::InvalidProject(
                             "não foi possível adicionar a Foto à Lâmina".into(),
@@ -389,7 +397,14 @@ impl PersistentProjectSession {
                 let parsed_sheet = parse_uuid(&sheet_id)
                     .map_err(|()| CoreError::SheetNotFound(sheet_id.clone()))?;
                 let (next, frame_id) = project
-                    .with_dropped_photo(parsed_sheet, media_id.into_uuid(), x_um, y_um, mode)
+                    .with_dropped_photo(
+                        parsed_sheet,
+                        media_id.into_uuid(),
+                        x_um,
+                        y_um,
+                        mode,
+                        &custom,
+                    )
                     .map_err(|()| {
                         CoreError::InvalidProject("o alvo da Foto não é válido".into())
                     })?;
@@ -409,6 +424,23 @@ impl PersistentProjectSession {
                 CoreError::InvalidProject("o vínculo externo da Foto não é válido".into())
             })
         })
+    }
+
+    pub(crate) fn refresh_layout_catalog(
+        &mut self,
+        snapshot: crate::LayoutCatalogSnapshot,
+    ) -> Result<bool, CoreError> {
+        if !snapshot.is_valid()
+            || snapshot.revision == self.layout_catalog.revision && snapshot != self.layout_catalog
+        {
+            return Err(CoreError::InvalidLayoutQuery);
+        }
+        if snapshot.revision <= self.layout_catalog.revision {
+            return Ok(false);
+        }
+        self.layout_catalog = snapshot;
+        self.prepared_layout_query = None;
+        Ok(true)
     }
 
     pub(crate) fn query_layouts(
@@ -441,14 +473,19 @@ impl PersistentProjectSession {
             return Err(CoreError::LayoutLocked);
         }
         let ids: Vec<_> = sheet.frames().iter().map(|f| f.id()).collect();
-        let mut listing = crate::LayoutRules::list_for_lock(&query, sheet.last_layout());
+        let sources = crate::LayoutSources {
+            last: sheet.last_layout(),
+            custom: &self.layout_catalog.entries,
+        };
+        let mut listing = crate::LayoutRules::list_for_lock(&query, sources);
         if locked {
             let current = self.project().current_layout(parsed)?;
             listing.candidates.retain(|candidate| {
-                !crate::LayoutRules::same_definition(
-                    &candidate.layout.definition,
-                    &current.definition,
-                )
+                candidate.layout.origin != current.origin
+                    || !crate::LayoutRules::same_definition(
+                        &candidate.layout.definition,
+                        &current.definition,
+                    )
             });
             for candidate in &mut listing.candidates {
                 candidate.is_last_applied = false;
@@ -456,6 +493,7 @@ impl PersistentProjectSession {
             listing.candidates.insert(
                 0,
                 crate::LayoutCandidate {
+                    custom_id: sources.custom_id(&current),
                     layout: current,
                     is_last_applied: true,
                 },
@@ -495,6 +533,7 @@ impl PersistentProjectSession {
             project_id: self.project_id().to_string(),
             revision: self.revision(),
             sheet_id: sheet_id.into(),
+            catalog_revision: self.layout_catalog.revision,
             frame_count,
             locked,
             settings: self.project().layout_settings().clone(),

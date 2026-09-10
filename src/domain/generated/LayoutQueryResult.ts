@@ -2,4 +2,4 @@
 import type { LayoutListing } from "./LayoutListing";
 import type { LayoutSettings } from "./LayoutSettings";
 
-export type LayoutQueryResult = { queryId: string, projectId: string, revision: number, sheetId: string, frameCount: number, locked: boolean, settings: LayoutSettings, listing: LayoutListing, };
+export type LayoutQueryResult = { queryId: string, projectId: string, revision: number, catalogRevision: number, sheetId: string, frameCount: number, locked: boolean, settings: LayoutSettings, listing: LayoutListing, };

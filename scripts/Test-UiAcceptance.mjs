@@ -331,6 +331,7 @@ test("the manifest covers the integrated workspace and every critical Project di
       "graphicsFailure",
       "imageProcessingProblems",
       "imageProcessingProgress",
+      "layoutDeletionConfirmation",
       "projectCloseConfirmation",
       "projectCloseFailure",
       "projectOperationFailure",

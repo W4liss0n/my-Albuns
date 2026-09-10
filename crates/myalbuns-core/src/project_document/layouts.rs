@@ -217,11 +217,22 @@ impl ProjectDocument {
         Ok(next)
     }
 
-    pub(super) fn reorganize_sheet(&mut self, sheet_id: Uuid) -> Result<(), CoreError> {
+    pub(super) fn reorganize_sheet(
+        &mut self,
+        sheet_id: Uuid,
+        custom: &[crate::CustomLayout],
+    ) -> Result<(), CoreError> {
         let query = self.layout_query(sheet_id)?;
         let sheet = self.sheets.iter().find(|s| s.id == sheet_id).unwrap();
         let ids = sheet.frames.iter().map(|f| f.id).collect::<Vec<_>>();
-        let patch = crate::LayoutRules::automatic(&query, sheet.last_layout(), &ids)?;
+        let patch = crate::LayoutRules::automatic(
+            &query,
+            crate::LayoutSources {
+                last: sheet.last_layout(),
+                custom,
+            },
+            &ids,
+        )?;
         self.apply_layout_patch(sheet_id, &patch)
     }
 

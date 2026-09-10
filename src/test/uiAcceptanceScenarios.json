@@ -4978,6 +4978,222 @@
     }
     ,
     {
+      "id": "workspace-layout-custom",
+      "title": "Layouts personalizados — catálogo global e controles",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=custom",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-catalog",
+        "reason": "A SPEC e o design 0029 definem criação global sem modal, miniaturas por origem, aviso de duplicidade e confirmação de exclusão. O corpus usa a geometria do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__delete",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__candidate[data-custom-layout-id]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-custom-125",
+      "title": "Layouts personalizados — catálogo a 125%",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=custom&scale=1.25",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-catalog",
+        "reason": "A SPEC e o design 0029 definem criação global sem modal, miniaturas por origem, aviso de duplicidade e confirmação de exclusão. O corpus usa a geometria do Core."
+      },
+      "viewport": {
+        "width": 1800,
+        "height": 1000
+      },
+      "readySelector": ".layout-panel__delete",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__candidate[data-custom-layout-id]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-custom-150",
+      "title": "Layouts personalizados — catálogo a 150%",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=custom&scale=1.5",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-catalog",
+        "reason": "A SPEC e o design 0029 definem criação global sem modal, miniaturas por origem, aviso de duplicidade e confirmação de exclusão. O corpus usa a geometria do Core."
+      },
+      "viewport": {
+        "width": 2160,
+        "height": 1200
+      },
+      "readySelector": ".layout-panel__delete",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__candidate[data-custom-layout-id]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-custom-save",
+      "title": "Layouts personalizados — salvar em Design da Lâmina",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=custom-save&mode=edit&selection=none",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-catalog",
+        "reason": "A SPEC e o design 0029 definem criação global sem modal, miniaturas por origem, aviso de duplicidade e confirmação de exclusão. O corpus usa a geometria do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-catalog-notice",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": ".sheet-design-inspector button:last-child"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-custom-duplicate",
+      "title": "Layouts personalizados — duplicata e miniatura localizada",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=custom&mode=edit&selection=none",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-catalog",
+        "reason": "A SPEC e o design 0029 definem criação global sem modal, miniaturas por origem, aviso de duplicidade e confirmação de exclusão. O corpus usa a geometria do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__candidate--revealed",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": ".sheet-design-inspector button:last-child"
+        },
+        {
+          "type": "focus",
+          "selector": ".pixi-canvas"
+        },
+        {
+          "type": "key",
+          "key": "Escape"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-custom-save-menu",
+      "title": "Layouts personalizados — salvar com Frame selecionado",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=custom-save&mode=edit",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-catalog",
+        "reason": "A SPEC e o design 0029 definem criação global sem modal, miniaturas por origem, aviso de duplicidade e confirmação de exclusão. O corpus usa a geometria do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-catalog-notice",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[role=\"menuitem\"][aria-label=\"Editar\"]"
+        },
+        {
+          "type": "click",
+          "selector": "button[role=\"menuitem\"][aria-label=\"Salvar disposição como Layout\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-custom-empty",
+      "title": "Layouts personalizados — salvar desabilitado sem Frames",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=empty&mode=edit&selection=none",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-catalog",
+        "reason": "A SPEC e o design 0029 definem criação global sem modal, miniaturas por origem, aviso de duplicidade e confirmação de exclusão. O corpus usa a geometria do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".sheet-design-inspector button:last-child:disabled",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        }
+      ]
+    },
+    {
+      "id": "layout-deletion-confirmation",
+      "title": "Layout personalizado — confirmação de exclusão global",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22layoutDeletionConfirmation%22%2C%22busy%22%3Afalse%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-confirmation-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "O design 0029 exige confirmação pertencente à Janela para excluir somente a origem global."
+      },
+      "viewport": {
+        "width": 520,
+        "height": 320
+      },
+      "readySelector": ".ui-confirmation-dialog__danger-action",
+      "actions": []
+    },
+    {
       "id": "workspace-layout-panel",
       "title": "Layouts — painel horizontal aberto",
       "implementationPath": "/workspace-preview.html?frame=layouts",

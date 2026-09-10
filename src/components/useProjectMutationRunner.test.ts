@@ -1,3 +1,4 @@
+import { emptyLayoutCatalogPort } from "../test/layoutCatalogPorts";
 import {
   act,
   render,
@@ -44,6 +45,7 @@ function projectCorePort(): ProjectCorePort {
       kind: "cancelled",
       projection: representativeProjection,
     }),
+    ...emptyLayoutCatalogPort,
     readFrameDragThreshold: async () => ({ x: 5, y: 5 }),
     readSliderDoubleClickTime: async () => 500,
     queryLayouts: async () => { throw new Error("Layouts are not configured in this fixture."); },
