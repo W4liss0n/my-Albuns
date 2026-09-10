@@ -77,10 +77,9 @@ interface MediaPanelProps {
   mediaItems: readonly MediaCatalogItem[];
   mediaUsage: readonly MediaUsage[];
   onFillPhoto(mediaId: string): void;
-  selectedMediaId: string | null;
+  selectionRequest?: { mediaId: string } | null;
   importPending?: boolean;
   onImportPhoto(): void;
-  onSelectMedia(mediaId: string): void;
   onPhotoDragStart(mediaId: string): void;
   onPhotoDragEnd(): void;
   onRelinkMedia(mediaId: string): void;
@@ -101,10 +100,9 @@ export function MediaPanel({
   mediaItems,
   mediaUsage,
   onFillPhoto,
-  selectedMediaId,
+  selectionRequest,
   importPending = false,
   onImportPhoto,
-  onSelectMedia,
   onPhotoDragStart,
   onPhotoDragEnd,
   onRelinkMedia,
@@ -146,6 +144,7 @@ export function MediaPanel({
   const [selectionAnchorId, setSelectionAnchorId] = useState<string | null>(
     null,
   );
+  const handledSelectionRequest = useRef<typeof selectionRequest>(null);
   const mediaUsageById = useMemo(
     () => new Map(mediaUsage.map((usage) => [usage.mediaId, usage.count])),
     [mediaUsage],
@@ -240,10 +239,12 @@ export function MediaPanel({
   }, [visibleMediaIdSet]);
 
   useEffect(() => {
-    if (!selectedMediaId || !visibleMediaIdSet.has(selectedMediaId)) return;
-    setSelectedMediaIds(new Set([selectedMediaId]));
-    setSelectionAnchorId(selectedMediaId);
-  }, [selectedMediaId, visibleMediaIdSet]);
+    if (selectionRequest === handledSelectionRequest.current) return;
+    handledSelectionRequest.current = selectionRequest;
+    if (!selectionRequest || !visibleMediaIdSet.has(selectionRequest.mediaId)) return;
+    setSelectedMediaIds(new Set([selectionRequest.mediaId]));
+    setSelectionAnchorId(selectionRequest.mediaId);
+  }, [selectionRequest, visibleMediaIdSet]);
 
   useEffect(() => {
     if (!onMediaDemandChange) return;
@@ -392,7 +393,6 @@ export function MediaPanel({
     mediaId: string,
     event: MouseEvent<HTMLButtonElement>,
   ) {
-    onSelectMedia(mediaId);
     if (
       event.shiftKey &&
       selectionAnchorId &&

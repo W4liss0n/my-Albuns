@@ -21,9 +21,7 @@ const mediaUsage: readonly MediaUsage[] = [
 ];
 
 const mediaPanelInteractions = {
-  selectedMediaId: null,
   onImportPhoto: () => undefined,
-  onSelectMedia: () => undefined,
   onPhotoDragStart: () => undefined,
   onPhotoDragEnd: () => undefined,
   onRelinkMedia: () => undefined,

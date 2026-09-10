@@ -120,16 +120,9 @@ export function ProjectWorkspace({
   );
   const projectId = projection.state.projectId;
   useEffect(() => {
-    setSelectedMediaId(null);
+    setMediaSelectionRequest(null);
     setDraggedPhotoId(null);
   }, [projectId]);
-  useEffect(() => {
-    setSelectedMediaId((current) =>
-      current && projection.state.album.media.some((media) => media.id === current)
-        ? current
-        : null,
-    );
-  }, [projection.state.album.media]);
   useEffect(() => {
     if (workspacePreferences.ready) onPreferencesReady(projectId);
   }, [onPreferencesReady, projectId, workspacePreferences.ready]);
@@ -137,7 +130,7 @@ export function ProjectWorkspace({
   const [saveAsBarrierActive, setSaveAsBarrierActive] = useState(false);
   const saveAsBarrierRef = useRef(false);
   const [draggedPhotoId, setDraggedPhotoId] = useState<string | null>(null);
-  const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
+  const [mediaSelectionRequest, setMediaSelectionRequest] = useState<{ mediaId: string } | null>(null);
   const [sheetContextMenu, setSheetContextMenu] = useState<{
     position: { x: number; y: number };
     sheetId: string;
@@ -776,20 +769,20 @@ export function ProjectWorkspace({
           }}
         />}
 
-        {workspacePanels.panels.media.visible && <MediaPanel
-          hidden={controller.layoutPanel.visible}
+        <MediaPanel
+          key={`media-${projectId}`}
+          hidden={!workspacePanels.panels.media.visible || controller.layoutPanel.visible}
           ref={mediaPanelRef}
           mediaItems={projection.state.album.media}
           mediaUsage={projection.mediaUsage}
           onFillPhoto={controller.fillMedia}
-          selectedMediaId={selectedMediaId}
+          selectionRequest={mediaSelectionRequest}
           importPending={controller.importPending}
           onImportPhoto={() => {
             void controller.importPhoto().then((mediaId) => {
-              if (mediaId) setSelectedMediaId(mediaId);
+              if (mediaId) setMediaSelectionRequest({ mediaId });
             });
           }}
-          onSelectMedia={setSelectedMediaId}
           onPhotoDragStart={setDraggedPhotoId}
           onPhotoDragEnd={() => setDraggedPhotoId(null)}
           onRelinkMedia={controller.relinkMedia}
@@ -826,7 +819,7 @@ export function ProjectWorkspace({
             previews: mediaPreviews,
             onDemandChange: setPanelMediaDemand,
           }}
-        />}
+        />
       </div>
 
       {frameContextMenu?.kind === "frames" ? <FrameContextMenu position={frameContextMenu.position}

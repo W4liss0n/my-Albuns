@@ -6463,6 +6463,41 @@ test.each([0, 12])("completes import with %i new Photos without a success dialog
   expect(screen.queryByText("12 Fotos importadas.")).not.toBeInTheDocument();
 });
 
+test("the connected media panel preserves a group and its anchor through ordering and filters", () => {
+  const port = projectCorePortWithApply(async () => projection);
+  const apply = vi.spyOn(port, "applyWithOutcome");
+  render(<ProjectWorkspace exportPipelinePort={exportPipelinePort} projection={projection}
+    projectCorePort={port} onProjectionChange={vi.fn()} />);
+  const first = screen.getByRole("button", { name: "Campo.jpg" });
+  const second = screen.getByRole("button", { name: "Serra ao amanhecer.jpg. Já usada" });
+  fireEvent.click(first);
+  fireEvent.click(second, { ctrlKey: true });
+  expect(first).toHaveAttribute("aria-pressed", "true");
+  expect(second).toHaveAttribute("aria-pressed", "true");
+  fireEvent.click(screen.getByRole("button", { name: "Filtro, ordem e tamanho" }));
+  fireEvent.change(screen.getByRole("combobox", { name: "Ordenar por" }), { target: { value: "name-descending" } });
+  expect(first).toHaveAttribute("aria-pressed", "true");
+  expect(second).toHaveAttribute("aria-pressed", "true");
+  const search = screen.getByRole("searchbox", { name: "Buscar Fotos" });
+  fireEvent.change(search, { target: { value: "campo" } });
+  expect(first).toHaveAttribute("aria-pressed", "true");
+  fireEvent.change(search, { target: { value: "" } });
+  expect(screen.getByRole("button", { name: "Serra ao amanhecer.jpg. Já usada" })).toHaveAttribute("aria-pressed", "false");
+  expect(apply).not.toHaveBeenCalled();
+});
+
+test("hiding the media panel preserves the search and selection for the open window", () => {
+  render(<ProjectWorkspace exportPipelinePort={exportPipelinePort} projection={projection}
+    projectCorePort={projectCorePortWithApply(async () => projection)} onProjectionChange={vi.fn()} />);
+  fireEvent.change(screen.getByRole("searchbox", { name: "Buscar Fotos" }), { target: { value: "Campo" } });
+  fireEvent.click(screen.getByRole("button", { name: "Campo.jpg" }));
+  fireEvent.click(getApplicationCommand("Exibir", "Painel de imagens"));
+  expect(screen.queryByRole("region", { name: "Painel de imagens" })).not.toBeInTheDocument();
+  fireEvent.click(getApplicationCommand("Exibir", "Painel de imagens"));
+  expect(screen.getByRole("searchbox", { name: "Buscar Fotos" })).toHaveValue("Campo");
+  expect(screen.getByRole("button", { name: "Campo.jpg" })).toHaveAttribute("aria-pressed", "true");
+});
+
 test("reimporting a JPEG selects its existing card without a creative mutation", async () => {
   const port = projectCorePortWithApply(async () => projection);
   const importPhoto = vi.fn(async () => ({
