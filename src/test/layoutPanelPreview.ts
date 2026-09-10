@@ -12,5 +12,6 @@ export const layoutPanelCorpus = corpus as unknown as {
     favoriteStates?: Record<string, LayoutPanelSample>; favoriteTransitions?: { from: string; to: string; candidateIndex: number }[];
     catalogSaved?: LayoutPanelSample; catalogDeleted?: LayoutPanelSample; saveResult?: SaveCustomLayoutResult;
     lockReady?: LayoutPanelSample; locked?: LayoutPanelSample; unlocked?: LayoutPanelSample;
+    reducedReady?: LayoutPanelSample; reduced?: LayoutPanelSample; reducedLocked?: LayoutPanelSample;
     filled?: LayoutPanelSample; cleared?: LayoutPanelSample; exportProblems?: LayoutExportProblem[] }>;
 };

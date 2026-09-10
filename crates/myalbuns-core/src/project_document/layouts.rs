@@ -305,14 +305,20 @@ impl ProjectDocument {
         if sheet.layout_locked {
             return Err(CoreError::LayoutLocked);
         }
+        let retained_ids: std::collections::HashSet<_> =
+            patch.frame_ids().iter().copied().collect();
         if !sheet
             .frames
             .iter()
+            .filter(|frame| frame.photo.is_some() || retained_ids.contains(&frame.id))
             .map(|f| f.id)
             .eq(patch.frame_ids().iter().copied())
         {
             return Err(CoreError::StaleLayoutPreview);
         }
+        sheet
+            .frames
+            .retain(|frame| retained_ids.contains(&frame.id));
         for (frame, rect) in sheet.frames.iter_mut().zip(&patch.definition().positions) {
             frame.rect = ProjectRect::new(
                 rect.x as u64,

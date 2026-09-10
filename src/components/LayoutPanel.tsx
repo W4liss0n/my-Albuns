@@ -44,6 +44,9 @@ export function LayoutPanel({ controller, sheet, catalog }: LayoutPanelProps) {
   const query = controller.displayQuery;
   const busy = controller.committing || controller.query === null;
   const count = sheet.frames.length;
+  const minimumCount = controller.minimumPositionCount;
+  const counts = Array.from({ length: Math.max(0, 31 - minimumCount) }, (_, index) => minimumCount + index);
+  if (controller.positionCount > 30) counts.push(controller.positionCount);
   const emptyMessage = query?.listing.generationStatus === "empty"
     ? "Escolha a quantidade de Frames para preparar um Layout."
     : query?.listing.generationStatus === "outsideCoverage"
@@ -54,9 +57,9 @@ export function LayoutPanel({ controller, sheet, catalog }: LayoutPanelProps) {
       <div className="layout-panel__header">
         <label className="layout-panel__positions">Frames
           <select aria-label="Quantidade de Frames" value={controller.positionCount}
-            disabled={controller.committing || query?.locked || count > 30}
+            disabled={controller.committing || query?.locked || minimumCount > 30}
             onChange={(event) => controller.configurePositions(Number(event.target.value))}>
-            {Array.from({ length: Math.max(1, 31 - count) }, (_, index) => count + index).map((value) =>
+            {counts.map((value) =>
               <option key={value} value={value}>{value}</option>)}
           </select>
         </label>

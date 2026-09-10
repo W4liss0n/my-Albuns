@@ -41,10 +41,10 @@ fn starring_is_one_undoable_project_edit_without_applying_or_locking_the_layout(
     let before = project.project().clone();
     let projection = project.projection();
     let query = project
-        .query_layouts_with_expansion(
+        .query_layouts_with_frame_request(
             &sheet,
-            Some(LayoutExpansion {
-                additional_positions: 2,
+            Some(LayoutFrameRequest {
+                frame_count: 3,
                 orientation: FrameOrientation::Horizontal,
             }),
         )

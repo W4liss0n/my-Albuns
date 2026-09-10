@@ -16,6 +16,7 @@ impl LayoutPatch {
     pub fn definition(&self) -> &LayoutDefinition {
         &self.definition
     }
+    /// Existing Frames retained in order. A document may omit only empty Frames.
     pub fn frame_ids(&self) -> &[Uuid] {
         &self.frame_ids
     }

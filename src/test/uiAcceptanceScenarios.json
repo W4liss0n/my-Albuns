@@ -6059,6 +6059,829 @@
       ]
     },
     {
+      "id": "workspace-layout-reduced-hover",
+      "title": "Layouts — Prévia de 2 Frames após ampliar para 6 e destravar",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=expanded",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "A SPEC e os designs 0026 e 0028 permitem reduzir a quantidade até o número de Frames com Foto após destravar; a confirmação remove apenas placeholders excedentes em uma ação de Undo/Redo. As transições e geometrias vêm do Core produtivo."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body:has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001\"]):not(:has([role=\"scrollbar\"]))"
+        },
+        {
+          "type": "focus",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__candidate:first-child"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate--locked"
+        },
+        {
+          "type": "assert",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]:disabled"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Destravar Layout da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]:not(:disabled):has(option[value=\"2\"]):not(:has(option[value=\"1\"]))"
+        },
+        {
+          "type": "focus",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__candidate:first-child"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-reduced-applied",
+      "title": "Layouts — Aplicar 2 Frames preserva as Fotos e remove os placeholders excedentes",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=expanded",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "A SPEC e os designs 0026 e 0028 permitem reduzir a quantidade até o número de Frames com Foto após destravar; a confirmação remove apenas placeholders excedentes em uma ação de Undo/Redo. As transições e geometrias vêm do Core produtivo."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body:has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001\"]):not(:has([role=\"scrollbar\"]))"
+        },
+        {
+          "type": "focus",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__candidate:first-child"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate--locked"
+        },
+        {
+          "type": "assert",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]:disabled"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Destravar Layout da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]:not(:disabled):has(option[value=\"2\"]):not(:has(option[value=\"1\"]))"
+        },
+        {
+          "type": "focus",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+        },
+        {
+          "type": "click",
+          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__preview[aria-label=\"Aplicar Layout 1 — último aplicado\"]"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__header"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-reduced-locked",
+      "title": "Layouts — Reduzir para 2 Frames e travar",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=expanded",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "A SPEC e os designs 0026 e 0028 permitem reduzir a quantidade até o número de Frames com Foto após destravar; a confirmação remove apenas placeholders excedentes em uma ação de Undo/Redo. As transições e geometrias vêm do Core produtivo."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__candidate--locked:has(svg[aria-label=\"Layout com 2 Frames\"])",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body:has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001\"]):not(:has([role=\"scrollbar\"]))"
+        },
+        {
+          "type": "focus",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__candidate:first-child"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate--locked"
+        },
+        {
+          "type": "assert",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]:disabled"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Destravar Layout da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]:not(:disabled):has(option[value=\"2\"]):not(:has(option[value=\"1\"]))"
+        },
+        {
+          "type": "focus",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-reduced-undo",
+      "title": "Layouts — Desfazer a redução restaura os 6 Frames",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=expanded",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "A SPEC e os designs 0026 e 0028 permitem reduzir a quantidade até o número de Frames com Foto após destravar; a confirmação remove apenas placeholders excedentes em uma ação de Undo/Redo. As transições e geometrias vêm do Core produtivo."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body:has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001\"]):not(:has([role=\"scrollbar\"]))"
+        },
+        {
+          "type": "focus",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__candidate:first-child"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate--locked"
+        },
+        {
+          "type": "assert",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]:disabled"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Destravar Layout da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]:not(:disabled):has(option[value=\"2\"]):not(:has(option[value=\"1\"]))"
+        },
+        {
+          "type": "focus",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+        },
+        {
+          "type": "click",
+          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__preview[aria-label=\"Aplicar Layout 1 — último aplicado\"]"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__header"
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Desfazer\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]:not(:disabled)"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-reduced-redo",
+      "title": "Layouts — Refazer a redução retorna aos 2 Frames",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=expanded",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "A SPEC e os designs 0026 e 0028 permitem reduzir a quantidade até o número de Frames com Foto após destravar; a confirmação remove apenas placeholders excedentes em uma ação de Undo/Redo. As transições e geometrias vêm do Core produtivo."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body:has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001\"]):not(:has([role=\"scrollbar\"]))"
+        },
+        {
+          "type": "focus",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__candidate:first-child"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate--locked"
+        },
+        {
+          "type": "assert",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]:disabled"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Destravar Layout da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]:not(:disabled):has(option[value=\"2\"]):not(:has(option[value=\"1\"]))"
+        },
+        {
+          "type": "focus",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+        },
+        {
+          "type": "click",
+          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__preview[aria-label=\"Aplicar Layout 1 — último aplicado\"]"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__header"
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Desfazer\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]:not(:disabled)"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Refazer\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]:not(:disabled)"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-reduced-scale-125",
+      "title": "Layouts — Redução de Frames em escala de 125%",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=expanded&scale=1.25",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "A SPEC e os designs 0026 e 0028 permitem reduzir a quantidade até o número de Frames com Foto após destravar; a confirmação remove apenas placeholders excedentes em uma ação de Undo/Redo. As transições e geometrias vêm do Core produtivo."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body:has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001\"]):not(:has([role=\"scrollbar\"]))"
+        },
+        {
+          "type": "focus",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__candidate:first-child"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate--locked"
+        },
+        {
+          "type": "assert",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]:disabled"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Destravar Layout da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]:not(:disabled):has(option[value=\"2\"]):not(:has(option[value=\"1\"]))"
+        },
+        {
+          "type": "focus",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+        },
+        {
+          "type": "click",
+          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__preview[aria-label=\"Aplicar Layout 1 — último aplicado\"]"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__header"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-reduced-scale-150",
+      "title": "Layouts — Redução de Frames em escala de 150%",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=expanded&scale=1.5",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "A SPEC e os designs 0026 e 0028 permitem reduzir a quantidade até o número de Frames com Foto após destravar; a confirmação remove apenas placeholders excedentes em uma ação de Undo/Redo. As transições e geometrias vêm do Core produtivo."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body:has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001\"]):not(:has([role=\"scrollbar\"]))"
+        },
+        {
+          "type": "focus",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__candidate:first-child"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate--locked"
+        },
+        {
+          "type": "assert",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]:disabled"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Destravar Layout da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]:not(:disabled):has(option[value=\"2\"]):not(:has(option[value=\"1\"]))"
+        },
+        {
+          "type": "focus",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+        },
+        {
+          "type": "click",
+          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__preview[aria-label=\"Aplicar Layout 1 — último aplicado\"]"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__header"
+        }
+      ]
+    },
+    {
       "id": "workspace-layout-empty-lock-hover",
       "title": "Layout travado — 2 posições reservadas na prévia",
       "implementationPath": "/workspace-preview.html?frame=layouts&layouts=empty-lock",

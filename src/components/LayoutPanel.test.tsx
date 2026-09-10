@@ -15,7 +15,8 @@ function panel(overrides: Partial<LayoutPanelController> = {}, caseName = "mixed
     toggle: vi.fn(), close: vi.fn(), refresh: vi.fn(), preview: vi.fn(), cancelPreview: vi.fn(),
     apply: vi.fn(async () => true), toggleFavorite: vi.fn(async () => true),
     lock: vi.fn(async () => true), unlock: vi.fn(async () => true),
-    positionCount: sheet.frames.length, configurePositions: vi.fn(),
+    positionCount: sheet.frames.length, minimumPositionCount: sheet.frames.filter((frame) => frame.photo !== null).length,
+    configurePositions: vi.fn(),
     ...overrides,
   };
   const view = render(<LayoutPanel controller={controller} sheet={sheet} />);
@@ -61,6 +62,20 @@ test("the frame count requests additional positions without applying a Layout", 
   expect(controller.configurePositions).toHaveBeenCalledExactlyOnceWith(6);
   expect(controller.apply).not.toHaveBeenCalled();
   expect(controller.lock).not.toHaveBeenCalled();
+});
+
+test("placeholders do not prevent choosing a smaller Layout that keeps every Photo", () => {
+  const sample = layoutPanelCorpus.cases.mixed.before;
+  const sheet = sample.projection.composition.sheets[0];
+  const photoCount = sheet.frames.filter((frame) => frame.photo !== null).length;
+  expect(photoCount).toBeGreaterThan(0);
+  expect(photoCount).toBeLessThan(sheet.frames.length);
+  const { controller } = panel();
+  const count = screen.getByRole("combobox", { name: "Quantidade de Frames" });
+  expect(within(count).getByRole("option", { name: String(photoCount) })).toBeInTheDocument();
+  fireEvent.change(count, { target: { value: String(photoCount) } });
+  expect(controller.configurePositions).toHaveBeenCalledExactlyOnceWith(photoCount);
+  expect(controller.apply).not.toHaveBeenCalled();
 });
 
 test("filled Frames are represented by generic geometry without photo content or decoration", () => {

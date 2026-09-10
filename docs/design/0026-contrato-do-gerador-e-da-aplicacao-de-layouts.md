@@ -2,6 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-09
+updated: 2026-09-10
 ticket: 28
 ---
 
@@ -289,12 +290,20 @@ ser confundida com uma falha da garantia de reorganizar Frames existentes.
 5. O clique leva a mesma definição e revisão à fila de mutações. Com revisão,
    alvo ou ordem divergentes, a operação é recusada como prévia desatualizada
    e a consulta é renovada. Não se aplica silenciosamente uma nova geometria.
-6. Somente `ProjectSession` confirma. Geometria, Último Layout e eventual
-   travamento mudam juntos em uma ação de Undo/Redo.
+6. Somente `ProjectSession` confirma. Geometria, quantidade de placeholders,
+   Último Layout e eventual travamento mudam juntos em uma ação de Undo/Redo.
+
+A quantidade pedida no painel pode ser menor que a quantidade atual de Frames,
+desde que comporte todos os Frames com Foto e a Lâmina esteja destravada.
+Nesse caso, o Mapeamento retém todos os Frames com Foto e os primeiros
+placeholders necessários, na ordem original. Os placeholders excedentes só
+saem na confirmação. A consulta captura a sequência completa de IDs original
+para detectar mudanças posteriores; o patch identifica a subsequência retida.
+Consultas sem uma quantidade explícita continuam preservando todos os Frames.
 
 O Gerador inicial produz a quantidade exata. Posições excedentes de candidatos
 de travamento vêm de definições apropriadas de outras origens ou consultas
-explícitas futuras. O corpo da preview não confirma esses excedentes; somente
+explícitas. O corpo da preview não confirma esses excedentes; somente
 o cadeado cria placeholders e trava, seguindo a SPEC. A busca comum não inventa
 Fotos ou orientações futuras para preencher dez sugestões.
 

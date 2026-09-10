@@ -5,7 +5,7 @@ use myalbuns_core::{
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, fs, path::Path};
 
-fn fixture_project(root: &Path, count: usize) -> EditableProject {
+pub(super) fn fixture_project(root: &Path, count: usize) -> EditableProject {
     let mut document: Value = serde_json::from_str(include_str!(
         "../fixtures/project_document_v6_photo_migration_expected.myalbuns"
     ))
@@ -77,7 +77,7 @@ fn record(project: &mut EditableProject, name: &str) -> Value {
 fn record_expansion(
     project: &mut EditableProject,
     name: &str,
-    expansion: Option<myalbuns_core::LayoutExpansion>,
+    expansion: Option<myalbuns_core::LayoutFrameRequest>,
 ) -> (Value, Option<LayoutSelection>) {
     let projection = project.projection();
     let mut queries = serde_json::Map::new();
@@ -87,7 +87,7 @@ fn record_expansion(
             .then(|| expansion.clone())
             .flatten();
         let query = project
-            .query_layouts_with_expansion(&sheet.id, extra)
+            .query_layouts_with_frame_request(&sheet.id, extra)
             .unwrap();
         let previews: Vec<_> = (0..query.listing.candidates.len())
             .map(|index| {
@@ -248,8 +248,8 @@ fn layout_panel_corpus_is_produced_by_the_public_core() {
                 project.undo().unwrap();
             }
             let extra = matches!(name, "expanded" | "empty-lock").then_some(
-                myalbuns_core::LayoutExpansion {
-                    additional_positions: 2,
+                myalbuns_core::LayoutFrameRequest {
+                    frame_count: project.projection().state.album.sheets[0].frames.len() + 2,
                     orientation: myalbuns_core::FrameOrientation::Horizontal,
                 },
             );
@@ -258,7 +258,9 @@ fn layout_panel_corpus_is_produced_by_the_public_core() {
             entry["lockReady"] = ready;
             // Queries for other Sheets replace the session's handle, so prepare the
             // target last and retain precisely its previews and generated Frame IDs.
-            let query = project.query_layouts_with_expansion(&sheet, extra).unwrap();
+            let query = project
+                .query_layouts_with_frame_request(&sheet, extra)
+                .unwrap();
             let selection = LayoutSelection {
                 query_id: query.query_id.clone(),
                 candidate_index: selection.unwrap().candidate_index,
@@ -293,6 +295,36 @@ fn layout_panel_corpus_is_produced_by_the_public_core() {
                 })
                 .unwrap();
             entry["unlocked"] = record(&mut project, &format!("{name}-unlocked"));
+            if name == "expanded" {
+                let request = Some(myalbuns_core::LayoutFrameRequest {
+                    frame_count: 2,
+                    orientation: myalbuns_core::FrameOrientation::Horizontal,
+                });
+                entry["reducedReady"] =
+                    record_expansion(&mut project, "expanded-reduced-ready", request.clone()).0;
+                for lock in [false, true] {
+                    let query = project
+                        .query_layouts_with_frame_request(&sheet, request.clone())
+                        .unwrap();
+                    let selection = LayoutSelection {
+                        query_id: query.query_id,
+                        candidate_index: 0,
+                    };
+                    let preview = project.preview_layout(&selection).unwrap();
+                    let reduced = project
+                        .apply(if lock {
+                            ProjectIntent::LockLayout { selection }
+                        } else {
+                            ProjectIntent::ApplyLayout { selection }
+                        })
+                        .unwrap();
+                    assert_eq!(reduced.composition.sheets[0].frames, preview);
+                    assert_eq!(reduced.state.album.sheets[0].frames.len(), 2);
+                    let key = if lock { "reducedLocked" } else { "reduced" };
+                    entry[key] = record(&mut project, &format!("expanded-{key}"));
+                    project.undo().unwrap();
+                }
+            }
             project.undo().unwrap();
             let media_id = project
                 .projection()

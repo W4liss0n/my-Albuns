@@ -541,18 +541,18 @@ impl EditableProject {
     }
 
     pub fn query_layouts(&mut self, sheet_id: &str) -> Result<crate::LayoutQueryResult, CoreError> {
-        self.query_layouts_with_expansion(sheet_id, None)
+        self.query_layouts_with_frame_request(sheet_id, None)
     }
 
-    pub fn query_layouts_with_expansion(
+    pub fn query_layouts_with_frame_request(
         &mut self,
         sheet_id: &str,
-        expansion: Option<crate::LayoutExpansion>,
+        frame_request: Option<crate::LayoutFrameRequest>,
     ) -> Result<crate::LayoutQueryResult, CoreError> {
         if !self.session_valid {
             return Err(CoreError::EditableSessionInvalidated);
         }
-        self.session.query_layouts(sheet_id, expansion)
+        self.session.query_layouts(sheet_id, frame_request)
     }
 
     pub fn preview_layout(

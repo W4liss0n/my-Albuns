@@ -2,6 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-09
+updated: 2026-09-10
 ticket: 26
 ---
 
@@ -22,7 +23,19 @@ Salvar ou Desfazer chegam enquanto uma confirmação está pendente.
 
 Por padrão, as sugestões usam a quantidade e as orientações dos Frames
 existentes. O seletor de quantidade de Frames permite pedir uma quantidade
-maior, até o limite de 30 posições do Gerador. As posições adicionais adotam
+entre a quantidade de Frames com Foto e o limite de 30 posições do Gerador,
+ignorando placeholders no mínimo permitido. Conforme decisão de 10/09/2026,
+é necessário destravar antes de alterar essa quantidade. Pedir uma quantidade
+menor prepara uma prévia sem os placeholders excedentes; consultar e passar
+o ponteiro não modifica o Projeto. Aplicar a miniatura confirma a remoção
+desses placeholders junto à nova geometria, em uma única ação de Undo/Redo.
+Todas as Fotos, seus ajustes e estilos de Frame são preservados, assim como
+a ordem dos Frames mantidos. Quando ainda cabem placeholders, os primeiros
+na ordem atual são conservados. Uma nova Foto inserida após a consulta
+invalida a prévia anterior. A quantidade explícita filtra as sugestões pelo
+total solicitado. Zero posições não produz uma miniatura aplicável.
+
+As posições adicionais adotam
 a orientação horizontal padrão. Elas só podem ser confirmadas pelo
 cadeado; clicar no corpo de uma preview não cria estruturas adicionais.
 Os IDs dos placeholders são reservados na consulta e reutilizados pela prévia

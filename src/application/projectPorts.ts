@@ -7,7 +7,7 @@ import type {
   PhotoAngleEdit,
   FrameStyleEdit,
   LayoutQueryResult,
-  LayoutExpansion,
+  LayoutFrameRequest,
   LayoutExportProblem,
   LayoutSelection,
   CustomLayoutId,
@@ -258,7 +258,7 @@ export interface ProjectCorePort {
   readSliderDoubleClickTime(): Promise<number>;
   previewPhotoAngle(edit: PhotoAngleEdit): Promise<ComposedFrame[]>;
   previewFrameStyle(edit: FrameStyleEdit): Promise<ComposedFrame[]>;
-  queryLayouts(sheetId: string, expansion?: LayoutExpansion): Promise<LayoutQueryResult>;
+  queryLayouts(sheetId: string, frameRequest?: LayoutFrameRequest): Promise<LayoutQueryResult>;
   previewLayout(selection: LayoutSelection): Promise<ComposedFrame[]>;
   previewFrameGeometry(edit: FrameGeometryEdit): Promise<ComposedFrame[]>;
   load(operationId: string): Promise<EditorProjection>;

@@ -176,10 +176,12 @@ const projectCorePort: ProjectCorePort = {
     layoutCatalogStage = "deleted";
     return 2;
   },
-  queryLayouts: async (sheetId, expansion) => {
-    const samples = layoutCase.favoriteStates ? [layoutCase.favoriteStates[layoutFavoriteStage]] : expansion ? [layoutCase.lockReady] : layoutCatalogStage === "saved" ? [layoutCase.catalogSaved]
+  queryLayouts: async (sheetId, frameRequest) => {
+    const requested = [layoutCase.lockReady, layoutCase.reducedReady].filter((sample) => sample?.queries[sheetId]?.query
+      .listing.candidates[0]?.layout.definition.positions.length === frameRequest?.frameCount);
+    const samples = layoutCase.favoriteStates ? [layoutCase.favoriteStates[layoutFavoriteStage]] : frameRequest ? requested : layoutCatalogStage === "saved" ? [layoutCase.catalogSaved]
       : layoutCatalogStage === "deleted" ? [layoutCase.catalogDeleted]
-      : [layoutCase.before, layoutCase.applied, layoutCase.locked, layoutCase.unlocked, layoutCase.filled, layoutCase.cleared];
+      : [layoutCase.before, layoutCase.applied, layoutCase.locked, layoutCase.unlocked, layoutCase.reduced, layoutCase.reducedLocked, layoutCase.filled, layoutCase.cleared];
     const sample = samples.find((state) => state &&
       JSON.stringify(state.projection.state.album) === JSON.stringify(projection.state.album));
     const prepared = sample?.queries[sheetId];
@@ -509,14 +511,20 @@ function applyPreviewIntent(intent: ProjectIntent): ProjectMutationOutcome {
     return { projection, affectedFrameId: null, affectedSheetId: null };
   }
   if (intent.kind === "unlockLayout") {
-    if (frameContext !== "layouts" || !layoutCase.unlocked || !projection.state.album.sheets.find((sheet) => sheet.id === intent.sheetId)?.layoutLocked) {
+    const sheet = projection.state.album.sheets.find((sheet) => sheet.id === intent.sheetId);
+    const unlocked = sheet?.frames.length === layoutCase.reduced?.projection.state.album.sheets[0].frames.length
+      ? layoutCase.reduced : layoutCase.unlocked;
+    if (frameContext !== "layouts" || !unlocked || !sheet?.layoutLocked) {
       throw new Error("Comando fora do corpus de travamento desta prévia.");
     }
-    projection = finalizePhysicalPreviewMutation(structuredClone(layoutCase.unlocked.projection), structuredClone(projection));
+    projection = finalizePhysicalPreviewMutation(structuredClone(unlocked.projection), structuredClone(projection));
     return { projection, affectedFrameId: null, affectedSheetId: intent.sheetId };
   }
   if (intent.kind === "applyLayout" || intent.kind === "lockLayout") {
-    const result = intent.kind === "lockLayout" ? layoutCase.locked : layoutCase.applied;
+    const reducing = preparedLayoutQuery && (preparedLayoutQuery.query.listing.candidates[intent.selection.candidateIndex]
+      ?.layout.definition.positions.length ?? 0) < preparedLayoutQuery.query.frameCount;
+    const result = intent.kind === "lockLayout" ? reducing ? layoutCase.reducedLocked : layoutCase.locked
+      : reducing ? layoutCase.reduced : layoutCase.applied;
     if (frameContext !== "layouts" || !result || !preparedLayoutQuery ||
         intent.selection.queryId !== preparedLayoutQuery.query.queryId ||
         projection.state.revision !== preparedLayoutQuery.query.revision || intent.selection.candidateIndex !== 0) {

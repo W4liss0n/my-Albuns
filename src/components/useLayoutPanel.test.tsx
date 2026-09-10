@@ -3,6 +3,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 import type { ComposedFrame, EditorProjection, LayoutQueryResult, ProjectIntent } from "../domain/project";
 import { frameDeletionCorpus } from "../test/frameDeletionPreview";
+import { layoutPanelCorpus } from "../test/layoutPanelPreview";
 import { useLayoutPanel } from "./useLayoutPanel";
 import type { ProjectMutationRunner } from "./useProjectMutationRunner";
 
@@ -25,14 +26,14 @@ function deferred<T>() {
   const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; });
   return { promise, resolve, reject };
 }
-function harness() {
+function harness(startingProjection = initial) {
   const queryLayouts = vi.fn(async (target: string) => query(`query-${target}`, target));
   const previewLayout = vi.fn(async (): Promise<ComposedFrame[]> => frames);
   const commit = vi.fn(async (_intent: ProjectIntent) => true);
   const runner = { waitForIdle: vi.fn(async () => null) } as unknown as ProjectMutationRunner;
   const onError = vi.fn();
   const view = renderHook(({ editing, blocked }) => {
-    const [projection, setProjection] = useState(initial);
+    const [projection, setProjection] = useState(startingProjection);
     return { panel: useLayoutPanel({ projection, editing, disabled: blocked,
       port: { queryLayouts, previewLayout }, runner, commit, onError }), setProjection };
   }, { initialProps: { editing: false, blocked: false } });
@@ -105,9 +106,48 @@ test("changing extra positions discards a late query and its preview", async () 
   act(() => view.result.current.panel.configurePositions(frames.length + 2));
   expect(view.result.current.panel.query).toBeNull();
   await act(async () => { delayed.resolve(query("obsolete")); });
-  await waitFor(() => expect(queryLayouts).toHaveBeenLastCalledWith(sheetId, { additionalPositions: 2, orientation: "horizontal" }));
+  await waitFor(() => expect(queryLayouts).toHaveBeenLastCalledWith(sheetId, { frameCount: frames.length + 2, orientation: "horizontal" }));
   await waitFor(() => expect(view.result.current.panel.query?.queryId).toBe(`query-${sheetId}`));
   expect(view.result.current.panel.composition).toBe(initial.composition);
+});
+
+test("after unlocking, the requested count may drop to filled Frames and apply the smaller prepared Layout", async () => {
+  const sample = layoutPanelCorpus.cases.expanded;
+  const unlocked = sample.unlocked!;
+  const sheetId = unlocked.projection.state.album.sheets[0].id;
+  const reduced = sample.reducedReady!.queries[sheetId];
+  const h = harness(unlocked.projection);
+  h.queryLayouts.mockResolvedValue(unlocked.queries[sheetId].query);
+  h.previewLayout.mockResolvedValue(unlocked.queries[sheetId].previews[0]);
+  act(() => h.view.result.current.panel.toggle(sheetId));
+  await waitFor(() => expect(h.view.result.current.panel.query).not.toBeNull());
+  expect(h.view.result.current.panel.positionCount).toBe(6);
+  expect(h.view.result.current.panel.minimumPositionCount).toBe(2);
+  h.queryLayouts.mockResolvedValue(reduced.query);
+  h.previewLayout.mockResolvedValue(reduced.previews[0]);
+  act(() => h.view.result.current.panel.configurePositions(2));
+  await waitFor(() => expect(h.queryLayouts).toHaveBeenLastCalledWith(sheetId, { frameCount: 2, orientation: "horizontal" }));
+  await waitFor(() => expect(h.view.result.current.panel.query?.queryId).toBe(reduced.query.queryId));
+  expect(h.view.result.current.panel.positionCount).toBe(2);
+  act(() => h.view.result.current.panel.configurePositions(1));
+  expect(h.view.result.current.panel.positionCount).toBe(2);
+  act(() => h.view.result.current.panel.preview(0));
+  expect(h.view.result.current.panel.composition.sheets[0].frames).toEqual(reduced.previews[0]);
+  expect(h.commit).not.toHaveBeenCalled();
+  await act(async () => { expect(await h.view.result.current.panel.apply(0)).toBe(true); });
+  expect(h.commit).toHaveBeenCalledExactlyOnceWith({ kind: "applyLayout", selection: {
+    queryId: reduced.query.queryId, candidateIndex: 0,
+  } });
+});
+
+test("the count remains fixed while the Layout is locked, including its placeholders", async () => {
+  const locked = layoutPanelCorpus.cases.expanded.locked!;
+  const h = harness(locked.projection);
+  const sheetId = locked.projection.state.album.sheets[0].id;
+  act(() => h.view.result.current.panel.toggle(sheetId));
+  act(() => h.view.result.current.panel.configurePositions(2));
+  expect(h.view.result.current.panel.positionCount).toBe(6);
+  expect(h.commit).not.toHaveBeenCalled();
 });
 
 test.each([false, true])("confirmation retains the prepared selection behind a pending mutation, failure=%s", async (fails) => {

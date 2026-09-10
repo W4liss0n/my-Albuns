@@ -32,13 +32,13 @@ export function useLayoutPanel(input: LayoutPanelInput) {
   const visible = sheetId !== null && !editing;
   const sheet = projection.state.album.sheets.find((sheet) => sheet.id === sheetId);
   const frameCount = sheet?.frames.length ?? 0;
+  const minimumPositionCount = sheet?.frames.filter((frame) => frame.photo !== null).length ?? 0;
   const [requestedPositions, setRequestedPositions] = useState<{ projectId: string; sheetId: string; count: number } | null>(null);
   const request = requestedPositions?.projectId === projectId && requestedPositions.sheetId === sheetId ? requestedPositions : null;
-  const positionCount = sheet?.layoutLocked ? frameCount : Math.max(frameCount, request?.count ?? frameCount);
-  const additionalPositions = positionCount - frameCount;
+  const positionCount = sheet?.layoutLocked ? frameCount : Math.max(minimumPositionCount, request?.count ?? frameCount);
   const [refresh, setRefresh] = useState(0);
   const scope = useMemo(() => ({ active: false }),
-    [projectId, projection.state.revision, projection.composition, sheetId, editing, disabled, input.port.queryLayouts, input.catalogRevision, refresh, additionalPositions]);
+    [projectId, projection.state.revision, projection.composition, sheetId, editing, disabled, input.port.queryLayouts, input.catalogRevision, refresh, positionCount]);
   const [prepared, setPrepared] = useState<PreparedLayouts | null>(null);
   const [hover, setHover] = useState<{ scope: object; index: number } | null>(null);
   const [error, setError] = useState<{ scope: object; message: string } | null>(null);
@@ -60,7 +60,7 @@ export function useLayoutPanel(input: LayoutPanelInput) {
       const outcome = await latest.current.runner.waitForIdle();
       if (!current() || outcome?.status === "obsolete") return null;
       if (outcome?.status === "failed") throw outcome.error;
-      return additionalPositions > 0 ? latest.current.port.queryLayouts(sheetId, { additionalPositions, orientation: "horizontal" })
+      return positionCount !== frameCount ? latest.current.port.queryLayouts(sheetId, { frameCount: positionCount, orientation: "horizontal" })
         : latest.current.port.queryLayouts(sheetId);
     });
     queries.current = task;
@@ -77,7 +77,7 @@ export function useLayoutPanel(input: LayoutPanelInput) {
       latest.current.onError(message);
     });
     return () => { active = false; };
-  }, [scope, visible, disabled, sheetId, projectId, additionalPositions]);
+  }, [scope, visible, disabled, sheetId, projectId, positionCount, frameCount]);
 
   const data = visible && !disabled && prepared?.scope === scope ? prepared : null;
   // Keep the last thumbnails painted while this same target refreshes. Only
@@ -108,7 +108,7 @@ export function useLayoutPanel(input: LayoutPanelInput) {
   }
 
   return {
-    visible, sheetId, composition, committing, positionCount,
+    visible, sheetId, composition, committing, positionCount, minimumPositionCount,
     query: data?.query ?? null,
     displayQuery: displayData?.query ?? null,
     previews: displayData?.previews ?? [],
@@ -121,7 +121,7 @@ export function useLayoutPanel(input: LayoutPanelInput) {
     close() { setHover(null); setTarget(null); },
     refresh() { setHover(null); setRefresh((value) => value + 1); },
     configurePositions(count: number) {
-      if (!sheetId || disabled || committingRef.current || sheet?.layoutLocked || !Number.isSafeInteger(count) || count < frameCount || count > 30) return;
+      if (!sheetId || disabled || committingRef.current || sheet?.layoutLocked || !Number.isSafeInteger(count) || count < minimumPositionCount || count > 30) return;
       setHover(null);
       setRequestedPositions({ projectId, sheetId, count });
     },
@@ -130,7 +130,7 @@ export function useLayoutPanel(input: LayoutPanelInput) {
     },
     cancelPreview() { setHover(null); },
     apply(index: number) {
-      if (!data?.previews[index] || data.query.locked || data.query.listing.candidates[index].layout.definition.positions.length !== data.query.frameCount) return Promise.resolve(false);
+      if (!data?.previews[index] || data.query.locked || data.query.listing.candidates[index].layout.definition.positions.length > data.query.frameCount) return Promise.resolve(false);
       return commit({ kind: "applyLayout", selection: { queryId: data.query.queryId, candidateIndex: index } });
     },
     lock(index: number) {

@@ -454,22 +454,11 @@ impl PersistentProjectSession {
     pub(crate) fn query_layouts(
         &mut self,
         sheet_id: &str,
-        expansion: Option<crate::LayoutExpansion>,
+        frame_request: Option<crate::LayoutFrameRequest>,
     ) -> Result<crate::LayoutQueryResult, CoreError> {
         let parsed = parse_uuid(sheet_id).map_err(|_| CoreError::SheetNotFound(sheet_id.into()))?;
         let mut query = self.project().layout_query(parsed)?;
         let frame_count = query.frame_orientations.len();
-        if let Some(expansion) = expansion {
-            if expansion.additional_positions > 30
-                || frame_count.saturating_add(expansion.additional_positions) > 30
-            {
-                return Err(CoreError::InvalidLayoutQuery);
-            }
-            query.frame_orientations.extend(std::iter::repeat_n(
-                expansion.orientation,
-                expansion.additional_positions,
-            ));
-        }
         let sheet = self
             .project()
             .sheets()
@@ -477,16 +466,51 @@ impl PersistentProjectSession {
             .find(|s| s.id() == parsed)
             .unwrap();
         let locked = sheet.layout_locked();
-        if locked && frame_count != query.frame_orientations.len() {
+        let requested_count = frame_request
+            .as_ref()
+            .map_or(frame_count, |request| request.frame_count);
+        if frame_request.is_some() && requested_count > 30 {
+            return Err(CoreError::InvalidLayoutQuery);
+        }
+        if locked && frame_count != requested_count {
             return Err(CoreError::LayoutLocked);
         }
-        let ids: Vec<_> = sheet.frames().iter().map(|f| f.id()).collect();
+        let filled_count = sheet
+            .frames()
+            .iter()
+            .filter(|frame| frame.photo().is_some())
+            .count();
+        if requested_count < filled_count {
+            return Err(CoreError::InvalidLayoutQuery);
+        }
+        let captured_ids: Vec<_> = sheet.frames().iter().map(|frame| frame.id()).collect();
+        let mut ids = Vec::new();
+        let mut orientations = Vec::new();
+        let mut remaining_placeholders = requested_count.saturating_sub(filled_count);
+        for (frame, orientation) in sheet.frames().iter().zip(&query.frame_orientations) {
+            if frame.photo().is_none() {
+                if remaining_placeholders == 0 {
+                    continue;
+                }
+                remaining_placeholders -= 1;
+            }
+            ids.push(frame.id());
+            orientations.push(*orientation);
+        }
+        if let Some(request) = &frame_request {
+            orientations.resize(requested_count, request.orientation);
+        }
+        query.frame_orientations = orientations;
         let sources = crate::LayoutSources {
             last: sheet.last_layout(),
             custom: &self.layout_catalog.entries,
             favorites: self.project().favorite_layouts(),
         };
-        let mut listing = crate::LayoutRules::list_for_lock(&query, sources);
+        let mut listing = if frame_request.is_some() {
+            crate::LayoutRules::list(&query, sources)
+        } else {
+            crate::LayoutRules::list_for_lock(&query, sources)
+        };
         if locked {
             let current = self.project().current_layout(parsed)?;
             listing.candidates.retain(|candidate| {
@@ -535,7 +559,7 @@ impl PersistentProjectSession {
             id: id.clone(),
             revision: self.revision(),
             sheet_id: parsed,
-            frame_ids: ids,
+            frame_ids: captured_ids,
             patches,
         });
         Ok(crate::LayoutQueryResult {

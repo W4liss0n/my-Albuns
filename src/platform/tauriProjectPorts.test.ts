@@ -59,6 +59,15 @@ beforeEach(() => {
   eventBoundary.listeners.length = 0;
 });
 
+test("Layout queries send the requested total Frame count across the native boundary", async () => {
+  await tauriProjectCorePort.queryLayouts("sheet-001", { frameCount: 2, orientation: "horizontal" });
+  expect(invoke).toHaveBeenLastCalledWith("query_layouts", {
+    sheetId: "sheet-001", frameRequest: { frameCount: 2, orientation: "horizontal" },
+  });
+  await tauriProjectCorePort.queryLayouts("sheet-001");
+  expect(invoke).toHaveBeenLastCalledWith("query_layouts", { sheetId: "sheet-001" });
+});
+
 test("composes machine-local State with roaming Settings and routes updates to the owning store", async () => {
   const state = {
     inspectorSections: { "album.design": true },

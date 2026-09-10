@@ -534,10 +534,10 @@ impl ProjectHost {
     pub(crate) fn query_layouts(
         &self,
         sheet_id: &str,
-        expansion: Option<myalbuns_core::LayoutExpansion>,
+        frame_request: Option<myalbuns_core::LayoutFrameRequest>,
     ) -> Result<myalbuns_core::LayoutQueryResult, String> {
         self.project()?
-            .query_layouts_with_expansion(sheet_id, expansion)
+            .query_layouts_with_frame_request(sheet_id, frame_request)
             .map_err(|error| error.to_string())
     }
 
@@ -2065,8 +2065,8 @@ mod tests {
                 let lock_query = host
                     .query_layouts(
                         &sheet_id,
-                        Some(myalbuns_core::LayoutExpansion {
-                            additional_positions: 1,
+                        Some(myalbuns_core::LayoutFrameRequest {
+                            frame_count: resized.projection.state.album.sheets[1].frames.len() + 1,
                             orientation: myalbuns_core::FrameOrientation::Horizontal,
                         }),
                     )

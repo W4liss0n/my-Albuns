@@ -215,7 +215,7 @@ pub(crate) async fn preview_photo_angle(
 #[tauri::command]
 pub(crate) async fn query_layouts(
     sheet_id: String,
-    expansion: Option<myalbuns_core::LayoutExpansion>,
+    frame_request: Option<myalbuns_core::LayoutFrameRequest>,
     window: WebviewWindow,
     state: State<'_, ProjectHost>,
     catalog: State<'_, crate::layout_catalog_store::LayoutCatalogStore>,
@@ -227,7 +227,7 @@ pub(crate) async fn query_layouts(
         .load()
         .map_err(|_| "Não foi possível ler os Layouts personalizados.".to_string())?;
     state.refresh_layout_catalog(snapshot)?;
-    state.query_layouts(&sheet_id, expansion)
+    state.query_layouts(&sheet_id, frame_request)
 }
 
 #[tauri::command]

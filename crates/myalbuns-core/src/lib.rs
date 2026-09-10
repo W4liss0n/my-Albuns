@@ -15,11 +15,11 @@ pub use frame_geometry::{
 };
 pub use layouts::{
     CustomLayout, CustomLayoutId, FavoriteLayout, FrameOrientation, GeneratedLayout,
-    LayoutCandidate, LayoutCatalogSnapshot, LayoutDefinition, LayoutExpansion, LayoutExportProblem,
-    LayoutFavoriteId, LayoutGeneration, LayoutGenerationStatus, LayoutListing, LayoutOrigin,
-    LayoutParameters, LayoutPatch, LayoutPermission, LayoutQuery, LayoutQueryResult, LayoutRules,
-    LayoutScope, LayoutSelection, LayoutSettings, LayoutSources, LayoutSurface, LayoutSurfaceKind,
-    SaveCustomLayoutResult, StoredLayout, generate_layouts,
+    LayoutCandidate, LayoutCatalogSnapshot, LayoutDefinition, LayoutExportProblem,
+    LayoutFavoriteId, LayoutFrameRequest, LayoutGeneration, LayoutGenerationStatus, LayoutListing,
+    LayoutOrigin, LayoutParameters, LayoutPatch, LayoutPermission, LayoutQuery, LayoutQueryResult,
+    LayoutRules, LayoutScope, LayoutSelection, LayoutSettings, LayoutSources, LayoutSurface,
+    LayoutSurfaceKind, SaveCustomLayoutResult, StoredLayout, generate_layouts,
 };
 
 pub use model::{

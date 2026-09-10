@@ -85,11 +85,11 @@ pub struct LayoutSelection {
     pub candidate_index: usize,
 }
 
-/// An explicit request for future placeholder profiles; never inferred from Photos.
+/// An explicit target count; orientation applies only to newly reserved placeholders.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-pub struct LayoutExpansion {
-    pub additional_positions: usize,
+pub struct LayoutFrameRequest {
+    pub frame_count: usize,
     pub orientation: FrameOrientation,
 }
 

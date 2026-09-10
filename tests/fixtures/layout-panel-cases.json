@@ -31944,7 +31944,7 @@
             },
             "projectId": "550e8400-e29b-41d4-a716-446655440000",
             "projectName": "Layouts",
-            "revision": 19,
+            "revision": 21,
             "savedRevision": 9
           }
         },
@@ -36904,7 +36904,7 @@
               "locked": true,
               "projectId": "550e8400-e29b-41d4-a716-446655440000",
               "queryId": "expanded-cleared-sheet-001",
-              "revision": 19,
+              "revision": 21,
               "settings": {
                 "gapUm": 5000,
                 "marginUm": 15000,
@@ -36927,7 +36927,7 @@
               "locked": false,
               "projectId": "550e8400-e29b-41d4-a716-446655440000",
               "queryId": "expanded-cleared-sheet-002",
-              "revision": 19,
+              "revision": 21,
               "settings": {
                 "gapUm": 5000,
                 "marginUm": 15000,
@@ -37788,7 +37788,7 @@
             },
             "projectId": "550e8400-e29b-41d4-a716-446655440000",
             "projectName": "Layouts",
-            "revision": 18,
+            "revision": 20,
             "savedRevision": 9
           }
         },
@@ -43378,7 +43378,7 @@
               "locked": true,
               "projectId": "550e8400-e29b-41d4-a716-446655440000",
               "queryId": "expanded-filled-sheet-001",
-              "revision": 18,
+              "revision": 20,
               "settings": {
                 "gapUm": 5000,
                 "marginUm": 15000,
@@ -43401,7 +43401,7 @@
               "locked": false,
               "projectId": "550e8400-e29b-41d4-a716-446655440000",
               "queryId": "expanded-filled-sheet-002",
-              "revision": 18,
+              "revision": 20,
               "settings": {
                 "gapUm": 5000,
                 "marginUm": 15000,
@@ -50600,6 +50600,4092 @@
               "projectId": "550e8400-e29b-41d4-a716-446655440000",
               "queryId": "expanded-locked-sheet-002",
               "revision": 13,
+              "settings": {
+                "gapUm": 5000,
+                "marginUm": 15000,
+                "minimumSideUm": 20000,
+                "permission": "pagesAndSheet"
+              },
+              "sheetId": "sheet-002"
+            }
+          }
+        }
+      },
+      "reduced": {
+        "projection": {
+          "canPasteFrames": false,
+          "composition": {
+            "frameBorder": {
+              "kind": "none"
+            },
+            "sheets": [
+              {
+                "activeSides": "both",
+                "backgrounds": [
+                  {
+                    "drawRect": {
+                      "height": 300000,
+                      "width": 600000,
+                      "x": 0,
+                      "y": 0
+                    },
+                    "kind": "color",
+                    "rgb": "#FFFFFF"
+                  }
+                ],
+                "base": {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "rgb": "#FFFFFF"
+                },
+                "frames": [
+                  {
+                    "border": {
+                      "kind": "solid",
+                      "rgb": "#205070",
+                      "widthUm": 2000
+                    },
+                    "borderFillRects": [
+                      {
+                        "height": 2000,
+                        "width": 180000,
+                        "x": 347500,
+                        "y": 15000
+                      },
+                      {
+                        "height": 2000,
+                        "width": 180000,
+                        "x": 347500,
+                        "y": 283000
+                      },
+                      {
+                        "height": 266000,
+                        "width": 2000,
+                        "x": 347500,
+                        "y": 17000
+                      },
+                      {
+                        "height": 266000,
+                        "width": 2000,
+                        "x": 525500,
+                        "y": 17000
+                      }
+                    ],
+                    "clipRect": {
+                      "height": 270000,
+                      "width": 180000,
+                      "x": 347500,
+                      "y": 15000
+                    },
+                    "frameId": "00000000-0000-4000-8000-000000000101",
+                    "opacityByte": 153,
+                    "photo": {
+                      "blackAndWhite": false,
+                      "drawRect": {
+                        "height": 472500,
+                        "width": 708750,
+                        "x": 149219,
+                        "y": -136875
+                      },
+                      "mediaId": "00000000-0000-4000-8000-000000000010",
+                      "mirrorX": false,
+                      "name": "Foto.jpg",
+                      "palette": [
+                        "#C22C24",
+                        "#248044",
+                        "#2454C2"
+                      ],
+                      "placement": {
+                        "baseFillZoom": 675.0,
+                        "current": {
+                          "center": {
+                            "x": 156093.75,
+                            "y": 84375.0
+                          },
+                          "size": {
+                            "height": 472500.0,
+                            "width": 708750.0
+                          }
+                        },
+                        "currentPan": {
+                          "x": 0.25,
+                          "y": -0.5
+                        },
+                        "currentZoom": 1.75,
+                        "panOrigin": {
+                          "x": 90000.0,
+                          "y": 135000.0
+                        },
+                        "panRange": {
+                          "maximum": 1.0,
+                          "minimum": -1.0
+                        },
+                        "panToCenter": {
+                          "xx": 264375.0,
+                          "xy": -0.0,
+                          "yx": 0.0,
+                          "yy": 101250.0
+                        },
+                        "panToCenterPerZoom": {
+                          "xx": 202500.0,
+                          "xy": -0.0,
+                          "yx": 0.0,
+                          "yy": 135000.0
+                        },
+                        "sizePerZoom": {
+                          "height": 270000.0,
+                          "width": 405000.0
+                        },
+                        "zoomRange": {
+                          "maximum": 4.0,
+                          "minimum": 1.0
+                        }
+                      },
+                      "rotationDegrees": 0.0
+                    },
+                    "zIndex": 0
+                  },
+                  {
+                    "border": {
+                      "kind": "none"
+                    },
+                    "borderFillRects": [],
+                    "clipRect": {
+                      "height": 270000,
+                      "width": 270000,
+                      "x": 72500,
+                      "y": 15000
+                    },
+                    "frameId": "00000000-0000-4000-8000-000000000103",
+                    "opacityByte": 255,
+                    "photo": {
+                      "blackAndWhite": false,
+                      "drawRect": {
+                        "height": 472500,
+                        "width": 708750,
+                        "x": -92031,
+                        "y": -136875
+                      },
+                      "mediaId": "00000000-0000-4000-8000-000000000010",
+                      "mirrorX": false,
+                      "name": "Foto.jpg",
+                      "palette": [
+                        "#C22C24",
+                        "#248044",
+                        "#2454C2"
+                      ],
+                      "placement": {
+                        "baseFillZoom": 675.0,
+                        "current": {
+                          "center": {
+                            "x": 189843.75,
+                            "y": 84375.0
+                          },
+                          "size": {
+                            "height": 472500.0,
+                            "width": 708750.0
+                          }
+                        },
+                        "currentPan": {
+                          "x": 0.25,
+                          "y": -0.5
+                        },
+                        "currentZoom": 1.75,
+                        "panOrigin": {
+                          "x": 135000.0,
+                          "y": 135000.0
+                        },
+                        "panRange": {
+                          "maximum": 1.0,
+                          "minimum": -1.0
+                        },
+                        "panToCenter": {
+                          "xx": 219375.0,
+                          "xy": -0.0,
+                          "yx": 0.0,
+                          "yy": 101250.0
+                        },
+                        "panToCenterPerZoom": {
+                          "xx": 202500.0,
+                          "xy": -0.0,
+                          "yx": 0.0,
+                          "yy": 135000.0
+                        },
+                        "sizePerZoom": {
+                          "height": 270000.0,
+                          "width": 405000.0
+                        },
+                        "zoomRange": {
+                          "maximum": 4.0,
+                          "minimum": 1.0
+                        }
+                      },
+                      "rotationDegrees": 0.0
+                    },
+                    "zIndex": 1
+                  }
+                ],
+                "heightUm": 300000,
+                "number": 1,
+                "overlays": [],
+                "sheetId": "sheet-001",
+                "widthUm": 600000
+              },
+              {
+                "activeSides": "both",
+                "backgrounds": [
+                  {
+                    "drawRect": {
+                      "height": 300000,
+                      "width": 600000,
+                      "x": 0,
+                      "y": 0
+                    },
+                    "kind": "color",
+                    "rgb": "#FFFFFF"
+                  }
+                ],
+                "base": {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "rgb": "#FFFFFF"
+                },
+                "frames": [],
+                "heightUm": 300000,
+                "number": 2,
+                "overlays": [],
+                "sheetId": "sheet-002",
+                "widthUm": 600000
+              }
+            ]
+          },
+          "mediaUsage": [
+            {
+              "count": 2,
+              "mediaId": "00000000-0000-4000-8000-000000000010"
+            }
+          ],
+          "state": {
+            "album": {
+              "media": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000010",
+                  "kind": "photo",
+                  "name": "Foto.jpg",
+                  "palette": [
+                    "#C22C24",
+                    "#248044",
+                    "#2454C2"
+                  ],
+                  "sourceHeightPx": 400,
+                  "sourceWidthPx": 600
+                }
+              ],
+              "sheets": [
+                {
+                  "activeSides": "both",
+                  "frames": [
+                    {
+                      "id": "00000000-0000-4000-8000-000000000101",
+                      "photo": {
+                        "mediaId": "00000000-0000-4000-8000-000000000010",
+                        "transform": {
+                          "blackAndWhite": false,
+                          "fineRotationDegrees": 0.0,
+                          "mirrorX": false,
+                          "panX": 0.25,
+                          "panY": -0.5,
+                          "quarterTurns": 0,
+                          "userZoom": 1.75
+                        }
+                      },
+                      "rect": {
+                        "height": 270000,
+                        "width": 180000,
+                        "x": 347500,
+                        "y": 15000
+                      },
+                      "style": {
+                        "borderRgb": "#205070",
+                        "borderWidthUm": 2000,
+                        "opacityPercent": 60,
+                        "source": "custom"
+                      },
+                      "zIndex": 0
+                    },
+                    {
+                      "id": "00000000-0000-4000-8000-000000000103",
+                      "photo": {
+                        "mediaId": "00000000-0000-4000-8000-000000000010",
+                        "transform": {
+                          "blackAndWhite": false,
+                          "fineRotationDegrees": 0.0,
+                          "mirrorX": false,
+                          "panX": 0.25,
+                          "panY": -0.5,
+                          "quarterTurns": 0,
+                          "userZoom": 1.75
+                        }
+                      },
+                      "rect": {
+                        "height": 270000,
+                        "width": 270000,
+                        "x": 72500,
+                        "y": 15000
+                      },
+                      "style": {
+                        "borderRgb": "#000000",
+                        "borderWidthUm": 0,
+                        "opacityPercent": 100,
+                        "source": "album"
+                      },
+                      "zIndex": 1
+                    }
+                  ],
+                  "heightUm": 300000,
+                  "id": "sheet-001",
+                  "layoutLocked": false,
+                  "number": 1,
+                  "pageNumbers": [
+                    1,
+                    2
+                  ],
+                  "role": "initial",
+                  "widthUm": 600000
+                },
+                {
+                  "activeSides": "both",
+                  "frames": [],
+                  "heightUm": 300000,
+                  "id": "sheet-002",
+                  "layoutLocked": false,
+                  "number": 2,
+                  "pageNumbers": [
+                    3,
+                    4
+                  ],
+                  "role": "final",
+                  "widthUm": 600000
+                }
+              ],
+              "visualDefaults": {
+                "background": {
+                  "both": {
+                    "kind": "color",
+                    "rgb": "#FFFFFF"
+                  },
+                  "scope": "bothSides"
+                },
+                "frameBorder": {
+                  "kind": "none"
+                },
+                "overlay": {
+                  "both": null,
+                  "scope": "bothSides"
+                }
+              }
+            },
+            "canRedo": false,
+            "canUndo": true,
+            "dirty": true,
+            "document": {
+              "bleedUm": 3000,
+              "displayUnit": "mm",
+              "dpi": 300,
+              "safetyUm": 3000,
+              "sheetHeightUm": 300000,
+              "sheetWidthUm": 600000
+            },
+            "projectId": "550e8400-e29b-41d4-a716-446655440000",
+            "projectName": "Layouts",
+            "revision": 15,
+            "savedRevision": 9
+          }
+        },
+        "queries": {
+          "sheet-001": {
+            "previews": [
+              [
+                {
+                  "border": {
+                    "kind": "solid",
+                    "rgb": "#205070",
+                    "widthUm": 2000
+                  },
+                  "borderFillRects": [
+                    {
+                      "height": 2000,
+                      "width": 180000,
+                      "x": 347500,
+                      "y": 15000
+                    },
+                    {
+                      "height": 2000,
+                      "width": 180000,
+                      "x": 347500,
+                      "y": 283000
+                    },
+                    {
+                      "height": 266000,
+                      "width": 2000,
+                      "x": 347500,
+                      "y": 17000
+                    },
+                    {
+                      "height": 266000,
+                      "width": 2000,
+                      "x": 525500,
+                      "y": 17000
+                    }
+                  ],
+                  "clipRect": {
+                    "height": 270000,
+                    "width": 180000,
+                    "x": 347500,
+                    "y": 15000
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000101",
+                  "opacityByte": 153,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 472500,
+                      "width": 708750,
+                      "x": 149219,
+                      "y": -136875
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#C22C24",
+                      "#248044",
+                      "#2454C2"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 675.0,
+                      "current": {
+                        "center": {
+                          "x": 156093.75,
+                          "y": 84375.0
+                        },
+                        "size": {
+                          "height": 472500.0,
+                          "width": 708750.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.25,
+                        "y": -0.5
+                      },
+                      "currentZoom": 1.75,
+                      "panOrigin": {
+                        "x": 90000.0,
+                        "y": 135000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 264375.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 101250.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 202500.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 135000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 270000.0,
+                        "width": 405000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 270000,
+                    "width": 270000,
+                    "x": 72500,
+                    "y": 15000
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000103",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 472500,
+                      "width": 708750,
+                      "x": -92031,
+                      "y": -136875
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#C22C24",
+                      "#248044",
+                      "#2454C2"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 675.0,
+                      "current": {
+                        "center": {
+                          "x": 189843.75,
+                          "y": 84375.0
+                        },
+                        "size": {
+                          "height": 472500.0,
+                          "width": 708750.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.25,
+                        "y": -0.5
+                      },
+                      "currentZoom": 1.75,
+                      "panOrigin": {
+                        "x": 135000.0,
+                        "y": 135000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 219375.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 101250.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 202500.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 135000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 270000.0,
+                        "width": 405000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 1
+                }
+              ],
+              [
+                {
+                  "border": {
+                    "kind": "solid",
+                    "rgb": "#205070",
+                    "widthUm": 2000
+                  },
+                  "borderFillRects": [
+                    {
+                      "height": 2000,
+                      "width": 180000,
+                      "x": 360000,
+                      "y": 15000
+                    },
+                    {
+                      "height": 2000,
+                      "width": 180000,
+                      "x": 360000,
+                      "y": 283000
+                    },
+                    {
+                      "height": 266000,
+                      "width": 2000,
+                      "x": 360000,
+                      "y": 17000
+                    },
+                    {
+                      "height": 266000,
+                      "width": 2000,
+                      "x": 538000,
+                      "y": 17000
+                    }
+                  ],
+                  "clipRect": {
+                    "height": 270000,
+                    "width": 180000,
+                    "x": 360000,
+                    "y": 15000
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000101",
+                  "opacityByte": 153,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 472500,
+                      "width": 708750,
+                      "x": 161719,
+                      "y": -136875
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#C22C24",
+                      "#248044",
+                      "#2454C2"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 675.0,
+                      "current": {
+                        "center": {
+                          "x": 156093.75,
+                          "y": 84375.0
+                        },
+                        "size": {
+                          "height": 472500.0,
+                          "width": 708750.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.25,
+                        "y": -0.5
+                      },
+                      "currentZoom": 1.75,
+                      "panOrigin": {
+                        "x": 90000.0,
+                        "y": 135000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 264375.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 101250.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 202500.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 135000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 270000.0,
+                        "width": 405000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 270000,
+                    "width": 270000,
+                    "x": 15000,
+                    "y": 15000
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000103",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 472500,
+                      "width": 708750,
+                      "x": -149531,
+                      "y": -136875
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#C22C24",
+                      "#248044",
+                      "#2454C2"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 675.0,
+                      "current": {
+                        "center": {
+                          "x": 189843.75,
+                          "y": 84375.0
+                        },
+                        "size": {
+                          "height": 472500.0,
+                          "width": 708750.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.25,
+                        "y": -0.5
+                      },
+                      "currentZoom": 1.75,
+                      "panOrigin": {
+                        "x": 135000.0,
+                        "y": 135000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 219375.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 101250.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 202500.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 135000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 270000.0,
+                        "width": 405000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 1
+                }
+              ],
+              [
+                {
+                  "border": {
+                    "kind": "solid",
+                    "rgb": "#205070",
+                    "widthUm": 2000
+                  },
+                  "borderFillRects": [
+                    {
+                      "height": 2000,
+                      "width": 180000,
+                      "x": 60000,
+                      "y": 15000
+                    },
+                    {
+                      "height": 2000,
+                      "width": 180000,
+                      "x": 60000,
+                      "y": 283000
+                    },
+                    {
+                      "height": 266000,
+                      "width": 2000,
+                      "x": 60000,
+                      "y": 17000
+                    },
+                    {
+                      "height": 266000,
+                      "width": 2000,
+                      "x": 238000,
+                      "y": 17000
+                    }
+                  ],
+                  "clipRect": {
+                    "height": 270000,
+                    "width": 180000,
+                    "x": 60000,
+                    "y": 15000
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000101",
+                  "opacityByte": 153,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 472500,
+                      "width": 708750,
+                      "x": -138281,
+                      "y": -136875
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#C22C24",
+                      "#248044",
+                      "#2454C2"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 675.0,
+                      "current": {
+                        "center": {
+                          "x": 156093.75,
+                          "y": 84375.0
+                        },
+                        "size": {
+                          "height": 472500.0,
+                          "width": 708750.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.25,
+                        "y": -0.5
+                      },
+                      "currentZoom": 1.75,
+                      "panOrigin": {
+                        "x": 90000.0,
+                        "y": 135000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 264375.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 101250.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 202500.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 135000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 270000.0,
+                        "width": 405000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 270000,
+                    "width": 270000,
+                    "x": 315000,
+                    "y": 15000
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000103",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 472500,
+                      "width": 708750,
+                      "x": 150469,
+                      "y": -136875
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#C22C24",
+                      "#248044",
+                      "#2454C2"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 675.0,
+                      "current": {
+                        "center": {
+                          "x": 189843.75,
+                          "y": 84375.0
+                        },
+                        "size": {
+                          "height": 472500.0,
+                          "width": 708750.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.25,
+                        "y": -0.5
+                      },
+                      "currentZoom": 1.75,
+                      "panOrigin": {
+                        "x": 135000.0,
+                        "y": 135000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 219375.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 101250.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 202500.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 135000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 270000.0,
+                        "width": 405000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 1
+                }
+              ],
+              [
+                {
+                  "border": {
+                    "kind": "solid",
+                    "rgb": "#205070",
+                    "widthUm": 2000
+                  },
+                  "borderFillRects": [
+                    {
+                      "height": 2000,
+                      "width": 180000,
+                      "x": 72500,
+                      "y": 15000
+                    },
+                    {
+                      "height": 2000,
+                      "width": 180000,
+                      "x": 72500,
+                      "y": 283000
+                    },
+                    {
+                      "height": 266000,
+                      "width": 2000,
+                      "x": 72500,
+                      "y": 17000
+                    },
+                    {
+                      "height": 266000,
+                      "width": 2000,
+                      "x": 250500,
+                      "y": 17000
+                    }
+                  ],
+                  "clipRect": {
+                    "height": 270000,
+                    "width": 180000,
+                    "x": 72500,
+                    "y": 15000
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000101",
+                  "opacityByte": 153,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 472500,
+                      "width": 708750,
+                      "x": -125781,
+                      "y": -136875
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#C22C24",
+                      "#248044",
+                      "#2454C2"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 675.0,
+                      "current": {
+                        "center": {
+                          "x": 156093.75,
+                          "y": 84375.0
+                        },
+                        "size": {
+                          "height": 472500.0,
+                          "width": 708750.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.25,
+                        "y": -0.5
+                      },
+                      "currentZoom": 1.75,
+                      "panOrigin": {
+                        "x": 90000.0,
+                        "y": 135000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 264375.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 101250.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 202500.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 135000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 270000.0,
+                        "width": 405000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 270000,
+                    "width": 270000,
+                    "x": 257500,
+                    "y": 15000
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000103",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 472500,
+                      "width": 708750,
+                      "x": 92969,
+                      "y": -136875
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#C22C24",
+                      "#248044",
+                      "#2454C2"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 675.0,
+                      "current": {
+                        "center": {
+                          "x": 189843.75,
+                          "y": 84375.0
+                        },
+                        "size": {
+                          "height": 472500.0,
+                          "width": 708750.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.25,
+                        "y": -0.5
+                      },
+                      "currentZoom": 1.75,
+                      "panOrigin": {
+                        "x": 135000.0,
+                        "y": 135000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 219375.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 101250.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 202500.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 135000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 270000.0,
+                        "width": 405000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 1
+                }
+              ]
+            ],
+            "query": {
+              "catalogRevision": 0,
+              "frameCount": 2,
+              "listing": {
+                "algorithmVersion": 1,
+                "candidates": [
+                  {
+                    "customId": null,
+                    "favoriteId": null,
+                    "isLastApplied": true,
+                    "layout": {
+                      "definition": {
+                        "positions": [
+                          {
+                            "height": 270000,
+                            "width": 180000,
+                            "x": 347500,
+                            "y": 15000
+                          },
+                          {
+                            "height": 270000,
+                            "width": 270000,
+                            "x": 72500,
+                            "y": 15000
+                          }
+                        ],
+                        "scope": "sheet",
+                        "surface": {
+                          "heightUm": 300000,
+                          "type": "doubleSheet",
+                          "widthUm": 600000
+                        }
+                      },
+                      "origin": "automatic"
+                    }
+                  },
+                  {
+                    "customId": null,
+                    "favoriteId": null,
+                    "isLastApplied": false,
+                    "layout": {
+                      "definition": {
+                        "positions": [
+                          {
+                            "height": 270000,
+                            "width": 180000,
+                            "x": 360000,
+                            "y": 15000
+                          },
+                          {
+                            "height": 270000,
+                            "width": 270000,
+                            "x": 15000,
+                            "y": 15000
+                          }
+                        ],
+                        "scope": "page",
+                        "surface": {
+                          "heightUm": 300000,
+                          "type": "doubleSheet",
+                          "widthUm": 600000
+                        }
+                      },
+                      "origin": "automatic"
+                    }
+                  },
+                  {
+                    "customId": null,
+                    "favoriteId": null,
+                    "isLastApplied": false,
+                    "layout": {
+                      "definition": {
+                        "positions": [
+                          {
+                            "height": 270000,
+                            "width": 180000,
+                            "x": 60000,
+                            "y": 15000
+                          },
+                          {
+                            "height": 270000,
+                            "width": 270000,
+                            "x": 315000,
+                            "y": 15000
+                          }
+                        ],
+                        "scope": "page",
+                        "surface": {
+                          "heightUm": 300000,
+                          "type": "doubleSheet",
+                          "widthUm": 600000
+                        }
+                      },
+                      "origin": "automatic"
+                    }
+                  },
+                  {
+                    "customId": null,
+                    "favoriteId": null,
+                    "isLastApplied": false,
+                    "layout": {
+                      "definition": {
+                        "positions": [
+                          {
+                            "height": 270000,
+                            "width": 180000,
+                            "x": 72500,
+                            "y": 15000
+                          },
+                          {
+                            "height": 270000,
+                            "width": 270000,
+                            "x": 257500,
+                            "y": 15000
+                          }
+                        ],
+                        "scope": "sheet",
+                        "surface": {
+                          "heightUm": 300000,
+                          "type": "doubleSheet",
+                          "widthUm": 600000
+                        }
+                      },
+                      "origin": "automatic"
+                    }
+                  }
+                ],
+                "generationStatus": "candidates"
+              },
+              "locked": false,
+              "projectId": "550e8400-e29b-41d4-a716-446655440000",
+              "queryId": "expanded-reduced-sheet-001",
+              "revision": 15,
+              "settings": {
+                "gapUm": 5000,
+                "marginUm": 15000,
+                "minimumSideUm": 20000,
+                "permission": "pagesAndSheet"
+              },
+              "sheetId": "sheet-001"
+            }
+          },
+          "sheet-002": {
+            "previews": [],
+            "query": {
+              "catalogRevision": 0,
+              "frameCount": 0,
+              "listing": {
+                "algorithmVersion": 1,
+                "candidates": [],
+                "generationStatus": "empty"
+              },
+              "locked": false,
+              "projectId": "550e8400-e29b-41d4-a716-446655440000",
+              "queryId": "expanded-reduced-sheet-002",
+              "revision": 15,
+              "settings": {
+                "gapUm": 5000,
+                "marginUm": 15000,
+                "minimumSideUm": 20000,
+                "permission": "pagesAndSheet"
+              },
+              "sheetId": "sheet-002"
+            }
+          }
+        }
+      },
+      "reducedLocked": {
+        "projection": {
+          "canPasteFrames": false,
+          "composition": {
+            "frameBorder": {
+              "kind": "none"
+            },
+            "sheets": [
+              {
+                "activeSides": "both",
+                "backgrounds": [
+                  {
+                    "drawRect": {
+                      "height": 300000,
+                      "width": 600000,
+                      "x": 0,
+                      "y": 0
+                    },
+                    "kind": "color",
+                    "rgb": "#FFFFFF"
+                  }
+                ],
+                "base": {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "rgb": "#FFFFFF"
+                },
+                "frames": [
+                  {
+                    "border": {
+                      "kind": "solid",
+                      "rgb": "#205070",
+                      "widthUm": 2000
+                    },
+                    "borderFillRects": [
+                      {
+                        "height": 2000,
+                        "width": 180000,
+                        "x": 347500,
+                        "y": 15000
+                      },
+                      {
+                        "height": 2000,
+                        "width": 180000,
+                        "x": 347500,
+                        "y": 283000
+                      },
+                      {
+                        "height": 266000,
+                        "width": 2000,
+                        "x": 347500,
+                        "y": 17000
+                      },
+                      {
+                        "height": 266000,
+                        "width": 2000,
+                        "x": 525500,
+                        "y": 17000
+                      }
+                    ],
+                    "clipRect": {
+                      "height": 270000,
+                      "width": 180000,
+                      "x": 347500,
+                      "y": 15000
+                    },
+                    "frameId": "00000000-0000-4000-8000-000000000101",
+                    "opacityByte": 153,
+                    "photo": {
+                      "blackAndWhite": false,
+                      "drawRect": {
+                        "height": 472500,
+                        "width": 708750,
+                        "x": 149219,
+                        "y": -136875
+                      },
+                      "mediaId": "00000000-0000-4000-8000-000000000010",
+                      "mirrorX": false,
+                      "name": "Foto.jpg",
+                      "palette": [
+                        "#C22C24",
+                        "#248044",
+                        "#2454C2"
+                      ],
+                      "placement": {
+                        "baseFillZoom": 675.0,
+                        "current": {
+                          "center": {
+                            "x": 156093.75,
+                            "y": 84375.0
+                          },
+                          "size": {
+                            "height": 472500.0,
+                            "width": 708750.0
+                          }
+                        },
+                        "currentPan": {
+                          "x": 0.25,
+                          "y": -0.5
+                        },
+                        "currentZoom": 1.75,
+                        "panOrigin": {
+                          "x": 90000.0,
+                          "y": 135000.0
+                        },
+                        "panRange": {
+                          "maximum": 1.0,
+                          "minimum": -1.0
+                        },
+                        "panToCenter": {
+                          "xx": 264375.0,
+                          "xy": -0.0,
+                          "yx": 0.0,
+                          "yy": 101250.0
+                        },
+                        "panToCenterPerZoom": {
+                          "xx": 202500.0,
+                          "xy": -0.0,
+                          "yx": 0.0,
+                          "yy": 135000.0
+                        },
+                        "sizePerZoom": {
+                          "height": 270000.0,
+                          "width": 405000.0
+                        },
+                        "zoomRange": {
+                          "maximum": 4.0,
+                          "minimum": 1.0
+                        }
+                      },
+                      "rotationDegrees": 0.0
+                    },
+                    "zIndex": 0
+                  },
+                  {
+                    "border": {
+                      "kind": "none"
+                    },
+                    "borderFillRects": [],
+                    "clipRect": {
+                      "height": 270000,
+                      "width": 270000,
+                      "x": 72500,
+                      "y": 15000
+                    },
+                    "frameId": "00000000-0000-4000-8000-000000000103",
+                    "opacityByte": 255,
+                    "photo": {
+                      "blackAndWhite": false,
+                      "drawRect": {
+                        "height": 472500,
+                        "width": 708750,
+                        "x": -92031,
+                        "y": -136875
+                      },
+                      "mediaId": "00000000-0000-4000-8000-000000000010",
+                      "mirrorX": false,
+                      "name": "Foto.jpg",
+                      "palette": [
+                        "#C22C24",
+                        "#248044",
+                        "#2454C2"
+                      ],
+                      "placement": {
+                        "baseFillZoom": 675.0,
+                        "current": {
+                          "center": {
+                            "x": 189843.75,
+                            "y": 84375.0
+                          },
+                          "size": {
+                            "height": 472500.0,
+                            "width": 708750.0
+                          }
+                        },
+                        "currentPan": {
+                          "x": 0.25,
+                          "y": -0.5
+                        },
+                        "currentZoom": 1.75,
+                        "panOrigin": {
+                          "x": 135000.0,
+                          "y": 135000.0
+                        },
+                        "panRange": {
+                          "maximum": 1.0,
+                          "minimum": -1.0
+                        },
+                        "panToCenter": {
+                          "xx": 219375.0,
+                          "xy": -0.0,
+                          "yx": 0.0,
+                          "yy": 101250.0
+                        },
+                        "panToCenterPerZoom": {
+                          "xx": 202500.0,
+                          "xy": -0.0,
+                          "yx": 0.0,
+                          "yy": 135000.0
+                        },
+                        "sizePerZoom": {
+                          "height": 270000.0,
+                          "width": 405000.0
+                        },
+                        "zoomRange": {
+                          "maximum": 4.0,
+                          "minimum": 1.0
+                        }
+                      },
+                      "rotationDegrees": 0.0
+                    },
+                    "zIndex": 1
+                  }
+                ],
+                "heightUm": 300000,
+                "number": 1,
+                "overlays": [],
+                "sheetId": "sheet-001",
+                "widthUm": 600000
+              },
+              {
+                "activeSides": "both",
+                "backgrounds": [
+                  {
+                    "drawRect": {
+                      "height": 300000,
+                      "width": 600000,
+                      "x": 0,
+                      "y": 0
+                    },
+                    "kind": "color",
+                    "rgb": "#FFFFFF"
+                  }
+                ],
+                "base": {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "rgb": "#FFFFFF"
+                },
+                "frames": [],
+                "heightUm": 300000,
+                "number": 2,
+                "overlays": [],
+                "sheetId": "sheet-002",
+                "widthUm": 600000
+              }
+            ]
+          },
+          "mediaUsage": [
+            {
+              "count": 2,
+              "mediaId": "00000000-0000-4000-8000-000000000010"
+            }
+          ],
+          "state": {
+            "album": {
+              "media": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000010",
+                  "kind": "photo",
+                  "name": "Foto.jpg",
+                  "palette": [
+                    "#C22C24",
+                    "#248044",
+                    "#2454C2"
+                  ],
+                  "sourceHeightPx": 400,
+                  "sourceWidthPx": 600
+                }
+              ],
+              "sheets": [
+                {
+                  "activeSides": "both",
+                  "frames": [
+                    {
+                      "id": "00000000-0000-4000-8000-000000000101",
+                      "photo": {
+                        "mediaId": "00000000-0000-4000-8000-000000000010",
+                        "transform": {
+                          "blackAndWhite": false,
+                          "fineRotationDegrees": 0.0,
+                          "mirrorX": false,
+                          "panX": 0.25,
+                          "panY": -0.5,
+                          "quarterTurns": 0,
+                          "userZoom": 1.75
+                        }
+                      },
+                      "rect": {
+                        "height": 270000,
+                        "width": 180000,
+                        "x": 347500,
+                        "y": 15000
+                      },
+                      "style": {
+                        "borderRgb": "#205070",
+                        "borderWidthUm": 2000,
+                        "opacityPercent": 60,
+                        "source": "custom"
+                      },
+                      "zIndex": 0
+                    },
+                    {
+                      "id": "00000000-0000-4000-8000-000000000103",
+                      "photo": {
+                        "mediaId": "00000000-0000-4000-8000-000000000010",
+                        "transform": {
+                          "blackAndWhite": false,
+                          "fineRotationDegrees": 0.0,
+                          "mirrorX": false,
+                          "panX": 0.25,
+                          "panY": -0.5,
+                          "quarterTurns": 0,
+                          "userZoom": 1.75
+                        }
+                      },
+                      "rect": {
+                        "height": 270000,
+                        "width": 270000,
+                        "x": 72500,
+                        "y": 15000
+                      },
+                      "style": {
+                        "borderRgb": "#000000",
+                        "borderWidthUm": 0,
+                        "opacityPercent": 100,
+                        "source": "album"
+                      },
+                      "zIndex": 1
+                    }
+                  ],
+                  "heightUm": 300000,
+                  "id": "sheet-001",
+                  "layoutLocked": true,
+                  "number": 1,
+                  "pageNumbers": [
+                    1,
+                    2
+                  ],
+                  "role": "initial",
+                  "widthUm": 600000
+                },
+                {
+                  "activeSides": "both",
+                  "frames": [],
+                  "heightUm": 300000,
+                  "id": "sheet-002",
+                  "layoutLocked": false,
+                  "number": 2,
+                  "pageNumbers": [
+                    3,
+                    4
+                  ],
+                  "role": "final",
+                  "widthUm": 600000
+                }
+              ],
+              "visualDefaults": {
+                "background": {
+                  "both": {
+                    "kind": "color",
+                    "rgb": "#FFFFFF"
+                  },
+                  "scope": "bothSides"
+                },
+                "frameBorder": {
+                  "kind": "none"
+                },
+                "overlay": {
+                  "both": null,
+                  "scope": "bothSides"
+                }
+              }
+            },
+            "canRedo": false,
+            "canUndo": true,
+            "dirty": true,
+            "document": {
+              "bleedUm": 3000,
+              "displayUnit": "mm",
+              "dpi": 300,
+              "safetyUm": 3000,
+              "sheetHeightUm": 300000,
+              "sheetWidthUm": 600000
+            },
+            "projectId": "550e8400-e29b-41d4-a716-446655440000",
+            "projectName": "Layouts",
+            "revision": 16,
+            "savedRevision": 9
+          }
+        },
+        "queries": {
+          "sheet-001": {
+            "previews": [
+              [
+                {
+                  "border": {
+                    "kind": "solid",
+                    "rgb": "#205070",
+                    "widthUm": 2000
+                  },
+                  "borderFillRects": [
+                    {
+                      "height": 2000,
+                      "width": 180000,
+                      "x": 347500,
+                      "y": 15000
+                    },
+                    {
+                      "height": 2000,
+                      "width": 180000,
+                      "x": 347500,
+                      "y": 283000
+                    },
+                    {
+                      "height": 266000,
+                      "width": 2000,
+                      "x": 347500,
+                      "y": 17000
+                    },
+                    {
+                      "height": 266000,
+                      "width": 2000,
+                      "x": 525500,
+                      "y": 17000
+                    }
+                  ],
+                  "clipRect": {
+                    "height": 270000,
+                    "width": 180000,
+                    "x": 347500,
+                    "y": 15000
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000101",
+                  "opacityByte": 153,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 472500,
+                      "width": 708750,
+                      "x": 149219,
+                      "y": -136875
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#C22C24",
+                      "#248044",
+                      "#2454C2"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 675.0,
+                      "current": {
+                        "center": {
+                          "x": 156093.75,
+                          "y": 84375.0
+                        },
+                        "size": {
+                          "height": 472500.0,
+                          "width": 708750.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.25,
+                        "y": -0.5
+                      },
+                      "currentZoom": 1.75,
+                      "panOrigin": {
+                        "x": 90000.0,
+                        "y": 135000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 264375.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 101250.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 202500.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 135000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 270000.0,
+                        "width": 405000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 270000,
+                    "width": 270000,
+                    "x": 72500,
+                    "y": 15000
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000103",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 472500,
+                      "width": 708750,
+                      "x": -92031,
+                      "y": -136875
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#C22C24",
+                      "#248044",
+                      "#2454C2"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 675.0,
+                      "current": {
+                        "center": {
+                          "x": 189843.75,
+                          "y": 84375.0
+                        },
+                        "size": {
+                          "height": 472500.0,
+                          "width": 708750.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.25,
+                        "y": -0.5
+                      },
+                      "currentZoom": 1.75,
+                      "panOrigin": {
+                        "x": 135000.0,
+                        "y": 135000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 219375.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 101250.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 202500.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 135000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 270000.0,
+                        "width": 405000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 1
+                }
+              ],
+              [
+                {
+                  "border": {
+                    "kind": "solid",
+                    "rgb": "#205070",
+                    "widthUm": 2000
+                  },
+                  "borderFillRects": [
+                    {
+                      "height": 2000,
+                      "width": 180000,
+                      "x": 360000,
+                      "y": 15000
+                    },
+                    {
+                      "height": 2000,
+                      "width": 180000,
+                      "x": 360000,
+                      "y": 283000
+                    },
+                    {
+                      "height": 266000,
+                      "width": 2000,
+                      "x": 360000,
+                      "y": 17000
+                    },
+                    {
+                      "height": 266000,
+                      "width": 2000,
+                      "x": 538000,
+                      "y": 17000
+                    }
+                  ],
+                  "clipRect": {
+                    "height": 270000,
+                    "width": 180000,
+                    "x": 360000,
+                    "y": 15000
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000101",
+                  "opacityByte": 153,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 472500,
+                      "width": 708750,
+                      "x": 161719,
+                      "y": -136875
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#C22C24",
+                      "#248044",
+                      "#2454C2"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 675.0,
+                      "current": {
+                        "center": {
+                          "x": 156093.75,
+                          "y": 84375.0
+                        },
+                        "size": {
+                          "height": 472500.0,
+                          "width": 708750.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.25,
+                        "y": -0.5
+                      },
+                      "currentZoom": 1.75,
+                      "panOrigin": {
+                        "x": 90000.0,
+                        "y": 135000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 264375.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 101250.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 202500.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 135000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 270000.0,
+                        "width": 405000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 270000,
+                    "width": 270000,
+                    "x": 15000,
+                    "y": 15000
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000103",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 472500,
+                      "width": 708750,
+                      "x": -149531,
+                      "y": -136875
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#C22C24",
+                      "#248044",
+                      "#2454C2"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 675.0,
+                      "current": {
+                        "center": {
+                          "x": 189843.75,
+                          "y": 84375.0
+                        },
+                        "size": {
+                          "height": 472500.0,
+                          "width": 708750.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.25,
+                        "y": -0.5
+                      },
+                      "currentZoom": 1.75,
+                      "panOrigin": {
+                        "x": 135000.0,
+                        "y": 135000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 219375.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 101250.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 202500.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 135000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 270000.0,
+                        "width": 405000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 1
+                }
+              ],
+              [
+                {
+                  "border": {
+                    "kind": "solid",
+                    "rgb": "#205070",
+                    "widthUm": 2000
+                  },
+                  "borderFillRects": [
+                    {
+                      "height": 2000,
+                      "width": 180000,
+                      "x": 60000,
+                      "y": 15000
+                    },
+                    {
+                      "height": 2000,
+                      "width": 180000,
+                      "x": 60000,
+                      "y": 283000
+                    },
+                    {
+                      "height": 266000,
+                      "width": 2000,
+                      "x": 60000,
+                      "y": 17000
+                    },
+                    {
+                      "height": 266000,
+                      "width": 2000,
+                      "x": 238000,
+                      "y": 17000
+                    }
+                  ],
+                  "clipRect": {
+                    "height": 270000,
+                    "width": 180000,
+                    "x": 60000,
+                    "y": 15000
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000101",
+                  "opacityByte": 153,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 472500,
+                      "width": 708750,
+                      "x": -138281,
+                      "y": -136875
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#C22C24",
+                      "#248044",
+                      "#2454C2"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 675.0,
+                      "current": {
+                        "center": {
+                          "x": 156093.75,
+                          "y": 84375.0
+                        },
+                        "size": {
+                          "height": 472500.0,
+                          "width": 708750.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.25,
+                        "y": -0.5
+                      },
+                      "currentZoom": 1.75,
+                      "panOrigin": {
+                        "x": 90000.0,
+                        "y": 135000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 264375.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 101250.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 202500.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 135000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 270000.0,
+                        "width": 405000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 270000,
+                    "width": 270000,
+                    "x": 315000,
+                    "y": 15000
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000103",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 472500,
+                      "width": 708750,
+                      "x": 150469,
+                      "y": -136875
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#C22C24",
+                      "#248044",
+                      "#2454C2"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 675.0,
+                      "current": {
+                        "center": {
+                          "x": 189843.75,
+                          "y": 84375.0
+                        },
+                        "size": {
+                          "height": 472500.0,
+                          "width": 708750.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.25,
+                        "y": -0.5
+                      },
+                      "currentZoom": 1.75,
+                      "panOrigin": {
+                        "x": 135000.0,
+                        "y": 135000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 219375.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 101250.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 202500.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 135000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 270000.0,
+                        "width": 405000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 1
+                }
+              ],
+              [
+                {
+                  "border": {
+                    "kind": "solid",
+                    "rgb": "#205070",
+                    "widthUm": 2000
+                  },
+                  "borderFillRects": [
+                    {
+                      "height": 2000,
+                      "width": 180000,
+                      "x": 72500,
+                      "y": 15000
+                    },
+                    {
+                      "height": 2000,
+                      "width": 180000,
+                      "x": 72500,
+                      "y": 283000
+                    },
+                    {
+                      "height": 266000,
+                      "width": 2000,
+                      "x": 72500,
+                      "y": 17000
+                    },
+                    {
+                      "height": 266000,
+                      "width": 2000,
+                      "x": 250500,
+                      "y": 17000
+                    }
+                  ],
+                  "clipRect": {
+                    "height": 270000,
+                    "width": 180000,
+                    "x": 72500,
+                    "y": 15000
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000101",
+                  "opacityByte": 153,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 472500,
+                      "width": 708750,
+                      "x": -125781,
+                      "y": -136875
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#C22C24",
+                      "#248044",
+                      "#2454C2"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 675.0,
+                      "current": {
+                        "center": {
+                          "x": 156093.75,
+                          "y": 84375.0
+                        },
+                        "size": {
+                          "height": 472500.0,
+                          "width": 708750.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.25,
+                        "y": -0.5
+                      },
+                      "currentZoom": 1.75,
+                      "panOrigin": {
+                        "x": 90000.0,
+                        "y": 135000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 264375.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 101250.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 202500.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 135000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 270000.0,
+                        "width": 405000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 270000,
+                    "width": 270000,
+                    "x": 257500,
+                    "y": 15000
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000103",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 472500,
+                      "width": 708750,
+                      "x": 92969,
+                      "y": -136875
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#C22C24",
+                      "#248044",
+                      "#2454C2"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 675.0,
+                      "current": {
+                        "center": {
+                          "x": 189843.75,
+                          "y": 84375.0
+                        },
+                        "size": {
+                          "height": 472500.0,
+                          "width": 708750.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.25,
+                        "y": -0.5
+                      },
+                      "currentZoom": 1.75,
+                      "panOrigin": {
+                        "x": 135000.0,
+                        "y": 135000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 219375.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 101250.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 202500.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 135000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 270000.0,
+                        "width": 405000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 1
+                }
+              ]
+            ],
+            "query": {
+              "catalogRevision": 0,
+              "frameCount": 2,
+              "listing": {
+                "algorithmVersion": 1,
+                "candidates": [
+                  {
+                    "customId": null,
+                    "favoriteId": null,
+                    "isLastApplied": true,
+                    "layout": {
+                      "definition": {
+                        "positions": [
+                          {
+                            "height": 270000,
+                            "width": 180000,
+                            "x": 347500,
+                            "y": 15000
+                          },
+                          {
+                            "height": 270000,
+                            "width": 270000,
+                            "x": 72500,
+                            "y": 15000
+                          }
+                        ],
+                        "scope": "sheet",
+                        "surface": {
+                          "heightUm": 300000,
+                          "type": "doubleSheet",
+                          "widthUm": 600000
+                        }
+                      },
+                      "origin": "automatic"
+                    }
+                  },
+                  {
+                    "customId": null,
+                    "favoriteId": null,
+                    "isLastApplied": false,
+                    "layout": {
+                      "definition": {
+                        "positions": [
+                          {
+                            "height": 270000,
+                            "width": 180000,
+                            "x": 360000,
+                            "y": 15000
+                          },
+                          {
+                            "height": 270000,
+                            "width": 270000,
+                            "x": 15000,
+                            "y": 15000
+                          }
+                        ],
+                        "scope": "page",
+                        "surface": {
+                          "heightUm": 300000,
+                          "type": "doubleSheet",
+                          "widthUm": 600000
+                        }
+                      },
+                      "origin": "automatic"
+                    }
+                  },
+                  {
+                    "customId": null,
+                    "favoriteId": null,
+                    "isLastApplied": false,
+                    "layout": {
+                      "definition": {
+                        "positions": [
+                          {
+                            "height": 270000,
+                            "width": 180000,
+                            "x": 60000,
+                            "y": 15000
+                          },
+                          {
+                            "height": 270000,
+                            "width": 270000,
+                            "x": 315000,
+                            "y": 15000
+                          }
+                        ],
+                        "scope": "page",
+                        "surface": {
+                          "heightUm": 300000,
+                          "type": "doubleSheet",
+                          "widthUm": 600000
+                        }
+                      },
+                      "origin": "automatic"
+                    }
+                  },
+                  {
+                    "customId": null,
+                    "favoriteId": null,
+                    "isLastApplied": false,
+                    "layout": {
+                      "definition": {
+                        "positions": [
+                          {
+                            "height": 270000,
+                            "width": 180000,
+                            "x": 72500,
+                            "y": 15000
+                          },
+                          {
+                            "height": 270000,
+                            "width": 270000,
+                            "x": 257500,
+                            "y": 15000
+                          }
+                        ],
+                        "scope": "sheet",
+                        "surface": {
+                          "heightUm": 300000,
+                          "type": "doubleSheet",
+                          "widthUm": 600000
+                        }
+                      },
+                      "origin": "automatic"
+                    }
+                  }
+                ],
+                "generationStatus": "candidates"
+              },
+              "locked": true,
+              "projectId": "550e8400-e29b-41d4-a716-446655440000",
+              "queryId": "expanded-reducedLocked-sheet-001",
+              "revision": 16,
+              "settings": {
+                "gapUm": 5000,
+                "marginUm": 15000,
+                "minimumSideUm": 20000,
+                "permission": "pagesAndSheet"
+              },
+              "sheetId": "sheet-001"
+            }
+          },
+          "sheet-002": {
+            "previews": [],
+            "query": {
+              "catalogRevision": 0,
+              "frameCount": 0,
+              "listing": {
+                "algorithmVersion": 1,
+                "candidates": [],
+                "generationStatus": "empty"
+              },
+              "locked": false,
+              "projectId": "550e8400-e29b-41d4-a716-446655440000",
+              "queryId": "expanded-reducedLocked-sheet-002",
+              "revision": 16,
+              "settings": {
+                "gapUm": 5000,
+                "marginUm": 15000,
+                "minimumSideUm": 20000,
+                "permission": "pagesAndSheet"
+              },
+              "sheetId": "sheet-002"
+            }
+          }
+        }
+      },
+      "reducedReady": {
+        "projection": {
+          "canPasteFrames": false,
+          "composition": {
+            "frameBorder": {
+              "kind": "none"
+            },
+            "sheets": [
+              {
+                "activeSides": "both",
+                "backgrounds": [
+                  {
+                    "drawRect": {
+                      "height": 300000,
+                      "width": 600000,
+                      "x": 0,
+                      "y": 0
+                    },
+                    "kind": "color",
+                    "rgb": "#FFFFFF"
+                  }
+                ],
+                "base": {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "rgb": "#FFFFFF"
+                },
+                "frames": [
+                  {
+                    "border": {
+                      "kind": "solid",
+                      "rgb": "#205070",
+                      "widthUm": 2000
+                    },
+                    "borderFillRects": [
+                      {
+                        "height": 2000,
+                        "width": 83705,
+                        "x": 201295,
+                        "y": 15000
+                      },
+                      {
+                        "height": 2000,
+                        "width": 83705,
+                        "x": 201295,
+                        "y": 150647
+                      },
+                      {
+                        "height": 133647,
+                        "width": 2000,
+                        "x": 201295,
+                        "y": 17000
+                      },
+                      {
+                        "height": 133647,
+                        "width": 2000,
+                        "x": 283000,
+                        "y": 17000
+                      }
+                    ],
+                    "clipRect": {
+                      "height": 137647,
+                      "width": 83705,
+                      "x": 201295,
+                      "y": 15000
+                    },
+                    "frameId": "00000000-0000-4000-8000-000000000101",
+                    "opacityByte": 153,
+                    "photo": {
+                      "blackAndWhite": false,
+                      "drawRect": {
+                        "height": 240883,
+                        "width": 361324,
+                        "x": 97188,
+                        "y": -62426
+                      },
+                      "mediaId": "00000000-0000-4000-8000-000000000010",
+                      "mirrorX": false,
+                      "name": "Foto.jpg",
+                      "palette": [
+                        "#C22C24",
+                        "#248044",
+                        "#2454C2"
+                      ],
+                      "placement": {
+                        "baseFillZoom": 344.1175,
+                        "current": {
+                          "center": {
+                            "x": 76554.796875,
+                            "y": 43014.6875
+                          },
+                          "size": {
+                            "height": 240882.25,
+                            "width": 361323.375
+                          }
+                        },
+                        "currentPan": {
+                          "x": 0.25,
+                          "y": -0.5
+                        },
+                        "currentZoom": 1.75,
+                        "panOrigin": {
+                          "x": 41852.5,
+                          "y": 68823.5
+                        },
+                        "panRange": {
+                          "maximum": 1.0,
+                          "minimum": -1.0
+                        },
+                        "panToCenter": {
+                          "xx": 138809.1875,
+                          "xy": -0.0,
+                          "yx": 0.0,
+                          "yy": 51617.625
+                        },
+                        "panToCenterPerZoom": {
+                          "xx": 103235.25,
+                          "xy": -0.0,
+                          "yx": 0.0,
+                          "yy": 68823.5
+                        },
+                        "sizePerZoom": {
+                          "height": 137647.0,
+                          "width": 206470.5
+                        },
+                        "zoomRange": {
+                          "maximum": 4.0,
+                          "minimum": 1.0
+                        }
+                      },
+                      "rotationDegrees": 0.0
+                    },
+                    "zIndex": 0
+                  },
+                  {
+                    "border": {
+                      "kind": "none"
+                    },
+                    "borderFillRects": [],
+                    "clipRect": {
+                      "height": 132500,
+                      "width": 181295,
+                      "x": 15000,
+                      "y": 15000
+                    },
+                    "frameId": "00000000-0000-4000-8000-000000000102",
+                    "opacityByte": 255,
+                    "photo": null,
+                    "zIndex": 1
+                  },
+                  {
+                    "border": {
+                      "kind": "none"
+                    },
+                    "borderFillRects": [],
+                    "clipRect": {
+                      "height": 270000,
+                      "width": 270000,
+                      "x": 315000,
+                      "y": 15000
+                    },
+                    "frameId": "00000000-0000-4000-8000-000000000103",
+                    "opacityByte": 255,
+                    "photo": {
+                      "blackAndWhite": false,
+                      "drawRect": {
+                        "height": 472500,
+                        "width": 708750,
+                        "x": 150469,
+                        "y": -136875
+                      },
+                      "mediaId": "00000000-0000-4000-8000-000000000010",
+                      "mirrorX": false,
+                      "name": "Foto.jpg",
+                      "palette": [
+                        "#C22C24",
+                        "#248044",
+                        "#2454C2"
+                      ],
+                      "placement": {
+                        "baseFillZoom": 675.0,
+                        "current": {
+                          "center": {
+                            "x": 189843.75,
+                            "y": 84375.0
+                          },
+                          "size": {
+                            "height": 472500.0,
+                            "width": 708750.0
+                          }
+                        },
+                        "currentPan": {
+                          "x": 0.25,
+                          "y": -0.5
+                        },
+                        "currentZoom": 1.75,
+                        "panOrigin": {
+                          "x": 135000.0,
+                          "y": 135000.0
+                        },
+                        "panRange": {
+                          "maximum": 1.0,
+                          "minimum": -1.0
+                        },
+                        "panToCenter": {
+                          "xx": 219375.0,
+                          "xy": -0.0,
+                          "yx": 0.0,
+                          "yy": 101250.0
+                        },
+                        "panToCenterPerZoom": {
+                          "xx": 202500.0,
+                          "xy": -0.0,
+                          "yx": 0.0,
+                          "yy": 135000.0
+                        },
+                        "sizePerZoom": {
+                          "height": 270000.0,
+                          "width": 405000.0
+                        },
+                        "zoomRange": {
+                          "maximum": 4.0,
+                          "minimum": 1.0
+                        }
+                      },
+                      "rotationDegrees": 0.0
+                    },
+                    "zIndex": 2
+                  },
+                  {
+                    "border": {
+                      "kind": "none"
+                    },
+                    "borderFillRects": [],
+                    "clipRect": {
+                      "height": 132500,
+                      "width": 181295,
+                      "x": 15000,
+                      "y": 152500
+                    },
+                    "frameId": "00000000-0000-4000-8000-000000000104",
+                    "opacityByte": 255,
+                    "photo": null,
+                    "zIndex": 3
+                  },
+                  {
+                    "border": {
+                      "kind": "none"
+                    },
+                    "borderFillRects": [],
+                    "clipRect": {
+                      "height": 61177,
+                      "width": 83705,
+                      "x": 201295,
+                      "y": 157647
+                    },
+                    "frameId": "lock-placeholder-5",
+                    "opacityByte": 255,
+                    "photo": null,
+                    "zIndex": 4
+                  },
+                  {
+                    "border": {
+                      "kind": "none"
+                    },
+                    "borderFillRects": [],
+                    "clipRect": {
+                      "height": 61176,
+                      "width": 83705,
+                      "x": 201295,
+                      "y": 223824
+                    },
+                    "frameId": "lock-placeholder-6",
+                    "opacityByte": 255,
+                    "photo": null,
+                    "zIndex": 5
+                  }
+                ],
+                "heightUm": 300000,
+                "number": 1,
+                "overlays": [],
+                "sheetId": "sheet-001",
+                "widthUm": 600000
+              },
+              {
+                "activeSides": "both",
+                "backgrounds": [
+                  {
+                    "drawRect": {
+                      "height": 300000,
+                      "width": 600000,
+                      "x": 0,
+                      "y": 0
+                    },
+                    "kind": "color",
+                    "rgb": "#FFFFFF"
+                  }
+                ],
+                "base": {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "rgb": "#FFFFFF"
+                },
+                "frames": [],
+                "heightUm": 300000,
+                "number": 2,
+                "overlays": [],
+                "sheetId": "sheet-002",
+                "widthUm": 600000
+              }
+            ]
+          },
+          "mediaUsage": [
+            {
+              "count": 2,
+              "mediaId": "00000000-0000-4000-8000-000000000010"
+            }
+          ],
+          "state": {
+            "album": {
+              "media": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000010",
+                  "kind": "photo",
+                  "name": "Foto.jpg",
+                  "palette": [
+                    "#C22C24",
+                    "#248044",
+                    "#2454C2"
+                  ],
+                  "sourceHeightPx": 400,
+                  "sourceWidthPx": 600
+                }
+              ],
+              "sheets": [
+                {
+                  "activeSides": "both",
+                  "frames": [
+                    {
+                      "id": "00000000-0000-4000-8000-000000000101",
+                      "photo": {
+                        "mediaId": "00000000-0000-4000-8000-000000000010",
+                        "transform": {
+                          "blackAndWhite": false,
+                          "fineRotationDegrees": 0.0,
+                          "mirrorX": false,
+                          "panX": 0.25,
+                          "panY": -0.5,
+                          "quarterTurns": 0,
+                          "userZoom": 1.75
+                        }
+                      },
+                      "rect": {
+                        "height": 137647,
+                        "width": 83705,
+                        "x": 201295,
+                        "y": 15000
+                      },
+                      "style": {
+                        "borderRgb": "#205070",
+                        "borderWidthUm": 2000,
+                        "opacityPercent": 60,
+                        "source": "custom"
+                      },
+                      "zIndex": 0
+                    },
+                    {
+                      "id": "00000000-0000-4000-8000-000000000102",
+                      "photo": null,
+                      "rect": {
+                        "height": 132500,
+                        "width": 181295,
+                        "x": 15000,
+                        "y": 15000
+                      },
+                      "style": {
+                        "borderRgb": "#000000",
+                        "borderWidthUm": 0,
+                        "opacityPercent": 100,
+                        "source": "album"
+                      },
+                      "zIndex": 1
+                    },
+                    {
+                      "id": "00000000-0000-4000-8000-000000000103",
+                      "photo": {
+                        "mediaId": "00000000-0000-4000-8000-000000000010",
+                        "transform": {
+                          "blackAndWhite": false,
+                          "fineRotationDegrees": 0.0,
+                          "mirrorX": false,
+                          "panX": 0.25,
+                          "panY": -0.5,
+                          "quarterTurns": 0,
+                          "userZoom": 1.75
+                        }
+                      },
+                      "rect": {
+                        "height": 270000,
+                        "width": 270000,
+                        "x": 315000,
+                        "y": 15000
+                      },
+                      "style": {
+                        "borderRgb": "#000000",
+                        "borderWidthUm": 0,
+                        "opacityPercent": 100,
+                        "source": "album"
+                      },
+                      "zIndex": 2
+                    },
+                    {
+                      "id": "00000000-0000-4000-8000-000000000104",
+                      "photo": null,
+                      "rect": {
+                        "height": 132500,
+                        "width": 181295,
+                        "x": 15000,
+                        "y": 152500
+                      },
+                      "style": {
+                        "borderRgb": "#000000",
+                        "borderWidthUm": 0,
+                        "opacityPercent": 100,
+                        "source": "album"
+                      },
+                      "zIndex": 3
+                    },
+                    {
+                      "id": "lock-placeholder-5",
+                      "photo": null,
+                      "rect": {
+                        "height": 61177,
+                        "width": 83705,
+                        "x": 201295,
+                        "y": 157647
+                      },
+                      "style": {
+                        "borderRgb": "#000000",
+                        "borderWidthUm": 0,
+                        "opacityPercent": 100,
+                        "source": "album"
+                      },
+                      "zIndex": 4
+                    },
+                    {
+                      "id": "lock-placeholder-6",
+                      "photo": null,
+                      "rect": {
+                        "height": 61176,
+                        "width": 83705,
+                        "x": 201295,
+                        "y": 223824
+                      },
+                      "style": {
+                        "borderRgb": "#000000",
+                        "borderWidthUm": 0,
+                        "opacityPercent": 100,
+                        "source": "album"
+                      },
+                      "zIndex": 5
+                    }
+                  ],
+                  "heightUm": 300000,
+                  "id": "sheet-001",
+                  "layoutLocked": false,
+                  "number": 1,
+                  "pageNumbers": [
+                    1,
+                    2
+                  ],
+                  "role": "initial",
+                  "widthUm": 600000
+                },
+                {
+                  "activeSides": "both",
+                  "frames": [],
+                  "heightUm": 300000,
+                  "id": "sheet-002",
+                  "layoutLocked": false,
+                  "number": 2,
+                  "pageNumbers": [
+                    3,
+                    4
+                  ],
+                  "role": "final",
+                  "widthUm": 600000
+                }
+              ],
+              "visualDefaults": {
+                "background": {
+                  "both": {
+                    "kind": "color",
+                    "rgb": "#FFFFFF"
+                  },
+                  "scope": "bothSides"
+                },
+                "frameBorder": {
+                  "kind": "none"
+                },
+                "overlay": {
+                  "both": null,
+                  "scope": "bothSides"
+                }
+              }
+            },
+            "canRedo": false,
+            "canUndo": true,
+            "dirty": true,
+            "document": {
+              "bleedUm": 3000,
+              "displayUnit": "mm",
+              "dpi": 300,
+              "safetyUm": 3000,
+              "sheetHeightUm": 300000,
+              "sheetWidthUm": 600000
+            },
+            "projectId": "550e8400-e29b-41d4-a716-446655440000",
+            "projectName": "Layouts",
+            "revision": 14,
+            "savedRevision": 9
+          }
+        },
+        "queries": {
+          "sheet-001": {
+            "previews": [
+              [
+                {
+                  "border": {
+                    "kind": "solid",
+                    "rgb": "#205070",
+                    "widthUm": 2000
+                  },
+                  "borderFillRects": [
+                    {
+                      "height": 2000,
+                      "width": 180000,
+                      "x": 347500,
+                      "y": 15000
+                    },
+                    {
+                      "height": 2000,
+                      "width": 180000,
+                      "x": 347500,
+                      "y": 283000
+                    },
+                    {
+                      "height": 266000,
+                      "width": 2000,
+                      "x": 347500,
+                      "y": 17000
+                    },
+                    {
+                      "height": 266000,
+                      "width": 2000,
+                      "x": 525500,
+                      "y": 17000
+                    }
+                  ],
+                  "clipRect": {
+                    "height": 270000,
+                    "width": 180000,
+                    "x": 347500,
+                    "y": 15000
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000101",
+                  "opacityByte": 153,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 472500,
+                      "width": 708750,
+                      "x": 149219,
+                      "y": -136875
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#C22C24",
+                      "#248044",
+                      "#2454C2"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 675.0,
+                      "current": {
+                        "center": {
+                          "x": 156093.75,
+                          "y": 84375.0
+                        },
+                        "size": {
+                          "height": 472500.0,
+                          "width": 708750.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.25,
+                        "y": -0.5
+                      },
+                      "currentZoom": 1.75,
+                      "panOrigin": {
+                        "x": 90000.0,
+                        "y": 135000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 264375.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 101250.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 202500.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 135000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 270000.0,
+                        "width": 405000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 270000,
+                    "width": 270000,
+                    "x": 72500,
+                    "y": 15000
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000103",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 472500,
+                      "width": 708750,
+                      "x": -92031,
+                      "y": -136875
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#C22C24",
+                      "#248044",
+                      "#2454C2"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 675.0,
+                      "current": {
+                        "center": {
+                          "x": 189843.75,
+                          "y": 84375.0
+                        },
+                        "size": {
+                          "height": 472500.0,
+                          "width": 708750.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.25,
+                        "y": -0.5
+                      },
+                      "currentZoom": 1.75,
+                      "panOrigin": {
+                        "x": 135000.0,
+                        "y": 135000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 219375.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 101250.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 202500.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 135000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 270000.0,
+                        "width": 405000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 1
+                }
+              ],
+              [
+                {
+                  "border": {
+                    "kind": "solid",
+                    "rgb": "#205070",
+                    "widthUm": 2000
+                  },
+                  "borderFillRects": [
+                    {
+                      "height": 2000,
+                      "width": 180000,
+                      "x": 360000,
+                      "y": 15000
+                    },
+                    {
+                      "height": 2000,
+                      "width": 180000,
+                      "x": 360000,
+                      "y": 283000
+                    },
+                    {
+                      "height": 266000,
+                      "width": 2000,
+                      "x": 360000,
+                      "y": 17000
+                    },
+                    {
+                      "height": 266000,
+                      "width": 2000,
+                      "x": 538000,
+                      "y": 17000
+                    }
+                  ],
+                  "clipRect": {
+                    "height": 270000,
+                    "width": 180000,
+                    "x": 360000,
+                    "y": 15000
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000101",
+                  "opacityByte": 153,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 472500,
+                      "width": 708750,
+                      "x": 161719,
+                      "y": -136875
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#C22C24",
+                      "#248044",
+                      "#2454C2"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 675.0,
+                      "current": {
+                        "center": {
+                          "x": 156093.75,
+                          "y": 84375.0
+                        },
+                        "size": {
+                          "height": 472500.0,
+                          "width": 708750.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.25,
+                        "y": -0.5
+                      },
+                      "currentZoom": 1.75,
+                      "panOrigin": {
+                        "x": 90000.0,
+                        "y": 135000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 264375.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 101250.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 202500.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 135000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 270000.0,
+                        "width": 405000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 270000,
+                    "width": 270000,
+                    "x": 15000,
+                    "y": 15000
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000103",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 472500,
+                      "width": 708750,
+                      "x": -149531,
+                      "y": -136875
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#C22C24",
+                      "#248044",
+                      "#2454C2"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 675.0,
+                      "current": {
+                        "center": {
+                          "x": 189843.75,
+                          "y": 84375.0
+                        },
+                        "size": {
+                          "height": 472500.0,
+                          "width": 708750.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.25,
+                        "y": -0.5
+                      },
+                      "currentZoom": 1.75,
+                      "panOrigin": {
+                        "x": 135000.0,
+                        "y": 135000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 219375.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 101250.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 202500.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 135000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 270000.0,
+                        "width": 405000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 1
+                }
+              ],
+              [
+                {
+                  "border": {
+                    "kind": "solid",
+                    "rgb": "#205070",
+                    "widthUm": 2000
+                  },
+                  "borderFillRects": [
+                    {
+                      "height": 2000,
+                      "width": 180000,
+                      "x": 60000,
+                      "y": 15000
+                    },
+                    {
+                      "height": 2000,
+                      "width": 180000,
+                      "x": 60000,
+                      "y": 283000
+                    },
+                    {
+                      "height": 266000,
+                      "width": 2000,
+                      "x": 60000,
+                      "y": 17000
+                    },
+                    {
+                      "height": 266000,
+                      "width": 2000,
+                      "x": 238000,
+                      "y": 17000
+                    }
+                  ],
+                  "clipRect": {
+                    "height": 270000,
+                    "width": 180000,
+                    "x": 60000,
+                    "y": 15000
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000101",
+                  "opacityByte": 153,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 472500,
+                      "width": 708750,
+                      "x": -138281,
+                      "y": -136875
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#C22C24",
+                      "#248044",
+                      "#2454C2"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 675.0,
+                      "current": {
+                        "center": {
+                          "x": 156093.75,
+                          "y": 84375.0
+                        },
+                        "size": {
+                          "height": 472500.0,
+                          "width": 708750.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.25,
+                        "y": -0.5
+                      },
+                      "currentZoom": 1.75,
+                      "panOrigin": {
+                        "x": 90000.0,
+                        "y": 135000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 264375.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 101250.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 202500.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 135000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 270000.0,
+                        "width": 405000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 270000,
+                    "width": 270000,
+                    "x": 315000,
+                    "y": 15000
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000103",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 472500,
+                      "width": 708750,
+                      "x": 150469,
+                      "y": -136875
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#C22C24",
+                      "#248044",
+                      "#2454C2"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 675.0,
+                      "current": {
+                        "center": {
+                          "x": 189843.75,
+                          "y": 84375.0
+                        },
+                        "size": {
+                          "height": 472500.0,
+                          "width": 708750.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.25,
+                        "y": -0.5
+                      },
+                      "currentZoom": 1.75,
+                      "panOrigin": {
+                        "x": 135000.0,
+                        "y": 135000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 219375.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 101250.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 202500.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 135000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 270000.0,
+                        "width": 405000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 1
+                }
+              ],
+              [
+                {
+                  "border": {
+                    "kind": "solid",
+                    "rgb": "#205070",
+                    "widthUm": 2000
+                  },
+                  "borderFillRects": [
+                    {
+                      "height": 2000,
+                      "width": 180000,
+                      "x": 72500,
+                      "y": 15000
+                    },
+                    {
+                      "height": 2000,
+                      "width": 180000,
+                      "x": 72500,
+                      "y": 283000
+                    },
+                    {
+                      "height": 266000,
+                      "width": 2000,
+                      "x": 72500,
+                      "y": 17000
+                    },
+                    {
+                      "height": 266000,
+                      "width": 2000,
+                      "x": 250500,
+                      "y": 17000
+                    }
+                  ],
+                  "clipRect": {
+                    "height": 270000,
+                    "width": 180000,
+                    "x": 72500,
+                    "y": 15000
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000101",
+                  "opacityByte": 153,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 472500,
+                      "width": 708750,
+                      "x": -125781,
+                      "y": -136875
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#C22C24",
+                      "#248044",
+                      "#2454C2"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 675.0,
+                      "current": {
+                        "center": {
+                          "x": 156093.75,
+                          "y": 84375.0
+                        },
+                        "size": {
+                          "height": 472500.0,
+                          "width": 708750.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.25,
+                        "y": -0.5
+                      },
+                      "currentZoom": 1.75,
+                      "panOrigin": {
+                        "x": 90000.0,
+                        "y": 135000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 264375.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 101250.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 202500.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 135000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 270000.0,
+                        "width": 405000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 270000,
+                    "width": 270000,
+                    "x": 257500,
+                    "y": 15000
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000103",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 472500,
+                      "width": 708750,
+                      "x": 92969,
+                      "y": -136875
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#C22C24",
+                      "#248044",
+                      "#2454C2"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 675.0,
+                      "current": {
+                        "center": {
+                          "x": 189843.75,
+                          "y": 84375.0
+                        },
+                        "size": {
+                          "height": 472500.0,
+                          "width": 708750.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.25,
+                        "y": -0.5
+                      },
+                      "currentZoom": 1.75,
+                      "panOrigin": {
+                        "x": 135000.0,
+                        "y": 135000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 219375.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 101250.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 202500.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 135000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 270000.0,
+                        "width": 405000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 1
+                }
+              ]
+            ],
+            "query": {
+              "catalogRevision": 0,
+              "frameCount": 6,
+              "listing": {
+                "algorithmVersion": 1,
+                "candidates": [
+                  {
+                    "customId": null,
+                    "favoriteId": null,
+                    "isLastApplied": false,
+                    "layout": {
+                      "definition": {
+                        "positions": [
+                          {
+                            "height": 270000,
+                            "width": 180000,
+                            "x": 347500,
+                            "y": 15000
+                          },
+                          {
+                            "height": 270000,
+                            "width": 270000,
+                            "x": 72500,
+                            "y": 15000
+                          }
+                        ],
+                        "scope": "sheet",
+                        "surface": {
+                          "heightUm": 300000,
+                          "type": "doubleSheet",
+                          "widthUm": 600000
+                        }
+                      },
+                      "origin": "automatic"
+                    }
+                  },
+                  {
+                    "customId": null,
+                    "favoriteId": null,
+                    "isLastApplied": false,
+                    "layout": {
+                      "definition": {
+                        "positions": [
+                          {
+                            "height": 270000,
+                            "width": 180000,
+                            "x": 360000,
+                            "y": 15000
+                          },
+                          {
+                            "height": 270000,
+                            "width": 270000,
+                            "x": 15000,
+                            "y": 15000
+                          }
+                        ],
+                        "scope": "page",
+                        "surface": {
+                          "heightUm": 300000,
+                          "type": "doubleSheet",
+                          "widthUm": 600000
+                        }
+                      },
+                      "origin": "automatic"
+                    }
+                  },
+                  {
+                    "customId": null,
+                    "favoriteId": null,
+                    "isLastApplied": false,
+                    "layout": {
+                      "definition": {
+                        "positions": [
+                          {
+                            "height": 270000,
+                            "width": 180000,
+                            "x": 60000,
+                            "y": 15000
+                          },
+                          {
+                            "height": 270000,
+                            "width": 270000,
+                            "x": 315000,
+                            "y": 15000
+                          }
+                        ],
+                        "scope": "page",
+                        "surface": {
+                          "heightUm": 300000,
+                          "type": "doubleSheet",
+                          "widthUm": 600000
+                        }
+                      },
+                      "origin": "automatic"
+                    }
+                  },
+                  {
+                    "customId": null,
+                    "favoriteId": null,
+                    "isLastApplied": false,
+                    "layout": {
+                      "definition": {
+                        "positions": [
+                          {
+                            "height": 270000,
+                            "width": 180000,
+                            "x": 72500,
+                            "y": 15000
+                          },
+                          {
+                            "height": 270000,
+                            "width": 270000,
+                            "x": 257500,
+                            "y": 15000
+                          }
+                        ],
+                        "scope": "sheet",
+                        "surface": {
+                          "heightUm": 300000,
+                          "type": "doubleSheet",
+                          "widthUm": 600000
+                        }
+                      },
+                      "origin": "automatic"
+                    }
+                  }
+                ],
+                "generationStatus": "candidates"
+              },
+              "locked": false,
+              "projectId": "550e8400-e29b-41d4-a716-446655440000",
+              "queryId": "expanded-reduced-ready-sheet-001",
+              "revision": 14,
+              "settings": {
+                "gapUm": 5000,
+                "marginUm": 15000,
+                "minimumSideUm": 20000,
+                "permission": "pagesAndSheet"
+              },
+              "sheetId": "sheet-001"
+            }
+          },
+          "sheet-002": {
+            "previews": [],
+            "query": {
+              "catalogRevision": 0,
+              "frameCount": 0,
+              "listing": {
+                "algorithmVersion": 1,
+                "candidates": [],
+                "generationStatus": "empty"
+              },
+              "locked": false,
+              "projectId": "550e8400-e29b-41d4-a716-446655440000",
+              "queryId": "expanded-reduced-ready-sheet-002",
+              "revision": 14,
               "settings": {
                 "gapUm": 5000,
                 "marginUm": 15000,
