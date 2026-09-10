@@ -670,7 +670,7 @@ fn processor_never_replaces_an_existing_preparation() {
 
 #[test]
 fn processor_builds_one_reduced_representation_per_real_photo() {
-    assert_reduced_photo_cache_round_trip(&[]);
+    assert_reduced_photo_cache_round_trip(&[], false);
 }
 
 #[cfg(windows)]
@@ -689,10 +689,11 @@ fn processor_builds_preview_for_adobe_jpeg_with_standard_windows_srgb() {
     metadata.extend_from_slice(b"ICC_PROFILE\0\x01\x01");
     metadata.extend_from_slice(&profile);
 
-    assert_reduced_photo_cache_round_trip(&metadata);
+    assert_reduced_photo_cache_round_trip(&metadata, false);
+    assert_reduced_photo_cache_round_trip(&metadata, true);
 }
 
-fn assert_reduced_photo_cache_round_trip(jpeg_metadata: &[u8]) {
+fn assert_reduced_photo_cache_round_trip(jpeg_metadata: &[u8], zero_based_components: bool) {
     let source_dir = tempfile::tempdir().expect("temporary source directory");
     let cache = TestCache::new("build");
     let log_dir = tempfile::tempdir().expect("temporary log directory");
@@ -707,6 +708,29 @@ fn assert_reduced_photo_cache_round_trip(jpeg_metadata: &[u8]) {
     if !jpeg_metadata.is_empty() {
         let mut bytes = std::fs::read(&source_path).expect("the generated JPEG is readable");
         bytes.splice(2..2, jpeg_metadata.iter().copied());
+        if zero_based_components {
+            // The encoder fixture has one baseline frame and one scan. Keep
+            // the compressed samples unchanged while renaming both selectors.
+            let mut cursor = 2;
+            loop {
+                let marker = bytes[cursor + 1];
+                let length =
+                    usize::from(u16::from_be_bytes([bytes[cursor + 2], bytes[cursor + 3]]));
+                let payload = cursor + 4;
+                if marker == 0xc0 {
+                    for index in 0..3 {
+                        bytes[payload + 6 + index * 3] = index as u8;
+                    }
+                }
+                if marker == 0xda {
+                    for index in 0..3 {
+                        bytes[payload + 1 + index * 2] = index as u8;
+                    }
+                    break;
+                }
+                cursor += 2 + length;
+            }
+        }
         std::fs::write(&source_path, bytes).expect("the fixture receives exporter metadata");
     }
     let original_source = std::fs::read(&source_path).expect("the source is readable");

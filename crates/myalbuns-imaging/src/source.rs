@@ -101,6 +101,7 @@ enum JpegComponentLayout {
     Grayscale,
     Numeric123,
     RgbLetters,
+    OtherThreeComponents,
 }
 
 struct PngPreflight {
@@ -389,16 +390,22 @@ fn preflight_jpeg(
             }
             let detected_layout = match components {
                 1 => JpegComponentLayout::Grayscale,
-                3 => match [payload[6], payload[9], payload[12]] {
-                    [1, 2, 3] => JpegComponentLayout::Numeric123,
-                    [b'R', b'G', b'B'] => JpegComponentLayout::RgbLetters,
-                    _ => {
+                3 => {
+                    let ids = [payload[6], payload[9], payload[12]];
+                    if ids[0] == ids[1] || ids[0] == ids[2] || ids[1] == ids[2] {
                         return Err(SourceFailure::new(
-                            ImagingFailureCode::UnsupportedColorModel,
-                            "os identificadores de componentes JPEG não descrevem RGB nem YCbCr",
+                            ImagingFailureCode::DecodeFailed,
+                            "os identificadores de componentes JPEG estão repetidos",
                         ));
                     }
-                },
+                    match ids {
+                        [1, 2, 3] => JpegComponentLayout::Numeric123,
+                        [b'R', b'G', b'B'] => JpegComponentLayout::RgbLetters,
+                        // Component IDs identify scan channels. A later APP14
+                        // can declare their color model, so classify after SOS.
+                        _ => JpegComponentLayout::OtherThreeComponents,
+                    }
+                }
                 _ => {
                     return Err(SourceFailure::new(
                         ImagingFailureCode::UnsupportedColorModel,
@@ -505,12 +512,22 @@ fn classify_jpeg_color_model(
         (None, JpegComponentLayout::Grayscale) => Ok(JpegColorModel::Grayscale),
         (None, JpegComponentLayout::Numeric123) => Ok(JpegColorModel::YCbCr),
         (None, JpegComponentLayout::RgbLetters) => Ok(JpegColorModel::Rgb),
-        (Some(0), JpegComponentLayout::Numeric123 | JpegComponentLayout::RgbLetters) => {
-            Ok(JpegColorModel::Rgb)
-        }
-        (Some(1), JpegComponentLayout::Numeric123 | JpegComponentLayout::RgbLetters) => {
-            Ok(JpegColorModel::YCbCr)
-        }
+        (
+            Some(0),
+            JpegComponentLayout::Numeric123
+            | JpegComponentLayout::RgbLetters
+            | JpegComponentLayout::OtherThreeComponents,
+        ) => Ok(JpegColorModel::Rgb),
+        (
+            Some(1),
+            JpegComponentLayout::Numeric123
+            | JpegComponentLayout::RgbLetters
+            | JpegComponentLayout::OtherThreeComponents,
+        ) => Ok(JpegColorModel::YCbCr),
+        (None, JpegComponentLayout::OtherThreeComponents) => Err(SourceFailure::new(
+            ImagingFailureCode::UnsupportedColorModel,
+            "os identificadores de componentes JPEG não descrevem RGB nem YCbCr",
+        )),
         _ => Err(SourceFailure::new(
             ImagingFailureCode::UnsupportedColorModel,
             "o transform Adobe não corresponde a um modelo JPEG aceito",
@@ -1956,6 +1973,33 @@ mod render_source_tests {
                 .expect_err("unknown component identifiers are rejected before decode")
                 .code,
             ImagingFailureCode::UnsupportedColorModel
+        );
+    }
+
+    #[test]
+    fn jpeg_adobe_color_declaration_accepts_distinct_component_identifiers() {
+        let jpeg = jpeg_fixture(None, ExtendedColorType::Rgb8, &[10, 20, 30]);
+        for transform in [0, 1] {
+            let mut declared = jpeg.clone();
+            insert_adobe_transform(&mut declared, transform);
+            let expected = decode_fixture(&declared).unwrap();
+            for ids in [[0, 1, 2], [7, 8, 9]] {
+                let mut actual = declared.clone();
+                replace_jpeg_component_ids(&mut actual, ids);
+                assert_eq!(
+                    decode_fixture(&actual)
+                        .expect("Adobe declares the three-component color model"),
+                    expected,
+                    "component identifiers must not change the declared color model"
+                );
+            }
+        }
+        let mut duplicate = jpeg;
+        insert_adobe_transform(&mut duplicate, 1);
+        replace_jpeg_component_ids(&mut duplicate, [0, 0, 2]);
+        assert!(
+            decode_fixture(&duplicate).is_err(),
+            "component identifiers must be unique"
         );
     }
 

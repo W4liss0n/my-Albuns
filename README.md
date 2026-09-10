@@ -56,6 +56,7 @@ Contratos detalhados por área. Os de interface descrevem superfícies e intera�
 - [0017 — Contrato da primeira composição com Foto](docs/design/0017-contrato-da-primeira-composicao-com-foto.md) — esquema v3, Frames, enquadramento, resolução do alvo de soltura e autoridade do Original na Exportação.
 - [0019 — Contrato do Renderizador final](docs/design/0019-contrato-do-renderizador-final.md) — composição canônica, JPEG/PNG/PDF, captura estável dos Originais, Publicação e corpus dourado.
 - [0020 — Importação com decode único e lotes](docs/design/0020-importacao-com-decode-unico-e-lotes.md) — tentativa com caminhos congelados, adoção pelo Monitor, transações de Cache e capacidade de CPU/RAM.
+- [0032 — Revisão da admissão por memória](docs/design/0032-revisao-da-admissao-por-memoria.md) — redução até processamento individual sob pressão e resultado recuperável quando não há capacidade para continuar.
 - [0021 — Orientação de Fotos e Projeto v4](docs/design/0021-orientacao-de-fotos-e-projeto-v4.md) — Giro, Espelhamento, seleção múltipla e migração do arquivo persistente.
 - [0022 — Ângulo fino da Foto e Projeto v5](docs/design/0022-angulo-fino-da-foto-e-projeto-v5.md) — slider, entrada numérica, prévia, Histórico e migração do Ângulo.
 - [0024 — Borda e Opacidade dos Frames e Projeto v7](docs/design/0024-borda-opacidade-dos-frames-e-projeto-v7.md) — estilo por Frame, herança, restauração e composição em grupo.

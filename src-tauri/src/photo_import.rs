@@ -1071,6 +1071,104 @@ mod tests {
     }
 
     #[test]
+    fn memory_pressure_keeps_partial_imports_and_allows_retry_without_duplicates() {
+        let fixture = Fixture::new();
+        let first = fixture.photo("preparada.jpg");
+        let second = fixture.photo("pendente.jpg");
+        let engine = CacheEngine::default();
+        let blocked = ImagingProcessor::with_available_memory_for_test(256, 3393);
+        let attempt = fixture.attempt(vec![first.clone(), second.clone()]);
+        let roots = attempt.roots.clone();
+        let outcomes = attempt
+            .sources
+            .iter()
+            .filter(|source| source.candidate.path() == first)
+            .map(|source| (source.candidate.source_id.clone(), validated(source)))
+            .collect();
+        let prepared = prepare_proposal_with_inspection(
+            attempt,
+            None,
+            outcomes,
+            HashMap::new(),
+            None,
+            Vec::new(),
+            |candidate| {
+                inspect_with_capacity(
+                    MediaKind::Photo,
+                    &engine,
+                    &blocked,
+                    candidate.path(),
+                    &[],
+                    &roots,
+                )
+            },
+        )
+        .unwrap();
+        let ImportMediaResult::Completed {
+            imported_count,
+            problems,
+            ..
+        } = fixture
+            .host
+            .commit_photo_import_proposal(fixture.namespace.project_id(), prepared.proposal)
+            .unwrap()
+        else {
+            panic!("partial import completes");
+        };
+        assert_eq!(imported_count, 1);
+        assert_eq!(problems.len(), 1);
+        assert_eq!(
+            problems[0].reason,
+            ProcessorAdmissionFailure::MemoryPressure.to_string()
+        );
+        let first_binding = fixture.host.authorized_media_catalog().unwrap().bindings[0].clone();
+
+        let available = ImagingProcessor::with_available_memory_for_test(1699, 3393);
+        let attempt = fixture.attempt(vec![first, second]);
+        let roots = attempt.roots.clone();
+        let bindings = attempt.catalog.bindings.clone();
+        let prepared = prepare_proposal_with_inspection(
+            attempt,
+            None,
+            HashMap::new(),
+            HashMap::new(),
+            None,
+            Vec::new(),
+            |candidate| {
+                inspect_with_capacity(
+                    MediaKind::Photo,
+                    &engine,
+                    &available,
+                    candidate.path(),
+                    &bindings,
+                    &roots,
+                )
+            },
+        )
+        .unwrap();
+        let ImportMediaResult::Completed {
+            imported_count,
+            problems,
+            projection,
+            ..
+        } = fixture
+            .host
+            .commit_photo_import_proposal(fixture.namespace.project_id(), prepared.proposal)
+            .unwrap()
+        else {
+            panic!("retry completes");
+        };
+        assert_eq!(imported_count, 1, "retry adds only the remaining image");
+        assert!(problems.is_empty());
+        assert_eq!(projection.state.album.media.len(), 2);
+        assert_eq!(fixture.host.undo().unwrap().state.album.media.len(), 1);
+        assert_eq!(
+            fixture.host.authorized_media_catalog().unwrap().bindings[0].media_id,
+            first_binding.media_id
+        );
+    }
+
+    #[test]
     fn missing_native_results_use_the_frozen_inspector_and_keep_partial_success() {
         let fixture = Fixture::new();
         let first = fixture.photo("valida.jpg");

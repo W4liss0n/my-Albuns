@@ -115,6 +115,14 @@ incompleto, marcador Adobe duplicado e transformações incompatíveis continuam
 recusados. Isso permite as extensões emitidas por exportadores Adobe sem alterar
 a interpretação dos pixels.
 
+Em um JPEG de três componentes distintos, APP14 com transformação `0` declara
+RGB e `1` declara YCbCr, inclusive quando os identificadores são `0, 1, 2` ou
+outros valores. Essa decisão ocorre depois de ler os marcadores anteriores ao
+scan; a posição do APP14 em relação ao frame não muda seu significado.
+Sem essa declaração, continuam aceitas apenas as convenções `1, 2, 3` e `R, G, B`.
+Identificadores repetidos são inválidos; quatro componentes, CMYK e YCCK
+continuam recusados antes da conversão.
+
 A política temporária de cor é estrita:
 
 - qualquer modelo aceito sem perfil ICC é assumido como sRGB após a normalização definida acima;

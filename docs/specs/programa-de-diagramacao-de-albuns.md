@@ -920,6 +920,7 @@ validação das superfícies descritas nesta seção.
 - O Painel de imagens também aceita arquivos e pastas arrastados do sistema operacional. A soltura usa a aba ativa e, para cada pasta, considera somente os arquivos diretamente contidos nela.
 - JPG/JPEG, PNG e TIFF/TIF são os formatos importáveis iniciais. Outros formatos não são importados.
 - Uma importação múltipla possui sucesso parcial: arquivos válidos são importados, enquanto arquivos inválidos, corrompidos ou incompatíveis são rejeitados sem reverter os sucessos.
+- Sob pressão de memória, o processamento reduz a concorrência até uma imagem por vez quando houver capacidade. Se nenhuma imagem puder avançar e não houver trabalho ativo que possa liberar recursos, a tentativa termina com o motivo na Tela de Problemas e preserva os sucessos. Depois de liberar memória, uma nova execução de Importar pode concluir os itens restantes sem duplicar os já vinculados.
 - Duplicatas seguem a regra normal de reimportação e não são classificadas como falha.
 - Quando houver rejeições, a Tela de Problemas é aberta ao final com `Arquivo` e `Motivo`; fechá-la não remove os itens importados.
 - Cada seleção de arquivos, escolha de pasta ou única soltura agrupa todos os novos vínculos aceitos em uma única ação de Undo/Redo e deixa o Projeto com alterações pendentes.

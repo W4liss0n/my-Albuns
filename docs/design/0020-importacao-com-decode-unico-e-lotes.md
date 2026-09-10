@@ -60,8 +60,10 @@ processos paralelo ao `ImagingProcessor`.
 
 `ImagingProcessor` possui os limites de trabalhadores e de memória para todas
 as ações e demandas de Cache. A política considera capacidade de CPU, RAM física
-e commit disponíveis, limita reservas por imagem e espera de forma cancelável
-sob pressão. Não aprende continuamente pela velocidade do lote. A Exportação
+e commit disponíveis, limita reservas por imagem e reduz a concorrência até
+um trabalho sob pressão, conforme a
+[admissão por memória](0032-revisao-da-admissao-por-memoria.md).
+Não aprende continuamente pela velocidade do lote. A Exportação
 continua pausando Cache e adquirindo exclusividade de toda a capacidade.
 As inspeções do Monitor e a inspeção alternativa da importação usam essa mesma
 reserva, liberam esperas quando há pausa e drenam um decoder iniciado antes de
@@ -76,11 +78,10 @@ Essa estimativa de admissão complementa os limites do codec; não constitui uma
 garantia contra mudanças de memória feitas por outros programas após a leitura.
 
 O orçamento agregado por Host usa no máximo um quarto da RAM total e 4 GiB.
-A admissão também observa metade da RAM disponível e do commit disponível,
-depois de preservar uma margem de um oitavo da RAM total, limitada entre
-512 MiB e 2 GiB. A cada 100 ms, a espera reavalia pressão externa, cancelamento
-e quarentena. Ausência de telemetria permite apenas uma reserva até 1 GiB;
-uma imagem acima do teto produz falha explícita de recursos.
+A margem para concorrência é maior que a exigida para um trabalho individual.
+Somente uma fila com trabalho ativo aguarda liberação de recursos; sem trabalho
+ativo e sem memória até para uma imagem, a operação recebe uma falha recuperável.
+O contrato de admissão define os valores, o cancelamento e a nova tentativa.
 
 `CacheEngine` possui a interface transacional do índice: consulta por mídia em
 uma leitura validada da operação, agrupamento de alterações e publicação

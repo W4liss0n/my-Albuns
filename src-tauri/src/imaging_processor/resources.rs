@@ -16,6 +16,7 @@ use tokio::sync::{Notify, Semaphore};
 const MIB: u64 = 1024 * 1024;
 const GIB: u64 = 1024 * MIB;
 const RESOURCE_REFRESH: Duration = Duration::from_millis(100);
+const SERIAL_HEADROOM: u64 = 512 * MIB;
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct ImageMemoryEstimate(u64);
@@ -75,6 +76,12 @@ impl Resources {
             .min(self.physical_available.saturating_sub(headroom) / 2)
             .min(self.commit_available.saturating_sub(headroom) / 2)
     }
+
+    fn serial_available(self) -> u64 {
+        self.ceiling()
+            .min(self.physical_available.saturating_sub(SERIAL_HEADROOM))
+            .min(self.commit_available.saturating_sub(SERIAL_HEADROOM))
+    }
 }
 
 #[cfg(windows)]
@@ -106,6 +113,7 @@ pub(crate) enum ProcessorAdmissionFailure {
     Cancelled,
     Unavailable,
     MemoryLimit,
+    MemoryPressure,
 }
 
 impl std::fmt::Display for ProcessorAdmissionFailure {
@@ -115,6 +123,9 @@ impl std::fmt::Display for ProcessorAdmissionFailure {
             Self::Unavailable => "o Processador está em quarentena; reinicie o aplicativo",
             Self::MemoryLimit => {
                 "a imagem excede o orçamento de memória disponível para processamento"
+            }
+            Self::MemoryPressure => {
+                "Não há memória disponível para processar a próxima imagem. Libere memória e tente novamente."
             }
         })
     }
@@ -154,6 +165,17 @@ pub(super) struct MemoryReservation {
 }
 
 impl ResourceBudget {
+    #[cfg(test)]
+    pub(super) fn with_available_memory_for_test(physical_mib: u64, commit_mib: u64) -> Self {
+        Self::with_probe(move || {
+            Some(Resources {
+                physical_total: 24 * GIB,
+                physical_available: physical_mib * MIB,
+                commit_available: commit_mib * MIB,
+            })
+        })
+    }
+
     fn with_probe(probe: impl Fn() -> Option<Resources> + Send + Sync + 'static) -> Self {
         Self {
             usage: Mutex::new(Usage::default()),
@@ -168,6 +190,7 @@ impl ResourceBudget {
         cancellation: &AtomicBool,
         permits: &Semaphore,
     ) -> Result<MemoryReservation, ProcessorAdmissionFailure> {
+        let mut waiting = false;
         loop {
             // notify_waiters observes an already-created future even before its
             // first poll; checking the condition afterwards cannot lose release.
@@ -189,17 +212,57 @@ impl ResourceBudget {
                     .lock()
                     .unwrap_or_else(std::sync::PoisonError::into_inner);
                 let available = resources.map_or(GIB, Resources::available);
+                let serial_available = resources.map_or(GIB, Resources::serial_available);
+                let parallel_admission = estimate.0 <= available.saturating_sub(usage.bytes);
+                let serial_admission = usage.active == 0 && estimate.0 <= serial_available;
                 // Missing telemetry admits one conservative reservation. Never
                 // invent free RAM or use an earlier successful observation.
                 if (resources.is_some() || usage.active == 0)
-                    && estimate.0 <= available.saturating_sub(usage.bytes)
+                    && (parallel_admission || serial_admission)
                 {
+                    if waiting || !parallel_admission {
+                        tracing::info!(
+                            event = "processor_memory_admitted",
+                            mode = if parallel_admission {
+                                "parallel"
+                            } else {
+                                "serial"
+                            },
+                            waited = waiting,
+                            estimate_bytes = estimate.0,
+                            reserved_bytes = usage.bytes,
+                            physical_available_bytes =
+                                resources.map(|value| value.physical_available),
+                            commit_available_bytes = resources.map(|value| value.commit_available),
+                        );
+                    }
                     usage.bytes += estimate.0;
                     usage.active += 1;
                     return Ok(MemoryReservation {
                         budget: Arc::clone(self),
                         bytes: estimate.0,
                     });
+                }
+                if usage.active == 0 {
+                    // No local worker can release memory. Return control so the
+                    // operation can report the interruption and be retried.
+                    tracing::warn!(
+                        event = "processor_memory_unavailable",
+                        estimate_bytes = estimate.0,
+                        serial_available_bytes = serial_available,
+                        physical_available_bytes = resources.map(|value| value.physical_available),
+                        commit_available_bytes = resources.map(|value| value.commit_available),
+                    );
+                    return Err(ProcessorAdmissionFailure::MemoryPressure);
+                }
+                if !waiting {
+                    tracing::info!(
+                        event = "processor_memory_wait_started",
+                        estimate_bytes = estimate.0,
+                        reserved_bytes = usage.bytes,
+                        active_workers = usage.active,
+                    );
+                    waiting = true;
                 }
             }
             // Refresh external memory pressure even when no local worker exits;
@@ -252,6 +315,86 @@ mod tests {
     }
 
     #[test]
+    fn low_memory_keeps_one_image_moving_without_parallel_headroom() {
+        tauri::async_runtime::block_on(async {
+            let budget = Arc::new(ResourceBudget::with_probe(|| {
+                Some(Resources {
+                    physical_total: 24 * GIB,
+                    physical_available: 1699 * MIB,
+                    commit_available: 3393 * MIB,
+                })
+            }));
+            let permits = Semaphore::new(8);
+            let cancelled = AtomicBool::new(false);
+            let first = tokio::time::timeout(
+                Duration::from_millis(200),
+                budget.reserve(ImageMemoryEstimate(236 * MIB), &cancelled, &permits),
+            )
+            .await
+            .expect("one image must advance below the parallel headroom")
+            .unwrap();
+            let mut next =
+                Box::pin(budget.reserve(ImageMemoryEstimate(236 * MIB), &cancelled, &permits));
+            assert!(
+                tokio::time::timeout(Duration::from_millis(20), &mut next)
+                    .await
+                    .is_err()
+            );
+            drop(first);
+            drop(
+                tokio::time::timeout(Duration::from_millis(200), next)
+                    .await
+                    .unwrap()
+                    .unwrap(),
+            );
+        });
+    }
+
+    #[test]
+    fn insufficient_memory_without_active_work_finishes_with_a_recoverable_failure() {
+        tauri::async_runtime::block_on(async {
+            let current = Arc::new(Mutex::new(Resources {
+                physical_total: 24 * GIB,
+                physical_available: 256 * MIB,
+                commit_available: 3 * GIB,
+            }));
+            let probe = Arc::clone(&current);
+            let budget = Arc::new(ResourceBudget::with_probe(move || {
+                Some(*probe.lock().unwrap())
+            }));
+            let permits = Semaphore::new(8);
+            let cancelled = AtomicBool::new(false);
+            let result = tokio::time::timeout(
+                Duration::from_millis(200),
+                budget.reserve(ImageMemoryEstimate(236 * MIB), &cancelled, &permits),
+            )
+            .await
+            .expect("an idle Processor cannot wait indefinitely for external memory");
+            assert_eq!(
+                result.unwrap_err(),
+                ProcessorAdmissionFailure::MemoryPressure
+            );
+            *current.lock().unwrap() = abundant().unwrap();
+            current.lock().unwrap().commit_available = 600 * MIB;
+            assert_eq!(
+                budget
+                    .reserve(ImageMemoryEstimate(236 * MIB), &cancelled, &permits)
+                    .await
+                    .unwrap_err(),
+                ProcessorAdmissionFailure::MemoryPressure,
+                "commit also limits serial admission"
+            );
+            *current.lock().unwrap() = abundant().unwrap();
+            drop(
+                budget
+                    .reserve(ImageMemoryEstimate(236 * MIB), &cancelled, &permits)
+                    .await
+                    .unwrap(),
+            );
+        });
+    }
+
+    #[test]
     fn resource_budget_limits_aggregate_memory_and_releases_every_reservation() {
         tauri::async_runtime::block_on(async {
             let budget = Arc::new(ResourceBudget::with_probe(abundant));
@@ -284,19 +427,20 @@ mod tests {
     }
 
     #[test]
-    fn zero_headroom_waits_for_recovery_and_cancellation_and_quarantine_wake_waiters() {
+    fn active_work_waits_for_recovery_and_cancellation_and_quarantine_wake_waiters() {
         tauri::async_runtime::block_on(async {
-            let current = Arc::new(Mutex::new(Resources {
-                physical_total: 16 * GIB,
-                physical_available: GIB,
-                commit_available: GIB,
-            }));
+            let current = Arc::new(Mutex::new(abundant().unwrap()));
             let probe = Arc::clone(&current);
             let budget = Arc::new(ResourceBudget::with_probe(move || {
                 Some(*probe.lock().unwrap())
             }));
             let permits = Semaphore::new(8);
             let cancelled = AtomicBool::new(false);
+            let active = budget
+                .reserve(ImageMemoryEstimate(128 * MIB), &cancelled, &permits)
+                .await
+                .unwrap();
+            current.lock().unwrap().physical_available = 256 * MIB;
             let mut waiting =
                 Box::pin(budget.reserve(ImageMemoryEstimate(128 * MIB), &cancelled, &permits));
             assert!(
@@ -304,7 +448,7 @@ mod tests {
                     .await
                     .is_err()
             );
-            assert_eq!(budget.usage.lock().unwrap().active, 0);
+            assert_eq!(budget.usage.lock().unwrap().active, 1);
             *current.lock().unwrap() = abundant().unwrap();
             let reservation = tokio::time::timeout(Duration::from_secs(1), &mut waiting)
                 .await
@@ -336,6 +480,7 @@ mod tests {
                     .unwrap_err(),
                 ProcessorAdmissionFailure::Unavailable
             );
+            drop(active);
         });
     }
 

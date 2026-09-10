@@ -124,6 +124,46 @@ fn real_import_flow_reports_each_alternate_inspection_for_files_and_folder() {
 }
 
 fn run_real_import_flow(kind: MediaKind, build_inputs: fn(&Path) -> InputSet, by_folder: bool) {
+    run_real_import_flow_with_memory(kind, build_inputs, by_folder, None);
+}
+
+#[test]
+#[ignore = "executed with the real debug sidecar"]
+fn real_import_flow_finishes_serially_under_memory_pressure() {
+    fn small_inputs(root: &Path) -> InputSet {
+        let paths = (0..8)
+            .map(|index| {
+                let path = root.join(format!("serial-{index}.jpg"));
+                RgbImage::from_pixel(37, 23, Rgb([index, 80, 160]))
+                    .save(&path)
+                    .unwrap();
+                path
+            })
+            .collect();
+        InputSet {
+            paths,
+            imported: 8,
+            previews: 8,
+            rejected: 0,
+            host_decodes: 0,
+        }
+    }
+    for by_folder in [false, true] {
+        run_real_import_flow_with_memory(
+            MediaKind::Photo,
+            small_inputs,
+            by_folder,
+            Some((1699, 3393)),
+        );
+    }
+}
+
+fn run_real_import_flow_with_memory(
+    kind: MediaKind,
+    build_inputs: fn(&Path) -> InputSet,
+    by_folder: bool,
+    available_memory_mib: Option<(u64, u64)>,
+) {
     let executable = PathBuf::from(
         std::env::var_os("MYALBUNS_TEST_IMAGING_PROCESSOR").expect("real Processor path"),
     );
@@ -165,7 +205,10 @@ fn run_real_import_flow(kind: MediaKind, build_inputs: fn(&Path) -> InputSet, by
             AuthorizedCacheNamespace::mount(&app_paths, project.identity_authority()).unwrap();
         let host = ProjectHost::new(project);
         let engine = CacheEngine::default();
-        let processor = ImagingProcessor::default();
+        // Success-path tests must not depend on other applications' memory use.
+        // The pressure scenario supplies its own constrained snapshot.
+        let (physical, commit) = available_memory_mib.unwrap_or((16 * 1024, 16 * 1024));
+        let processor = ImagingProcessor::with_available_memory_for_test(physical, commit);
         let registry = CachePreviewRegistry::new("import-flow");
         let monitor = MediaMonitor::default();
         let runtime = MediaRuntime::default();
@@ -295,6 +338,13 @@ fn run_real_import_flow(kind: MediaKind, build_inputs: fn(&Path) -> InputSet, by
         let native_ms = milliseconds(native_started);
         assert_eq!(active.load(Ordering::Acquire), 0);
         assert!(peak_active.load(Ordering::Acquire) <= processor.cache_capacity());
+        if available_memory_mib.is_some() {
+            assert_eq!(
+                peak_active.load(Ordering::Acquire),
+                1,
+                "memory pressure keeps the real workers serial"
+            );
+        }
         assert!(!namespace.paths().metadata_file().exists());
         let outcomes: HashMap<_, _> = completions
             .into_iter()
