@@ -160,6 +160,25 @@ test("the count remains fixed while the Layout is locked, including its placehol
   expect(h.commit).not.toHaveBeenCalled();
 });
 
+test("locking a requested count switches to the Core locked-layout query", async () => {
+  const sample = layoutPanelCorpus.cases.expanded;
+  const h = harness(sample.before.projection);
+  const sheetId = sample.before.projection.state.album.sheets[0].id;
+  h.queryLayouts.mockResolvedValue(sample.lockReady!.queries[sheetId].query);
+  h.previewLayout.mockResolvedValue(sample.lockReady!.queries[sheetId].previews[0]);
+  act(() => h.view.result.current.panel.toggle(sheetId));
+  act(() => h.view.result.current.panel.configurePositions(6));
+  await waitFor(() => expect(h.view.result.current.panel.query).not.toBeNull());
+  h.commit.mockImplementationOnce(async () => {
+    h.view.result.current.setProjection(sample.locked!.projection);
+    return true;
+  });
+  h.queryLayouts.mockResolvedValue(sample.locked!.queries[sheetId].query);
+  await act(async () => { expect(await h.view.result.current.panel.lock(0)).toBe(true); });
+  await waitFor(() => expect(h.view.result.current.panel.query?.locked).toBe(true));
+  expect(h.queryLayouts).toHaveBeenLastCalledWith(sheetId);
+});
+
 test("adding Photos beyond automatic coverage releases an earlier count request", async () => {
   const h = harness();
   act(() => h.view.result.current.panel.toggle(sheetId));

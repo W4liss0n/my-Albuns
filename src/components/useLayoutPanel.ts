@@ -36,7 +36,7 @@ export function useLayoutPanel(input: LayoutPanelInput) {
   const [requestedPositions, setRequestedPositions] = useState<{ projectId: string; sheetId: string; count: number } | null>(null);
   const request = requestedPositions?.projectId === projectId && requestedPositions.sheetId === sheetId ? requestedPositions : null;
   const positionCount = sheet?.layoutLocked || minimumPositionCount > 30 ? frameCount : Math.max(minimumPositionCount, request?.count ?? frameCount);
-  const explicitPositionCount = request && positionCount <= 30 ? positionCount : null;
+  const explicitPositionCount = request && !sheet?.layoutLocked && positionCount <= 30 ? positionCount : null;
   const [refresh, setRefresh] = useState(0);
   const scope = useMemo(() => ({ active: false }),
     [projectId, projection.state.revision, projection.composition, sheetId, editing, disabled, input.port.queryLayouts, input.catalogRevision, refresh, positionCount, explicitPositionCount]);
