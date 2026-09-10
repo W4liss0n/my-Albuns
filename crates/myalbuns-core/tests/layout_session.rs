@@ -30,6 +30,94 @@ fn project(root: &Path) -> myalbuns_core::EditableProject {
 }
 
 #[test]
+fn saving_and_reapplying_a_page_layout_preserves_the_frame_positions() {
+    use myalbuns_core::{CustomLayout, CustomLayoutId, LayoutCatalogSnapshot, LayoutScope};
+    let root = tempfile::tempdir().unwrap();
+    let mut project = project(root.path());
+    let sheet = project.projection().state.album.sheets[0].id.clone();
+    for _ in 0..4 {
+        project
+            .apply(ProjectIntent::AddFrame {
+                sheet_id: sheet.clone(),
+            })
+            .unwrap();
+    }
+    let generated = project.query_layouts(&sheet).unwrap();
+    let candidate_index = generated
+        .listing
+        .candidates
+        .iter()
+        .position(|candidate| candidate.layout.definition.scope == LayoutScope::Page)
+        .unwrap();
+    project
+        .apply(ProjectIntent::ApplyLayout {
+            selection: LayoutSelection {
+                query_id: generated.query_id,
+                candidate_index,
+            },
+        })
+        .unwrap();
+    let initial = project.projection().state.album.sheets[0].clone();
+    for right in [false, true] {
+        project
+            .apply(ProjectIntent::EditFrameGeometry {
+                edit: myalbuns_core::FrameGeometryEdit {
+                    frames: initial
+                        .frames
+                        .iter()
+                        .filter(|frame| (frame.rect.x * 2 >= initial.width_um) == right)
+                        .map(|frame| myalbuns_core::FrameGeometryTarget {
+                            frame_id: frame.id.clone(),
+                            expected_rect: frame.rect.clone(),
+                        })
+                        .collect(),
+                    gesture: myalbuns_core::FrameGeometryGesture::Move {
+                        delta_x_um: if right { -2_000 } else { 2_000 },
+                        delta_y_um: 1_000,
+                    },
+                },
+            })
+            .unwrap();
+    }
+    let before = project.projection().state.album.sheets[0].frames.clone();
+    let definition = project.capture_custom_layout(&sheet).unwrap();
+    assert_eq!(
+        definition.positions,
+        before
+            .iter()
+            .map(|frame| frame.rect.clone())
+            .collect::<Vec<_>>()
+    );
+    let id = CustomLayoutId::generate();
+    project
+        .refresh_layout_catalog(LayoutCatalogSnapshot {
+            revision: 1,
+            entries: vec![CustomLayout { id, definition }],
+        })
+        .unwrap();
+    let saved = project.query_layouts(&sheet).unwrap();
+    let candidate_index = saved
+        .listing
+        .candidates
+        .iter()
+        .position(|candidate| candidate.custom_id == Some(id))
+        .unwrap();
+    project
+        .apply(ProjectIntent::ApplyLayout {
+            selection: LayoutSelection {
+                query_id: saved.query_id,
+                candidate_index,
+            },
+        })
+        .unwrap();
+    let after = project.projection().state.album.sheets[0].frames.clone();
+    assert_eq!(
+        after.iter().map(|frame| &frame.rect).collect::<Vec<_>>(),
+        before.iter().map(|frame| &frame.rect).collect::<Vec<_>>()
+    );
+}
+
+#[test]
 fn catalog_refresh_is_independent_of_project_history_and_deletion_preserves_the_last_copy() {
     use myalbuns_core::{CustomLayout, CustomLayoutId, LayoutCatalogSnapshot, LayoutOrigin};
     let root = tempfile::tempdir().unwrap();

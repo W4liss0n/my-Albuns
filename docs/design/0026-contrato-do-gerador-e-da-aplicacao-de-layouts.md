@@ -169,7 +169,7 @@ já possui sua própria regra de recorte de Frames atravessados.
 - Não há células vazias dentro dos grupos. Margens, intervalos e espaço externo
   de um bloco centralizado continuam permitidos.
 - Grades uniformes e trilhas repetidas são excluídas segundo o perfil aprovado.
-- Em Layouts por Página, nenhum Frame atravessa o centro e cada bloco é centralizado.
+- Em Layouts gerados por Página, nenhum Frame atravessa o centro e cada bloco é centralizado. A captura de Layouts personalizados conserva os ajustes manuais conforme o design 0029.
 
 Essas exigências estéticas pertencem às sugestões do Gerador. Elas não
 invalidam um Layout personalizado criado a partir da composição manual,

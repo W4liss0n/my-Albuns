@@ -5085,7 +5085,7 @@
         },
         {
           "type": "click",
-          "selector": ".sheet-design-inspector > button:last-child"
+          "selector": ".sheet-design-save-layout > button"
         }
       ]
     },
@@ -5110,7 +5110,7 @@
         },
         {
           "type": "click",
-          "selector": ".sheet-design-inspector > button:last-child"
+          "selector": ".sheet-design-save-layout > button"
         },
         {
           "type": "focus",
@@ -5123,6 +5123,143 @@
         {
           "type": "click",
           "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-custom-duplicate-notice",
+      "title": "Layouts personalizados — aviso neutro de duplicata",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=custom&mode=edit&selection=none&scale=1",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-catalog",
+        "reason": "A SPEC e o design 0029 definem criação global sem modal, miniaturas por origem, aviso de duplicidade e confirmação de exclusão. O corpus usa a geometria do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-catalog-notice",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": ".sheet-design-save-layout > button"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-custom-duplicate-notice-125",
+      "title": "Layouts personalizados — aviso neutro de duplicata a 125%",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=custom&mode=edit&selection=none&scale=1.25",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-catalog",
+        "reason": "A SPEC e o design 0029 definem criação global sem modal, miniaturas por origem, aviso de duplicidade e confirmação de exclusão. O corpus usa a geometria do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-catalog-notice",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": ".sheet-design-save-layout > button"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-custom-duplicate-notice-150",
+      "title": "Layouts personalizados — aviso neutro de duplicata a 150%",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=custom&mode=edit&selection=none&scale=1.5",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-catalog",
+        "reason": "A SPEC e o design 0029 definem criação global sem modal, miniaturas por origem, aviso de duplicidade e confirmação de exclusão. O corpus usa a geometria do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-catalog-notice",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": ".sheet-design-save-layout > button"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-custom-notice-dismissed",
+      "title": "Layouts personalizados — fechar o aviso",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=custom-save&mode=edit&selection=none",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-catalog",
+        "reason": "A SPEC e o design 0029 definem criação global sem modal, miniaturas por origem, aviso de duplicidade e confirmação de exclusão. O corpus usa a geometria do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".sheet-design-save-layout:not(:has(.layout-catalog-notice))",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": ".sheet-design-save-layout > button"
+        },
+        {
+          "type": "click",
+          "selector": ".layout-catalog-notice button[aria-label=\"Fechar aviso\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-custom-notice-collapsed",
+      "title": "Layouts personalizados — aviso com Design da Lâmina recolhido",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=custom-save&mode=edit&selection=none",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-catalog",
+        "reason": "A SPEC e o design 0029 definem criação global sem modal, miniaturas por origem, aviso de duplicidade e confirmação de exclusão. O corpus usa a geometria do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-catalog-menu-feedback > .layout-catalog-notice",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": ".sheet-design-save-layout > button"
+        },
+        {
+          "type": "assert",
+          "selector": ".sheet-design-save-layout > .layout-catalog-notice"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Design da Lâmina\"]"
         }
       ]
     },
@@ -5168,7 +5305,7 @@
         "width": 1440,
         "height": 800
       },
-      "readySelector": ".sheet-design-inspector > button:last-child:disabled",
+      "readySelector": ".sheet-design-save-layout > button:disabled",
       "actions": [
         {
           "type": "assert",

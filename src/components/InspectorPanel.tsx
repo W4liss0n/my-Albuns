@@ -87,7 +87,7 @@ export type InspectorSectionState =
   | { kind: "local" };
 
 export interface InspectorPanelProps {
-  saveLayout?: { enabled: boolean; onSave(): void };
+  saveLayout?: { enabled: boolean; onSave(): void; feedback?: ReactNode };
   frameStyle?: FrameStyleControlActions;
   photoEffects?: PhotoEffectsControlActions;
   photoOrientation?: PhotoOrientationControlActions;

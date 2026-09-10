@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 
 import type { VisualScope } from "../application/scopedValues";
 import type {
@@ -12,7 +12,7 @@ import "./SheetDesignInspector.css";
 export type SheetDesignScope = VisualScope;
 
 interface SheetDesignInspectorProps {
-  saveLayout?: { enabled: boolean; onSave(): void };
+  saveLayout?: { enabled: boolean; onSave(): void; feedback?: ReactNode };
   mediaPreviewUrls: Readonly<Record<string, string>>;
   scope: SheetDesignScope;
   sheet: ComposedSheet;
@@ -59,20 +59,23 @@ export function SheetDesignInspector({
         mediaPreviewUrls={mediaPreviewUrls}
       />
 
-      <ActionButton
-        density="compact"
-        disabled={!saveLayout?.enabled}
-        onClick={saveLayout?.onSave}
-        title={
-          sheet.frames.length === 0
-            ? "Adicione ao menos um Frame para salvar um Layout."
-            : "Salvar a disposição dos Frames em Personalizados."
-        }
-        type="button"
-        variant="secondary"
-      >
-        Salvar disposição como Layout
-      </ActionButton>
+      <div className="sheet-design-save-layout">
+        <ActionButton
+          density="compact"
+          disabled={!saveLayout?.enabled}
+          onClick={saveLayout?.onSave}
+          title={
+            sheet.frames.length === 0
+              ? "Adicione ao menos um Frame para salvar um Layout."
+              : "Salvar a disposição dos Frames em Personalizados."
+          }
+          type="button"
+          variant="secondary"
+        >
+          Salvar disposição como Layout
+        </ActionButton>
+        {saveLayout?.feedback}
+      </div>
     </div>
   );
 }

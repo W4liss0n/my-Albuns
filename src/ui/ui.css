@@ -10,9 +10,12 @@
   white-space: nowrap;
 }
 
-.ui-field-validation-auto-tooltip {
-  --ui-field-validation-pointer-inline-start: 14px;
-  --ui-field-validation-pointer-inline-end: auto;
+.ui-anchored-tooltip {
+  --ui-tooltip-pointer-inline-start: 14px;
+  --ui-tooltip-pointer-inline-end: auto;
+  --ui-tooltip-border: var(--ui-border-strong);
+  --ui-tooltip-background: var(--ui-surface-raised);
+  --ui-tooltip-text: var(--ui-text);
 
   position: absolute;
   z-index: 40;
@@ -21,30 +24,36 @@
   left: 0;
   display: block;
   padding: var(--ui-space-2) 10px;
-  border: 1px solid var(--ui-danger-border);
+  border: 1px solid var(--ui-tooltip-border);
   border-radius: var(--ui-radius);
-  color: var(--ui-danger-text);
-  background: var(--ui-danger-soft);
+  color: var(--ui-tooltip-text);
+  background: var(--ui-tooltip-background);
   box-shadow: var(--ui-shadow-toolbar);
   font-size: var(--ui-font-size-caption);
   line-height: 1.35;
-  pointer-events: none;
   white-space: pre-line;
 }
 
-.ui-field-validation-auto-tooltip::before {
+.ui-anchored-tooltip::before {
   position: absolute;
   top: -5px;
   width: 9px;
   height: 9px;
-  border: 1px solid var(--ui-danger-border);
+  border: 1px solid var(--ui-tooltip-border);
   border-right: 0;
   border-bottom: 0;
-  background: var(--ui-danger-soft);
+  background: var(--ui-tooltip-background);
   content: "";
-  inset-inline-start: var(--ui-field-validation-pointer-inline-start);
-  inset-inline-end: var(--ui-field-validation-pointer-inline-end);
+  inset-inline-start: var(--ui-tooltip-pointer-inline-start);
+  inset-inline-end: var(--ui-tooltip-pointer-inline-end);
   transform: rotate(45deg);
+}
+
+.ui-field-validation-auto-tooltip {
+  --ui-tooltip-border: var(--ui-danger-border);
+  --ui-tooltip-background: var(--ui-danger-soft);
+  --ui-tooltip-text: var(--ui-danger-text);
+  pointer-events: none;
 }
 
 .ui-app-icon {

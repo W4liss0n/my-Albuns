@@ -116,7 +116,7 @@ export function FieldValidationAutoTooltip({
 
   return open ? (
     <span
-      className="ui-field-validation-auto-tooltip"
+      className="ui-anchored-tooltip ui-field-validation-auto-tooltip"
       ref={elementRef}
       role="tooltip"
     >

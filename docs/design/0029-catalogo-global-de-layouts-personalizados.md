@@ -2,6 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-09
+updated: 2026-09-10
 ticket: 27
 implementation-readiness: ready-for-agent
 ---
@@ -16,9 +17,18 @@ O comando captura a geometria confirmada no Core depois das edições pendentes.
 Exige ao menos um Frame e não altera composição, travamento, Projeto ou Histórico.
 
 A definição contém superfície, escopo e retângulos ordenados. Uma travessia
-central determina escopo por Lâmina e conserva as coordenadas. Sem travessia,
-cada bloco é centralizado em sua Página, conservando dimensões, intervalos e
-ordem. A captura de Página única usa a superfície ativa local.
+central determina escopo por Lâmina; sem travessia, o escopo é por Página.
+Conforme correção solicitada em 10/09/2026, ambos preservam as coordenadas
+exatas, dimensões, intervalos e ordem, inclusive os ajustes manuais. Salvar e
+reaplicar na mesma superfície não recentraliza nem desloca os Frames. A
+centralização permanece uma regra do Gerador. A captura de Página única usa
+a superfície ativa local.
+
+O retorno de salvar ou de detectar uma duplicata aparece junto ao botão em
+Design da Lâmina. Quando esse controle não está visível, aparece abaixo do
+menu Editar. O aviso compartilha formato, seta, tipografia e sombra com os
+balões de validação das entradas, usando as cores neutras do programa e um
+botão de fechar. Ele não cobre o canto inferior do Canvas.
 
 A identidade geométrica compara escopo, tipo e proporção da superfície e a
 sequência normalizada de retângulos; não depende de DPI, Unidade ou tamanho

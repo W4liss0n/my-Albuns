@@ -23,9 +23,10 @@ import type { ProjectDialogPort } from "../application/projectDialogPort";
 import type { GraphicsDiagnostic } from "../application/graphics";
 import { mergeMediaPreviewDemands, renderableMediaPreviewUrls } from "../application/mediaPreviews";
 import type { DisplayUnit, EditorProjection } from "../domain/project";
-import { ApplicationHeader, InlineNotice } from "../ui";
+import { ApplicationHeader } from "../ui";
 import { AlbumCanvas } from "./AlbumCanvas";
 import { LayoutPanel } from "./LayoutPanel";
+import { LayoutCatalogNotice } from "./LayoutCatalogNotice";
 import { ApplicationMenuBar } from "./ApplicationMenuBar";
 import {
   ExportPreviewControl,
@@ -611,6 +612,14 @@ export function ProjectWorkspace({
       ),
   });
 
+  const noticeInInspector = inspectorContext.kind === "sheet" &&
+    workspacePanels.panels.inspector.visible &&
+    (workspacePreferences.preferences.inspectorSections["sheet.design"] ?? true);
+  const layoutNotice = controller.layoutCatalog.notice ? <LayoutCatalogNotice
+    message={controller.layoutCatalog.notice}
+    onDismiss={controller.layoutCatalog.dismissNotice}
+  /> : null;
+
   return (
     <div className="app-shell ui-chrome-selection-scope">
       <ApplicationHeader
@@ -620,10 +629,13 @@ export function ProjectWorkspace({
       />
 
       <div className="commandbar">
-        <ApplicationMenuBar
-          disabled={commandsBlocked}
-          groups={applicationMenus}
-        />
+        <div className="layout-catalog-menu-feedback">
+          <ApplicationMenuBar
+            disabled={commandsBlocked}
+            groups={applicationMenus}
+          />
+          {!noticeInInspector && layoutNotice}
+        </div>
         <ExportPreviewControl
           ref={exportControlRef}
           dialogPort={projectDialogPort}
@@ -655,10 +667,6 @@ export function ProjectWorkspace({
           {controller.layoutPanel.visible && <LayoutPanel controller={controller.layoutPanel}
             catalog={controller.layoutCatalog}
             sheet={projection.composition.sheets.find((sheet) => sheet.sheetId === controller.layoutPanel.sheetId)!} />}
-          {controller.layoutCatalog.notice && <InlineNotice className="layout-catalog-notice" role="status">
-            {controller.layoutCatalog.notice}
-            <button type="button" onClick={controller.layoutCatalog.dismissNotice}>Fechar aviso</button>
-          </InlineNotice>}
           <AlbumCanvas
             {...controller.canvasProps}
             onOpenFrameContextMenu={openFrameContextMenu}
@@ -709,7 +717,8 @@ export function ProjectWorkspace({
         )}
 
         {workspacePanels.panels.inspector.visible && <InspectorPanel
-          saveLayout={{ enabled: controller.canSaveLayout, onSave: controller.saveLayout }}
+          saveLayout={{ enabled: controller.canSaveLayout, onSave: controller.saveLayout,
+            feedback: noticeInInspector ? layoutNotice : null }}
           key={projectId}
           frameStyle={controller.frameStyle}
           photoOrientation={{ disabled: !controller.canOrientPhotos,

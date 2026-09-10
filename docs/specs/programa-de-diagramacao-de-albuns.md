@@ -265,7 +265,7 @@ A saída final será uma Exportação JPEG, PNG ou PDF, `Por lâmina` ou `Por p�
 1. Como pessoa diagramadora, quero separar Layouts de página única e Lâmina dupla, para impedir geometrias incompatíveis.
 1. Como pessoa diagramadora, quero usar Layouts por Lâmina que atravessem o centro, para criar organizações contínuas.
 1. Como pessoa diagramadora, quero usar Layouts por Página que nunca atravessem o centro, para manter cada Frame integralmente em um lado.
-1. Como pessoa diagramadora, quero que Layouts por Página centralizem globalmente seus Blocos de Frames, para equilibrar a composição.
+1. Como pessoa diagramadora, quero que Layouts automáticos por Página centralizem globalmente seus Blocos de Frames, para equilibrar a composição.
 1. Como pessoa diagramadora, quero salvar imediatamente a geometria atual como Layout personalizado global no Modo de edição, sem informar um nome, para reutilizá-la em outros Projetos pela própria preview.
 1. Como pessoa diagramadora, quero que cada Janela consulte o catálogo global ao abrir o Painel de Layouts, receber foco ou solicitar atualização, para ver mudanças persistidas sem exigir sincronização instantânea entre processos.
 1. Como pessoa diagramadora, quero impedir Layouts sem Frames e organizações geométricas ordenadas duplicadas, para manter `Personalizados` útil sem confundir sequências visuais diferentes.
@@ -900,10 +900,11 @@ validação das superfícies descritas nesta seção.
 - Desfavoritar remove apenas a cópia do Projeto e não altera Organizações aplicadas. Sem origem disponível, a preview só permanece no painel de uma Lâmina que ainda a conserva como Último Layout aplicado.
 - Layouts copiados para um Projeto acompanham Cópias de Projeto e Geração de Projetos em lote.
 - Layout por Lâmina pode permitir Travessia central.
-- Layout por Página produz uma organização global formada por Blocos de Frames centralizados nas Páginas e nunca permite que um Frame atravesse o centro.
+- Layout por Página nunca permite que um Frame atravesse o centro. O Gerador centraliza seus Blocos de Frames nas Páginas; Layouts personalizados preservam o posicionamento manual capturado.
 - Um Projeto que permite Travessia central admite Layouts por Lâmina e por Página. Essa permissão amplia os candidatos compatíveis; não exige que uma sugestão atravesse o centro.
 - Um Projeto explicitamente restrito a Layouts por Página não oferece nem aplica Layouts com Travessia central. Essa restrição vale para candidatos do Gerador, personalizados, Favoritos e Último Layout aplicado, além dos demais critérios de compatibilidade.
 - Ao salvar um Layout personalizado, a existência de qualquer Travessia central determina escopo por Lâmina; se todos os Frames estiverem integralmente em um dos lados, o escopo é por Página.
+- Salvar um Layout personalizado conserva as coordenadas e dimensões exatas dos Frames, sem recentralização. Reaplicá-lo na mesma superfície reproduz a disposição salva, inclusive os ajustes manuais.
 - Compatibilidade exige o mesmo tipo de superfície e a mesma proporção. Diferenças de tamanho físico, Unidade ou DPI são acomodadas por escala proporcional.
 - Converter uma Lâmina de extremidade entre dupla e página única preserva Fotos, placeholders e estilos, descarta a geometria anterior e destrava a organização. Se houver Frames, aplica o primeiro Layout compatível; se não houver, mantém a Lâmina sem Layout.
 - Na conversão de Lâmina dupla para Página única, aplicações de Background e Overlay por lado preservam o lado que continua ativo e descartam o lado inativo; aplicações de Ambos os lados são reajustadas à área ativa.

@@ -59,8 +59,8 @@ impl LayoutSources<'_> {
 }
 
 impl LayoutRules {
-    /// Captures only ordered geometry. Page blocks are centered independently;
-    /// the source composition and its Frame mapping remain untouched.
+    /// Captures the exact ordered geometry, including manual placement.
+    /// The source composition and its Frame mapping remain untouched.
     pub fn capture_custom(
         surface: LayoutSurface,
         positions: Vec<crate::RectUm>,
@@ -70,7 +70,7 @@ impl LayoutRules {
                 2 * i128::from(r.x) < i128::from(surface.width_um)
                     && 2 * (i128::from(r.x) + i128::from(r.width)) > i128::from(surface.width_um)
             });
-        let mut definition = LayoutDefinition {
+        let definition = LayoutDefinition {
             surface,
             scope: if crosses {
                 LayoutScope::Sheet
@@ -81,9 +81,6 @@ impl LayoutRules {
         };
         if !Self::definition_is_valid(&definition) {
             return Err(CoreError::IncompatibleLayout);
-        }
-        if definition.scope == LayoutScope::Page {
-            center_page_blocks(&mut definition);
         }
         Ok(definition)
     }
@@ -335,37 +332,6 @@ impl LayoutRules {
             placeholder_ids: Vec::new(),
             last_layout: None,
         })
-    }
-}
-
-fn center_page_blocks(definition: &mut LayoutDefinition) {
-    let double = definition.surface.kind == LayoutSurfaceKind::DoubleSheet;
-    let width = definition.surface.width_um;
-    let page_width = if double { width / 2 } else { width };
-    for right in [false, true].into_iter().take(if double { 2 } else { 1 }) {
-        let on_page = |r: &&crate::RectUm| !double || (2 * r.x >= width) == right;
-        let frames = definition
-            .positions
-            .iter()
-            .filter(on_page)
-            .collect::<Vec<_>>();
-        let Some(min_x) = frames.iter().map(|r| r.x).min() else {
-            continue;
-        };
-        let min_y = frames.iter().map(|r| r.y).min().unwrap();
-        let max_x = frames.iter().map(|r| r.x + r.width).max().unwrap();
-        let max_y = frames.iter().map(|r| r.y + r.height).max().unwrap();
-        let page_x = if right { width - page_width } else { 0 };
-        let dx = page_x + (page_width - (max_x - min_x)) / 2 - min_x;
-        let dy = (definition.surface.height_um - (max_y - min_y)) / 2 - min_y;
-        for frame in definition
-            .positions
-            .iter_mut()
-            .filter(|r| !double || (2 * r.x >= width) == right)
-        {
-            frame.x += dx;
-            frame.y += dy;
-        }
     }
 }
 

@@ -2,7 +2,7 @@ use myalbuns_core::{LayoutRules, LayoutScope, LayoutSurface, LayoutSurfaceKind};
 use uuid::Uuid;
 
 #[test]
-fn custom_capture_infers_crossing_and_centers_each_active_page() {
+fn custom_capture_infers_crossing_and_preserves_each_active_page() {
     use myalbuns_core::RectUm;
     let rect = |x, y, width, height| RectUm {
         x,
@@ -16,10 +16,10 @@ fn custom_capture_infers_crossing_and_centers_each_active_page() {
         height_um: 240,
     };
     for (input, expected) in [
-        (vec![rect(320, 20, 60, 80)], vec![rect(420, 80, 60, 80)]),
+        (vec![rect(320, 20, 60, 80)], vec![rect(320, 20, 60, 80)]),
         (
             vec![rect(320, 20, 60, 80), rect(10, 40, 100, 100)],
-            vec![rect(420, 80, 60, 80), rect(100, 70, 100, 100)],
+            vec![rect(320, 20, 60, 80), rect(10, 40, 100, 100)],
         ),
         (vec![rect(300, 0, 300, 240)], vec![rect(300, 0, 300, 240)]),
     ] {
@@ -40,7 +40,7 @@ fn custom_capture_infers_crossing_and_centers_each_active_page() {
     };
     let captured = LayoutRules::capture_custom(single, vec![rect(10, 20, 100, 80)]).unwrap();
     assert_eq!(captured.scope, LayoutScope::Page);
-    assert_eq!(captured.positions, [rect(100, 80, 100, 80)]);
+    assert_eq!(captured.positions, [rect(10, 20, 100, 80)]);
 }
 
 #[test]
@@ -121,7 +121,7 @@ fn custom_and_automatic_geometry_stay_in_their_own_sections_and_keep_priority() 
 }
 
 #[test]
-fn custom_page_layout_centers_the_frame_block_without_changing_its_order() {
+fn custom_page_layout_preserves_manual_placement_and_frame_order() {
     use myalbuns_core::RectUm;
     let surface = LayoutSurface {
         kind: LayoutSurfaceKind::DoubleSheet,
@@ -142,25 +142,9 @@ fn custom_page_layout_centers_the_frame_block_without_changing_its_order() {
             height: 100_000,
         },
     ];
-    let layout = LayoutRules::capture_custom(surface, positions).unwrap();
+    let layout = LayoutRules::capture_custom(surface, positions.clone()).unwrap();
     assert_eq!(layout.scope, LayoutScope::Page);
-    assert_eq!(
-        layout.positions,
-        vec![
-            RectUm {
-                x: 65_000,
-                y: 70_000,
-                width: 60_000,
-                height: 80_000
-            },
-            RectUm {
-                x: 145_000,
-                y: 70_000,
-                width: 90_000,
-                height: 100_000
-            },
-        ]
-    );
+    assert_eq!(layout.positions, positions);
 }
 
 #[test]
