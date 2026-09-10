@@ -1192,7 +1192,7 @@ mod tests {
                     .expect("the namespace is readable before publication")
                     .is_none()
             );
-            tokio::time::sleep(Duration::from_millis(90)).await;
+            wait_for_checkpoint(&fixture.store, &fixture.authority).await;
             let bytes = fixture
                 .store
                 .load(&fixture.authority)
@@ -1275,7 +1275,7 @@ mod tests {
                 .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
                 .expect("the completed action becomes recoverable")
                 .projection;
-            tokio::time::sleep(Duration::from_millis(90)).await;
+            wait_for_checkpoint(&fixture.store, &fixture.authority).await;
             let checkpoint = fixture
                 .store
                 .checkpoint_path(&fixture.authority)
@@ -1391,7 +1391,7 @@ mod tests {
                 .host
                 .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
                 .expect("the completed action becomes recoverable");
-            tokio::time::sleep(Duration::from_millis(90)).await;
+            wait_for_checkpoint(&fixture.store, &fixture.authority).await;
             drop(fixture.host);
 
             let host = ProjectHost::with_recovery(
@@ -1425,7 +1425,7 @@ mod tests {
                 .host
                 .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
                 .expect("the completed action becomes recoverable");
-            tokio::time::sleep(Duration::from_millis(90)).await;
+            wait_for_checkpoint(&fixture.store, &fixture.authority).await;
             drop(fixture.host);
 
             let host = ProjectHost::with_recovery(
@@ -1472,12 +1472,12 @@ mod tests {
     #[test]
     fn explicit_discard_opens_the_last_saved_version_and_finishes_recovery() {
         tauri::async_runtime::block_on(async {
-            let fixture = recovery_fixture();
+            let fixture = recovery_fixture_with_delay(Duration::from_millis(150));
             fixture
                 .host
                 .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
                 .expect("the completed action becomes recoverable");
-            tokio::time::sleep(Duration::from_millis(90)).await;
+            wait_for_checkpoint(&fixture.store, &fixture.authority).await;
             drop(fixture.host);
             let host = ProjectHost::with_recovery(
                 open_editable_project(&fixture.project_path, &fixture.identity_lease_root),
@@ -1560,7 +1560,7 @@ mod tests {
                 .host
                 .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
                 .expect("the completed action becomes recoverable");
-            tokio::time::sleep(Duration::from_millis(90)).await;
+            wait_for_checkpoint(&fixture.store, &fixture.authority).await;
             drop(fixture.host);
             let host = ProjectHost::with_recovery(
                 open_editable_project(&fixture.project_path, &fixture.identity_lease_root),
@@ -1734,7 +1734,7 @@ mod tests {
                 .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
                 .expect("the action is completed before Undo");
             clean.host.undo().expect("Undo returns to the saved state");
-            tokio::time::sleep(Duration::from_millis(90)).await;
+            wait_for_checkpoint(&clean.store, &clean.authority).await;
             assert!(clean.store.load(&clean.authority).unwrap().is_some());
             assert_eq!(
                 clean.host.begin_close(),
@@ -1747,7 +1747,7 @@ mod tests {
                 .host
                 .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
                 .expect("the discarded action is completed");
-            tokio::time::sleep(Duration::from_millis(90)).await;
+            wait_for_checkpoint(&discarded.store, &discarded.authority).await;
             assert_eq!(
                 discarded.host.begin_close(),
                 Ok(ProjectCloseRequestOutcome::ConfirmationRequired)
@@ -1769,7 +1769,7 @@ mod tests {
                 .host
                 .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
                 .expect("the saved action is completed");
-            tokio::time::sleep(Duration::from_millis(90)).await;
+            wait_for_checkpoint(&saved.store, &saved.authority).await;
             assert_eq!(
                 saved.host.begin_close(),
                 Ok(ProjectCloseRequestOutcome::ConfirmationRequired)
@@ -1791,7 +1791,7 @@ mod tests {
                 .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
                 .expect("the action is completed before the failed Save")
                 .projection;
-            tokio::time::sleep(Duration::from_millis(90)).await;
+            wait_for_checkpoint(&fixture.store, &fixture.authority).await;
             assert_eq!(
                 fixture.host.begin_close(),
                 Ok(ProjectCloseRequestOutcome::ConfirmationRequired)
