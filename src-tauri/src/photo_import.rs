@@ -32,7 +32,7 @@ use crate::{
         ImageMemoryEstimate, ImagingProcessor, InvocationContext, InvocationControl,
         InvocationFailureStage, ProcessorAdmissionFailure, TauriImagingTransport,
     },
-    ipc_contract::{ImageProcessingProblem, ImageProcessingProgress, ImportPhotoResult},
+    ipc_contract::{ImageProcessingProblem, ImageProcessingProgress, ImportMediaResult},
     logging::LoggingState,
     media_runtime::{
         ImportedPhotoInspection, MediaBinding, MediaMonitor, MediaObservation, MediaResolver,
@@ -47,6 +47,7 @@ struct SelectedSource {
 }
 
 struct PhotoImportAttempt {
+    kind: MediaKind,
     id: String,
     catalog: AuthorizedMediaCatalog,
     namespace: AuthorizedCacheNamespace,
@@ -56,13 +57,23 @@ struct PhotoImportAttempt {
 }
 
 impl PhotoImportAttempt {
+    #[cfg(test)]
     fn capture(
         catalog: AuthorizedMediaCatalog,
         namespace: AuthorizedCacheNamespace,
         paths: Vec<PathBuf>,
     ) -> Result<Self, String> {
+        Self::capture_for_kind(MediaKind::Photo, catalog, namespace, paths)
+    }
+
+    fn capture_for_kind(
+        kind: MediaKind,
+        catalog: AuthorizedMediaCatalog,
+        namespace: AuthorizedCacheNamespace,
+        paths: Vec<PathBuf>,
+    ) -> Result<Self, String> {
         if catalog.project_id != namespace.project_id() {
-            return Err("O Projeto mudou durante a importação das Fotos.".into());
+            return Err("O Projeto mudou durante a importação das imagens.".into());
         }
         let mut seen = HashSet::new();
         let paths = paths
@@ -72,7 +83,7 @@ impl PhotoImportAttempt {
         let existing = catalog
             .bindings
             .iter()
-            .filter(|binding| binding.kind == MediaKind::Photo)
+            .filter(|binding| binding.kind == kind)
             .map(|binding| binding.logical_path.as_path())
             .collect::<HashSet<_>>();
         let mut context = OperationPathContext::new();
@@ -100,11 +111,12 @@ impl PhotoImportAttempt {
                     source_path: NativePathDto::from(path.clone()),
                     generation_id: uuid::Uuid::new_v4().simple().to_string(),
                 };
-                let before = MediaResolver.observe_in_plan(&roots, &source_binding(path));
+                let before = MediaResolver.observe_in_plan(&roots, &source_binding(kind, path));
                 SelectedSource { candidate, before }
             })
             .collect();
         Ok(Self {
+            kind,
             id: uuid::Uuid::new_v4().simple().to_string(),
             catalog,
             namespace,
@@ -144,12 +156,13 @@ impl PhotoImportAttempt {
     }
 }
 
-pub(crate) async fn import_selected_photos(
+pub(crate) async fn import_selected_media(
     app: &AppHandle,
+    kind: MediaKind,
     paths: Vec<PathBuf>,
     unsupported: Vec<ImageProcessingProblem>,
     publish: impl FnMut(ImageProcessingProgress) + Send,
-) -> Result<ImportPhotoResult, String> {
+) -> Result<ImportMediaResult, String> {
     let host = app.state::<ProjectHost>();
     let catalog = host.authorized_media_catalog()?;
     let namespace = app.state::<ActiveCacheNamespace>().namespace();
@@ -158,7 +171,7 @@ pub(crate) async fn import_selected_photos(
     let unsupported_count = unsupported.len();
     let capture_app = app.clone();
     let (attempt, mut stage, stage_error) = tauri::async_runtime::spawn_blocking(move || {
-        let attempt = PhotoImportAttempt::capture(catalog, namespace, paths)?;
+        let attempt = PhotoImportAttempt::capture_for_kind(kind, catalog, namespace, paths)?;
         let candidates = attempt
             .sources
             .iter()
@@ -177,7 +190,7 @@ pub(crate) async fn import_selected_photos(
         Ok::<_, String>((attempt, stage, error))
     })
     .await
-    .map_err(|_| "Não foi possível preparar a importação das Fotos.".to_string())??;
+    .map_err(|_| "Não foi possível preparar a importação das imagens.".to_string())??;
 
     let requests = if stage.is_some() {
         attempt.requests(app.state::<ImagingProcessor>().cache_capacity())
@@ -239,6 +252,7 @@ pub(crate) async fn import_selected_photos(
             unsupported,
             |path| {
                 inspect_with_capacity(
+                    kind,
                     finish_app.state::<CacheEngine>().inner(),
                     finish_app.state::<ImagingProcessor>().inner(),
                     path,
@@ -249,7 +263,7 @@ pub(crate) async fn import_selected_photos(
         )
     })
     .await
-    .map_err(|_| "Não foi possível validar a importação das Fotos.".to_string())??;
+    .map_err(|_| "Não foi possível validar a importação das imagens.".to_string())??;
 
     let engine = app.state::<CacheEngine>();
     let _commit_permit = engine
@@ -273,7 +287,7 @@ pub(crate) async fn import_selected_photos(
         )
     })
     .await
-    .map_err(|_| "Não foi possível concluir a importação das Fotos.".to_string())??;
+    .map_err(|_| "Não foi possível concluir a importação das imagens.".to_string())??;
     drop(_commit_permit);
     let mut progress = native_progress.finish((new_source_count + unsupported_count) as u32);
     for path in new_paths {
@@ -282,7 +296,7 @@ pub(crate) async fn import_selected_photos(
         }
     }
     progress.prepare_all_in_plan(app, existing, roots).await;
-    if let ImportPhotoResult::Completed { projection, .. } = &mut result {
+    if let ImportMediaResult::Completed { projection, .. } = &mut result {
         *projection = host.projection()?;
     }
     Ok(result)
@@ -311,6 +325,7 @@ fn prepare_proposal_with_inspection(
         .map(|source| (source.candidate.path(), source))
         .collect::<HashMap<_, _>>();
     let mut proposal = PhotoImportsProposal {
+        kind: attempt.kind,
         commands: Vec::new(),
         problems: unsupported,
         inspections: Vec::new(),
@@ -329,7 +344,8 @@ fn prepare_proposal_with_inspection(
             preview,
         }) = outcomes.remove(&source.candidate.source_id)
         {
-            let current = MediaResolver.observe_in_plan(&attempt.roots, &source_binding(path));
+            let current =
+                MediaResolver.observe_in_plan(&attempt.roots, &source_binding(attempt.kind, path));
             if source.before.same_source(&current) && current.matches_fingerprint(&fingerprint) {
                 let metadata = PhotoSourceMetadata::new(
                     dimensions.width_px,
@@ -370,7 +386,7 @@ fn prepare_proposal_with_inspection(
             accepted_paths.push(path.clone());
             cache_problems.entry(path.clone()).or_insert_with(|| {
                 stage_error.clone().unwrap_or_else(|| {
-                    "A Foto exige uma nova tentativa de preparação da miniatura.".into()
+                    "A imagem exige uma nova tentativa de preparação da miniatura.".into()
                 })
             });
         }
@@ -388,7 +404,7 @@ fn prepare_proposal_with_inspection(
 }
 
 struct CommittedImport {
-    result: ImportPhotoResult,
+    result: ImportMediaResult,
     existing: Vec<MediaBinding>,
     roots: RootBindingPlan,
     cache_problems: HashMap<PathBuf, String>,
@@ -429,10 +445,10 @@ fn commit_prepared_import(
         .filter(|command| {
             new_paths.contains(command.path())
                 && !evidence.get(command.path()).is_some_and(|observed| {
-                    observed.same_source(
-                        &MediaResolver
-                            .observe_in_plan(&attempt.roots, &source_binding(command.path())),
-                    )
+                    observed.same_source(&MediaResolver.observe_in_plan(
+                        &attempt.roots,
+                        &source_binding(attempt.kind, command.path()),
+                    ))
                 })
         })
         .map(|command| command.path().to_path_buf())
@@ -457,7 +473,7 @@ fn commit_prepared_import(
                 .to_string_lossy()
                 .into_owned(),
             reason:
-                "O Original mudou antes da conclusão da importação. Selecione a Foto novamente."
+                "O Original mudou antes da conclusão da importação. Selecione a imagem novamente."
                     .into(),
         });
     }
@@ -485,7 +501,7 @@ fn commit_prepared_import(
     let by_path = catalog
         .bindings
         .iter()
-        .filter(|binding| binding.kind == MediaKind::Photo)
+        .filter(|binding| binding.kind == attempt.kind)
         .map(|binding| (binding.logical_path.as_path(), binding))
         .collect::<HashMap<_, _>>();
     let inspections = inspections
@@ -533,7 +549,7 @@ fn commit_prepared_import(
         .bindings
         .into_iter()
         .filter(|binding| {
-            binding.kind == MediaKind::Photo && selected.contains(binding.logical_path.as_path())
+            binding.kind == attempt.kind && selected.contains(binding.logical_path.as_path())
         })
         .collect();
     Ok(CommittedImport {
@@ -686,15 +702,16 @@ async fn execute_import_batch(
     }
 }
 
-fn source_binding(path: &Path) -> MediaBinding {
+fn source_binding(kind: MediaKind, path: &Path) -> MediaBinding {
     MediaBinding {
         media_id: String::new(),
-        kind: MediaKind::Photo,
+        kind,
         logical_path: path.to_path_buf(),
     }
 }
 
 fn inspect_with_capacity(
+    kind: MediaKind,
     engine: &CacheEngine,
     processor: &ImagingProcessor,
     path: &Path,
@@ -727,7 +744,8 @@ fn inspect_with_capacity(
             }
             // This function runs on the blocking pool. A started decoder is
             // drained before returning its memory and exclusive CPU reservation.
-            let proposal = MediaResolver.propose_photo_imports_in_plan(
+            let proposal = MediaResolver.propose_media_imports_in_plan(
+                kind,
                 vec![path.to_path_buf()],
                 bindings,
                 roots,
@@ -739,6 +757,7 @@ fn inspect_with_capacity(
         }
     });
     result.unwrap_or_else(|error| PhotoImportsProposal {
+        kind,
         commands: Vec::new(),
         inspections: Vec::new(),
         problems: vec![ImageProcessingProblem {
@@ -910,7 +929,7 @@ mod tests {
             .host
             .commit_photo_import_proposal(fixture.namespace.project_id(), prepared.proposal)
             .unwrap();
-        let ImportPhotoResult::Completed {
+        let ImportMediaResult::Completed {
             imported_count,
             media_ids,
             projection,
@@ -949,7 +968,7 @@ mod tests {
             prepared,
         )
         .unwrap();
-        let ImportPhotoResult::Completed {
+        let ImportMediaResult::Completed {
             imported_count,
             problems,
             projection,
@@ -1001,7 +1020,7 @@ mod tests {
             .unwrap();
         assert!(matches!(
             result,
-            ImportPhotoResult::Completed {
+            ImportMediaResult::Completed {
                 imported_count: 0,
                 ..
             }

@@ -370,7 +370,7 @@ impl ProjectHost {
         &self,
         paths: Vec<std::path::PathBuf>,
         on_progress: impl FnMut(crate::ipc_contract::ImageProcessingProgress),
-    ) -> Result<crate::ipc_contract::ImportPhotoResult, String> {
+    ) -> Result<crate::ipc_contract::ImportMediaResult, String> {
         let catalog = self.authorized_media_catalog()?;
         let proposal = crate::media_runtime::MediaResolver.propose_photo_imports(
             paths,
@@ -384,21 +384,21 @@ impl ProjectHost {
         &self,
         expected_project_id: &str,
         proposal: crate::media_runtime::PhotoImportsProposal,
-    ) -> Result<crate::ipc_contract::ImportPhotoResult, String> {
+    ) -> Result<crate::ipc_contract::ImportMediaResult, String> {
         let mut project = self.project()?;
         if project.project_id().hyphenated().to_string() != expected_project_id {
             return Err(
-                "O Projeto mudou durante a importação. Selecione as Fotos novamente.".into(),
+                "O Projeto mudou durante a importação. Selecione as imagens novamente.".into(),
             );
         }
         let outcome = project
-            .import_photos(proposal.commands)
+            .import_media(proposal.kind, proposal.commands)
             .map_err(|error| error.to_string())?;
         let photos_by_path = project
             .project()
             .media()
             .iter()
-            .filter(|media| media.kind() == myalbuns_core::MediaKind::Photo)
+            .filter(|media| media.kind() == proposal.kind)
             .map(|media| (media.path(), media.id()))
             .collect::<HashMap<_, _>>();
         let inspections = proposal
@@ -416,7 +416,7 @@ impl ProjectHost {
         if outcome.imported_count > 0 {
             self.schedule_recovery(&project);
         }
-        Ok(crate::ipc_contract::ImportPhotoResult::Completed {
+        Ok(crate::ipc_contract::ImportMediaResult::Completed {
             projection: outcome.projection,
             media_ids: outcome
                 .media_ids
@@ -1317,7 +1317,7 @@ mod tests {
         std::fs::write(&invalid, b"not a JPEG").unwrap();
         let missing = fixture._root.path().join("missing.jpeg");
         for (paths, expected_problems) in [(vec![invalid, missing], 2), (vec![], 0)] {
-            let crate::ipc_contract::ImportPhotoResult::Completed {
+            let crate::ipc_contract::ImportMediaResult::Completed {
                 projection,
                 imported_count,
                 media_ids,
@@ -1341,7 +1341,7 @@ mod tests {
             RgbImage::from_pixel(48, 32, Rgb([20, 120, 220]))
                 .save_with_format(&photo_path, ImageFormat::Jpeg)
                 .expect("the Photo Original is written");
-            let crate::ipc_contract::ImportPhotoResult::Completed {
+            let crate::ipc_contract::ImportMediaResult::Completed {
                 projection,
                 imported_count,
                 ..
@@ -1356,7 +1356,7 @@ mod tests {
             fixture.host.save(projection.state.revision).unwrap();
             assert!(fixture.store.load(&fixture.authority).unwrap().is_none());
             std::fs::remove_file(&photo_path).unwrap();
-            let crate::ipc_contract::ImportPhotoResult::Completed {
+            let crate::ipc_contract::ImportMediaResult::Completed {
                 projection,
                 imported_count,
                 problems,
@@ -1982,7 +1982,7 @@ mod tests {
                 .clone();
             let second_photo_path = media_root.path().join("second-photo.jpeg");
             std::fs::copy(&photo_path, &second_photo_path).unwrap();
-            let crate::ipc_contract::ImportPhotoResult::Completed {
+            let crate::ipc_contract::ImportMediaResult::Completed {
                 media_ids,
                 imported_count,
                 ..

@@ -6,10 +6,10 @@ import type {
   ProjectDialogSession,
 } from "../application/projectDialogPort";
 
-import type { PhotoImportCompletion, ImageProcessingProblem } from "../application/projectPorts";
+import type { MediaImportCompletion, ImageProcessingProblem } from "../application/projectPorts";
 
 interface ProjectOperationResultDialogOptions {
-  importResult?: PhotoImportCompletion | null;
+  importResult?: MediaImportCompletion | null;
   processingProblems?: readonly ImageProcessingProblem[];
   message: string | null;
   projectDialogPort: ProjectDialogPort;

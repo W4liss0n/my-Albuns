@@ -4,7 +4,7 @@ use myalbuns_desktop_lib::ipc_contract::{
     ApplicationSettings, CacheClearAllOutcome, CacheFreeResult, CacheProcessorState,
     CacheProcessorWarning, CacheServiceCommandError, CacheServiceStatus, CancelDisposition,
     ExportCommandError, ExportEvent, ExportResult, FrontendLogEvent, ImageProcessingProgress,
-    ImportPhotoResult, LinkedMediaChanged, MediaFileCatalog, MediaPanelSettings,
+    ImportMediaResult, LinkedMediaChanged, MediaFileCatalog, MediaPanelSettings,
     MediaPanelTabSettings, MediaPreferenceKind, MediaPreview, MediaPreviewCommandError,
     MediaPreviewDemand, MediaPreviewState, MediaSortDirection, MediaThumbnailSizes,
     MediaUsageFilter, OpeningExternalCopyDecision, PointerDragThreshold, ProjectCloseChoice,
@@ -53,7 +53,9 @@ fn main() {
         .expect("media panel settings bindings should be generated");
     MediaPanelTabSettings::export_all(&config)
         .expect("media panel tab settings bindings should be generated");
-    ImportPhotoResult::export_all(&config).expect("Photo import bindings should be generated");
+    ImportMediaResult::export_all(&config).expect("Media import bindings should be generated");
+    myalbuns_desktop_lib::ipc_contract::MediaImportSelection::export_all(&config)
+        .expect("Media selection bindings should be generated");
     MediaFileCatalog::export_all(&config)
         .expect("Original file information bindings should be generated");
     ImageProcessingProgress::export_all(&config)

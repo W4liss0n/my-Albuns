@@ -254,12 +254,26 @@ export interface ImageProcessingProgress {
   problem?: ImageProcessingProblem | null;
 }
 
-export interface PhotoImportCompletion {
+export interface MediaImportCompletion {
   kind: "completed";
   projection: EditorProjection;
   mediaIds: string[];
   importedCount: number;
   problems: ImageProcessingProblem[];
+}
+
+export type MediaImportSelection = {
+  mediaKind: "photo" | "decorative";
+  source: { kind: "files" } | { kind: "folder" } | { kind: "drop"; paths: string[] };
+};
+
+export type MediaFileDrag =
+  | { kind: "over"; x: number; y: number }
+  | { kind: "drop"; x: number; y: number; paths: string[] }
+  | { kind: "leave" };
+
+export interface MediaDropPort {
+  subscribe(listener: (event: MediaFileDrag) => void): Promise<() => void>;
 }
 
 export interface ProjectCorePort {
@@ -279,9 +293,9 @@ export interface ProjectCorePort {
   ): Promise<AlbumInformationValidation>;
   apply(intent: ProjectIntent, onProgress?: (progress: ImageProcessingProgress) => void): Promise<EditorProjection>;
   applyWithOutcome(intent: ProjectIntent, onProgress?: (progress: ImageProcessingProgress) => void): Promise<ProjectMutationOutcome>;
-  importPhoto(onProgress: (progress: ImageProcessingProgress) => void): Promise<
+  importMedia(onProgress: (progress: ImageProcessingProgress) => void, selection: MediaImportSelection): Promise<
     | { kind: "cancelled"; projection: EditorProjection }
-    | PhotoImportCompletion
+    | MediaImportCompletion
   >;
   resolvePhotoDropTarget(
     sheetId: string,

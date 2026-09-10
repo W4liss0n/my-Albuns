@@ -24,10 +24,9 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
         mediaItems={mediaItems}
         mediaUsage={mediaUsage}
         onFillPhoto={() => undefined}
-        onImportPhoto={() => undefined}
+        onImportMedia={() => undefined}
         importPending={new URLSearchParams(window.location.search).get("import") === "pending"}
-        onPhotoDragStart={() => undefined}
-        onPhotoDragEnd={() => undefined}
+        onMediaDragChange={() => undefined}
         onRelinkMedia={() => undefined}
         onRetryUnavailableMedia={async () => undefined}
         preferences={{ kind: "local" }}

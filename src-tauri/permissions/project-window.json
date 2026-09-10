@@ -10,7 +10,7 @@
           "project_state",
           "validate_album_information",
           "apply_project_intent",
-          "import_photo",
+          "import_media",
           "photo_drop_target",
           "preview_frame_geometry",
           "preview_photo_angle",

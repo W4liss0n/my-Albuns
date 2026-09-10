@@ -6,7 +6,7 @@ import type {
   MediaFileInfo,
   ImageProcessingProgress,
   ImageProcessingProblem,
-  PhotoImportCompletion,
+  MediaImportCompletion,
   MediaPreviewDemand,
   ProjectCorePort,
   ProjectWindowPort,
@@ -65,6 +65,7 @@ import {
 } from "./workspacePanelLayout";
 
 interface ProjectWorkspaceProps {
+  mediaDropPort?: import("../application/projectPorts").MediaDropPort;
   projection: EditorProjection;
   projectDialogPort: ProjectDialogPort;
   exportPipelinePort: ExportPipelinePort;
@@ -74,7 +75,7 @@ interface ProjectWorkspaceProps {
   mediaPreviews: Readonly<Record<string, MediaPreview>>;
   mediaFiles?: Readonly<Record<string, MediaFileInfo>>;
   onMediaDemandChange(demand: MediaPreviewDemand): void;
-  prepareMediaPresentation?(imported: PhotoImportCompletion, demand: MediaPreviewDemand): Promise<readonly ImageProcessingProblem[]>;
+  prepareMediaPresentation?(imported: MediaImportCompletion, demand: MediaPreviewDemand): Promise<readonly ImageProcessingProblem[]>;
   onRetryUnavailableMedia(mediaId: string, onProgress: (progress: ImageProcessingProgress) => void): Promise<void>;
   onProjectionChange(projection: EditorProjection): void;
   onGraphicsUnavailable(diagnostic: GraphicsDiagnostic): void;
@@ -88,6 +89,7 @@ interface ProjectWorkspaceProps {
 const SHEET_EDITING_MEDIA_PANEL_HEIGHT = 120;
 
 export function ProjectWorkspace({
+  mediaDropPort,
   projection,
   projectDialogPort,
   exportPipelinePort,
@@ -124,7 +126,7 @@ export function ProjectWorkspace({
   const projectId = projection.state.projectId;
   useEffect(() => {
     setMediaSelectionRequest(null);
-    setDraggedPhotoId(null);
+    setMediaDrag(null);
   }, [projectId]);
   useEffect(() => {
     if (workspacePreferences.ready) onPreferencesReady(projectId);
@@ -132,7 +134,8 @@ export function ProjectWorkspace({
   const [exportActive, setExportActive] = useState(false);
   const [saveAsBarrierActive, setSaveAsBarrierActive] = useState(false);
   const saveAsBarrierRef = useRef(false);
-  const [draggedPhotoId, setDraggedPhotoId] = useState<string | null>(null);
+  const [mediaDrag, setMediaDrag] = useState<import("./useMediaDragGesture").MediaDrag | null>(null);
+  const draggedPhotoId = mediaDrag?.kind === "photo" ? mediaDrag.mediaId : null;
   const [mediaSelectionRequest, setMediaSelectionRequest] = useState<{ mediaId: string } | null>(null);
   const [sheetContextMenu, setSheetContextMenu] = useState<{
     position: { x: number; y: number };
@@ -503,7 +506,7 @@ export function ProjectWorkspace({
   const sheetNavigationActive =
     canvasMode.kind === "normal" &&
     controller.selectedFrames.length === 0 &&
-    draggedPhotoId === null &&
+    mediaDrag === null &&
     sheetContextMenu === null &&
     !commandsBlocked &&
     !structuralCommandsBlocked &&
@@ -532,10 +535,10 @@ export function ProjectWorkspace({
   useProjectCommandShortcuts({
     copyFrames: () => { void controller.copyFrames(); },
     pasteFrames: () => { void controller.pasteFrames(); },
-    frameClipboardActive: canvasMode.kind === "sheet-editing" && draggedPhotoId === null && sheetContextMenu === null && frameContextMenu === null,
+    frameClipboardActive: canvasMode.kind === "sheet-editing" && mediaDrag === null && sheetContextMenu === null && frameContextMenu === null,
     deleteFrames: () => { void controller.deleteFrames(); },
     arrangeFrames: (action) => { void controller.arrangeFrames(action); },
-    frameCommandsActive: controller.canDeleteFrames && draggedPhotoId === null && sheetContextMenu === null && frameContextMenu === null,
+    frameCommandsActive: controller.canDeleteFrames && mediaDrag === null && sheetContextMenu === null && frameContextMenu === null,
     canDeleteSheet: implicitSheetAvailability.canDelete,
     canRedo: projection.state.canRedo,
     canUndo: projection.state.canUndo,
@@ -673,7 +676,8 @@ export function ProjectWorkspace({
             onOpenFrameContextMenu={openFrameContextMenu}
             onOpenEmptyCanvasContextMenu={openEmptyCanvasContextMenu}
             draggedPhotoId={draggedPhotoId}
-            onPhotoDragCancel={() => setDraggedPhotoId(null)}
+            mediaDrag={mediaDrag}
+            onPhotoDragCancel={() => setMediaDrag(null)}
             sheetReorder={{
               disabled: structuralCommandsBlocked,
               representation: sheetReorderRepresentation(
@@ -779,6 +783,7 @@ export function ProjectWorkspace({
         />}
 
         <MediaPanel
+          dropPort={mediaDropPort}
           key={`media-${projectId}`}
           mediaFiles={mediaFiles}
           hidden={!workspacePanels.panels.media.visible || controller.layoutPanel.visible}
@@ -788,13 +793,13 @@ export function ProjectWorkspace({
           onFillPhoto={controller.fillMedia}
           selectionRequest={mediaSelectionRequest}
           importPending={controller.importPending}
-          onImportPhoto={() => {
-            void controller.importPhoto().then((mediaId) => {
+          onImportMedia={(selection) => {
+            void controller.importMedia(selection).then((mediaId) => {
               if (mediaId) setMediaSelectionRequest({ mediaId });
             });
           }}
-          onPhotoDragStart={setDraggedPhotoId}
-          onPhotoDragEnd={() => setDraggedPhotoId(null)}
+          onMediaDragChange={setMediaDrag}
+          dragThreshold={controller.frameStyle.dragThreshold}
           onRelinkMedia={controller.relinkMedia}
           onRetryUnavailableMedia={(mediaId) => controller.retryUnavailableMedia(
             (publish) => onRetryUnavailableMedia(mediaId, publish),

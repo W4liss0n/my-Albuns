@@ -64,9 +64,6 @@ fn prepare_photo(
         .map_err(|error| error.to_string())?;
     let fingerprint = fingerprint_source(candidate.source_id.as_str(), &resolved)?;
     let opened = open_cache_source(&resolved).map_err(|failure| failure.message)?;
-    if !opened.is_jpeg() {
-        return Err("Escolha um Arquivo JPEG válido (.jpg ou .jpeg).".into());
-    }
     if opened.pixel_count().map_err(|failure| failure.message)? > request.policy.max_decoded_pixels
     {
         return Err("O Original excede o limite de pixels do Cache.".into());
@@ -193,6 +190,43 @@ mod tests {
             candidates,
             policy: CacheRepresentationPolicy::measured_v1(),
             root_bindings: context.freeze(),
+        }
+    }
+
+    #[test]
+    fn png_and_tiff_imports_preserve_transparency_in_the_prepared_preview() {
+        for format in [ImageFormat::Png, ImageFormat::Tiff] {
+            let root = tempfile::tempdir().unwrap();
+            let paths =
+                AppPaths::from_roots(&root.path().join("roaming"), &root.path().join("local"));
+            let request = request(root.path(), &paths, 1);
+            image::RgbaImage::from_pixel(31, 17, image::Rgba([21, 70, 150, 100]))
+                .save_with_format(request.candidates[0].path(), format)
+                .unwrap();
+            let completion = prepare(&request, &paths, |_, _| Ok(())).unwrap();
+            let PhotoImportOutcome::Validated {
+                dimensions,
+                preview: ImportedPhotoPreview::Prepared { generation },
+                ..
+            } = &completion.photos[0].outcome
+            else {
+                panic!(
+                    "PNG/TIFF must prepare successfully: {:?}",
+                    completion.photos[0].outcome
+                )
+            };
+            assert_eq!((dimensions.width_px, dimensions.height_px), (31, 17));
+            let output = request
+                .cache_paths
+                .import_preview_file(
+                    &request.attempt_id,
+                    request.candidates[0].source_id.as_str(),
+                    &generation.generation_id,
+                    generation.format,
+                )
+                .unwrap();
+            let image = image::open(output).unwrap().to_rgba8();
+            assert_eq!(image.get_pixel(0, 0).0, [21, 70, 150, 100]);
         }
     }
 

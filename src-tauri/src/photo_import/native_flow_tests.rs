@@ -75,12 +75,17 @@ fn inputs(root: &Path) -> InputSet {
         .save_with_format(&png, ImageFormat::Png)
         .unwrap();
     paths.push(png);
+    let tiff = root.join("overlay.tiff");
+    image::RgbaImage::from_pixel(37, 23, image::Rgba([40, 80, 160, 100]))
+        .save_with_format(&tiff, ImageFormat::Tiff)
+        .unwrap();
+    paths.push(tiff);
     paths.push(paths[0].clone());
     InputSet {
         paths,
-        imported: 42,
-        previews: 41,
-        rejected: 2,
+        imported: 44,
+        previews: 43,
+        rejected: 1,
         host_decodes: 1,
     }
 }
@@ -88,6 +93,13 @@ fn inputs(root: &Path) -> InputSet {
 #[test]
 #[ignore = "executed by scripts/Test-Rust.ps1 with the real debug sidecar"]
 fn real_import_flow() {
+    run_real_import_flow(MediaKind::Photo);
+    if std::env::var_os("MYALBUNS_IMPORT_MEASUREMENT_INPUTS").is_none() {
+        run_real_import_flow(MediaKind::Decorative);
+    }
+}
+
+fn run_real_import_flow(kind: MediaKind) {
     let executable = PathBuf::from(
         std::env::var_os("MYALBUNS_TEST_IMAGING_PROCESSOR").expect("real Processor path"),
     );
@@ -132,7 +144,8 @@ fn real_import_flow() {
         let monitor = MediaMonitor::default();
         let runtime = MediaRuntime::default();
         let total_started = Instant::now();
-        let attempt = PhotoImportAttempt::capture(
+        let attempt = PhotoImportAttempt::capture_for_kind(
+            kind,
             host.authorized_media_catalog().unwrap(),
             namespace.clone(),
             inputs.paths.clone(),
@@ -269,7 +282,7 @@ fn real_import_flow() {
             HashMap::new(),
             None,
             Vec::new(),
-            |path| inspect_with_capacity(&engine, &processor, path, &bindings, &roots),
+            |path| inspect_with_capacity(kind, &engine, &processor, path, &bindings, &roots),
         )
         .unwrap();
         assert_eq!(
@@ -324,7 +337,7 @@ fn real_import_flow() {
             committed.cache_problems.len(),
             inputs.imported - inputs.previews
         );
-        let ImportPhotoResult::Completed {
+        let ImportMediaResult::Completed {
             imported_count,
             problems,
             projection,
@@ -336,6 +349,14 @@ fn real_import_flow() {
         assert_eq!(imported_count as usize, inputs.imported);
         assert_eq!(problems.len(), inputs.rejected);
         assert_eq!(projection.state.revision, 1);
+        assert!(
+            projection
+                .state
+                .album
+                .media
+                .iter()
+                .all(|media| media.kind == kind)
+        );
         let catalog = host.authorized_media_catalog().unwrap();
         assert!(
             monitor

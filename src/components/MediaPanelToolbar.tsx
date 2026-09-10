@@ -28,7 +28,7 @@ interface MediaPanelToolbarProps {
   importDisabled?: boolean;
   itemCount: number;
   importPending?: boolean;
-  onImportPhoto(): void;
+  onImportMedia(source: "files" | "folder"): void;
   onActiveMediaKindChange(mediaKind: MediaKind): void;
   onPreferencesChange(preferences: Partial<MediaPanelViewPreferences>): void;
   onSearchChange(search: string): void;
@@ -48,7 +48,7 @@ export function MediaPanelToolbar({
   importDisabled = false,
   itemCount,
   importPending = false,
-  onImportPhoto,
+  onImportMedia,
   onActiveMediaKindChange,
   onPreferencesChange,
   onSearchChange,
@@ -137,22 +137,21 @@ export function MediaPanelToolbar({
             role="menu"
           >
             <button
-              disabled={activeMediaKind !== "photo" || importDisabled}
+              disabled={importDisabled}
               role="menuitem"
               type="button"
               onClick={() => {
                 setOpenPopup(null);
-                onImportPhoto();
+                onImportMedia("files");
               }}
             >
-              Arquivos JPEG…
+              Arquivos…
             </button>
             <button
-              data-placeholder-feature="import-media-folder"
-              disabled
+              disabled={importDisabled}
               role="menuitem"
-              title={PLACEHOLDER_TITLE}
               type="button"
+              onClick={() => { setOpenPopup(null); onImportMedia("folder"); }}
             >
               Pasta…
             </button>

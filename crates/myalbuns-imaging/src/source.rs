@@ -117,10 +117,6 @@ struct TiffPreflight {
 }
 
 impl OpenRenderSource {
-    pub(crate) fn is_jpeg(&self) -> bool {
-        matches!(self.preflight, SourcePreflight::Jpeg(_))
-    }
-
     pub(crate) fn byte_count(&self) -> u64 {
         self.source_bytes
     }

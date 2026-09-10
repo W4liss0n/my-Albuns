@@ -394,17 +394,16 @@ test("shows only the resolved Photo target and drops only after a valid highligh
     y: 0,
     toJSON: () => ({}),
   });
-  const host = view.container.querySelector(".canvas-host")!;
-  const dataTransfer = { dropEffect: "none" };
 
-  fireEvent.dragOver(host, { clientX: 600, clientY: 250, dataTransfer });
+
+  view.rerenderCanvas({ mediaDrag: { gestureId: 1, mediaId: "media-002", kind: "photo", x: 600, y: 250, shiftKey: false, phase: "dragging" } });
   await waitFor(() => {
     expect(displayWithLabel("frame-photo-drop-frame-001").visible).toBe(true);
   });
   expect(displayWithLabel("sheet-photo-drop-sheet-001").visible).toBe(false);
-  expect(dataTransfer.dropEffect).toBe("copy");
 
-  fireEvent.drop(host, { clientX: 600, clientY: 250, dataTransfer });
+
+  view.rerenderCanvas({ mediaDrag: { gestureId: 1, mediaId: "media-002", kind: "photo", x: 600, y: 250, shiftKey: false, phase: "drop" } });
   await waitFor(() => expect(onDropPhoto).toHaveBeenCalledOnce());
   expect(onDropPhoto).toHaveBeenCalledWith(
     "media-002",
@@ -413,7 +412,7 @@ test("shows only the resolved Photo target and drops only after a valid highligh
   expect(onPhotoDragCancel).toHaveBeenCalledOnce();
 });
 
-test("does not drop on a new point while its resolved highlight is still pending", async () => {
+test("waits for the released point and ignores an older pending hover result", async () => {
   let resolveFirst!: (target: {
     kind: "frame";
     frameId: string;
@@ -422,6 +421,7 @@ test("does not drop on a new point while its resolved highlight is still pending
     kind: "frame";
     frameId: string;
   }) => void;
+  let resolveDrop!: (target: { kind: "frame"; frameId: string }) => void;
   const onResolvePhotoDropTarget = vi
     .fn()
     .mockImplementationOnce(
@@ -435,7 +435,8 @@ test("does not drop on a new point while its resolved highlight is still pending
         new Promise((resolve) => {
           resolveSecond = resolve;
         }),
-    );
+    )
+    .mockImplementationOnce(() => new Promise((resolve) => { resolveDrop = resolve; }));
   const onDropPhoto = vi.fn(async () => true);
   const view = renderCanvas({
     compositionPlan: interactiveComposition,
@@ -456,10 +457,9 @@ test("does not drop on a new point while its resolved highlight is still pending
     y: 0,
     toJSON: () => ({}),
   });
-  const host = view.container.querySelector(".canvas-host")!;
-  const dataTransfer = { dropEffect: "none" };
 
-  fireEvent.dragOver(host, { clientX: 560, clientY: 250, dataTransfer });
+
+  view.rerenderCanvas({ mediaDrag: { gestureId: 1, mediaId: "media-002", kind: "photo", x: 560, y: 250, shiftKey: false, phase: "dragging" } });
   await waitFor(() => expect(onResolvePhotoDropTarget).toHaveBeenCalledOnce());
   await act(async () => {
     resolveFirst({ kind: "frame", frameId: "frame-001" });
@@ -468,15 +468,18 @@ test("does not drop on a new point while its resolved highlight is still pending
     expect(displayWithLabel("frame-photo-drop-frame-001").visible).toBe(true);
   });
 
-  fireEvent.dragOver(host, { clientX: 680, clientY: 250, dataTransfer });
+  view.rerenderCanvas({ mediaDrag: { gestureId: 1, mediaId: "media-002", kind: "photo", x: 680, y: 250, shiftKey: false, phase: "dragging" } });
   await waitFor(() => expect(onResolvePhotoDropTarget).toHaveBeenCalledTimes(2));
-  fireEvent.drop(host, { clientX: 680, clientY: 250, dataTransfer });
+  view.rerenderCanvas({ mediaDrag: { gestureId: 1, mediaId: "media-002", kind: "photo", x: 680, y: 250, shiftKey: false, phase: "drop" } });
 
   expect(onDropPhoto).not.toHaveBeenCalled();
   await act(async () => {
     resolveSecond({ kind: "frame", frameId: "frame-001" });
   });
   expect(displayWithLabel("frame-photo-drop-frame-001").visible).toBe(false);
+  expect(onDropPhoto).not.toHaveBeenCalled();
+  await act(async () => { resolveDrop({ kind: "frame", frameId: "frame-001" }); });
+  expect(onDropPhoto).toHaveBeenCalledOnce();
 });
 
 test("Esc and an invalid Photo target cancel without a Project mutation", async () => {
@@ -505,12 +508,11 @@ test("Esc and an invalid Photo target cancel without a Project mutation", async 
     y: 0,
     toJSON: () => ({}),
   });
-  const host = view.container.querySelector(".canvas-host")!;
-  const dataTransfer = { dropEffect: "none" };
 
-  fireEvent.dragOver(host, { clientX: 600, clientY: 250, dataTransfer });
+
+  view.rerenderCanvas({ mediaDrag: { gestureId: 1, mediaId: "media-002", kind: "photo", x: 600, y: 250, shiftKey: false, phase: "dragging" } });
   await waitFor(() => expect(onResolvePhotoDropTarget).toHaveBeenCalled());
-  fireEvent.drop(host, { clientX: 600, clientY: 250, dataTransfer });
+  view.rerenderCanvas({ mediaDrag: { gestureId: 1, mediaId: "media-002", kind: "photo", x: 600, y: 250, shiftKey: false, phase: "drop" } });
   expect(onDropPhoto).not.toHaveBeenCalled();
 
   fireEvent.keyDown(window, { key: "Escape" });

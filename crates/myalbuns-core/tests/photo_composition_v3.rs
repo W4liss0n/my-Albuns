@@ -105,6 +105,76 @@ fn multiple_photos_commit_once_and_preserve_existing_links_through_undo_and_reop
 }
 
 #[test]
+fn decorative_batch_has_its_own_links_and_one_history_entry() {
+    let root = tempfile::tempdir().unwrap();
+    let project_path = root.path().join("Decorativos.myalbuns");
+    let paths = ["fundo.png", "moldura.tiff"].map(|name| root.path().join(name));
+    let core = ProjectCore::new()
+        .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"));
+    let mut project = create_project(&core, &project_path);
+    let photo = project
+        .import_photo(ImportPhoto::new(paths[0].clone(), photo_metadata()))
+        .unwrap();
+    project.save(1).unwrap();
+    let imported = project
+        .import_media(
+            MediaKind::Decorative,
+            vec![
+                ImportPhoto::new(paths[0].clone(), photo_metadata()),
+                ImportPhoto::new(paths[1].clone(), photo_metadata()),
+                ImportPhoto::new(paths[0].clone(), photo_metadata()),
+            ],
+        )
+        .unwrap();
+    assert_eq!(imported.imported_count, 2);
+    assert_eq!(imported.media_ids.len(), 2);
+    assert_ne!(imported.media_ids[0], photo.media_id);
+    assert_eq!(imported.projection.state.revision, 2);
+    assert!(
+        imported.projection.state.album.media[1..]
+            .iter()
+            .all(|media| media.kind == MediaKind::Decorative)
+    );
+    let undone = project.undo().unwrap();
+    assert_eq!(undone.state.album.media.len(), 1);
+    assert!(!undone.state.dirty);
+    let redone = project.redo().unwrap();
+    project.save(redone.state.revision).unwrap();
+    let repeated = project
+        .import_media(
+            MediaKind::Decorative,
+            paths
+                .iter()
+                .cloned()
+                .map(ImportPhoto::select_existing)
+                .collect(),
+        )
+        .unwrap();
+    assert_eq!(repeated.imported_count, 0);
+    assert_eq!(repeated.projection.state.revision, redone.state.revision);
+    assert!(!repeated.projection.state.dirty);
+    drop(project);
+    let reopened = core
+        .open_editable(OpenProjectRequest::new(location(&project_path)))
+        .unwrap();
+    assert_eq!(
+        reopened
+            .project()
+            .media()
+            .iter()
+            .map(|media| (media.id(), media.kind()))
+            .collect::<Vec<_>>(),
+        redone
+            .state
+            .album
+            .media
+            .iter()
+            .map(|media| (media.id.into_uuid(), media.kind))
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
 fn imported_photo_adds_one_filled_frame_and_persists_only_the_external_link() {
     let root = tempfile::tempdir().expect("temporary first-photo Project");
     let project_path = root.path().join("Primeira composição.myalbuns");

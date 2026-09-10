@@ -15,6 +15,7 @@ import {
 import { installDesktopWebViewPolicy } from "./platform/desktopWebViewPolicy";
 import { tauriLogger } from "./platform/tauriLogger";
 import { tauriProjectWindowPort } from "./platform/tauriProjectWindowPort";
+import { tauriMediaDropPort } from "./platform/tauriMediaDropPort";
 import { tauriProjectDialogPort } from "./platform/tauriProjectDialogPort";
 import { tauriWindowControls } from "./platform/tauriWindowControls";
 import { WindowControlsProvider } from "./ui";
@@ -27,6 +28,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
       <App
         exportPipelinePort={tauriExportPipelinePort}
         mediaPreviewPort={tauriMediaPreviewPort}
+        mediaDropPort={tauriMediaDropPort}
         projectStartupPort={tauriProjectStartupPort}
         projectCorePort={tauriProjectCorePort}
         projectDialogPort={tauriProjectDialogPort}

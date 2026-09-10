@@ -42,7 +42,7 @@ function harness() {
     queryLayouts: async () => { throw new Error("Layouts are not configured in this fixture."); },
     previewLayout: async () => { throw new Error("Layouts are not configured in this fixture."); },
     previewFrameStyle: preview, previewPhotoAngle: unsupported, previewFrameGeometry: unsupported, saveAs: unsupported,
-    validateAlbumInformation: unsupported, importPhoto: unsupported, resolvePhotoDropTarget: unsupported, relink: unsupported,
+    validateAlbumInformation: unsupported, importMedia: unsupported, resolvePhotoDropTarget: unsupported, relink: unsupported,
   };
   const sheetId = initial.state.album.sheets[0].id;
   useEditorView.setState({ projectId: initial.state.projectId, editingSheetId: sheetId,

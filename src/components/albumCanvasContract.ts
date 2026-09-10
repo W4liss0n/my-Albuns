@@ -101,6 +101,7 @@ export interface AlbumCanvasProps {
   centeredSheetId: string | null;
   viewport: ViewportState;
   draggedPhotoId?: string | null;
+  mediaDrag?: import("./useMediaDragGesture").MediaDrag | null;
   sheetReorder?: CanvasSheetReorder;
   sheetSideSwap?: {
     disabled: boolean;

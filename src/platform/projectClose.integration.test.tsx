@@ -51,7 +51,7 @@ function projectCorePortWithApply(
       affectedFrameId: "frame-001",
       affectedSheetId: null,
     }),
-    importPhoto: async () => ({ kind: "cancelled", projection }),
+    importMedia: async () => ({ kind: "cancelled", projection }),
     ...emptyLayoutCatalogPort,
     readFrameDragThreshold: async () => ({ x: 5, y: 5 }),
     readSliderDoubleClickTime: async () => 500,

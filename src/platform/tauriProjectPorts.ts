@@ -40,7 +40,7 @@ import { LayoutExportBlockedError } from "../application/projectPorts";
 import { parseLayoutExportProblems } from "./layoutExportContract";
 import type { ExportEvent as IpcExportEvent } from "./generated/ExportEvent";
 import type { ExportResult as IpcExportResult } from "./generated/ExportResult";
-import type { ImportPhotoResult as IpcImportPhotoResult } from "./generated/ImportPhotoResult";
+import type { ImportMediaResult as IpcImportMediaResult } from "./generated/ImportMediaResult";
 import type { ImageProcessingProgress as IpcImageProcessingProgress } from "./generated/ImageProcessingProgress";
 import type { LinkedMediaChanged as IpcLinkedMediaChanged } from "./generated/LinkedMediaChanged";
 import type { MediaPreview as IpcMediaPreview } from "./generated/MediaPreview";
@@ -320,7 +320,7 @@ export const tauriProjectCorePort: ProjectCorePort = {
     ).projection,
   applyWithOutcome: (intent: ProjectIntent, onProgress) =>
     invokeImageProcessing<ProjectMutationOutcome>("apply_project_intent", { intent }, onProgress),
-  importPhoto: (onProgress) => invokeImageProcessing<IpcImportPhotoResult>("import_photo", {}, onProgress),
+  importMedia: (onProgress, selection) => invokeImageProcessing<IpcImportMediaResult>("import_media", { selection }, onProgress),
   resolvePhotoDropTarget: (
     sheetId: string,
     xUm: number,

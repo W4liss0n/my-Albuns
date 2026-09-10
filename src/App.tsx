@@ -13,6 +13,7 @@ import type {
   ExportPipelinePort,
   CacheProcessorWarning,
   MediaPreview,
+  MediaDropPort,
   MediaFileCatalog,
   ImageProcessingProgress,
   ImageProcessingProblem,
@@ -20,7 +21,7 @@ import type {
   MediaPreviewPort,
   ProjectStartupPort,
   ProjectCorePort,
-  PhotoImportCompletion,
+  MediaImportCompletion,
   ProjectWindowPort,
 } from "./application/projectPorts";
 import type { ProjectDialogPort } from "./application/projectDialogPort";
@@ -47,6 +48,7 @@ import "./App.css";
 type AppProps = {
   exportPipelinePort: ExportPipelinePort;
   mediaPreviewPort: MediaPreviewPort;
+  mediaDropPort?: MediaDropPort;
   projectStartupPort: ProjectStartupPort;
   projectCorePort: ProjectCorePort;
   projectDialogPort: ProjectDialogPort;
@@ -80,6 +82,7 @@ interface ImportPresentation {
 function App({
   exportPipelinePort,
   mediaPreviewPort,
+  mediaDropPort,
   projectStartupPort,
   projectCorePort,
   projectDialogPort,
@@ -306,7 +309,7 @@ function App({
   }, [projectId, mediaPreviewPort]);
 
   const prepareMediaPresentation = useCallback(async (
-    completion: PhotoImportCompletion,
+    completion: MediaImportCompletion,
     demand: MediaPreviewDemand,
   ): Promise<readonly ImageProcessingProblem[]> => {
     const imported = completion.projection;
@@ -682,6 +685,7 @@ function App({
         probe={canvasGraphicsDiagnosticProbe}
       >
         <ProjectWorkspace
+          mediaDropPort={mediaDropPort}
           projection={projection}
           exportPipelinePort={exportPipelinePort}
           projectDialogPort={projectDialogPort}

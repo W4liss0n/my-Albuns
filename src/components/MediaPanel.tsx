@@ -11,6 +11,7 @@ import {
 } from "react";
 import type {
   MediaPreview,
+  MediaImportSelection,
   MediaFileInfo,
   MediaPreviewDemand,
 } from "../application/projectPorts";
@@ -31,6 +32,8 @@ import { MediaPanelEmptyState } from "./MediaPanelEmptyState";
 import { MediaPanelToolbar } from "./MediaPanelToolbar";
 import { MediaPreviewCard } from "./MediaPreviewCard";
 import { isTextEntryTarget } from "./isTextEntryTarget";
+import { useMediaFileDrop } from "./useMediaFileDrop";
+import { useMediaDragGesture, type MediaDrag } from "./useMediaDragGesture";
 import "./MediaPanel.css";
 import { MEDIA_PANEL_PRELOAD_MARGIN, mediaPanelViewportDemand } from "./mediaPanelViewport";
 
@@ -85,9 +88,10 @@ interface MediaPanelProps {
   onFillPhoto(mediaId: string): void;
   selectionRequest?: { mediaId: string } | null;
   importPending?: boolean;
-  onImportPhoto(): void;
-  onPhotoDragStart(mediaId: string): void;
-  onPhotoDragEnd(): void;
+  onImportMedia(selection: MediaImportSelection): void;
+  dropPort?: import("../application/projectPorts").MediaDropPort;
+  onMediaDragChange(drag: MediaDrag | null): void;
+  dragThreshold?: import("../application/projectPorts").PointerDragThreshold | null;
   onRelinkMedia(mediaId: string): void;
   onRetryUnavailableMedia(mediaId: string): Promise<void>;
   relinkDisabled?: boolean;
@@ -110,9 +114,10 @@ export function MediaPanel({
   onFillPhoto,
   selectionRequest,
   importPending = false,
-  onImportPhoto,
-  onPhotoDragStart,
-  onPhotoDragEnd,
+  onImportMedia,
+  dropPort,
+  onMediaDragChange,
+  dragThreshold = { x: 5, y: 5 },
   onRelinkMedia,
   onRetryUnavailableMedia,
   relinkDisabled = false,
@@ -212,7 +217,11 @@ export function MediaPanel({
         ? "filtered"
         : null;
   const gridRef = useRef<HTMLDivElement>(null);
-  const transparentDragImageRef = useRef<HTMLCanvasElement>(null);
+  const mediaDrag = useMediaDragGesture({ threshold: dragThreshold, disabled: Boolean(hidden) || importPending || relinkDisabled, onChange: onMediaDragChange });
+  const panelHostRef = useRef<HTMLElement>(null);
+  const fileDrop = useMediaFileDrop({ port: dropPort, host: panelHostRef,
+    hidden: Boolean(hidden), disabled: importPending || relinkDisabled,
+    mediaKind: activeMediaKind, onImport: onImportMedia });
   const observedDemandByKind = useRef<Record<MediaKind, MediaPreviewDemand>>({
     photo: { visibleMediaIds: [], preloadMediaIds: [] },
     decorative: { visibleMediaIds: [], preloadMediaIds: [] },
@@ -507,26 +516,15 @@ export function MediaPanel({
   return (
     <section
       id="media-panel"
-      className="media-panel"
+      ref={panelHostRef}
+      className={`media-panel${fileDrop.over ? " media-panel--file-drop" : ""}`}
       hidden={hidden}
       data-project-command-context="media-panel"
       aria-label="Painel de imagens"
       onKeyDown={selectAllVisibleMedia}
     >
-      <canvas
-        aria-hidden="true"
-        height={1}
-        ref={transparentDragImageRef}
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          width: 1,
-          height: 1,
-          pointerEvents: "none",
-        }}
-        width={1}
-      />
+      {fileDrop.over && <div className="media-file-drop-hint" role="status">Solte para importar em {activeMediaKind === "photo" ? "Fotos" : "Decorativos"}</div>}
+      {fileDrop.error && <div className="media-file-drop-error" role="status">{fileDrop.error}</div>}
       <MediaPanelToolbar
         activeMediaKind={activeMediaKind}
         missingCounts={missingCounts}
@@ -541,7 +539,7 @@ export function MediaPanel({
         search={search}
         importDisabled={relinkDisabled || importPending}
         importPending={importPending}
-        onImportPhoto={onImportPhoto}
+        onImportMedia={(kind) => onImportMedia({ mediaKind: activeMediaKind, source: { kind } })}
         onActiveMediaKindChange={setActiveMediaKind}
         onPreferencesChange={updatePreferences}
         onSearchChange={(nextSearch) => {
@@ -603,30 +601,14 @@ export function MediaPanel({
                 data-media-id={media.id}
                 data-used={String(isUsed)}
                 dimmed={isUsed}
-                draggable={media.kind === "photo"}
+                draggable={false}
                 kind="media"
                 media={media}
                 previewUrl={preview?.url ?? undefined}
                 selected={isSelected}
-                onClick={(event) => selectMedia(media.id, event)}
+                onClick={(event) => { if (!mediaDrag.suppressClick()) selectMedia(media.id, event); }}
                 onContextMenu={() => selectMediaForContextMenu(media.id)}
-                onDragStart={
-                  media.kind === "photo"
-                    ? (event) => {
-                        event.dataTransfer.effectAllowed = "copy";
-                        const dragImage = transparentDragImageRef.current;
-                        if (dragImage) event.dataTransfer.setDragImage(dragImage, 0, 0);
-                        event.dataTransfer.setData(
-                          "application/x-myalbuns-photo",
-                          media.id,
-                        );
-                        onPhotoDragStart(media.id);
-                      }
-                    : undefined
-                }
-                onDragEnd={
-                  media.kind === "photo" ? onPhotoDragEnd : undefined
-                }
+                onPointerDown={(event) => mediaDrag.start(media.id, media.kind, event)}
                 onDoubleClick={
                   media.kind === "photo"
                     ? () => onFillPhoto(media.id)

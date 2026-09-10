@@ -603,7 +603,7 @@ pub struct ImageProcessingProgress {
     rename_all_fields = "camelCase"
 )]
 #[ts(tag = "kind")]
-pub enum ImportPhotoResult {
+pub enum ImportMediaResult {
     Cancelled {
         #[ts(type = "import(\"../../domain/project\").EditorProjection")]
         projection: EditorProjection,
@@ -615,6 +615,21 @@ pub enum ImportPhotoResult {
         imported_count: u32,
         problems: Vec<ImageProcessingProblem>,
     },
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct MediaImportSelection {
+    pub(crate) media_kind: myalbuns_core::MediaKind,
+    pub(crate) source: MediaImportSource,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, TS)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum MediaImportSource {
+    Files,
+    Folder,
+    Drop { paths: Vec<String> },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]

@@ -25,6 +25,7 @@ pub(crate) fn photo_source_decode_count() -> usize {
 }
 
 pub(crate) struct PhotoImportsProposal {
+    pub(crate) kind: MediaKind,
     pub(crate) commands: Vec<ImportPhoto>,
     pub(crate) problems: Vec<ImageProcessingProblem>,
     pub(crate) inspections: Vec<ImportedPhotoInspection>,
@@ -272,8 +273,20 @@ impl MediaResolver {
         self.propose_photo_imports_in_plan(paths, bindings, &context.freeze(), on_progress)
     }
 
+    #[cfg(test)]
     pub(crate) fn propose_photo_imports_in_plan(
         &self,
+        paths: Vec<PathBuf>,
+        bindings: &[MediaBinding],
+        plan: &RootBindingPlan,
+        on_progress: impl FnMut(crate::ipc_contract::ImageProcessingProgress),
+    ) -> PhotoImportsProposal {
+        self.propose_media_imports_in_plan(MediaKind::Photo, paths, bindings, plan, on_progress)
+    }
+
+    pub(crate) fn propose_media_imports_in_plan(
+        &self,
+        kind: MediaKind,
         paths: Vec<PathBuf>,
         bindings: &[MediaBinding],
         plan: &RootBindingPlan,
@@ -281,7 +294,7 @@ impl MediaResolver {
     ) -> PhotoImportsProposal {
         let existing = bindings
             .iter()
-            .filter(|binding| binding.kind == MediaKind::Photo)
+            .filter(|binding| binding.kind == kind)
             .map(|binding| binding.logical_path.as_path())
             .collect::<HashSet<_>>();
         let mut seen = HashSet::new();
@@ -316,11 +329,11 @@ impl MediaResolver {
                     .and_then(|()| {
                         let binding = MediaBinding {
                             media_id: String::new(),
-                            kind: MediaKind::Photo,
+                            kind,
                             logical_path: path.clone(),
                         };
                         let before = self.observe_in_plan(plan, &binding);
-                        let metadata = inspect_media_source_in_plan(plan, &path, true)?;
+                        let metadata = inspect_media_source_in_plan(plan, &path, false)?;
                         let after = self.observe_in_plan(plan, &binding);
                         if !before.same_source(&after) {
                             return Err("O Original mudou durante a inspeção.".into());
@@ -360,6 +373,7 @@ impl MediaResolver {
             }
         }
         PhotoImportsProposal {
+            kind,
             commands,
             problems,
             inspections,
@@ -1093,6 +1107,26 @@ mod tests {
     };
 
     #[test]
+    fn image_import_accepts_png_and_tiff_alongside_photos() {
+        let root = tempfile::tempdir().unwrap();
+        let paths = [
+            ("fundo.png", ImageFormat::Png),
+            ("overlay.tiff", ImageFormat::Tiff),
+        ]
+        .map(|(name, format)| {
+            let path = root.path().join(name);
+            RgbImage::from_pixel(37, 23, Rgb([20, 80, 160]))
+                .save_with_format(&path, format)
+                .unwrap();
+            path
+        });
+        let result = MediaResolver.propose_photo_imports(paths.to_vec(), &[], |_| {});
+        assert!(result.problems.is_empty(), "{:?}", result.problems);
+        assert_eq!(result.commands.len(), 2);
+        assert_eq!(result.inspections.len(), 2);
+    }
+
+    #[test]
     fn multiple_photo_import_keeps_valid_files_and_reports_each_rejection() {
         let root = tempfile::tempdir().unwrap();
         let good = root.path().join("boa.JPG");
@@ -1106,9 +1140,7 @@ mod tests {
         original
             .save_with_format(&second, ImageFormat::Jpeg)
             .unwrap();
-        original
-            .save_with_format(&invalid, ImageFormat::Png)
-            .unwrap();
+        std::fs::write(&invalid, b"GIF89a unsupported image").unwrap();
         let before = std::fs::read(&good).unwrap();
         let scan = before
             .windows(2)
@@ -1183,7 +1215,7 @@ mod tests {
     }
 
     #[test]
-    fn photo_import_rejects_non_jpeg_content_even_with_a_jpg_extension() {
+    fn photo_import_accepts_supported_content_even_with_a_different_extension() {
         let root = tempfile::tempdir().expect("temporary invalid JPEG fixture");
         let source = root.path().join("Nao e JPEG.jpg");
         RgbImage::from_pixel(12, 8, Rgb([90, 30, 10]))
@@ -1192,8 +1224,8 @@ mod tests {
         let before = std::fs::read(&source).expect("the renamed Original is readable");
 
         let proposal = MediaResolver.propose_photo_imports(vec![source.clone()], &[], |_| {});
-        assert!(proposal.commands.is_empty());
-        assert!(proposal.problems[0].reason.contains("JPEG válido"));
+        assert_eq!(proposal.commands.len(), 1);
+        assert!(proposal.problems.is_empty());
         assert_eq!(
             std::fs::read(source).expect("the rejected file remains"),
             before

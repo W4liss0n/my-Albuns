@@ -348,7 +348,7 @@ function projectCorePortWithApply(
       affectedFrameId: "frame-001",
       affectedSheetId: null,
     }),
-    importPhoto: async () => ({ kind: "cancelled", projection }),
+    importMedia: async () => ({ kind: "cancelled", projection }),
     ...emptyLayoutCatalogPort,
     readFrameDragThreshold: async () => ({ x: 5, y: 5 }),
     readSliderDoubleClickTime: async () => 500,
@@ -4987,14 +4987,14 @@ test("makes Salvar como a terminal barrier after an accepted deferred import", a
       dirty: false,
     },
   };
-  type ImportPhotoResult = Awaited<
-    ReturnType<ProjectCorePort["importPhoto"]>
+  type ImportMediaResult = Awaited<
+    ReturnType<ProjectCorePort["importMedia"]>
   >;
-  let resolveImport!: (result: ImportPhotoResult) => void;
-  const pendingImport = new Promise<ImportPhotoResult>((resolve) => {
+  let resolveImport!: (result: ImportMediaResult) => void;
+  const pendingImport = new Promise<ImportMediaResult>((resolve) => {
     resolveImport = resolve;
   });
-  const importPhoto = vi.fn<ProjectCorePort["importPhoto"]>(
+  const importMedia = vi.fn<ProjectCorePort["importMedia"]>(
     () => pendingImport,
   );
   const saveAs = vi.fn<ProjectCorePort["saveAs"]>(async () => ({
@@ -5009,7 +5009,7 @@ test("makes Salvar como a terminal barrier after an accepted deferred import", a
   const apply = vi.fn<ProjectCorePort["apply"]>(async () => projection);
   const undo = vi.fn<ProjectCorePort["undo"]>(async () => projection);
   const projectCorePort = projectCorePortWithApply(apply);
-  projectCorePort.importPhoto = importPhoto;
+  projectCorePort.importMedia = importMedia;
   projectCorePort.saveAs = saveAs;
   projectCorePort.undo = undo;
   const onProjectionChange = vi.fn();
@@ -5030,8 +5030,8 @@ test("makes Salvar como a terminal barrier after an accepted deferred import", a
   });
 
   fireEvent.click(screen.getByRole("button", { name: "Importar" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos JPEG…" }));
-  await waitFor(() => expect(importPhoto).toHaveBeenCalledOnce());
+  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos…" }));
+  await waitFor(() => expect(importMedia).toHaveBeenCalledOnce());
 
   fireEvent.click(
     screen.getByRole("button", { name: "Filtro, ordem e tamanho" }),
@@ -6364,12 +6364,12 @@ test("imports a JPEG through the Host boundary without inserting it automaticall
     },
   };
   const port = projectCorePortWithApply(async () => projection);
-  const importPhoto = vi.fn(async () => ({
+  const importMedia = vi.fn(async () => ({
     kind: "completed" as const,
     projection: importedProjection,
     mediaIds: ["media-imported"], importedCount: 1, problems: [],
   }));
-  port.importPhoto = importPhoto;
+  port.importMedia = importMedia;
   const applyWithOutcome = vi.fn(port.applyWithOutcome);
   port.applyWithOutcome = applyWithOutcome;
   const onProjectionChange = vi.fn();
@@ -6384,19 +6384,19 @@ test("imports a JPEG through the Host boundary without inserting it automaticall
   );
 
   fireEvent.click(screen.getByRole("button", { name: "Importar" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos JPEG…" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos…" }));
 
-  await waitFor(() => expect(importPhoto).toHaveBeenCalledOnce());
+  await waitFor(() => expect(importMedia).toHaveBeenCalledOnce());
   expect(onProjectionChange).toHaveBeenCalledWith(importedProjection);
   expect(applyWithOutcome).not.toHaveBeenCalled();
 });
 
 test.each(["completed", "cancelled", "failed"] as const)("shows photo import progress after selection and releases it on %s", async (outcome) => {
   const port = projectCorePortWithApply(async () => projection);
-  let progress: Parameters<ProjectCorePort["importPhoto"]>[0] = () => undefined;
-  let resolve!: (result: Awaited<ReturnType<ProjectCorePort["importPhoto"]>>) => void;
+  let progress: Parameters<ProjectCorePort["importMedia"]>[0] = () => undefined;
+  let resolve!: (result: Awaited<ReturnType<ProjectCorePort["importMedia"]>>) => void;
   let reject!: (error: Error) => void;
-  port.importPhoto = vi.fn<ProjectCorePort["importPhoto"]>((onProgress) => {
+  port.importMedia = vi.fn<ProjectCorePort["importMedia"]>((onProgress) => {
     progress = onProgress;
     return new Promise((yes, no) => { resolve = yes; reject = no; });
   });
@@ -6405,8 +6405,8 @@ test.each(["completed", "cancelled", "failed"] as const)("shows photo import pro
     projection={projection} projectCorePort={port} projectDialogPort={dialogs.port}
     onProjectionChange={() => undefined} />);
   fireEvent.click(screen.getByRole("button", { name: "Importar" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos JPEG…" }));
-  await waitFor(() => expect(port.importPhoto).toHaveBeenCalledOnce());
+  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos…" }));
+  await waitFor(() => expect(port.importMedia).toHaveBeenCalledOnce());
   expect(dialogs.present).not.toHaveBeenCalled();
   if (outcome !== "cancelled") {
     act(() => progress?.({ completedFiles: 0, totalFiles: 12 }));
@@ -6440,7 +6440,7 @@ test.each(["completed", "cancelled", "failed"] as const)("shows photo import pro
 
 test.each([0, 12])("completes import with %i new Photos without a success dialog or toolbar status text", async (importedCount) => {
   const port = projectCorePortWithApply(async () => projection);
-  port.importPhoto = vi.fn(async () => ({
+  port.importMedia = vi.fn(async () => ({
     kind: "completed" as const,
     projection,
     mediaIds: ["media-002"], importedCount, problems: [],
@@ -6456,9 +6456,9 @@ test.each([0, 12])("completes import with %i new Photos without a success dialog
     />,
   );
   fireEvent.click(screen.getByRole("button", { name: "Importar" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos JPEG…" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos…" }));
   await waitFor(() => expect(screen.getByRole("button", { name: "Importar" })).toBeEnabled());
-  expect(port.importPhoto).toHaveBeenCalledOnce();
+  expect(port.importMedia).toHaveBeenCalledOnce();
   expect(dialogs.present).not.toHaveBeenCalled();
   expect(screen.queryByText("12 Fotos importadas.")).not.toBeInTheDocument();
 });
@@ -6535,12 +6535,12 @@ test("the album absence notice opens a temporary view and restores the previous 
 
 test("reimporting a JPEG selects its existing card without a creative mutation", async () => {
   const port = projectCorePortWithApply(async () => projection);
-  const importPhoto = vi.fn(async () => ({
+  const importMedia = vi.fn(async () => ({
     kind: "completed" as const,
     projection,
     mediaIds: ["media-002"], importedCount: 0, problems: [],
   }));
-  port.importPhoto = importPhoto;
+  port.importMedia = importMedia;
   const applyWithOutcome = vi.fn(port.applyWithOutcome);
   port.applyWithOutcome = applyWithOutcome;
   const onProjectionChange = vi.fn();
@@ -6555,9 +6555,9 @@ test("reimporting a JPEG selects its existing card without a creative mutation",
   );
 
   fireEvent.click(screen.getByRole("button", { name: "Importar" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos JPEG…" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos…" }));
 
-  await waitFor(() => expect(importPhoto).toHaveBeenCalledOnce());
+  await waitFor(() => expect(importMedia).toHaveBeenCalledOnce());
   const existingPhoto = screen.getByRole("button", { name: "Campo.jpg" });
   await waitFor(() =>
     expect(existingPhoto).toHaveAttribute("aria-pressed", "true"),
@@ -6622,42 +6622,17 @@ test("resolves a mode-free target while dropping a Photo in the current Canvas m
   expect(resolvePhotoDropTarget).toHaveBeenCalledTimes(2);
 });
 
-test("exposes only Photos as native drag sources and clears the active drag", () => {
-  render(
-    <ProjectWorkspace
-      exportPipelinePort={exportPipelinePort}
-      projection={projection}
-      projectCorePort={projectCorePortWithApply(async () => projection)}
-      onProjectionChange={() => undefined}
-    />,
-  );
+test("starts a pointer drag for the directly pressed Photo and cancels it with Escape", async () => {
+  render(<ProjectWorkspace exportPipelinePort={exportPipelinePort} projection={projection}
+    projectCorePort={projectCorePortWithApply(async () => projection)} onProjectionChange={() => undefined} />);
+  await act(async () => {});
   const photo = screen.getByRole("button", { name: "Campo.jpg" });
-  const dataTransfer = {
-    effectAllowed: "none",
-    setData: vi.fn(),
-    setDragImage: vi.fn(),
-  };
-
-  fireEvent.dragStart(photo, { dataTransfer });
-  expect(dataTransfer.setData).toHaveBeenCalledWith(
-    "application/x-myalbuns-photo",
-    "media-002",
-  );
-  expect(dataTransfer.setDragImage).toHaveBeenCalledOnce();
-  expect(dataTransfer.setDragImage).toHaveBeenCalledWith(
-    expect.any(HTMLCanvasElement),
-    0,
-    0,
-  );
-  const dragImage = dataTransfer.setDragImage.mock.calls[0][0];
-  expect(dragImage).toHaveProperty("width", 1);
-  expect(dragImage).toHaveProperty("height", 1);
+  fireEvent.pointerDown(photo, { button: 0, pointerId: 1, clientX: 10, clientY: 10 });
+  fireEvent.pointerMove(document, { pointerId: 1, clientX: 40, clientY: 30 });
   expect(canvasHarness.props?.draggedPhotoId).toBe("media-002");
-
-  fireEvent.dragEnd(photo, { dataTransfer });
+  fireEvent.keyDown(window, { key: "Escape" });
   expect(canvasHarness.props?.draggedPhotoId).toBeNull();
 });
-
 test("starts Exportação for the Canvas-centered Lâmina even while focus remains on another Lâmina", () => {
   const startSheet = vi.fn<ExportPipelinePort["startSheet"]>(() => ({
     completion: Promise.resolve({
@@ -6790,7 +6765,7 @@ test.each([0, 2])("presents photo import rejections after committing %i valid fi
   const dialog = projectDialogHarness();
   const port = projectCorePortWithApply(async () => projection);
   const problems = [{ fileName: "corrompida.jpg", reason: "JPEG corrompido" }];
-  port.importPhoto = vi.fn(async () => ({
+  port.importMedia = vi.fn(async () => ({
     kind: "completed" as const, projection, mediaIds: importedCount ? ["media-002"] : [],
     importedCount, problems,
   }));
@@ -6798,7 +6773,7 @@ test.each([0, 2])("presents photo import rejections after committing %i valid fi
   render(<ProjectWorkspace exportPipelinePort={exportPipelinePort} projection={projection}
     projectCorePort={port} projectDialogPort={dialog.port} onProjectionChange={onProjectionChange} />);
   fireEvent.click(screen.getByRole("button", { name: "Importar" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos JPEG…" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos…" }));
   await waitFor(() => expect(dialog.present).toHaveBeenCalledWith({
     kind: "imageProcessingProblems", importedCount, problems,
   }));
@@ -6810,18 +6785,18 @@ test.each([0, 2])("presents photo import rejections after committing %i valid fi
 
 
 test("preserves partial import problems after dismissing a queued Save failure", async () => {
-  type ImportResult = Awaited<ReturnType<ProjectCorePort["importPhoto"]>>;
+  type ImportResult = Awaited<ReturnType<ProjectCorePort["importMedia"]>>;
   let resolveImport!: (value: ImportResult) => void;
   const pendingImport = new Promise<ImportResult>((resolve) => { resolveImport = resolve; });
   const dialog = projectDialogHarness();
   const port = projectCorePortWithApply(async () => projection);
-  port.importPhoto = vi.fn(() => pendingImport);
+  port.importMedia = vi.fn(() => pendingImport);
   port.save = vi.fn(async () => { throw new Error("Não foi possível salvar"); });
   const problems = [{ fileName: "corrompida.jpg", reason: "JPEG corrompido" }];
   render(<ProjectWorkspace exportPipelinePort={exportPipelinePort} projection={projection}
     projectCorePort={port} projectDialogPort={dialog.port} onProjectionChange={vi.fn()} />);
   fireEvent.click(screen.getByRole("button", { name: "Importar" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos JPEG…" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos…" }));
   fireEvent.keyDown(window, { ctrlKey: true, key: "s" });
   expect(port.save).not.toHaveBeenCalled();
   await act(async () => {

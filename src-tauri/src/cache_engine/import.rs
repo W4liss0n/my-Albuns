@@ -76,8 +76,7 @@ impl CacheEngine {
             CacheIndex::read_or_empty(&stage.storage, paths, stage.namespace.project_id());
         let by_path = bindings
             .iter()
-            .filter(|binding| binding.kind == MediaKind::Photo)
-            .map(|binding| (binding.logical_path.as_path(), binding))
+            .map(|binding| ((binding.kind, binding.logical_path.as_path()), binding))
             .collect::<HashMap<_, _>>();
         let mut problems = Vec::new();
         let mut receipts = Vec::new();
@@ -88,8 +87,8 @@ impl CacheEngine {
             let source_id = prepared.candidate.source_id.clone();
             let result = (|| -> Result<(), String> {
                 let binding = by_path
-                    .get(prepared.candidate.path())
-                    .ok_or("A Foto não pertence mais ao Projeto.")?;
+                    .get(&(prepared.source.kind, prepared.candidate.path()))
+                    .ok_or("A imagem não pertence mais ao Projeto.")?;
                 let current = MediaResolver.observe_in_plan(root_bindings, binding);
                 if !prepared.source.same_source(&current)
                     || !current.matches_fingerprint(&prepared.generation.fingerprint)
@@ -209,7 +208,6 @@ impl CacheImportStage {
         generation: CacheReusableGeneration,
     ) -> Result<(), String> {
         if candidate.path() != source.logical_path()
-            || source.kind != MediaKind::Photo
             || candidate.generation_id != generation.generation_id
             || !source.matches_fingerprint(&generation.fingerprint)
         {

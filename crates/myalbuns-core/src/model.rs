@@ -635,14 +635,17 @@ fn is_canonical_rgb(value: &str) -> bool {
 }
 
 /// Trusted native import command. The Host constructs it only after the
-/// selected JPEG has passed path and codec inspection.
+/// selected image has passed path and codec inspection.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ImportPhoto {
+pub struct ImportMedia {
     pub(crate) path: PathBuf,
     pub(crate) source_metadata: Option<PhotoSourceMetadata>,
 }
 
-impl ImportPhoto {
+/// Compatibility name for callers that import only Photos.
+pub type ImportPhoto = ImportMedia;
+
+impl ImportMedia {
     pub fn path(&self) -> &std::path::Path {
         &self.path
     }

@@ -1,5 +1,5 @@
 import { createRef, useState, type ComponentProps } from "react";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 
@@ -21,9 +21,8 @@ const mediaUsage: readonly MediaUsage[] = [
 ];
 
 const mediaPanelInteractions = {
-  onImportPhoto: () => undefined,
-  onPhotoDragStart: () => undefined,
-  onPhotoDragEnd: () => undefined,
+  onImportMedia: () => undefined,
+  onMediaDragChange: () => undefined,
   onRelinkMedia: () => undefined,
   onRetryUnavailableMedia: async () => undefined,
 };
@@ -146,16 +145,44 @@ test("matches the reference toolbar and marks only unavailable import actions as
   await user.click(screen.getByRole("button", { name: "Importar" }));
   const importMenu = screen.getByRole("menu", { name: "Importar" });
   expect(
-    within(importMenu).getByRole("menuitem", { name: "Arquivos JPEG…" }),
+    within(importMenu).getByRole("menuitem", { name: "Arquivos…" }),
   ).toBeEnabled();
   const folderItem = within(importMenu).getByRole("menuitem", {
     name: "Pasta…",
   });
-  expect(folderItem).toBeDisabled();
-  expect(folderItem).toHaveAttribute(
-    "data-placeholder-feature",
-    "import-media-folder",
-  );
+  expect(folderItem).toBeEnabled();
+});
+
+test("imports files or a folder into the active media tab", async () => {
+  const user = userEvent.setup();
+  const onImportMedia = vi.fn();
+  render(<MediaPanel {...mediaPanelInteractions} onImportMedia={onImportMedia} mediaItems={mediaItems} mediaUsage={mediaUsage} onFillPhoto={vi.fn()} previewSource={{ kind: "static" }} preferences={{ kind: "local" }} />);
+  await user.click(screen.getByRole("button", { name: "Importar" }));
+  await user.click(screen.getByRole("menuitem", { name: "Arquivos…" }));
+  expect(onImportMedia).toHaveBeenLastCalledWith({ mediaKind: "photo", source: { kind: "files" } });
+  await user.click(screen.getByRole("button", { name: "Decorativos" }));
+  await user.click(screen.getByRole("button", { name: "Importar" }));
+  await user.click(screen.getByRole("menuitem", { name: "Pasta…" }));
+  expect(onImportMedia).toHaveBeenLastCalledWith({ mediaKind: "decorative", source: { kind: "folder" } });
+});
+
+test("imports a Windows drop anywhere inside the visible panel into the current tab", async () => {
+  const user = userEvent.setup();
+  let publish!: (event: import("../application/projectPorts").MediaFileDrag) => void;
+  const stop = vi.fn();
+  const dropPort = { subscribe: async (listener: typeof publish) => { publish = listener; return stop; } };
+  const onImportMedia = vi.fn();
+  const view = render(<MediaPanel {...mediaPanelInteractions} dropPort={dropPort} onImportMedia={onImportMedia} mediaItems={mediaItems} mediaUsage={mediaUsage} onFillPhoto={vi.fn()} previewSource={{ kind: "static" }} preferences={{ kind: "local" }} />);
+  vi.spyOn(screen.getByRole("region", { name: "Painel de imagens" }), "getBoundingClientRect").mockReturnValue({ left: 10, right: 510, top: 400, bottom: 600 } as DOMRect);
+  await user.click(screen.getByRole("button", { name: "Decorativos" }));
+  act(() => publish({ kind: "over", x: 15, y: 405 }));
+  expect(screen.getByText("Solte para importar em Decorativos")).toBeVisible();
+  act(() => publish({ kind: "drop", x: 15, y: 405, paths: ["C:\\Fotos"] }));
+  expect(onImportMedia).toHaveBeenCalledWith({ mediaKind: "decorative", source: { kind: "drop", paths: ["C:\\Fotos"] } });
+  act(() => publish({ kind: "drop", x: 15, y: 100, paths: ["C:\\fora.png"] }));
+  expect(onImportMedia).toHaveBeenCalledOnce();
+  view.unmount();
+  expect(stop).toHaveBeenCalledOnce();
 });
 
 test("renders only centered copy when the media catalog is empty", () => {

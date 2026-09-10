@@ -63,7 +63,7 @@ function harness(pendingKind: "applyLayout" | "lockLayout" | "unlockLayout" | "s
     },
     previewFrameStyle: unsupported, previewPhotoAngle: unsupported, previewFrameGeometry: unsupported,
     saveAs: unsupported, validateAlbumInformation: unsupported, applyWithOutcome: unsupported,
-    importPhoto: unsupported, resolvePhotoDropTarget: unsupported, relink: unsupported,
+    importMedia: unsupported, resolvePhotoDropTarget: unsupported, relink: unsupported,
   };
   const view = renderHook(() => {
     const [projection, setProjection] = useState<EditorProjection>(initial);

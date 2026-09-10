@@ -211,7 +211,7 @@ const projectCorePort: ProjectCorePort = {
   }),
   apply: async (intent) => applyPreviewIntent(intent).projection,
   applyWithOutcome: async (intent) => applyPreviewIntent(intent),
-  importPhoto: async () => ({ kind: "cancelled", projection }),
+  importMedia: async () => ({ kind: "cancelled", projection }),
   readFrameDragThreshold: async () => ({ x: 5, y: 5 }),
   readSliderDoubleClickTime: async () => 500,
   previewFrameStyle: async (edit) => {

@@ -41,7 +41,7 @@ function projectCorePort(): ProjectCorePort {
       affectedFrameId: null,
       affectedSheetId: null,
     }),
-    importPhoto: async () => ({
+    importMedia: async () => ({
       kind: "cancelled",
       projection: representativeProjection,
     }),

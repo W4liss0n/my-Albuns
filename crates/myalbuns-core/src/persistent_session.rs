@@ -423,13 +423,14 @@ impl PersistentProjectSession {
         Ok(outcome)
     }
 
-    pub(crate) fn import_photos(
+    pub(crate) fn import_media(
         &mut self,
+        kind: crate::MediaKind,
         links: Vec<(Uuid, std::path::PathBuf)>,
     ) -> Result<(), CoreError> {
         self.commit_edit(move |project| {
-            project.with_imported_photos(links).map_err(|()| {
-                CoreError::InvalidProject("o vínculo externo da Foto não é válido".into())
+            project.with_imported_media(kind, links).map_err(|()| {
+                CoreError::InvalidProject("o vínculo externo da imagem não é válido".into())
             })
         })
     }

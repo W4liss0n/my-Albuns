@@ -15,7 +15,7 @@ use crate::{
     cache_service::{ActiveCacheNamespace, CacheService},
     image_processing::{ImageProcessingBatch, prepare_changed_images},
     ipc_contract::{
-        ImportPhotoResult, SaveAsProjectCommandError, SaveAsProjectOutcome, SaveAsProjectResult,
+        ImportMediaResult, SaveAsProjectCommandError, SaveAsProjectOutcome, SaveAsProjectResult,
         SaveProjectCommandError, SaveProjectOutcome, SaveProjectResult,
     },
     logging::validate_optional_identifier,
@@ -122,36 +122,62 @@ pub(crate) async fn apply_project_intent(
 }
 
 #[tauri::command]
-pub(crate) async fn import_photo(
+pub(crate) async fn import_media(
     app: AppHandle,
+    selection: crate::ipc_contract::MediaImportSelection,
     window: WebviewWindow,
     state: State<'_, ProjectHost>,
     on_progress: tauri::ipc::Channel<crate::ipc_contract::ImageProcessingProgress>,
-) -> Result<ImportPhotoResult, String> {
+) -> Result<ImportMediaResult, String> {
     if window.label() != PROJECT_WINDOW_LABEL {
-        return Err("A importação de Foto só está disponível na Janela do Projeto.".into());
+        return Err("A importação só está disponível na Janela do Projeto.".into());
     }
     let host = state.inner().clone();
-    let (sender, receiver) = tokio::sync::oneshot::channel();
-    app.dialog()
-        .file()
-        .set_parent(&window)
-        .set_title("Importar Fotos JPEG")
-        .add_filter("Imagem JPEG", &["jpg", "jpeg"])
-        .pick_files(move |selection| {
-            let _ = sender.send(selection);
-        });
-    let selection = receiver
-        .await
-        .map_err(|_| "Não foi possível concluir o diálogo de importação de Foto.".to_string())?;
-    let Some(selection) = selection else {
-        return Ok(ImportPhotoResult::Cancelled {
+    use crate::ipc_contract::MediaImportSource;
+    let media_kind = selection.media_kind;
+    let selected = match selection.source {
+        MediaImportSource::Drop { paths } => Some(
+            paths
+                .into_iter()
+                .map(|path| FilePath::Path(path.into()))
+                .collect(),
+        ),
+        source => {
+            let (sender, receiver) = tokio::sync::oneshot::channel();
+            let dialog = app
+                .dialog()
+                .file()
+                .set_parent(&window)
+                .set_title(match media_kind {
+                    myalbuns_core::MediaKind::Photo => "Importar Fotos",
+                    myalbuns_core::MediaKind::Decorative => "Importar Decorativos",
+                });
+            match source {
+                MediaImportSource::Folder => dialog.pick_folder(move |selection| {
+                    let _ = sender.send(selection.map(|path| vec![path]));
+                }),
+                _ => dialog
+                    .add_filter(
+                        "Imagens JPEG, PNG e TIFF",
+                        &["jpg", "jpeg", "png", "tif", "tiff"],
+                    )
+                    .pick_files(move |selection| {
+                        let _ = sender.send(selection);
+                    }),
+            }
+            receiver
+                .await
+                .map_err(|_| "Não foi possível concluir o diálogo de importação.".to_string())?
+        }
+    };
+    let Some(selected) = selected else {
+        return Ok(ImportMediaResult::Cancelled {
             projection: host.projection()?,
         });
     };
     let mut paths = Vec::new();
     let mut unsupported = Vec::new();
-    for selected in selection {
+    for selected in selected {
         match selected {
             FilePath::Path(path) => paths.push(path),
             FilePath::Url(_) => unsupported.push(crate::ipc_contract::ImageProcessingProblem {
@@ -160,12 +186,22 @@ pub(crate) async fn import_photo(
             }),
         }
     }
-    let result =
-        crate::photo_import::import_selected_photos(&app, paths, unsupported, |progress| {
+    let (paths, mut selection_problems) =
+        tauri::async_runtime::spawn_blocking(move || crate::media_import_selection::expand(paths))
+            .await
+            .map_err(|_| "Não foi possível ler os arquivos selecionados.".to_string())?;
+    unsupported.append(&mut selection_problems);
+    let result = crate::photo_import::import_selected_media(
+        &app,
+        media_kind,
+        paths,
+        unsupported,
+        |progress| {
             let _ = on_progress.send(progress);
-        })
-        .await?;
-    if let ImportPhotoResult::Completed {
+        },
+    )
+    .await?;
+    if let ImportMediaResult::Completed {
         projection,
         imported_count,
         media_ids,

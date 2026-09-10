@@ -479,7 +479,7 @@ export function useProjectEditorController({
     applyAlbumDesign: mutations.applyAlbumDesign,
     applyDpi: mutations.applyDpi,
     relinkMedia: mutations.relinkMedia,
-    importPhoto: mutations.importPhoto,
+    importMedia: mutations.importMedia,
     addSheetBefore,
     addSheetAfter,
     convertEdge,

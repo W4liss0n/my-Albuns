@@ -739,6 +739,14 @@ impl EditableProject {
         &mut self,
         commands: Vec<ImportPhoto>,
     ) -> Result<ImportPhotosOutcome, CoreError> {
+        self.import_media(crate::MediaKind::Photo, commands)
+    }
+
+    pub fn import_media(
+        &mut self,
+        kind: crate::MediaKind,
+        commands: Vec<crate::ImportMedia>,
+    ) -> Result<ImportPhotosOutcome, CoreError> {
         if !self.session_valid {
             return Err(CoreError::EditableSessionInvalidated);
         }
@@ -746,7 +754,7 @@ impl EditableProject {
             .project()
             .media()
             .iter()
-            .filter(|media| media.kind() == crate::MediaKind::Photo)
+            .filter(|media| media.kind() == kind)
             .map(|media| (media.path().to_path_buf(), MediaId::from_uuid(media.id())))
             .collect::<HashMap<_, _>>();
         let mut new_links = Vec::new();
@@ -759,7 +767,7 @@ impl EditableProject {
             } else {
                 if command.source_metadata.is_none() {
                     return Err(CoreError::InvalidProject(
-                        "O vínculo da Foto selecionada não está mais no Projeto.".into(),
+                        "O vínculo da imagem selecionada não está mais no Projeto.".into(),
                     ));
                 }
                 let media_id = MediaId::from_uuid(Uuid::new_v4());
@@ -776,7 +784,7 @@ impl EditableProject {
         }
         let imported_count = new_links.len();
         if !new_links.is_empty() {
-            self.session.import_photos(new_links)?;
+            self.session.import_media(kind, new_links)?;
         }
         for (media_id, path, metadata) in observations {
             self.photo_sources

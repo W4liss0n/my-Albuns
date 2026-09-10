@@ -35,7 +35,7 @@ function deletionHarness() {
     previewPhotoAngle: async () => { throw new Error("Photo angle preview is not configured in this fixture."); },
     previewFrameGeometry: unsupported, saveAs: unsupported,
     validateAlbumInformation: unsupported, applyWithOutcome: unsupported,
-    importPhoto: unsupported, resolvePhotoDropTarget: unsupported, relink: unsupported,
+    importMedia: unsupported, resolvePhotoDropTarget: unsupported, relink: unsupported,
   };
   useEditorView.setState({ projectId: initial.state.projectId, editingSheetId: "sheet-001",
     focusedSheetId: "sheet-001", centeredSheetId: "sheet-001", selectedFrameIds: deletion.selectedFrameIds });

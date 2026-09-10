@@ -219,7 +219,7 @@ pub(crate) fn run(
             crate::project_commands::project_state,
             crate::project_commands::validate_album_information,
             crate::project_commands::apply_project_intent,
-            crate::project_commands::import_photo,
+            crate::project_commands::import_media,
             crate::project_commands::photo_drop_target,
             crate::project_commands::preview_frame_geometry,
             crate::project_commands::preview_photo_angle,

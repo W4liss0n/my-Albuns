@@ -48,7 +48,7 @@ test.each([1, 2])("releasing %i Frames and immediately undoing presents the late
     previewFrameGeometry: preview, readFrameDragThreshold: async () => ({ x: 5, y: 5 }),
     undo, redo: unsupported, save: unsupported, saveAs: unsupported,
     validateAlbumInformation: unsupported, applyWithOutcome: unsupported,
-    importPhoto: unsupported, resolvePhotoDropTarget: unsupported, relink: unsupported,
+    importMedia: unsupported, resolvePhotoDropTarget: unsupported, relink: unsupported,
   };
   useEditorView.setState({
     projectId: initial.state.projectId, editingSheetId: "sheet-001",
