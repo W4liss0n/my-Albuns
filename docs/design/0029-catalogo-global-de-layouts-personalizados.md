@@ -25,8 +25,12 @@ centralização permanece uma regra do Gerador. A captura de Página única usa
 a superfície ativa local.
 
 O retorno de salvar ou de detectar uma duplicata aparece junto ao botão em
-Design da Lâmina. Quando esse controle não está visível, aparece abaixo do
-menu Editar. O aviso compartilha formato, seta, tipografia e sombra com os
+Design da Lâmina. Salvar pelo menu Editar quando esse controle já não está
+visível apresenta o retorno abaixo do menu. O aviso desaparece após quatro
+segundos, renovados a cada salvamento, ou imediatamente ao sair da edição,
+trocar a Lâmina ou ocultar seu contexto. Ele nunca migra entre o botão e o
+menu, nem reaparece ao voltar ao contexto anterior. Uma conclusão pendente
+também não reabre o aviso após a saída. O aviso compartilha formato, seta, tipografia e sombra com os
 balões de validação das entradas, usando as cores neutras do programa e um
 botão de fechar. Ele não cobre o canto inferior do Canvas.
 

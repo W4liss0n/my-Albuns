@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import type {
   ExportPipelinePort,
@@ -615,7 +615,12 @@ export function ProjectWorkspace({
   const noticeInInspector = inspectorContext.kind === "sheet" &&
     workspacePanels.panels.inspector.visible &&
     (workspacePreferences.preferences.inspectorSections["sheet.design"] ?? true);
-  const layoutNotice = controller.layoutCatalog.notice ? <LayoutCatalogNotice
+  const noticeSheetId = editingSheet?.sheetId ?? null;
+  const dismissLayoutNotice = controller.layoutCatalog.dismissNotice;
+  useLayoutEffect(() => {
+    dismissLayoutNotice();
+  }, [noticeInInspector, noticeSheetId, dismissLayoutNotice]);
+  const layoutNotice = sheetEditing && controller.layoutCatalog.notice ? <LayoutCatalogNotice
     message={controller.layoutCatalog.notice}
     onDismiss={controller.layoutCatalog.dismissNotice}
   /> : null;

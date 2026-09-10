@@ -5123,6 +5123,10 @@
         {
           "type": "click",
           "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": ".app-shell:not(:has(.layout-catalog-notice))"
         }
       ]
     },
@@ -5231,8 +5235,34 @@
       ]
     },
     {
+      "id": "workspace-layout-custom-notice-expired",
+      "title": "Layouts personalizados — aviso encerrado automaticamente",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=custom-save&mode=edit&selection=none",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-catalog",
+        "reason": "O design 0029 determina que o aviso desapareça após quatro segundos, sem migrar para o menu."
+      },
+      "viewport": { "width": 1440, "height": 800 },
+      "readySelector": ".app-shell:not(:has(.layout-catalog-notice))",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": ".sheet-design-save-layout > button"
+        },
+        {
+          "type": "assert",
+          "selector": ".sheet-design-save-layout > .layout-catalog-notice"
+        }
+      ]
+    },
+    {
       "id": "workspace-layout-custom-notice-collapsed",
-      "title": "Layouts personalizados — aviso com Design da Lâmina recolhido",
+      "title": "Layouts personalizados — aviso encerrado ao recolher Design da Lâmina",
       "implementationPath": "/workspace-preview.html?frame=layouts&layouts=custom-save&mode=edit&selection=none",
       "comparison": {
         "kind": "implementation-only",
@@ -5243,7 +5273,7 @@
         "width": 1440,
         "height": 800
       },
-      "readySelector": ".layout-catalog-menu-feedback > .layout-catalog-notice",
+      "readySelector": ".app-shell:not(:has(.layout-catalog-notice))",
       "actions": [
         {
           "type": "assert",

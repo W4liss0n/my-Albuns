@@ -892,6 +892,7 @@ validação das superfícies descritas nesta seção.
 - A criação exige ao menos um Frame. Sem Frames, botão e item de menu ficam desabilitados com uma explicação curta.
 - Dois Layouts personalizados são duplicados quando possuem o mesmo escopo, tipo e proporção de superfície, quantidade de Frames e a mesma sequência ordenada de posições e dimensões normalizadas. Uma ordem visual diferente representa outra identidade de Layout.
 - Tentar salvar uma duplicata não modifica o catálogo, mostra um aviso não modal e faz a preview existente ser localizada e brevemente realçada na próxima abertura compatível do Painel de Layouts no modo normal.
+- Os avisos de salvar e de duplicata desaparecem após quatro segundos, renovados a cada salvamento. Sair da edição, trocar a Lâmina ou ocultar o contexto que contém o aviso o encerra imediatamente, inclusive quando o salvamento ainda está pendente. O aviso nunca migra do botão para o menu nem reaparece ao voltar ao contexto anterior.
 - Previews automáticas oferecem estrela e cadeado; previews personalizadas oferecem também uma lixeira.
 - A lixeira exige confirmação e remove somente o Layout personalizado do catálogo global, sem aviso de sucesso após a exclusão. Organizações aplicadas, Últimos Layouts aplicados e Favoritos do Projeto permanecem intactos; o Projeto aberto não é modificado.
 - A estrela pode favoritar um Layout automático ou personalizado. Favoritar cria uma cópia completa e estável dentro do Projeto, e a estrela preenchida indica sua existência.

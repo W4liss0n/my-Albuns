@@ -98,6 +98,42 @@ test("duplicate saves keep the catalog revision and retain the pending reveal un
   expect(h.view.result.current.catalog.revealId).toBeNull();
 });
 
+test.each([false, true])("save feedback expires four seconds after the most recent save; created=%s", async (created) => {
+  vi.useFakeTimers();
+  const h = harness();
+  try {
+    h.saveCustomLayout.mockResolvedValue({ catalogRevision: 7, layoutId, created });
+    await act(async () => { await h.view.result.current.catalog.save("sheet-001"); });
+    expect(h.view.result.current.catalog.notice).not.toBeNull();
+    await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+    await act(async () => { await h.view.result.current.catalog.save("sheet-001"); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+    expect(h.view.result.current.catalog.notice).not.toBeNull();
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+    expect(h.view.result.current.catalog.notice).toBeNull();
+    expect(h.view.result.current.catalog.revealId).toBe(layoutId);
+  } finally {
+    h.view.unmount();
+    vi.useRealTimers();
+  }
+});
+
+test("leaving the feedback context suppresses a pending save notice but retains the saved Layout", async () => {
+  const h = harness();
+  const gate = deferred<Awaited<ReturnType<typeof h.saveCustomLayout>>>();
+  h.saveCustomLayout.mockReturnValue(gate.promise);
+  let saved!: Promise<void>;
+  await act(async () => { saved = h.view.result.current.catalog.save("sheet-001"); });
+  act(() => h.view.result.current.catalog.dismissNotice());
+  await act(async () => {
+    gate.resolve({ catalogRevision: 7, layoutId, created: true });
+    await saved;
+  });
+  expect(h.view.result.current.catalog.notice).toBeNull();
+  expect(h.view.result.current.catalog.revision).toBe(7);
+  expect(h.view.result.current.catalog.revealId).toBe(layoutId);
+});
+
 test("deletion requires confirmation, dismisses cancellation, and preserves the Project", async () => {
   const h = harness();
   await act(async () => h.view.result.current.catalog.requestDelete(layoutId));

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ProjectDialogPort, ProjectDialogSession } from "../application/projectDialogPort";
 import type { ProjectCorePort } from "../application/projectPorts";
 import type { CustomLayoutId, EditorProjection, SaveCustomLayoutResult } from "../domain/project";
@@ -20,8 +20,19 @@ export function useLayoutCatalog(input: LayoutCatalogInput) {
     [input.projection.state.projectId, input.runner, input.dialogPort, input.port]);
   const [revision, setRevision] = useState(0);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ message: string } | null>(null);
+  const noticeContext = useRef(0);
+  const dismissNotice = useCallback(() => {
+    noticeContext.current += 1;
+    setNotice(null);
+  }, []);
   const [revealId, setRevealId] = useState<CustomLayoutId | null>(null);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(dismissNotice, 4000);
+    return () => window.clearTimeout(timer);
+  }, [notice, dismissNotice]);
 
   useLayoutEffect(() => {
     context.active = true;
@@ -59,6 +70,8 @@ export function useLayoutCatalog(input: LayoutCatalogInput) {
 
   async function save(sheetId: string) {
     if (context.busy || !context.active) return;
+    dismissNotice();
+    const savingNoticeContext = noticeContext.current;
     context.busy = true;
     setBusy(true);
     let saved: SaveCustomLayoutResult | null = null;
@@ -74,7 +87,9 @@ export function useLayoutCatalog(input: LayoutCatalogInput) {
     const result = saved as SaveCustomLayoutResult;
     setRevision((previous) => Math.max(previous, result.catalogRevision));
     setRevealId(result.layoutId);
-    setNotice(result.created ? "Layout salvo em Personalizados." : "Este Layout já está em Personalizados.");
+    if (noticeContext.current === savingNoticeContext) {
+      setNotice({ message: result.created ? "Layout salvo em Personalizados." : "Este Layout já está em Personalizados." });
+    }
   }
 
   function requestDelete(layoutId: CustomLayoutId) {
@@ -122,8 +137,8 @@ export function useLayoutCatalog(input: LayoutCatalogInput) {
     void session.present({ kind: "layoutDeletionConfirmation", busy: false }).catch(fail);
   }
 
-  return { revision, busy, notice, revealId, refresh, save, requestDelete,
-    acknowledgeReveal: () => setRevealId(null), dismissNotice: () => setNotice(null) };
+  return { revision, busy, notice: notice?.message ?? null, revealId, refresh, save, requestDelete,
+    acknowledgeReveal: () => setRevealId(null), dismissNotice };
 }
 
 function messageFromError(error: unknown) { return error instanceof Error ? error.message : String(error); }
