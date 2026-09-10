@@ -164,11 +164,16 @@ pub(crate) async fn import_selected_media(
     kind: MediaKind,
     paths: Vec<PathBuf>,
     mut unsupported: Vec<ImageProcessingProblem>,
-    publish: impl FnMut(ImageProcessingProgress) + Send,
+    mut publish: impl FnMut(ImageProcessingProgress) + Send + 'static,
 ) -> Result<ImportMediaResult, String> {
     let host = app.state::<ProjectHost>();
     let catalog = host.authorized_media_catalog()?;
     let namespace = app.state::<ActiveCacheNamespace>().namespace();
+    publish(ImageProcessingProgress {
+        completed_files: 0,
+        total_files: 0,
+        problem: None,
+    });
     let capture_app = app.clone();
     let (mut attempt, mut stage, stage_error) = tauri::async_runtime::spawn_blocking(move || {
         let attempt = PhotoImportAttempt::capture_for_kind(kind, catalog, namespace, paths)?;
@@ -246,25 +251,31 @@ pub(crate) async fn import_selected_media(
     let finish_app = app.clone();
     let inspection_roots = attempt.roots.clone();
     let inspection_bindings = attempt.catalog.bindings.clone();
-    let prepared = tauri::async_runtime::spawn_blocking(move || {
-        prepare_proposal_with_inspection(
+    native_progress.begin_inspection(outcomes.iter().filter_map(|(source, outcome)| {
+        matches!(outcome, PhotoImportOutcome::Validated { .. }).then_some(source)
+    }));
+    let (prepared, native_progress) = tauri::async_runtime::spawn_blocking(move || {
+        let prepared = prepare_proposal_with_inspection(
             attempt,
             stage,
             outcomes,
             cache_problems,
             stage_error,
             unsupported,
-            |path| {
-                inspect_with_capacity(
+            |candidate| {
+                let proposal = inspect_with_capacity(
                     kind,
                     finish_app.state::<CacheEngine>().inner(),
                     finish_app.state::<ImagingProcessor>().inner(),
-                    path,
+                    candidate.path(),
                     &inspection_bindings,
                     &inspection_roots,
-                )
+                );
+                native_progress.complete_inspection(&candidate.source_id);
+                proposal
             },
-        )
+        )?;
+        Ok::<_, String>((prepared, native_progress))
     })
     .await
     .map_err(|_| "Não foi possível validar a importação das imagens.".to_string())??;
@@ -321,7 +332,7 @@ fn prepare_proposal_with_inspection(
     mut cache_problems: HashMap<PathBuf, String>,
     stage_error: Option<String>,
     unsupported: Vec<ImageProcessingProblem>,
-    inspect: impl Fn(&Path) -> PhotoImportsProposal,
+    inspect: impl Fn(&PhotoImportCandidate) -> PhotoImportsProposal,
 ) -> Result<PreparedImport, String> {
     let sources = attempt
         .sources
@@ -385,7 +396,7 @@ fn prepare_proposal_with_inspection(
                 "O Original mudou durante a preparação da miniatura.".into(),
             );
         }
-        let fallback = inspect(path);
+        let fallback = inspect(&source.candidate);
         if !fallback.commands.is_empty() {
             accepted_paths.push(path.clone());
             cache_problems.entry(path.clone()).or_insert_with(|| {
@@ -815,9 +826,9 @@ mod tests {
             problems,
             stage_error,
             unsupported,
-            |path| {
+            |candidate| {
                 MediaResolver.propose_photo_imports_in_plan(
-                    vec![path.to_path_buf()],
+                    vec![candidate.path().to_path_buf()],
                     &bindings,
                     &roots,
                     |_| {},

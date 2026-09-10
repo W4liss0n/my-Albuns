@@ -6404,7 +6404,9 @@ test("imports a JPEG through the Host boundary without inserting it automaticall
   expect(applyWithOutcome).not.toHaveBeenCalled();
 });
 
-test.each(["completed", "cancelled", "failed"] as const)("shows photo import progress after selection and releases it on %s", async (outcome) => {
+test.each((["files", "folder"] as const).flatMap((source) =>
+  (["completed", "cancelled", "failed"] as const).map((outcome) => ({ source, outcome })),
+))("shows $source import progress after selection and releases it on $outcome", async ({ source, outcome }) => {
   const port = projectCorePortWithApply(async () => projection);
   let progress: Parameters<ProjectCorePort["importMedia"]>[0] = () => undefined;
   let resolve!: (result: Awaited<ReturnType<ProjectCorePort["importMedia"]>>) => void;
@@ -6418,10 +6420,15 @@ test.each(["completed", "cancelled", "failed"] as const)("shows photo import pro
     projection={projection} projectCorePort={port} projectDialogPort={dialogs.port}
     onProjectionChange={() => undefined} />);
   fireEvent.click(screen.getByRole("button", { name: "Importar" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos…" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: source === "files" ? "Arquivos…" : "Pasta…" }));
   await waitFor(() => expect(port.importMedia).toHaveBeenCalledOnce());
   expect(dialogs.present).not.toHaveBeenCalled();
   if (outcome !== "cancelled") {
+    act(() => progress({ completedFiles: 0, totalFiles: 0 }));
+    await waitFor(() => expect(dialogs.present).toHaveBeenCalledWith({
+      kind: "imageProcessingProgress",
+      progress: { kind: "indeterminate", status: "Aguarde…" },
+    }));
     act(() => progress?.({ completedFiles: 0, totalFiles: 12 }));
     await waitFor(() => expect(dialogs.present).toHaveBeenCalledWith({
       kind: "imageProcessingProgress",
@@ -6442,7 +6449,7 @@ test.each(["completed", "cancelled", "failed"] as const)("shows photo import pro
   else {
     await waitFor(() => expect(dialogs.dismiss).toHaveBeenCalled());
     if (outcome === "completed") {
-      expect(dialogs.present).toHaveBeenCalledTimes(2);
+      expect(dialogs.present).toHaveBeenCalledTimes(3);
       expect(screen.queryByText("12 Fotos importadas.")).not.toBeInTheDocument();
     } else {
       expect(dialogs.present).toHaveBeenLastCalledWith({ kind: "projectOperationFailure", message: "Falha na importação." });

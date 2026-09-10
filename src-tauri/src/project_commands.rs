@@ -195,7 +195,7 @@ pub(crate) async fn import_media(
         media_kind,
         paths,
         unsupported,
-        |progress| {
+        move |progress| {
             let _ = on_progress.send(progress);
         },
     )
