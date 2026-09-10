@@ -27,6 +27,7 @@ const webdriverKeys = Object.freeze({
 
 const webdriverModifiers = Object.freeze({
   Control: "\uE009",
+  Shift: "\uE008",
 });
 
 const cdpArrowKeys = Object.freeze({
@@ -511,6 +512,11 @@ export async function performUiAcceptanceAction({
   }
 
   if (action.type === "drag") {
+    const modifierValues = (action.modifiers ?? []).map((modifier) => webdriverModifiers[modifier]);
+    if (modifierValues.length) {
+      await request("POST", `/session/${sessionId}/actions`, { actions: [{ type: "key", id: "acceptance-keyboard",
+        actions: modifierValues.map((value) => ({ type: "keyDown", value })) }] });
+    }
     const targetId = await locateSelector(action.targetSelector);
     const dropTargetId = action.dropTargetSelector
       ? await locateSelector(action.dropTargetSelector)
@@ -597,6 +603,12 @@ export async function performUiAcceptanceAction({
         request,
         sessionId,
       });
+    }
+    // Keep modifiers pressed while a preview is captured; the runner releases
+    // every input source after the screenshot, as required by W3C WebDriver.
+    if (action.phase !== "preview" && modifierValues.length) {
+      await request("POST", `/session/${sessionId}/actions`, { actions: [{ type: "key", id: "acceptance-keyboard",
+        actions: [...modifierValues].reverse().map((value) => ({ type: "keyUp", value })) }] });
     }
     return;
   }

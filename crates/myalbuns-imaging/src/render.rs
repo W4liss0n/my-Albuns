@@ -79,12 +79,13 @@ pub(crate) fn render_request(
             ComposedBackground::Media {
                 media_id,
                 draw_rect,
+                clip_rect,
                 ..
             } => {
                 let source = sources
                     .get(media_id)
                     .ok_or_else(|| format!("a fonte do Background {media_id} não foi carregada"))?;
-                draw_stretched_media(&mut image, draw_rect, raster, source)?;
+                draw_stretched_media(&mut image, draw_rect, clip_rect.as_ref(), raster, source)?;
             }
         }
     }
@@ -111,7 +112,13 @@ pub(crate) fn render_request(
                 overlay.media_id
             )
         })?;
-        draw_stretched_media(&mut image, &overlay.draw_rect, raster, source)?;
+        draw_stretched_media(
+            &mut image,
+            &overlay.draw_rect,
+            overlay.clip_rect.as_ref(),
+            raster,
+            source,
+        )?;
     }
 
     progress(ImagingProgressStage::EncodingOutput, 0, 1)?;
@@ -355,15 +362,19 @@ fn sample_bilinear(image: &RgbaImage, horizontal: f32, vertical: f32) -> Rgba<u8
 fn draw_stretched_media(
     image: &mut RgbaImage,
     draw_rect: &RectUm,
+    clip_rect: Option<&RectUm>,
     raster: RasterPlan,
     source: &RgbaImage,
 ) -> Result<(), RenderFailure> {
     let (left, top, right, bottom) = raster_rect(image, draw_rect, raster)?;
     let width = right.saturating_sub(left).max(1);
     let height = bottom.saturating_sub(top).max(1);
-
-    for y in top..bottom {
-        for x in left..right {
+    let (clip_left, clip_top, clip_right, clip_bottom) = clip_rect
+        .map(|clip| raster_rect(image, clip, raster))
+        .transpose()?
+        .unwrap_or((left, top, right, bottom));
+    for y in top.max(clip_top)..bottom.min(clip_bottom) {
+        for x in left.max(clip_left)..right.min(clip_right) {
             let horizontal = (x - left) as f32 / width.saturating_sub(1).max(1) as f32;
             let vertical = (y - top) as f32 / height.saturating_sub(1).max(1) as f32;
             blend_pixel(image, x, y, sample_bilinear(source, horizontal, vertical));

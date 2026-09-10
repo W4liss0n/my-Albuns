@@ -1373,6 +1373,7 @@ fn real_cache_webview_canvas_reference_matches_background_overlay_export() {
         let full_sheet = sheet.base.draw_rect.clone();
         sheet.frames.clear();
         sheet.backgrounds = vec![ComposedBackground::Media {
+            clip_rect: None,
             media_id: background
                 .media_id()
                 .parse()
@@ -1381,6 +1382,7 @@ fn real_cache_webview_canvas_reference_matches_background_overlay_export() {
             draw_rect: full_sheet.clone(),
         }];
         sheet.overlays = vec![ComposedDecorative {
+            clip_rect: None,
             media_id: overlay
                 .media_id()
                 .parse()

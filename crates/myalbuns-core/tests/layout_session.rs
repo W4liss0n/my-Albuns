@@ -619,7 +619,7 @@ fn saving_a_locked_layout_uses_current_schema_and_migrates_v8_without_inventing_
     let path = root.join("Layouts.myalbuns");
     let mut saved: serde_json::Value =
         serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
-    assert_eq!(saved["schemaVersion"], 10);
+    assert_eq!(saved["schemaVersion"], 11);
     assert_eq!(saved["project"]["sheets"][0]["layoutLocked"], true);
     let core = ProjectCore::new()
         .with_identity_storage_roots(root.join("leases"), root.join("identities"));
@@ -641,6 +641,7 @@ fn saving_a_locked_layout_uses_current_schema_and_migrates_v8_without_inventing_
         .as_object_mut()
         .unwrap()
         .remove("favoriteLayouts");
+    saved.as_object_mut().unwrap().remove("sheetVisuals");
     saved["schemaVersion"] = 8.into();
     let legacy = serde_json::to_vec(&saved).unwrap();
     std::fs::write(&path, &legacy).unwrap();
@@ -658,7 +659,7 @@ fn saving_a_locked_layout_uses_current_schema_and_migrates_v8_without_inventing_
     migrated.save(migrated.revision()).unwrap();
     let upgraded: serde_json::Value =
         serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
-    assert_eq!(upgraded["schemaVersion"], 10);
+    assert_eq!(upgraded["schemaVersion"], 11);
     assert_eq!(upgraded["project"]["sheets"][0]["layoutLocked"], false);
 }
 
@@ -955,7 +956,7 @@ fn saving_and_reopening_preserves_last_layout_and_generation_settings() {
     assert!(query.listing.candidates[0].is_last_applied);
     let bytes = std::fs::read(root.join("Layouts.myalbuns")).unwrap();
     let persisted: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
-    assert_eq!(persisted["schemaVersion"], 10);
+    assert_eq!(persisted["schemaVersion"], 11);
 }
 
 #[test]

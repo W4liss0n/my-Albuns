@@ -231,6 +231,28 @@ impl PersistentProjectSession {
                 return Ok(outcome);
             }
         }
+        if let ProjectIntent::DropDecorative { request } = &intent {
+            let next = self.project().with_dropped_decorative(request)?;
+            if next != *self.project() {
+                self.commit_edit(|_| Ok(next))?;
+            }
+            return Ok(outcome);
+        }
+        if let ProjectIntent::ApplyDecorative {
+            sheet_id,
+            media_id,
+            role,
+            scope,
+        } = &intent
+        {
+            let next = self
+                .project()
+                .with_applied_decorative(sheet_id, *media_id, *role, *scope)?;
+            if next != *self.project() {
+                self.commit_edit(|_| Ok(next))?;
+            }
+            return Ok(outcome);
+        }
         if let ProjectIntent::RemoveMedia { media_ids, mode } = &intent {
             let next = self.project().with_removed_media(media_ids, *mode)?;
             if next != *self.project() {
@@ -289,7 +311,10 @@ impl PersistentProjectSession {
             ProjectIntent::SwapFrameContents { frame_ids } => {
                 project.with_swapped_frame_contents(&frame_ids)
             }
-            ProjectIntent::RemoveMedia { .. } | ProjectIntent::DeleteFrames { .. } => {
+            ProjectIntent::DropDecorative { .. }
+            | ProjectIntent::ApplyDecorative { .. }
+            | ProjectIntent::RemoveMedia { .. }
+            | ProjectIntent::DeleteFrames { .. } => {
                 unreachable!("Frame deletion commits its prepared document once")
             }
             ProjectIntent::ArrangeFrames { frame_ids, action } => {

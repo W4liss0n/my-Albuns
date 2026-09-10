@@ -24,6 +24,88 @@ import {
 setupAlbumCanvasTestHarness();
 const pixiLifecycle = getPixiLifecycle();
 
+test("composes the Decorative preview below Frames, switches role with Shift, and commits only the released gesture", async () => {
+  const onSelectFrame = vi.fn();
+  const onDropDecorative = vi.fn(async () => true);
+  const onPhotoDragCancel = vi.fn();
+  const onPreviewDecorativeDrop = vi.fn(async (request: import("../domain/project").DecorativeDropRequest): Promise<import("../domain/project").DecorativeDropPreview> => {
+    const content = { mediaId: request.mediaId, name: "Papel", drawRect: { x: 0, y: 0, width: 600_000, height: 300_000 } };
+    return {
+      revision: 1, role: request.role, scope: "bothSides",
+      zoneRect: { x: 240_000, y: 0, width: 120_000, height: 300_000 },
+      centerRect: { x: 240_000, y: 0, width: 120_000, height: 300_000 },
+      sheet: { ...interactiveComposition.sheets[0],
+        backgrounds: request.role === "background" ? [{ kind: "media", ...content }] : interactiveComposition.sheets[0].backgrounds,
+        overlays: request.role === "overlay" ? [content] : [],
+      },
+    };
+  });
+  const view = renderCanvas({ compositionPlan: interactiveComposition, selectedFrameIds: ["frame-001"], onSelectFrame, onPhotoDragCancel });
+  await finishPixiInitialization();
+  vi.spyOn(pixiLifecycle.instances[0].canvas, "getBoundingClientRect").mockReturnValue({
+    left: 0, top: 0, width: 1_200, height: 500, right: 1_200, bottom: 500, x: 0, y: 0, toJSON: () => ({}),
+  });
+  const mediaDrag = { gestureId: 1, mediaId: "decorative-001", kind: "decorative" as const, x: 600, y: 250, shiftKey: false, phase: "dragging" as const };
+  const callbacks = { revision: 1, onPreviewDecorativeDrop, onDropDecorative };
+  view.rerenderCanvas({ ...callbacks, mediaDrag });
+  await waitFor(() => expect(screen.getByRole("status", { name: "Aplicação do Decorativo" })).toHaveTextContent("Fundo · Ambos os lados"));
+  expect(displayWithLabel("background-media-fallback-decorative-001")).toBeDefined();
+  expect(displayWithLabel("decorative-drop-center-sheet-001")).toMatchObject({ rectCommands: [{ x: 240, y: 0, width: 120, height: 300 }] });
+  expect(onDropDecorative).not.toHaveBeenCalled();
+  expect(onSelectFrame).not.toHaveBeenCalled();
+  view.rerenderCanvas({ ...callbacks, mediaDrag: { ...mediaDrag, shiftKey: true } });
+  await waitFor(() => expect(screen.getByRole("status", { name: "Aplicação do Decorativo" })).toHaveTextContent("Overlay · Ambos os lados"));
+  expect(onPreviewDecorativeDrop).toHaveBeenLastCalledWith(expect.objectContaining({ role: "overlay" }));
+  expect(displayWithLabel("decorative-overlay-fallback-decorative-001")).toBeDefined();
+  view.rerenderCanvas({ ...callbacks, mediaDrag: { ...mediaDrag, shiftKey: true, phase: "drop" } });
+  await waitFor(() => expect(onDropDecorative).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ mediaId: "decorative-001", role: "overlay" })));
+  expect(onSelectFrame).not.toHaveBeenCalled();
+  expect(onPhotoDragCancel).toHaveBeenCalledOnce();
+});
+
+test("ignores obsolete Decorative previews and cancels a pending release with Escape", async () => {
+  type Preview = import("../domain/project").DecorativeDropPreview;
+  let resolveOld!: (preview: Preview) => void;
+  let resolveDrop!: (preview: Preview) => void;
+  const preview: Preview = {
+    revision: 1, role: "overlay", scope: "bothSides",
+    zoneRect: { x: 240_000, y: 0, width: 120_000, height: 300_000 },
+    centerRect: { x: 240_000, y: 0, width: 120_000, height: 300_000 },
+    sheet: interactiveComposition.sheets[0],
+  };
+  const onPreviewDecorativeDrop = vi.fn()
+    .mockImplementationOnce(() => new Promise<Preview>((resolve) => { resolveOld = resolve; }))
+    .mockResolvedValueOnce(preview)
+    .mockImplementationOnce(() => new Promise<Preview>((resolve) => { resolveDrop = resolve; }));
+  const onDropDecorative = vi.fn(async () => true);
+  const onPhotoDragCancel = vi.fn();
+  const view = renderCanvas({ compositionPlan: interactiveComposition, onPhotoDragCancel });
+  await finishPixiInitialization();
+  vi.spyOn(pixiLifecycle.instances[0].canvas, "getBoundingClientRect").mockReturnValue({
+    left: 0, top: 0, width: 1_200, height: 500, right: 1_200, bottom: 500, x: 0, y: 0, toJSON: () => ({}),
+  });
+  const mediaDrag = { gestureId: 1, mediaId: "decorative-001", kind: "decorative" as const, x: 600, y: 250, shiftKey: false, phase: "dragging" as const };
+  const callbacks = { revision: 1, onPreviewDecorativeDrop, onDropDecorative };
+  view.rerenderCanvas({ ...callbacks, mediaDrag });
+  await waitFor(() => expect(onPreviewDecorativeDrop).toHaveBeenCalledOnce());
+  view.rerenderCanvas({ ...callbacks, mediaDrag: { ...mediaDrag, shiftKey: true } });
+  await waitFor(() => expect(screen.getByRole("status", { name: "Aplicação do Decorativo" })).toHaveTextContent("Overlay"));
+  await act(async () => resolveOld({ ...preview, role: "background" }));
+  expect(screen.getByRole("status", { name: "Aplicação do Decorativo" })).toHaveTextContent("Overlay");
+  view.rerenderCanvas({ ...callbacks, mediaDrag: { ...mediaDrag, x: 605, shiftKey: true } });
+  expect(onPreviewDecorativeDrop).toHaveBeenCalledTimes(2);
+  view.rerenderCanvas({ ...callbacks, mediaDrag: { ...mediaDrag, shiftKey: true, phase: "drop" } });
+  await waitFor(() => expect(onPreviewDecorativeDrop).toHaveBeenCalledTimes(3));
+  fireEvent.keyDown(window, { key: "Escape" });
+  await act(async () => resolveDrop(preview));
+  expect(screen.queryByRole("status", { name: "Aplicação do Decorativo" })).not.toBeInTheDocument();
+  expect(onDropDecorative).not.toHaveBeenCalled();
+  expect(onPhotoDragCancel).toHaveBeenCalledOnce();
+  view.rerenderCanvas({ ...callbacks, mediaDrag: { ...mediaDrag, gestureId: 2, x: 1_300, phase: "drop" } });
+  await waitFor(() => expect(onPhotoDragCancel).toHaveBeenCalledTimes(2));
+  expect(onPreviewDecorativeDrop).toHaveBeenCalledTimes(3);
+});
+
 test("fits the complete sheet to the continuous Canvas at device resolution", async () => {
   renderCanvas();
   await finishPixiInitialization();

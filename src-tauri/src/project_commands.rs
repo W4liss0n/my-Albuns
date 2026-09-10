@@ -59,6 +59,8 @@ pub(crate) async fn apply_project_intent(
     let previous = state.projection()?;
     let intent_kind = match &intent {
         ProjectIntent::RemoveMedia { .. } => "remove_media",
+        ProjectIntent::ApplyDecorative { .. } => "apply_decorative",
+        ProjectIntent::DropDecorative { .. } => "drop_decorative",
         ProjectIntent::CopyFrames { .. } => "copy_frames",
         ProjectIntent::ApplyLayout { .. } => "apply_layout",
         ProjectIntent::ToggleLayoutFavorite { .. } => "toggle_layout_favorite",
@@ -137,10 +139,11 @@ pub(crate) async fn import_media(
     use crate::ipc_contract::MediaImportSource;
     let media_kind = selection.media_kind;
     let selected = match selection.source {
-        MediaImportSource::Drop { paths } => Some(
-            paths
+        MediaImportSource::Drop { drop_id } => Some(
+            app.state::<crate::media_file_drop::NativeMediaDrops>()
+                .take(&drop_id)?
                 .into_iter()
-                .map(|path| FilePath::Path(path.into()))
+                .map(FilePath::Path)
                 .collect(),
         ),
         source => {
@@ -187,11 +190,6 @@ pub(crate) async fn import_media(
             }),
         }
     }
-    let (paths, mut selection_problems) =
-        tauri::async_runtime::spawn_blocking(move || crate::media_import_selection::expand(paths))
-            .await
-            .map_err(|_| "Não foi possível ler os arquivos selecionados.".to_string())?;
-    unsupported.append(&mut selection_problems);
     let result = crate::photo_import::import_selected_media(
         &app,
         media_kind,
@@ -247,6 +245,18 @@ pub(crate) async fn preview_photo_angle(
         return Err("O Ângulo da Foto só pode ser consultada na Janela do Projeto.".into());
     }
     state.preview_photo_angle(&edit)
+}
+
+#[tauri::command]
+pub(crate) fn preview_decorative_drop(
+    request: myalbuns_core::DecorativeDropRequest,
+    window: WebviewWindow,
+    state: State<'_, ProjectHost>,
+) -> Result<Option<myalbuns_core::DecorativeDropPreview>, String> {
+    if window.label() != PROJECT_WINDOW_LABEL {
+        return Err("O Decorativo só pode ser consultado na Janela do Projeto.".into());
+    }
+    state.preview_decorative_drop(&request)
 }
 
 #[tauri::command]

@@ -145,6 +145,7 @@ pub(crate) fn run(
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
         .manage(project_host)
+        .manage(crate::media_file_drop::NativeMediaDrops::default())
         .manage(startup_handshake)
         .manage(initial_image_processing)
         .manage(cache_previews)
@@ -161,6 +162,14 @@ pub(crate) fn run(
         .manage(layout_catalog)
         .manage(crate::workspace_preferences::WorkspacePreferencesStore::new(&app_paths))
         .on_window_event(|window, event| {
+            if window.label() == PROJECT_WINDOW_LABEL
+                && let tauri::WindowEvent::DragDrop(event) = event
+                && let Some(payload) = window
+                    .state::<crate::media_file_drop::NativeMediaDrops>()
+                    .receive(event)
+            {
+                let _ = window.emit(crate::media_file_drop::MEDIA_FILE_DRAG_EVENT, payload);
+            }
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 if window.label() != PROJECT_WINDOW_LABEL {
                     return;
@@ -221,6 +230,7 @@ pub(crate) fn run(
             crate::project_commands::apply_project_intent,
             crate::project_commands::import_media,
             crate::project_commands::photo_drop_target,
+            crate::project_commands::preview_decorative_drop,
             crate::project_commands::preview_frame_geometry,
             crate::project_commands::preview_photo_angle,
             crate::project_commands::preview_frame_style,

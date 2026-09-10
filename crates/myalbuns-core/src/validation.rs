@@ -73,6 +73,14 @@ fn validate_composed_content(
         )?;
         validate_canonical_color(&sheet.base.rgb, CoreError::InvalidSnapshot)?;
         for background in &sheet.backgrounds {
+            if let ComposedBackground::Media {
+                draw_rect,
+                clip_rect: Some(clip),
+                ..
+            } = background
+            {
+                validate_decorative_clip(draw_rect, clip, sheet)?;
+            }
             let (id, draw_rect) = match background {
                 ComposedBackground::Color { rgb, draw_rect } => {
                     validate_canonical_color(rgb, CoreError::InvalidSnapshot)?;
@@ -94,6 +102,9 @@ fn validate_composed_content(
             )?;
         }
         for overlay in &sheet.overlays {
+            if let Some(clip) = &overlay.clip_rect {
+                validate_decorative_clip(&overlay.draw_rect, clip, sheet)?;
+            }
             let media_id = overlay.media_id.to_string();
             validate_rect_within(
                 &overlay.draw_rect,
@@ -160,6 +171,32 @@ fn validate_composed_content(
     }
 
     validate_frame_border(frame_border, CoreError::InvalidSnapshot)?;
+    Ok(())
+}
+
+fn validate_decorative_clip(
+    draw: &RectUm,
+    clip: &RectUm,
+    sheet: &ComposedSheet,
+) -> Result<(), CoreError> {
+    validate_rect_within(
+        clip,
+        sheet.width_um,
+        sheet.height_um,
+        "Recorte do Decorativo",
+        &sheet.sheet_id,
+        CoreError::InvalidSnapshot,
+    )?;
+    if clip.x < draw.x
+        || clip.y < draw.y
+        || i128::from(clip.x) + i128::from(clip.width) > i128::from(draw.x) + i128::from(draw.width)
+        || i128::from(clip.y) + i128::from(clip.height)
+            > i128::from(draw.y) + i128::from(draw.height)
+    {
+        return Err(CoreError::InvalidSnapshot(
+            "O recorte excede a área do Decorativo.".into(),
+        ));
+    }
     Ok(())
 }
 

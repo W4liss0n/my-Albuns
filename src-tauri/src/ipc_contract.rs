@@ -635,11 +635,27 @@ pub struct MediaImportSelection {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, TS)]
-#[serde(tag = "kind", rename_all = "camelCase")]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub enum MediaImportSource {
     Files,
     Folder,
-    Drop { paths: Vec<String> },
+    Drop { drop_id: String },
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, TS)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub enum MediaFileDrag {
+    Over { x: f64, y: f64 },
+    Drop { x: f64, y: f64, drop_id: String },
+    Leave,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]

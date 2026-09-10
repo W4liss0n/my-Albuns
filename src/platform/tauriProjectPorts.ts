@@ -299,6 +299,7 @@ export const tauriProjectCorePort: ProjectCorePort = {
   readFrameDragThreshold: () => invoke<PointerDragThreshold>("frame_drag_threshold"),
   readSliderDoubleClickTime: () => invoke<number>("slider_double_click_time"),
   previewPhotoAngle: (edit) => invoke<ComposedFrame[]>("preview_photo_angle", { edit }),
+  previewDecorativeDrop: (request) => invoke<import("../domain/project").DecorativeDropPreview | null>("preview_decorative_drop", { request }),
   previewFrameStyle: (edit) => invoke<ComposedFrame[]>("preview_frame_style", { edit }),
   queryLayouts: (sheetId, frameRequest) => invoke<LayoutQueryResult>("query_layouts", frameRequest ? { sheetId, frameRequest } : { sheetId }),
   refreshLayoutCatalog: () => invoke<number>("refresh_layout_catalog"),

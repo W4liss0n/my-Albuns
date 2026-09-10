@@ -8,7 +8,13 @@ mod persistent_session;
 mod project_document;
 mod project_recovery;
 mod project_store;
+mod sheet_visuals;
 mod validation;
+
+pub use sheet_visuals::{
+    DecorativeDropPreview, DecorativeDropRequest, DecorativeRole, DecorativeScope, SheetVisual,
+    SheetVisuals, SideVisual, VisualMapping,
+};
 
 pub use frame_geometry::{
     FrameGeometryEdit, FrameGeometryGesture, FrameGeometryTarget, FrameResizeHandle,
@@ -28,13 +34,13 @@ pub use model::{
     EditorProjection, EditorState, FrameSnapshot, FrameStackAction, FrameStyleChange,
     FrameStyleEdit, FrameStyleSource, ImportMedia, ImportPhoto, ImportPhotoDisposition,
     ImportPhotoOutcome, ImportPhotosOutcome, Matrix2, MediaCatalogItem, MediaId, MediaKind,
-    MediaRemovalMode, MediaTransform, MediaUsage, NormalizedPan, NumberRange, ParseMediaIdError,
-    PhotoAngleEdit, PhotoDropTarget, PhotoOrientationAction, PhotoPlacement, PhotoPlacementMode,
-    PhotoPlacementPlan, PhotoSnapshot, PhotoSourceMetadata, ProjectIntent, ProjectMutationOutcome,
-    ProjectedActiveSides, ProjectedBackground, ProjectedBackgroundContent, ProjectedDisplayUnit,
-    ProjectedFrameBorder, ProjectedFrameStyle, ProjectedOverlay, ProjectedOverlayContent,
-    ProjectedVisualDefaults, RectUm, RelinkMedia, RenderSnapshot, RenderSnapshotRef,
-    SheetInsertionPosition, SheetRole, SheetSnapshot, SizeUm, VectorUm,
+    MediaRemovalMode, MediaTransform, MediaUsage, MediaUsageBreakdown, NormalizedPan, NumberRange,
+    ParseMediaIdError, PhotoAngleEdit, PhotoDropTarget, PhotoOrientationAction, PhotoPlacement,
+    PhotoPlacementMode, PhotoPlacementPlan, PhotoSnapshot, PhotoSourceMetadata, ProjectIntent,
+    ProjectMutationOutcome, ProjectedActiveSides, ProjectedBackground, ProjectedBackgroundContent,
+    ProjectedDisplayUnit, ProjectedFrameBorder, ProjectedFrameStyle, ProjectedOverlay,
+    ProjectedOverlayContent, ProjectedVisualDefaults, RectUm, RelinkMedia, RenderSnapshot,
+    RenderSnapshotRef, SheetInsertionPosition, SheetRole, SheetSnapshot, SizeUm, VectorUm,
 };
 pub use persistent_project::{
     CreateAuthorization, CreateProjectError, CreateProjectRequest, EditableProject,

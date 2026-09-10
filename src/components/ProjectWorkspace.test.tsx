@@ -198,6 +198,18 @@ const decorativeProjection: EditorProjection = {
   ],
 };
 
+test.each([false, true])("applies a double-clicked Decorative to both sides of the implicit Sheet (Shift=%s)", async (shiftKey) => {
+  const apply = vi.fn(async () => decorativeProjection);
+  render(<ProjectWorkspace exportPipelinePort={exportPipelinePort} projection={decorativeProjection}
+    projectCorePort={projectCorePortWithApply(apply)} onProjectionChange={vi.fn()} />);
+  fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
+  fireEvent.doubleClick(within(screen.getByRole("group", { name: "Grade de Decorativos" })).getByRole("button", { name: /Overlay translúcido.png/ }), { shiftKey });
+  await waitFor(() => expect(apply).toHaveBeenCalledExactlyOnceWith({
+    kind: "applyDecorative", mediaId: "decorative-overlay", sheetId: decorativeProjection.state.album.sheets[0].id,
+    role: shiftKey ? "overlay" : "background", scope: "bothSides",
+  }, expect.any(Function)));
+});
+
 function deferredProjection() {
   let resolve!: (value: EditorProjection) => void;
   let reject!: (reason: unknown) => void;
@@ -355,6 +367,7 @@ function projectCorePortWithApply(
     queryLayouts: async () => { throw new Error("Layouts are not configured in this fixture."); },
     previewLayout: async () => { throw new Error("Layouts are not configured in this fixture."); },
     previewFrameStyle: async () => { throw new Error("Frame style preview is not configured in this fixture."); },
+    previewDecorativeDrop: async () => { throw new Error("Decorative preview is not configured in this fixture."); },
     previewPhotoAngle: async () => { throw new Error("Photo angle preview is not configured in this fixture."); },
     previewFrameGeometry: async () => { throw new Error("Frame geometry preview is not configured in this fixture."); },
     resolvePhotoDropTarget: async () => ({ kind: "invalid" }),
@@ -5912,7 +5925,7 @@ test("renders derived media usage as the thumbnail opacity state", () => {
   );
 
   const usedMedia = screen.getByRole("button", {
-    name: "Serra ao amanhecer.jpg. Já usada",
+    name: "Serra ao amanhecer.jpg. Já usada. 1 uso",
   });
   expect(usedMedia).toHaveAttribute("data-used", "true");
   expect(usedMedia).not.toHaveTextContent("Serra ao amanhecer.jpg");
@@ -6469,7 +6482,7 @@ test("the connected media panel preserves a group and its anchor through orderin
   render(<ProjectWorkspace exportPipelinePort={exportPipelinePort} projection={projection}
     projectCorePort={port} onProjectionChange={vi.fn()} />);
   const first = screen.getByRole("button", { name: "Campo.jpg" });
-  const second = screen.getByRole("button", { name: "Serra ao amanhecer.jpg. Já usada" });
+  const second = screen.getByRole("button", { name: "Serra ao amanhecer.jpg. Já usada. 1 uso" });
   fireEvent.click(first);
   fireEvent.click(second, { ctrlKey: true });
   expect(first).toHaveAttribute("aria-pressed", "true");
@@ -6482,7 +6495,7 @@ test("the connected media panel preserves a group and its anchor through orderin
   fireEvent.change(search, { target: { value: "campo" } });
   expect(first).toHaveAttribute("aria-pressed", "true");
   fireEvent.change(search, { target: { value: "" } });
-  expect(screen.getByRole("button", { name: "Serra ao amanhecer.jpg. Já usada" })).toHaveAttribute("aria-pressed", "false");
+  expect(screen.getByRole("button", { name: "Serra ao amanhecer.jpg. Já usada. 1 uso" })).toHaveAttribute("aria-pressed", "false");
   expect(apply).not.toHaveBeenCalled();
 });
 
@@ -6525,7 +6538,7 @@ test("the album absence notice opens a temporary view and restores the previous 
   fireEvent.click(screen.getByRole("button", { name: "Ver arquivos ausentes" }));
   expect(screen.getByRole("button", { name: "Fotos" })).toHaveAttribute("aria-pressed", "true");
   expect(screen.getByRole("button", { name: "Campo.jpg. Arquivo ausente" })).toBeVisible();
-  expect(screen.queryByRole("button", { name: "Serra ao amanhecer.jpg. Já usada" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Serra ao amanhecer.jpg. Já usada. 1 uso" })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Encerrar visualização de ausentes" }));
   expect(screen.getByRole("button", { name: "Decorativos" })).toHaveAttribute("aria-pressed", "true");
   expect(screen.getByRole("searchbox", { name: "Buscar Decorativos" })).toHaveValue("dourado");

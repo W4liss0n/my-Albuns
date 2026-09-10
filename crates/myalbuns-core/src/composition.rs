@@ -24,6 +24,7 @@ impl CompositionCore {
                 .sheets
                 .iter()
                 .map(|sheet| {
+                    let visuals = sheet.visuals.clone().unwrap_or_default();
                     let surface =
                         active_surface_rect(sheet.active_sides, sheet.width_um, sheet.height_um);
                     let mut frames = sheet
@@ -77,6 +78,7 @@ impl CompositionCore {
                         },
                         backgrounds: compose_backgrounds(
                             &album.visual_defaults.background,
+                            &visuals.background,
                             sheet.active_sides,
                             sheet.width_um,
                             sheet.height_um,
@@ -85,6 +87,7 @@ impl CompositionCore {
                         frames,
                         overlays: compose_overlays(
                             &album.visual_defaults.overlay,
+                            &visuals.overlay,
                             sheet.active_sides,
                             sheet.width_um,
                             sheet.height_um,
@@ -141,25 +144,86 @@ pub(crate) fn compose_frame_border_fill_rects(
 }
 
 fn derive_media_usage(album: &AlbumSnapshot, composition: &CompositionPlan) -> Vec<MediaUsage> {
-    let mut counts = HashMap::<MediaId, usize>::new();
-    for media_id in composition
-        .sheets
-        .iter()
-        .flat_map(ComposedSheet::referenced_media_ids)
-    {
-        *counts.entry(media_id).or_default() += 1;
+    let mut counts = HashMap::<MediaId, crate::MediaUsageBreakdown>::new();
+    for sheet in &composition.sheets {
+        for frame in &sheet.frames {
+            if let Some(photo) = &frame.photo {
+                counts.entry(photo.media_id).or_default().frames += 1;
+            }
+        }
+        for background in &sheet.backgrounds {
+            if let ComposedBackground::Media { media_id, .. } = background {
+                counts.entry(*media_id).or_default().backgrounds += 1;
+            }
+        }
+        for overlay in &sheet.overlays {
+            counts.entry(overlay.media_id).or_default().overlays += 1;
+        }
     }
-
+    // Single-page conversion preserves the inactive side's custom content.
+    // Those stored references remain uses even while they do not render.
+    for sheet in &album.sheets {
+        if let Some(visuals) = &sheet.visuals {
+            if let Some(ProjectedBackgroundContent::Media { media_id }) =
+                inactive_visual_content(&visuals.background, sheet.active_sides)
+            {
+                counts.entry(*media_id).or_default().backgrounds += 1;
+            }
+            if let Some(Some(ProjectedOverlayContent::Media { media_id })) =
+                inactive_visual_content(&visuals.overlay, sheet.active_sides)
+            {
+                counts.entry(*media_id).or_default().overlays += 1;
+            }
+        }
+    }
+    let backgrounds = match &album.visual_defaults.background {
+        ProjectedBackground::BothSides { both } => vec![both],
+        ProjectedBackground::PerSide { left, right } => vec![left, right],
+    };
+    for content in backgrounds {
+        if let ProjectedBackgroundContent::Media { media_id } = content {
+            counts.entry(*media_id).or_default().album_backgrounds += 1;
+        }
+    }
+    let overlays = match &album.visual_defaults.overlay {
+        ProjectedOverlay::BothSides { both } => vec![both],
+        ProjectedOverlay::PerSide { left, right } => vec![left, right],
+    };
+    for content in overlays.into_iter().flatten() {
+        let ProjectedOverlayContent::Media { media_id } = content;
+        counts.entry(*media_id).or_default().album_overlays += 1;
+    }
     album
         .media
         .iter()
-        .map(|media| MediaUsage {
-            media_id: media.id,
-            count: counts.get(&media.id).copied().unwrap_or_default(),
+        .map(|media| {
+            let breakdown = counts.remove(&media.id).unwrap_or_default();
+            MediaUsage {
+                media_id: media.id,
+                count: breakdown.count(),
+                breakdown: Some(breakdown),
+            }
         })
         .collect()
 }
 
+fn inactive_visual_content<T>(
+    visual: &crate::SheetVisual<T>,
+    active: ProjectedActiveSides,
+) -> Option<&T> {
+    let crate::SheetVisual::PerSide { left, right } = visual else {
+        return None;
+    };
+    let side = match active {
+        ProjectedActiveSides::Both => return None,
+        ProjectedActiveSides::Left => right,
+        ProjectedActiveSides::Right => left,
+    };
+    match side {
+        crate::SideVisual::Custom { content, .. } => Some(content),
+        crate::SideVisual::Default => None,
+    }
+}
 /// The crate's only entry point that resolves an Album into a CompositionPlan.
 pub(crate) fn resolve_editor_projection(state: EditorState) -> EditorProjection {
     let composition = CompositionCore::compose(&state.album);
@@ -206,119 +270,190 @@ fn side_rects(full_width_um: i64, height_um: i64) -> [RectUm; 2] {
     ]
 }
 
+struct VisualRegion<'a, T> {
+    content: &'a T,
+    draw_rect: RectUm,
+    clip_rect: Option<RectUm>,
+}
+
+fn visual_regions<'a, T>(
+    local: &'a crate::SheetVisual<T>,
+    defaults: Vec<VisualRegion<'a, T>>,
+    active_sides: ProjectedActiveSides,
+    full_width_um: i64,
+    height_um: i64,
+) -> Vec<VisualRegion<'a, T>> {
+    use crate::{SheetVisual, SideVisual, VisualMapping};
+    let surface = active_surface_rect(active_sides, full_width_um, height_um);
+    match local {
+        SheetVisual::Default => defaults,
+        SheetVisual::BothSides { content } => vec![VisualRegion {
+            content,
+            draw_rect: surface,
+            clip_rect: None,
+        }],
+        SheetVisual::PerSide { left, right } => {
+            let sides = match active_sides {
+                ProjectedActiveSides::Both => {
+                    let [l, r] = side_rects(full_width_um, height_um);
+                    vec![(left, l), (right, r)]
+                }
+                ProjectedActiveSides::Left => vec![(left, surface.clone())],
+                ProjectedActiveSides::Right => vec![(right, surface.clone())],
+            };
+            sides
+                .into_iter()
+                .flat_map(|(side, rect)| match side {
+                    SideVisual::Default => defaults
+                        .iter()
+                        .filter_map(|region| {
+                            intersect_rects(&region.draw_rect, &rect).map(|clip| VisualRegion {
+                                content: region.content,
+                                draw_rect: region.draw_rect.clone(),
+                                clip_rect: (clip != region.draw_rect).then_some(clip),
+                            })
+                        })
+                        .collect(),
+                    SideVisual::Custom { content, mapping } => {
+                        let draw_rect = if *mapping == VisualMapping::BothSides {
+                            surface.clone()
+                        } else {
+                            rect.clone()
+                        };
+                        vec![VisualRegion {
+                            content,
+                            clip_rect: (draw_rect != rect).then_some(rect),
+                            draw_rect,
+                        }]
+                    }
+                })
+                .collect()
+        }
+    }
+}
+
+fn intersect_rects(a: &RectUm, b: &RectUm) -> Option<RectUm> {
+    let x = a.x.max(b.x);
+    let y = a.y.max(b.y);
+    let width = (a.x + a.width).min(b.x + b.width) - x;
+    let height = (a.y + a.height).min(b.y + b.height) - y;
+    (width > 0 && height > 0).then_some(RectUm {
+        x,
+        y,
+        width,
+        height,
+    })
+}
+
+fn default_visual_regions<'a, T>(
+    both: Option<&'a T>,
+    sides: Option<(&'a T, &'a T)>,
+    active_sides: ProjectedActiveSides,
+    width: i64,
+    height: i64,
+) -> Vec<VisualRegion<'a, T>> {
+    let surface = active_surface_rect(active_sides, width, height);
+    let entries = if let Some(content) = both {
+        vec![(content, surface)]
+    } else {
+        let (left, right) = sides.expect("a visual default has either whole or per-side content");
+        match active_sides {
+            ProjectedActiveSides::Both => {
+                let [l, r] = side_rects(width, height);
+                vec![(left, l), (right, r)]
+            }
+            ProjectedActiveSides::Left => vec![(left, surface)],
+            ProjectedActiveSides::Right => vec![(right, surface)],
+        }
+    };
+    entries
+        .into_iter()
+        .map(|(content, draw_rect)| VisualRegion {
+            content,
+            draw_rect,
+            clip_rect: None,
+        })
+        .collect()
+}
+
 fn compose_backgrounds(
     background: &ProjectedBackground,
+    local: &crate::SheetVisual<ProjectedBackgroundContent>,
     active_sides: ProjectedActiveSides,
     full_width_um: i64,
     height_um: i64,
     media_by_id: &HashMap<MediaId, &MediaCatalogItem>,
 ) -> Vec<ComposedBackground> {
-    let surface = active_surface_rect(active_sides, full_width_um, height_um);
-    match background {
+    let defaults = match background {
         ProjectedBackground::BothSides { both } => {
-            vec![compose_background(both, surface, media_by_id)]
+            default_visual_regions(Some(both), None, active_sides, full_width_um, height_um)
         }
-        ProjectedBackground::PerSide { left, right } => match active_sides {
-            ProjectedActiveSides::Both => {
-                let [left_rect, right_rect] = side_rects(full_width_um, height_um);
-                vec![
-                    compose_background(left, left_rect, media_by_id),
-                    compose_background(right, right_rect, media_by_id),
-                ]
+        ProjectedBackground::PerSide { left, right } => default_visual_regions(
+            None,
+            Some((left, right)),
+            active_sides,
+            full_width_um,
+            height_um,
+        ),
+    };
+    visual_regions(local, defaults, active_sides, full_width_um, height_um)
+        .into_iter()
+        .map(|region| match region.content {
+            ProjectedBackgroundContent::Color { rgb } => ComposedBackground::Color {
+                rgb: rgb.clone(),
+                draw_rect: region.clip_rect.unwrap_or(region.draw_rect),
+            },
+            ProjectedBackgroundContent::Media { media_id } => {
+                let media = media_by_id
+                    .get(media_id)
+                    .expect("validated Background reference");
+                ComposedBackground::Media {
+                    media_id: *media_id,
+                    name: media.name.clone(),
+                    draw_rect: region.draw_rect,
+                    clip_rect: region.clip_rect,
+                }
             }
-            ProjectedActiveSides::Left => {
-                vec![compose_background(left, surface, media_by_id)]
-            }
-            ProjectedActiveSides::Right => {
-                vec![compose_background(right, surface, media_by_id)]
-            }
-        },
-    }
-}
-
-fn compose_background(
-    content: &ProjectedBackgroundContent,
-    draw_rect: RectUm,
-    media_by_id: &HashMap<MediaId, &MediaCatalogItem>,
-) -> ComposedBackground {
-    match content {
-        ProjectedBackgroundContent::Color { rgb } => ComposedBackground::Color {
-            rgb: rgb.clone(),
-            draw_rect,
-        },
-        ProjectedBackgroundContent::Media { media_id } => {
-            let media = media_by_id
-                .get(media_id)
-                .copied()
-                .expect("validated Background media reference");
-            ComposedBackground::Media {
-                media_id: media.id,
-                name: media.name.clone(),
-                draw_rect,
-            }
-        }
-    }
+        })
+        .collect()
 }
 
 fn compose_overlays(
     overlay: &ProjectedOverlay,
+    local: &crate::SheetVisual<Option<ProjectedOverlayContent>>,
     active_sides: ProjectedActiveSides,
     full_width_um: i64,
     height_um: i64,
     media_by_id: &HashMap<MediaId, &MediaCatalogItem>,
 ) -> Vec<ComposedDecorative> {
-    let surface = active_surface_rect(active_sides, full_width_um, height_um);
-    match overlay {
-        ProjectedOverlay::BothSides { both } => both
-            .as_ref()
-            .map(|content| compose_overlay(content, surface, media_by_id))
-            .into_iter()
-            .collect(),
-        ProjectedOverlay::PerSide { left, right } => match active_sides {
-            ProjectedActiveSides::Both => {
-                let [left_rect, right_rect] = side_rects(full_width_um, height_um);
-                [
-                    left.as_ref()
-                        .map(|content| compose_overlay(content, left_rect, media_by_id)),
-                    right
-                        .as_ref()
-                        .map(|content| compose_overlay(content, right_rect, media_by_id)),
-                ]
-                .into_iter()
-                .flatten()
-                .collect()
-            }
-            ProjectedActiveSides::Left => left
-                .as_ref()
-                .map(|content| compose_overlay(content, surface, media_by_id))
-                .into_iter()
-                .collect(),
-            ProjectedActiveSides::Right => right
-                .as_ref()
-                .map(|content| compose_overlay(content, surface, media_by_id))
-                .into_iter()
-                .collect(),
-        },
-    }
+    let defaults = match overlay {
+        ProjectedOverlay::BothSides { both } => {
+            default_visual_regions(Some(both), None, active_sides, full_width_um, height_um)
+        }
+        ProjectedOverlay::PerSide { left, right } => default_visual_regions(
+            None,
+            Some((left, right)),
+            active_sides,
+            full_width_um,
+            height_um,
+        ),
+    };
+    visual_regions(local, defaults, active_sides, full_width_um, height_um)
+        .into_iter()
+        .filter_map(|region| {
+            let ProjectedOverlayContent::Media { media_id } = region.content.as_ref()?;
+            let media = media_by_id
+                .get(media_id)
+                .expect("validated Overlay reference");
+            Some(ComposedDecorative {
+                media_id: *media_id,
+                name: media.name.clone(),
+                draw_rect: region.draw_rect,
+                clip_rect: region.clip_rect,
+            })
+        })
+        .collect()
 }
-
-fn compose_overlay(
-    content: &ProjectedOverlayContent,
-    draw_rect: RectUm,
-    media_by_id: &HashMap<MediaId, &MediaCatalogItem>,
-) -> ComposedDecorative {
-    let ProjectedOverlayContent::Media { media_id } = content;
-    let media = media_by_id
-        .get(media_id)
-        .copied()
-        .expect("validated Overlay media reference");
-    ComposedDecorative {
-        media_id: media.id,
-        name: media.name.clone(),
-        draw_rect,
-    }
-}
-
 fn compose_photo(frame: &RectUm, photo: &PhotoSnapshot, media: &MediaCatalogItem) -> ComposedPhoto {
     let rotation_degrees =
         photo.transform.quarter_turns as f32 * 90.0 - photo.transform.fine_rotation_degrees;

@@ -27,6 +27,8 @@ impl ProjectDocument {
         }
         let mut next = self.clone();
         for sheet in &mut next.sheets {
+            sheet.visuals.background.restore_matching(|content| matches!(content, ProjectedBackgroundContent::Media { media_id } if selected.contains(&media_id.into_uuid())));
+            sheet.visuals.overlay.restore_matching(|content| matches!(content, Some(ProjectedOverlayContent::Media { media_id }) if selected.contains(&media_id.into_uuid())));
             if mode == MediaRemovalMode::RemoveAll && !sheet.layout_locked {
                 sheet.frames.retain(|frame| {
                     !frame

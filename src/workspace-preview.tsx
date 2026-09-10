@@ -42,6 +42,7 @@ import { frameClipboardCorpus } from "./test/frameClipboardPreview";
 import { sheetSideSwapCorpus } from "./test/sheetSideSwapPreview";
 import { photoOrientationCorpus } from "./test/photoOrientationPreview";
 import { frameStyleCorpus } from "./test/frameStylePreview";
+import { decorativeCorpus, decorativePreview, decorativeStateName } from "./test/decorativePreview";
 import { layoutPanelCorpus } from "./test/layoutPanelPreview";
 import { continuousCanvasScale, createCanvasSheetPresentation } from "./components/canvasGeometry";
 import { createCanvasSheetViewGeometry, createNormalCanvasLayout } from "./components/canvasSheetViewGeometry";
@@ -100,6 +101,11 @@ if (frameContext === "manual") {
 }
 const undoStack: EditorProjection[] = [];
 const redoStack: EditorProjection[] = [];
+if (frameContext === "decorations") {
+  const sheet = projection.state.album.sheets[0];
+  useEditorView.setState({ projectId: projection.state.projectId, editingSheetId: sheet.id,
+    focusedSheetId: sheet.id, centeredSheetId: sheet.id, selectedFrameIds: [sheet.frames[0].id] });
+}
 let addedSheetSequence = 0;
 if (frameContext === "deletion") {
   useEditorView.setState({ projectId: projection.state.projectId, editingSheetId: "sheet-001",
@@ -228,6 +234,7 @@ const projectCorePort: ProjectCorePort = {
     document.body.dataset.photoAnglePreview = String(edit.angleTenths);
     return structuredClone(sample.frames);
   },
+  previewDecorativeDrop: async (request) => decorativePreview(projection, request),
   previewFrameGeometry: async () => { throw new Error("Frame geometry preview is not configured in this fixture."); },
   // Replay Core-produced point probes with tolerance for CSS pixel rounding.
   resolvePhotoDropTarget: async (sheetId, xUm, yUm) => frameContext === "swap"
@@ -260,6 +267,12 @@ const projectCorePort: ProjectCorePort = {
 const mediaPreviewPort: MediaPreviewPort = {
   readMediaFiles: async () => ({ projectId: projection.state.projectId, files: [] }),
   prepareMediaPreviews: async () =>
+    frameContext === "decorations" ? projection.state.album.media.map((media, index) => ({
+      mediaId: media.id, state: "ready" as const,
+      url: `data:image/svg+xml,${encodeURIComponent(index === 2
+        ? '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="300"><path fill="#dbad45" fill-opacity=".65" d="M0 0h600v24H0zM0 276h600v24H0zM0 0h24v300H0zM576 0h24v300h-24z"/><circle cx="300" cy="150" r="75" fill="#247580" fill-opacity=".4"/></svg>'
+        : '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="300"><path fill="#d97e63" d="M0 0h300v300H0z"/><path fill="#557f98" d="M300 0h300v300H300z"/><circle cx="150" cy="150" r="85" fill="#f7c988"/><path fill="#b2d6cd" d="m450 55 95 190H355z"/></svg>')}`,
+    })) :
     (frameContext === "orientation" || frameContext === "style" || frameContext === "layouts") && previewParameters.get("preview") === "palette"
       ? projection.state.album.media.map((media) => ({ mediaId: media.id, state: "unavailable" as const, url: null }))
       : frameContext === "orientation" || frameContext === "style" || frameContext === "layouts" ? projection.state.album.media.map((media) => ({
@@ -373,6 +386,7 @@ function createPreviewProjection(
   decorativeMode: string | null,
   structureMode: string | null,
 ): EditorProjection {
+  if (frameMode === "decorations") return structuredClone(decorativeCorpus.states[previewParameters.get("decoration-state") ?? "whole"]);
   if (frameMode === "layouts") {
     const stage = previewParameters.get("layout-state");
     const sample = layoutCase.favoriteStates?.[layoutFavoriteStage] ?? (stage === "locked" ? layoutCase.locked : stage === "filled" ? layoutCase.filled : stage === "cleared" ? layoutCase.cleared : layoutCase.before);
@@ -504,6 +518,20 @@ function configurePhysicalPreview(
 }
 
 function applyPreviewIntent(intent: ProjectIntent): ProjectMutationOutcome {
+  if (intent.kind === "applyDecorative" || intent.kind === "dropDecorative") {
+    const preview = intent.kind === "dropDecorative" ? decorativePreview(projection, intent.request) : null;
+    const edit = intent.kind === "applyDecorative" ? intent : preview ? {
+      kind: "applyDecorative", sheetId: intent.request.sheetId, mediaId: intent.request.mediaId,
+      role: intent.request.role, scope: preview.scope,
+    } : null;
+    const sample = decorativeCorpus.transitions.find((item) => item.from === decorativeStateName(projection) &&
+      edit && item.intent.sheetId === edit.sheetId && item.intent.mediaId === edit.mediaId &&
+      item.intent.role === edit.role && item.intent.scope === edit.scope);
+    if (frameContext !== "decorations" || !sample) throw new Error("Aplicação fora do corpus de Decorativos.");
+    projection = finalizePhysicalPreviewMutation(structuredClone(sample.projection), structuredClone(projection));
+    document.body.dataset.decorativeApplied = `${sample.intent.role}-${sample.intent.scope}`;
+    return { projection, affectedFrameId: null, affectedSheetId: sample.intent.sheetId };
+  }
   if (intent.kind === "toggleLayoutFavorite") {
     const transition = layoutCase.favoriteTransitions?.find((item) => item.from === layoutFavoriteStage && item.candidateIndex === intent.selection.candidateIndex);
     if (frameContext !== "layouts" || !transition || !preparedLayoutQuery ||

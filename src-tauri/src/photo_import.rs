@@ -54,6 +54,7 @@ struct PhotoImportAttempt {
     roots: RootBindingPlan,
     paths: Vec<PathBuf>,
     sources: Vec<SelectedSource>,
+    selection_problems: Vec<ImageProcessingProblem>,
 }
 
 impl PhotoImportAttempt {
@@ -101,6 +102,7 @@ impl PhotoImportAttempt {
             let _ = context.capture(path);
         }
         let roots = context.freeze();
+        let (paths, selection_problems) = crate::media_import_selection::expand(paths, &roots);
         let sources = paths
             .iter()
             .filter(|path| !existing.contains(path.as_path()))
@@ -123,6 +125,7 @@ impl PhotoImportAttempt {
             roots,
             paths,
             sources,
+            selection_problems,
         })
     }
 
@@ -160,17 +163,14 @@ pub(crate) async fn import_selected_media(
     app: &AppHandle,
     kind: MediaKind,
     paths: Vec<PathBuf>,
-    unsupported: Vec<ImageProcessingProblem>,
+    mut unsupported: Vec<ImageProcessingProblem>,
     publish: impl FnMut(ImageProcessingProgress) + Send,
 ) -> Result<ImportMediaResult, String> {
     let host = app.state::<ProjectHost>();
     let catalog = host.authorized_media_catalog()?;
     let namespace = app.state::<ActiveCacheNamespace>().namespace();
-    let total = paths.iter().collect::<HashSet<_>>().len() + unsupported.len();
-    let progress = ImageProcessingBatch::new(total as u32, publish);
-    let unsupported_count = unsupported.len();
     let capture_app = app.clone();
-    let (attempt, mut stage, stage_error) = tauri::async_runtime::spawn_blocking(move || {
+    let (mut attempt, mut stage, stage_error) = tauri::async_runtime::spawn_blocking(move || {
         let attempt = PhotoImportAttempt::capture_for_kind(kind, catalog, namespace, paths)?;
         let candidates = attempt
             .sources
@@ -191,6 +191,10 @@ pub(crate) async fn import_selected_media(
     })
     .await
     .map_err(|_| "Não foi possível preparar a importação das imagens.".to_string())??;
+    unsupported.append(&mut attempt.selection_problems);
+    let unsupported_count = unsupported.len();
+    let total = attempt.paths.len() + unsupported_count;
+    let progress = ImageProcessingBatch::new(total as u32, publish);
 
     let requests = if stage.is_some() {
         attempt.requests(app.state::<ImagingProcessor>().cache_capacity())

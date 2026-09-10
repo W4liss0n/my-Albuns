@@ -17,6 +17,7 @@ use crate::model::{
 
 pub(crate) const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
 
+mod decorations;
 mod frame_clipboard;
 mod layouts;
 mod media;
@@ -504,6 +505,7 @@ impl MediaRef {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProjectSheet {
+    visuals: crate::SheetVisuals,
     id: Uuid,
     active_sides: ActiveSides,
     frames: Vec<ProjectFrame>,
@@ -526,6 +528,7 @@ impl ProjectSheet {
 
     pub(crate) fn new(id: Uuid, active_sides: ActiveSides) -> Self {
         Self {
+            visuals: crate::SheetVisuals::default(),
             id,
             active_sides,
             frames: Vec::new(),
@@ -540,6 +543,7 @@ impl ProjectSheet {
         frames: Vec<ProjectFrame>,
     ) -> Self {
         Self {
+            visuals: crate::SheetVisuals::default(),
             id,
             active_sides,
             frames,
@@ -1959,7 +1963,7 @@ impl ProjectRevision {
 }
 
 pub(crate) fn validate_project_state(project: &ProjectDocument) -> Result<(), ()> {
-    if !project.layout_state_is_valid() {
+    if !project.layout_state_is_valid() || !project.sheet_visuals_are_valid() {
         return Err(());
     }
     let settings = project.document();

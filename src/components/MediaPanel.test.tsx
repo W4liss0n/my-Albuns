@@ -21,12 +21,31 @@ const mediaUsage: readonly MediaUsage[] = [
 ];
 
 const mediaPanelInteractions = {
+  onApplyDecorative: () => undefined,
   onImportMedia: () => undefined,
   onRemoveMedia: () => undefined,
   onMediaDragChange: () => undefined,
   onRelinkMedia: () => undefined,
   onRetryUnavailableMedia: async () => undefined,
 };
+
+test("applies only the double-clicked Decorative and distinguishes each usage role", () => {
+  const onApplyDecorative = vi.fn();
+  render(<MediaPanel {...mediaPanelInteractions} onApplyDecorative={onApplyDecorative}
+    mediaItems={[...mediaItems, media("decorative-other", "decorative", "Textura")]} mediaUsage={[
+      { mediaId: "decorative-overlay", count: 5, breakdown: { frames: 0, backgrounds: 2, overlays: 1, albumBackgrounds: 1, albumOverlays: 1 } },
+    ]} onFillPhoto={vi.fn()} preferences={{ kind: "local" }} previewSource={{ kind: "static" }} />);
+  fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
+  const overlay = screen.getByRole("button", { name: /Overlay dourado/ });
+  fireEvent.click(overlay);
+  fireEvent.click(screen.getByRole("button", { name: /Textura/ }), { ctrlKey: true });
+  fireEvent.doubleClick(overlay);
+  expect(onApplyDecorative).toHaveBeenLastCalledWith("decorative-overlay", "background");
+  fireEvent.doubleClick(overlay, { shiftKey: true });
+  expect(onApplyDecorative).toHaveBeenLastCalledWith("decorative-overlay", "overlay");
+  expect(onApplyDecorative).toHaveBeenCalledTimes(2);
+  expect(overlay).toHaveAccessibleName(/2 Fundos.*1 Overlay.*1 padrão de Fundo.*1 padrão de Overlay/);
+});
 
 test("requests the initial measured viewport without waiting for a scroll or observer paint", () => {
   vi.stubGlobal("IntersectionObserver", class {
@@ -178,9 +197,9 @@ test("imports a Windows drop anywhere inside the visible panel into the current 
   await user.click(screen.getByRole("button", { name: "Decorativos" }));
   act(() => publish({ kind: "over", x: 15, y: 405 }));
   expect(screen.getByText("Solte para importar em Decorativos")).toBeVisible();
-  act(() => publish({ kind: "drop", x: 15, y: 405, paths: ["C:\\Fotos"] }));
-  expect(onImportMedia).toHaveBeenCalledWith({ mediaKind: "decorative", source: { kind: "drop", paths: ["C:\\Fotos"] } });
-  act(() => publish({ kind: "drop", x: 15, y: 100, paths: ["C:\\fora.png"] }));
+  act(() => publish({ kind: "drop", x: 15, y: 405, dropId: "native-drop-1" }));
+  expect(onImportMedia).toHaveBeenCalledWith({ mediaKind: "decorative", source: { kind: "drop", dropId: "native-drop-1" } });
+  act(() => publish({ kind: "drop", x: 15, y: 100, dropId: "native-drop-2" }));
   expect(onImportMedia).toHaveBeenCalledOnce();
   view.unmount();
   expect(stop).toHaveBeenCalledOnce();
@@ -616,9 +635,9 @@ test("uses image orientation and opacity without visible names or usage counts",
   );
 
   expect(usedCard).toHaveAttribute("data-used", "true");
-  expect(usedCard).toHaveAccessibleName("Álbum 10. Já usada");
+  expect(usedCard).toHaveAccessibleName("Álbum 10. Já usada. 2 usos");
   expect(usedCard).not.toHaveTextContent("Álbum 10");
-  expect(usedCard?.querySelector(".media-usage-badge")).toBeNull();
+  expect(usedCard?.querySelector(".media-usage-badge")).toHaveTextContent("2");
   expect(usedCard?.querySelector(".media-meta")).toBeNull();
   const landscapeThumb = usedCard?.querySelector<HTMLElement>(
     ".media-preview-thumbnail",
@@ -642,10 +661,10 @@ test("keeps selection on media ids and supports click, Ctrl, Shift, and Ctrl+A",
 
   const album2 = screen.getByRole("button", { name: "album 2" });
   const album10 = screen.getByRole("button", {
-    name: "Álbum 10. Já usada",
+    name: "Álbum 10. Já usada. 2 usos",
   });
   const portrait = screen.getByRole("button", {
-    name: "Retrato. Já usada",
+    name: "Retrato. Já usada. 1 uso",
   });
   const grid = screen.getByRole("group", { name: "Grade de Fotos" });
 
@@ -674,10 +693,10 @@ test("preserves a selected group on right click and replaces it for an unselecte
 
   const album2 = screen.getByRole("button", { name: "album 2" });
   const album10 = screen.getByRole("button", {
-    name: "Álbum 10. Já usada",
+    name: "Álbum 10. Já usada. 2 usos",
   });
   const portrait = screen.getByRole("button", {
-    name: "Retrato. Já usada",
+    name: "Retrato. Já usada. 1 uso",
   });
 
   fireEvent.click(album2);

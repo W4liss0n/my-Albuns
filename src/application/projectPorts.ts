@@ -264,12 +264,12 @@ export interface MediaImportCompletion {
 
 export type MediaImportSelection = {
   mediaKind: "photo" | "decorative";
-  source: { kind: "files" } | { kind: "folder" } | { kind: "drop"; paths: string[] };
+  source: { kind: "files" } | { kind: "folder" } | { kind: "drop"; dropId: string };
 };
 
 export type MediaFileDrag =
   | { kind: "over"; x: number; y: number }
-  | { kind: "drop"; x: number; y: number; paths: string[] }
+  | { kind: "drop"; x: number; y: number; dropId: string }
   | { kind: "leave" };
 
 export interface MediaDropPort {
@@ -277,6 +277,7 @@ export interface MediaDropPort {
 }
 
 export interface ProjectCorePort {
+  previewDecorativeDrop(request: import("../domain/project").DecorativeDropRequest): Promise<import("../domain/project").DecorativeDropPreview | null>;
   refreshLayoutCatalog(): Promise<number>;
   saveCustomLayout(sheetId: string): Promise<SaveCustomLayoutResult>;
   deleteCustomLayout(layoutId: CustomLayoutId): Promise<number>;

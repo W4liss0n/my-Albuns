@@ -261,6 +261,13 @@
     },
     "mediaUsage": [
       {
+        "breakdown": {
+          "albumBackgrounds": 0,
+          "albumOverlays": 0,
+          "backgrounds": 0,
+          "frames": 2,
+          "overlays": 0
+        },
         "count": 2,
         "mediaId": "00000000-0000-4000-8000-000000000001"
       }
@@ -684,6 +691,13 @@
         },
         "mediaUsage": [
           {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 0,
+              "backgrounds": 0,
+              "frames": 2,
+              "overlays": 0
+            },
             "count": 2,
             "mediaId": "00000000-0000-4000-8000-000000000001"
           }
@@ -1015,6 +1029,13 @@
         },
         "mediaUsage": [
           {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 0,
+              "backgrounds": 0,
+              "frames": 1,
+              "overlays": 0
+            },
             "count": 1,
             "mediaId": "00000000-0000-4000-8000-000000000001"
           }
@@ -1223,6 +1244,13 @@
         },
         "mediaUsage": [
           {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 0,
+              "backgrounds": 0,
+              "frames": 0,
+              "overlays": 0
+            },
             "count": 0,
             "mediaId": "00000000-0000-4000-8000-000000000001"
           }

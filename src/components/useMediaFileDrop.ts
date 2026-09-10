@@ -25,8 +25,8 @@ export function useMediaFileDrop({ port, host, hidden, disabled, mediaKind, onIm
       const inside = event.kind !== "leave" && !latest.hidden && !latest.disabled && bounds &&
         event.x >= bounds.left && event.x <= bounds.right && event.y >= bounds.top && event.y <= bounds.bottom;
       setOver(Boolean(inside && event.kind === "over"));
-      if (inside && event.kind === "drop" && event.paths.length > 0) {
-        latest.onImport({ mediaKind: latest.mediaKind, source: { kind: "drop", paths: event.paths } });
+      if (inside && event.kind === "drop") {
+        latest.onImport({ mediaKind: latest.mediaKind, source: { kind: "drop", dropId: event.dropId } });
       }
     }).then((stop) => { if (active) unsubscribe = stop; else stop(); }, () => {
       if (active) setError("Não foi possível receber arquivos arrastados. Use Importar.");

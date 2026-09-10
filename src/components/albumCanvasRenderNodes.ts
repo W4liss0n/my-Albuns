@@ -14,6 +14,7 @@ import type {
   ComposedSheet,
   FrameResizeHandle,
   NormalizedPan,
+  RectUm,
 } from "../domain/project";
 import type {
   CanvasTechnicalGuides,
@@ -136,6 +137,7 @@ export function createSheetRenderNode(
   modePolicy: AlbumCanvasModePolicy,
   signature: string,
   callbacks: SheetRenderNodeCallbacks,
+  decorativePreview?: import("../domain/project").DecorativeDropPreview | null,
 ): SheetRenderNode {
   const sheetContainer = new Container();
   const presentation = createCanvasSheetPresentation(sheet);
@@ -215,14 +217,14 @@ export function createSheetRenderNode(
       sprite.width = backgroundWidth;
       sprite.height = backgroundHeight;
       sprite.eventMode = "none";
-      activeContent.addChild(sprite);
+      addDecorativeRenderNode(activeContent, sprite, background.clipRect);
     } else {
       const fallback = new Graphics()
         .rect(x, y, backgroundWidth, backgroundHeight)
         .fill({ color: pixiColor(SHEET_VISUAL_STYLE.mediaFallback.fill) });
       fallback.label = `background-media-fallback-${background.mediaId}`;
       fallback.eventMode = "none";
-      activeContent.addChild(fallback);
+      addDecorativeRenderNode(activeContent, fallback, background.clipRect);
     }
   }
 
@@ -457,7 +459,7 @@ export function createSheetRenderNode(
       overlay.height =
         composedOverlay.drawRect.height * MICROMETER_TO_CANVAS_PIXEL;
       overlay.eventMode = "none";
-      activeContent.addChild(overlay);
+      addDecorativeRenderNode(activeContent, overlay, composedOverlay.clipRect);
     } else {
       const overlayStyle = SHEET_VISUAL_STYLE.overlay;
       const overlay = new Graphics()
@@ -475,7 +477,7 @@ export function createSheetRenderNode(
         });
       overlay.label = `decorative-overlay-fallback-${composedOverlay.mediaId}`;
       overlay.eventMode = "none";
-      activeContent.addChild(overlay);
+      addDecorativeRenderNode(activeContent, overlay, composedOverlay.clipRect);
     }
   }
 
@@ -499,6 +501,21 @@ export function createSheetRenderNode(
     }
   }
   activeContent.addChild(frameSelectionLayer);
+  if (decorativePreview) {
+    for (const [name, rect, alpha] of [
+      ["center", decorativePreview.centerRect, 0.10],
+      ["zone", decorativePreview.zoneRect, 0.08],
+    ] as const) {
+      if (!rect) continue;
+      const zone = new Graphics().rect(
+        rect.x * MICROMETER_TO_CANVAS_PIXEL, rect.y * MICROMETER_TO_CANVAS_PIXEL,
+        rect.width * MICROMETER_TO_CANVAS_PIXEL, rect.height * MICROMETER_TO_CANVAS_PIXEL,
+      ).fill({ color: 0x2f7fba, alpha }).stroke({ color: 0x2f7fba, width: 1, pixelLine: true });
+      zone.label = `decorative-drop-${name}-${sheet.sheetId}`;
+      zone.eventMode = "none";
+      activeContent.addChild(zone);
+    }
+  }
 
   const sheetBar = createSheetBarRenderNode(
     sheet,
@@ -725,4 +742,23 @@ function setPhotoLayersScale(
 ) {
   node.layer.scale.set(x, y);
   node.outsideLayer.scale.set(x, y);
+}
+
+function addDecorativeRenderNode(
+  parent: Container,
+  node: Sprite | Graphics,
+  clipRect?: RectUm,
+) {
+  parent.addChild(node);
+  if (!clipRect) return;
+  const mask = new Graphics().rect(
+    clipRect.x * MICROMETER_TO_CANVAS_PIXEL,
+    clipRect.y * MICROMETER_TO_CANVAS_PIXEL,
+    clipRect.width * MICROMETER_TO_CANVAS_PIXEL,
+    clipRect.height * MICROMETER_TO_CANVAS_PIXEL,
+  ).fill({ color: 0xffffff });
+  mask.label = `${node.label}-clip`;
+  mask.eventMode = "none";
+  parent.addChild(mask);
+  node.mask = mask;
 }

@@ -12,6 +12,7 @@
           "apply_project_intent",
           "import_media",
           "photo_drop_target",
+          "preview_decorative_drop",
           "preview_frame_geometry",
           "preview_photo_angle",
           "preview_frame_style",

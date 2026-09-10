@@ -1,23 +1,25 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { getCurrentWebview, type DragDropEvent } from "@tauri-apps/api/webview";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import type { MediaFileDrag } from "./generated/MediaFileDrag";
 import { tauriMediaDropPort } from "./tauriMediaDropPort";
 
-vi.mock("@tauri-apps/api/webview", () => ({ getCurrentWebview: vi.fn() }));
+vi.mock("@tauri-apps/api/window", () => ({ getCurrentWindow: vi.fn() }));
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-test("maps physical Windows drop coordinates to CSS pixels and returns native cleanup", async () => {
-  let publish!: (event: { payload: DragDropEvent }) => void;
+test("maps physical Windows drop coordinates to CSS pixels and keeps the native drop opaque", async () => {
+  let publish!: (event: { payload: MediaFileDrag }) => void;
   const stop = vi.fn();
-  vi.mocked(getCurrentWebview).mockReturnValue({ onDragDropEvent: async (listener: typeof publish) => { publish = listener; return stop; } } as unknown as ReturnType<typeof getCurrentWebview>);
+  const listen = vi.fn(async (_name: string, listener: typeof publish) => { publish = listener; return stop; });
+  vi.mocked(getCurrentWindow).mockReturnValue({ listen } as unknown as ReturnType<typeof getCurrentWindow>);
   vi.stubGlobal("devicePixelRatio", 1.5);
   const listener = vi.fn();
   const unsubscribe = await tauriMediaDropPort.subscribe(listener);
-  const position = { x: 300, y: 600 } as Extract<DragDropEvent, { type: "drop" }>["position"];
-  publish({ payload: { type: "enter", paths: ["C:\\Fotos"], position } });
+  expect(listen).toHaveBeenCalledWith("myalbuns-media-file-drag", expect.any(Function));
+  publish({ payload: { kind: "over", x: 300, y: 600 } });
   expect(listener).toHaveBeenLastCalledWith({ kind: "over", x: 200, y: 400 });
-  publish({ payload: { type: "drop", paths: ["C:\\Fotos"], position } });
-  expect(listener).toHaveBeenLastCalledWith({ kind: "drop", paths: ["C:\\Fotos"], x: 200, y: 400 });
-  publish({ payload: { type: "leave" } });
+  publish({ payload: { kind: "drop", dropId: "native-drop-1", x: 300, y: 600 } });
+  expect(listener).toHaveBeenLastCalledWith({ kind: "drop", dropId: "native-drop-1", x: 200, y: 400 });
+  publish({ payload: { kind: "leave" } });
   expect(listener).toHaveBeenLastCalledWith({ kind: "leave" });
   unsubscribe();
   expect(stop).toHaveBeenCalledOnce();

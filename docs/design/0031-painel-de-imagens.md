@@ -54,6 +54,19 @@ Assim, mover uma miniatura dentro do programa coexiste com a recepção de
 arquivos externos. Solturas de Fotos consultam o alvo atual no Core;
 respostas de movimentos anteriores e gestos cancelados não fazem commit.
 
+O Host captura raízes do catálogo, Cache e seleção antes de enumerar pastas.
+A enumeração e o processamento usam o mesmo plano congelado; filhos diretos
+conservam o caminho lógico da pasta selecionada.
+
+No Windows, a soltura chega ao Host como `WindowEvent::DragDrop`. O Host conserva
+os `PathBuf` nativos de somente uma soltura ainda não consumida e envia ao WebView
+um identificador opaco com a posição física. Uma importação aceita consome essa
+soltura uma única vez; a próxima substitui a pendência anterior. Isso evita a
+conversão de caminhos para texto Unicode: o serializador padrão de `PathBuf`
+usado pelo evento de arraste do Tauri rejeita caminhos que não sejam UTF-8.
+`Leave` conserva a pendência, pois pode chegar antes do comando assíncrono que
+consome uma soltura já aceita.
+
 ## Remoção da seleção
 
 O Painel é dono do alvo de `Delete` e do menu `Remover`. Campos de texto
@@ -68,6 +81,49 @@ esvazia todas as ocorrências e preserva a estrutura. Itens sem uso saem junto
 com o restante da seleção. Os Originais permanecem intactos e Undo restaura o
 catálogo e a composição juntos.
 
+## Aplicações de Decorativos
+
+Cada Lâmina guarda personalizações independentes de Fundo e Overlay. Cada papel
+pode acompanhar o padrão inteiro, conter uma aplicação personalizada de Ambos
+os lados ou possuir decisões independentes à esquerda e à direita. Uma decisão
+por lado conserva a origem herdada ou o conteúdo personalizado e sua área de
+mapeamento: Página ou Lâmina inteira.
+
+Dividir uma aplicação de Ambos os lados conserva no lado oposto o mapeamento
+da imagem inteira, limitado por um recorte da Página. O Core entrega área de
+desenho e recorte separadamente ao Canvas e à exportação. Um lado herdado resolve
+sempre o padrão atual; portanto, uma mudança posterior de conteúdo ou escopo
+acompanha o padrão sem substituir a personalização do outro lado.
+
+Aplicações de Ambos os lados usam a superfície ativa: em Página única ocupam
+a Página e se expandem quando a Lâmina volta a ser dupla. Aplicações específicas
+de um lado permanecem específicas desse lado. O papel de Fundo nunca altera
+o Overlay, a geometria dos Frames ou a seleção transitória.
+
+O formato público passa à versão 11. Ele conserva o conteúdo da versão 10 e
+acrescenta `sheetVisuals`, uma lista de personalizações identificadas por Lâmina.
+Lâminas omitidas acompanham integralmente o padrão. O carregamento rejeita
+identificadores desconhecidos ou duplicados e referências que não sejam
+Decorativos existentes. Versões anteriores começam sem personalizações locais.
+
+O protocolo do Processador passa à versão 22 para impedir que um binário antigo
+ignore os recortes enviados pelo Host. O snapshot de renderização conserva a
+versão 6: o campo opcional de recorte mantém a leitura dos snapshots anteriores;
+a negociação do protocolo exige o consumidor que sabe aplicá-lo.
+
+A faixa central ocupa 20% da largura da Lâmina dupla, entre 40% e 60%. O Core
+devolve a zona atingida e sua composição temporária. A interface reutiliza essa
+prévia enquanto o ponteiro permanece na mesma zona e papel; a soltura sempre
+consulta o ponto final e o comando confirma o alvo novamente na sessão atual.
+Respostas atrasadas, cancelamento e soltura fora da superfície não fazem commit.
+
+Os indicadores de uso separam Frames, Fundos, Overlays, padrão de Fundo e padrão
+de Overlay. Um padrão continua contando como uso mesmo quando personalizações
+ocultam todas as suas aplicações. Personalizações conservadas no lado inativo
+de uma Página única também continuam contando como uso. Remover um Decorativo restaura o padrão nos
+alvos personalizados que o referenciavam; remover o próprio padrão usa branco
+para Fundo e ausência para Overlay, preservando as outras personalizações.
+
 ## Contratos externos
 
 Versões verificadas: React 19.2.8, API JavaScript do Tauri 2.11.1,
@@ -77,9 +133,23 @@ documentação oficial e as interfaces da versão instalada.
 
 A [configuração do Tauri](https://v2.tauri.app/reference/config/#dragdropenabled)
 documenta a substituição do arraste HTML5 pelo manipulador nativo no Windows.
-[onDragDropEvent](https://v2.tauri.app/reference/javascript/api/namespacewebview/#ondragdropevent)
-define posições físicas e a função para cancelar a assinatura. O código
+[DragDropEvent](https://docs.rs/tauri/2.11.5/tauri/enum.DragDropEvent.html)
+define caminhos nativos e posições físicas. O evento opaco próprio chega pela
+assinatura da Janela, cancelada ao desmontar o adaptador. O código
 instalado de `tauri-plugin-dialog` confirma `pick_files` e `pick_folder`
 assíncronos e o resultado opcional de cancelamento.
 O processamento reutiliza os decodificadores de PNG e TIFF já presentes no
 programa e as APIs verificadas no contrato de importação.
+
+O Canvas usa PixiJS 8.19.0. A documentação da versão instalada
+(`effectsMixin.d.ts`, propriedade `mask`) exige que a máscara pertença à árvore
+do pai do objeto; cada recorte é um `Graphics` irmão do raster, com o mesmo ciclo
+de vida da Lâmina. A consulta `find-docs` para máscaras também atingiu a cota;
+a interface instalada confirmou o contrato documentado de máscaras do PixiJS 8.
+
+A captura dos gestos usa o protocolo W3C WebDriver implementado pelo Edge e
+seu driver pareado, cujas versões ficam registradas na evidência. O contrato de
+[ações do WebDriver](https://www.w3.org/TR/webdriver2/#actions) define `Shift`
+como U+E008 e conserva teclas pressionadas entre ações; a captura libera as
+fontes de entrada depois da imagem. A consulta indexada também atingiu a cota
+neste caso; a especificação oficial confirmou esse comportamento.

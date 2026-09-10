@@ -507,6 +507,15 @@ impl ProjectHost {
             .map_err(|error| error.to_string())
     }
 
+    pub(crate) fn preview_decorative_drop(
+        &self,
+        request: &myalbuns_core::DecorativeDropRequest,
+    ) -> Result<Option<myalbuns_core::DecorativeDropPreview>, String> {
+        self.project()?
+            .preview_decorative_drop(request)
+            .map_err(|error| error.to_string())
+    }
+
     pub(crate) fn capture_custom_layout(
         &self,
         sheet_id: &str,

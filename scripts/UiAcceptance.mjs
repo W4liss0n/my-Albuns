@@ -19,7 +19,7 @@ const supportedKeys = new Set([
   "Minus",
   "Plus",
 ]);
-const supportedModifiers = new Set(["Control"]);
+const supportedModifiers = new Set(["Control", "Shift"]);
 
 function invariant(condition, message) {
   if (!condition) throw new Error(`Invalid UI acceptance manifest: ${message}`);
@@ -166,11 +166,13 @@ export function validateUiAcceptanceManifest(manifest) {
         );
         if (modifiers !== undefined) {
           invariant(
-            ["click", "key", "wheel"].includes(action.type),
+            ["click", "key", "wheel"].includes(action.type) || (action.type === "drag" && action.gesture === "pointer"),
             `${actionLocation}.modifiers are not valid for ${action.type}`,
           );
           const seenModifiers = new Set();
           for (const modifier of modifiers) {
+            invariant(modifier !== "Shift" || ["key", "drag"].includes(action.type),
+              `${actionLocation}.Shift is supported for keys and pointer drags`);
             invariant(
               supportedModifiers.has(modifier),
               `${actionLocation}.modifier ${modifier} is not supported`,

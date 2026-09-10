@@ -1,13 +1,11 @@
-import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { MediaDropPort } from "../application/projectPorts";
+import type { MediaFileDrag } from "./generated/MediaFileDrag";
 
 export const tauriMediaDropPort: MediaDropPort = {
-  subscribe: (listener) => getCurrentWebview().onDragDropEvent(({ payload }) => {
-    if (payload.type === "leave") { listener({ kind: "leave" }); return; }
+  subscribe: (listener) => getCurrentWindow().listen<MediaFileDrag>("myalbuns-media-file-drag", ({ payload }) => {
+    if (payload.kind === "leave") { listener(payload); return; }
     const ratio = window.devicePixelRatio || 1;
-    const position = { x: payload.position.x / ratio, y: payload.position.y / ratio };
-    listener(payload.type === "drop"
-      ? { kind: "drop", ...position, paths: payload.paths }
-      : { kind: "over", ...position });
+    listener({ ...payload, x: payload.x / ratio, y: payload.y / ratio });
   }),
 };

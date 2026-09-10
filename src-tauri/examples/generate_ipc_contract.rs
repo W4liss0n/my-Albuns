@@ -56,6 +56,8 @@ fn main() {
     ImportMediaResult::export_all(&config).expect("Media import bindings should be generated");
     myalbuns_desktop_lib::ipc_contract::MediaImportSelection::export_all(&config)
         .expect("Media selection bindings should be generated");
+    myalbuns_desktop_lib::ipc_contract::MediaFileDrag::export_all(&config)
+        .expect("Native media drag bindings should be generated");
     MediaFileCatalog::export_all(&config)
         .expect("Original file information bindings should be generated");
     ImageProcessingProgress::export_all(&config)

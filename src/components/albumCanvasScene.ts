@@ -512,6 +512,7 @@ export class AlbumCanvasScene {
           previewStates,
           backgroundPreviewStates,
           overlayPreviewStates,
+          this.input.decorativeDropPreview?.sheet.sheetId === sheet.sheetId ? this.input.decorativeDropPreview.scope : null,
         ]),
       );
     }
@@ -684,36 +685,42 @@ export class AlbumCanvasScene {
       {
         previewTextureFor: (mediaId) => this.previewTextureFor(mediaId),
         onSheetTap: (sheetId) => {
+          if (this.input?.mediaDrag) return;
           if (!this.input || this.frameInteractions.ignoresTap || this.frameContentDrag.ignoresTap) return;
           this.input.onSelectFrame(null);
           this.input.onFocusSheet(sheetId);
         },
         onSheetDoubleTap: (sheetId) => {
+          if (this.input?.mediaDrag) return;
           if (this.frameInteractions.ignoresTap || this.frameContentDrag.ignoresTap) return;
           this.input?.onEditSheet(sheetId);
         },
         onFrameTap: (sheetId, frameId, toggle) => {
+          if (this.input?.mediaDrag) return;
           if (!this.input || this.frameInteractions.ignoresTap || this.frameContentDrag.ignoresTap) return;
           if (toggle) this.input.onSelectFrame(frameId, true);
           else this.input.onSelectFrame(frameId);
           this.input.onFocusSheet(sheetId);
         },
         onPhotoPanStart: (photoNode, event) => {
+          if (this.input?.mediaDrag) return;
           this.photoInteractions.startPan(photoNode, event);
         },
-        onPhotoContentDragStart: (frameId, event) => this.frameContentDrag.start(frameId, event),
+        onPhotoContentDragStart: (frameId, event) => { if (!this.input?.mediaDrag) this.frameContentDrag.start(frameId, event); },
         onFrameContextMenu: (frameId, position) => {
           if (!this.input || this.input.frameGeometry?.disabled || this.frameInteractions.ignoresTap) return;
           this.input.onOpenFrameContextMenu?.(frameId, position);
         },
         onEmptyCanvasContextMenu: (sheetId, position) => this.openEmptyCanvasContextMenu(sheetId, position),
         onFrameGeometryStart: (frameId, handle, event) => {
+          if (this.input?.mediaDrag) return;
           this.frameInteractions.start(frameId, handle, event);
         },
         onPhotoWheel: (photoNode, event) => {
           this.photoInteractions.handleWheel(photoNode, event);
         },
       },
+      this.input?.decorativeDropPreview?.sheet.sheetId === sheet.sheetId ? this.input.decorativeDropPreview : null,
     );
     for (const photoNode of node.photoNodes) {
       this.photoNodes.set(photoNode.frameId, photoNode);

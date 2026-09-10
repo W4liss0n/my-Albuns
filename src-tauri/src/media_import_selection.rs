@@ -1,13 +1,15 @@
 //! File and folder selections converge before the single native import attempt.
 use crate::ipc_contract::ImageProcessingProblem;
-use myalbuns_paths::{ExpectedObject, OperationPathContext};
+use myalbuns_paths::{ExpectedObject, RootBindingPlan};
 use std::{
     collections::HashSet,
     path::{Path, PathBuf},
 };
 
-pub(crate) fn expand(selected: Vec<PathBuf>) -> (Vec<PathBuf>, Vec<ImageProcessingProblem>) {
-    let mut context = OperationPathContext::new();
+pub(crate) fn expand(
+    selected: Vec<PathBuf>,
+    plan: &RootBindingPlan,
+) -> (Vec<PathBuf>, Vec<ImageProcessingProblem>) {
     let mut problems = Vec::new();
     let mut candidates = Vec::new();
     let mut seen = HashSet::new();
@@ -15,10 +17,8 @@ pub(crate) fn expand(selected: Vec<PathBuf>) -> (Vec<PathBuf>, Vec<ImageProcessi
         if !seen.insert(path.clone()) {
             continue;
         }
-        let _ = context.capture(&path);
         candidates.push(path);
     }
-    let plan = context.freeze();
     let mut files = Vec::new();
     for path in candidates {
         match plan.resolve_existing(&path, ExpectedObject::Directory) {
@@ -81,6 +81,14 @@ fn problem(path: &Path, reason: String) -> ImageProcessingProblem {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use myalbuns_paths::OperationPathContext;
+    fn expand_selected(paths: Vec<PathBuf>) -> (Vec<PathBuf>, Vec<ImageProcessingProblem>) {
+        let mut context = OperationPathContext::new();
+        for path in &paths {
+            let _ = context.capture(path);
+        }
+        expand(paths, &context.freeze())
+    }
     #[test]
     fn folder_and_drop_keep_direct_images_once_and_do_not_walk_subfolders() {
         let root = tempfile::tempdir().unwrap();
@@ -97,7 +105,7 @@ mod tests {
         }
         let explicit = root.path().join("explicit.bmp");
         std::fs::write(&explicit, b"selected unsupported image").unwrap();
-        let (files, problems) = expand(vec![
+        let (files, problems) = expand_selected(vec![
             folder.clone(),
             folder.join("a.JPG"),
             folder.clone(),
@@ -115,9 +123,26 @@ mod tests {
         );
         let absent = root.path().join("previously imported.jpg");
         assert_eq!(
-            expand(vec![absent.clone()]).0,
+            expand_selected(vec![absent.clone()]).0,
             vec![absent],
             "reselection is decided by the import catalog even when the Original is gone"
         );
+    }
+
+    #[test]
+    fn folder_expansion_uses_the_attempt_binding_and_retains_logical_paths() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::create_dir(root.path().join("Fotos")).unwrap();
+        std::fs::write(root.path().join("Fotos").join("Foto.png"), b"image").unwrap();
+        let selected = PathBuf::from(r"Z:\Fotos");
+        let mut context = OperationPathContext::new();
+        context
+            .capture_with_binding(&selected, root.path())
+            .unwrap();
+        let plan = context.freeze();
+        let (files, problems) = expand(vec![selected.clone()], &plan);
+        assert!(problems.is_empty());
+        assert_eq!(files, vec![selected.join("Foto.png")]);
+        assert!(plan.covers(&files[0]));
     }
 }

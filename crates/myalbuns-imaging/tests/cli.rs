@@ -1125,6 +1125,79 @@ fn processor_composites_a_transparent_decorative_from_its_original_png() {
 }
 
 #[test]
+fn processor_clips_decorative_media_without_stretching_the_retained_half() {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("decorative.png");
+    let mut original = RgbaImage::from_pixel(100, 50, Rgba([0, 0, 240, 255]));
+    for y in 0..50 {
+        for x in 0..50 {
+            original.put_pixel(x, y, Rgba([240, 0, 0, 255]));
+        }
+    }
+    original.save_with_format(&path, ImageFormat::Png).unwrap();
+    for background in [false, true] {
+        let mut snapshot = productive_photo_snapshot(&path, Some(&path));
+        let sheet = &mut snapshot.composition.sheets[0];
+        let mut decoration = sheet.overlays[0].clone();
+        sheet.width_um = 25_400;
+        sheet.height_um = 12_700;
+        sheet.base.draw_rect = myalbuns_core::RectUm {
+            x: 0,
+            y: 0,
+            width: 25_400,
+            height: 12_700,
+        };
+        sheet.frames.clear();
+        sheet.backgrounds.clear();
+        decoration.draw_rect = sheet.base.draw_rect.clone();
+        decoration.clip_rect = Some(myalbuns_core::RectUm {
+            x: 12_700,
+            y: 0,
+            width: 12_700,
+            height: 12_700,
+        });
+        let media_id = decoration.media_id;
+        if background {
+            sheet.overlays.clear();
+            sheet
+                .backgrounds
+                .push(myalbuns_core::ComposedBackground::Media {
+                    media_id,
+                    name: "Decorativo".into(),
+                    draw_rect: decoration.draw_rect,
+                    clip_rect: decoration.clip_rect,
+                });
+        } else {
+            sheet.overlays = vec![decoration];
+        }
+        let output = root.path().join(format!("clipped-{background}.jpg"));
+        let result = invoke_real_processor(
+            snapshot,
+            &output,
+            "clipped-001",
+            100,
+            vec![RenderSource::new(media_id, path.clone()).unwrap()],
+        );
+        assert!(
+            result.status.success(),
+            "{}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+        let rendered = image::open(output).unwrap().to_rgb8();
+        let left = rendered.get_pixel(25, 25);
+        assert!(
+            left[0] > 245 && left[1] > 245 && left[2] > 245,
+            "the opposite side stays white: {left:?}"
+        );
+        let right = rendered.get_pixel(60, 25);
+        assert!(
+            right[0] < 15 && right[2] > 220,
+            "the retained right portion stays blue without refitting the Original: {right:?}"
+        );
+    }
+}
+
+#[test]
 fn processor_opens_the_current_original_once_and_classifies_its_content() {
     let source_dir = tempfile::tempdir().expect("temporary source directory");
     let output_dir = tempfile::tempdir().expect("temporary output directory");

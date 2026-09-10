@@ -291,6 +291,7 @@ export function useProjectEditorController({
   };
 
   const canvasProps: AlbumCanvasProps = {
+    revision: projection.state.revision,
     projectId: projection.state.projectId,
     mode: canvasMode.kind === "normal" && layoutPanel.visible && layoutPanel.sheetId
       ? { kind: "normal", isolatedSheetId: layoutPanel.sheetId } : canvasMode,
@@ -353,6 +354,8 @@ export function useProjectEditorController({
         yUm: point.yUm,
         mode: canvasMode.kind === "sheet-editing" ? "edit" : "normal",
       }),
+    onPreviewDecorativeDrop: (request) => projectCorePort.previewDecorativeDrop(request),
+    onDropDecorative: (request) => mutations.applyIntent({ kind: "dropDecorative", request }),
     onCanvasMetricsChange: navigation.handleCanvasMetricsChange,
   };
 
@@ -497,6 +500,11 @@ export function useProjectEditorController({
           mediaId,
           mode: canvasMode.kind === "sheet-editing" ? "edit" : "normal",
         });
+      }
+    },
+    applyDecorative: (mediaId: string, role: import("../domain/project").DecorativeRole) => {
+      if (!interactionBlocked && navigation.implicitSheetId) {
+        void mutations.applyIntent({ kind: "applyDecorative", sheetId: navigation.implicitSheetId, mediaId, role, scope: "bothSides" });
       }
     },
     dismissFeedback: mutations.dismissFeedback,

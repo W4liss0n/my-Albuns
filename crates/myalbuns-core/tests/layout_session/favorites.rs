@@ -252,13 +252,13 @@ fn favorite_copies_survive_save_reopen_save_as_and_external_copy_and_remain_proj
 }
 
 #[test]
-fn v10_rejects_incomplete_or_corrupt_favorites_without_rewriting_the_source() {
+fn current_schema_rejects_incomplete_or_corrupt_favorites_without_rewriting_the_source() {
     let root = tempfile::tempdir().unwrap();
     let (mut project, sheet) = prepare(root.path(), 2);
     toggle(&mut project, &sheet, |_| true);
     project.save(project.revision()).unwrap();
     let valid: Value = serde_json::from_slice(&fs::read(project.project_path()).unwrap()).unwrap();
-    assert_eq!(valid["schemaVersion"], 10);
+    assert_eq!(valid["schemaVersion"], 11);
     let original = valid["project"]["favoriteLayouts"][0].clone();
     let mut cases = Vec::new();
     let mut missing = valid.clone();
@@ -334,7 +334,7 @@ fn v9_opens_with_no_favorites_and_upgrades_only_on_explicit_save() {
     assert_eq!(fs::read(&path).unwrap(), bytes);
     project.save(project.revision()).unwrap();
     let saved: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
-    assert_eq!(saved["schemaVersion"], 10);
+    assert_eq!(saved["schemaVersion"], 11);
     assert_eq!(saved["project"]["favoriteLayouts"], json!([]));
 }
 

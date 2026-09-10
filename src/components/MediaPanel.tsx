@@ -87,6 +87,7 @@ interface MediaPanelProps {
   mediaUsage: readonly MediaUsage[];
   mediaFiles?: Readonly<Record<string, MediaFileInfo>>;
   onFillPhoto(mediaId: string): void;
+  onApplyDecorative(mediaId: string, role: import("../domain/project").DecorativeRole): void;
   selectionRequest?: { mediaId: string } | null;
   importPending?: boolean;
   onImportMedia(selection: MediaImportSelection): void;
@@ -114,6 +115,7 @@ export function MediaPanel({
   mediaUsage,
   mediaFiles = EMPTY_MEDIA_FILES,
   onFillPhoto,
+  onApplyDecorative,
   selectionRequest,
   importPending = false,
   onImportMedia,
@@ -195,6 +197,7 @@ export function MediaPanel({
     () => new Map(mediaUsage.map((usage) => [usage.mediaId, usage.count])),
     [mediaUsage],
   );
+  const usageDetailsById = useMemo(() => new Map(mediaUsage.map((usage) => [usage.mediaId, mediaUsageLabel(usage)])), [mediaUsage]);
   const activeMediaItems = useMemo(
     () => mediaItems.filter((media) => media.kind === activeMediaKind),
     [activeMediaKind, mediaItems],
@@ -603,6 +606,7 @@ export function MediaPanel({
             const accessibleLabel = [
               media.name,
               isUsed ? "Já usada" : null,
+              usageDetailsById.get(media.id),
               availabilityLabel,
             ]
               .filter(Boolean)
@@ -627,17 +631,16 @@ export function MediaPanel({
                   setContextMenu({ x: event.clientX, y: event.clientY });
                 }}
                 onPointerDown={(event) => mediaDrag.start(media.id, media.kind, event)}
-                onDoubleClick={
-                  media.kind === "photo"
-                    ? () => onFillPhoto(media.id)
-                    : undefined
-                }
-                title={
-                  media.kind === "photo"
-                    ? "Duplo clique para preencher o placeholder mais à esquerda da Lâmina centralizada"
-                    : undefined
-                }
+                onDoubleClick={(event) => {
+                  if (relinkDisabled || importPending) return;
+                  if (media.kind === "photo") onFillPhoto(media.id);
+                  else onApplyDecorative(media.id, event.shiftKey ? "overlay" : "background");
+                }}
+                title={[media.name, usageDetailsById.get(media.id), media.kind === "photo"
+                  ? "Duplo clique para preencher o placeholder mais à esquerda da Lâmina centralizada"
+                  : "Duplo clique aplica Fundo. Shift + duplo clique aplica Overlay."].filter(Boolean).join("\n")}
               >
+                {isUsed && <span aria-hidden="true" className="media-usage-badge" title={usageDetailsById.get(media.id)}>{usageCount}</span>}
                 {availabilityLabel && (
                   <span
                     aria-label={availabilityLabel ?? undefined}
@@ -756,4 +759,16 @@ function passesUsageFilter(
   if (usageFilter === "used") return usageCount > 0;
   if (usageFilter === "unused") return usageCount === 0;
   return true;
+}
+
+function mediaUsageLabel(usage: MediaUsage): string {
+  if (!usage.breakdown) return usage.count ? `${usage.count} ${usage.count === 1 ? "uso" : "usos"}` : "";
+  const { frames, backgrounds, overlays, albumBackgrounds, albumOverlays } = usage.breakdown;
+  return [
+    frames ? `${frames} ${frames === 1 ? "Frame" : "Frames"}` : "",
+    backgrounds ? `${backgrounds} ${backgrounds === 1 ? "Fundo" : "Fundos"}` : "",
+    overlays ? `${overlays} ${overlays === 1 ? "Overlay" : "Overlays"}` : "",
+    albumBackgrounds ? `${albumBackgrounds} ${albumBackgrounds === 1 ? "padrão" : "padrões"} de Fundo` : "",
+    albumOverlays ? `${albumOverlays} ${albumOverlays === 1 ? "padrão" : "padrões"} de Overlay` : "",
+  ].filter(Boolean).join(" · ");
 }

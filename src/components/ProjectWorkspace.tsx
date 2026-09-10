@@ -551,7 +551,7 @@ export function ProjectWorkspace({
     deleteSheet: () => {
       void controller.deleteSheet();
     },
-    disabled: commandsBlocked,
+    disabled: commandsBlocked || mediaDrag !== null,
     navigateToNextSheet: () => controller.navigateToAdjacentSheet("next"),
     navigateToPreviousSheet: () =>
       controller.navigateToAdjacentSheet("previous"),
@@ -640,7 +640,7 @@ export function ProjectWorkspace({
       <div className="commandbar">
         <div className="layout-catalog-menu-feedback">
           <ApplicationMenuBar
-            disabled={commandsBlocked}
+            disabled={commandsBlocked || mediaDrag !== null}
             groups={applicationMenus}
           />
           {!noticeInInspector && layoutNotice}
@@ -796,6 +796,7 @@ export function ProjectWorkspace({
           mediaItems={projection.state.album.media}
           mediaUsage={projection.mediaUsage}
           onFillPhoto={controller.fillMedia}
+          onApplyDecorative={controller.applyDecorative}
           onRemoveMedia={(ids) => { if (!commandsBlocked) void mediaRemoval.request(ids); }}
           selectionRequest={mediaSelectionRequest}
           importPending={controller.importPending}
