@@ -6150,12 +6150,12 @@
           "key": "ArrowUp"
         },
         {
-          "type": "key",
-          "key": "Enter"
-        },
-        {
           "type": "assert",
           "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__header"
         },
         {
           "type": "hover",
@@ -6507,6 +6507,10 @@
         {
           "type": "click",
           "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__header"
         }
       ]
     },
@@ -6652,6 +6656,10 @@
         {
           "type": "click",
           "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__header"
         }
       ]
     },
