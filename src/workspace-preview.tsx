@@ -53,6 +53,8 @@ const frameContext = previewParameters.get("frame");
 const layoutCase = layoutPanelCorpus.cases[previewParameters.get("layouts") ?? "mixed"];
 let preparedLayoutQuery: { query: LayoutQueryResult; previews: ComposedFrame[][] } | null = null;
 let layoutQuerySequence = 0;
+let layoutFavoriteStage = previewParameters.get("favorite-stage") ?? "before";
+let layoutCatalogStage: "initial" | "saved" | "deleted" = "initial";
 const sideSwapCase = sheetSideSwapCorpus.cases.find((item) => item.name === (previewParameters.get("side-swap") ?? "mixed"))!;
 const frameClipboardCase = frameClipboardCorpus.cases.find((item) => item.name === (previewParameters.get("clipboard") ?? "same-group"))!;
 const manualFrameCase = manualFrameCorpus.cases.find((item) => item.name === (previewParameters.get("surface") ?? "double"));
@@ -81,7 +83,8 @@ if (frameContext === "multiple" || frameContext === "stack") {
 if (frameContext === "layouts" && previewParameters.get("mode") === "edit") {
   const sheet = projection.state.album.sheets[0];
   useEditorView.setState({ projectId: projection.state.projectId, editingSheetId: sheet.id,
-    focusedSheetId: sheet.id, centeredSheetId: sheet.id, selectedFrameIds: sheet.frames.map((frame) => frame.id) });
+    focusedSheetId: sheet.id, centeredSheetId: sheet.id,
+    selectedFrameIds: previewParameters.get("selection") === "none" ? [] : sheet.frames.map((frame) => frame.id) });
 }
 if (frameContext === "stack") {
   const exposeSelection = () => { document.body.dataset.stackSelection = useEditorView.getState().selectedFrameIds.join(","); };
@@ -155,8 +158,33 @@ if (frameContext === "style") {
 }
 
 const projectCorePort: ProjectCorePort = {
-  queryLayouts: async (sheetId, expansion) => {
-    const samples = expansion ? [layoutCase.lockReady] : [layoutCase.before, layoutCase.applied, layoutCase.locked, layoutCase.unlocked, layoutCase.filled, layoutCase.cleared];
+  refreshLayoutCatalog: async () => layoutCase.favoriteStates ? layoutCase.favoriteStates[layoutFavoriteStage].queries[projection.state.album.sheets[0].id].query.catalogRevision : layoutCatalogStage === "deleted" ? 2 : layoutCatalogStage === "saved" ? 1
+    : layoutCase.before.queries[layoutCase.before.projection.state.album.sheets[0].id].query.catalogRevision,
+  saveCustomLayout: async (sheetId) => {
+    if (frameContext !== "layouts" || !layoutCase.saveResult || sheetId !== projection.state.album.sheets[0].id) throw new Error("Captura de Layout fora do corpus.");
+    const result = { ...layoutCase.saveResult, created: layoutCatalogStage === "initial" && layoutCase.saveResult.created };
+    layoutCatalogStage = "saved";
+    return result;
+  },
+  deleteCustomLayout: async (layoutId) => {
+    if (frameContext === "layouts" && layoutCase.favoriteStates && layoutFavoriteStage === "both" &&
+        preparedLayoutQuery?.query.listing.candidates.some((item) => item.customId === layoutId)) {
+      layoutFavoriteStage = "orphaned";
+      return 2;
+    }
+    if (frameContext !== "layouts" || layoutId !== layoutCase.saveResult?.layoutId || !layoutCase.catalogDeleted) throw new Error("Exclusão de Layout fora do corpus.");
+    layoutCatalogStage = "deleted";
+    return 2;
+  },
+  queryLayouts: async (sheetId, frameRequest) => {
+    const currentSamples = layoutCase.favoriteStates ? [layoutCase.favoriteStates[layoutFavoriteStage]] : layoutCatalogStage === "saved" ? [layoutCase.catalogSaved]
+      : layoutCatalogStage === "deleted" ? [layoutCase.catalogDeleted]
+      : [layoutCase.before, layoutCase.applied, layoutCase.locked, layoutCase.unlocked, layoutCase.reduced, layoutCase.reducedLocked, layoutCase.filled, layoutCase.cleared];
+    const samples = frameRequest ? [layoutCase.lockReady, layoutCase.reducedReady, ...currentSamples].filter((sample) => {
+      const query = sample?.queries[sheetId]?.query;
+      return query && (query.listing.candidates.length > 0 ? query.listing.candidates.every((candidate) =>
+        candidate.layout.definition.positions.length === frameRequest.frameCount) : query.frameCount === frameRequest.frameCount);
+    }) : currentSamples;
     const sample = samples.find((state) => state &&
       JSON.stringify(state.projection.state.album) === JSON.stringify(projection.state.album));
     const prepared = sample?.queries[sheetId];
@@ -346,7 +374,7 @@ function createPreviewProjection(
 ): EditorProjection {
   if (frameMode === "layouts") {
     const stage = previewParameters.get("layout-state");
-    const sample = stage === "locked" ? layoutCase.locked : stage === "filled" ? layoutCase.filled : stage === "cleared" ? layoutCase.cleared : layoutCase.before;
+    const sample = layoutCase.favoriteStates?.[layoutFavoriteStage] ?? (stage === "locked" ? layoutCase.locked : stage === "filled" ? layoutCase.filled : stage === "cleared" ? layoutCase.cleared : layoutCase.before);
     return structuredClone(sample!.projection);
   }
   if (frameMode === "style") return structuredClone(frameStyleCorpus.states[previewParameters.get("style") ?? "album"]);
@@ -475,15 +503,31 @@ function configurePhysicalPreview(
 }
 
 function applyPreviewIntent(intent: ProjectIntent): ProjectMutationOutcome {
+  if (intent.kind === "toggleLayoutFavorite") {
+    const transition = layoutCase.favoriteTransitions?.find((item) => item.from === layoutFavoriteStage && item.candidateIndex === intent.selection.candidateIndex);
+    if (frameContext !== "layouts" || !transition || !preparedLayoutQuery ||
+        intent.selection.queryId !== preparedLayoutQuery.query.queryId || projection.state.revision !== preparedLayoutQuery.query.revision) {
+      throw new Error("Favorito fora do corpus de Layouts desta prévia.");
+    }
+    layoutFavoriteStage = transition.to;
+    projection = finalizePhysicalPreviewMutation(structuredClone(layoutCase.favoriteStates![transition.to].projection), structuredClone(projection));
+    return { projection, affectedFrameId: null, affectedSheetId: null };
+  }
   if (intent.kind === "unlockLayout") {
-    if (frameContext !== "layouts" || !layoutCase.unlocked || !projection.state.album.sheets.find((sheet) => sheet.id === intent.sheetId)?.layoutLocked) {
+    const sheet = projection.state.album.sheets.find((sheet) => sheet.id === intent.sheetId);
+    const unlocked = sheet?.frames.length === layoutCase.reduced?.projection.state.album.sheets[0].frames.length
+      ? layoutCase.reduced : layoutCase.unlocked;
+    if (frameContext !== "layouts" || !unlocked || !sheet?.layoutLocked) {
       throw new Error("Comando fora do corpus de travamento desta prévia.");
     }
-    projection = finalizePhysicalPreviewMutation(structuredClone(layoutCase.unlocked.projection), structuredClone(projection));
+    projection = finalizePhysicalPreviewMutation(structuredClone(unlocked.projection), structuredClone(projection));
     return { projection, affectedFrameId: null, affectedSheetId: intent.sheetId };
   }
   if (intent.kind === "applyLayout" || intent.kind === "lockLayout") {
-    const result = intent.kind === "lockLayout" ? layoutCase.locked : layoutCase.applied;
+    const reducing = preparedLayoutQuery && (preparedLayoutQuery.query.listing.candidates[intent.selection.candidateIndex]
+      ?.layout.definition.positions.length ?? 0) < preparedLayoutQuery.query.frameCount;
+    const result = intent.kind === "lockLayout" ? reducing ? layoutCase.reducedLocked : layoutCase.locked
+      : reducing ? layoutCase.reduced : layoutCase.applied;
     if (frameContext !== "layouts" || !result || !preparedLayoutQuery ||
         intent.selection.queryId !== preparedLayoutQuery.query.queryId ||
         projection.state.revision !== preparedLayoutQuery.query.revision || intent.selection.candidateIndex !== 0) {

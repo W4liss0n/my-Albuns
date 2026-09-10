@@ -3,6 +3,10 @@
   gap: var(--ui-space-3);
 }
 
+.sheet-design-save-layout { position: relative; }
+.sheet-design-save-layout > button { width: 100%; }
+.sheet-design-save-layout > .layout-catalog-notice { position: relative; top: auto; margin-top: var(--ui-space-2); }
+
 .sheet-design-preview {
   position: relative;
   width: 100%;

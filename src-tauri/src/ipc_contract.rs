@@ -39,6 +39,9 @@ pub struct ProjectDialogDetail {
 )]
 #[ts(tag = "kind")]
 pub enum ProjectDialogState {
+    LayoutDeletionConfirmation {
+        busy: bool,
+    },
     ImageProcessingProgress {
         progress: ProjectDialogProgress,
     },
@@ -91,6 +94,8 @@ pub struct ProjectDialogPresentation {
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub enum ProjectDialogAction {
+    CancelLayoutDeletion,
+    ConfirmLayoutDeletion,
     CancelAlbumInformation,
     CancelExport,
     CancelProjectClose,

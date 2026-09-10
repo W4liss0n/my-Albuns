@@ -3,6 +3,7 @@ import { expect, test, vi } from "vitest";
 import { layoutPanelCorpus } from "../test/layoutPanelPreview";
 import { LayoutPanel } from "./LayoutPanel";
 import type { LayoutPanelController } from "./useLayoutPanel";
+import type { LayoutCatalogController } from "./useLayoutCatalog";
 
 function panel(overrides: Partial<LayoutPanelController> = {}, caseName = "mixed", stage: "before" | "lockReady" | "filled" = "before") {
   const sample = layoutPanelCorpus.cases[caseName][stage]!;
@@ -11,10 +12,11 @@ function panel(overrides: Partial<LayoutPanelController> = {}, caseName = "mixed
   const controller: LayoutPanelController = {
     visible: true, sheetId: sheet.sheetId, composition: sample.projection.composition,
     committing: false, query: prepared.query, displayQuery: overrides.query ?? prepared.query, previews: prepared.previews, error: null,
-    toggle: vi.fn(), close: vi.fn(), preview: vi.fn(), cancelPreview: vi.fn(),
-    apply: vi.fn(async () => true),
+    toggle: vi.fn(), close: vi.fn(), refresh: vi.fn(), preview: vi.fn(), cancelPreview: vi.fn(),
+    apply: vi.fn(async () => true), toggleFavorite: vi.fn(async () => true),
     lock: vi.fn(async () => true), unlock: vi.fn(async () => true),
-    positionCount: sheet.frames.length, configurePositions: vi.fn(),
+    positionCount: sheet.frames.length, minimumPositionCount: sheet.frames.filter((frame) => frame.photo !== null).length,
+    configurePositions: vi.fn(),
     ...overrides,
   };
   const view = render(<LayoutPanel controller={controller} sheet={sheet} />);
@@ -62,6 +64,20 @@ test("the frame count requests additional positions without applying a Layout", 
   expect(controller.lock).not.toHaveBeenCalled();
 });
 
+test("placeholders do not prevent choosing a smaller Layout that keeps every Photo", () => {
+  const sample = layoutPanelCorpus.cases.mixed.before;
+  const sheet = sample.projection.composition.sheets[0];
+  const photoCount = sheet.frames.filter((frame) => frame.photo !== null).length;
+  expect(photoCount).toBeGreaterThan(0);
+  expect(photoCount).toBeLessThan(sheet.frames.length);
+  const { controller } = panel();
+  const count = screen.getByRole("combobox", { name: "Quantidade de Frames" });
+  expect(within(count).getByRole("option", { name: String(photoCount) })).toBeInTheDocument();
+  fireEvent.change(count, { target: { value: String(photoCount) } });
+  expect(controller.configurePositions).toHaveBeenCalledExactlyOnceWith(photoCount);
+  expect(controller.apply).not.toHaveBeenCalled();
+});
+
 test("filled Frames are represented by generic geometry without photo content or decoration", () => {
   panel({}, "mixed", "filled");
   const region = screen.getByRole("region", { name: "Painel de Layouts" });
@@ -69,4 +85,49 @@ test("filled Frames are represented by generic geometry without photo content or
   expect(thumbnail).toHaveAccessibleName("Layout com 4 Frames");
   expect(thumbnail.querySelectorAll("[data-preview-frame-id]")).toHaveLength(4);
   expect(thumbnail.querySelector("image, [data-preview-frame-content-id], [data-preview-frame-border-id]")).toBeNull();
+});
+
+test("a pending custom duplicate is consumed only by a compatible, current query and reveals its existing card", () => {
+  const sample = layoutPanelCorpus.cases.custom.before;
+  const sheet = sample.projection.composition.sheets[0];
+  const prepared = sample.queries[sheet.sheetId];
+  const { controller, view } = panel({ query: null, displayQuery: null });
+  const revealId = layoutPanelCorpus.cases.custom.saveResult!.layoutId;
+  const catalog: LayoutCatalogController = { revision: 1, busy: false, notice: null, revealId,
+    save: vi.fn(async () => undefined), refresh: vi.fn(async () => true), requestDelete: vi.fn(),
+    acknowledgeReveal: vi.fn(), dismissNotice: vi.fn() };
+  view.rerender(<LayoutPanel controller={controller} sheet={sheet} catalog={catalog} />);
+  expect(catalog.acknowledgeReveal).not.toHaveBeenCalled();
+  view.rerender(<LayoutPanel controller={{ ...controller, query: prepared.query, displayQuery: prepared.query, previews: prepared.previews }} sheet={sheet} catalog={catalog} />);
+  expect(catalog.acknowledgeReveal).toHaveBeenCalledOnce();
+  expect(document.querySelector(`[data-custom-layout-id="${revealId}"]`)).toHaveClass("layout-panel__candidate--revealed");
+  fireEvent.click(screen.getByRole("button", { name: "Excluir Layout personalizado 1" }));
+  expect(catalog.requestDelete).toHaveBeenCalledExactlyOnceWith(revealId);
+});
+
+
+test("stars keep their origin, expose their state and toggle independently of applying a Layout", () => {
+  const sample = layoutPanelCorpus.cases.favorites.favoriteStates!.both;
+  const sheet = sample.projection.composition.sheets[0];
+  const prepared = sample.queries[sheet.sheetId];
+  const { controller } = panel({ query: prepared.query, displayQuery: prepared.query, previews: prepared.previews });
+  const favorites = screen.getAllByRole("button", { name: /^Remover dos favoritos Layout/ });
+  expect(favorites).toHaveLength(2);
+  for (const button of favorites) {
+    expect(button).toHaveAttribute("aria-pressed", "true");
+    expect(button).toBeEnabled();
+  }
+  expect(favorites.map((button) => button.closest(".layout-panel__section")?.querySelector("h3")?.textContent)).toEqual(["Automáticos", "Personalizados"]);
+  fireEvent.click(favorites[1]);
+  expect(controller.toggleFavorite).toHaveBeenCalledExactlyOnceWith(1);
+  expect(controller.apply).not.toHaveBeenCalled();
+  expect(controller.lock).not.toHaveBeenCalled();
+});
+
+test("the current locked Layout can be starred while stars on other candidates are disabled", () => {
+  const query = structuredClone(layoutPanelCorpus.cases.mixed.locked!.queries["sheet-001"].query);
+  panel({ query });
+  const stars = screen.getAllByRole("button", { name: /^Favoritar Layout/ });
+  expect(stars[0]).toBeEnabled();
+  for (const star of stars.slice(1)) expect(star).toBeDisabled();
 });

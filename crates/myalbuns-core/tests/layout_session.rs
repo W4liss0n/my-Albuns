@@ -1,5 +1,9 @@
 #![cfg(windows)]
 
+#[path = "layout_session/favorites.rs"]
+mod favorites;
+#[path = "layout_session/frame_counts.rs"]
+mod frame_counts;
 #[path = "layout_session/visual_corpus.rs"]
 mod visual_corpus;
 
@@ -28,6 +32,169 @@ fn project(root: &Path) -> myalbuns_core::EditableProject {
 }
 
 #[test]
+fn saving_and_reapplying_a_page_layout_preserves_the_frame_positions() {
+    use myalbuns_core::{CustomLayout, CustomLayoutId, LayoutCatalogSnapshot, LayoutScope};
+    let root = tempfile::tempdir().unwrap();
+    let mut project = project(root.path());
+    let sheet = project.projection().state.album.sheets[0].id.clone();
+    for _ in 0..4 {
+        project
+            .apply(ProjectIntent::AddFrame {
+                sheet_id: sheet.clone(),
+            })
+            .unwrap();
+    }
+    let generated = project.query_layouts(&sheet).unwrap();
+    let candidate_index = generated
+        .listing
+        .candidates
+        .iter()
+        .position(|candidate| candidate.layout.definition.scope == LayoutScope::Page)
+        .unwrap();
+    project
+        .apply(ProjectIntent::ApplyLayout {
+            selection: LayoutSelection {
+                query_id: generated.query_id,
+                candidate_index,
+            },
+        })
+        .unwrap();
+    let initial = project.projection().state.album.sheets[0].clone();
+    for right in [false, true] {
+        project
+            .apply(ProjectIntent::EditFrameGeometry {
+                edit: myalbuns_core::FrameGeometryEdit {
+                    frames: initial
+                        .frames
+                        .iter()
+                        .filter(|frame| (frame.rect.x * 2 >= initial.width_um) == right)
+                        .map(|frame| myalbuns_core::FrameGeometryTarget {
+                            frame_id: frame.id.clone(),
+                            expected_rect: frame.rect.clone(),
+                        })
+                        .collect(),
+                    gesture: myalbuns_core::FrameGeometryGesture::Move {
+                        delta_x_um: if right { -2_000 } else { 2_000 },
+                        delta_y_um: 1_000,
+                    },
+                },
+            })
+            .unwrap();
+    }
+    let before = project.projection().state.album.sheets[0].frames.clone();
+    let definition = project.capture_custom_layout(&sheet).unwrap();
+    assert_eq!(
+        definition.positions,
+        before
+            .iter()
+            .map(|frame| frame.rect.clone())
+            .collect::<Vec<_>>()
+    );
+    let id = CustomLayoutId::generate();
+    project
+        .refresh_layout_catalog(LayoutCatalogSnapshot {
+            revision: 1,
+            entries: vec![CustomLayout { id, definition }],
+        })
+        .unwrap();
+    let saved = project.query_layouts(&sheet).unwrap();
+    let candidate_index = saved
+        .listing
+        .candidates
+        .iter()
+        .position(|candidate| candidate.custom_id == Some(id))
+        .unwrap();
+    project
+        .apply(ProjectIntent::ApplyLayout {
+            selection: LayoutSelection {
+                query_id: saved.query_id,
+                candidate_index,
+            },
+        })
+        .unwrap();
+    let after = project.projection().state.album.sheets[0].frames.clone();
+    assert_eq!(
+        after.iter().map(|frame| &frame.rect).collect::<Vec<_>>(),
+        before.iter().map(|frame| &frame.rect).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn catalog_refresh_is_independent_of_project_history_and_deletion_preserves_the_last_copy() {
+    use myalbuns_core::{CustomLayout, CustomLayoutId, LayoutCatalogSnapshot, LayoutOrigin};
+    let root = tempfile::tempdir().unwrap();
+    let mut project = project(root.path());
+    let sheet = project.projection().state.album.sheets[0].id.clone();
+    assert!(project.capture_custom_layout(&sheet).is_err());
+    project
+        .apply(ProjectIntent::AddFrame {
+            sheet_id: sheet.clone(),
+        })
+        .unwrap();
+    let captured = project.capture_custom_layout(&sheet).unwrap();
+    let before = project.projection();
+    let bytes = std::fs::read(root.path().join("Layouts.myalbuns")).unwrap();
+    let id = CustomLayoutId::generate();
+    let snapshot = LayoutCatalogSnapshot {
+        revision: 1,
+        entries: vec![CustomLayout {
+            id,
+            definition: captured.clone(),
+        }],
+    };
+    assert!(project.refresh_layout_catalog(snapshot.clone()).unwrap());
+    assert!(!project.refresh_layout_catalog(snapshot).unwrap());
+    assert_eq!(project.projection(), before);
+    assert_eq!(
+        std::fs::read(root.path().join("Layouts.myalbuns")).unwrap(),
+        bytes
+    );
+    let query = project.query_layouts(&sheet).unwrap();
+    assert_eq!(query.catalog_revision, 1);
+    let index = query
+        .listing
+        .candidates
+        .iter()
+        .position(|item| item.custom_id == Some(id))
+        .unwrap();
+    project
+        .apply(ProjectIntent::ApplyLayout {
+            selection: LayoutSelection {
+                query_id: query.query_id,
+                candidate_index: index,
+            },
+        })
+        .unwrap();
+    let applied = project.projection();
+    project
+        .refresh_layout_catalog(LayoutCatalogSnapshot {
+            revision: 2,
+            entries: vec![],
+        })
+        .unwrap();
+    assert_eq!(project.projection(), applied);
+    let query = project.query_layouts(&sheet).unwrap();
+    let last = &query.listing.candidates[0];
+    assert!(last.is_last_applied);
+    assert_eq!(last.layout.origin, LayoutOrigin::Custom);
+    assert_eq!(last.layout.definition, captured);
+    assert_eq!(last.custom_id, None);
+    project.undo().unwrap();
+    let mut undone = before;
+    undone.state.can_redo = true;
+    assert_eq!(project.projection(), undone);
+    assert!(
+        project
+            .query_layouts(&sheet)
+            .unwrap()
+            .listing
+            .candidates
+            .iter()
+            .all(|item| item.custom_id.is_none())
+    );
+}
+
+#[test]
 fn export_rejects_placeholders_after_unlock_and_on_manual_frames() {
     for lock_then_unlock in [true, false] {
         let root = tempfile::tempdir().unwrap();
@@ -40,10 +207,10 @@ fn export_rejects_placeholders_after_unlock_and_on_manual_frames() {
             .unwrap();
         if lock_then_unlock {
             let query = project
-                .query_layouts_with_expansion(
+                .query_layouts_with_frame_request(
                     &sheet,
-                    Some(myalbuns_core::LayoutExpansion {
-                        additional_positions: 2,
+                    Some(myalbuns_core::LayoutFrameRequest {
+                        frame_count: 3,
                         orientation: myalbuns_core::FrameOrientation::Horizontal,
                     }),
                 )
@@ -361,7 +528,7 @@ fn the_locked_preview_tracks_frame_order_and_remains_available_after_permission_
 
 #[test]
 fn expanded_preview_creates_inherited_placeholders_only_when_confirmed_by_the_lock() {
-    use myalbuns_core::{CoreError, FrameOrientation, FrameStyleSource, LayoutExpansion};
+    use myalbuns_core::{CoreError, FrameOrientation, FrameStyleSource, LayoutFrameRequest};
     let directory = tempfile::tempdir().unwrap();
     let mut project = project(directory.path());
     let sheet = project.projection().state.album.sheets[0].id.clone();
@@ -372,10 +539,10 @@ fn expanded_preview_creates_inherited_placeholders_only_when_confirmed_by_the_lo
         .unwrap();
     let before = project.projection();
     let query = project
-        .query_layouts_with_expansion(
+        .query_layouts_with_frame_request(
             &sheet,
-            Some(LayoutExpansion {
-                additional_positions: 2,
+            Some(LayoutFrameRequest {
+                frame_count: 3,
                 orientation: FrameOrientation::Horizontal,
             }),
         )
@@ -426,7 +593,7 @@ fn expanded_preview_creates_inherited_placeholders_only_when_confirmed_by_the_lo
 }
 
 #[test]
-fn saving_a_locked_layout_requires_v9_and_migrates_v8_without_inventing_a_lock() {
+fn saving_a_locked_layout_uses_current_schema_and_migrates_v8_without_inventing_a_lock() {
     use myalbuns_core::OpenProjectRequest;
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path();
@@ -452,7 +619,7 @@ fn saving_a_locked_layout_requires_v9_and_migrates_v8_without_inventing_a_lock()
     let path = root.join("Layouts.myalbuns");
     let mut saved: serde_json::Value =
         serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
-    assert_eq!(saved["schemaVersion"], 9);
+    assert_eq!(saved["schemaVersion"], 10);
     assert_eq!(saved["project"]["sheets"][0]["layoutLocked"], true);
     let core = ProjectCore::new()
         .with_identity_storage_roots(root.join("leases"), root.join("identities"));
@@ -468,8 +635,12 @@ fn saving_a_locked_layout_requires_v9_and_migrates_v8_without_inventing_a_lock()
     assert!(
         core.open_editable(OpenProjectRequest::new(location(&path)))
             .is_err(),
-        "v9 cannot silently default a missing lock"
+        "the current schema cannot silently default a missing lock"
     );
+    saved["project"]
+        .as_object_mut()
+        .unwrap()
+        .remove("favoriteLayouts");
     saved["schemaVersion"] = 8.into();
     let legacy = serde_json::to_vec(&saved).unwrap();
     std::fs::write(&path, &legacy).unwrap();
@@ -487,7 +658,7 @@ fn saving_a_locked_layout_requires_v9_and_migrates_v8_without_inventing_a_lock()
     migrated.save(migrated.revision()).unwrap();
     let upgraded: serde_json::Value =
         serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
-    assert_eq!(upgraded["schemaVersion"], 9);
+    assert_eq!(upgraded["schemaVersion"], 10);
     assert_eq!(upgraded["project"]["sheets"][0]["layoutLocked"], false);
 }
 
@@ -784,7 +955,7 @@ fn saving_and_reopening_preserves_last_layout_and_generation_settings() {
     assert!(query.listing.candidates[0].is_last_applied);
     let bytes = std::fs::read(root.join("Layouts.myalbuns")).unwrap();
     let persisted: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
-    assert_eq!(persisted["schemaVersion"], 9);
+    assert_eq!(persisted["schemaVersion"], 10);
 }
 
 #[test]

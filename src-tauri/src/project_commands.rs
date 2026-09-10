@@ -60,6 +60,7 @@ pub(crate) async fn apply_project_intent(
     let intent_kind = match &intent {
         ProjectIntent::CopyFrames { .. } => "copy_frames",
         ProjectIntent::ApplyLayout { .. } => "apply_layout",
+        ProjectIntent::ToggleLayoutFavorite { .. } => "toggle_layout_favorite",
         ProjectIntent::LockLayout { .. } => "lock_layout",
         ProjectIntent::UnlockLayout { .. } => "unlock_layout",
         ProjectIntent::SetLayoutSettings { .. } => "set_layout_settings",
@@ -214,14 +215,19 @@ pub(crate) async fn preview_photo_angle(
 #[tauri::command]
 pub(crate) async fn query_layouts(
     sheet_id: String,
-    expansion: Option<myalbuns_core::LayoutExpansion>,
+    frame_request: Option<myalbuns_core::LayoutFrameRequest>,
     window: WebviewWindow,
     state: State<'_, ProjectHost>,
+    catalog: State<'_, crate::layout_catalog_store::LayoutCatalogStore>,
 ) -> Result<myalbuns_core::LayoutQueryResult, String> {
     if window.label() != PROJECT_WINDOW_LABEL {
         return Err("Os Layouts só podem ser consultados na Janela do Projeto.".into());
     }
-    state.query_layouts(&sheet_id, expansion)
+    let snapshot = catalog
+        .load()
+        .map_err(|_| "Não foi possível ler os Layouts personalizados.".to_string())?;
+    state.refresh_layout_catalog(snapshot)?;
+    state.query_layouts(&sheet_id, frame_request)
 }
 
 #[tauri::command]

@@ -126,6 +126,10 @@ pub(crate) fn run(
         project_config.visible = false;
     }
 
+    let layout_catalog = crate::layout_catalog_store::LayoutCatalogStore::new(&app_paths);
+    if let Ok(snapshot) = layout_catalog.load() {
+        let _ = project_host.refresh_layout_catalog(snapshot);
+    }
     let run_result = tauri::Builder::default()
         .register_asynchronous_uri_scheme_protocol(
             crate::cache_previews::CACHE_MEDIA_PROTOCOL_SCHEME,
@@ -154,6 +158,7 @@ pub(crate) fn run(
         .manage(ExportAttempts::default())
         .manage(crate::project_dialog_window::ProjectDialogPresentationStore::default())
         .manage(crate::settings_preferences::SettingsStore::new(&app_paths))
+        .manage(layout_catalog)
         .manage(crate::workspace_preferences::WorkspacePreferencesStore::new(&app_paths))
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -220,6 +225,9 @@ pub(crate) fn run(
             crate::project_commands::preview_photo_angle,
             crate::project_commands::preview_frame_style,
             crate::project_commands::query_layouts,
+            crate::layout_commands::refresh_layout_catalog,
+            crate::layout_commands::save_custom_layout,
+            crate::layout_commands::delete_custom_layout,
             crate::project_commands::preview_layout,
             crate::project_commands::slider_double_click_time,
             crate::project_commands::frame_drag_threshold,

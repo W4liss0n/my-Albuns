@@ -16,6 +16,7 @@ impl LayoutPatch {
     pub fn definition(&self) -> &LayoutDefinition {
         &self.definition
     }
+    /// Existing Frames retained in order. A document may omit only empty Frames.
     pub fn frame_ids(&self) -> &[Uuid] {
         &self.frame_ids
     }
@@ -29,29 +30,75 @@ impl LayoutPatch {
 
 pub struct LayoutRules;
 
-impl LayoutRules {
-    pub fn list_for_lock(query: &LayoutQuery, last: Option<&StoredLayout>) -> LayoutListing {
-        let mut listing = Self::list(query, last);
-        if listing.generation_status != LayoutGenerationStatus::InvalidQuery
-            && let Some(last) = last.filter(|last| {
-                last.definition.positions.len() > query.frame_orientations.len()
-                    && (query.permission == LayoutPermission::PagesAndSheet
-                        || last.definition.scope == LayoutScope::Page)
-                    && scaled_definition(&last.definition, &query.surface).is_some()
+#[derive(Clone, Copy, Default)]
+pub struct LayoutSources<'a> {
+    pub last: Option<&'a StoredLayout>,
+    pub custom: &'a [CustomLayout],
+    pub favorites: &'a [FavoriteLayout],
+}
+
+impl LayoutSources<'_> {
+    pub(crate) fn favorite_id(&self, layout: &StoredLayout) -> Option<LayoutFavoriteId> {
+        self.favorites
+            .iter()
+            .find(|item| {
+                item.layout.origin == layout.origin
+                    && LayoutRules::same_definition(&item.layout.definition, &layout.definition)
             })
-        {
-            listing.candidates.insert(
-                0,
-                LayoutCandidate {
-                    layout: last.clone(),
-                    is_last_applied: true,
-                },
-            );
-        }
-        listing
+            .map(|item| item.id)
     }
 
-    pub fn list(query: &LayoutQuery, last: Option<&StoredLayout>) -> LayoutListing {
+    pub(crate) fn custom_id(&self, layout: &StoredLayout) -> Option<CustomLayoutId> {
+        if layout.origin != LayoutOrigin::Custom {
+            return None;
+        }
+        self.custom
+            .iter()
+            .find(|item| LayoutRules::same_definition(&item.definition, &layout.definition))
+            .map(|item| item.id)
+    }
+}
+
+impl LayoutRules {
+    /// Captures the exact ordered geometry, including manual placement.
+    /// The source composition and its Frame mapping remain untouched.
+    pub fn capture_custom(
+        surface: LayoutSurface,
+        positions: Vec<crate::RectUm>,
+    ) -> Result<LayoutDefinition, CoreError> {
+        let crosses = surface.kind == LayoutSurfaceKind::DoubleSheet
+            && positions.iter().any(|r| {
+                2 * i128::from(r.x) < i128::from(surface.width_um)
+                    && 2 * (i128::from(r.x) + i128::from(r.width)) > i128::from(surface.width_um)
+            });
+        let definition = LayoutDefinition {
+            surface,
+            scope: if crosses {
+                LayoutScope::Sheet
+            } else {
+                LayoutScope::Page
+            },
+            positions,
+        };
+        if !Self::definition_is_valid(&definition) {
+            return Err(CoreError::IncompatibleLayout);
+        }
+        Ok(definition)
+    }
+
+    pub fn list_for_lock(query: &LayoutQuery, sources: LayoutSources<'_>) -> LayoutListing {
+        Self::listing(query, sources, true)
+    }
+
+    pub fn list(query: &LayoutQuery, sources: LayoutSources<'_>) -> LayoutListing {
+        Self::listing(query, sources, false)
+    }
+
+    fn listing(
+        query: &LayoutQuery,
+        sources: LayoutSources<'_>,
+        allow_larger: bool,
+    ) -> LayoutListing {
         let generation = generate_layouts(query);
         let mut listing = LayoutListing {
             algorithm_version: generation.algorithm_version,
@@ -61,18 +108,67 @@ impl LayoutRules {
         if generation.status == LayoutGenerationStatus::InvalidQuery {
             return listing;
         }
-        if let Some(last) = last.filter(|last| compatible(&last.definition, query)) {
+        let accepts = |definition: &LayoutDefinition| {
+            compatible(definition, query)
+                || allow_larger
+                    && definition.positions.len() > query.frame_orientations.len()
+                    && (query.permission == LayoutPermission::PagesAndSheet
+                        || definition.scope == LayoutScope::Page)
+                    && scaled_definition(definition, &query.surface).is_some()
+        };
+        if let Some(last) = sources.last.filter(|last| accepts(&last.definition)) {
             listing.candidates.push(LayoutCandidate {
                 layout: last.clone(),
                 is_last_applied: true,
+                custom_id: sources.custom_id(last),
+                favorite_id: sources.favorite_id(last),
+            });
+        }
+        let mut favorites: Vec<_> = sources.favorites.iter().collect();
+        favorites.sort_by_key(|item| (item.order, item.id));
+        for favorite in favorites
+            .into_iter()
+            .filter(|item| accepts(&item.layout.definition))
+        {
+            if listing.candidates.iter().any(|item| {
+                item.layout.origin == favorite.layout.origin
+                    && Self::same_definition(&item.layout.definition, &favorite.layout.definition)
+            }) {
+                continue;
+            }
+            listing.candidates.push(LayoutCandidate {
+                layout: favorite.layout.clone(),
+                is_last_applied: false,
+                custom_id: sources.custom_id(&favorite.layout),
+                favorite_id: Some(favorite.id),
+            });
+        }
+        for custom in sources
+            .custom
+            .iter()
+            .filter(|item| accepts(&item.definition))
+        {
+            if listing.candidates.iter().any(|item| {
+                item.layout.origin == LayoutOrigin::Custom
+                    && Self::same_definition(&item.layout.definition, &custom.definition)
+            }) {
+                continue;
+            }
+            listing.candidates.push(LayoutCandidate {
+                layout: StoredLayout {
+                    definition: custom.definition.clone(),
+                    origin: LayoutOrigin::Custom,
+                },
+                is_last_applied: false,
+                custom_id: Some(custom.id),
+                favorite_id: None,
             });
         }
         for candidate in generation.candidates {
-            if listing
-                .candidates
-                .iter()
-                .any(|item| Self::same_definition(&item.layout.definition, &candidate.definition))
-            {
+            if listing.candidates.iter().any(|item| {
+                item.layout.origin == LayoutOrigin::Automatic
+                    && Self::same_definition(&item.layout.definition, &candidate.definition)
+            }) {
                 continue;
             }
             listing.candidates.push(LayoutCandidate {
@@ -81,6 +177,8 @@ impl LayoutRules {
                     origin: LayoutOrigin::Automatic,
                 },
                 is_last_applied: false,
+                custom_id: None,
+                favorite_id: None,
             });
         }
         listing
@@ -121,13 +219,13 @@ impl LayoutRules {
 
     pub fn automatic(
         query: &LayoutQuery,
-        last: Option<&StoredLayout>,
+        sources: LayoutSources<'_>,
         frame_ids: &[Uuid],
     ) -> Result<LayoutPatch, CoreError> {
         if query.frame_orientations.len() != frame_ids.len() {
             return Err(CoreError::IncompatibleLayout);
         }
-        let listing = Self::list(query, last);
+        let listing = Self::list(query, sources);
         if listing.generation_status == LayoutGenerationStatus::InvalidQuery {
             return Err(CoreError::InvalidLayoutQuery);
         }

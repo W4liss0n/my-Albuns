@@ -7,9 +7,11 @@ import type {
   PhotoAngleEdit,
   FrameStyleEdit,
   LayoutQueryResult,
-  LayoutExpansion,
+  LayoutFrameRequest,
   LayoutExportProblem,
   LayoutSelection,
+  CustomLayoutId,
+  SaveCustomLayoutResult,
   PhotoDropTarget,
   ProjectIntent,
   ProjectMutationOutcome,
@@ -249,11 +251,14 @@ export interface PhotoImportCompletion {
 }
 
 export interface ProjectCorePort {
+  refreshLayoutCatalog(): Promise<number>;
+  saveCustomLayout(sheetId: string): Promise<SaveCustomLayoutResult>;
+  deleteCustomLayout(layoutId: CustomLayoutId): Promise<number>;
   readFrameDragThreshold(): Promise<PointerDragThreshold>;
   readSliderDoubleClickTime(): Promise<number>;
   previewPhotoAngle(edit: PhotoAngleEdit): Promise<ComposedFrame[]>;
   previewFrameStyle(edit: FrameStyleEdit): Promise<ComposedFrame[]>;
-  queryLayouts(sheetId: string, expansion?: LayoutExpansion): Promise<LayoutQueryResult>;
+  queryLayouts(sheetId: string, frameRequest?: LayoutFrameRequest): Promise<LayoutQueryResult>;
   previewLayout(selection: LayoutSelection): Promise<ComposedFrame[]>;
   previewFrameGeometry(edit: FrameGeometryEdit): Promise<ComposedFrame[]>;
   load(operationId: string): Promise<EditorProjection>;

@@ -330,9 +330,9 @@ fn classifies_document_type_and_schema_failures_with_public_typed_errors() {
             replace_literal_once(
                 NEUTRAL_PROJECT_V1,
                 "\"schemaVersion\": 1",
-                "\"schemaVersion\": 10",
+                "\"schemaVersion\": 11",
             ),
-            DocumentFailure::UnsupportedFutureSchema { version: 10 },
+            DocumentFailure::UnsupportedFutureSchema { version: 11 },
         ),
         (
             "schema legado",

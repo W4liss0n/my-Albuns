@@ -5,14 +5,14 @@ use serde::{Deserialize, Serialize};
 use tauri::State;
 
 #[cfg(windows)]
-use crate::preference_store_io::{CrossProcessPreferenceGuard, preference_mutex_name};
+use crate::local_store_io::{CrossProcessStoreGuard, store_mutex_name};
 
 use crate::{
     ipc_contract::{
         MediaPreferenceKind, MediaThumbnailSizes, WorkspacePanelKind, WorkspacePanelPreference,
         WorkspacePanelPreferences, WorkspacePreferenceChange, WorkspacePreferences,
     },
-    preference_store_io::write_atomically,
+    local_store_io::write_atomically,
 };
 
 const SCHEMA_VERSION: u16 = 1;
@@ -62,8 +62,7 @@ pub(crate) struct WorkspacePreferencesStore {
 impl WorkspacePreferencesStore {
     pub(crate) fn new(app_paths: &AppPaths) -> Self {
         #[cfg(windows)]
-        let write_mutex_name =
-            preference_mutex_name("WorkspacePreferences", app_paths.local_root());
+        let write_mutex_name = store_mutex_name("WorkspacePreferences", app_paths.local_root());
         Self {
             access: Mutex::new(()),
             file: app_paths.workspace_preferences_file(),
@@ -89,10 +88,8 @@ impl WorkspacePreferencesStore {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         #[cfg(windows)]
-        let _cross_process = CrossProcessPreferenceGuard::acquire(
-            &self.write_mutex_name,
-            "WorkspacePreferencesStore",
-        )?;
+        let _cross_process =
+            CrossProcessStoreGuard::acquire(&self.write_mutex_name, "WorkspacePreferencesStore")?;
         let mut preferences = self.load_unlocked();
         match change {
             WorkspacePreferenceChange::InspectorSection {

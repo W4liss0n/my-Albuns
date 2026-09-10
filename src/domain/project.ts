@@ -1,6 +1,8 @@
 export type { AlbumSnapshot } from "./generated/AlbumSnapshot";
 export type { LayoutQueryResult } from "./generated/LayoutQueryResult";
-export type { LayoutExpansion } from "./generated/LayoutExpansion";
+export type { CustomLayoutId } from "./generated/CustomLayoutId";
+export type { SaveCustomLayoutResult } from "./generated/SaveCustomLayoutResult";
+export type { LayoutFrameRequest } from "./generated/LayoutFrameRequest";
 export type { LayoutExportProblem } from "./generated/LayoutExportProblem";
 export type { FrameOrientation } from "./generated/FrameOrientation";
 export type { LayoutSelection } from "./generated/LayoutSelection";

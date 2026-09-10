@@ -555,6 +555,7 @@ pub struct ProjectDocument {
     media: Vec<MediaRef>,
     sheets: Vec<ProjectSheet>,
     layout_settings: crate::LayoutSettings,
+    favorite_layouts: Vec<crate::FavoriteLayout>,
 }
 
 impl ProjectDocument {
@@ -586,6 +587,7 @@ impl ProjectDocument {
             media,
             sheets,
             layout_settings: crate::LayoutSettings::default(),
+            favorite_layouts: Vec::new(),
         }
     }
 
@@ -659,7 +661,11 @@ impl ProjectDocument {
         Ok((candidate, neighbor_id))
     }
 
-    pub(crate) fn with_converted_edge_sheet(&self, sheet_id: Uuid) -> Result<Self, ()> {
+    pub(crate) fn with_converted_edge_sheet(
+        &self,
+        sheet_id: Uuid,
+        custom: &[crate::CustomLayout],
+    ) -> Result<Self, ()> {
         let mut candidate = self.clone();
         let sheet_index = candidate
             .sheets
@@ -676,7 +682,9 @@ impl ProjectDocument {
             _ => return Err(()),
         };
         sheet.layout_locked = false;
-        candidate.reorganize_sheet(sheet_id).map_err(|_| ())?;
+        candidate
+            .reorganize_sheet(sheet_id, custom)
+            .map_err(|_| ())?;
         validate_project_state(&candidate)?;
         Ok(candidate)
     }
@@ -757,6 +765,7 @@ impl ProjectDocument {
     pub(crate) fn with_album_information(
         &self,
         information: AlbumInformation,
+        custom: &[crate::CustomLayout],
     ) -> Result<Self, Vec<ProjectConfigurationValidationError>> {
         let validation = self.validate_album_information(&information);
         if !validation.errors.is_empty() {
@@ -785,7 +794,7 @@ impl ProjectDocument {
             if candidate.sheets[index].active_sides != sides {
                 candidate.sheets[index].active_sides = sides;
                 candidate.sheets[index].layout_locked = false;
-                candidate.reorganize_sheet(candidate.sheets[index].id).map_err(|_| vec![error])?;
+                candidate.reorganize_sheet(candidate.sheets[index].id, custom).map_err(|_| vec![error])?;
             }
         }
         validate_project_state(&candidate).map_err(|()| validation.errors)?;
@@ -827,6 +836,7 @@ impl ProjectDocument {
         sheet_id: Uuid,
         media_id: Uuid,
         mode: PhotoPlacementMode,
+        custom: &[crate::CustomLayout],
     ) -> Result<(Self, Uuid), ()> {
         self.ensure_photo(media_id)?;
         let mut candidate = self.clone();
@@ -854,7 +864,9 @@ impl ProjectDocument {
         if mode == PhotoPlacementMode::Normal
             && candidate.sheets[sheet_index].frames.len() != self.sheets[sheet_index].frames.len()
         {
-            candidate.reorganize_sheet(sheet_id).map_err(|_| ())?;
+            candidate
+                .reorganize_sheet(sheet_id, custom)
+                .map_err(|_| ())?;
         }
         validate_project_state(&candidate)?;
         Ok((candidate, affected))
@@ -867,6 +879,7 @@ impl ProjectDocument {
         x_um: i64,
         y_um: i64,
         mode: PhotoPlacementMode,
+        custom: &[crate::CustomLayout],
     ) -> Result<(Self, Uuid), ()> {
         self.ensure_photo(media_id)?;
         let mut candidate = self.clone();
@@ -905,7 +918,9 @@ impl ProjectDocument {
         if mode == PhotoPlacementMode::Normal
             && candidate.sheets[sheet_index].frames.len() != self.sheets[sheet_index].frames.len()
         {
-            candidate.reorganize_sheet(sheet_id).map_err(|_| ())?;
+            candidate
+                .reorganize_sheet(sheet_id, custom)
+                .map_err(|_| ())?;
         }
         validate_project_state(&candidate)?;
         Ok((candidate, affected))
@@ -1183,6 +1198,7 @@ impl ProjectDocument {
         &self,
         frame_ids: &[String],
         mode: PhotoPlacementMode,
+        custom: &[crate::CustomLayout],
     ) -> Result<Self, crate::CoreError> {
         let (sheet_index, selected) = self
             .frame_selection(frame_ids)
@@ -1200,7 +1216,7 @@ impl ProjectDocument {
             .frames
             .retain(|frame| !selected.contains(&frame.id));
         if mode == PhotoPlacementMode::Normal {
-            candidate.reorganize_sheet(candidate.sheets[sheet_index].id)?;
+            candidate.reorganize_sheet(candidate.sheets[sheet_index].id, custom)?;
         }
         Ok(candidate)
     }

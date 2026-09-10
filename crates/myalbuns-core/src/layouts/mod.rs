@@ -3,11 +3,16 @@ use ts_rs::TS;
 
 use crate::RectUm;
 
+mod catalog;
+mod favorites;
 mod generator;
+mod identity;
 mod rules;
 
+pub use catalog::{CustomLayout, CustomLayoutId, LayoutCatalogSnapshot, SaveCustomLayoutResult};
+pub use favorites::{FavoriteLayout, LayoutFavoriteId};
 pub use generator::generate_layouts;
-pub use rules::{LayoutPatch, LayoutRules};
+pub use rules::{LayoutPatch, LayoutRules, LayoutSources};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -80,11 +85,11 @@ pub struct LayoutSelection {
     pub candidate_index: usize,
 }
 
-/// An explicit request for future placeholder profiles; never inferred from Photos.
+/// An explicit target count; orientation applies only to newly reserved placeholders.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-pub struct LayoutExpansion {
-    pub additional_positions: usize,
+pub struct LayoutFrameRequest {
+    pub frame_count: usize,
     pub orientation: FrameOrientation,
 }
 
@@ -103,6 +108,7 @@ pub struct LayoutQueryResult {
     pub query_id: String,
     pub project_id: String,
     pub revision: u64,
+    pub catalog_revision: u64,
     pub sheet_id: String,
     pub frame_count: usize,
     pub locked: bool,
@@ -157,6 +163,8 @@ pub struct StoredLayout {
 pub struct LayoutCandidate {
     pub layout: StoredLayout,
     pub is_last_applied: bool,
+    pub custom_id: Option<CustomLayoutId>,
+    pub favorite_id: Option<LayoutFavoriteId>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]

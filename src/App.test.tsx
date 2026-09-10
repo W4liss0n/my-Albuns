@@ -1,3 +1,4 @@
+import { emptyLayoutCatalogPort } from "./test/layoutCatalogPorts";
 import { useEffect, useState, type ComponentProps } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
@@ -117,6 +118,7 @@ const projectCorePort: ProjectCorePort = {
     affectedSheetId: null,
   }),
   importPhoto: async () => ({ kind: "cancelled", projection }),
+  ...emptyLayoutCatalogPort,
   readFrameDragThreshold: async () => ({ x: 5, y: 5 }),
   readSliderDoubleClickTime: async () => 500,
     queryLayouts: async () => { throw new Error("Layouts are not configured in this fixture."); },

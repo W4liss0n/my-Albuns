@@ -13,6 +13,8 @@ import type {
 } from "./ApplicationMenuBar";
 
 interface ProjectApplicationMenuOptions {
+  saveLayout(): void;
+  canSaveLayout: boolean;
   copyFrames(): void;
   pasteFrames(): void;
   canCopyFrames: boolean;
@@ -48,6 +50,8 @@ interface ProjectApplicationMenuOptions {
 }
 
 export function createProjectApplicationMenus({
+  saveLayout,
+  canSaveLayout,
   copyFrames,
   pasteFrames,
   canCopyFrames,
@@ -115,7 +119,8 @@ export function createProjectApplicationMenus({
         submenu("arrange-frames", "Organizar", FRAME_STACK_COMMANDS.map(({ id, action }) =>
           implemented(id, "frame", () => arrangeFrames(action), !canArrangeFrames))),
         separator("edit-layout-separator"),
-        placeholder("save-frame-arrangement-as-layout", "frame"),
+        { ...implemented("save-frame-arrangement-as-layout", "frame", saveLayout, !canSaveLayout),
+          title: canSaveLayout ? "Salvar a disposição dos Frames em Personalizados." : "Entre no Modo de edição de uma Lâmina com ao menos um Frame." },
         placeholder("select-all", "frame"),
       ],
     },
@@ -197,7 +202,7 @@ function implemented(
   onSelect: () => void,
   disabled?: boolean,
   checked?: boolean,
-): ApplicationMenuCommand {
+): Extract<ApplicationMenuCommand, { availability: "implemented" }> {
   const descriptor = projectCommandDescriptor(id);
   const binding = projectCommandBinding(id, context);
   if (binding?.availability !== "implemented") {

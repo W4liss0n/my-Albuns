@@ -1,3 +1,4 @@
+import { emptyLayoutCatalogPort, unusedLayoutDialogPort } from "../test/layoutCatalogPorts";
 import { useState } from "react";
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
@@ -36,6 +37,7 @@ function harness() {
   const undo = vi.fn(async () => first);
   const port: ProjectCorePort = {
     load: async () => initial, apply, applyWithOutcome: unsupported, save, undo, redo: async () => second,
+    ...emptyLayoutCatalogPort,
     readFrameDragThreshold: async () => ({ x: 5, y: 5 }), readSliderDoubleClickTime: async () => 500,
     queryLayouts: async () => { throw new Error("Layouts are not configured in this fixture."); },
     previewLayout: async () => { throw new Error("Layouts are not configured in this fixture."); },
@@ -48,7 +50,7 @@ function harness() {
   function useHarness() {
     const [projection, setProjection] = useState(initial);
     const runner = useProjectMutationRunner(initial.state.projectId, port);
-    const controller = useProjectEditorController({ projection, projectCorePort: port,
+    const controller = useProjectEditorController({ projectDialogPort: unusedLayoutDialogPort, projection, projectCorePort: port,
       runProjectMutation: runner, onProjectionChange: setProjection });
     return { runner, projection, setProjection, ...controller };
   }

@@ -1,3 +1,4 @@
+import { emptyLayoutCatalogPort } from "../test/layoutCatalogPorts";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -51,6 +52,7 @@ function projectCorePortWithApply(
       affectedSheetId: null,
     }),
     importPhoto: async () => ({ kind: "cancelled", projection }),
+    ...emptyLayoutCatalogPort,
     readFrameDragThreshold: async () => ({ x: 5, y: 5 }),
     readSliderDoubleClickTime: async () => 500,
     queryLayouts: async () => { throw new Error("Layouts are not configured in this fixture."); },

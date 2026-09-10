@@ -1,3 +1,4 @@
+import { emptyLayoutCatalogPort, unusedLayoutDialogPort } from "../test/layoutCatalogPorts";
 import { useState } from "react";
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
@@ -26,6 +27,7 @@ test.each([false, true])("ordering followed by Save and Undo uses the queue when
   const undo = vi.fn(async () => initial);
   const port: ProjectCorePort = {
     load: async () => initial, apply, save, undo,
+    ...emptyLayoutCatalogPort,
     readFrameDragThreshold: async () => ({ x: 5, y: 5 }),
     readSliderDoubleClickTime: async () => 500,
     queryLayouts: async () => { throw new Error("Layouts are not configured in this fixture."); },
@@ -41,7 +43,7 @@ test.each([false, true])("ordering followed by Save and Undo uses the queue when
   const view = renderHook(() => {
     const [projection, setProjection] = useState(initial);
     const runProjectMutation = useProjectMutationRunner(initial.state.projectId, port);
-    return useProjectEditorController({ projection, projectCorePort: port,
+    return useProjectEditorController({ projectDialogPort: unusedLayoutDialogPort, projection, projectCorePort: port,
       runProjectMutation, onProjectionChange: setProjection });
   });
   let completion!: Promise<unknown>;

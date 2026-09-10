@@ -13,6 +13,7 @@ use uuid::{Uuid, Version};
 
 use super::{DecodeFailure, DocumentFailure, PathFailure};
 use crate::MediaKind;
+mod layouts_v10;
 mod layouts_v8;
 mod layouts_v9;
 use crate::project_document::{
@@ -24,6 +25,7 @@ use crate::project_document::{
 };
 use layouts_v8::ProjectDocumentV8;
 use layouts_v9::ProjectDocumentV9;
+use layouts_v10::ProjectDocumentV10;
 
 const DOCUMENT_TYPE: &str = "myalbuns.project";
 const SCHEMA_VERSION_V1: u32 = 1;
@@ -35,6 +37,7 @@ pub(super) const SCHEMA_VERSION_V6: u32 = 6;
 pub(super) const SCHEMA_VERSION_V7: u32 = 7;
 pub(super) const SCHEMA_VERSION_V8: u32 = 8;
 pub(super) const SCHEMA_VERSION_V9: u32 = 9;
+pub(super) const SCHEMA_VERSION_V10: u32 = 10;
 const UTF8_BOM: &[u8] = &[0xEF, 0xBB, 0xBF];
 
 pub(super) struct DecodedProjectRevision {
@@ -47,6 +50,14 @@ pub(super) fn decode(bytes: &[u8]) -> Result<DecodedProjectRevision, DecodeFailu
         return Err(document_failure(DocumentFailure::InvalidProjectDocument));
     }
     let schema_version = classify_header(bytes)?;
+    if schema_version == SCHEMA_VERSION_V10 {
+        let document: ProjectDocumentV10 = serde_json::from_slice(bytes)
+            .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))?;
+        return Ok(DecodedProjectRevision {
+            revision: document.into_domain()?,
+            source_schema_version: schema_version,
+        });
+    }
     if schema_version == SCHEMA_VERSION_V9 {
         let document: ProjectDocumentV9 = serde_json::from_slice(bytes)
             .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))?;
@@ -112,7 +123,7 @@ pub(super) fn encode(revision: &ProjectRevision) -> Result<Vec<u8>, DecodeFailur
     if revision.revision > MAX_SAFE_INTEGER {
         return Err(document_failure(DocumentFailure::InvalidProjectDocument));
     }
-    let dto = ProjectDocumentV9::from_domain(revision)?;
+    let dto = ProjectDocumentV10::from_domain(revision)?;
     let mut bytes = serde_json::to_vec_pretty(&dto)
         .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))?;
     bytes.push(b'\n');
@@ -126,6 +137,12 @@ pub(super) fn rewrite_project_id(
     let source = decode(bytes)?;
     let project_id = project_id.hyphenated().to_string();
     let mut rewritten = match source.source_schema_version {
+        SCHEMA_VERSION_V10 => {
+            let mut document: ProjectDocumentV10 = serde_json::from_slice(bytes)
+                .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))?;
+            document.project_id = project_id;
+            serde_json::to_vec_pretty(&document)
+        }
         SCHEMA_VERSION_V9 => {
             let mut document: ProjectDocumentV9 = serde_json::from_slice(bytes)
                 .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))?;
@@ -205,7 +222,7 @@ fn classify_header(bytes: &[u8]) -> Result<u32, DecodeFailure> {
     match version {
         SCHEMA_VERSION_V1 | SCHEMA_VERSION_V2 | SCHEMA_VERSION_V3 | SCHEMA_VERSION_V4
         | SCHEMA_VERSION_V5 | SCHEMA_VERSION_V6 | SCHEMA_VERSION_V7 | SCHEMA_VERSION_V8
-        | SCHEMA_VERSION_V9 => Ok(version),
+        | SCHEMA_VERSION_V9 | SCHEMA_VERSION_V10 => Ok(version),
         0 => Err(document_failure(DocumentFailure::UnsupportedLegacySchema {
             version,
         })),

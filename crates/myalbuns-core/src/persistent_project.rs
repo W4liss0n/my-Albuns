@@ -517,19 +517,42 @@ impl EditableProject {
         )
     }
 
-    pub fn query_layouts(&mut self, sheet_id: &str) -> Result<crate::LayoutQueryResult, CoreError> {
-        self.query_layouts_with_expansion(sheet_id, None)
+    pub fn capture_custom_layout(
+        &self,
+        sheet_id: &str,
+    ) -> Result<crate::LayoutDefinition, CoreError> {
+        if !self.session_valid {
+            return Err(CoreError::EditableSessionInvalidated);
+        }
+        let parsed =
+            Uuid::parse_str(sheet_id).map_err(|_| CoreError::SheetNotFound(sheet_id.into()))?;
+        let current = self.project().current_layout(parsed)?.definition;
+        crate::LayoutRules::capture_custom(current.surface, current.positions)
     }
 
-    pub fn query_layouts_with_expansion(
+    pub fn refresh_layout_catalog(
+        &mut self,
+        snapshot: crate::LayoutCatalogSnapshot,
+    ) -> Result<bool, CoreError> {
+        if !self.session_valid {
+            return Err(CoreError::EditableSessionInvalidated);
+        }
+        self.session.refresh_layout_catalog(snapshot)
+    }
+
+    pub fn query_layouts(&mut self, sheet_id: &str) -> Result<crate::LayoutQueryResult, CoreError> {
+        self.query_layouts_with_frame_request(sheet_id, None)
+    }
+
+    pub fn query_layouts_with_frame_request(
         &mut self,
         sheet_id: &str,
-        expansion: Option<crate::LayoutExpansion>,
+        frame_request: Option<crate::LayoutFrameRequest>,
     ) -> Result<crate::LayoutQueryResult, CoreError> {
         if !self.session_valid {
             return Err(CoreError::EditableSessionInvalidated);
         }
-        self.session.query_layouts(sheet_id, expansion)
+        self.session.query_layouts(sheet_id, frame_request)
     }
 
     pub fn preview_layout(

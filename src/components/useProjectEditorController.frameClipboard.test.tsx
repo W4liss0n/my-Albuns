@@ -1,3 +1,4 @@
+import { emptyLayoutCatalogPort, unusedLayoutDialogPort } from "../test/layoutCatalogPorts";
 import { useState } from "react";
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
@@ -32,6 +33,7 @@ function harness(name = "same-group") {
   const redo = vi.fn(async () => pasted);
   const port: ProjectCorePort = {
     load: async () => initial, apply, applyWithOutcome, save, undo, redo,
+    ...emptyLayoutCatalogPort,
     readFrameDragThreshold: async () => ({ x: 5, y: 5 }),
     readSliderDoubleClickTime: async () => 500,
     queryLayouts: async () => { throw new Error("Layouts are not configured in this fixture."); },
@@ -46,7 +48,7 @@ function harness(name = "same-group") {
   const view = renderHook(({ blocked, currentPort, projectId }) => {
     const [projection, setProjection] = useState(initial);
     const runProjectMutation = useProjectMutationRunner(projectId, currentPort);
-    return { runner: runProjectMutation, projection, ...useProjectEditorController({ projection, projectCorePort: currentPort,
+    return { runner: runProjectMutation, projection, ...useProjectEditorController({ projectDialogPort: unusedLayoutDialogPort, projection, projectCorePort: currentPort,
       runProjectMutation, onProjectionChange: setProjection, interactionBlocked: blocked }) };
   }, { initialProps: { blocked: false, currentPort: port, projectId: initial.state.projectId } });
   // AlbumCanvasScene reports its dimensionless scale; geometry separately uses

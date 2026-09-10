@@ -1,3 +1,4 @@
+import { emptyLayoutCatalogPort, unusedLayoutDialogPort } from "../test/layoutCatalogPorts";
 import { useLayoutEffect, useState } from "react";
 import { act, fireEvent, render, waitFor } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
@@ -37,6 +38,7 @@ test.each([1, 2])("releasing %i Frames and immediately undoing presents the late
   const preview = vi.fn(async () => changed.composition.sheets[0].frames);
   const undo = vi.fn(async () => undone);
   const port: ProjectCorePort = {
+    ...emptyLayoutCatalogPort,
     load: async () => initial, apply: async () => pendingEdit,
     readSliderDoubleClickTime: async () => 500,
     queryLayouts: async () => { throw new Error("Layouts are not configured in this fixture."); },
@@ -57,7 +59,7 @@ test.each([1, 2])("releasing %i Frames and immediately undoing presents the late
   function Editor() {
     const [projection, setProjection] = useState(initial);
     const runProjectMutation = useProjectMutationRunner(initial.state.projectId, port);
-    const controller = useProjectEditorController({
+    const controller = useProjectEditorController({ projectDialogPort: unusedLayoutDialogPort,
       projection, projectCorePort: port, runProjectMutation, onProjectionChange: setProjection,
     });
     useLayoutEffect(() => { presentedRevisions.push(projection.state.revision); }, [projection]);

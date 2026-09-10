@@ -288,8 +288,7 @@ const DEFINITIONS = [
     description: "Salva a disposição atual dos Frames como Layout.",
     kind: "application",
     contexts: ["frame"],
-    availability: "placeholder",
-    placeholderFeature: "save-frame-arrangement-as-layout",
+    availability: "implemented",
     shortcuts: [],
   }),
   command({

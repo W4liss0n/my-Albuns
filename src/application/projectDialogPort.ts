@@ -19,6 +19,7 @@ export interface ProjectDialogDetail {
 }
 
 export type ProjectDialogState =
+  | { kind: "layoutDeletionConfirmation"; busy: boolean }
   | { kind: "exportProblems"; projectName: string; problems: readonly LayoutExportProblem[] }
   | { kind: "imageProcessingProgress"; progress: ProjectDialogProgress }
   | {
@@ -65,6 +66,8 @@ export type ProjectDialogState =
     };
 
 export type ProjectDialogAction =
+  | "cancelLayoutDeletion"
+  | "confirmLayoutDeletion"
   | "cancelAlbumInformation"
   | "cancelExport"
   | "cancelProjectClose"

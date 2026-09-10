@@ -839,6 +839,9 @@ pub enum ProjectIntent {
     UnlockLayout {
         sheet_id: String,
     },
+    ToggleLayoutFavorite {
+        selection: crate::LayoutSelection,
+    },
     ApplyLayout {
         selection: crate::LayoutSelection,
     },

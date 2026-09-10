@@ -105,3 +105,16 @@
 .layout-panel__lock:hover:not(:disabled) { color: var(--ui-accent); }
 .layout-panel__positions { display: flex; align-items: center; gap: 5px; color: var(--ui-text-muted); }
 .layout-panel__positions select { min-height: 24px; border: 1px solid var(--ui-border); border-radius: 2px; background: var(--ui-surface); color: var(--ui-text); font: inherit; }
+.layout-panel__delete { right: 24px; }
+.layout-panel__candidate--revealed .sheet-preview-shell { box-shadow: 0 0 0 3px var(--ui-accent); }
+.ui-anchored-tooltip.layout-catalog-notice { display: flex; align-items: flex-start; gap: var(--ui-space-2); scroll-margin-block: var(--ui-space-2); }
+.layout-catalog-notice > span { flex: 1; }
+.layout-catalog-notice button { display: grid; place-items: center; flex: none; width: 18px; height: 18px; border: 0; padding: 0; color: var(--ui-text-secondary); background: transparent; cursor: pointer; }
+.layout-catalog-notice button:hover { color: var(--ui-text); background: var(--ui-surface-muted); }
+.layout-catalog-notice button:focus-visible { outline: 2px solid var(--ui-accent); }
+.layout-catalog-menu-feedback { position: relative; flex: 1; min-width: 0; }
+.layout-catalog-menu-feedback > .layout-catalog-notice { left: 54px; right: auto; width: 270px; }
+
+.layout-panel__favorite { left: 2px; right: auto; }
+.layout-panel__favorite[aria-pressed="true"] { opacity: 1; color: var(--ui-accent); }
+.layout-panel__favorite[aria-pressed="true"] .ui-app-icon { fill: currentColor; }

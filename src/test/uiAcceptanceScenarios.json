@@ -4978,6 +4978,389 @@
     }
     ,
     {
+      "id": "workspace-layout-custom",
+      "title": "Layouts personalizados — catálogo global e controles",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=custom",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-catalog",
+        "reason": "A SPEC e o design 0029 definem criação global sem modal, miniaturas por origem, aviso de duplicidade e confirmação de exclusão. O corpus usa a geometria do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__delete",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__candidate[data-custom-layout-id]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-custom-125",
+      "title": "Layouts personalizados — catálogo a 125%",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=custom&scale=1.25",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-catalog",
+        "reason": "A SPEC e o design 0029 definem criação global sem modal, miniaturas por origem, aviso de duplicidade e confirmação de exclusão. O corpus usa a geometria do Core."
+      },
+      "viewport": {
+        "width": 1800,
+        "height": 1000
+      },
+      "readySelector": ".layout-panel__delete",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__candidate[data-custom-layout-id]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-custom-150",
+      "title": "Layouts personalizados — catálogo a 150%",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=custom&scale=1.5",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-catalog",
+        "reason": "A SPEC e o design 0029 definem criação global sem modal, miniaturas por origem, aviso de duplicidade e confirmação de exclusão. O corpus usa a geometria do Core."
+      },
+      "viewport": {
+        "width": 2160,
+        "height": 1200
+      },
+      "readySelector": ".layout-panel__delete",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__candidate[data-custom-layout-id]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-custom-save",
+      "title": "Layouts personalizados — salvar em Design da Lâmina",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=custom-save&mode=edit&selection=none",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-catalog",
+        "reason": "A SPEC e o design 0029 definem criação global sem modal, miniaturas por origem, aviso de duplicidade e confirmação de exclusão. O corpus usa a geometria do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-catalog-notice",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": ".sheet-design-save-layout > button"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-custom-duplicate",
+      "title": "Layouts personalizados — duplicata e miniatura localizada",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=custom&mode=edit&selection=none",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-catalog",
+        "reason": "A SPEC e o design 0029 definem criação global sem modal, miniaturas por origem, aviso de duplicidade e confirmação de exclusão. O corpus usa a geometria do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__candidate--revealed",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": ".sheet-design-save-layout > button"
+        },
+        {
+          "type": "focus",
+          "selector": ".pixi-canvas"
+        },
+        {
+          "type": "key",
+          "key": "Escape"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": ".app-shell:not(:has(.layout-catalog-notice))"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-custom-duplicate-notice",
+      "title": "Layouts personalizados — aviso neutro de duplicata",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=custom&mode=edit&selection=none&scale=1",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-catalog",
+        "reason": "A SPEC e o design 0029 definem criação global sem modal, miniaturas por origem, aviso de duplicidade e confirmação de exclusão. O corpus usa a geometria do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-catalog-notice",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": ".sheet-design-save-layout > button"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-custom-duplicate-notice-125",
+      "title": "Layouts personalizados — aviso neutro de duplicata a 125%",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=custom&mode=edit&selection=none&scale=1.25",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-catalog",
+        "reason": "A SPEC e o design 0029 definem criação global sem modal, miniaturas por origem, aviso de duplicidade e confirmação de exclusão. O corpus usa a geometria do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-catalog-notice",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": ".sheet-design-save-layout > button"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-custom-duplicate-notice-150",
+      "title": "Layouts personalizados — aviso neutro de duplicata a 150%",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=custom&mode=edit&selection=none&scale=1.5",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-catalog",
+        "reason": "A SPEC e o design 0029 definem criação global sem modal, miniaturas por origem, aviso de duplicidade e confirmação de exclusão. O corpus usa a geometria do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-catalog-notice",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": ".sheet-design-save-layout > button"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-custom-notice-dismissed",
+      "title": "Layouts personalizados — fechar o aviso",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=custom-save&mode=edit&selection=none",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-catalog",
+        "reason": "A SPEC e o design 0029 definem criação global sem modal, miniaturas por origem, aviso de duplicidade e confirmação de exclusão. O corpus usa a geometria do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".sheet-design-save-layout:not(:has(.layout-catalog-notice))",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": ".sheet-design-save-layout > button"
+        },
+        {
+          "type": "click",
+          "selector": ".layout-catalog-notice button[aria-label=\"Fechar aviso\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-custom-notice-expired",
+      "title": "Layouts personalizados — aviso encerrado automaticamente",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=custom-save&mode=edit&selection=none",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-catalog",
+        "reason": "O design 0029 determina que o aviso desapareça após quatro segundos, sem migrar para o menu."
+      },
+      "viewport": { "width": 1440, "height": 800 },
+      "readySelector": ".app-shell:not(:has(.layout-catalog-notice))",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": ".sheet-design-save-layout > button"
+        },
+        {
+          "type": "assert",
+          "selector": ".sheet-design-save-layout > .layout-catalog-notice"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-custom-notice-collapsed",
+      "title": "Layouts personalizados — aviso encerrado ao recolher Design da Lâmina",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=custom-save&mode=edit&selection=none",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-catalog",
+        "reason": "A SPEC e o design 0029 definem criação global sem modal, miniaturas por origem, aviso de duplicidade e confirmação de exclusão. O corpus usa a geometria do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".app-shell:not(:has(.layout-catalog-notice))",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": ".sheet-design-save-layout > button"
+        },
+        {
+          "type": "assert",
+          "selector": ".sheet-design-save-layout > .layout-catalog-notice"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Design da Lâmina\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-custom-save-menu",
+      "title": "Layouts personalizados — salvar com Frame selecionado",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=custom-save&mode=edit",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-catalog",
+        "reason": "A SPEC e o design 0029 definem criação global sem modal, miniaturas por origem, aviso de duplicidade e confirmação de exclusão. O corpus usa a geometria do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-catalog-notice",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-controls=\"application-menu-edit\"]"
+        },
+        {
+          "type": "click",
+          "selector": "button[role=\"menuitem\"][aria-label=\"Salvar disposição como Layout\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-custom-empty",
+      "title": "Layouts personalizados — salvar desabilitado sem Frames",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=empty&mode=edit&selection=none",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-catalog",
+        "reason": "A SPEC e o design 0029 definem criação global sem modal, miniaturas por origem, aviso de duplicidade e confirmação de exclusão. O corpus usa a geometria do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".sheet-design-save-layout > button:disabled",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        }
+      ]
+    },
+    {
+      "id": "layout-deletion-confirmation",
+      "title": "Layout personalizado — confirmação de exclusão global",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22layoutDeletionConfirmation%22%2C%22busy%22%3Afalse%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-confirmation-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "O design 0029 exige confirmação pertencente à Janela para excluir somente a origem global."
+      },
+      "viewport": {
+        "width": 520,
+        "height": 320
+      },
+      "readySelector": ".ui-confirmation-dialog__danger-action",
+      "actions": []
+    },
+    {
       "id": "workspace-layout-panel",
       "title": "Layouts — painel horizontal aberto",
       "implementationPath": "/workspace-preview.html?frame=layouts",
@@ -5676,6 +6059,837 @@
       ]
     },
     {
+      "id": "workspace-layout-reduced-hover",
+      "title": "Layouts — Prévia de 2 Frames após ampliar para 6 e destravar",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=expanded",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "A SPEC e os designs 0026 e 0028 permitem reduzir a quantidade até o número de Frames com Foto após destravar; a confirmação remove apenas placeholders excedentes em uma ação de Undo/Redo. As transições e geometrias vêm do Core produtivo."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body:has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001\"]):not(:has([role=\"scrollbar\"]))"
+        },
+        {
+          "type": "focus",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__candidate:first-child"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate--locked"
+        },
+        {
+          "type": "assert",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]:disabled"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Destravar Layout da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]:not(:disabled):has(option[value=\"2\"]):not(:has(option[value=\"1\"]))"
+        },
+        {
+          "type": "focus",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__header"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__candidate:first-child"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-reduced-applied",
+      "title": "Layouts — Aplicar 2 Frames preserva as Fotos e remove os placeholders excedentes",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=expanded",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "A SPEC e os designs 0026 e 0028 permitem reduzir a quantidade até o número de Frames com Foto após destravar; a confirmação remove apenas placeholders excedentes em uma ação de Undo/Redo. As transições e geometrias vêm do Core produtivo."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body:has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001\"]):not(:has([role=\"scrollbar\"]))"
+        },
+        {
+          "type": "focus",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__candidate:first-child"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate--locked"
+        },
+        {
+          "type": "assert",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]:disabled"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Destravar Layout da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]:not(:disabled):has(option[value=\"2\"]):not(:has(option[value=\"1\"]))"
+        },
+        {
+          "type": "focus",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+        },
+        {
+          "type": "click",
+          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__preview[aria-label=\"Aplicar Layout 1 — último aplicado\"]"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__header"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-reduced-locked",
+      "title": "Layouts — Reduzir para 2 Frames e travar",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=expanded",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "A SPEC e os designs 0026 e 0028 permitem reduzir a quantidade até o número de Frames com Foto após destravar; a confirmação remove apenas placeholders excedentes em uma ação de Undo/Redo. As transições e geometrias vêm do Core produtivo."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__candidate--locked:has(svg[aria-label=\"Layout com 2 Frames\"])",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body:has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001\"]):not(:has([role=\"scrollbar\"]))"
+        },
+        {
+          "type": "focus",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__candidate:first-child"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate--locked"
+        },
+        {
+          "type": "assert",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]:disabled"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Destravar Layout da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]:not(:disabled):has(option[value=\"2\"]):not(:has(option[value=\"1\"]))"
+        },
+        {
+          "type": "focus",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-reduced-undo",
+      "title": "Layouts — Desfazer a redução restaura os 6 Frames",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=expanded",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "A SPEC e os designs 0026 e 0028 permitem reduzir a quantidade até o número de Frames com Foto após destravar; a confirmação remove apenas placeholders excedentes em uma ação de Undo/Redo. As transições e geometrias vêm do Core produtivo."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body:has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001\"]):not(:has([role=\"scrollbar\"]))"
+        },
+        {
+          "type": "focus",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__candidate:first-child"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate--locked"
+        },
+        {
+          "type": "assert",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]:disabled"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Destravar Layout da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]:not(:disabled):has(option[value=\"2\"]):not(:has(option[value=\"1\"]))"
+        },
+        {
+          "type": "focus",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+        },
+        {
+          "type": "click",
+          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__preview[aria-label=\"Aplicar Layout 1 — último aplicado\"]"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__header"
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Desfazer\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]:not(:disabled)"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__header"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-reduced-redo",
+      "title": "Layouts — Refazer a redução retorna aos 2 Frames",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=expanded",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "A SPEC e os designs 0026 e 0028 permitem reduzir a quantidade até o número de Frames com Foto após destravar; a confirmação remove apenas placeholders excedentes em uma ação de Undo/Redo. As transições e geometrias vêm do Core produtivo."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body:has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001\"]):not(:has([role=\"scrollbar\"]))"
+        },
+        {
+          "type": "focus",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__candidate:first-child"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate--locked"
+        },
+        {
+          "type": "assert",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]:disabled"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Destravar Layout da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]:not(:disabled):has(option[value=\"2\"]):not(:has(option[value=\"1\"]))"
+        },
+        {
+          "type": "focus",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+        },
+        {
+          "type": "click",
+          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__preview[aria-label=\"Aplicar Layout 1 — último aplicado\"]"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__header"
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Desfazer\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]:not(:disabled)"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Refazer\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]:not(:disabled)"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__header"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-reduced-scale-125",
+      "title": "Layouts — Redução de Frames em escala de 125%",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=expanded&scale=1.25",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "A SPEC e os designs 0026 e 0028 permitem reduzir a quantidade até o número de Frames com Foto após destravar; a confirmação remove apenas placeholders excedentes em uma ação de Undo/Redo. As transições e geometrias vêm do Core produtivo."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body:has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001\"]):not(:has([role=\"scrollbar\"]))"
+        },
+        {
+          "type": "focus",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__candidate:first-child"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate--locked"
+        },
+        {
+          "type": "assert",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]:disabled"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Destravar Layout da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]:not(:disabled):has(option[value=\"2\"]):not(:has(option[value=\"1\"]))"
+        },
+        {
+          "type": "focus",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+        },
+        {
+          "type": "click",
+          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__preview[aria-label=\"Aplicar Layout 1 — último aplicado\"]"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__header"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-reduced-scale-150",
+      "title": "Layouts — Redução de Frames em escala de 150%",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=expanded&scale=1.5",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "A SPEC e os designs 0026 e 0028 permitem reduzir a quantidade até o número de Frames com Foto após destravar; a confirmação remove apenas placeholders excedentes em uma ação de Undo/Redo. As transições e geometrias vêm do Core produtivo."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body:has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001\"]):not(:has([role=\"scrollbar\"]))"
+        },
+        {
+          "type": "focus",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__candidate:first-child"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate--locked"
+        },
+        {
+          "type": "assert",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]:disabled"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Destravar Layout da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]:not(:disabled):has(option[value=\"2\"]):not(:has(option[value=\"1\"]))"
+        },
+        {
+          "type": "focus",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "ArrowUp"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+        },
+        {
+          "type": "click",
+          "selector": ".layout-panel__preview:not(:disabled):has(svg[aria-label=\"Layout com 2 Frames\"])"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__preview[aria-label=\"Aplicar Layout 1 — último aplicado\"]"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__header"
+        }
+      ]
+    },
+    {
       "id": "workspace-layout-empty-lock-hover",
       "title": "Layout travado — 2 posições reservadas na prévia",
       "implementationPath": "/workspace-preview.html?frame=layouts&layouts=empty-lock",
@@ -5965,6 +7179,219 @@
       },
       "readySelector": ".ui-problems-table",
       "actions": []
+    },
+    {
+      "id": "workspace-layout-favorites",
+      "title": "Layouts favoritos — estrelas nas duas origens",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=favorites&scale=1",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-favorites",
+        "reason": "A SPEC e o design 0030 definem estrelas por origem, cópias portáteis e ordem de Favoritos. O corpus usa definições e transições produzidas pelo Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__section:nth-of-type(3) .layout-panel__favorite[aria-pressed=\"true\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__section:nth-of-type(2) .layout-panel__candidate"
+        },
+        {
+          "type": "click",
+          "selector": ".layout-panel__section:nth-of-type(2) .layout-panel__favorite"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__section:nth-of-type(2) .layout-panel__favorite[aria-pressed=\"true\"]"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__section:nth-of-type(3) .layout-panel__candidate"
+        },
+        {
+          "type": "click",
+          "selector": ".layout-panel__section:nth-of-type(3) .layout-panel__favorite"
+        },
+        {
+          "type": "focus",
+          "selector": ".pixi-canvas"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-favorites-125",
+      "title": "Layouts favoritos — estrelas nas duas origens a 125%",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=favorites&scale=1.25",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-favorites",
+        "reason": "A SPEC e o design 0030 definem estrelas por origem, cópias portáteis e ordem de Favoritos. O corpus usa definições e transições produzidas pelo Core."
+      },
+      "viewport": {
+        "width": 1800,
+        "height": 1000
+      },
+      "readySelector": ".layout-panel__section:nth-of-type(3) .layout-panel__favorite[aria-pressed=\"true\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__section:nth-of-type(2) .layout-panel__candidate"
+        },
+        {
+          "type": "click",
+          "selector": ".layout-panel__section:nth-of-type(2) .layout-panel__favorite"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__section:nth-of-type(2) .layout-panel__favorite[aria-pressed=\"true\"]"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__section:nth-of-type(3) .layout-panel__candidate"
+        },
+        {
+          "type": "click",
+          "selector": ".layout-panel__section:nth-of-type(3) .layout-panel__favorite"
+        },
+        {
+          "type": "focus",
+          "selector": ".pixi-canvas"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-favorites-150",
+      "title": "Layouts favoritos — estrelas nas duas origens a 150%",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=favorites&scale=1.5",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-favorites",
+        "reason": "A SPEC e o design 0030 definem estrelas por origem, cópias portáteis e ordem de Favoritos. O corpus usa definições e transições produzidas pelo Core."
+      },
+      "viewport": {
+        "width": 2160,
+        "height": 1200
+      },
+      "readySelector": ".layout-panel__section:nth-of-type(3) .layout-panel__favorite[aria-pressed=\"true\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__section:nth-of-type(2) .layout-panel__candidate"
+        },
+        {
+          "type": "click",
+          "selector": ".layout-panel__section:nth-of-type(2) .layout-panel__favorite"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__section:nth-of-type(2) .layout-panel__favorite[aria-pressed=\"true\"]"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__section:nth-of-type(3) .layout-panel__candidate"
+        },
+        {
+          "type": "click",
+          "selector": ".layout-panel__section:nth-of-type(3) .layout-panel__favorite"
+        },
+        {
+          "type": "focus",
+          "selector": ".pixi-canvas"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-favorite-orphaned",
+      "title": "Layouts favoritos — cópia preservada sem origem",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=favorites&favorite-stage=orphaned",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-favorites",
+        "reason": "A SPEC e o design 0030 definem estrelas por origem, cópias portáteis e ordem de Favoritos. O corpus usa definições e transições produzidas pelo Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__section:nth-of-type(3) .layout-panel__favorite[aria-pressed=\"true\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "focus",
+          "selector": ".pixi-canvas"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-favorite-unfavorited",
+      "title": "Layouts favoritos — cópia sem origem desfavoritada",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=favorites&favorite-stage=orphaned",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-favorites",
+        "reason": "A SPEC e o design 0030 definem estrelas por origem, cópias portáteis e ordem de Favoritos. O corpus usa definições e transições produzidas pelo Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__section:nth-of-type(3) [role=\"status\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__section:nth-of-type(3) .layout-panel__candidate"
+        },
+        {
+          "type": "click",
+          "selector": ".layout-panel__section:nth-of-type(3) .layout-panel__favorite"
+        },
+        {
+          "type": "focus",
+          "selector": ".pixi-canvas"
+        }
+      ]
     }
   ]
 }

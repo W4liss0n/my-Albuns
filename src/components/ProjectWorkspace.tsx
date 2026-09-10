@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import type {
   ExportPipelinePort,
@@ -26,6 +26,7 @@ import type { DisplayUnit, EditorProjection } from "../domain/project";
 import { ApplicationHeader } from "../ui";
 import { AlbumCanvas } from "./AlbumCanvas";
 import { LayoutPanel } from "./LayoutPanel";
+import { LayoutCatalogNotice } from "./LayoutCatalogNotice";
 import { ApplicationMenuBar } from "./ApplicationMenuBar";
 import {
   ExportPreviewControl,
@@ -217,6 +218,7 @@ export function ProjectWorkspace({
     projectDialogPort,
   });
   const controller = useProjectEditorController({
+    projectDialogPort,
     interactionBlocked:
       exportActive ||
       projectClose.interactionBlocked ||
@@ -558,6 +560,8 @@ export function ProjectWorkspace({
     undo: controller.undo,
   });
   const applicationMenus = createProjectApplicationMenus({
+    saveLayout: controller.saveLayout,
+    canSaveLayout: controller.canSaveLayout,
     copyFrames: () => { void controller.copyFrames(); },
     pasteFrames: () => { void controller.pasteFrames(); },
     canCopyFrames: controller.canCopyFrames,
@@ -608,6 +612,19 @@ export function ProjectWorkspace({
       ),
   });
 
+  const noticeInInspector = inspectorContext.kind === "sheet" &&
+    workspacePanels.panels.inspector.visible &&
+    (workspacePreferences.preferences.inspectorSections["sheet.design"] ?? true);
+  const noticeSheetId = editingSheet?.sheetId ?? null;
+  const dismissLayoutNotice = controller.layoutCatalog.dismissNotice;
+  useLayoutEffect(() => {
+    dismissLayoutNotice();
+  }, [noticeInInspector, noticeSheetId, dismissLayoutNotice]);
+  const layoutNotice = sheetEditing && controller.layoutCatalog.notice ? <LayoutCatalogNotice
+    message={controller.layoutCatalog.notice}
+    onDismiss={controller.layoutCatalog.dismissNotice}
+  /> : null;
+
   return (
     <div className="app-shell ui-chrome-selection-scope">
       <ApplicationHeader
@@ -617,10 +634,13 @@ export function ProjectWorkspace({
       />
 
       <div className="commandbar">
-        <ApplicationMenuBar
-          disabled={commandsBlocked}
-          groups={applicationMenus}
-        />
+        <div className="layout-catalog-menu-feedback">
+          <ApplicationMenuBar
+            disabled={commandsBlocked}
+            groups={applicationMenus}
+          />
+          {!noticeInInspector && layoutNotice}
+        </div>
         <ExportPreviewControl
           ref={exportControlRef}
           dialogPort={projectDialogPort}
@@ -650,6 +670,7 @@ export function ProjectWorkspace({
           aria-label="Área de composição"
         >
           {controller.layoutPanel.visible && <LayoutPanel controller={controller.layoutPanel}
+            catalog={controller.layoutCatalog}
             sheet={projection.composition.sheets.find((sheet) => sheet.sheetId === controller.layoutPanel.sheetId)!} />}
           <AlbumCanvas
             {...controller.canvasProps}
@@ -701,6 +722,8 @@ export function ProjectWorkspace({
         )}
 
         {workspacePanels.panels.inspector.visible && <InspectorPanel
+          saveLayout={{ enabled: controller.canSaveLayout, onSave: controller.saveLayout,
+            feedback: noticeInInspector ? layoutNotice : null }}
           key={projectId}
           frameStyle={controller.frameStyle}
           photoOrientation={{ disabled: !controller.canOrientPhotos,

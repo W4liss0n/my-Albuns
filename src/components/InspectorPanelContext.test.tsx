@@ -314,7 +314,6 @@ test("marks unavailable Sheet-design mutations as explicit placeholders", () => 
   expect(
     section.querySelector('[data-placeholder-feature="edit-sheet-overlay"]'),
   ).toBeDisabled();
-  expect(
-    section.querySelector('[data-placeholder-feature="save-sheet-layout"]'),
-  ).toBeDisabled();
+  expect(design.getByRole("button", { name: "Salvar disposição como Layout" })).toBeDisabled();
+  expect(section.querySelector('[data-placeholder-feature="save-sheet-layout"]')).toBeNull();
 });

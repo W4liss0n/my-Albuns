@@ -507,13 +507,37 @@ impl ProjectHost {
             .map_err(|error| error.to_string())
     }
 
+    pub(crate) fn capture_custom_layout(
+        &self,
+        sheet_id: &str,
+    ) -> Result<myalbuns_core::LayoutDefinition, String> {
+        self.project()?
+            .capture_custom_layout(sheet_id)
+            .map_err(|error| error.to_string())
+    }
+
+    pub(crate) fn refresh_layout_catalog(
+        &self,
+        snapshot: myalbuns_core::LayoutCatalogSnapshot,
+    ) -> Result<bool, String> {
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_| SESSION_UNAVAILABLE_MESSAGE.to_string())?;
+        state
+            .session_mut()?
+            .project
+            .refresh_layout_catalog(snapshot)
+            .map_err(|error| error.to_string())
+    }
+
     pub(crate) fn query_layouts(
         &self,
         sheet_id: &str,
-        expansion: Option<myalbuns_core::LayoutExpansion>,
+        frame_request: Option<myalbuns_core::LayoutFrameRequest>,
     ) -> Result<myalbuns_core::LayoutQueryResult, String> {
         self.project()?
-            .query_layouts_with_expansion(sheet_id, expansion)
+            .query_layouts_with_frame_request(sheet_id, frame_request)
             .map_err(|error| error.to_string())
     }
 
@@ -1168,7 +1192,7 @@ mod tests {
                     .expect("the namespace is readable before publication")
                     .is_none()
             );
-            tokio::time::sleep(Duration::from_millis(90)).await;
+            wait_for_checkpoint(&fixture.store, &fixture.authority).await;
             let bytes = fixture
                 .store
                 .load(&fixture.authority)
@@ -1251,7 +1275,7 @@ mod tests {
                 .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
                 .expect("the completed action becomes recoverable")
                 .projection;
-            tokio::time::sleep(Duration::from_millis(90)).await;
+            wait_for_checkpoint(&fixture.store, &fixture.authority).await;
             let checkpoint = fixture
                 .store
                 .checkpoint_path(&fixture.authority)
@@ -1367,7 +1391,7 @@ mod tests {
                 .host
                 .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
                 .expect("the completed action becomes recoverable");
-            tokio::time::sleep(Duration::from_millis(90)).await;
+            wait_for_checkpoint(&fixture.store, &fixture.authority).await;
             drop(fixture.host);
 
             let host = ProjectHost::with_recovery(
@@ -1401,7 +1425,7 @@ mod tests {
                 .host
                 .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
                 .expect("the completed action becomes recoverable");
-            tokio::time::sleep(Duration::from_millis(90)).await;
+            wait_for_checkpoint(&fixture.store, &fixture.authority).await;
             drop(fixture.host);
 
             let host = ProjectHost::with_recovery(
@@ -1448,12 +1472,12 @@ mod tests {
     #[test]
     fn explicit_discard_opens_the_last_saved_version_and_finishes_recovery() {
         tauri::async_runtime::block_on(async {
-            let fixture = recovery_fixture();
+            let fixture = recovery_fixture_with_delay(Duration::from_millis(150));
             fixture
                 .host
                 .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
                 .expect("the completed action becomes recoverable");
-            tokio::time::sleep(Duration::from_millis(90)).await;
+            wait_for_checkpoint(&fixture.store, &fixture.authority).await;
             drop(fixture.host);
             let host = ProjectHost::with_recovery(
                 open_editable_project(&fixture.project_path, &fixture.identity_lease_root),
@@ -1536,7 +1560,7 @@ mod tests {
                 .host
                 .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
                 .expect("the completed action becomes recoverable");
-            tokio::time::sleep(Duration::from_millis(90)).await;
+            wait_for_checkpoint(&fixture.store, &fixture.authority).await;
             drop(fixture.host);
             let host = ProjectHost::with_recovery(
                 open_editable_project(&fixture.project_path, &fixture.identity_lease_root),
@@ -1710,7 +1734,7 @@ mod tests {
                 .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
                 .expect("the action is completed before Undo");
             clean.host.undo().expect("Undo returns to the saved state");
-            tokio::time::sleep(Duration::from_millis(90)).await;
+            wait_for_checkpoint(&clean.store, &clean.authority).await;
             assert!(clean.store.load(&clean.authority).unwrap().is_some());
             assert_eq!(
                 clean.host.begin_close(),
@@ -1723,7 +1747,7 @@ mod tests {
                 .host
                 .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
                 .expect("the discarded action is completed");
-            tokio::time::sleep(Duration::from_millis(90)).await;
+            wait_for_checkpoint(&discarded.store, &discarded.authority).await;
             assert_eq!(
                 discarded.host.begin_close(),
                 Ok(ProjectCloseRequestOutcome::ConfirmationRequired)
@@ -1745,7 +1769,7 @@ mod tests {
                 .host
                 .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
                 .expect("the saved action is completed");
-            tokio::time::sleep(Duration::from_millis(90)).await;
+            wait_for_checkpoint(&saved.store, &saved.authority).await;
             assert_eq!(
                 saved.host.begin_close(),
                 Ok(ProjectCloseRequestOutcome::ConfirmationRequired)
@@ -1767,7 +1791,7 @@ mod tests {
                 .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
                 .expect("the action is completed before the failed Save")
                 .projection;
-            tokio::time::sleep(Duration::from_millis(90)).await;
+            wait_for_checkpoint(&fixture.store, &fixture.authority).await;
             assert_eq!(
                 fixture.host.begin_close(),
                 Ok(ProjectCloseRequestOutcome::ConfirmationRequired)
@@ -2041,8 +2065,8 @@ mod tests {
                 let lock_query = host
                     .query_layouts(
                         &sheet_id,
-                        Some(myalbuns_core::LayoutExpansion {
-                            additional_positions: 1,
+                        Some(myalbuns_core::LayoutFrameRequest {
+                            frame_count: resized.projection.state.album.sheets[1].frames.len() + 1,
                             orientation: myalbuns_core::FrameOrientation::Horizontal,
                         }),
                     )

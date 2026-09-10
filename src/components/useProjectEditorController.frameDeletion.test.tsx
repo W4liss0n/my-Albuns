@@ -1,3 +1,4 @@
+import { emptyLayoutCatalogPort, unusedLayoutDialogPort } from "../test/layoutCatalogPorts";
 import { useState } from "react";
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
@@ -25,6 +26,7 @@ function deletionHarness() {
   const redo = vi.fn(async () => deleted);
   const port: ProjectCorePort = {
     load: async () => initial, apply, save, undo, redo,
+    ...emptyLayoutCatalogPort,
     readFrameDragThreshold: async () => ({ x: 5, y: 5 }),
     readSliderDoubleClickTime: async () => 500,
     queryLayouts: async () => { throw new Error("Layouts are not configured in this fixture."); },
@@ -40,7 +42,7 @@ function deletionHarness() {
   const view = renderHook(({ blocked }) => {
     const [projection, setProjection] = useState(initial);
     const runProjectMutation = useProjectMutationRunner(initial.state.projectId, port);
-    return useProjectEditorController({ projection, projectCorePort: port,
+    return useProjectEditorController({ projectDialogPort: unusedLayoutDialogPort, projection, projectCorePort: port,
       runProjectMutation, onProjectionChange: setProjection, interactionBlocked: blocked });
   }, { initialProps: { blocked: false } });
   return { view, initial, deleted, resolve, reject, apply, save, undo, redo };

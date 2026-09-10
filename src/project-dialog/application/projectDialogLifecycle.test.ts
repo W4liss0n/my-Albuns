@@ -7,6 +7,8 @@ test.each<{
   expected: ReturnType<typeof defaultProjectDialogCloseAction>;
   state: ProjectDialogState;
 }>([
+  { expected: "cancelLayoutDeletion", state: { kind: "layoutDeletionConfirmation", busy: false } },
+  { expected: null, state: { kind: "layoutDeletionConfirmation", busy: true } },
   { expected: null, state: { kind: "imageProcessingProgress", progress: { kind: "determinate", completed: 5, total: 12, status: "5 de 12" } } },
   {
     expected: "cancelAlbumInformation",

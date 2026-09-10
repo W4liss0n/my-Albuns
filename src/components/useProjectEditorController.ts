@@ -19,12 +19,15 @@ import { useProjectMutations } from "./useProjectMutations";
 import type { ProjectMutationRunner } from "./useProjectMutationRunner";
 import { useProjectNavigation } from "./useProjectNavigation";
 import { useLayoutPanel } from "./useLayoutPanel";
+import { useLayoutCatalog } from "./useLayoutCatalog";
+import type { ProjectDialogPort } from "../application/projectDialogPort";
 
 interface ProjectEditorControllerInput {
   interactionBlocked?: boolean;
   projection: EditorProjection;
   runProjectMutation: ProjectMutationRunner;
   projectCorePort: ProjectCorePort;
+  projectDialogPort: ProjectDialogPort;
   onProjectionChange(projection: EditorProjection): void;
   onSaveAsBarrierChange?(active: boolean): void;
   prepareImportedMedia?: PrepareImportedMedia;
@@ -35,6 +38,7 @@ export function useProjectEditorController({
   projection,
   runProjectMutation,
   projectCorePort,
+  projectDialogPort,
   onProjectionChange,
   onSaveAsBarrierChange,
   prepareImportedMedia,
@@ -157,10 +161,20 @@ export function useProjectEditorController({
     onError: reportInteractionError,
   });
   const flushPropertyDrafts = () => { void photoAngle.commit(); void frameStyle.commit(); };
+  const layoutCatalog = useLayoutCatalog({ projection, runner: runProjectMutation,
+    port: projectCorePort, dialogPort: projectDialogPort, onError: reportInteractionError });
+  const canSaveLayout = canvasMode.kind === "sheet-editing" && !interactionBlocked && !layoutCatalog.busy &&
+    projection.state.album.sheets.some((sheet) => sheet.id === canvasMode.sheetId && sheet.frames.length > 0);
+  const saveLayout = () => {
+    if (!canSaveLayout || canvasMode.kind !== "sheet-editing") return;
+    flushPropertyDrafts();
+    void layoutCatalog.save(canvasMode.sheetId);
+  };
   const layoutPanel = useLayoutPanel({
     projection, editing: canvasMode.kind === "sheet-editing", disabled: interactionBlocked,
     port: projectCorePort, runner: runProjectMutation, commit: mutations.applyIntent,
     onError: reportInteractionError,
+    catalogRevision: layoutCatalog.revision,
   });
   const orientPhotos = (action: PhotoOrientationAction) => {
     if (!canOrientPhotos) return Promise.resolve(false);
@@ -435,6 +449,9 @@ export function useProjectEditorController({
     swapSheetSides,
     arrangeFrames,
     canArrangeFrames,
+    layoutCatalog,
+    canSaveLayout,
+    saveLayout,
     message: mutations.message,
     importPending: mutations.importPending,
     imageProcessingProgress: mutations.imageProcessingProgress,

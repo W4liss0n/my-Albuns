@@ -1,3 +1,4 @@
+import { emptyLayoutCatalogPort } from "../test/layoutCatalogPorts";
 import {
   act,
   fireEvent,
@@ -348,6 +349,7 @@ function projectCorePortWithApply(
       affectedSheetId: null,
     }),
     importPhoto: async () => ({ kind: "cancelled", projection }),
+    ...emptyLayoutCatalogPort,
     readFrameDragThreshold: async () => ({ x: 5, y: 5 }),
     readSliderDoubleClickTime: async () => 500,
     queryLayouts: async () => { throw new Error("Layouts are not configured in this fixture."); },
@@ -1759,6 +1761,64 @@ test("hydrates and publishes machine-local Inspector and media density preferenc
       size: 126,
     }),
   );
+});
+
+test("saving a custom Layout works from Sheet Design and the Edit menu while a Frame owns the Inspector", async () => {
+  const sample = layoutPanelCorpus.cases["custom-save"];
+  const initial = sample.before.projection;
+  const sheet = initial.state.album.sheets[0];
+  const port = projectCorePortWithApply(async () => initial);
+  port.saveCustomLayout = vi.fn(async () => sample.saveResult!);
+  const onProjectionChange = vi.fn();
+  render(<ProjectWorkspace projection={initial} projectCorePort={port} onProjectionChange={onProjectionChange} />);
+  act(() => canvasHarness.props?.onEditSheet?.(sheet.id));
+  const save = screen.getByRole("button", { name: "Salvar disposição como Layout" });
+  expect(save).toBeEnabled();
+  await act(async () => fireEvent.click(save));
+  expect(port.saveCustomLayout).toHaveBeenCalledExactlyOnceWith(sheet.id);
+  expect(screen.getByText("Layout salvo em Personalizados.")).toBeInTheDocument();
+  expect(canvasHarness.props?.mode).toEqual({ kind: "sheet-editing", sheetId: sheet.id });
+  act(() => useEditorView.getState().selectFrames([sheet.frames[0].id]));
+  expect(screen.queryByText("Layout salvo em Personalizados.")).not.toBeInTheDocument();
+  const menu = getApplicationCommand("Editar", "Salvar disposição como Layout");
+  expect(menu).toBeEnabled();
+  await act(async () => fireEvent.click(menu));
+  expect(port.saveCustomLayout).toHaveBeenCalledTimes(2);
+  expect(screen.getByText("Layout salvo em Personalizados.")).toBeInTheDocument();
+  expect(onProjectionChange).not.toHaveBeenCalled();
+  expect(canvasHarness.props?.mode).toEqual({ kind: "sheet-editing", sheetId: sheet.id });
+});
+
+test.each(["exit", "collapse"])("save feedback disappears permanently when leaving its button: %s", async (transition) => {
+  const sample = layoutPanelCorpus.cases["custom-save"];
+  const initial = sample.before.projection;
+  const sheetId = initial.state.album.sheets[0].id;
+  const port = projectCorePortWithApply(async () => initial);
+  port.saveCustomLayout = vi.fn(async () => sample.saveResult!);
+  render(<ProjectWorkspace projection={initial} projectCorePort={port} onProjectionChange={() => undefined} />);
+  act(() => canvasHarness.props?.onEditSheet?.(sheetId));
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Salvar disposição como Layout" })));
+  expect(screen.getByText("Layout salvo em Personalizados.")).toBeInTheDocument();
+  await act(async () => {
+    if (transition === "exit") useEditorView.getState().exitSheetEdit();
+    else fireEvent.click(screen.getByRole("button", { name: "Design da Lâmina" }));
+  });
+  expect(screen.queryByText("Layout salvo em Personalizados.")).not.toBeInTheDocument();
+  await act(async () => {
+    if (transition === "exit") canvasHarness.props?.onEditSheet?.(sheetId);
+    else fireEvent.click(screen.getByRole("button", { name: "Design da Lâmina" }));
+  });
+  expect(screen.queryByText("Layout salvo em Personalizados.")).not.toBeInTheDocument();
+});
+
+test("an empty edited Sheet explains why custom Layout saving is unavailable in both surfaces", () => {
+  const initial = layoutPanelCorpus.cases.empty.before.projection;
+  render(<ProjectWorkspace projection={initial} onProjectionChange={() => undefined} />);
+  act(() => canvasHarness.props?.onEditSheet?.(initial.state.album.sheets[0].id));
+  const save = screen.getByRole("button", { name: "Salvar disposição como Layout" });
+  expect(save).toBeDisabled();
+  expect(save).toHaveAttribute("title", "Adicione ao menos um Frame para salvar um Layout.");
+  expect(getApplicationCommand("Editar", "Salvar disposição como Layout")).toBeDisabled();
 });
 
 test("Layout focus temporarily hides media and restores the mounted panel with its search", async () => {

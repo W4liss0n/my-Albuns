@@ -20,6 +20,8 @@ type ProjectDialogProgressKind = ProjectDialogProgress["kind"];
 type IpcProjectDialogProgressKind = IpcProjectDialogProgress["kind"];
 
 const projectDialogActionMap = {
+  cancelLayoutDeletion: "cancelLayoutDeletion",
+  confirmLayoutDeletion: "confirmLayoutDeletion",
   cancelAlbumInformation: "cancelAlbumInformation",
   cancelExport: "cancelExport",
   cancelProjectClose: "cancelProjectClose",
@@ -123,6 +125,8 @@ const stateDecoders: Record<
   StateDecoder
 > &
   Record<ProjectDialogStateKind, StateDecoder> = {
+  layoutDeletionConfirmation: (value) => typeof value.busy === "boolean"
+    ? { kind: "layoutDeletionConfirmation", busy: value.busy } : null,
   imageProcessingProgress: (value) => {
     const progress = decodeProgress(value.progress);
     return progress ? { kind: "imageProcessingProgress", progress } : null;
@@ -278,6 +282,7 @@ export function toIpcProjectDialogState(
         details: state.details.map(toIpcProjectDialogDetail),
         kind: state.kind,
       };
+    case "layoutDeletionConfirmation":
     case "projectCloseConfirmation":
       return { busy: state.busy, kind: state.kind };
     case "projectCloseFailure":
@@ -320,6 +325,7 @@ function fromIpcProjectDialogState(
         details: state.details.map(fromIpcProjectDialogDetail),
         kind: state.kind,
       };
+    case "layoutDeletionConfirmation":
     case "projectCloseConfirmation":
       return { busy: state.busy, kind: state.kind };
     case "projectCloseFailure":

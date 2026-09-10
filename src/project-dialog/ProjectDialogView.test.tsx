@@ -4,6 +4,20 @@ import { expect, test, vi } from "vitest";
 
 import { ProjectDialogView } from "./ProjectDialogView";
 
+test("custom Layout deletion explains its global scope and offers Cancel and Delete", async () => {
+  const user = userEvent.setup();
+  const onAction = vi.fn();
+  const view = render(<ProjectDialogView onAction={onAction} state={{ kind: "layoutDeletionConfirmation", busy: false }} />);
+  const dialog = screen.getByRole("dialog", { name: "Excluir Layout personalizado?" });
+  expect(dialog).toHaveTextContent("O Layout será removido do catálogo em todas as Janelas.");
+  await user.click(within(dialog).getByRole("button", { name: "Cancelar" }));
+  await user.click(within(dialog).getByRole("button", { name: "Excluir" }));
+  expect(onAction.mock.calls).toEqual([["cancelLayoutDeletion"], ["confirmLayoutDeletion"]]);
+  view.rerender(<ProjectDialogView onAction={onAction} state={{ kind: "layoutDeletionConfirmation", busy: true }} />);
+  expect(screen.getByRole("button", { name: "Cancelar" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Excluindo…" })).toBeDisabled();
+});
+
 test("confirms all Album information changes as one action", async () => {
   const user = userEvent.setup();
   const onAction = vi.fn();
