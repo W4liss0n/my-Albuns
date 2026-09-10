@@ -11,6 +11,7 @@ import {
 } from "react";
 import type {
   MediaPreview,
+  MediaFileInfo,
   MediaPreviewDemand,
 } from "../application/projectPorts";
 import { matchProjectCommandShortcut } from "../application/projectCommandCatalog";
@@ -34,6 +35,7 @@ import "./MediaPanel.css";
 import { MEDIA_PANEL_PRELOAD_MARGIN, mediaPanelViewportDemand } from "./mediaPanelViewport";
 
 export interface MediaPanelHandle {
+  showAbsent(): void;
   planCatalog(mediaItems: readonly MediaCatalogItem[], mediaUsage: readonly MediaUsage[]): {
     demand: MediaPreviewDemand;
     commit(): void;
@@ -43,6 +45,9 @@ export interface MediaPanelHandle {
 type MediaPanelPreferenceMode =
   | {
       kind: "controlled";
+      activeKind: MediaKind;
+      onActiveKindChange(mediaKind: MediaKind): void;
+      onSortKeyChange(mediaKind: MediaKind, sortKey: MediaPanelPersistentPreference["sortKey"]): void;
       persistent: Readonly<Record<MediaKind, MediaPanelPersistentPreference>>;
       thumbnailSizes: Readonly<Record<MediaKind, number>>;
       onSortDirectionChange(
@@ -76,6 +81,7 @@ interface MediaPanelProps {
   hidden?: boolean;
   mediaItems: readonly MediaCatalogItem[];
   mediaUsage: readonly MediaUsage[];
+  mediaFiles?: Readonly<Record<string, MediaFileInfo>>;
   onFillPhoto(mediaId: string): void;
   selectionRequest?: { mediaId: string } | null;
   importPending?: boolean;
@@ -93,12 +99,14 @@ const naturalNameCollator = new Intl.Collator("pt-BR", {
   numeric: true,
   sensitivity: "base",
 });
+const EMPTY_MEDIA_FILES: Readonly<Record<string, MediaFileInfo>> = {};
 
 export function MediaPanel({
   ref,
   hidden = false,
   mediaItems,
   mediaUsage,
+  mediaFiles = EMPTY_MEDIA_FILES,
   onFillPhoto,
   selectionRequest,
   importPending = false,
@@ -120,8 +128,36 @@ export function MediaPanel({
     preferenceMode.kind === "controlled"
       ? preferenceMode.thumbnailSizes
       : null;
-  const [activeMediaKind, setActiveMediaKind] =
+  const [missingReview, setMissingReview] = useState<{
+    activeKind: MediaKind;
+    searches: Record<MediaKind, string>;
+    usageFilters: Record<MediaKind, MediaUsageFilter>;
+  } | null>(null);
+  const [missingOnlyByKind, setMissingOnlyByKind] = useState<Record<MediaKind, boolean>>({ photo: false, decorative: false });
+  const [localActiveMediaKind, setLocalActiveMediaKind] =
     useState<MediaKind>("photo");
+  const preferredActiveMediaKind = preferenceMode.kind === "controlled" ? preferenceMode.activeKind : localActiveMediaKind;
+  const activeMediaKind = missingReview?.activeKind ?? preferredActiveMediaKind;
+  function setActiveMediaKind(activeKind: MediaKind) {
+    if (missingReview) setMissingReview({ ...missingReview, activeKind });
+    else if (preferenceMode.kind === "controlled") preferenceMode.onActiveKindChange(activeKind);
+    else setLocalActiveMediaKind(activeKind);
+  }
+  const fileInformation = useMemo(() => {
+    const result = { ...mediaFiles };
+    for (const media of mediaItems) {
+      const preview = mediaPreviews[media.id];
+      if (!result[media.id] && (preview?.state === "absent" || preview?.state === "unavailable")) {
+        result[media.id] = { mediaId: media.id, state: preview.state, createdAtMs: null, modifiedAtMs: null };
+      }
+    }
+    return result;
+  }, [mediaFiles, mediaItems, previewSource.previews]);
+  const missingCounts = useMemo(() => {
+    const counts = { photo: 0, decorative: 0 };
+    for (const media of mediaItems) if (fileInformation[media.id]?.state === "absent") counts[media.kind] += 1;
+    return counts;
+  }, [mediaItems, fileInformation]);
   const [searchByKind, setSearchByKind] = useState<Record<MediaKind, string>>({
     decorative: "",
     photo: "",
@@ -153,12 +189,14 @@ export function MediaPanel({
     () => mediaItems.filter((media) => media.kind === activeMediaKind),
     [activeMediaKind, mediaItems],
   );
-  const search = searchByKind[activeMediaKind];
-  const preferences = preferencesByKind[activeMediaKind];
-  const { sortDirection, thumbnailSize, usageFilter } = preferences;
+  const search = (missingReview?.searches ?? searchByKind)[activeMediaKind];
+  const storedPreferences = preferencesByKind[activeMediaKind];
+  const preferences = missingReview ? { ...storedPreferences, usageFilter: missingReview.usageFilters[activeMediaKind] } : storedPreferences;
+  const missingOnly = missingReview !== null || missingOnlyByKind[activeMediaKind];
+  const { sortKey, sortDirection, thumbnailSize, usageFilter } = preferences;
   const visibleMediaItems = useMemo(() => filterMediaItems(
-    activeMediaItems, mediaUsageById, search, sortDirection, usageFilter,
-  ), [activeMediaItems, mediaUsageById, search, sortDirection, usageFilter]);
+    activeMediaItems, mediaUsageById, search, sortKey, sortDirection, usageFilter, fileInformation, missingOnly,
+  ), [activeMediaItems, mediaUsageById, search, sortKey, sortDirection, usageFilter, fileInformation, missingOnly]);
   const visibleMediaIds = useMemo(
     () => visibleMediaItems.map(({ id }) => id),
     [visibleMediaItems],
@@ -181,11 +219,16 @@ export function MediaPanel({
   });
 
   useImperativeHandle(ref, () => ({
+    showAbsent() {
+      if (!missingCounts.photo && !missingCounts.decorative) return;
+      setMissingReview({ activeKind: missingCounts[activeMediaKind] ? activeMediaKind : activeMediaKind === "photo" ? "decorative" : "photo",
+        searches: { photo: "", decorative: "" }, usageFilters: { photo: "all", decorative: "all" } });
+    },
     planCatalog(nextItems, nextUsage) {
       const ordered = filterMediaItems(
         nextItems.filter((media) => media.kind === activeMediaKind),
         new Map(nextUsage.map((usage) => [usage.mediaId, usage.count])),
-        search, sortDirection, usageFilter,
+        search, sortKey, sortDirection, usageFilter, fileInformation, missingOnly,
       );
       const demand = mediaPanelViewportDemand(gridRef.current, ordered.map(({ id }) => id), thumbnailSize);
       const inactive = observedDemandByKind.current[activeMediaKind === "photo" ? "decorative" : "photo"];
@@ -353,6 +396,14 @@ export function MediaPanel({
   function updatePreferences(
     nextPreferences: Partial<MediaPanelViewPreferences>,
   ) {
+    if (missingReview && nextPreferences.usageFilter !== undefined) {
+      setMissingReview({ ...missingReview, usageFilters: { ...missingReview.usageFilters, [activeMediaKind]: nextPreferences.usageFilter } });
+      const { usageFilter: _filter, ...remaining } = nextPreferences;
+      nextPreferences = remaining;
+    }
+    if (preferenceMode.kind === "controlled" && nextPreferences.sortKey !== undefined) {
+      preferenceMode.onSortKeyChange(activeMediaKind, nextPreferences.sortKey);
+    }
     if (
       preferenceMode.kind === "controlled" &&
       nextPreferences.thumbnailSize !== undefined
@@ -478,6 +529,13 @@ export function MediaPanel({
       />
       <MediaPanelToolbar
         activeMediaKind={activeMediaKind}
+        missingCounts={missingCounts}
+        missingOnly={missingOnly}
+        reviewingMissing={missingReview !== null}
+        onMissingOnlyChange={(value) => {
+          if (missingReview && !value) setMissingReview(null);
+          else setMissingOnlyByKind((current) => ({ ...current, [activeMediaKind]: value }));
+        }}
         itemCount={activeMediaItems.length}
         preferences={preferences}
         search={search}
@@ -486,12 +544,13 @@ export function MediaPanel({
         onImportPhoto={onImportPhoto}
         onActiveMediaKindChange={setActiveMediaKind}
         onPreferencesChange={updatePreferences}
-        onSearchChange={(nextSearch) =>
-          setSearchByKind((current) => ({
+        onSearchChange={(nextSearch) => {
+          if (missingReview) setMissingReview({ ...missingReview, searches: { ...missingReview.searches, [activeMediaKind]: nextSearch } });
+          else setSearchByKind((current) => ({
             ...current,
             [activeMediaKind]: nextSearch,
-          }))
-        }
+          }));
+        }}
       />
       <div
         aria-label={
@@ -521,7 +580,11 @@ export function MediaPanel({
             const usageCount = mediaUsageById.get(media.id) ?? 0;
             const isUsed = usageCount > 0;
             const isSelected = selectedMediaIds.has(media.id);
-            const preview = mediaPreviews[media.id];
+            const cachedPreview = mediaPreviews[media.id];
+            const file = fileInformation[media.id];
+            const preview = file && file.state !== "available" ? {
+              mediaId: media.id, state: file.state, url: cachedPreview?.url ?? null,
+            } : cachedPreview;
             const availabilityLabel = preview
               ? mediaAvailabilityLabel(preview)
               : null;
@@ -652,15 +715,31 @@ function filterMediaItems(
   items: readonly MediaCatalogItem[],
   usage: ReadonlyMap<string, number>,
   search: string,
+  sortKey: MediaPanelViewPreferences["sortKey"],
   sortDirection: MediaPanelViewPreferences["sortDirection"],
   usageFilter: MediaUsageFilter,
+  files: Readonly<Record<string, MediaFileInfo>>,
+  missingOnly: boolean,
 ) {
   const normalizedSearch = normalizeSearchText(search);
   const direction = sortDirection === "ascending" ? 1 : -1;
   return items.filter((media) =>
+    (!missingOnly || files[media.id]?.state === "absent") &&
     passesUsageFilter(usage.get(media.id) ?? 0, usageFilter) &&
     normalizeSearchText(media.name).includes(normalizedSearch),
-  ).sort((left, right) => direction * naturalNameCollator.compare(left.name, right.name));
+  ).sort((left, right) => {
+    const leftFile = files[left.id];
+    const rightFile = files[right.id];
+    const absent = Number(leftFile?.state === "absent") - Number(rightFile?.state === "absent");
+    if (absent) return absent;
+    if (sortKey !== "name") {
+      const leftDate = sortKey === "createdAt" ? leftFile?.createdAtMs : leftFile?.modifiedAtMs;
+      const rightDate = sortKey === "createdAt" ? rightFile?.createdAtMs : rightFile?.modifiedAtMs;
+      if (leftDate != null && rightDate != null && leftDate !== rightDate) return direction * (leftDate - rightDate);
+      if ((leftDate == null) !== (rightDate == null)) return leftDate == null ? 1 : -1;
+    }
+    return direction * naturalNameCollator.compare(left.name, right.name);
+  });
 }
 
 function passesUsageFilter(

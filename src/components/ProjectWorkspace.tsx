@@ -3,6 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type {
   ExportPipelinePort,
   MediaPreview,
+  MediaFileInfo,
   ImageProcessingProgress,
   ImageProcessingProblem,
   PhotoImportCompletion,
@@ -71,6 +72,7 @@ interface ProjectWorkspaceProps {
   runProjectMutation: ProjectMutationRunner;
   projectCorePort: ProjectCorePort;
   mediaPreviews: Readonly<Record<string, MediaPreview>>;
+  mediaFiles?: Readonly<Record<string, MediaFileInfo>>;
   onMediaDemandChange(demand: MediaPreviewDemand): void;
   prepareMediaPresentation?(imported: PhotoImportCompletion, demand: MediaPreviewDemand): Promise<readonly ImageProcessingProblem[]>;
   onRetryUnavailableMedia(mediaId: string, onProgress: (progress: ImageProcessingProgress) => void): Promise<void>;
@@ -93,6 +95,7 @@ export function ProjectWorkspace({
   runProjectMutation,
   projectCorePort,
   mediaPreviews,
+  mediaFiles,
   onMediaDemandChange,
   prepareMediaPresentation,
   onRetryUnavailableMedia,
@@ -715,6 +718,12 @@ export function ProjectWorkspace({
         )}
 
         {workspacePanels.panels.inspector.visible && <InspectorPanel
+          missingMedia={{ count: projection.state.album.media.filter((media) => mediaFiles?.[media.id]?.state === "absent").length,
+            onShow: () => {
+              if (controller.layoutPanel.visible) controller.layoutPanel.close();
+              workspacePreferences.update({ kind: "workspacePanelVisibility", panel: "media", visible: true });
+              mediaPanelRef.current?.showAbsent();
+            } }}
           saveLayout={{ enabled: controller.canSaveLayout, onSave: controller.saveLayout,
             feedback: noticeInInspector ? layoutNotice : null }}
           key={projectId}
@@ -771,6 +780,7 @@ export function ProjectWorkspace({
 
         <MediaPanel
           key={`media-${projectId}`}
+          mediaFiles={mediaFiles}
           hidden={!workspacePanels.panels.media.visible || controller.layoutPanel.visible}
           ref={mediaPanelRef}
           mediaItems={projection.state.album.media}
@@ -792,6 +802,9 @@ export function ProjectWorkspace({
           relinkDisabled={commandsBlocked}
           preferences={{
             kind: "controlled",
+            activeKind: workspacePreferences.preferences.mediaPanelActiveKind,
+            onActiveKindChange: (mediaKind) => workspacePreferences.update({ kind: "mediaPanelActiveKind", mediaKind }),
+            onSortKeyChange: (mediaKind, sortKey) => workspacePreferences.update({ kind: "mediaPanelSortKey", mediaKind, sortKey }),
             persistent: workspacePreferences.preferences.mediaPanel,
             thumbnailSizes:
               workspacePreferences.preferences.mediaThumbnailSizes,

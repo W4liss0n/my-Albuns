@@ -620,6 +620,42 @@ pub(crate) struct MediaRuntime {
 }
 
 impl MediaRuntime {
+    /// UI metadata comes only from stabilized observations of current bindings.
+    /// Reading the catalog neither inspects Originals nor consults Cache demand.
+    pub(crate) fn files_for(
+        &self,
+        bindings: &[MediaBinding],
+    ) -> Vec<crate::ipc_contract::MediaFileInfo> {
+        use crate::ipc_contract::{MediaFileInfo, MediaFileState};
+        let Some(snapshot) = self.snapshot() else {
+            return Vec::new();
+        };
+        let by_id: HashMap<_, _> = snapshot
+            .observations
+            .iter()
+            .map(|file| (file.media_id.as_str(), file))
+            .collect();
+        bindings
+            .iter()
+            .filter_map(|binding| {
+                let file = by_id.get(binding.media_id.as_str())?;
+                if file.logical_path != binding.logical_path || file.kind != binding.kind {
+                    return None;
+                }
+                Some(MediaFileInfo {
+                    media_id: binding.media_id.clone(),
+                    state: match file.availability {
+                        MediaAvailability::Candidate => MediaFileState::Available,
+                        MediaAvailability::Absent => MediaFileState::Absent,
+                        MediaAvailability::Unavailable => MediaFileState::Unavailable,
+                    },
+                    created_at_ms: file.source_created_unix_ms,
+                    modified_at_ms: file.source_modified_unix_ms,
+                })
+            })
+            .collect()
+    }
+
     pub(crate) fn apply(&self, proposal: MediaResolutionProposal) -> MediaRuntimeUpdate {
         let mut current = self
             .current
@@ -1492,6 +1528,7 @@ mod tests {
         let monitor = MediaMonitor::default();
 
         let first = monitor.poll(&runtime, &bindings);
+        assert!(runtime.files_for(&bindings).is_empty());
         assert!(
             first.confirmed_observation().is_none(),
             "one raw filesystem sample cannot reach Runtime"
@@ -1512,6 +1549,30 @@ mod tests {
             confirmed.confirmed_observation().cloned()
         );
         assert_eq!(bindings[0].logical_path, root.path().join("photo.jpg"));
+        let files = runtime.files_for(&bindings);
+        assert_eq!(files.len(), 2);
+        assert_eq!(
+            files[0].state,
+            crate::ipc_contract::MediaFileState::Available
+        );
+        let metadata = std::fs::metadata(&bindings[0].logical_path).unwrap();
+        assert_eq!(
+            files[0].created_at_ms,
+            super::file_time_millis(metadata.created())
+        );
+        assert_eq!(
+            files[0].modified_at_ms,
+            super::file_time_millis(metadata.modified())
+        );
+        assert_eq!(files[1].state, crate::ipc_contract::MediaFileState::Absent);
+        assert_eq!(files[1].created_at_ms, None);
+        let mut relinked = bindings.clone();
+        relinked[0].logical_path = root.path().join("new-original.jpg");
+        assert_eq!(
+            runtime.files_for(&relinked).len(),
+            1,
+            "old-path metadata cannot survive relinking"
+        );
     }
 
     #[test]

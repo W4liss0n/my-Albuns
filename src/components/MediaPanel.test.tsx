@@ -1,4 +1,4 @@
-import { createRef } from "react";
+import { createRef, useState, type ComponentProps } from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
@@ -88,7 +88,7 @@ test("prepares only the future viewport with the panel's active ordering and fil
     ...mediaPanelInteractions, mediaUsage: [], onFillPhoto: vi.fn(),
     previewSource: { kind: "connected" as const, onDemandChange: demand, previews: {} },
     preferences: { kind: "local" as const, initial: { photo: {
-      thumbnailSize: 84, sortDirection: "descending" as const, usageFilter: "all" as const,
+      thumbnailSize: 84, sortKey: "name" as const, sortDirection: "descending" as const, usageFilter: "all" as const,
     } } },
   };
   const view = render(<MediaPanel {...props} ref={ref} mediaItems={mediaItems} />);
@@ -239,6 +239,26 @@ test("combines accent-insensitive search with the usage filter and natural name 
   );
 });
 
+test("orders by the Original dates and keeps absent files last in both directions", async () => {
+  const user = userEvent.setup();
+  render(<MediaPanel {...mediaPanelInteractions} mediaItems={mediaItems} mediaUsage={mediaUsage}
+    onFillPhoto={vi.fn()} previewSource={{ kind: "static" }} preferences={{ kind: "local" }}
+    mediaFiles={{
+      "photo-album-10": { mediaId: "photo-album-10", state: "available", createdAtMs: 100, modifiedAtMs: 300 },
+      "photo-album-2": { mediaId: "photo-album-2", state: "available", createdAtMs: 200, modifiedAtMs: 100 },
+      "photo-retrato": { mediaId: "photo-retrato", state: "absent", createdAtMs: null, modifiedAtMs: null },
+    }} />);
+  await user.click(screen.getByRole("button", { name: "Filtro, ordem e tamanho" }));
+  await user.selectOptions(screen.getByRole("combobox", { name: "Ordenar por" }), "createdAt-ascending");
+  expect(visibleMediaIds()).toEqual(["photo-album-10", "photo-album-2", "photo-retrato"]);
+  await user.selectOptions(screen.getByRole("combobox", { name: "Ordenar por" }), "createdAt-descending");
+  expect(visibleMediaIds()).toEqual(["photo-album-2", "photo-album-10", "photo-retrato"]);
+  await user.selectOptions(screen.getByRole("combobox", { name: "Ordenar por" }), "modifiedAt-ascending");
+  expect(visibleMediaIds()).toEqual(["photo-album-2", "photo-album-10", "photo-retrato"]);
+  await user.selectOptions(screen.getByRole("combobox", { name: "Ordenar por" }), "name-descending");
+  expect(visibleMediaIds()).toEqual(["photo-album-10", "photo-album-2", "photo-retrato"]);
+});
+
 test("treats compact options as a disclosure and restores its trigger on Escape", async () => {
   const user = userEvent.setup();
   renderPanel();
@@ -294,11 +314,7 @@ test("resizes thumbnails independently per tab and marks unavailable date orderi
   });
 
   const dateOption = screen.getByRole("option", { name: "Data de criação" });
-  expect(dateOption).toBeDisabled();
-  expect(dateOption).toHaveAttribute(
-    "data-placeholder-feature",
-    "sort-media-by-created-at",
-  );
+  expect(dateOption).toBeEnabled();
 
   await user.click(screen.getByRole("button", { name: "Decorativos" }));
   await user.click(
@@ -326,7 +342,7 @@ test("hydrates per-tab thumbnail sizes and publishes later changes", async () =>
   const user = userEvent.setup();
   const onThumbnailSizeChange = vi.fn();
   render(
-    <MediaPanel
+    <PersistentMediaPanel
       {...mediaPanelInteractions}
       mediaItems={mediaItems}
       mediaUsage={mediaUsage}
@@ -335,11 +351,12 @@ test("hydrates per-tab thumbnail sizes and publishes later changes", async () =>
       preferences={{
         kind: "controlled",
         persistent: {
-          decorative: { sortDirection: "ascending", usageFilter: "all" },
-          photo: { sortDirection: "ascending", usageFilter: "all" },
+          decorative: { sortKey: "name", sortDirection: "ascending", usageFilter: "all" },
+          photo: { sortKey: "name", sortDirection: "ascending", usageFilter: "all" },
         },
         thumbnailSizes: { decorative: 110, photo: 124 },
         onSortDirectionChange: vi.fn(),
+        onSortKeyChange: vi.fn(),
         onThumbnailSizeChange,
         onUsageFilterChange: vi.fn(),
       }}
@@ -370,7 +387,7 @@ test("hydrates authoritative per-tab settings and publishes only the changed fie
   const onSortDirectionChange = vi.fn();
   const onUsageFilterChange = vi.fn();
   render(
-    <MediaPanel
+    <PersistentMediaPanel
       {...mediaPanelInteractions}
       mediaItems={mediaItems}
       mediaUsage={mediaUsage}
@@ -379,11 +396,12 @@ test("hydrates authoritative per-tab settings and publishes only the changed fie
       preferences={{
         kind: "controlled",
         persistent: {
-          decorative: { sortDirection: "ascending", usageFilter: "all" },
-          photo: { sortDirection: "descending", usageFilter: "unused" },
+          decorative: { sortKey: "name", sortDirection: "ascending", usageFilter: "all" },
+          photo: { sortKey: "name", sortDirection: "descending", usageFilter: "unused" },
         },
         thumbnailSizes: { decorative: 84, photo: 84 },
         onSortDirectionChange,
+        onSortKeyChange: vi.fn(),
         onThumbnailSizeChange: vi.fn(),
         onUsageFilterChange,
       }}
@@ -759,6 +777,13 @@ function renderPanel() {
       preferences={{ kind: "local" }}
     />,
   );
+}
+
+function PersistentMediaPanel(props: Omit<ComponentProps<typeof MediaPanel>, "preferences"> & {
+  preferences: Omit<Extract<ComponentProps<typeof MediaPanel>["preferences"], { kind: "controlled" }>, "activeKind" | "onActiveKindChange">;
+}) {
+  const [activeKind, setActiveKind] = useState<MediaCatalogItem["kind"]>("photo");
+  return <MediaPanel {...props} preferences={{ ...props.preferences, activeKind, onActiveKindChange: setActiveKind }} />;
 }
 
 function media(

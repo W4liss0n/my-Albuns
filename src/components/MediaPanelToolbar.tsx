@@ -21,6 +21,10 @@ import { useDismissableSurface } from "../ui/useDismissableSurface";
 
 interface MediaPanelToolbarProps {
   activeMediaKind: MediaKind;
+  missingCounts: Readonly<Record<MediaKind, number>>;
+  missingOnly: boolean;
+  reviewingMissing: boolean;
+  onMissingOnlyChange(value: boolean): void;
   importDisabled?: boolean;
   itemCount: number;
   importPending?: boolean;
@@ -37,6 +41,10 @@ type OpenPopup = "import" | "options" | null;
 
 export function MediaPanelToolbar({
   activeMediaKind,
+  missingCounts,
+  missingOnly,
+  reviewingMissing,
+  onMissingOnlyChange,
   importDisabled = false,
   itemCount,
   importPending = false,
@@ -72,6 +80,7 @@ export function MediaPanelToolbar({
   useEffect(() => {
     if (importDisabled && openPopup === "import") setOpenPopup(null);
   }, [importDisabled, openPopup]);
+  useEffect(() => { setOpenPopup(null); }, [activeMediaKind, reviewingMissing]);
 
   function changeMediaKind(mediaKind: MediaKind) {
     setOpenPopup(null);
@@ -90,6 +99,7 @@ export function MediaPanelToolbar({
           onClick={() => changeMediaKind("photo")}
         >
           <AppIcon icon={ImageIcon} size={16} />
+          {missingCounts.photo > 0 && <span className="media-missing-badge" aria-label={`${missingCounts.photo} Fotos com arquivo ausente`}>{missingCounts.photo}</span>}
         </button>
         <button
           aria-label="Decorativos"
@@ -100,6 +110,7 @@ export function MediaPanelToolbar({
           onClick={() => changeMediaKind("decorative")}
         >
           <AppIcon icon={SlidersHorizontal} size={14} />
+          {missingCounts.decorative > 0 && <span className="media-missing-badge" aria-label={`${missingCounts.decorative} Decorativos com arquivo ausente`}>{missingCounts.decorative}</span>}
         </button>
       </div>
 
@@ -153,13 +164,21 @@ export function MediaPanelToolbar({
         <div className="media-folder-strip">
           <button
             aria-label={`Todas ${itemCount}`}
-            aria-pressed="true"
-            className="media-folder-chip active"
+            aria-pressed={!missingOnly}
+            className={`media-folder-chip${!missingOnly ? " active" : ""}`}
             type="button"
+            onClick={() => onMissingOnlyChange(false)}
           >
             <span>Todas</span>
             <small>{itemCount}</small>
           </button>
+          <button type="button" className={`media-folder-chip${missingOnly ? " active" : ""}`}
+            aria-pressed={missingOnly} onClick={() => onMissingOnlyChange(!missingOnly)}>
+            Ausentes<small>{missingCounts[activeMediaKind]}</small>
+          </button>
+          {reviewingMissing && <button type="button" className="media-folder-add"
+            aria-label="Encerrar visualização de ausentes" title="Voltar à aba e aos filtros anteriores"
+            onClick={() => onMissingOnlyChange(false)}><AppIcon icon={X} size={12} /></button>}
           {/*
             PLACEHOLDER UI: organization chips belong here after the Project
             exposes Media organization folders through an application port.
@@ -247,33 +266,19 @@ export function MediaPanelToolbar({
               <span>Ordem</span>
               <select
                 aria-label="Ordenar por"
-                value={`name-${preferences.sortDirection}`}
+                value={`${preferences.sortKey}-${preferences.sortDirection}`}
                 onChange={(event) => {
-                  if (event.target.value === "name-ascending") {
-                    onPreferencesChange({ sortDirection: "ascending" });
-                  }
-                  if (event.target.value === "name-descending") {
-                    onPreferencesChange({ sortDirection: "descending" });
-                  }
+                  const [sortKey, sortDirection] = event.target.value.split("-");
+                  onPreferencesChange({ sortKey: sortKey as MediaPanelViewPreferences["sortKey"],
+                    sortDirection: sortDirection as MediaPanelViewPreferences["sortDirection"] });
                 }}
               >
                 <option value="name-ascending">Nome</option>
                 <option value="name-descending">Nome (inverso)</option>
-                {/* PLACEHOLDER UI: MediaCatalogItem has no date metadata yet. */}
-                <option
-                  data-placeholder-feature="sort-media-by-created-at"
-                  disabled
-                  value="created-at"
-                >
-                  Data de criação
-                </option>
-                <option
-                  data-placeholder-feature="sort-media-by-modified-at"
-                  disabled
-                  value="modified-at"
-                >
-                  Data de alteração
-                </option>
+                <option value="createdAt-ascending">Data de criação</option>
+                <option value="createdAt-descending">Data de criação (inversa)</option>
+                <option value="modifiedAt-ascending">Data de alteração</option>
+                <option value="modifiedAt-descending">Data de alteração (inversa)</option>
               </select>
             </label>
 

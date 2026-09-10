@@ -331,10 +331,11 @@ pub enum WorkspacePreferenceChange {
     },
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, TS)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub enum MediaPreferenceKind {
     Decorative,
+    #[default]
     Photo,
 }
 
@@ -354,6 +355,8 @@ pub struct ApplicationSettings {
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct MediaPanelSettings {
+    #[serde(default)]
+    pub(crate) active_kind: MediaPreferenceKind,
     pub(crate) decorative: MediaPanelTabSettings,
     pub(crate) photo: MediaPanelTabSettings,
 }
@@ -361,6 +364,8 @@ pub struct MediaPanelSettings {
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct MediaPanelTabSettings {
+    #[serde(default)]
+    pub(crate) sort_key: MediaSortKey,
     pub(crate) sort_direction: MediaSortDirection,
     pub(crate) usage_filter: MediaUsageFilter,
 }
@@ -370,6 +375,15 @@ pub struct MediaPanelTabSettings {
 pub enum MediaSortDirection {
     Ascending,
     Descending,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum MediaSortKey {
+    #[default]
+    Name,
+    CreatedAt,
+    ModifiedAt,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
@@ -388,6 +402,13 @@ pub enum MediaUsageFilter {
 )]
 #[ts(tag = "kind")]
 pub enum SettingsPreferenceChange {
+    MediaPanelActiveKind {
+        media_kind: MediaPreferenceKind,
+    },
+    MediaPanelSortKey {
+        media_kind: MediaPreferenceKind,
+        sort_key: MediaSortKey,
+    },
     MediaPanelSortDirection {
         media_kind: MediaPreferenceKind,
         sort_direction: MediaSortDirection,
@@ -533,6 +554,32 @@ pub struct MediaPreview {
     pub(crate) media_id: String,
     pub(crate) state: MediaPreviewState,
     pub(crate) url: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum MediaFileState {
+    Available,
+    Absent,
+    Unavailable,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct MediaFileInfo {
+    pub(crate) media_id: String,
+    pub(crate) state: MediaFileState,
+    #[ts(type = "number | null")]
+    pub(crate) created_at_ms: Option<u64>,
+    #[ts(type = "number | null")]
+    pub(crate) modified_at_ms: Option<u64>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct MediaFileCatalog {
+    pub(crate) project_id: String,
+    pub(crate) files: Vec<MediaFileInfo>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, TS)]

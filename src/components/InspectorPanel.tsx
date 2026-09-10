@@ -29,7 +29,7 @@ import type {
 } from "../application/projectSettingsDraft";
 import type { MediaPreview } from "../application/projectPorts";
 import { renderableMediaPreviewUrls } from "../application/mediaPreviews";
-import { ActionButton, AppIcon, EmptyState } from "../ui";
+import { ActionButton, AppIcon, EmptyState, InlineNotice } from "../ui";
 import { AlbumDesignForm } from "./AlbumDesignForm";
 import { AlbumInformationForm } from "./AlbumInformationForm";
 import { SheetPreviewShell } from "./SheetPreview";
@@ -87,6 +87,7 @@ export type InspectorSectionState =
   | { kind: "local" };
 
 export interface InspectorPanelProps {
+  missingMedia?: { count: number; onShow(): void };
   saveLayout?: { enabled: boolean; onSave(): void; feedback?: ReactNode };
   frameStyle?: FrameStyleControlActions;
   photoEffects?: PhotoEffectsControlActions;
@@ -135,6 +136,7 @@ export interface InspectorPanelProps {
 }
 
 export function InspectorPanel({
+  missingMedia,
   saveLayout,
   frameStyle,
   photoOrientation,
@@ -482,6 +484,10 @@ export function InspectorPanel({
               defaultOpen
             >
               <div className="inspector-subsections">
+                {missingMedia && missingMedia.count > 0 && <InlineNotice tone="warning">
+                  <p>{missingMedia.count === 1 ? "1 arquivo original ausente." : `${missingMedia.count} arquivos originais ausentes.`}</p>
+                  <ActionButton type="button" density="compact" variant="quiet" onClick={missingMedia.onShow}>Ver arquivos ausentes</ActionButton>
+                </InlineNotice>}
                 <AlbumInformationForm
                   document={document}
                   formId={ALBUM_INFORMATION_FORM_ID}

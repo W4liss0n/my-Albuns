@@ -84,6 +84,20 @@
   content: "";
 }
 
+.media-missing-badge {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  min-width: 12px;
+  padding: 0 2px;
+  border-radius: 6px;
+  color: var(--ui-warning-text);
+  background: var(--ui-warning-soft);
+  font-size: 9px;
+  line-height: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
 .media-toolbar-text-button {
   display: inline-flex;
   height: 100%;

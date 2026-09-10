@@ -79,8 +79,8 @@ test("composes machine-local State with roaming Settings and routes updates to t
   };
   const settings = {
     mediaPanel: {
-      decorative: { sortDirection: "ascending", usageFilter: "all" },
-      photo: { sortDirection: "descending", usageFilter: "used" },
+      decorative: { sortKey: "name", sortDirection: "ascending", usageFilter: "all" },
+      photo: { sortKey: "name", sortDirection: "descending", usageFilter: "used" },
     },
   };
   vi.mocked(invoke).mockImplementation(async (command) => {
@@ -95,6 +95,7 @@ test("composes machine-local State with roaming Settings and routes updates to t
 
   const preferences = {
     ...state,
+    mediaPanelActiveKind: "photo",
     mediaPanel: settings.mediaPanel,
   };
 

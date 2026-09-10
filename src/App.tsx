@@ -13,6 +13,7 @@ import type {
   ExportPipelinePort,
   CacheProcessorWarning,
   MediaPreview,
+  MediaFileCatalog,
   ImageProcessingProgress,
   ImageProcessingProblem,
   MediaPreviewDemand,
@@ -109,6 +110,7 @@ function App({
     preloadMediaIds: [],
   });
   const [mediaRefreshRevision, setMediaRefreshRevision] = useState(0);
+  const [mediaFileCatalog, setMediaFileCatalog] = useState<MediaFileCatalog | null>(null);
   const [cacheProcessorWarning, setCacheProcessorWarning] =
     useState<CacheProcessorWarning | null>(null);
   const [saveAsStartupFailure, setSaveAsStartupFailure] = useState(() =>
@@ -227,6 +229,20 @@ function App({
   }, [graphics, logger]);
 
   const projectId = projection?.state.projectId ?? "";
+  const mediaFiles = useMemo(() => Object.fromEntries(
+    mediaFileCatalog?.projectId === projectId ? mediaFileCatalog.files.map((file) => [file.mediaId, file]) : [],
+  ), [mediaFileCatalog, projectId]);
+  useEffect(() => {
+    if (!projectId) return;
+    let active = true;
+    void mediaPreviewPort.readMediaFiles().then((catalog) => {
+      if (active && catalog.projectId === projectId) setMediaFileCatalog(catalog);
+    }).catch((error: unknown) => {
+      if (active) loggerRef.current.write({ level: "warn", component: "media-preview",
+        event: "media_file_information_failed", projectId, reason: logReasonFromError(error) });
+    });
+    return () => { active = false; };
+  }, [projectId, projection?.state.revision, mediaRefreshRevision, mediaPreviewPort]);
   const handlePreferencesReady = useCallback((readyProjectId: string) => {
     setPreferencesReadyProject(readyProjectId);
   }, []);
@@ -673,6 +689,7 @@ function App({
           runProjectMutation={runProjectMutation}
           projectCorePort={projectCorePort}
           mediaPreviews={mediaPreviews}
+          mediaFiles={mediaFiles}
           onMediaDemandChange={updateMediaDemand}
           prepareMediaPresentation={prepareMediaPresentation}
           onRetryUnavailableMedia={retryUnavailableMedia}

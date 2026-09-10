@@ -4,10 +4,10 @@ use myalbuns_desktop_lib::ipc_contract::{
     ApplicationSettings, CacheClearAllOutcome, CacheFreeResult, CacheProcessorState,
     CacheProcessorWarning, CacheServiceCommandError, CacheServiceStatus, CancelDisposition,
     ExportCommandError, ExportEvent, ExportResult, FrontendLogEvent, ImageProcessingProgress,
-    ImportPhotoResult, LinkedMediaChanged, MediaPanelSettings, MediaPanelTabSettings,
-    MediaPreferenceKind, MediaPreview, MediaPreviewCommandError, MediaPreviewDemand,
-    MediaPreviewState, MediaSortDirection, MediaThumbnailSizes, MediaUsageFilter,
-    OpeningExternalCopyDecision, PointerDragThreshold, ProjectCloseChoice,
+    ImportPhotoResult, LinkedMediaChanged, MediaFileCatalog, MediaPanelSettings,
+    MediaPanelTabSettings, MediaPreferenceKind, MediaPreview, MediaPreviewCommandError,
+    MediaPreviewDemand, MediaPreviewState, MediaSortDirection, MediaThumbnailSizes,
+    MediaUsageFilter, OpeningExternalCopyDecision, PointerDragThreshold, ProjectCloseChoice,
     ProjectCloseRequestOutcome, ProjectCloseResolution, ProjectDialogAction,
     ProjectDialogActionEvent, ProjectDialogPresentation, ProjectDialogState,
     ProjectRecoveryDecision, SaveAsProjectCommandError, SaveAsProjectOutcome, SaveAsProjectResult,
@@ -54,6 +54,8 @@ fn main() {
     MediaPanelTabSettings::export_all(&config)
         .expect("media panel tab settings bindings should be generated");
     ImportPhotoResult::export_all(&config).expect("Photo import bindings should be generated");
+    MediaFileCatalog::export_all(&config)
+        .expect("Original file information bindings should be generated");
     ImageProcessingProgress::export_all(&config)
         .expect("Photo import progress bindings should be generated");
     MediaPreview::export_all(&config).expect("media preview bindings should be generated");

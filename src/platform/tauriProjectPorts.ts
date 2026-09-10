@@ -44,6 +44,7 @@ import type { ImportPhotoResult as IpcImportPhotoResult } from "./generated/Impo
 import type { ImageProcessingProgress as IpcImageProcessingProgress } from "./generated/ImageProcessingProgress";
 import type { LinkedMediaChanged as IpcLinkedMediaChanged } from "./generated/LinkedMediaChanged";
 import type { MediaPreview as IpcMediaPreview } from "./generated/MediaPreview";
+import type { MediaFileCatalog as IpcMediaFileCatalog } from "./generated/MediaFileCatalog";
 import type { MediaPreviewCommandError as IpcMediaPreviewCommandError } from "./generated/MediaPreviewCommandError";
 import type { PointerDragThreshold } from "./generated/PointerDragThreshold";
 import type { SaveProjectOutcome as IpcSaveProjectOutcome } from "./generated/SaveProjectOutcome";
@@ -371,6 +372,7 @@ async function loadWorkspacePreferences(): Promise<WorkspacePreferences> {
   return createWorkspacePreferences({
     inspectorSections: state.inspectorSections,
     mediaPanel: settings.mediaPanel,
+    mediaPanelActiveKind: settings.mediaPanel.activeKind,
     mediaThumbnailSizes: state.mediaThumbnailSizes,
     workspacePanels: state.workspacePanels,
   });
@@ -381,6 +383,8 @@ export const tauriWorkspacePreferencesPort: WorkspacePreferencesPort = {
   update: async (change: WorkspacePreferenceChange) => {
     if (
       change.kind === "mediaPanelSortDirection" ||
+      change.kind === "mediaPanelActiveKind" ||
+      change.kind === "mediaPanelSortKey" ||
       change.kind === "mediaPanelUsageFilter"
     ) {
       await invoke<IpcApplicationSettings>("update_application_setting", {
@@ -396,6 +400,7 @@ export const tauriWorkspacePreferencesPort: WorkspacePreferencesPort = {
 };
 
 export const tauriMediaPreviewPort: MediaPreviewPort = {
+  readMediaFiles: () => invoke<IpcMediaFileCatalog>("read_media_files"),
   prepareMediaPreviews: async (demand, publish) => {
     const onPreview = new Channel<IpcMediaPreview>();
     let active = true;

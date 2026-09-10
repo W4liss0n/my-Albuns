@@ -244,6 +244,7 @@ pub(crate) fn run(
             crate::project_dialog_window::current_project_dialog_presentation,
             crate::project_dialog_window::submit_project_dialog_action,
             crate::media_preview_commands::prepare_media_previews,
+            crate::media_preview_commands::read_media_files,
             crate::export_commands::export_sheet,
             crate::export_commands::cancel_export,
             crate::workspace_preferences::workspace_preferences,

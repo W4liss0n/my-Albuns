@@ -33,6 +33,7 @@
           "present_project_dialog",
           "dismiss_project_dialog",
           "prepare_media_previews",
+          "read_media_files",
           "export_sheet",
           "cancel_export",
           "workspace_preferences",

@@ -35,6 +35,18 @@ export interface MediaPreview {
   url: string | null;
 }
 
+export interface MediaFileInfo {
+  mediaId: string;
+  state: "available" | "absent" | "unavailable";
+  createdAtMs: number | null;
+  modifiedAtMs: number | null;
+}
+
+export interface MediaFileCatalog {
+  projectId: string;
+  files: readonly MediaFileInfo[];
+}
+
 export interface MediaPreviewDemand {
   visibleMediaIds: readonly string[];
   preloadMediaIds: readonly string[];
@@ -284,6 +296,7 @@ export interface ProjectCorePort {
 }
 
 export interface MediaPreviewPort {
+  readMediaFiles(): Promise<MediaFileCatalog>;
   // Completion replaces the presentation snapshot: demanded outcomes plus the
   // native registry's bounded recent residents. Omission revokes a prior URL.
   prepareMediaPreviews(

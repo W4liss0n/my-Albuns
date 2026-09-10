@@ -49,8 +49,8 @@ test("keeps the non-desktop fallback authoritative for the lifetime of its works
     createWorkspacePreferences({
       inspectorSections: { "album.design": false },
       mediaPanel: {
-        decorative: { sortDirection: "ascending", usageFilter: "all" },
-        photo: { sortDirection: "descending", usageFilter: "used" },
+        decorative: { sortKey: "name", sortDirection: "ascending", usageFilter: "all" },
+        photo: { sortKey: "name", sortDirection: "descending", usageFilter: "used" },
       },
       mediaThumbnailSizes: { decorative: 110, photo: 84 },
       workspacePanels: {

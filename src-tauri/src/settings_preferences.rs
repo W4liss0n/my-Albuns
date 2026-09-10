@@ -9,7 +9,7 @@ use crate::local_store_io::{CrossProcessStoreGuard, store_mutex_name};
 use crate::{
     ipc_contract::{
         ApplicationSettings, MediaPanelSettings, MediaPanelTabSettings, MediaPreferenceKind,
-        MediaSortDirection, MediaUsageFilter, SettingsPreferenceChange,
+        MediaSortDirection, MediaSortKey, MediaUsageFilter, SettingsPreferenceChange,
     },
     local_store_io::write_atomically,
 };
@@ -78,6 +78,15 @@ impl SettingsStore {
             CrossProcessStoreGuard::acquire(&self.write_mutex_name, "SettingsStore")?;
         let mut settings = self.load_unlocked();
         match change {
+            SettingsPreferenceChange::MediaPanelActiveKind { media_kind } => {
+                settings.media_panel.active_kind = media_kind;
+            }
+            SettingsPreferenceChange::MediaPanelSortKey {
+                media_kind,
+                sort_key,
+            } => {
+                media_panel_tab_mut(&mut settings.media_panel, media_kind).sort_key = sort_key;
+            }
             SettingsPreferenceChange::MediaPanelSortDirection {
                 media_kind,
                 sort_direction,
@@ -136,11 +145,13 @@ fn media_panel_tab_mut(
 
 fn default_settings() -> ApplicationSettings {
     let tab = MediaPanelTabSettings {
+        sort_key: MediaSortKey::Name,
         sort_direction: MediaSortDirection::Ascending,
         usage_filter: MediaUsageFilter::All,
     };
     ApplicationSettings {
         media_panel: MediaPanelSettings {
+            active_kind: MediaPreferenceKind::Photo,
             decorative: tab,
             photo: tab,
         },
@@ -187,6 +198,17 @@ mod tests {
         let (_root, paths, first_host) = store();
 
         first_host
+            .update(SettingsPreferenceChange::MediaPanelActiveKind {
+                media_kind: MediaPreferenceKind::Decorative,
+            })
+            .expect("active tab persists");
+        first_host
+            .update(SettingsPreferenceChange::MediaPanelSortKey {
+                media_kind: MediaPreferenceKind::Photo,
+                sort_key: crate::ipc_contract::MediaSortKey::ModifiedAt,
+            })
+            .expect("Original date order persists");
+        first_host
             .update(SettingsPreferenceChange::MediaPanelSortDirection {
                 media_kind: MediaPreferenceKind::Photo,
                 sort_direction: MediaSortDirection::Descending,
@@ -200,6 +222,14 @@ mod tests {
             .expect("photo usage filter persists");
 
         let loaded = SettingsStore::new(&paths).load();
+        assert_eq!(
+            loaded.media_panel.active_kind,
+            MediaPreferenceKind::Decorative
+        );
+        assert_eq!(
+            loaded.media_panel.photo.sort_key,
+            crate::ipc_contract::MediaSortKey::ModifiedAt
+        );
         assert_eq!(
             loaded.media_panel.photo.sort_direction,
             MediaSortDirection::Descending
@@ -246,6 +276,27 @@ mod tests {
         let loaded = SettingsStore::new(&paths).load();
         assert_eq!(
             loaded.media_panel.photo.sort_direction,
+            MediaSortDirection::Descending
+        );
+        assert_eq!(
+            loaded.media_panel.photo.usage_filter,
+            MediaUsageFilter::Unused
+        );
+    }
+
+    #[test]
+    fn older_settings_preserve_each_tab_when_new_fields_are_absent() {
+        let (_root, paths, store) = store();
+        fs::create_dir_all(paths.settings_file().parent().unwrap()).unwrap();
+        fs::write(paths.settings_file(), br#"{"schemaVersion":1,"mediaPanel":{"decorative":{"sortDirection":"descending","usageFilter":"used"},"photo":{"sortDirection":"ascending","usageFilter":"unused"}}}"#).unwrap();
+        let loaded = store.load();
+        assert_eq!(loaded.media_panel.active_kind, MediaPreferenceKind::Photo);
+        assert_eq!(
+            loaded.media_panel.photo.sort_key,
+            crate::ipc_contract::MediaSortKey::Name
+        );
+        assert_eq!(
+            loaded.media_panel.decorative.sort_direction,
             MediaSortDirection::Descending
         );
         assert_eq!(

@@ -258,6 +258,7 @@ const projectCorePort: ProjectCorePort = {
 };
 
 const mediaPreviewPort: MediaPreviewPort = {
+  readMediaFiles: async () => ({ projectId: projection.state.projectId, files: [] }),
   prepareMediaPreviews: async () =>
     (frameContext === "orientation" || frameContext === "style" || frameContext === "layouts") && previewParameters.get("preview") === "palette"
       ? projection.state.album.media.map((media) => ({ mediaId: media.id, state: "unavailable" as const, url: null }))
