@@ -296,7 +296,7 @@
   top: calc(100% + 2px);
   right: 10px;
   display: grid;
-  width: 212px;
+  width: 288px;
   padding: 11px;
   gap: 11px;
 }

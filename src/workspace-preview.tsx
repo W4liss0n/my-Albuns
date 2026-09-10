@@ -265,7 +265,10 @@ const projectCorePort: ProjectCorePort = {
 };
 
 const mediaPreviewPort: MediaPreviewPort = {
-  readMediaFiles: async () => ({ projectId: projection.state.projectId, files: [] }),
+  readMediaFiles: async () => ({ projectId: projection.state.projectId,
+    files: previewParameters.get("files") === "absent" ? projection.state.album.media.map((media, index) => ({
+      mediaId: media.id, state: index === 0 ? "absent" as const : "available" as const, createdAtMs: null, modifiedAtMs: null,
+    })) : [] }),
   prepareMediaPreviews: async () =>
     frameContext === "decorations" ? projection.state.album.media.map((media, index) => ({
       mediaId: media.id, state: "ready" as const,
