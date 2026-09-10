@@ -205,6 +205,7 @@ pub(crate) async fn import_media(
         imported_count,
         media_ids,
         problems,
+        operation_problem,
     } = &result
     {
         tracing::info!(
@@ -214,6 +215,7 @@ pub(crate) async fn import_media(
             imported_count,
             media_id = safe_log_identifier(media_ids.last().map(String::as_str).unwrap_or("")),
             rejected_count = problems.len(),
+            interrupted = operation_problem.is_some(),
             revision = projection.state.revision,
             event = "photos_imported",
         );

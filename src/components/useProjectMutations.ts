@@ -439,6 +439,7 @@ export function useProjectMutations({
     importPending,
     imageProcessingProgress: imageProcessing.progress,
     imageProcessingProblems: imageProcessing.problems,
+    imageProcessingOperationProblem: imageProcessing.operationProblem,
     dismissImageProcessingProblems: imageProcessing.dismissProblems,
     photoImportResult,
     applyIntent,

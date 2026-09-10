@@ -6847,7 +6847,10 @@ test.each([0, 2])("presents photo import rejections after committing %i valid fi
 });
 
 
-test("preserves partial import problems after dismissing a queued Save failure", async () => {
+test.each([
+  { problems: [{ fileName: "corrompida.jpg", reason: "JPEG corrompido" }] },
+  { problems: [], operationProblem: "Não foi possível continuar o processamento por falta de memória. Tente novamente mais tarde." },
+])("preserves partial import feedback after dismissing a queued Save failure: %j", async (feedback) => {
   type ImportResult = Awaited<ReturnType<ProjectCorePort["importMedia"]>>;
   let resolveImport!: (value: ImportResult) => void;
   const pendingImport = new Promise<ImportResult>((resolve) => { resolveImport = resolve; });
@@ -6855,15 +6858,15 @@ test("preserves partial import problems after dismissing a queued Save failure",
   const port = projectCorePortWithApply(async () => projection);
   port.importMedia = vi.fn(() => pendingImport);
   port.save = vi.fn(async () => { throw new Error("Não foi possível salvar"); });
-  const problems = [{ fileName: "corrompida.jpg", reason: "JPEG corrompido" }];
+  const onProjectionChange = vi.fn();
   render(<ProjectWorkspace exportPipelinePort={exportPipelinePort} projection={projection}
-    projectCorePort={port} projectDialogPort={dialog.port} onProjectionChange={vi.fn()} />);
+    projectCorePort={port} projectDialogPort={dialog.port} onProjectionChange={onProjectionChange} />);
   fireEvent.click(screen.getByRole("button", { name: "Importar" }));
   fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos…" }));
   fireEvent.keyDown(window, { ctrlKey: true, key: "s" });
   expect(port.save).not.toHaveBeenCalled();
   await act(async () => {
-    resolveImport({ kind: "completed", projection, mediaIds: ["media-002"], importedCount: 1, problems });
+    resolveImport({ kind: "completed", projection, mediaIds: ["media-002"], importedCount: 1, ...feedback });
     await pendingImport;
   });
   await waitFor(() => expect(dialog.present).toHaveBeenLastCalledWith({
@@ -6871,8 +6874,10 @@ test("preserves partial import problems after dismissing a queued Save failure",
   }));
   act(() => dialog.emit("dismissProjectOperationFailure"));
   await waitFor(() => expect(dialog.present).toHaveBeenLastCalledWith({
-    kind: "imageProcessingProblems", importedCount: 1, problems,
+    kind: "imageProcessingProblems", importedCount: 1, ...feedback,
   }));
   act(() => dialog.emit("dismissImageProcessingProblems"));
+  await waitFor(() => expect(dialog.dismiss).toHaveBeenCalled());
+  expect(onProjectionChange).toHaveBeenCalledExactlyOnceWith(projection);
   expect(port.save).toHaveBeenCalledOnce();
 });

@@ -28,6 +28,7 @@ pub(crate) struct PhotoImportsProposal {
     pub(crate) kind: MediaKind,
     pub(crate) commands: Vec<ImportPhoto>,
     pub(crate) problems: Vec<ImageProcessingProblem>,
+    pub(crate) operation_problem: Option<String>,
     pub(crate) inspections: Vec<ImportedPhotoInspection>,
 }
 
@@ -307,6 +308,7 @@ impl MediaResolver {
             completed_files: 0,
             total_files,
             problem: None,
+            operation_problem: None,
         });
         let candidates = paths
             .into_iter()
@@ -357,6 +359,7 @@ impl MediaResolver {
                     completed_files,
                     total_files,
                     problem: None,
+                    operation_problem: None,
                 })
             },
         );
@@ -376,6 +379,7 @@ impl MediaResolver {
             kind,
             commands,
             problems,
+            operation_problem: None,
             inspections,
         }
     }

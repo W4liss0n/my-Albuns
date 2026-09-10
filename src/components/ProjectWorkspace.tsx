@@ -253,6 +253,7 @@ export function ProjectWorkspace({
   useProjectOperationResultDialog({
     importResult: controller.photoImportResult,
     processingProblems: controller.imageProcessingProgress ? undefined : controller.imageProcessingProblems,
+    processingOperationProblem: controller.imageProcessingProgress ? undefined : controller.imageProcessingOperationProblem,
     message: closeMessage ?? controller.message,
     projectDialogPort,
     onDismiss: (kind) => {

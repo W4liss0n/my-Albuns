@@ -459,6 +459,7 @@ export function useProjectEditorController({
     importPending: mutations.importPending,
     imageProcessingProgress: mutations.imageProcessingProgress,
     imageProcessingProblems: mutations.imageProcessingProblems,
+    imageProcessingOperationProblem: mutations.imageProcessingOperationProblem,
     dismissImageProcessingProblems: mutations.dismissImageProcessingProblems,
     retryUnavailableMedia: mutations.retryUnavailableMedia,
     photoImportResult: mutations.photoImportResult,

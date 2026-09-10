@@ -57,7 +57,13 @@ export function ProjectDialogView({
     case "imageProcessingProblems": {
       const imported = state.importedCount === null ? "" : state.importedCount === 0 ? "Nenhuma imagem nova foi importada." :
         state.importedCount === 1 ? "1 imagem importada." : `${state.importedCount} imagens importadas.`;
-      return <ProblemsDialog title="Problemas no processamento" description={`${imported} Confira os arquivos que não puderam ser processados por completo.`.trim()}
+      const title = state.operationProblem ? state.importedCount === null ? "Processamento interrompido" : "Importação interrompida" : "Problemas no processamento";
+      const description = `${imported} ${state.operationProblem ?? "Confira os arquivos que não puderam ser processados por completo."}`.trim();
+      if (state.operationProblem && state.problems.length === 0) {
+        return <MessageDialog title={title} tone="error" description={description}
+          secondaryAction={{ label: "Fechar", onClick: () => onAction("dismissImageProcessingProblems") }} />;
+      }
+      return <ProblemsDialog title={title} description={description}
         columns={["Arquivo", "Motivo"]}
         rows={state.problems.map(problem => [problem.fileName, problem.reason])}
         onClose={() => onAction("dismissImageProcessingProblems")} />;

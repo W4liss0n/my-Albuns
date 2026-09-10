@@ -77,6 +77,13 @@ pub(crate) struct ImageProcessingBatch<F: FnMut(crate::ipc_contract::ImageProces
     completed: u32,
     total: u32,
     publish: F,
+    operation_problem: Option<String>,
+}
+
+#[derive(Debug)]
+enum ProcessingFailure {
+    File(String),
+    Operation(String),
 }
 
 impl<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> ImageProcessingBatch<F> {
@@ -85,11 +92,13 @@ impl<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> ImageProcessingBatc
             completed_files: 0,
             total_files: total,
             problem: None,
+            operation_problem: None,
         });
         Self {
             completed: 0,
             total,
             publish,
+            operation_problem: None,
         }
     }
 
@@ -146,8 +155,11 @@ impl<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> ImageProcessingBatc
             let work = match work {
                 Ok(work) => work,
                 Err(error) => {
-                    self.prepare_with(&binding, std::future::ready(Err(error)))
-                        .await;
+                    self.prepare_with(
+                        &binding,
+                        std::future::ready(Err(ProcessingFailure::File(error))),
+                    )
+                    .await;
                     continue;
                 }
             };
@@ -164,19 +176,37 @@ impl<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> ImageProcessingBatc
             }
         }
         drop(permit);
+        let resource_interrupted = std::sync::atomic::AtomicBool::new(false);
         let preparation = stream::iter(owners)
-            .map(|(binding, work, owner)| async move {
-                let result = prepare_owned_cache(
-                    app,
-                    app.state::<LoggingState>().inner(),
-                    app.state::<AppPaths>().inner(),
-                    app.state::<CacheEngine>().inner(),
-                    app.state::<ImagingProcessor>().inner(),
-                    work,
-                    owner.cancellation(),
-                )
-                .await;
-                (binding, owner, result)
+            .map(|(binding, work, owner)| {
+                let resource_interrupted = &resource_interrupted;
+                async move {
+                    let result = if resource_interrupted.load(std::sync::atomic::Ordering::Acquire)
+                    {
+                        Err(CacheFailure::new(
+                            CacheFailureStage::MemoryPressure,
+                            ProcessorAdmissionFailure::MemoryPressure.to_string(),
+                        ))
+                    } else {
+                        prepare_owned_cache(
+                            app,
+                            app.state::<LoggingState>().inner(),
+                            app.state::<AppPaths>().inner(),
+                            app.state::<CacheEngine>().inner(),
+                            app.state::<ImagingProcessor>().inner(),
+                            work,
+                            owner.cancellation(),
+                        )
+                        .await
+                    };
+                    if result
+                        .as_ref()
+                        .is_err_and(|failure| failure.stage == CacheFailureStage::MemoryPressure)
+                    {
+                        resource_interrupted.store(true, std::sync::atomic::Ordering::Release);
+                    }
+                    (binding, owner, result)
+                }
             })
             .buffer_unordered(app.state::<ImagingProcessor>().cache_capacity());
         tokio::pin!(preparation);
@@ -267,21 +297,29 @@ impl<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> ImageProcessingBatc
             .buffer_unordered(concurrency);
         tokio::pin!(pending);
         while let Some((binding, result)) = pending.next().await {
-            self.prepare_with(&binding, std::future::ready(result))
-                .await;
+            self.prepare_with(
+                &binding,
+                std::future::ready(result.map_err(ProcessingFailure::File)),
+            )
+            .await;
         }
     }
 
     async fn prepare_with(
         &mut self,
         binding: &MediaBinding,
-        preparation: impl std::future::Future<Output = Result<(), String>>,
+        preparation: impl std::future::Future<Output = Result<(), ProcessingFailure>>,
     ) {
-        let problem =
-            preparation
-                .await
-                .err()
-                .map(|reason| crate::ipc_contract::ImageProcessingProblem {
+        let problem = match preparation.await {
+            Ok(()) => None,
+            Err(ProcessingFailure::Operation(reason)) => {
+                if self.operation_problem.is_none() {
+                    self.operation_problem = Some(reason);
+                }
+                None
+            }
+            Err(ProcessingFailure::File(reason)) => {
+                Some(crate::ipc_contract::ImageProcessingProblem {
                     file_name: binding
                         .logical_path
                         .file_name()
@@ -289,7 +327,9 @@ impl<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> ImageProcessingBatc
                         .to_string_lossy()
                         .into_owned(),
                     reason,
-                });
+                })
+            }
+        };
         self.complete(problem);
     }
 
@@ -310,6 +350,7 @@ impl<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> ImageProcessingBatc
             completed_files: self.completed,
             total_files: self.total,
             problem,
+            operation_problem: self.operation_problem.clone(),
         });
     }
 }
@@ -441,12 +482,15 @@ async fn synchronize_processing_sources(
 
 fn processing_result(
     execution: Result<cache_engine::CacheExecution, CacheFailure>,
-) -> Result<(), String> {
+) -> Result<(), ProcessingFailure> {
     execution.map(|_| ()).map_err(|failure| {
-        format!(
+        if failure.stage == CacheFailureStage::MemoryPressure {
+            return ProcessingFailure::Operation(failure.message);
+        }
+        ProcessingFailure::File(format!(
             "A imagem foi vinculada, mas não foi possível preparar sua miniatura: {}",
             failure.message
-        )
+        ))
     })
 }
 #[allow(clippy::too_many_arguments)]
@@ -552,7 +596,11 @@ async fn prepare_owned_cache(
             }
             Err(error) => {
                 return Err(CacheFailure::new(
-                    CacheFailureStage::Plan,
+                    if error == ProcessorAdmissionFailure::MemoryPressure {
+                        CacheFailureStage::MemoryPressure
+                    } else {
+                        CacheFailureStage::Plan
+                    },
                     error.to_string(),
                 ));
             }
@@ -690,7 +738,9 @@ mod tests {
                 preparation.await;
             }
             batch
-                .prepare_with(&binding, async { Err("Cache indisponível".into()) })
+                .prepare_with(&binding, async {
+                    Err(ProcessingFailure::File("Cache indisponível".into()))
+                })
                 .await;
             batch.prepare_with(&binding, async { Ok(()) }).await;
             let published = published.borrow();
@@ -704,6 +754,41 @@ mod tests {
             assert!(published.iter().all(|progress| progress.total_files == 3));
             assert_eq!(published[2].problem.as_ref().unwrap().file_name, "foto.jpg");
             assert!(published[3].problem.is_none());
+        });
+    }
+
+    #[test]
+    fn resource_failures_have_one_operation_reason_and_do_not_reject_files() {
+        tauri::async_runtime::block_on(async {
+            let mut events = Vec::new();
+            let binding = MediaBinding {
+                media_id: "photo-a".into(),
+                kind: myalbuns_core::MediaKind::Photo,
+                logical_path: "foto.jpg".into(),
+            };
+            let mut batch = ImageProcessingBatch::new(3, |event| events.push(event));
+            for _ in 0..2 {
+                let failure = CacheFailure::new(
+                    CacheFailureStage::MemoryPressure,
+                    ProcessorAdmissionFailure::MemoryPressure.to_string(),
+                );
+                batch
+                    .prepare_with(
+                        &binding,
+                        std::future::ready(processing_result(Err(failure))),
+                    )
+                    .await;
+            }
+            batch.prepare_with(&binding, async { Ok(()) }).await;
+            assert!(events.iter().all(|event| event.problem.is_none()));
+            assert_eq!(
+                events.last().unwrap().operation_problem.as_deref(),
+                Some(
+                    ProcessorAdmissionFailure::MemoryPressure
+                        .to_string()
+                        .as_str()
+                )
+            );
         });
     }
 }

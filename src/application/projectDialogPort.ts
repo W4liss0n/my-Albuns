@@ -27,6 +27,7 @@ export type ProjectDialogState =
       kind: "imageProcessingProblems";
       importedCount: number | null;
       problems: readonly ImageProcessingProblem[];
+      operationProblem?: string | null;
     }
   | {
       busy: boolean;

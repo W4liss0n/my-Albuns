@@ -78,9 +78,11 @@ Essa estimativa de admissão complementa os limites do codec; não constitui uma
 garantia contra mudanças de memória feitas por outros programas após a leitura.
 
 O orçamento agregado por Host usa no máximo um quarto da RAM total e 4 GiB.
-A margem para concorrência é maior que a exigida para um trabalho individual.
+A RAM física disponível governa a concorrência; um trabalho individual depende
+do commit disponível, sem exigir folga física fixa.
 Somente uma fila com trabalho ativo aguarda liberação de recursos; sem trabalho
-ativo e sem memória até para uma imagem, a operação recebe uma falha recuperável.
+ativo e sem commit para a estimativa de uma imagem, a operação recebe uma
+interrupção recuperável, separada dos problemas de arquivos.
 O contrato de admissão define os valores, o cancelamento e a nova tentativa.
 
 `CacheEngine` possui a interface transacional do índice: consulta por mídia em

@@ -141,12 +141,13 @@ const stateDecoders: Record<
   },
   imageProcessingProblems: (value) => {
     if ((value.importedCount !== null && !isWireU64(value.importedCount)) || !Array.isArray(value.problems)) return null;
+    if (value.operationProblem != null && typeof value.operationProblem !== "string") return null;
     const problems: { fileName: string; reason: string }[] = [];
     for (const problem of value.problems) {
       if (!isRecord(problem) || typeof problem.fileName !== "string" || typeof problem.reason !== "string") return null;
       problems.push({ fileName: problem.fileName, reason: problem.reason });
     }
-    return { kind: "imageProcessingProblems", importedCount: value.importedCount, problems };
+    return { kind: "imageProcessingProblems", importedCount: value.importedCount, problems, operationProblem: value.operationProblem ?? null };
   },
   exportProblems: (value) => {
     const problems = parseLayoutExportProblems(value.problems);
@@ -284,7 +285,7 @@ export function toIpcProjectDialogState(
     case "imageProcessingProgress":
       return { kind: state.kind, progress: toIpcProjectDialogProgress(state.progress) };
     case "imageProcessingProblems":
-      return { kind: state.kind, importedCount: state.importedCount, problems: state.problems.map(problem => ({ ...problem })) };
+      return { kind: state.kind, importedCount: state.importedCount, problems: state.problems.map(problem => ({ ...problem })), operationProblem: state.operationProblem ?? null };
     case "albumInformationConfirmation":
       return {
         busy: state.busy,
@@ -328,7 +329,7 @@ function fromIpcProjectDialogState(
     case "imageProcessingProgress":
       return { kind: state.kind, progress: fromIpcProjectDialogProgress(state.progress) };
     case "imageProcessingProblems":
-      return { kind: state.kind, importedCount: state.importedCount, problems: state.problems.map(problem => ({ ...problem })) };
+      return { kind: state.kind, importedCount: state.importedCount, problems: state.problems.map(problem => ({ ...problem })), ...(state.operationProblem ? { operationProblem: state.operationProblem } : {}) };
     case "albumInformationConfirmation":
       return {
         busy: state.busy,

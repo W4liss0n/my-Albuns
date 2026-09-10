@@ -10,9 +10,9 @@ implementation-readiness: ready-for-agent
 
 ## Escopo
 
-`ImagingProcessor` usa a memória disponível para ajustar o paralelismo e
-permite processamento individual quando a próxima imagem couber com uma
-margem de segurança. Este contrato substitui a espera indefinida sob pressão
+`ImagingProcessor` usa a RAM disponível para ajustar o paralelismo e
+permite processamento individual conforme a capacidade de commit do sistema,
+sem exigir RAM física livre. Este contrato substitui a espera indefinida sob pressão
 descrita anteriormente em
 [Importação com decode único e lotes](0020-importacao-com-decode-unico-e-lotes.md).
 Importação, Cache e inspeções compartilham o mesmo proprietário da admissão.
@@ -37,6 +37,12 @@ JPEG com declaração Adobe válida; o contrato corrigido está em
 O teste existente de espera, recuperação de recursos e cancelamento confirma
 que o código cumpre a regra; ele não valida a adequação dos limites escolhidos.
 
+Uma primeira revisão permitiu execução serial, mas ainda exigia 512 MiB de
+folga física. Às 20:18 de 10/09/2026, uma nova tentativa foi recusada com cerca
+de 350 MiB de RAM livre e 7 GiB de capacidade de commit disponível. Nenhum
+decoder precisou falhar: a exigência preventiva encerrou a importação antes
+do processamento. Essa revisão também foi substituída pela política abaixo.
+
 ## Política de admissão
 
 O teto agregado continua sendo o menor valor entre um quarto da RAM física
@@ -49,29 +55,41 @@ oitavo da RAM total, limitada entre 512 MiB e 2 GiB, usando somente metade
 da RAM e do commit restantes. As reservas ativas são descontadas desse
 orçamento: um trabalho admitido pode ainda não ter alocado seus buffers.
 
-Quando essa folga não permite paralelismo e não existe reserva ativa, pode
-ser admitido um único trabalho se sua estimativa couber na RAM física e
-no commit disponíveis depois de preservar 512 MiB, sem a divisão por dois.
-O piso de 512 MiB já fazia parte da política; a mudança retira as margens
-adicionais exigidas para concorrência quando há somente um trabalho.
-O teto agregado e os limites do decoder continuam valendo.
+Quando essa folga não permite paralelismo e não existe reserva ativa, admite-se
+um único trabalho se sua estimativa couber no commit disponível e no teto
+agregado, sem margem fixa adicional nem divisão por dois. RAM física livre
+não veta essa execução, inclusive quando a leitura é zero. O Windows pode
+atender memória comprometida com RAM e arquivo de paginação; a disponibilidade
+física indica o custo de residência e a conveniência da concorrência.
+Os limites do decoder continuam valendo.
 
 Enquanto houver trabalho ativo, a fila aguarda de forma cancelável e reavalia
 os recursos a cada 100 ms. A conclusão libera a reserva e permite continuar
 serialmente ou voltar ao paralelismo se houver folga. Não se interrompe um
 decoder iniciado apenas porque a pressão externa mudou.
 
-Se nenhum trabalho estiver ativo e a estimativa não couber nem individualmente,
-a admissão retorna `MemoryPressure` imediatamente. Essa falha não suspende nem
+Se nenhum trabalho estiver ativo e não houver capacidade de commit para a
+estimativa, a admissão retorna `MemoryPressure` imediatamente. Essa falha não suspende nem
 coloca o Processador em quarentena. Uma imagem acima do teto continua recebendo
 `MemoryLimit`. Ausência de telemetria permite apenas uma reserva até 1 GiB.
 
 ## Resultado e nova tentativa
 
-A operação termina o progresso e apresenta o motivo na Tela de Problemas.
+A operação termina o progresso e apresenta um único aviso de interrupção.
 Imagens já validadas são preservadas pelo resultado parcial normal, em uma
 única ação de Histórico. Uma imagem que não pôde ser validada por falta de
 recursos não recebe um vínculo fictício nem é marcada como corrompida.
+
+O motivo operacional é separado dos problemas de arquivos no resultado e nos
+eventos de processamento. Não se acrescenta uma linha por imagem não processada
+nem se conta essa interrupção como rejeição dos arquivos. Os lotes ativos são
+drenados, seus resultados válidos são aproveitados e novos lotes e inspeções
+pendentes deixam de ser iniciados. O progresso encerrado não preenche
+artificialmente o total dos Originais que ficaram sem processamento.
+
+Quando só existe a interrupção, usa-se a mensagem padrão da aplicação, sem
+tabela. Se também houve problemas reais de arquivos, a mesma janela apresenta
+o aviso geral e apenas essas linhas. Fechar o aviso preserva os sucessos.
 
 Depois de liberar memória, a pessoa pode executar novamente `Importar` por
 arquivos, pasta ou arraste. Essa é uma nova tentativa: as imagens já vinculadas
@@ -82,12 +100,15 @@ seleção de arquivos depois do término.
 
 ## Verificação e observabilidade
 
-- Admitir uma imagem estimada em 236 MiB com 1.699 MiB físicos e 3.393 MiB de
+- Admitir uma imagem estimada em 236 MiB com 350 MiB físicos e 7 GiB de
   commit disponíveis; manter o próximo trabalhador em espera até a liberação.
+- Admitir um trabalho individual também com zero de RAM física livre e commit
+  suficiente; manter a recusa por falta de commit e o teto por trabalho.
 - Concluir a importação real por arquivos e por pasta com um trabalhador sob
   a mesma pressão simulada, preservando todas as prévias e o progresso.
-- Recusar prontamente a falta de RAM ou commit até para um trabalho, permitir
-  nova tentativa após a recuperação e preservar resultados parciais sem duplicar.
+- Interromper por falta de commit com um motivo operacional, preservar
+  resultados nativos válidos mesmo depois de um item pendente na seleção e
+  permitir nova tentativa sem duplicar os sucessos.
 - Manter o teto agregado, os limites do decoder, o cancelamento, a quarentena
   e a confirmação de encerramento antes de devolver recursos.
 - Registrar `processor_memory_wait_started`, `processor_memory_admitted` e
@@ -123,12 +144,19 @@ outros programas. Outro teste executou os processos reais por arquivos e por
 pasta com 1.699 MiB físicos e 3.393 MiB de commit simulados, confirmando pico
 de um trabalhador e conclusão de todas as prévias.
 
-Na confirmação pelo aplicativo Windows, a pasta foi selecionada pelo diálogo
+Na confirmação da primeira revisão pelo aplicativo Windows, a pasta foi selecionada pelo diálogo
 nativo. A telemetria real registrou admissões seriais com RAM disponível entre
 1.289 e 1.865 MiB. A operação importou 44 imagens, sem rejeições ou falhas do
 Processador; a janela exibiu avanços intermediários e as 44 miniaturas foram
 carregadas, incluindo após rolar o Painel. Capturas e registros locais dessa
 verificação estão em `.scratch/memory-adobe-native-proof/`.
+
+A revisão seguinte passou pelo mesmo fluxo com processos reais, por arquivos
+e por pasta, usando 350 MiB físicos e 7 GiB de commit simulados. Cada tentativa
+concluiu as oito imagens e suas prévias com pico de um trabalhador. As
+regressões também verificam interrupção nativa sem inspeções adicionais,
+aproveitamento de resultados prontos posteriores na seleção e preservação do
+aviso durante um comando Salvar enfileirado.
 
 ## Contratos externos consultados
 
@@ -136,6 +164,11 @@ O contrato usado pelo projeto é Win32, por meio de `windows-sys` 0.61.2.
 A documentação de
 [PERFORMANCE_INFORMATION](https://learn.microsoft.com/en-us/windows/win32/api/psapi/ns-psapi-performance_information)
 distingue RAM física imediatamente reutilizável de capacidade de commit.
+[Page State](https://learn.microsoft.com/en-us/windows/win32/memory/page-state)
+especifica que páginas comprometidas são respaldadas por RAM e arquivos de
+paginação e só recebem residência física quando acessadas. O `CommitLimit`
+observado também pode crescer com o arquivo de paginação; a leitura atual é
+uma informação de admissão, não prova de que toda alocação futura falhará ou terá sucesso.
 [CreateMemoryResourceNotification](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-creatememoryresourcenotification)
 documenta sinais de pressão que permitem ajustar o consumo, inclusive uma
 faixa intermediária em que nenhum dos sinais está ativo. Esta implementação

@@ -425,6 +425,7 @@ impl ProjectHost {
                 .collect(),
             imported_count: outcome.imported_count as u32,
             problems: proposal.problems,
+            operation_problem: proposal.operation_problem,
         })
     }
 
@@ -1331,10 +1332,12 @@ mod tests {
                 imported_count,
                 media_ids,
                 problems,
+                operation_problem,
             } = fixture.host.import_photos(paths, |_| {}).unwrap()
             else {
                 panic!("selection completes")
             };
+            assert!(operation_problem.is_none());
             assert_eq!(projection, before);
             assert_eq!(imported_count, 0);
             assert!(media_ids.is_empty());

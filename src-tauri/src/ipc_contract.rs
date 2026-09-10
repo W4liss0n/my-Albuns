@@ -55,6 +55,7 @@ pub enum ProjectDialogState {
     ImageProcessingProblems {
         imported_count: Option<u32>,
         problems: Vec<ImageProcessingProblem>,
+        operation_problem: Option<String>,
     },
     AlbumInformationConfirmation {
         busy: bool,
@@ -604,6 +605,7 @@ pub struct ImageProcessingProgress {
     pub(crate) completed_files: u32,
     pub(crate) total_files: u32,
     pub(crate) problem: Option<ImageProcessingProblem>,
+    pub(crate) operation_problem: Option<String>,
 }
 
 #[derive(Serialize, TS)]
@@ -624,6 +626,7 @@ pub enum ImportMediaResult {
         media_ids: Vec<String>,
         imported_count: u32,
         problems: Vec<ImageProcessingProblem>,
+        operation_problem: Option<String>,
     },
 }
 

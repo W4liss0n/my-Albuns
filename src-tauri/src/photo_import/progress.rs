@@ -129,6 +129,13 @@ impl<F: FnMut(ImageProcessingProgress)> NativeImportProgress<F> {
         }
         state.batch
     }
+
+    pub(super) fn interrupt(self) -> ImageProcessingBatch<F> {
+        self.state
+            .into_inner()
+            .expect("import progress is available")
+            .batch
+    }
 }
 
 #[cfg(test)]
@@ -178,6 +185,17 @@ mod tests {
         let mut batch = progress.finish(5);
         batch.complete(None); // one existing photo is prepared separately
         assert_eq!(observed, vec![0, 1, 2, 3, 4, 5, 6]);
+    }
+
+    #[test]
+    fn interruption_keeps_unprocessed_sources_pending() {
+        let mut observed = Vec::new();
+        let batch = ImageProcessingBatch::new(5, |event| observed.push(event.completed_files));
+        let progress = NativeImportProgress::new(batch, &[]);
+        let source = PhotoImportSourceId::new("prepared").unwrap();
+        progress.complete_inspection(&source);
+        drop(progress.interrupt());
+        assert_eq!(observed, [0, 1]);
     }
 
     #[test]

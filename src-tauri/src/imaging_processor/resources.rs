@@ -16,7 +16,6 @@ use tokio::sync::{Notify, Semaphore};
 const MIB: u64 = 1024 * 1024;
 const GIB: u64 = 1024 * MIB;
 const RESOURCE_REFRESH: Duration = Duration::from_millis(100);
-const SERIAL_HEADROOM: u64 = 512 * MIB;
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct ImageMemoryEstimate(u64);
@@ -78,9 +77,9 @@ impl Resources {
     }
 
     fn serial_available(self) -> u64 {
-        self.ceiling()
-            .min(self.physical_available.saturating_sub(SERIAL_HEADROOM))
-            .min(self.commit_available.saturating_sub(SERIAL_HEADROOM))
+        // Windows can back committed memory with RAM or the paging file.
+        // Resident headroom governs concurrency, not whether one job may run.
+        self.ceiling().min(self.commit_available)
     }
 }
 
@@ -125,7 +124,7 @@ impl std::fmt::Display for ProcessorAdmissionFailure {
                 "a imagem excede o orçamento de memória disponível para processamento"
             }
             Self::MemoryPressure => {
-                "Não há memória disponível para processar a próxima imagem. Libere memória e tente novamente."
+                "Não foi possível continuar o processamento por falta de memória. Tente novamente mais tarde."
             }
         })
     }
@@ -320,8 +319,8 @@ mod tests {
             let budget = Arc::new(ResourceBudget::with_probe(|| {
                 Some(Resources {
                     physical_total: 24 * GIB,
-                    physical_available: 1699 * MIB,
-                    commit_available: 3393 * MIB,
+                    physical_available: 350 * MIB,
+                    commit_available: 7 * GIB,
                 })
             }));
             let permits = Semaphore::new(8);
@@ -356,7 +355,7 @@ mod tests {
             let current = Arc::new(Mutex::new(Resources {
                 physical_total: 24 * GIB,
                 physical_available: 256 * MIB,
-                commit_available: 3 * GIB,
+                commit_available: 200 * MIB,
             }));
             let probe = Arc::clone(&current);
             let budget = Arc::new(ResourceBudget::with_probe(move || {
@@ -375,7 +374,7 @@ mod tests {
                 ProcessorAdmissionFailure::MemoryPressure
             );
             *current.lock().unwrap() = abundant().unwrap();
-            current.lock().unwrap().commit_available = 600 * MIB;
+            current.lock().unwrap().commit_available = 200 * MIB;
             assert_eq!(
                 budget
                     .reserve(ImageMemoryEstimate(236 * MIB), &cancelled, &permits)
@@ -390,6 +389,13 @@ mod tests {
                     .reserve(ImageMemoryEstimate(236 * MIB), &cancelled, &permits)
                     .await
                     .unwrap(),
+            );
+            current.lock().unwrap().physical_available = 0;
+            drop(
+                budget
+                    .reserve(ImageMemoryEstimate(236 * MIB), &cancelled, &permits)
+                    .await
+                    .expect("free physical pages are not the commit capacity"),
             );
         });
     }

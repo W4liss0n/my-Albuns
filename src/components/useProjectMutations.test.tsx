@@ -374,7 +374,7 @@ test.each(["completed", "cancelled", "failed"] as const)(
   },
 );
 
-test("waits for image cache before Save and keeps its warning through a queued edit", async () => {
+test.each(["file", "operation"] as const)("waits for image cache before Save and keeps its %s warning through a queued edit", async (failureKind) => {
   let finish!: (result: Awaited<ReturnType<ProjectCorePort["importMedia"]>>) => void;
   let publish!: (progress: ImageProcessingProgress) => void;
   const imported = structuredClone(representativeProjection);
@@ -407,8 +407,10 @@ test("waits for image cache before Save and keeps its warning through a queued e
   expect(port.save).not.toHaveBeenCalled();
   expect(port.apply).not.toHaveBeenCalled();
   const problem = { fileName: "Foto.jpg", reason: "A Foto foi vinculada, mas seu Cache não pôde ser preparado." };
+  const operationProblem = "Não foi possível continuar o processamento por falta de memória.";
+  const warning = failureKind === "file" ? { problem } : { operationProblem };
   await act(async () => {
-    publish({ completedFiles: 1, totalFiles: 1, problem });
+    publish({ completedFiles: 1, totalFiles: 1, ...warning });
     finish({ kind: "completed", projection: imported, importedCount: 1, mediaIds: ["media-001"], problems: [] });
     await importing;
     await editing;
@@ -416,7 +418,9 @@ test("waits for image cache before Save and keeps its warning through a queued e
   expect(port.save).toHaveBeenCalledWith(imported.state.revision);
   expect(view.result.current.photoImportResult?.importedCount).toBe(1);
   expect(view.result.current.imageProcessingProgress).toBeNull();
-  expect(view.result.current.imageProcessingProblems).toEqual([problem]);
+  expect(view.result.current.imageProcessingProblems).toEqual(failureKind === "file" ? [problem] : []);
+  expect(view.result.current.imageProcessingOperationProblem).toBe(failureKind === "operation" ? operationProblem : null);
   act(() => view.result.current.dismissImageProcessingProblems());
   expect(view.result.current.imageProcessingProblems).toEqual([]);
+  expect(view.result.current.imageProcessingOperationProblem).toBeNull();
 });

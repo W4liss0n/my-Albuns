@@ -153,7 +153,7 @@ fn real_import_flow_finishes_serially_under_memory_pressure() {
             MediaKind::Photo,
             small_inputs,
             by_folder,
-            Some((1699, 3393)),
+            Some((350, 7168)),
         );
     }
 }

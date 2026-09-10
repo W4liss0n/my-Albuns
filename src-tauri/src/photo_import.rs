@@ -7,6 +7,7 @@ use progress::NativeImportProgress;
 use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
+    sync::atomic::{AtomicBool, Ordering},
 };
 
 use futures_util::{StreamExt, stream};
@@ -55,6 +56,7 @@ struct PhotoImportAttempt {
     paths: Vec<PathBuf>,
     sources: Vec<SelectedSource>,
     selection_problems: Vec<ImageProcessingProblem>,
+    operation_problem: Option<String>,
 }
 
 impl PhotoImportAttempt {
@@ -126,6 +128,7 @@ impl PhotoImportAttempt {
             paths,
             sources,
             selection_problems,
+            operation_problem: None,
         })
     }
 
@@ -173,6 +176,7 @@ pub(crate) async fn import_selected_media(
         completed_files: 0,
         total_files: 0,
         problem: None,
+        operation_problem: None,
     });
     let capture_app = app.clone();
     let (mut attempt, mut stage, stage_error) = tauri::async_runtime::spawn_blocking(move || {
@@ -208,26 +212,34 @@ pub(crate) async fn import_selected_media(
     };
     let new_source_count = attempt.sources.len();
     let native_progress = NativeImportProgress::new(progress, &requests);
+    let interrupted = AtomicBool::new(false);
     let batches = stream::iter(requests)
         .map(|request| {
             let progress = &native_progress;
+            let interrupted = &interrupted;
             async move {
-                let result =
-                    execute_import_batch(app, &request, &|event| progress.report(event)).await;
+                let result = if interrupted.load(Ordering::Acquire) {
+                    Err(BatchFailure::MemoryPressure)
+                } else {
+                    execute_import_batch(app, &request, &|event| progress.report(event)).await
+                };
+                if matches!(result, Err(BatchFailure::MemoryPressure)) {
+                    interrupted.store(true, Ordering::Release);
+                }
                 (request, result)
             }
         })
         .buffer_unordered(app.state::<ImagingProcessor>().cache_capacity())
         .collect::<Vec<_>>()
         .await;
-    if let Some(failure) = batches
-        .iter()
-        .find_map(|(_, result)| result.as_ref().err().filter(|failure| failure.quarantined))
-    {
+    if let Some(message) = batches.iter().find_map(|(_, result)| match result {
+        Err(BatchFailure::Quarantined(message)) => Some(message),
+        _ => None,
+    }) {
         if let Some(stage) = &mut stage {
             stage.defer_cleanup_until_restart();
         }
-        return Err(failure.message.clone());
+        return Err(message.clone());
     }
     let mut outcomes = HashMap::new();
     let mut cache_problems = HashMap::new();
@@ -239,9 +251,13 @@ pub(crate) async fn import_selected_media(
                     .into_iter()
                     .map(|photo| (photo.source_id, photo.outcome)),
             ),
-            Err(failure) => {
+            Err(BatchFailure::MemoryPressure) => {
+                attempt.operation_problem =
+                    Some(ProcessorAdmissionFailure::MemoryPressure.to_string());
+            }
+            Err(BatchFailure::Recoverable(message) | BatchFailure::Quarantined(message)) => {
                 for candidate in request.candidates {
-                    cache_problems.insert(candidate.path().to_path_buf(), failure.message.clone());
+                    cache_problems.insert(candidate.path().to_path_buf(), message.clone());
                 }
             }
         }
@@ -304,13 +320,26 @@ pub(crate) async fn import_selected_media(
     .await
     .map_err(|_| "Não foi possível concluir a importação das imagens.".to_string())??;
     drop(_commit_permit);
-    let mut progress = native_progress.finish((new_source_count + unsupported_count) as u32);
+    let interrupted = matches!(
+        &result,
+        ImportMediaResult::Completed {
+            operation_problem: Some(_),
+            ..
+        }
+    );
+    let mut progress = if interrupted {
+        native_progress.interrupt()
+    } else {
+        native_progress.finish((new_source_count + unsupported_count) as u32)
+    };
     for path in new_paths {
         if let Some(reason) = cache_problems.get(&path) {
             progress.report_problem(cache_problem(&path, reason.clone()));
         }
     }
-    progress.prepare_all_in_plan(app, existing, roots).await;
+    if !interrupted {
+        progress.prepare_all_in_plan(app, existing, roots).await;
+    }
     if let ImportMediaResult::Completed { projection, .. } = &mut result {
         *projection = host.projection()?;
     }
@@ -343,6 +372,7 @@ fn prepare_proposal_with_inspection(
         kind: attempt.kind,
         commands: Vec::new(),
         problems: unsupported,
+        operation_problem: attempt.operation_problem.clone(),
         inspections: Vec::new(),
     };
     let mut accepted_paths = Vec::new();
@@ -396,6 +426,9 @@ fn prepare_proposal_with_inspection(
                 "O Original mudou durante a preparação da miniatura.".into(),
             );
         }
+        if proposal.operation_problem.is_some() {
+            continue;
+        }
         let fallback = inspect(&source.candidate);
         if !fallback.commands.is_empty() {
             accepted_paths.push(path.clone());
@@ -407,6 +440,7 @@ fn prepare_proposal_with_inspection(
         }
         proposal.commands.extend(fallback.commands);
         proposal.problems.extend(fallback.problems);
+        proposal.operation_problem = fallback.operation_problem;
         proposal.inspections.extend(fallback.inspections);
     }
     Ok(PreparedImport {
@@ -576,9 +610,10 @@ fn commit_prepared_import(
     })
 }
 
-struct BatchFailure {
-    message: String,
-    quarantined: bool,
+enum BatchFailure {
+    Recoverable(String),
+    MemoryPressure,
+    Quarantined(String),
 }
 
 async fn execute_import_batch(
@@ -604,19 +639,17 @@ async fn execute_import_batch(
         )
     })
     .await
-    .map_err(|_| BatchFailure {
-        message: "Não foi possível estimar os recursos do lote.".into(),
-        quarantined: false,
+    .map_err(|_| {
+        BatchFailure::Recoverable("Não foi possível estimar os recursos do lote.".into())
     })?;
     loop {
         if !app
             .state::<ProjectHost>()
             .is_current_project(&request.project_id)
         {
-            return Err(BatchFailure {
-                message: "O Projeto mudou durante a importação.".into(),
-                quarantined: false,
-            });
+            return Err(BatchFailure::Recoverable(
+                "O Projeto mudou durante a importação.".into(),
+            ));
         }
         if cancellation.reason() == Some(CacheCancellationReason::Paused) {
             cancellation.resume_after_pause();
@@ -627,10 +660,9 @@ async fn execute_import_batch(
             continue;
         }
         if engine.processor_status() == CacheProcessorStatus::Suspended {
-            return Err(BatchFailure {
-                message: "O Processador de Imagens está suspenso.".into(),
-                quarantined: false,
-            });
+            return Err(BatchFailure::Recoverable(
+                "O Processador de Imagens está suspenso.".into(),
+            ));
         }
         let reservation = match processor
             .reserve_cache_for(estimate, cancellation.flag())
@@ -641,12 +673,15 @@ async fn execute_import_batch(
                 drop(permit);
                 continue;
             }
-            Err(error) => {
-                return Err(BatchFailure {
-                    message: error.to_string(),
-                    quarantined: error == ProcessorAdmissionFailure::Unavailable,
-                });
+            Err(ProcessorAdmissionFailure::MemoryPressure) => {
+                return Err(BatchFailure::MemoryPressure);
             }
+            Err(ProcessorAdmissionFailure::Unavailable) => {
+                return Err(BatchFailure::Quarantined(
+                    ProcessorAdmissionFailure::Unavailable.to_string(),
+                ));
+            }
+            Err(error) => return Err(BatchFailure::Recoverable(error.to_string())),
         };
         if cancellation.reason().is_some() {
             drop(reservation);
@@ -675,18 +710,13 @@ async fn execute_import_batch(
             )) if request_id == request.request_id => {
                 completion
                     .validate_for(request)
-                    .map_err(|message| BatchFailure {
-                        message,
-                        quarantined: false,
-                    })?;
+                    .map_err(BatchFailure::Recoverable)?;
                 return Ok(completion);
             }
             Ok(_) => {
-                return Err(BatchFailure {
-                    message: "O Processador devolveu uma conclusão incompatível com a importação."
-                        .into(),
-                    quarantined: false,
-                });
+                return Err(BatchFailure::Recoverable(
+                    "O Processador devolveu uma conclusão incompatível com a importação.".into(),
+                ));
             }
             Err(failure)
                 if failure.stage
@@ -694,10 +724,7 @@ async fn execute_import_batch(
                         InvocationFailureStage::TerminationUnconfirmed,
                     ) =>
             {
-                return Err(BatchFailure {
-                    message: failure.message,
-                    quarantined: true,
-                });
+                return Err(BatchFailure::Quarantined(failure.message));
             }
             Err(failure) => {
                 if matches!(
@@ -708,10 +735,7 @@ async fn execute_import_batch(
                 {
                     continue;
                 }
-                return Err(BatchFailure {
-                    message: failure.message,
-                    quarantined: false,
-                });
+                return Err(BatchFailure::Recoverable(failure.message));
             }
         }
     }
@@ -775,14 +799,20 @@ fn inspect_with_capacity(
         kind,
         commands: Vec::new(),
         inspections: Vec::new(),
-        problems: vec![ImageProcessingProblem {
-            file_name: path
-                .file_name()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .into_owned(),
-            reason: error.to_string(),
-        }],
+        operation_problem: (error == ProcessorAdmissionFailure::MemoryPressure)
+            .then(|| error.to_string()),
+        problems: if error == ProcessorAdmissionFailure::MemoryPressure {
+            Vec::new()
+        } else {
+            vec![ImageProcessingProblem {
+                file_name: path
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .into_owned(),
+                reason: error.to_string(),
+            }]
+        },
     })
 }
 
@@ -1071,13 +1101,57 @@ mod tests {
     }
 
     #[test]
+    fn native_memory_interruption_preserves_prepared_sources_without_fallback_inspections() {
+        let fixture = Fixture::new();
+        let pending = fixture.photo("pendente.jpg");
+        let prepared_path = fixture.photo("preparada.jpg");
+        let mut attempt = fixture.attempt(vec![pending, prepared_path]);
+        attempt.operation_problem = Some(ProcessorAdmissionFailure::MemoryPressure.to_string());
+        let prepared_source = &attempt.sources[1];
+        let outcomes = HashMap::from([(
+            prepared_source.candidate.source_id.clone(),
+            validated(prepared_source),
+        )]);
+        let prepared = prepare_proposal_with_inspection(
+            attempt,
+            None,
+            outcomes,
+            HashMap::new(),
+            None,
+            Vec::new(),
+            |_| panic!("native interruption must not start fallback inspection"),
+        )
+        .unwrap();
+        let ImportMediaResult::Completed {
+            imported_count,
+            problems,
+            operation_problem,
+            ..
+        } = fixture
+            .host
+            .commit_photo_import_proposal(fixture.namespace.project_id(), prepared.proposal)
+            .unwrap()
+        else {
+            panic!("prepared source completes the partial action")
+        };
+        assert_eq!(imported_count, 1);
+        assert!(problems.is_empty());
+        assert_eq!(
+            operation_problem,
+            Some(ProcessorAdmissionFailure::MemoryPressure.to_string())
+        );
+    }
+
+    #[test]
     fn memory_pressure_keeps_partial_imports_and_allows_retry_without_duplicates() {
         let fixture = Fixture::new();
         let first = fixture.photo("preparada.jpg");
         let second = fixture.photo("pendente.jpg");
+        let third = fixture.photo("ainda-nao-processada.jpg");
         let engine = CacheEngine::default();
-        let blocked = ImagingProcessor::with_available_memory_for_test(256, 3393);
-        let attempt = fixture.attempt(vec![first.clone(), second.clone()]);
+        let blocked = ImagingProcessor::with_available_memory_for_test(350, 32);
+        let attempt = fixture.attempt(vec![second.clone(), first.clone(), third.clone()]);
+        let inspections = std::cell::Cell::new(0);
         let roots = attempt.roots.clone();
         let outcomes = attempt
             .sources
@@ -1093,6 +1167,7 @@ mod tests {
             None,
             Vec::new(),
             |candidate| {
+                inspections.set(inspections.get() + 1);
                 inspect_with_capacity(
                     MediaKind::Photo,
                     &engine,
@@ -1107,6 +1182,7 @@ mod tests {
         let ImportMediaResult::Completed {
             imported_count,
             problems,
+            operation_problem,
             ..
         } = fixture
             .host
@@ -1116,15 +1192,23 @@ mod tests {
             panic!("partial import completes");
         };
         assert_eq!(imported_count, 1);
-        assert_eq!(problems.len(), 1);
         assert_eq!(
-            problems[0].reason,
-            ProcessorAdmissionFailure::MemoryPressure.to_string()
+            inspections.get(),
+            1,
+            "pending sources stop after the resource interruption"
+        );
+        assert!(
+            problems.is_empty(),
+            "a resource interruption does not reject files"
+        );
+        assert_eq!(
+            operation_problem,
+            Some(ProcessorAdmissionFailure::MemoryPressure.to_string())
         );
         let first_binding = fixture.host.authorized_media_catalog().unwrap().bindings[0].clone();
 
-        let available = ImagingProcessor::with_available_memory_for_test(1699, 3393);
-        let attempt = fixture.attempt(vec![first, second]);
+        let available = ImagingProcessor::with_available_memory_for_test(350, 7168);
+        let attempt = fixture.attempt(vec![first, second, third]);
         let roots = attempt.roots.clone();
         let bindings = attempt.catalog.bindings.clone();
         let prepared = prepare_proposal_with_inspection(
@@ -1158,9 +1242,9 @@ mod tests {
         else {
             panic!("retry completes");
         };
-        assert_eq!(imported_count, 1, "retry adds only the remaining image");
+        assert_eq!(imported_count, 2, "retry adds only the remaining images");
         assert!(problems.is_empty());
-        assert_eq!(projection.state.album.media.len(), 2);
+        assert_eq!(projection.state.album.media.len(), 3);
         assert_eq!(fixture.host.undo().unwrap().state.album.media.len(), 1);
         assert_eq!(
             fixture.host.authorized_media_catalog().unwrap().bindings[0].media_id,

@@ -11,6 +11,7 @@ import type { MediaImportCompletion, ImageProcessingProblem } from "../applicati
 interface ProjectOperationResultDialogOptions {
   importResult?: MediaImportCompletion | null;
   processingProblems?: readonly ImageProcessingProblem[];
+  processingOperationProblem?: string | null;
   message: string | null;
   projectDialogPort: ProjectDialogPort;
   onDismiss(kind: "projectOperationFailure" | "imageProcessingProblems"): void;
@@ -20,21 +21,24 @@ export function useProjectOperationResultDialog({
   message,
   importResult,
   processingProblems,
+  processingOperationProblem,
   projectDialogPort,
   onDismiss,
 }: ProjectOperationResultDialogOptions) {
   const feedback = useMemo(() => {
     if (message) return { kind: "projectOperationFailure" as const, message };
     const problems = [...(importResult?.problems ?? []), ...(processingProblems ?? [])];
-    if (problems.length) {
+    const operationProblem = importResult?.operationProblem ?? processingOperationProblem;
+    if (problems.length || operationProblem) {
       return {
         kind: "imageProcessingProblems" as const,
-        importedCount: importResult?.problems.length ? importResult.importedCount : null,
+        importedCount: importResult && (importResult.problems.length || operationProblem) ? importResult.importedCount : null,
         problems,
+        ...(operationProblem ? { operationProblem } : {}),
       };
     }
     return null;
-  }, [message, importResult, processingProblems]);
+  }, [message, importResult, processingProblems, processingOperationProblem]);
   const feedbackRef = useRef(feedback);
   const onDismissRef = useRef(onDismiss);
   const presentedFeedbackRef = useRef<typeof feedback>(null);

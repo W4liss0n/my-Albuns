@@ -7920,6 +7920,57 @@
           "selector": "[aria-label=\"Decorativos\"]"
         }
       ]
+    },
+    {
+      "id": "photo-import-memory-interruption",
+      "title": "Importação — interrupção única por memória",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22imageProcessingProblems%22%2C%22importedCount%22%3A2%2C%22problems%22%3A%5B%5D%2C%22operationProblem%22%3A%22N%C3%A3o%20foi%20poss%C3%ADvel%20continuar%20o%20processamento%20por%20falta%20de%20mem%C3%B3ria.%20Tente%20novamente%20mais%20tarde.%22%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-message-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "A revisão aceita em docs/design/0032-revisao-da-admissao-por-memoria.md distingue a interrupção da operação dos problemas reais de arquivo, usando os diálogos canônicos."
+      },
+      "viewport": {
+        "width": 520,
+        "height": 320
+      },
+      "readySelector": ".ui-standard-message[role=\"alert\"]",
+      "actions": []
+    },
+    {
+      "id": "photo-import-memory-with-file-problems",
+      "title": "Importação — interrupção por memória e arquivo corrompido",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22imageProcessingProblems%22%2C%22importedCount%22%3A2%2C%22problems%22%3A%5B%7B%22fileName%22%3A%22DSC_0148.jpg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%5D%2C%22operationProblem%22%3A%22N%C3%A3o%20foi%20poss%C3%ADvel%20continuar%20o%20processamento%20por%20falta%20de%20mem%C3%B3ria.%20Tente%20novamente%20mais%20tarde.%22%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-problems-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "A revisão aceita em docs/design/0032-revisao-da-admissao-por-memoria.md distingue a interrupção da operação dos problemas reais de arquivo, usando os diálogos canônicos."
+      },
+      "viewport": {
+        "width": 640,
+        "height": 438
+      },
+      "readySelector": ".ui-problems-table",
+      "actions": []
+    },
+    {
+      "id": "image-processing-memory-interruption",
+      "title": "Processamento — interrupção única por memória",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22imageProcessingProblems%22%2C%22importedCount%22%3Anull%2C%22problems%22%3A%5B%5D%2C%22operationProblem%22%3A%22N%C3%A3o%20foi%20poss%C3%ADvel%20continuar%20o%20processamento%20por%20falta%20de%20mem%C3%B3ria.%20Tente%20novamente%20mais%20tarde.%22%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-message-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "A revisão aceita em docs/design/0032-revisao-da-admissao-por-memoria.md distingue a interrupção da operação dos problemas reais de arquivo, usando os diálogos canônicos."
+      },
+      "viewport": {
+        "width": 520,
+        "height": 320
+      },
+      "readySelector": ".ui-standard-message[role=\"alert\"]",
+      "actions": []
     }
   ]
 }

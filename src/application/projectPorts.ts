@@ -252,6 +252,7 @@ export interface ImageProcessingProgress {
   completedFiles: number;
   totalFiles: number;
   problem?: ImageProcessingProblem | null;
+  operationProblem?: string | null;
 }
 
 export interface MediaImportCompletion {
@@ -260,6 +261,7 @@ export interface MediaImportCompletion {
   mediaIds: string[];
   importedCount: number;
   problems: ImageProcessingProblem[];
+  operationProblem?: string | null;
 }
 
 export type MediaImportSelection = {

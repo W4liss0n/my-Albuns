@@ -277,6 +277,7 @@ struct CacheFlightKey {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum CacheFailureStage {
     Plan,
+    MemoryPressure,
     Processor(InvocationFailureStage),
     ProcessorSuspended,
     RecoveryCleanup,
