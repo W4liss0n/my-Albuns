@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, type ReactNode } from "react";
 
 import { ActionButton } from "./ActionButton";
 import { DialogFocusScope } from "./DialogFocusScope";
@@ -9,7 +9,7 @@ interface ProblemsDialogProps {
   title: string;
   description: string;
   columns: readonly string[];
-  rows: readonly (readonly string[])[];
+  rows: readonly (readonly ReactNode[])[];
   onClose(): void;
 }
 

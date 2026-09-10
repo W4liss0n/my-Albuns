@@ -427,6 +427,7 @@
             ],
             "heightUm": 300000,
             "id": "sheet-001",
+            "layoutLocked": false,
             "number": 1,
             "pageNumbers": [
               1,
@@ -475,6 +476,7 @@
             ],
             "heightUm": 300000,
             "id": "sheet-002",
+            "layoutLocked": false,
             "number": 2,
             "pageNumbers": [
               3,
@@ -948,6 +950,7 @@
                 ],
                 "heightUm": 300000,
                 "id": "sheet-001",
+                "layoutLocked": false,
                 "number": 1,
                 "pageNumbers": [
                   1,
@@ -996,6 +999,7 @@
                 ],
                 "heightUm": 300000,
                 "id": "sheet-002",
+                "layoutLocked": false,
                 "number": 2,
                 "pageNumbers": [
                   3,
@@ -1472,6 +1476,7 @@
                 ],
                 "heightUm": 300000,
                 "id": "sheet-001",
+                "layoutLocked": false,
                 "number": 1,
                 "pageNumbers": [
                   1,
@@ -1520,6 +1525,7 @@
                 ],
                 "heightUm": 300000,
                 "id": "sheet-002",
+                "layoutLocked": false,
                 "number": 2,
                 "pageNumbers": [
                   3,
@@ -1647,6 +1653,7 @@
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-001",
+                "layoutLocked": false,
                 "number": 1,
                 "pageNumbers": [
                   1,
@@ -1660,6 +1667,7 @@
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-002",
+                "layoutLocked": false,
                 "number": 2,
                 "pageNumbers": [
                   3,
@@ -1782,6 +1790,7 @@
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-001",
+                "layoutLocked": false,
                 "number": 1,
                 "pageNumbers": [
                   1,
@@ -1795,6 +1804,7 @@
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-002",
+                "layoutLocked": false,
                 "number": 2,
                 "pageNumbers": [
                   3,
@@ -1957,6 +1967,7 @@
                 ],
                 "heightUm": 300000,
                 "id": "sheet-001",
+                "layoutLocked": false,
                 "number": 1,
                 "pageNumbers": [
                   1,
@@ -1970,6 +1981,7 @@
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-002",
+                "layoutLocked": false,
                 "number": 2,
                 "pageNumbers": [
                   3,
@@ -2127,6 +2139,7 @@
                 ],
                 "heightUm": 300000,
                 "id": "sheet-001",
+                "layoutLocked": false,
                 "number": 1,
                 "pageNumbers": [
                   1,
@@ -2140,6 +2153,7 @@
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-002",
+                "layoutLocked": false,
                 "number": 2,
                 "pageNumbers": [
                   3,
@@ -2267,6 +2281,7 @@
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-001",
+                "layoutLocked": false,
                 "number": 1,
                 "pageNumbers": [
                   1
@@ -2279,6 +2294,7 @@
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-002",
+                "layoutLocked": false,
                 "number": 2,
                 "pageNumbers": [
                   2,
@@ -2401,6 +2417,7 @@
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-001",
+                "layoutLocked": false,
                 "number": 1,
                 "pageNumbers": [
                   1
@@ -2413,6 +2430,7 @@
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-002",
+                "layoutLocked": false,
                 "number": 2,
                 "pageNumbers": [
                   2,
@@ -2540,6 +2558,7 @@
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-001",
+                "layoutLocked": false,
                 "number": 1,
                 "pageNumbers": [
                   1,
@@ -2553,6 +2572,7 @@
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-002",
+                "layoutLocked": false,
                 "number": 2,
                 "pageNumbers": [
                   3
@@ -2674,6 +2694,7 @@
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-001",
+                "layoutLocked": false,
                 "number": 1,
                 "pageNumbers": [
                   1,
@@ -2687,6 +2708,7 @@
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-002",
+                "layoutLocked": false,
                 "number": 2,
                 "pageNumbers": [
                   3

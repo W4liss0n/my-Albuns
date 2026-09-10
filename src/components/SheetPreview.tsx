@@ -66,20 +66,28 @@ export function SheetPreviewShell({
   viewport,
 }: SheetPreviewShellProps) {
   return (
+    <SheetPreviewSurface activeSides={sheet.activeSides} className={className}>
+      <SheetPreview mediaPreviewUrls={mediaPreviewUrls} sheet={sheet} viewport={viewport} />
+      {children}
+    </SheetPreviewSurface>
+  );
+}
+
+export function SheetPreviewSurface({ activeSides, className, children }: {
+  activeSides: ComposedSheet["activeSides"];
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
     <span
       className={
         className
           ? `sheet-preview-shell ${className}`
           : "sheet-preview-shell"
       }
-      data-active-sides={sheet.activeSides}
-      style={sheetPreviewShellStyle(sheet.activeSides)}
+      data-active-sides={activeSides}
+      style={sheetPreviewShellStyle(activeSides)}
     >
-      <SheetPreview
-        mediaPreviewUrls={mediaPreviewUrls}
-        sheet={sheet}
-        viewport={viewport}
-      />
       {children}
     </span>
   );

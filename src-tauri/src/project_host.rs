@@ -510,9 +510,10 @@ impl ProjectHost {
     pub(crate) fn query_layouts(
         &self,
         sheet_id: &str,
+        expansion: Option<myalbuns_core::LayoutExpansion>,
     ) -> Result<myalbuns_core::LayoutQueryResult, String> {
         self.project()?
-            .query_layouts(sheet_id)
+            .query_layouts_with_expansion(sheet_id, expansion)
             .map_err(|error| error.to_string())
     }
 
@@ -859,6 +860,16 @@ impl ProjectHost {
             output_unit,
             sources,
         })
+    }
+
+    pub(crate) fn validate_sheet_export(
+        &self,
+        sheet_id: &str,
+    ) -> Result<Vec<myalbuns_core::LayoutExportProblem>, String> {
+        self.project()?
+            .freeze_rendering()
+            .validate_export_sheets(&[sheet_id.into()])
+            .map_err(|error| error.to_string())
     }
 
     fn project(&self) -> Result<ActiveProject<'_>, String> {
@@ -1876,6 +1887,12 @@ mod tests {
     #[test]
     #[ignore = "executed by scripts/Test-Rust.ps1 with the freshly built real sidecar"]
     fn reopened_project_exports_the_frozen_visible_sheet_through_the_real_processor() {
+        for lock_layout in [false, true] {
+            assert_reopened_project_exports_layout(lock_layout);
+        }
+    }
+
+    fn assert_reopened_project_exports_layout(lock_layout: bool) {
         tauri::async_runtime::block_on(async {
             let executable = PathBuf::from(
                 std::env::var_os(TEST_PROCESSOR_ENV)
@@ -1963,7 +1980,7 @@ mod tests {
             let affected_frame_id = placed
                 .affected_frame_id
                 .expect("the added Frame is returned to the UI boundary");
-            let layouts = host.query_layouts(&sheet_id).unwrap();
+            let layouts = host.query_layouts(&sheet_id, None).unwrap();
             let selection = myalbuns_core::LayoutSelection {
                 query_id: layouts.query_id,
                 candidate_index: layouts.listing.candidates.len() - 1,
@@ -2020,7 +2037,47 @@ mod tests {
                 host.redo().unwrap().state.album,
                 resized.projection.state.album
             );
-            host.save(resized.projection.state.revision)
+            let saved = if lock_layout {
+                let lock_query = host
+                    .query_layouts(
+                        &sheet_id,
+                        Some(myalbuns_core::LayoutExpansion {
+                            additional_positions: 1,
+                            orientation: myalbuns_core::FrameOrientation::Horizontal,
+                        }),
+                    )
+                    .unwrap();
+                let lock_selection = myalbuns_core::LayoutSelection {
+                    query_id: lock_query.query_id,
+                    candidate_index: 0,
+                };
+                let locked_preview = host.preview_layout(&lock_selection).unwrap();
+                let locked = host
+                    .apply_with_outcome(ProjectIntent::LockLayout {
+                        selection: lock_selection,
+                    })
+                    .unwrap();
+                assert_eq!(
+                    locked.projection.composition.sheets[1].frames,
+                    locked_preview
+                );
+                assert_eq!(host.validate_sheet_export(&sheet_id).unwrap().len(), 1);
+                assert!(host.freeze_sheet_export(&sheet_id).is_err());
+                let filled = host
+                    .apply_with_outcome(ProjectIntent::AddPhoto {
+                        sheet_id: sheet_id.clone(),
+                        media_id: imported_media_id,
+                        mode: PhotoPlacementMode::Normal,
+                    })
+                    .unwrap();
+                assert!(host.validate_sheet_export(&sheet_id).unwrap().is_empty());
+                assert!(filled.projection.state.album.sheets[1].layout_locked);
+                filled.projection
+            } else {
+                resized.projection
+            };
+            let saved_frames = saved.composition.sheets[1].frames.clone();
+            host.save(saved.state.revision)
                 .expect("the Photo composition is saved before reopening");
             assert_eq!(
                 host.begin_close(),
@@ -2038,7 +2095,8 @@ mod tests {
                 "the initial and visible noninitial Lâminas must be semantically distinguishable"
             );
             let reopened_frame = &dirty.composition.sheets[1].frames[0];
-            assert_eq!(reopened_frame.clip_rect, preview.clip_rect);
+            assert_eq!(reopened_frame.clip_rect, saved_frames[0].clip_rect);
+            assert_eq!(dirty.state.album.sheets[1].layout_locked, lock_layout);
             let reopened_photo = reopened_frame
                 .photo
                 .as_ref()
@@ -2139,16 +2197,19 @@ mod tests {
                 right[0] > right[1] * 3 && right[2] > right[1] * 3,
                 "the red translucent Overlay is composed over the blue right Background"
             );
-            let actual_photo = rendered.get_pixel(rendered.width() / 2, rendered.height() / 2);
-            let outside_resized_frame = rendered.get_pixel(
-                (((original_rect.x + 10_000) as f64 / 600_000.0) * f64::from(rendered.width()))
-                    as u32,
-                rendered.height() / 2,
-            );
-            assert!(
-                (0..3).all(|channel| outside_resized_frame[channel].abs_diff(left[channel]) <= 12),
-                "the area removed by resize contains the Background and Overlay, not the previous Photo"
-            );
+            if !lock_layout {
+                let outside_resized_frame = rendered.get_pixel(
+                    (((original_rect.x + 10_000) as f64 / 600_000.0) * f64::from(rendered.width()))
+                        as u32,
+                    rendered.height() / 2,
+                );
+                assert!(
+                    (0..3).all(
+                        |channel| outside_resized_frame[channel].abs_diff(left[channel]) <= 12
+                    ),
+                    "the area removed by resize contains the Background and Overlay, not the previous Photo"
+                );
+            }
             let decoded_original = image::open(&photo_path)
                 .expect("the current linked Original decodes")
                 .to_rgb8();
@@ -2159,14 +2220,22 @@ mod tests {
                 ((10_u16 * 128 + u16::from(source_photo[1]) * 127) / 255) as u8,
                 ((10_u16 * 128 + u16::from(source_photo[2]) * 127) / 255) as u8,
             ];
-            let photo_max_channel_delta = (0..3)
-                .map(|channel| actual_photo[channel].abs_diff(expected_photo[channel]))
-                .max()
-                .expect("three RGB channels are compared");
-            assert!(
-                photo_max_channel_delta <= 12,
-                "Canvas-equivalent Photo composition and JPEG differ by {photo_max_channel_delta} channels at the sampled point"
-            );
+            for frame in &saved_frames {
+                let center_x = frame.clip_rect.x + frame.clip_rect.width / 2;
+                let center_y = frame.clip_rect.y + frame.clip_rect.height / 2;
+                let actual_photo = rendered.get_pixel(
+                    (center_x as f64 / 600_000.0 * f64::from(rendered.width())) as u32,
+                    (center_y as f64 / 300_000.0 * f64::from(rendered.height())) as u32,
+                );
+                let photo_max_channel_delta = (0..3)
+                    .map(|channel| actual_photo[channel].abs_diff(expected_photo[channel]))
+                    .max()
+                    .expect("three RGB channels are compared");
+                assert!(
+                    photo_max_channel_delta <= 12,
+                    "Canvas-equivalent Photo composition and JPEG differ by {photo_max_channel_delta} channels at the sampled point"
+                );
+            }
             assert_eq!(
                 std::fs::read(&photo_path).expect("the Original remains readable after Exportação"),
                 original_photo_bytes,

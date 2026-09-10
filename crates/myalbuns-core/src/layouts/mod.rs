@@ -80,6 +80,23 @@ pub struct LayoutSelection {
     pub candidate_index: usize,
 }
 
+/// An explicit request for future placeholder profiles; never inferred from Photos.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct LayoutExpansion {
+    pub additional_positions: usize,
+    pub orientation: FrameOrientation,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct LayoutExportProblem {
+    pub sheet_id: String,
+    pub sheet_number: usize,
+    pub frame_id: String,
+    pub frame_number: usize,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct LayoutQueryResult {
@@ -88,6 +105,7 @@ pub struct LayoutQueryResult {
     pub revision: u64,
     pub sheet_id: String,
     pub frame_count: usize,
+    pub locked: bool,
     pub settings: LayoutSettings,
     pub listing: LayoutListing,
 }

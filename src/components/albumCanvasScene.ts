@@ -36,6 +36,7 @@ import { FrameInteractionSession } from "./frameInteractionSession";
 import { FrameContentDragSession } from "./frameContentDragSession";
 import { FrameContentDragVisual } from "./frameContentDragVisual";
 import { ViewportTexturePool } from "./viewportTexturePool";
+import { createNormalCanvasLayout } from "./canvasSheetViewGeometry";
 
 const PRELOAD_MARGIN = 1;
 const VIEWPORT_PRELOAD_PX = 700;
@@ -148,8 +149,9 @@ export class AlbumCanvasScene {
     }
     const returnedToContinuousCanvas =
       !projectChanged &&
-      this.input?.mode.kind === "sheet-editing" &&
-      input.mode.kind === "normal";
+      this.input !== null &&
+      !albumCanvasModePolicy(this.input.mode).enablesContinuousNavigation &&
+      albumCanvasModePolicy(input.mode).enablesContinuousNavigation;
     const modeSignature = JSON.stringify(input.mode);
     if (
       this.modeSignature !== null &&
@@ -162,6 +164,7 @@ export class AlbumCanvasScene {
     this.input = input;
     this.app.canvas.setAttribute("aria-label", input.mode.kind === "sheet-editing"
       ? "Canvas da Lâmina em edição. Arraste um Frame para mover ou use as alças para redimensionar. Shift preserva a proporção; Alt preserva o centro; Esc cancela o gesto."
+      : input.mode.isolatedSheetId ? "Canvas da Lâmina no Painel de Layouts. Passe sobre uma miniatura para visualizar o Layout."
       : "Canvas contínuo do Álbum. Arraste uma Foto sobre outro Frame para trocar o conteúdo, inclusive entre Lâminas. Esc cancela. Use a roda para navegar, Alt mais arraste para Pan e Alt mais roda para Zoom.");
     const modePolicy = albumCanvasModePolicy(input.mode);
     const confirmedSheets = sheetsForCanvasMode(
@@ -186,7 +189,8 @@ export class AlbumCanvasScene {
     }
     const navigationLayout = input.continuousCanvasLayout;
     const layout = !modePolicy.enablesContinuousNavigation
-      ? createContinuousCanvasLayout(sheets)
+      ? modePolicy.masksBleed ? createNormalCanvasLayout(sheets, input.technicalGuides?.bleedUm)
+        : createContinuousCanvasLayout(sheets)
       : reorderPreview
         ? createReorderedCanvasLayout(input, sheets)
         : navigationLayout;
@@ -232,7 +236,7 @@ export class AlbumCanvasScene {
             this.app.screen.width,
           )
         : (layout.centeredOffset(
-            modePolicy.editingSheetId,
+            modePolicy.isolatedSheetId!,
             scale,
             this.app.screen.width,
           ) ?? 0);
@@ -252,6 +256,8 @@ export class AlbumCanvasScene {
         boundedOffsetX,
         scale,
       );
+    } else if (modePolicy.isolatedSheetId && modePolicy.isolatedSheetId !== input.centeredSheetId) {
+      input.onCenteredSheetChange(modePolicy.isolatedSheetId);
     }
     this.reportCanvasMetrics(scale);
     this.world.position.set(
@@ -409,12 +415,14 @@ export class AlbumCanvasScene {
     if (!this.input) return;
     const metrics = {
       width: this.app.screen.width,
+      height: this.app.screen.height,
       scale,
     };
     const previous = this.lastCanvasMetrics;
     if (
       previous === null ||
       Math.abs(previous.width - metrics.width) > 0.0001 ||
+      Math.abs(previous.height - metrics.height) > 0.0001 ||
       Math.abs(previous.scale - metrics.scale) > 0.0001
     ) {
       this.lastCanvasMetrics = metrics;
@@ -811,7 +819,7 @@ export class AlbumCanvasScene {
   };
 
   private scrollContinuousCanvas(deltaPx: number) {
-    if (!this.input || this.input.mode.kind !== "normal") return;
+    if (!this.input || !albumCanvasModePolicy(this.input.mode).enablesContinuousNavigation) return;
     const layout = this.input.continuousCanvasLayout;
     this.pendingViewportOffsetX = null;
     const nextOffset = layout.clampOffset(

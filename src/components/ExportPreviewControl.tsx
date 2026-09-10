@@ -20,6 +20,7 @@ import type {
   ExportSheetSelection,
 } from "../application/projectPorts";
 import { ActionButton } from "../ui";
+import { LayoutExportBlockedError } from "../application/projectPorts";
 import "./ExportPreviewControl.css";
 
 interface ExportPreviewControlProps {
@@ -82,6 +83,7 @@ export const ExportPreviewControl = forwardRef<
         retryExport();
         break;
       case "dismissExport":
+      case "openExportProject":
         dismissFeedback();
         break;
       default:
@@ -271,6 +273,11 @@ export const ExportPreviewControl = forwardRef<
     if (!finished) return;
 
     const message = messageFromError(error);
+    if (error instanceof LayoutExportBlockedError && selection) {
+      setPhase("failed");
+      presentDialog({ kind: "exportProblems", projectName: selection.projectName, problems: error.problems });
+      return;
+    }
     if (finished.started) {
       if (dialogPresentationFailed.current) {
         setPhase("idle");

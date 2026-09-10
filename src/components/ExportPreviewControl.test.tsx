@@ -110,6 +110,19 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+test("placeholder validation presents Project problems and returns to the Project without retrying", async () => {
+  const { dialog, exportHarness } = renderControl();
+  fireEvent.click(screen.getByRole("button", { name: "Exportar Lâmina" }));
+  const { LayoutExportBlockedError } = await import("../application/projectPorts");
+  const problems = [{ sheetId: "sheet-001", sheetNumber: 1, frameId: "frame-002", frameNumber: 2 }];
+  await act(async () => exportHarness.attempts[0].reject(new LayoutExportBlockedError(problems)));
+  expect(dialog.present).toHaveBeenLastCalledWith({ kind: "exportProblems", projectName: "Projeto de teste", problems });
+  dialog.emit("openExportProject");
+  await waitFor(() => expect(dialog.dismiss).toHaveBeenCalledOnce());
+  expect(exportHarness.startSheet).toHaveBeenCalledOnce();
+  expect(screen.getByRole("button", { name: "Exportar Lâmina" })).toBeEnabled();
+});
+
 test("waits for the backend started event before opening the native progress window", async () => {
   const user = userEvent.setup();
   const { dialog, exportHarness } = renderControl();

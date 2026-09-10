@@ -51,7 +51,7 @@ function harness(name = "same-group") {
   }, { initialProps: { blocked: false, currentPort: port, projectId: initial.state.projectId } });
   // AlbumCanvasScene reports its dimensionless scale; geometry separately uses
   // 1 Canvas unit per 1,000 micrometers.
-  act(() => view.result.current.canvasProps.onCanvasMetricsChange?.({ width: 1200, scale: 2 }));
+  act(() => view.result.current.canvasProps.onCanvasMetricsChange?.({ width: 1200, height: 500, scale: 2 }));
   return { view, initial, copied, pasted, scenario, pendingCopy, pendingPaste, apply, applyWithOutcome, save, undo, redo, port };
 }
 

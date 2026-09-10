@@ -17,6 +17,7 @@ interface PointerPosition {
 }
 
 interface FrameGesture {
+  layoutLocked: boolean;
   frames: ComposedFrame[];
   primaryFrameId: string;
   replacesSelection: boolean;
@@ -84,7 +85,7 @@ export class FrameInteractionSession {
     const layoutLocked = input.sheetBarMetadata.find(
       (item) => item.sheetId === editingSheetId,
     )?.layoutLocked;
-    if (!confirmedSheet || !frame || layoutLocked) return;
+    if (!confirmedSheet || !frame || (layoutLocked && handle !== null)) return;
     const replacesSelection = !input.selectedFrameIds.includes(frameId);
     const frames = replacesSelection ? [frame] : confirmedSheet.frames.filter(
       (candidate) => input.selectedFrameIds.includes(candidate.frameId),
@@ -94,6 +95,7 @@ export class FrameInteractionSession {
     this.suppressTap = false;
     clearTimeout(this.tapTimer);
     this.gesture = {
+      layoutLocked: layoutLocked === true,
       frames,
       primaryFrameId: frameId,
       replacesSelection,
@@ -184,6 +186,11 @@ export class FrameInteractionSession {
         Math.abs(point.clientX - gesture.origin.clientX) <= threshold.x &&
         Math.abs(point.clientY - gesture.origin.clientY) <= threshold.y
       ) return;
+      if (gesture.layoutLocked) {
+        this.cancel();
+        gesture.controls.onError("O Layout está travado. Destrave-o no Painel de Layouts para mover os Frames.");
+        return;
+      }
       gesture.phase = "dragging";
       this.suppressTap = true;
       if (gesture.replacesSelection) {

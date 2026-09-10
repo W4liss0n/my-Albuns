@@ -5003,6 +5003,10 @@
         },
         {
           "type": "assert",
+          "selector": "body:has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001\"]):not(:has([role=\"scrollbar\"]))"
+        },
+        {
+          "type": "assert",
           "selector": ".layout-panel__candidate"
         }
       ],
@@ -5025,7 +5029,7 @@
       "comparison": {
         "kind": "implementation-only",
         "surface": "layout-panel",
-        "reason": "O contrato 0026 define Gerador, consulta por Lâmina, prévia sem mutação e aplicação exata. As imagens e geometrias são produzidas pelo ProjectCore; o painel segue a referência visual vigente."
+        "reason": "O contrato 0026 define a consulta por Lâmina e a aplicação exata. As miniaturas mostram somente a geometria fornecida pelo Core; o hover usa as Fotos apenas no Canvas."
       },
       "viewport": {
         "width": 1440,
@@ -5040,6 +5044,10 @@
         {
           "type": "click",
           "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body:has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001\"]):not(:has([role=\"scrollbar\"]))"
         },
         {
           "type": "assert",
@@ -5058,13 +5066,13 @@
       "comparison": {
         "kind": "implementation-only",
         "surface": "layout-panel",
-        "reason": "O contrato 0026 define Gerador, consulta por Lâmina, prévia sem mutação e aplicação exata. As imagens e geometrias são produzidas pelo ProjectCore; o painel segue a referência visual vigente."
+        "reason": "O contrato 0026 define a consulta por Lâmina e a aplicação exata. As miniaturas mostram somente a geometria fornecida pelo Core; o hover usa as Fotos apenas no Canvas."
       },
       "viewport": {
         "width": 1440,
         "height": 800
       },
-      "readySelector": ".layout-panel__candidate[aria-label*=\"último aplicado\"]",
+      "readySelector": ".layout-panel__preview[aria-label*=\"último aplicado\"]",
       "actions": [
         {
           "type": "assert",
@@ -5073,6 +5081,10 @@
         {
           "type": "click",
           "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body:has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001\"]):not(:has([role=\"scrollbar\"]))"
         },
         {
           "type": "assert",
@@ -5095,7 +5107,7 @@
       "comparison": {
         "kind": "implementation-only",
         "surface": "layout-panel",
-        "reason": "O contrato 0026 define Gerador, consulta por Lâmina, prévia sem mutação e aplicação exata. As imagens e geometrias são produzidas pelo ProjectCore; o painel segue a referência visual vigente."
+        "reason": "O contrato 0026 define a consulta por Lâmina e a aplicação exata. As miniaturas mostram somente a geometria fornecida pelo Core; o hover usa as Fotos apenas no Canvas."
       },
       "viewport": {
         "width": 1440,
@@ -5113,6 +5125,10 @@
         },
         {
           "type": "assert",
+          "selector": "body:has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001\"]):not(:has([role=\"scrollbar\"]))"
+        },
+        {
+          "type": "assert",
           "selector": ".layout-panel__candidate"
         }
       ]
@@ -5124,7 +5140,7 @@
       "comparison": {
         "kind": "implementation-only",
         "surface": "layout-panel",
-        "reason": "O contrato 0026 define Gerador, consulta por Lâmina, prévia sem mutação e aplicação exata. As imagens e geometrias são produzidas pelo ProjectCore; o painel segue a referência visual vigente."
+        "reason": "O contrato 0026 define a consulta por Lâmina e a aplicação exata. As miniaturas mostram somente a geometria fornecida pelo Core; o hover usa as Fotos apenas no Canvas."
       },
       "viewport": {
         "width": 1440,
@@ -5139,6 +5155,44 @@
         {
           "type": "click",
           "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body:has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001\"]):not(:has([role=\"scrollbar\"]))"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-target-focus",
+      "title": "Layouts — Lâmina escolhida centralizada e isolada",
+      "implementationPath": "/workspace-preview.html?frame=layouts",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "A decisão aceita centraliza e enquadra a Lâmina escolhida, oculta as outras Lâminas e o Painel de imagens enquanto Layouts está aberto."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "body:has(.layout-panel):has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-002\"][data-centered-sheet-id=\"sheet-002\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-002\"]):not(:has([role=\"scrollbar\"]))",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "wheel",
+          "selector": ".pixi-canvas",
+          "deltaY": 10000
+        },
+        {
+          "type": "assert",
+          "selector": ".canvas-host[data-centered-sheet-id=\"sheet-002\"]"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 02\"]"
         }
       ]
     },
@@ -5149,7 +5203,7 @@
       "comparison": {
         "kind": "implementation-only",
         "surface": "layout-panel",
-        "reason": "O contrato 0026 define Gerador, consulta por Lâmina, prévia sem mutação e aplicação exata. As imagens e geometrias são produzidas pelo ProjectCore; o painel segue a referência visual vigente."
+        "reason": "O contrato 0026 define a consulta por Lâmina e a aplicação exata. As miniaturas mostram somente a geometria fornecida pelo Core; o hover usa as Fotos apenas no Canvas."
       },
       "viewport": {
         "width": 1440,
@@ -5164,23 +5218,27 @@
         {
           "type": "click",
           "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body:has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001\"]):not(:has([role=\"scrollbar\"]))"
         }
       ]
     },
     {
-      "id": "workspace-layout-settings",
-      "title": "Layouts — permissão e medidas",
+      "id": "workspace-layout-dismiss-outside",
+      "title": "Layouts — clique fora fecha o Painel",
       "implementationPath": "/workspace-preview.html?frame=layouts",
       "comparison": {
         "kind": "implementation-only",
         "surface": "layout-panel",
-        "reason": "O contrato 0026 define Gerador, consulta por Lâmina, prévia sem mutação e aplicação exata. As imagens e geometrias são produzidas pelo ProjectCore; o painel segue a referência visual vigente."
+        "reason": "O clique fora fecha o Painel de Layouts e restaura o espaço do Canvas, conforme a decisão aceita de simplificar a faixa."
       },
       "viewport": {
         "width": 1440,
         "height": 800
       },
-      "readySelector": ".layout-panel__settings",
+      "readySelector": "body:not(:has(.layout-panel)):has(#media-panel:not([hidden])):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001,sheet-002\"]):has([role=\"scrollbar\"])",
       "actions": [
         {
           "type": "assert",
@@ -5192,31 +5250,16 @@
         },
         {
           "type": "assert",
+          "selector": "body:has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001\"]):not(:has([role=\"scrollbar\"]))"
+        },
+        {
+          "type": "assert",
           "selector": ".layout-panel__candidate"
         },
         {
-          "type": "click-text",
-          "text": "Ajustes"
+          "type": "click",
+          "selector": ".pixi-canvas"
         }
-      ]
-    },
-    {
-      "id": "workspace-layout-settings-invalid",
-      "title": "Layouts — medida inválida com Tooltip compartilhado",
-      "implementationPath": "/workspace-preview.html?frame=layouts",
-      "comparison": {
-        "kind": "implementation-only",
-        "surface": "layout-panel",
-        "reason": "A validação compartilhada aceita exige indicação imediata no controle, descrição acessível e Tooltip sem ocupar espaço no formulário."
-      },
-      "viewport": { "width": 1440, "height": 800 },
-      "readySelector": ".layout-panel:has(input[aria-label=\"Menor lado (mm)\"][aria-invalid=\"true\"]):has([role=\"tooltip\"])",
-      "actions": [
-        { "type": "assert", "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))" },
-        { "type": "click", "selector": "button[aria-label=\"Layouts da Lâmina 01\"]" },
-        { "type": "assert", "selector": ".layout-panel__candidate" },
-        { "type": "click-text", "text": "Ajustes" },
-        { "type": "input", "selector": "input[aria-label=\"Menor lado (mm)\"]", "value": "0" }
       ]
     },
     {
@@ -5226,7 +5269,7 @@
       "comparison": {
         "kind": "implementation-only",
         "surface": "layout-panel",
-        "reason": "O contrato 0026 define Gerador, consulta por Lâmina, prévia sem mutação e aplicação exata. As imagens e geometrias são produzidas pelo ProjectCore; o painel segue a referência visual vigente."
+        "reason": "O contrato 0026 define a consulta por Lâmina e a aplicação exata. As miniaturas mostram somente a geometria fornecida pelo Core; o hover usa as Fotos apenas no Canvas."
       },
       "viewport": {
         "width": 1440,
@@ -5241,6 +5284,10 @@
         {
           "type": "click",
           "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body:has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001\"]):not(:has([role=\"scrollbar\"]))"
         },
         {
           "type": "assert",
@@ -5263,7 +5310,7 @@
       "comparison": {
         "kind": "implementation-only",
         "surface": "layout-panel",
-        "reason": "O contrato 0026 define Gerador, consulta por Lâmina, prévia sem mutação e aplicação exata. As imagens e geometrias são produzidas pelo ProjectCore; o painel segue a referência visual vigente."
+        "reason": "O contrato 0026 define a consulta por Lâmina e a aplicação exata. As miniaturas mostram somente a geometria fornecida pelo Core; o hover usa as Fotos apenas no Canvas."
       },
       "viewport": {
         "width": 1440,
@@ -5278,6 +5325,10 @@
         {
           "type": "click",
           "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body:has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001\"]):not(:has([role=\"scrollbar\"]))"
         },
         {
           "type": "assert",
@@ -5304,7 +5355,7 @@
       "comparison": {
         "kind": "implementation-only",
         "surface": "layout-panel",
-        "reason": "O contrato 0026 define Gerador, consulta por Lâmina, prévia sem mutação e aplicação exata. As imagens e geometrias são produzidas pelo ProjectCore; o painel segue a referência visual vigente."
+        "reason": "O contrato 0026 define a consulta por Lâmina e a aplicação exata. As miniaturas mostram somente a geometria fornecida pelo Core; o hover usa as Fotos apenas no Canvas."
       },
       "viewport": {
         "width": 1800,
@@ -5322,6 +5373,10 @@
         },
         {
           "type": "assert",
+          "selector": "body:has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001\"]):not(:has([role=\"scrollbar\"]))"
+        },
+        {
+          "type": "assert",
           "selector": ".layout-panel__candidate"
         }
       ]
@@ -5333,7 +5388,7 @@
       "comparison": {
         "kind": "implementation-only",
         "surface": "layout-panel",
-        "reason": "O contrato 0026 define Gerador, consulta por Lâmina, prévia sem mutação e aplicação exata. As imagens e geometrias são produzidas pelo ProjectCore; o painel segue a referência visual vigente."
+        "reason": "O contrato 0026 define a consulta por Lâmina e a aplicação exata. As miniaturas mostram somente a geometria fornecida pelo Core; o hover usa as Fotos apenas no Canvas."
       },
       "viewport": {
         "width": 2160,
@@ -5351,9 +5406,565 @@
         },
         {
           "type": "assert",
+          "selector": "body:has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001\"]):not(:has([role=\"scrollbar\"]))"
+        },
+        {
+          "type": "assert",
           "selector": ".layout-panel__candidate"
         }
       ]
+    },
+    {
+      "id": "workspace-layout-locked",
+      "title": "Layout travado — preview destacada e demais desabilitadas",
+      "implementationPath": "/workspace-preview.html?frame=layouts",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "A SPEC e o design 0028 definem travar na preview, posições adicionais explícitas, estrutura preservada, edição de conteúdo e desbloqueio. As geometrias e transições vêm do Core produtivo."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__candidate--locked",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body:has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001\"]):not(:has([role=\"scrollbar\"]))"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__candidate:first-child"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-unlocked",
+      "title": "Layout travado — destravar preserva Frames",
+      "implementationPath": "/workspace-preview.html?frame=layouts",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "A SPEC e o design 0028 definem travar na preview, posições adicionais explícitas, estrutura preservada, edição de conteúdo e desbloqueio. As geometrias e transições vêm do Core produtivo."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel:not(:has(.layout-panel__candidate--locked)):has(.layout-panel__preview:not(:disabled))",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body:has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001\"]):not(:has([role=\"scrollbar\"]))"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__candidate:first-child"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate--locked"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Destravar Layout da Lâmina 01\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-lock-undo",
+      "title": "Layout travado — Desfazer restaura a estrutura anterior",
+      "implementationPath": "/workspace-preview.html?frame=layouts",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "A SPEC e o design 0028 definem travar na preview, posições adicionais explícitas, estrutura preservada, edição de conteúdo e desbloqueio. As geometrias e transições vêm do Core produtivo."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel:not(:has(.layout-panel__candidate--locked)):has(.layout-panel__candidate)",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body:has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001\"]):not(:has([role=\"scrollbar\"]))"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__candidate:first-child"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate--locked"
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Desfazer\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]:not(:disabled)"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-expanded-hover",
+      "title": "Layout travado — 6 posições reservadas na prévia",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=expanded",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "A SPEC e o design 0028 definem travar na preview, posições adicionais explícitas, estrutura preservada, edição de conteúdo e desbloqueio. As geometrias e transições vêm do Core produtivo."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__preview:disabled",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body:has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001\"]):not(:has([role=\"scrollbar\"]))"
+        },
+        {
+          "type": "focus",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__candidate:first-child"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-expanded-locked",
+      "title": "Layout travado — 6 posições confirmadas pelo cadeado",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=expanded",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "A SPEC e o design 0028 definem travar na preview, posições adicionais explícitas, estrutura preservada, edição de conteúdo e desbloqueio. As geometrias e transições vêm do Core produtivo."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__candidate--locked",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body:has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001\"]):not(:has([role=\"scrollbar\"]))"
+        },
+        {
+          "type": "focus",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__candidate:first-child"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-empty-lock-hover",
+      "title": "Layout travado — 2 posições reservadas na prévia",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=empty-lock",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "A SPEC e o design 0028 definem travar na preview, posições adicionais explícitas, estrutura preservada, edição de conteúdo e desbloqueio. As geometrias e transições vêm do Core produtivo."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__preview:disabled",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body:has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001\"]):not(:has([role=\"scrollbar\"]))"
+        },
+        {
+          "type": "focus",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__candidate:first-child"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-empty-lock-locked",
+      "title": "Layout travado — 2 posições confirmadas pelo cadeado",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=empty-lock",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "A SPEC e o design 0028 definem travar na preview, posições adicionais explícitas, estrutura preservada, edição de conteúdo e desbloqueio. As geometrias e transições vêm do Core produtivo."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__candidate--locked",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body:has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001\"]):not(:has([role=\"scrollbar\"]))"
+        },
+        {
+          "type": "focus",
+          "selector": "select[aria-label=\"Quantidade de Frames\"]"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__candidate:first-child"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-locked-scale-125",
+      "title": "Layout travado — travamento a 125%",
+      "implementationPath": "/workspace-preview.html?frame=layouts&scale=1.25",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "A SPEC e o design 0028 definem travar na preview, posições adicionais explícitas, estrutura preservada, edição de conteúdo e desbloqueio. As geometrias e transições vêm do Core produtivo."
+      },
+      "viewport": {
+        "width": 1800,
+        "height": 1000
+      },
+      "readySelector": ".layout-panel__candidate--locked",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body:has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001\"]):not(:has([role=\"scrollbar\"]))"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__candidate:first-child"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-locked-scale-150",
+      "title": "Layout travado — travamento a 150%",
+      "implementationPath": "/workspace-preview.html?frame=layouts&scale=1.5",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "A SPEC e o design 0028 definem travar na preview, posições adicionais explícitas, estrutura preservada, edição de conteúdo e desbloqueio. As geometrias e transições vêm do Core produtivo."
+      },
+      "viewport": {
+        "width": 2160,
+        "height": 1200
+      },
+      "readySelector": ".layout-panel__candidate--locked",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body:has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001\"]):not(:has([role=\"scrollbar\"]))"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__candidate:first-child"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Aplicar e travar Layout 1\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-locked-selection",
+      "title": "Layout travado — seleção múltipla sem alças",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layout-state=locked&mode=edit",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "A SPEC e o design 0028 definem travar na preview, posições adicionais explícitas, estrutura preservada, edição de conteúdo e desbloqueio. As geometrias e transições vêm do Core produtivo."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "canvas[aria-label*=\"edição\"]",
+      "actions": []
+    },
+    {
+      "id": "workspace-layout-locked-filled",
+      "title": "Layout travado — posições preenchidas",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layout-state=filled",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "A SPEC e o design 0028 definem travar na preview, posições adicionais explícitas, estrutura preservada, edição de conteúdo e desbloqueio. As geometrias e transições vêm do Core produtivo."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__candidate--locked",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body:has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001\"]):not(:has([role=\"scrollbar\"]))"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-locked-cleared",
+      "title": "Layout travado — Foto apagada mantém posição",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layout-state=cleared",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "A SPEC e o design 0028 definem travar na preview, posições adicionais explícitas, estrutura preservada, edição de conteúdo e desbloqueio. As geometrias e transições vêm do Core produtivo."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__candidate--locked",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body:has(#media-panel[hidden]):has(.canvas-host[data-isolated-sheet-id=\"sheet-001\"]):has([data-reorder-surface=\"bar\"][data-sheet-order=\"sheet-001\"]):not(:has([role=\"scrollbar\"]))"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__candidate"
+        }
+      ]
+    },
+    {
+      "id": "layout-export-problems",
+      "title": "Exportação — Frames vazios e Abrir Projeto",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportProblems%22%2C%22projectName%22%3A%22Layouts%22%2C%22problems%22%3A%5B%7B%22frameId%22%3A%2200000000-0000-4000-8000-000000000102%22%2C%22frameNumber%22%3A2%2C%22sheetId%22%3A%22sheet-001%22%2C%22sheetNumber%22%3A1%7D%2C%7B%22frameId%22%3A%2200000000-0000-4000-8000-000000000104%22%2C%22frameNumber%22%3A4%2C%22sheetId%22%3A%22sheet-001%22%2C%22sheetNumber%22%3A1%7D%2C%7B%22frameId%22%3A%22lock-placeholder-5%22%2C%22frameNumber%22%3A5%2C%22sheetId%22%3A%22sheet-001%22%2C%22sheetNumber%22%3A1%7D%2C%7B%22frameId%22%3A%22lock-placeholder-6%22%2C%22frameNumber%22%3A6%2C%22sheetId%22%3A%22sheet-001%22%2C%22sheetNumber%22%3A1%7D%5D%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-problems-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "O bloqueio por placeholder projeta cada posição indicada pelo Core na tabela compartilhada com Projeto, Motivo e Abrir Projeto."
+      },
+      "viewport": {
+        "width": 640,
+        "height": 400
+      },
+      "readySelector": ".ui-problems-table",
+      "actions": []
     }
   ]
 }

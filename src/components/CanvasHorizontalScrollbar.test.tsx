@@ -23,7 +23,7 @@ describe("CanvasHorizontalScrollbar", () => {
       <CanvasHorizontalScrollbar
         centeredSheetId="sheet-2"
         layout={layout}
-        metrics={{ scale: 1, width: 600 }}
+        metrics={{ scale: 1, width: 600, height: 500 }}
         mode={{ kind: "normal" }}
         viewport={{ offsetX: 0 }}
         onCenteredSheetChange={vi.fn()}
@@ -46,7 +46,7 @@ describe("CanvasHorizontalScrollbar", () => {
       <CanvasHorizontalScrollbar
         centeredSheetId="sheet-2"
         layout={layout}
-        metrics={{ scale: 1, width: 600 }}
+        metrics={{ scale: 1, width: 600, height: 500 }}
         mode={{ kind: "normal" }}
         viewport={{ offsetX: 0 }}
         onCenteredSheetChange={vi.fn()}

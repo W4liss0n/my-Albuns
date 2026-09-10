@@ -10,10 +10,12 @@ import { useProjectMutationRunner } from "./useProjectMutationRunner";
 
 afterEach(() => useEditorView.setState(useEditorView.getInitialState(), true));
 
-function harness(pendingKind: "applyLayout" | "setDpi") {
+function harness(pendingKind: "applyLayout" | "lockLayout" | "unlockLayout" | "setDpi", locked = false) {
   const sample = layoutPanelCorpus.cases.mixed;
   const initial = structuredClone(sample.before.projection);
+  initial.state.album.sheets[0].layoutLocked = locked;
   const applied = structuredClone(sample.applied!.projection);
+  applied.state.album.sheets[0].layoutLocked = pendingKind === "lockLayout";
   const sheetId = initial.state.album.sheets[0].id;
   let authoritative = initial;
   let querySequence = 0;
@@ -29,8 +31,11 @@ function harness(pendingKind: "applyLayout" | "setDpi") {
   };
   const apply = vi.fn<ProjectCorePort["apply"]>(async (intent) => {
     if (intent.kind === pendingKind) await pending;
-    if (intent.kind === "applyLayout") {
+    if (intent.kind === "applyLayout" || intent.kind === "lockLayout") {
       checkSelection(intent.selection);
+      authoritative = applied;
+    } else if (intent.kind === "unlockLayout") {
+      expect(intent.sheetId).toBe(sheetId);
       authoritative = applied;
     } else if (intent.kind === "setDpi") {
       authoritative = { ...initial, state: { ...initial.state, revision: initial.state.revision + 1,
@@ -45,7 +50,8 @@ function harness(pendingKind: "applyLayout" | "setDpi") {
     readFrameDragThreshold: async () => ({ x: 5, y: 5 }), readSliderDoubleClickTime: async () => 500,
     queryLayouts: async (target) => {
       const query = { ...structuredClone(sample.before.queries[target].query),
-        queryId: `prepared-${++querySequence}`, revision: authoritative.state.revision };
+        queryId: `prepared-${++querySequence}`, revision: authoritative.state.revision,
+        locked: authoritative.state.album.sheets[0].layoutLocked };
       prepared = query;
       return query;
     },
@@ -66,17 +72,36 @@ function harness(pendingKind: "applyLayout" | "setDpi") {
   return { view, initial, applied, sheetId, apply, save, undo, resolve, reject };
 }
 
-test.each([false, true])("Layout, Save and Undo keep their queue order, failure=%s", async (fails) => {
-  const { view, sheetId, apply, save, undo, resolve, reject, applied } = harness("applyLayout");
+test("locked Sheet metadata reaches the Canvas and disables structural commands without disabling content or order", async () => {
+  const { view, sheetId, initial } = harness("setDpi", true);
+  act(() => {
+    useEditorView.getState().enterSheetEdit(sheetId);
+    useEditorView.getState().selectFrames(initial.state.album.sheets[0].frames.map((frame) => frame.id));
+  });
+  await waitFor(() => expect(view.result.current.selectedFrames.length).toBeGreaterThan(0));
+  expect(view.result.current.canvasProps.sheetBarMetadata[0].layoutLocked).toBe(true);
+  expect(view.result.current.canAddFrame).toBe(false);
+  expect(view.result.current.canPasteFrames).toBe(false);
+  expect(view.result.current.canArrangeFrames).toBe(true);
+  expect(view.result.current.canDeleteFrames).toBe(true);
+  expect(view.result.current.canOrientPhotos).toBe(true);
+});
+
+test.each((["applyLayout", "lockLayout", "unlockLayout"] as const).flatMap((kind) => [false, true].map((fails) => ({ kind, fails }))))("$kind, Save and Undo keep their queue order, failure=$fails", async ({ kind, fails }) => {
+  const { view, sheetId, apply, save, undo, resolve, reject, applied } = harness(kind, kind === "unlockLayout");
   act(() => view.result.current.canvasProps.sheetLayouts!.onToggle(sheetId));
   await waitFor(() => expect(view.result.current.layoutPanel.query).not.toBeNull());
   const queryId = view.result.current.layoutPanel.query!.queryId;
   let completion!: Promise<unknown>;
-  act(() => { completion = Promise.all([view.result.current.layoutPanel.apply(0), view.result.current.save(), view.result.current.undo()]); });
+  act(() => {
+    const panel = view.result.current.layoutPanel;
+    const command = kind === "applyLayout" ? panel.apply(0) : kind === "lockLayout" ? panel.lock(0) : panel.unlock();
+    completion = Promise.all([command, view.result.current.save(), view.result.current.undo()]);
+  });
   expect(save).not.toHaveBeenCalled();
   expect(undo).not.toHaveBeenCalled();
   await act(async () => { if (fails) reject(new Error("Aplicação recusada.")); else resolve(); await completion; });
-  expect(apply.mock.calls[0][0]).toEqual({ kind: "applyLayout", selection: { queryId, candidateIndex: 0 } });
+  expect(apply.mock.calls[0][0]).toEqual(kind === "unlockLayout" ? { kind, sheetId } : { kind, selection: { queryId, candidateIndex: 0 } });
   if (fails) {
     expect(save).not.toHaveBeenCalled();
     expect(undo).not.toHaveBeenCalled();

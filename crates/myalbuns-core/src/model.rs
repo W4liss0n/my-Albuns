@@ -381,6 +381,7 @@ impl Default for ProjectedVisualDefaults {
 #[serde(rename_all = "camelCase")]
 pub struct SheetSnapshot {
     pub id: String,
+    pub layout_locked: bool,
     pub number: usize,
     pub role: SheetRole,
     pub active_sides: ProjectedActiveSides,
@@ -832,6 +833,12 @@ pub enum FrameStackAction {
 )]
 #[ts(tag = "kind")]
 pub enum ProjectIntent {
+    LockLayout {
+        selection: crate::LayoutSelection,
+    },
+    UnlockLayout {
+        sheet_id: String,
+    },
     ApplyLayout {
         selection: crate::LayoutSelection,
     },
@@ -964,6 +971,20 @@ pub enum FrameStyleChange {
 pub enum CoreError {
     #[error("As medidas para gerar Layouts não são válidas")]
     InvalidLayoutQuery,
+    #[error("O Layout está travado. Destrave-o no Painel de Layouts para alterar os Frames.")]
+    LayoutLocked,
+    #[error(
+        "Este Layout possui posições adicionais. Use o cadeado para aplicá-lo e criar os placeholders."
+    )]
+    LayoutRequiresLock,
+    #[error(
+        "Não há posição vazia neste Layout travado. Arraste a Foto para um Frame existente para substituí-la."
+    )]
+    LockedLayoutHasNoPlaceholder,
+    #[error("A seleção contém Frames vazios.")]
+    UnfilledLayoutPositions {
+        problems: Vec<crate::LayoutExportProblem>,
+    },
     #[error("O Layout não é compatível com esta Lâmina")]
     IncompatibleLayout,
     #[error("A prévia do Layout está desatualizada; escolha novamente")]

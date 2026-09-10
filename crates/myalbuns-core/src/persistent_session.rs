@@ -110,9 +110,40 @@ impl PersistentProjectSession {
         intent: ProjectIntent,
     ) -> Result<ProjectIntentOutcome, CoreError> {
         let mut outcome = ProjectIntentOutcome::default();
-        if let ProjectIntent::ApplyLayout { selection } = &intent {
+        if let ProjectIntent::AddFrame { sheet_id } | ProjectIntent::PasteFrames { sheet_id, .. } =
+            &intent
+        {
+            let id =
+                parse_uuid(sheet_id).map_err(|_| CoreError::SheetNotFound(sheet_id.clone()))?;
+            self.project().ensure_layout_unlocked(id)?;
+        }
+        if let ProjectIntent::AddPhoto { sheet_id, .. } = &intent
+            && let Some(sheet) = self
+                .project()
+                .sheets()
+                .iter()
+                .find(|sheet| sheet.id().to_string() == *sheet_id)
+            && sheet.layout_locked()
+            && sheet.frames().iter().all(|frame| frame.photo().is_some())
+        {
+            return Err(CoreError::LockedLayoutHasNoPlaceholder);
+        }
+        if let ProjectIntent::UnlockLayout { sheet_id } = &intent {
+            let next = self.project().with_layout_unlocked(sheet_id)?;
+            if next != *self.project() {
+                self.commit_edit(|_| Ok(next))?;
+            }
+            return Ok(outcome);
+        }
+        if let ProjectIntent::ApplyLayout { selection } | ProjectIntent::LockLayout { selection } =
+            &intent
+        {
             let (sheet_id, patch) = self.checked_layout_patch(selection)?;
-            let next = self.project().with_layout_patch(sheet_id, patch)?;
+            let next = if matches!(intent, ProjectIntent::LockLayout { .. }) {
+                self.project().with_locked_layout_patch(sheet_id, patch)?
+            } else {
+                self.project().with_layout_patch(sheet_id, patch)?
+            };
             if next != *self.project() {
                 self.commit_edit(|_| Ok(next))?;
             }
@@ -190,6 +221,13 @@ impl PersistentProjectSession {
                 return Ok(outcome);
             }
         }
+        if let ProjectIntent::DeleteFrames { frame_ids, mode } = &intent {
+            let next = self.project().with_deleted_frames(frame_ids, *mode)?;
+            if next != *self.project() {
+                self.commit_edit(|_| Ok(next))?;
+            }
+            return Ok(outcome);
+        }
         if let ProjectIntent::EditFrameGeometry { edit } = &intent {
             let rects = self.project().frame_geometry_edit(edit)?;
             if rects
@@ -201,7 +239,10 @@ impl PersistentProjectSession {
             }
         }
         self.commit_edit(|project| match intent {
-            ProjectIntent::ApplyLayout { .. } | ProjectIntent::SetLayoutSettings { .. } => {
+            ProjectIntent::ApplyLayout { .. }
+            | ProjectIntent::LockLayout { .. }
+            | ProjectIntent::UnlockLayout { .. }
+            | ProjectIntent::SetLayoutSettings { .. } => {
                 unreachable!("Layout commands validate the captured query before committing")
             }
             ProjectIntent::SetFrameStyle { .. } => {
@@ -225,8 +266,8 @@ impl PersistentProjectSession {
             ProjectIntent::SwapFrameContents { frame_ids } => {
                 project.with_swapped_frame_contents(&frame_ids)
             }
-            ProjectIntent::DeleteFrames { frame_ids, mode } => {
-                project.with_deleted_frames(&frame_ids, mode)
+            ProjectIntent::DeleteFrames { .. } => {
+                unreachable!("Frame deletion commits its prepared document once")
             }
             ProjectIntent::ArrangeFrames { frame_ids, action } => {
                 project.with_arranged_frames(&frame_ids, action)
@@ -373,26 +414,71 @@ impl PersistentProjectSession {
     pub(crate) fn query_layouts(
         &mut self,
         sheet_id: &str,
+        expansion: Option<crate::LayoutExpansion>,
     ) -> Result<crate::LayoutQueryResult, CoreError> {
         let parsed = parse_uuid(sheet_id).map_err(|_| CoreError::SheetNotFound(sheet_id.into()))?;
-        let query = self.project().layout_query(parsed)?;
+        let mut query = self.project().layout_query(parsed)?;
+        let frame_count = query.frame_orientations.len();
+        if let Some(expansion) = expansion {
+            if expansion.additional_positions > 30
+                || frame_count.saturating_add(expansion.additional_positions) > 30
+            {
+                return Err(CoreError::InvalidLayoutQuery);
+            }
+            query.frame_orientations.extend(std::iter::repeat_n(
+                expansion.orientation,
+                expansion.additional_positions,
+            ));
+        }
         let sheet = self
             .project()
             .sheets()
             .iter()
             .find(|s| s.id() == parsed)
             .unwrap();
+        let locked = sheet.layout_locked();
+        if locked && frame_count != query.frame_orientations.len() {
+            return Err(CoreError::LayoutLocked);
+        }
         let ids: Vec<_> = sheet.frames().iter().map(|f| f.id()).collect();
-        let listing = crate::LayoutRules::list(&query, sheet.last_layout());
+        let mut listing = crate::LayoutRules::list_for_lock(&query, sheet.last_layout());
+        if locked {
+            let current = self.project().current_layout(parsed)?;
+            listing.candidates.retain(|candidate| {
+                !crate::LayoutRules::same_definition(
+                    &candidate.layout.definition,
+                    &current.definition,
+                )
+            });
+            for candidate in &mut listing.candidates {
+                candidate.is_last_applied = false;
+            }
+            listing.candidates.insert(
+                0,
+                crate::LayoutCandidate {
+                    layout: current,
+                    is_last_applied: true,
+                },
+            );
+        }
         let patches = listing
             .candidates
             .iter()
-            .map(|candidate| {
-                crate::LayoutRules::resolve(
+            .enumerate()
+            .map(|(index, candidate)| {
+                let placeholders = (ids.len()..candidate.layout.definition.positions.len())
+                    .map(|_| Uuid::new_v4())
+                    .collect::<Vec<_>>();
+                crate::LayoutRules::resolve_for_lock(
                     &candidate.layout,
                     &query.surface,
                     &ids,
-                    query.permission,
+                    &placeholders,
+                    if locked && index == 0 {
+                        crate::LayoutPermission::PagesAndSheet
+                    } else {
+                        query.permission
+                    },
                 )
             })
             .collect::<Result<Vec<_>, _>>()?;
@@ -409,7 +495,8 @@ impl PersistentProjectSession {
             project_id: self.project_id().to_string(),
             revision: self.revision(),
             sheet_id: sheet_id.into(),
-            frame_count: query.frame_orientations.len(),
+            frame_count,
+            locked,
             settings: self.project().layout_settings().clone(),
             listing,
         })
@@ -476,6 +563,7 @@ impl PersistentProjectSession {
             .filter(|revision| *revision <= MAX_SAFE_INTEGER)
             .ok_or(CoreError::RevisionSpaceExhausted)?;
         let project = edit(&self.current.project)?;
+        self.current.project.validate_locked_structure(&project)?;
 
         self.undo.push(self.current.clone());
         self.redo.clear();

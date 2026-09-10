@@ -22,6 +22,13 @@ const MAX_DIALOG_SESSION_ID_CHARS: usize = 128;
 impl ProjectDialogState {
     fn sanitized(self) -> Self {
         match self {
+            Self::ExportProblems {
+                project_name,
+                problems,
+            } => Self::ExportProblems {
+                project_name: bound_text(project_name),
+                problems,
+            },
             Self::ImageProcessingProgress { progress } => Self::ImageProcessingProgress {
                 progress: progress.sanitized(),
             },
@@ -87,7 +94,7 @@ impl ProjectDialogState {
 
     fn initial_dimensions(&self) -> (f64, f64) {
         match self {
-            Self::ImageProcessingProblems { .. } => (
+            Self::ImageProcessingProblems { .. } | Self::ExportProblems { .. } => (
                 640.0,
                 400.0 + native_dialog_window::OWNED_WINDOW_TITLEBAR_HEIGHT,
             ),

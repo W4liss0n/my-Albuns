@@ -580,14 +580,14 @@ validação das superfícies descritas nesta seção.
 - O controle de duas setas troca os Frames entre as Páginas esquerda e direita, levando consigo as Fotos contidas, sem trocar os números das Páginas.
 - A Troca de lados translada cada Frame totalmente contido em uma Página para a mesma posição relativa da Página oposta. Não espelha Frame ou Foto e preserva dimensões, Pan, Zoom, estilo e ordem visual.
 - Frames com Travessia central permanecem inalterados. A ação fica indisponível em Página única e em Layout travado e constitui uma única ação de Undo/Redo.
-- O controle central em forma de grade abre ou fecha o Painel de Layouts usando aquela Lâmina como alvo explícito, sem depender da Lâmina centralizada nem alterar a interatividade das demais.
+- O controle central em forma de grade abre ou fecha o Painel de Layouts usando aquela Lâmina como alvo explícito. Ao abrir, centraliza e enquadra a Lâmina escolhida, oculta as demais no Canvas e oculta o Painel de imagens.
 - Clique primário simples na área de seleção da Barra ativa a Lâmina para comandos e feedback visual, mas preserva integralmente a Lâmina centralizada e `viewport.offsetX`; seleção e navegação possuem ownership separado. Controles com gesto próprio continuam excluídos dessa área. Um movimento que não vence o limiar termina nessa seleção sem navegar, enquanto um arraste válido segue a política de reordenação. Essa regra é exclusiva da Barra e não altera o clique da Grade nem o clique no próprio Canvas.
-- Existe somente um Painel de Layouts aberto por vez. Ele ocupa horizontalmente a coluna de trabalho acima do Canvas, termina antes do Painel contextual e desloca as Lâminas para baixo sem cobri-las.
+- Existe somente um Painel de Layouts aberto por vez. Ele ocupa horizontalmente a coluna de trabalho acima do Canvas, termina antes do Painel contextual e reserva abaixo o espaço da Lâmina alvo, sem cobri-la.
 - Clicar novamente no controle da mesma Lâmina fecha o Painel; clicar no controle de outra reutiliza a faixa e troca seu alvo. Layouts não aparecem no Painel contextual direito.
 - A Barra da Lâmina e o Painel de Layouts existem somente no Canvas contínuo do modo normal; ambos ficam ausentes e indisponíveis no Modo de edição.
 - Se o Painel estava aberto ao entrar no Modo de edição, seu alvo e estado ficam suspensos; ao sair com `Esc`, ele reaparece para a mesma Lâmina com candidatos recalculados. Um Painel anteriormente fechado continua fechado.
 - O Canvas contínuo do modo normal não possui Zoom. O Zoom de visualização existe exclusivamente para a Lâmina isolada no Modo de edição.
-- No modo normal, todas as Lâminas compartilham uma escala automática que enquadra sua altura completa com margem; não existe rolagem vertical. Uma barra de rolagem horizontal sempre visível abaixo do Canvas representa os mesmos limites da navegação pela roda e permite percorrer a mesma visualização, sem criar estado do Projeto. A roda navega horizontalmente sobre toda a superfície e toda a Barra da Lâmina, nos lados esquerdo, central e direito, salvo quando o alvo possui ownership específico da roda.
+- Na navegação normal, todas as Lâminas compartilham uma escala automática que enquadra sua altura completa com margem; não existe rolagem vertical. Uma barra de rolagem horizontal abaixo do Canvas representa os mesmos limites da navegação pela roda e permite percorrer a mesma visualização, sem criar estado do Projeto. A roda navega horizontalmente sobre toda a superfície e toda a Barra da Lâmina, nos lados esquerdo, central e direito, salvo quando o alvo possui ownership específico da roda. Enquanto o Painel de Layouts está aberto, a navegação horizontal e sua barra ficam suspensas; somente a Lâmina alvo é enquadrada por largura e altura, centralizada nos dois eixos.
 - Nas extremidades da navegação, o centro da primeira e o centro da última Lâmina podem alcançar o centro visível do Canvas, mas nunca ultrapassá-lo em direção à borda oposta.
 - Redimensionar a Janela ou o splitter do Painel de imagens sincroniza primeiro a superfície do renderizador com a área útil e então recalcula essa escala, mantendo a Lâmina inteira visível sem alterar o Projeto ou criar um estado de Zoom.
 - Fora do Modo de edição, `Alt` + clique e arraste sobre um Frame faz Pan da Foto e `Alt` + roda do mouse altera o Zoom da Foto sob o ponteiro, sem mudar a geometria do Frame; ambos integram a `MediaTransform` persistente da colocação.
@@ -810,7 +810,7 @@ validação das superfícies descritas nesta seção.
 - A área de transferência de Frames é exclusiva da Janela do Projeto: uma cópia não pode ser colada em outro Projeto aberto.
 - Em Layout travado, copiar permanece permitido e colar fica indisponível porque a criação mudaria a quantidade de Frames.
 - Uma Foto sempre existe dentro de um Frame. O mesmo Arquivo vinculado pode aparecer em vários Frames com ajustes independentes.
-- Um Frame vazio intencional é um Frame placeholder. Qualquer Exportação que inclua sua Lâmina é bloqueada.
+- Um Frame vazio intencional é um Frame placeholder. Qualquer Exportação que inclua sua Lâmina é bloqueada. O aviso identifica o Frame vazio, independentemente de o Layout estar travado ou destravado.
 - Uma Lâmina sem Frames é válida e exportável.
 - A criação manual de um Frame placeholder ocorre somente no Modo de edição da Lâmina por `Editar > Adicionar Frame` ou pelo menu de contexto da área vazia do Canvas.
 - O comando cria imediatamente um único Frame centralizado, selecionado e com dimensões proporcionais à superfície ativa, sem modo de desenho nem ferramenta persistente.
@@ -852,9 +852,12 @@ validação das superfícies descritas nesta seção.
 ### Layouts
 
 - O Painel de Layouts é aberto exclusivamente pelo controle central da Barra de uma Lâmina no modo normal e permanece associado a esse alvo explícito até ser fechado ou redirecionado por outra Barra. Não pode ser aberto nem utilizado no Modo de edição.
+- Enquanto aberto, mostra somente a Lâmina alvo no Canvas e oculta o Painel de imagens com seu divisor. Ao fechar, restaura a sequência navegável centrada nessa Lâmina e a visibilidade e altura anteriores do Painel de imagens, preservando sua busca e preferências. Essa apresentação temporária não altera o Projeto nem o Histórico.
 - A entrada no Modo de edição oculta temporariamente uma faixa aberta sem perder seu alvo. A saída restaura a faixa e recalcula seus Layouts compatíveis antes de exibi-la.
 - O Painel de Layouts possui duas seções horizontais: `Automáticos` contém Layouts produzidos pelo Gerador de Layouts e `Personalizados` contém Layouts criados pelo usuário e disponíveis no catálogo global.
-- O hover sobre uma preview executa um Mapeamento transitório e renderiza os próprios Frames da Lâmina alvo nas posições/dimensões candidatas, preservando Fotos, placeholders, estilos, ordem e ajustes.
+- O cabeçalho contém somente o seletor de quantidade de Frames. Clicar fora do Painel o fecha; o controle da Barra continua responsável por alternar ou redirecionar o Painel. Não há botão de fechar nem formulário de ajustes no cabeçalho.
+- As miniaturas de Layout são representações genéricas de sua geometria, sem Fotos, estilos, Background, Overlay ou legenda abaixo. Ocupam 176 × 88 px na escala padrão, aproveitando a altura das faixas com margens verticais compactas. Os títulos verticais das seções mantêm espaçamento nas extremidades.
+- O hover sobre uma preview executa um Mapeamento transitório e renderiza no Canvas os próprios Frames da Lâmina alvo nas posições/dimensões candidatas, preservando Fotos, placeholders, estilos, ordem e ajustes.
 - Em candidatos de travamento com posições excedentes, o hover mostra essas posições como placeholders vazios transitórios, com o Padrão de Frame herdado, sem criá-los no Projeto; o corpo da preview não os aplica, e somente o cadeado pode confirmar a operação.
 - O enquadramento das Fotos é recalculado com o mesmo caminho da aplicação real. A prévia não modifica Projeto, estado de Salvamento ou Undo/Redo.
 - Sair da preview restaura a geometria anterior; passar para outra substitui a representação. Clicar confirma exatamente o resultado mostrado, e clicar no cadeado confirma, cria os placeholders excedentes e trava, cada um como uma única ação.
@@ -871,6 +874,7 @@ validação das superfícies descritas nesta seção.
 - Clicar no cadeado fechado da preview destacada destrava imediatamente, sem confirmação, reabilita as outras previews e preserva Frames, Fotos, placeholders, estilos, ajustes, ordem e geometria.
 - Enquanto a organização estiver travada, nenhuma ação pode aplicar outra geometria de Layout; o usuário deve destravá-la antes de trocar de organização.
 - Travar e destravar constituem ações de Undo/Redo.
+- Ao confirmar um Layout, a faixa mantém as miniaturas visíveis enquanto atualiza a consulta do mesmo alvo. As ações dessas miniaturas ficam indisponíveis até a consulta vigente estar pronta, sem esvaziar nem piscar o Painel.
 - O último Layout aplicado é uma cópia local de sua geometria original e de sua categoria de origem. Permanece primeiro dentro dessa seção enquanto compatível e pode ser reaplicado depois de edições manuais ou da remoção da origem global.
 - Dentro de cada seção, a ordem é: Último Layout aplicado, quando pertencer à categoria; Favoritos do Projeto; e demais candidatos. Uma definição possui somente uma preview, mesmo quando é simultaneamente a última aplicada e favorita.
 - Para aplicação automática, a prioridade global é: Último Layout aplicado compatível, primeiro Favorito do Projeto, primeiro Layout personalizado global e primeiro Layout do sistema. Dentro de cada grupo, prevalece a ordem exibida em sua seção.

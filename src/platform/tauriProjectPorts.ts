@@ -36,6 +36,8 @@ import type { ApplicationSettings as IpcApplicationSettings } from "./generated/
 import type { CancelDisposition as IpcCancelDisposition } from "./generated/CancelDisposition";
 import type { CacheProcessorWarning as IpcCacheProcessorWarning } from "./generated/CacheProcessorWarning";
 import type { ExportCommandError as IpcExportCommandError } from "./generated/ExportCommandError";
+import { LayoutExportBlockedError } from "../application/projectPorts";
+import { parseLayoutExportProblems } from "./layoutExportContract";
 import type { ExportEvent as IpcExportEvent } from "./generated/ExportEvent";
 import type { ExportResult as IpcExportResult } from "./generated/ExportResult";
 import type { ImportPhotoResult as IpcImportPhotoResult } from "./generated/ImportPhotoResult";
@@ -297,7 +299,7 @@ export const tauriProjectCorePort: ProjectCorePort = {
   readSliderDoubleClickTime: () => invoke<number>("slider_double_click_time"),
   previewPhotoAngle: (edit) => invoke<ComposedFrame[]>("preview_photo_angle", { edit }),
   previewFrameStyle: (edit) => invoke<ComposedFrame[]>("preview_frame_style", { edit }),
-  queryLayouts: (sheetId) => invoke<LayoutQueryResult>("query_layouts", { sheetId }),
+  queryLayouts: (sheetId, expansion) => invoke<LayoutQueryResult>("query_layouts", expansion ? { sheetId, expansion } : { sheetId }),
   previewLayout: (selection) => invoke<ComposedFrame[]>("preview_layout", { selection }),
   previewFrameGeometry: (edit) => invoke<ComposedFrame[]>("preview_frame_geometry", { edit }),
   load: (operationId) =>
@@ -484,6 +486,11 @@ export const tauriExportPipelinePort: ExportPipelinePort = {
           return {
             status: "cancelled" as const,
           };
+        }
+
+        if (typeof error === "object" && error !== null && "code" in error && error.code === "unfilled_layout_positions" && "layoutProblems" in error) {
+          const problems = parseLayoutExportProblems(error.layoutProblems);
+          if (problems?.length) throw new LayoutExportBlockedError(problems);
         }
 
         throw error;

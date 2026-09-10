@@ -47,6 +47,23 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
+test("dragging a locked selection reports the lock after the threshold without requesting geometry", async () => {
+  const frameGeometry = controls();
+  renderCanvas({ mode: { kind: "sheet-editing", sheetId: "sheet-001" }, selectedFrameId: "frame-001", frameGeometry,
+    compositionPlan: interactiveComposition,
+    sheetBarMetadata: [{ sheetId: "sheet-001", pageNumbers: [1, 2], layoutLocked: true }] });
+  await finishPixiInitialization();
+  preparePointerCanvas();
+  startPointer();
+  fireEvent.pointerMove(window, { pointerId: 7, clientX: 102, clientY: 100 });
+  expect(frameGeometry.onError).not.toHaveBeenCalled();
+  fireEvent.pointerMove(window, { pointerId: 7, clientX: 150, clientY: 120 });
+  fireEvent.pointerUp(window, { pointerId: 7, clientX: 150, clientY: 120 });
+  expect(frameGeometry.onError).toHaveBeenCalledExactlyOnceWith("O Layout está travado. Destrave-o no Painel de Layouts para mover os Frames.");
+  expect(frameGeometry.preview).not.toHaveBeenCalled();
+  expect(frameGeometry.commit).not.toHaveBeenCalled();
+});
+
 test.each(["move", "resize"])(
   "%s does not flash the old Frame between commit completion and the confirmed projection", async (action) => {
     const composition = structuredClone(interactiveComposition);

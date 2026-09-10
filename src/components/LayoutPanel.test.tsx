@@ -1,49 +1,72 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
-import type { DisplayUnit } from "../domain/project";
 import { layoutPanelCorpus } from "../test/layoutPanelPreview";
 import { LayoutPanel } from "./LayoutPanel";
 import type { LayoutPanelController } from "./useLayoutPanel";
 
-function panel(unit: DisplayUnit) {
-  const sample = layoutPanelCorpus.cases.mixed.before;
+function panel(overrides: Partial<LayoutPanelController> = {}, caseName = "mixed", stage: "before" | "lockReady" | "filled" = "before") {
+  const sample = layoutPanelCorpus.cases[caseName][stage]!;
   const sheet = sample.projection.composition.sheets[0];
   const prepared = sample.queries[sheet.sheetId];
-  const updateSettings = vi.fn(async () => true);
   const controller: LayoutPanelController = {
     visible: true, sheetId: sheet.sheetId, composition: sample.projection.composition,
-    committing: false, query: prepared.query, previews: prepared.previews, error: null,
+    committing: false, query: prepared.query, displayQuery: overrides.query ?? prepared.query, previews: prepared.previews, error: null,
     toggle: vi.fn(), close: vi.fn(), preview: vi.fn(), cancelPreview: vi.fn(),
-    apply: vi.fn(async () => true), updateSettings,
+    apply: vi.fn(async () => true),
+    lock: vi.fn(async () => true), unlock: vi.fn(async () => true),
+    positionCount: sheet.frames.length, configurePositions: vi.fn(),
+    ...overrides,
   };
-  render(<LayoutPanel controller={controller} sheet={sheet} mediaPreviewUrls={{}} presentationUnit={unit} />);
-  fireEvent.click(screen.getByRole("button", { name: "Ajustes" }));
-  return { updateSettings };
+  const view = render(<LayoutPanel controller={controller} sheet={sheet} />);
+  return { controller, view };
 }
 
-test.each([
-  ["mm", "Margem (mm)", "25", 25000],
-  ["cm", "Margem (cm)", "2,5", 25000],
-  ["in", "Margem (pol)", "1", 25400],
-] as const)("Layout settings use %s without rounding untouched physical values", (unit, label, value, marginUm) => {
-  const { updateSettings } = panel(unit);
-  fireEvent.change(screen.getByRole("textbox", { name: label }), { target: { value } });
-  fireEvent.change(screen.getByRole("combobox", { name: "Permitir" }), { target: { value: "pagesOnly" } });
-  fireEvent.click(screen.getByRole("button", { name: "Atualizar sugestões" }));
-  expect(updateSettings).toHaveBeenCalledExactlyOnceWith({ permission: "pagesOnly", marginUm,
-    gapUm: 5000, minimumSideUm: 20000 });
+test("the lock remains actionable when extra positions disable the preview body", () => {
+  const { controller } = panel({ positionCount: 6 }, "expanded", "lockReady");
+  expect(screen.getByRole("button", { name: /^Aplicar Layout 1$/ })).toBeDisabled();
+  const lock = screen.getByRole("button", { name: "Aplicar e travar Layout 1" });
+  expect(lock).toBeEnabled();
+  fireEvent.click(lock);
+  expect(controller.lock).toHaveBeenCalledExactlyOnceWith(0);
+  expect(controller.apply).not.toHaveBeenCalled();
 });
 
-test("invalid physical fields immediately expose the shared tooltip and never send settings", () => {
-  const { updateSettings } = panel("mm");
-  const input = screen.getByRole("textbox", { name: "Menor lado (mm)" });
-  fireEvent.change(input, { target: { value: "0" } });
-  expect(input).toHaveAttribute("aria-invalid", "true");
-  expect(input).toHaveAccessibleDescription("O menor lado deve ser maior que zero.");
-  expect(screen.getByRole("tooltip")).toHaveTextContent("maior que zero");
-  fireEvent.click(screen.getByRole("button", { name: "Atualizar sugestões" }));
-  expect(updateSettings).not.toHaveBeenCalled();
-  fireEvent.change(input, { target: { value: "20" } });
-  expect(input).not.toHaveAttribute("aria-invalid");
-  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+test("the highlighted closed lock unlocks directly while other candidates stay disabled", () => {
+  const prepared = structuredClone(layoutPanelCorpus.cases.mixed.before.queries["sheet-001"].query);
+  prepared.locked = true;
+  prepared.listing.candidates[0].isLastApplied = true;
+  const { controller } = panel({ query: prepared });
+  for (const candidate of screen.getAllByRole("button", { name: /^Aplicar/ })) expect(candidate).toBeDisabled();
+  const unlock = screen.getByRole("button", { name: "Destravar Layout da Lâmina 01" });
+  expect(unlock).toBeEnabled();
+  fireEvent.click(unlock);
+  expect(controller.unlock).toHaveBeenCalledOnce();
+  expect(controller.lock).not.toHaveBeenCalled();
+});
+
+test("an outside press closes the panel even when the outside control stops propagation", () => {
+  const { controller } = panel();
+  render(<button onPointerDown={(event) => event.stopPropagation()}>Fora do painel</button>);
+  fireEvent.pointerDown(screen.getByRole("combobox", { name: "Quantidade de Frames" }));
+  expect(controller.close).not.toHaveBeenCalled();
+  fireEvent.pointerDown(screen.getByRole("button", { name: "Fora do painel" }));
+  expect(controller.close).toHaveBeenCalledOnce();
+});
+
+test("the frame count requests additional positions without applying a Layout", () => {
+  const { controller } = panel();
+  const count = screen.getByRole("combobox", { name: "Quantidade de Frames" });
+  fireEvent.change(count, { target: { value: "6" } });
+  expect(controller.configurePositions).toHaveBeenCalledExactlyOnceWith(6);
+  expect(controller.apply).not.toHaveBeenCalled();
+  expect(controller.lock).not.toHaveBeenCalled();
+});
+
+test("filled Frames are represented by generic geometry without photo content or decoration", () => {
+  panel({}, "mixed", "filled");
+  const region = screen.getByRole("region", { name: "Painel de Layouts" });
+  const thumbnail = within(region).getAllByRole("img")[0];
+  expect(thumbnail).toHaveAccessibleName("Layout com 4 Frames");
+  expect(thumbnail.querySelectorAll("[data-preview-frame-id]")).toHaveLength(4);
+  expect(thumbnail.querySelector("image, [data-preview-frame-content-id], [data-preview-frame-border-id]")).toBeNull();
 });

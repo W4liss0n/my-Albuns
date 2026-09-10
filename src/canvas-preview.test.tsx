@@ -27,7 +27,7 @@ vi.mock("./components/AlbumCanvas", () => ({
       />
       <button
         data-testid="report-canvas-metrics"
-        onClick={() => onCanvasMetricsChange?.({ width: 1_000, scale: 0.5 })}
+        onClick={() => onCanvasMetricsChange?.({ width: 1_000, height: 500, scale: 0.5 })}
         type="button"
       />
       <button

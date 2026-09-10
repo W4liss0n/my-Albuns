@@ -14,6 +14,10 @@
   grid-template-rows: minmax(0, 1fr) 11px;
 }
 
+.canvas-shell--isolated {
+  grid-template-rows: minmax(0, 1fr);
+}
+
 .canvas-empty {
   width: 100%;
   height: 100%;

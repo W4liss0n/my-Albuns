@@ -269,3 +269,15 @@ test("shows rejected photo files in Problems and closes without a creative actio
   await user.keyboard("{Escape}");
   expect(onAction).toHaveBeenCalledExactlyOnceWith("dismissImageProcessingProblems");
 });
+
+test("export placeholders list the Project, exact position and Open Project action", async () => {
+  const user = userEvent.setup();
+  const onAction = vi.fn();
+  render(<ProjectDialogView onAction={onAction} state={{ kind: "exportProblems", projectName: "Álbum da turma",
+    problems: [{ sheetId: "sheet-001", sheetNumber: 1, frameId: "frame-003", frameNumber: 3 }] }} />);
+  const dialog = screen.getByRole("dialog", { name: "Problemas na Exportação" });
+  expect(within(dialog).getByRole("columnheader", { name: "Projeto" })).toBeInTheDocument();
+  expect(within(dialog).getByRole("row", { name: "Álbum da turma Lâmina 01, posição 3: Frame vazio. Abrir Projeto" })).toBeInTheDocument();
+  await user.click(within(dialog).getByRole("button", { name: "Abrir Projeto" }));
+  expect(onAction).toHaveBeenCalledExactlyOnceWith("openExportProject");
+});

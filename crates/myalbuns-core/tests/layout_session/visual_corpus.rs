@@ -71,10 +71,24 @@ fn fixture_project(root: &Path, count: usize) -> EditableProject {
 }
 
 fn record(project: &mut EditableProject, name: &str) -> Value {
+    record_expansion(project, name, None).0
+}
+
+fn record_expansion(
+    project: &mut EditableProject,
+    name: &str,
+    expansion: Option<myalbuns_core::LayoutExpansion>,
+) -> (Value, Option<LayoutSelection>) {
     let projection = project.projection();
     let mut queries = serde_json::Map::new();
+    let mut selection = None;
     for sheet in &projection.state.album.sheets {
-        let query = project.query_layouts(&sheet.id).unwrap();
+        let extra = (sheet.id == projection.state.album.sheets[0].id)
+            .then(|| expansion.clone())
+            .flatten();
+        let query = project
+            .query_layouts_with_expansion(&sheet.id, extra)
+            .unwrap();
         let previews: Vec<_> = (0..query.listing.candidates.len())
             .map(|index| {
                 project
@@ -85,6 +99,12 @@ fn record(project: &mut EditableProject, name: &str) -> Value {
                     .unwrap()
             })
             .collect();
+        if sheet.id == projection.state.album.sheets[0].id && !query.listing.candidates.is_empty() {
+            selection = Some(LayoutSelection {
+                query_id: query.query_id.clone(),
+                candidate_index: 0,
+            });
+        }
         let mut query = serde_json::to_value(query).unwrap();
         query["queryId"] = json!(format!("{name}-{}", sheet.id));
         queries.insert(sheet.id.clone(), json!({"query":query,"previews":previews}));
@@ -94,13 +114,23 @@ fn record(project: &mut EditableProject, name: &str) -> Value {
         projection,
         "querying and composing never touch history"
     );
-    json!({"projection":projection,"queries":queries})
+    (
+        json!({"projection":projection,"queries":queries}),
+        selection,
+    )
 }
 
 #[test]
 fn layout_panel_corpus_is_produced_by_the_public_core() {
     let mut cases = serde_json::Map::new();
-    for (name, count) in [("mixed", 4), ("single", 4), ("empty", 0), ("outside", 31)] {
+    for (name, count) in [
+        ("mixed", 4),
+        ("single", 4),
+        ("empty", 0),
+        ("outside", 31),
+        ("expanded", 4),
+        ("empty-lock", 0),
+    ] {
         let root = tempfile::tempdir().unwrap();
         let mut project = fixture_project(root.path(), count);
         let sheet = project.projection().state.album.sheets[0].id.clone();
@@ -113,39 +143,146 @@ fn layout_panel_corpus_is_produced_by_the_public_core() {
         }
         let before = record(&mut project, name);
         let query = project.query_layouts(&sheet).unwrap();
-        let applied = if query.listing.candidates.is_empty() {
-            Value::Null
-        } else {
-            let preview = project
-                .preview_layout(&LayoutSelection {
-                    query_id: query.query_id.clone(),
-                    candidate_index: 0,
-                })
-                .unwrap();
-            let previous = project.projection();
-            project
-                .apply(ProjectIntent::ApplyLayout {
-                    selection: LayoutSelection {
-                        query_id: query.query_id,
+        let applied =
+            if query.listing.candidates.is_empty() || matches!(name, "expanded" | "empty-lock") {
+                Value::Null
+            } else {
+                let preview = project
+                    .preview_layout(&LayoutSelection {
+                        query_id: query.query_id.clone(),
                         candidate_index: 0,
-                    },
+                    })
+                    .unwrap();
+                let previous = project.projection();
+                project
+                    .apply(ProjectIntent::ApplyLayout {
+                        selection: LayoutSelection {
+                            query_id: query.query_id,
+                            candidate_index: 0,
+                        },
+                    })
+                    .unwrap();
+                let applied = project.projection();
+                assert_eq!(applied.composition.sheets[0].frames, preview);
+                for (a, b) in previous.state.album.sheets[0]
+                    .frames
+                    .iter()
+                    .zip(&applied.state.album.sheets[0].frames)
+                {
+                    assert_eq!(
+                        (&a.id, a.z_index, &a.photo, &a.style),
+                        (&b.id, b.z_index, &b.photo, &b.style)
+                    );
+                }
+                record(&mut project, &format!("{name}-applied"))
+            };
+        let mut entry = json!({"before":before,"applied":applied});
+        if matches!(name, "mixed" | "expanded" | "empty-lock") {
+            if !entry["applied"].is_null() {
+                project.undo().unwrap();
+            }
+            let extra = matches!(name, "expanded" | "empty-lock").then_some(
+                myalbuns_core::LayoutExpansion {
+                    additional_positions: 2,
+                    orientation: myalbuns_core::FrameOrientation::Horizontal,
+                },
+            );
+            let (ready, selection) =
+                record_expansion(&mut project, &format!("{name}-ready"), extra.clone());
+            entry["lockReady"] = ready;
+            // Queries for other Sheets replace the session's handle, so prepare the
+            // target last and retain precisely its previews and generated Frame IDs.
+            let query = project.query_layouts_with_expansion(&sheet, extra).unwrap();
+            let selection = LayoutSelection {
+                query_id: query.query_id.clone(),
+                candidate_index: selection.unwrap().candidate_index,
+            };
+            let previews: Vec<_> = (0..query.listing.candidates.len())
+                .map(|candidate_index| {
+                    project
+                        .preview_layout(&LayoutSelection {
+                            query_id: query.query_id.clone(),
+                            candidate_index,
+                        })
+                        .unwrap()
+                })
+                .collect();
+            let mut serialized_query = serde_json::to_value(&query).unwrap();
+            serialized_query["queryId"] = json!(format!("{name}-ready-{sheet}"));
+            entry["lockReady"]["queries"][&sheet] =
+                json!({"query":serialized_query,"previews":previews});
+            let locked = project
+                .apply(ProjectIntent::LockLayout { selection })
+                .unwrap();
+            assert_eq!(locked.composition.sheets[0].frames, previews[0]);
+            entry["locked"] = record(&mut project, &format!("{name}-locked"));
+            let problems = project
+                .freeze_rendering()
+                .validate_export_sheets(std::slice::from_ref(&sheet))
+                .unwrap();
+            entry["exportProblems"] = serde_json::to_value(problems).unwrap();
+            project
+                .apply(ProjectIntent::UnlockLayout {
+                    sheet_id: sheet.clone(),
                 })
                 .unwrap();
-            let applied = project.projection();
-            assert_eq!(applied.composition.sheets[0].frames, preview);
-            for (a, b) in previous.state.album.sheets[0]
+            entry["unlocked"] = record(&mut project, &format!("{name}-unlocked"));
+            project.undo().unwrap();
+            let media_id = project
+                .projection()
+                .state
+                .album
+                .media
+                .iter()
+                .find(|m| m.kind == myalbuns_core::MediaKind::Photo)
+                .unwrap()
+                .id;
+            while project.projection().state.album.sheets[0]
                 .frames
                 .iter()
-                .zip(&applied.state.album.sheets[0].frames)
+                .any(|frame| frame.photo.is_none())
             {
-                assert_eq!(
-                    (&a.id, a.z_index, &a.photo, &a.style),
-                    (&b.id, b.z_index, &b.photo, &b.style)
-                );
+                project
+                    .apply(ProjectIntent::AddPhoto {
+                        sheet_id: sheet.clone(),
+                        media_id,
+                        mode: myalbuns_core::PhotoPlacementMode::Normal,
+                    })
+                    .unwrap();
             }
-            record(&mut project, &format!("{name}-applied"))
-        };
-        cases.insert(name.into(), json!({"before":before,"applied":applied}));
+            entry["filled"] = record(&mut project, &format!("{name}-filled"));
+            assert!(project.freeze_rendering().into_sheet(&sheet).is_ok());
+            let first = project.projection().state.album.sheets[0].frames[0]
+                .id
+                .clone();
+            project
+                .apply(ProjectIntent::DeleteFrames {
+                    frame_ids: vec![first],
+                    mode: myalbuns_core::PhotoPlacementMode::Edit,
+                })
+                .unwrap();
+            entry["cleared"] = record(&mut project, &format!("{name}-cleared"));
+            // Normalize only nondeterministic UUID allocation, never geometry.
+            let mut ids = BTreeMap::new();
+            for (candidate, preview) in previews.iter().enumerate().skip(1) {
+                for (index, frame) in preview.iter().enumerate().skip(count) {
+                    ids.insert(
+                        frame.frame_id.clone(),
+                        format!("candidate-{candidate}-placeholder-{}", index + 1),
+                    );
+                }
+            }
+            for (index, frame) in locked.state.album.sheets[0]
+                .frames
+                .iter()
+                .enumerate()
+                .skip(count)
+            {
+                ids.insert(frame.id.clone(), format!("lock-placeholder-{}", index + 1));
+            }
+            normalize(&mut entry, &ids);
+        }
+        cases.insert(name.into(), entry);
     }
     let mut value = json!({"cases":cases});
     let before = &value["cases"]["mixed"]["before"]["projection"];

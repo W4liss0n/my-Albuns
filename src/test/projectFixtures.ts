@@ -30,6 +30,7 @@ export const representativeProjection: EditorProjection = {
           role: "initial",
           activeSides: "both",
           pageNumbers: [1, 2],
+          layoutLocked: false,
           widthUm: 600_000,
           heightUm: 300_000,
           frames: [

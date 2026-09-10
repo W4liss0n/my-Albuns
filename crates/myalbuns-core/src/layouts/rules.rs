@@ -8,6 +8,7 @@ use crate::CoreError;
 pub struct LayoutPatch {
     definition: LayoutDefinition,
     frame_ids: Vec<Uuid>,
+    placeholder_ids: Vec<Uuid>,
     last_layout: Option<StoredLayout>,
 }
 
@@ -18,6 +19,9 @@ impl LayoutPatch {
     pub fn frame_ids(&self) -> &[Uuid] {
         &self.frame_ids
     }
+    pub fn placeholder_ids(&self) -> &[Uuid] {
+        &self.placeholder_ids
+    }
     pub fn last_layout(&self) -> Option<&StoredLayout> {
         self.last_layout.as_ref()
     }
@@ -26,6 +30,27 @@ impl LayoutPatch {
 pub struct LayoutRules;
 
 impl LayoutRules {
+    pub fn list_for_lock(query: &LayoutQuery, last: Option<&StoredLayout>) -> LayoutListing {
+        let mut listing = Self::list(query, last);
+        if listing.generation_status != LayoutGenerationStatus::InvalidQuery
+            && let Some(last) = last.filter(|last| {
+                last.definition.positions.len() > query.frame_orientations.len()
+                    && (query.permission == LayoutPermission::PagesAndSheet
+                        || last.definition.scope == LayoutScope::Page)
+                    && scaled_definition(&last.definition, &query.surface).is_some()
+            })
+        {
+            listing.candidates.insert(
+                0,
+                LayoutCandidate {
+                    layout: last.clone(),
+                    is_last_applied: true,
+                },
+            );
+        }
+        listing
+    }
+
     pub fn list(query: &LayoutQuery, last: Option<&StoredLayout>) -> LayoutListing {
         let generation = generate_layouts(query);
         let mut listing = LayoutListing {
@@ -67,8 +92,18 @@ impl LayoutRules {
         frame_ids: &[Uuid],
         permission: LayoutPermission,
     ) -> Result<LayoutPatch, CoreError> {
-        if frame_ids.is_empty()
-            || layout.definition.positions.len() != frame_ids.len()
+        Self::resolve_for_lock(layout, surface, frame_ids, &[], permission)
+    }
+
+    pub fn resolve_for_lock(
+        layout: &StoredLayout,
+        surface: &LayoutSurface,
+        frame_ids: &[Uuid],
+        placeholder_ids: &[Uuid],
+        permission: LayoutPermission,
+    ) -> Result<LayoutPatch, CoreError> {
+        if layout.definition.positions.is_empty()
+            || layout.definition.positions.len() != frame_ids.len() + placeholder_ids.len()
             || permission == LayoutPermission::PagesOnly
                 && layout.definition.scope == LayoutScope::Sheet
         {
@@ -79,6 +114,7 @@ impl LayoutRules {
         Ok(LayoutPatch {
             definition,
             frame_ids: frame_ids.to_vec(),
+            placeholder_ids: placeholder_ids.to_vec(),
             last_layout: Some(layout.clone()),
         })
     }
@@ -196,6 +232,7 @@ impl LayoutRules {
                 positions,
             },
             frame_ids: frame_ids.to_vec(),
+            placeholder_ids: Vec::new(),
             last_layout: None,
         })
     }

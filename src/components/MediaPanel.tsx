@@ -73,6 +73,7 @@ type MediaPanelPreviewSource =
 
 interface MediaPanelProps {
   ref?: Ref<MediaPanelHandle>;
+  hidden?: boolean;
   mediaItems: readonly MediaCatalogItem[];
   mediaUsage: readonly MediaUsage[];
   onFillPhoto(mediaId: string): void;
@@ -96,6 +97,7 @@ const naturalNameCollator = new Intl.Collator("pt-BR", {
 
 export function MediaPanel({
   ref,
+  hidden = false,
   mediaItems,
   mediaUsage,
   onFillPhoto,
@@ -455,6 +457,7 @@ export function MediaPanel({
     <section
       id="media-panel"
       className="media-panel"
+      hidden={hidden}
       data-project-command-context="media-panel"
       aria-label="Painel de imagens"
       onKeyDown={selectAllVisibleMedia}

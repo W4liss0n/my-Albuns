@@ -7,47 +7,47 @@ use crate::{
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct ProjectDocumentV8 {
-    document_type: String,
-    schema_version: u32,
+    pub(super) document_type: String,
+    pub(super) schema_version: u32,
     pub(super) project_id: String,
-    revision: u64,
-    project: ProjectPayloadV8,
+    pub(super) revision: u64,
+    pub(super) project: ProjectPayloadV8,
 }
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct ProjectPayloadV8 {
-    document: DocumentSettingsV1,
-    visual_defaults: VisualDefaultsV1,
-    layout_settings: LayoutSettingsV8,
-    media: Vec<MediaRefV2>,
-    sheets: Vec<SheetV8>,
+pub(super) struct ProjectPayloadV8 {
+    pub(super) document: DocumentSettingsV1,
+    pub(super) visual_defaults: VisualDefaultsV1,
+    pub(super) layout_settings: LayoutSettingsV8,
+    pub(super) media: Vec<MediaRefV2>,
+    pub(super) sheets: Vec<SheetV8>,
 }
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct SheetV8 {
-    id: String,
-    active_sides: ActiveSidesV1,
-    frames: Vec<FrameV7>,
+pub(super) struct SheetV8 {
+    pub(super) id: String,
+    pub(super) active_sides: ActiveSidesV1,
+    pub(super) frames: Vec<FrameV7>,
     #[serde(deserialize_with = "Option::deserialize")]
-    last_layout: Option<StoredLayoutV8>,
+    pub(super) last_layout: Option<StoredLayoutV8>,
 }
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct LayoutSettingsV8 {
-    permission: LayoutPermission,
-    margin_um: i64,
-    gap_um: i64,
-    minimum_side_um: i64,
+pub(super) struct LayoutSettingsV8 {
+    pub(super) permission: LayoutPermission,
+    pub(super) margin_um: i64,
+    pub(super) gap_um: i64,
+    pub(super) minimum_side_um: i64,
 }
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct StoredLayoutV8 {
+pub(super) struct StoredLayoutV8 {
     definition: LayoutDefinitionV8,
-    origin: LayoutOrigin,
+    pub(super) origin: LayoutOrigin,
 }
 
 #[derive(Deserialize, Serialize)]

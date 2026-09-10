@@ -18,6 +18,52 @@ import {
 setupAlbumCanvasTestHarness();
 const pixiLifecycle = getPixiLifecycle();
 
+test("Layout focus fits only its target and aligns the Sheet Bar, then restores continuous navigation", async () => {
+  const onViewportChange = vi.fn();
+  const view = renderCanvas({
+    onViewportChange,
+    compositionPlan: threeSheetComposition,
+    mode: { kind: "normal", isolatedSheetId: "sheet-002" },
+    sheetReorder: { disabled: false, status: "idle", onCancel: vi.fn(), onDrop: vi.fn(), onSelect: vi.fn(), onPreview: vi.fn(),
+      representation: { ghost: null, placeholderIndex: null, order: threeSheetComposition.sheets.map((sheet) => sheet.sheetId) } },
+  });
+  await finishPixiInitialization();
+  const host = document.querySelector(".canvas-host") as HTMLElement;
+  Object.defineProperties(host, {
+    clientWidth: { configurable: true, value: 900 },
+    clientHeight: { configurable: true, value: 700 },
+  });
+  await act(async () => { pixiLifecycle.resizeCallbacks[0]?.([], {} as ResizeObserver); });
+
+  const app = pixiLifecycle.instances[0];
+  const world = app.stage.children[0] as {
+    position: { x: number; y: number }; scale: { x: number }; children: { label: string }[];
+  };
+  expect(world.children.map((node) => node.label)).toEqual(["canvas-sheet-sheet-002"]);
+  const renderedWidth = 600 * world.scale.x;
+  const renderedHeight = 300 * world.scale.x;
+  expect(renderedWidth).toBeLessThan(900);
+  expect(renderedHeight).toBeLessThan(700);
+  expect(world.position.x + renderedWidth / 2).toBeCloseTo(450, 4);
+  expect(world.position.y + renderedHeight / 2).toBeCloseTo(350, 4);
+  expect(view.onCenteredSheetChange).toHaveBeenLastCalledWith("sheet-002");
+  expect(screen.queryByRole("scrollbar")).not.toBeInTheDocument();
+  const bar = screen.getByRole("button", { name: "Reordenar Lâmina 02 pela Barra" });
+  expect(Number.parseFloat(bar.style.left) + Number.parseFloat(bar.style.width) / 2).toBeCloseTo(450, 4);
+  expect(Number.parseFloat(bar.style.top)).toBeCloseTo(world.position.y, 4);
+  expect(screen.queryByRole("button", { name: "Reordenar Lâmina 01 pela Barra" })).not.toBeInTheDocument();
+  onViewportChange.mockClear();
+  app.canvas.dispatchEvent(new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: 600 }));
+  expect(view.onViewportChange).not.toHaveBeenCalled();
+
+  view.rerenderCanvas({ mode: { kind: "normal" }, centeredSheetId: "sheet-002" });
+  expect(screen.getByRole("scrollbar")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Reordenar Lâmina 01 pela Barra" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Reordenar Lâmina 03 pela Barra" })).toBeInTheDocument();
+  expect(view.onViewportChange).toHaveBeenCalled();
+  expect(pixiLifecycle.instances).toHaveLength(1);
+});
+
 test("does not zoom the continuous Canvas outside sheet-editing mode", async () => {
   const onViewportChange = vi.fn();
   renderCanvas({ onViewportChange });
@@ -174,6 +220,7 @@ test("resizes the Pixi renderer before fitting a taller Canvas", async () => {
   expect(world.scale.x).toBeCloseTo(expectedScale, 4);
   expect(onCanvasMetricsChange).toHaveBeenLastCalledWith({
     width: 900,
+    height: 700,
     scale: expectedScale,
   });
 });

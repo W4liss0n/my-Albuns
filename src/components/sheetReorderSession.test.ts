@@ -273,6 +273,7 @@ function sheet(
     role,
     activeSides,
     pageNumbers: [],
+    layoutLocked: false,
     widthUm: activeSides === "both" ? 600_000 : 300_000,
     heightUm: 300_000,
     frames: [],

@@ -110,6 +110,7 @@
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-001",
+                "layoutLocked": false,
                 "number": 1,
                 "pageNumbers": [
                   1
@@ -122,6 +123,7 @@
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-002",
+                "layoutLocked": false,
                 "number": 2,
                 "pageNumbers": [
                   2,
@@ -135,6 +137,7 @@
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-003",
+                "layoutLocked": false,
                 "number": 3,
                 "pageNumbers": [
                   4
@@ -323,6 +326,7 @@
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-001",
+                "layoutLocked": false,
                 "number": 1,
                 "pageNumbers": [
                   1
@@ -335,6 +339,7 @@
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-002",
+                "layoutLocked": false,
                 "number": 2,
                 "pageNumbers": [
                   2,
@@ -348,6 +353,7 @@
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-003",
+                "layoutLocked": false,
                 "number": 3,
                 "pageNumbers": [
                   4
@@ -536,6 +542,7 @@
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-001",
+                "layoutLocked": false,
                 "number": 1,
                 "pageNumbers": [
                   1
@@ -548,6 +555,7 @@
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-002",
+                "layoutLocked": false,
                 "number": 2,
                 "pageNumbers": [
                   2,
@@ -561,6 +569,7 @@
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-003",
+                "layoutLocked": false,
                 "number": 3,
                 "pageNumbers": [
                   4
@@ -749,6 +758,7 @@
                 "frames": [],
                 "heightUm": 100000,
                 "id": "sheet-001",
+                "layoutLocked": false,
                 "number": 1,
                 "pageNumbers": [
                   1
@@ -761,6 +771,7 @@
                 "frames": [],
                 "heightUm": 100000,
                 "id": "sheet-002",
+                "layoutLocked": false,
                 "number": 2,
                 "pageNumbers": [
                   2,
@@ -774,6 +785,7 @@
                 "frames": [],
                 "heightUm": 100000,
                 "id": "sheet-003",
+                "layoutLocked": false,
                 "number": 3,
                 "pageNumbers": [
                   4

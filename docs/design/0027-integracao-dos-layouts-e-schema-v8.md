@@ -61,6 +61,9 @@ escopos, 15 mm de margem, 5 mm de intervalo e 20 mm de menor lado.
 
 ## Formato persistido
 
+O [design 0028](0028-layout-travado-e-schema-v9.md) acrescenta o travamento
+persistido na v9; a v8 abaixo permanece como contrato histórico de leitura.
+
 O escritor passa a emitir `schemaVersion: 8`. O envelope e os campos de Foto,
 estilo e caminhos Windows continuam nos contratos anteriores. A v8 acrescenta:
 

@@ -293,7 +293,7 @@ Identidade informativa da última organização escolhida para uma Lâmina.
 Correspondência entre os Frames existentes e as posições ordenadas definidas por um Layout.
 
 **Layout travado**:
-Estado da Lâmina que protege posição e dimensões dos Frames de alterações diretas, sem congelar Fotos ou estilos.
+Estado da Lâmina que protege quantidade, posição e dimensões dos Frames de alterações diretas, sem congelar Fotos ou estilos. Sua aplicação e persistência seguem o [design 0028](docs/design/0028-layout-travado-e-schema-v9.md).
 
 ## Superfícies de trabalho
 
@@ -310,7 +310,7 @@ Superfície de trabalho dedicada a uma Sessão do Projeto.
 Lâmina mais próxima do centro visual do Canvas e usada como contexto implícito quando um comando não possui alvo explícito.
 
 **Modo normal do Canvas**:
-Contexto de trabalho do Canvas contínuo que mantém a sequência de Lâminas navegável e permite interações diretas sem isolar uma única Lâmina.
+Contexto de trabalho do Canvas que normalmente mantém a sequência de Lâminas navegável. Enquanto o Painel de Layouts está aberto, apresenta somente sua Lâmina alvo, centralizada e enquadrada na área disponível.
 
 **Modo de edição da Lâmina**:
 Contexto de trabalho dedicado à edição estrutural dos Frames de uma única Lâmina.
@@ -325,7 +325,7 @@ Identificação contextual associada a uma Lâmina no Canvas.
 Representação resumida e ordenada das Lâminas do Álbum.
 
 **Painel de Layouts**:
-Superfície usada para consultar e aplicar Layouts compatíveis à Lâmina em contexto.
+Superfície usada para consultar e aplicar Layouts compatíveis à Lâmina em contexto. Sua abertura centraliza a Lâmina alvo e oculta temporariamente as outras Lâminas do Canvas e o Painel de imagens.
 
 **Painel contextual**:
 Superfície única e reutilizável da Janela do Projeto que apresenta as ferramentas do contexto ativo, seja o Álbum, a Lâmina ou um Frame e sua Foto.

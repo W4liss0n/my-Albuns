@@ -373,3 +373,4 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.media-panel[hidden] { display: none; }
