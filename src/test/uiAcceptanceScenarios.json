@@ -7888,6 +7888,14 @@
         {
           "type": "click",
           "selector": "[aria-label=\"Decorativos\"]"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Informações do Álbum\"]"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Design do Álbum\"]"
         }
       ]
     },

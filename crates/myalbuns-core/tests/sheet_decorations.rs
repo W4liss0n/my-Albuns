@@ -183,6 +183,83 @@ fn applying_to_one_side_preserves_the_other_crop_and_history_through_save() {
         reopened.undo().unwrap();
         assert_eq!(reopened.undo().unwrap().composition, divided.composition);
     }
+    let last_id = reopened
+        .projection()
+        .state
+        .album
+        .sheets
+        .last()
+        .unwrap()
+        .id
+        .clone();
+    for (edge_id, scope) in [
+        (sheet_id, DecorativeScope::Right),
+        (last_id, DecorativeScope::Left),
+    ] {
+        for role in [DecorativeRole::Background, DecorativeRole::Overlay] {
+            for through_drop in [false, true] {
+                let before = reopened.projection();
+                reopened
+                    .apply(ProjectIntent::ConvertEdgeSheet {
+                        sheet_id: edge_id.clone(),
+                    })
+                    .unwrap();
+                let whole = reopened
+                    .apply(ProjectIntent::ApplyDecorative {
+                        sheet_id: edge_id.clone(),
+                        media_id: ids[0],
+                        role,
+                        scope: DecorativeScope::BothSides,
+                    })
+                    .unwrap();
+                let intent = if through_drop {
+                    ProjectIntent::DropDecorative {
+                        request: DecorativeDropRequest {
+                            sheet_id: edge_id.clone(),
+                            media_id: ids[1],
+                            role,
+                            x_um: 150_000,
+                            y_um: 150_000,
+                        },
+                    }
+                } else {
+                    ProjectIntent::ApplyDecorative {
+                        sheet_id: edge_id.clone(),
+                        media_id: ids[1],
+                        role,
+                        scope,
+                    }
+                };
+                let lateral = reopened.apply(intent).unwrap();
+                let expanded = reopened
+                    .apply(ProjectIntent::ConvertEdgeSheet {
+                        sheet_id: edge_id.clone(),
+                    })
+                    .unwrap();
+                let sheet = expanded
+                    .composition
+                    .sheets
+                    .iter()
+                    .find(|sheet| sheet.sheet_id == edge_id)
+                    .unwrap();
+                let inactive_index = usize::from(scope == DecorativeScope::Left);
+                if role == DecorativeRole::Background {
+                    assert!(
+                        matches!(&sheet.backgrounds[inactive_index], ComposedBackground::Color { rgb, .. } if rgb == "#FFFFFF")
+                    );
+                } else {
+                    assert_eq!(sheet.overlays.len(), 1);
+                    assert_eq!(sheet.overlays[0].media_id, ids[1]);
+                }
+                assert_eq!(reopened.undo().unwrap().composition, lateral.composition);
+                assert_eq!(reopened.redo().unwrap().composition, expanded.composition);
+                reopened.undo().unwrap();
+                assert_eq!(reopened.undo().unwrap().composition, whole.composition);
+                reopened.undo().unwrap();
+                assert_eq!(reopened.undo().unwrap().composition, before.composition);
+            }
+        }
+    }
 }
 
 #[test]

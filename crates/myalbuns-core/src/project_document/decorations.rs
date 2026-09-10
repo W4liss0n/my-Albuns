@@ -115,14 +115,16 @@ impl ProjectDocument {
             ));
         }
         match role {
-            DecorativeRole::Background => sheet
-                .visuals
-                .background
-                .apply(scope, ProjectedBackgroundContent::Media { media_id }),
-            DecorativeRole::Overlay => sheet
-                .visuals
-                .overlay
-                .apply(scope, Some(ProjectedOverlayContent::Media { media_id })),
+            DecorativeRole::Background => sheet.visuals.background.apply(
+                scope,
+                ProjectedBackgroundContent::Media { media_id },
+                sheet.active_sides,
+            ),
+            DecorativeRole::Overlay => sheet.visuals.overlay.apply(
+                scope,
+                Some(ProjectedOverlayContent::Media { media_id }),
+                sheet.active_sides,
+            ),
         }
         Ok(next)
     }

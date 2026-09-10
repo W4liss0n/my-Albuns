@@ -63,7 +63,7 @@ impl<T: Clone> SheetVisual<T> {
         }
     }
 
-    pub(crate) fn apply(&mut self, scope: DecorativeScope, content: T) {
+    pub(crate) fn apply(&mut self, scope: DecorativeScope, content: T, active: crate::ActiveSides) {
         if scope == DecorativeScope::BothSides {
             *self = Self::BothSides { content };
             return;
@@ -89,6 +89,7 @@ impl<T: Clone> SheetVisual<T> {
             mapping: VisualMapping::Side,
         };
         *self = Self::PerSide { left, right };
+        self.retain_active_sides(active);
     }
 
     pub(crate) fn contents(&self) -> Vec<&T> {

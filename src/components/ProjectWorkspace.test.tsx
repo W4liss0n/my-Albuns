@@ -5613,9 +5613,9 @@ test("offers retry only for an unavailable occurrence and keeps Relink exclusive
     name: /^(Arquivo ausente|Indisponível|Prévia indisponível)/,
   });
   expect(availabilityStatuses).toHaveLength(3);
-  expect(screen.getByRole("status", { name: "Arquivo ausente" })).toHaveTextContent(/^Ausente$/);
+  expect(screen.getByRole("status", { name: /^Arquivo ausente/ })).toHaveTextContent(/^Ausente$/);
   expect(screen.getByRole("status", { name: "Indisponível" })).toHaveTextContent(/^Indisponível$/);
-  expect(screen.getByRole("status", { name: "Prévia indisponível" })).toHaveTextContent(/^Prévia indisponível$/);
+  expect(screen.getByRole("status", { name: /^Prévia indisponível/ })).toHaveTextContent(/^Prévia indisponível/);
   fireEvent.click(
     screen.getByRole("button", { name: /Religar arquivo de/i }),
   );

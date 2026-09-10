@@ -31090,12 +31090,7 @@
                   "overlay": {
                     "kind": "perSide",
                     "left": {
-                      "content": {
-                        "kind": "media",
-                        "mediaId": "00000000-0000-4000-8000-000000000030"
-                      },
-                      "kind": "custom",
-                      "mapping": "bothSides"
+                      "kind": "default"
                     },
                     "right": {
                       "content": {
@@ -32651,12 +32646,7 @@
                   "overlay": {
                     "kind": "perSide",
                     "left": {
-                      "content": {
-                        "kind": "media",
-                        "mediaId": "00000000-0000-4000-8000-000000000030"
-                      },
-                      "kind": "custom",
-                      "mapping": "bothSides"
+                      "kind": "default"
                     },
                     "right": {
                       "content": {
