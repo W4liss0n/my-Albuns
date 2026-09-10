@@ -5085,7 +5085,7 @@
         },
         {
           "type": "click",
-          "selector": ".sheet-design-inspector button:last-child"
+          "selector": ".sheet-design-inspector > button:last-child"
         }
       ]
     },
@@ -5110,7 +5110,7 @@
         },
         {
           "type": "click",
-          "selector": ".sheet-design-inspector button:last-child"
+          "selector": ".sheet-design-inspector > button:last-child"
         },
         {
           "type": "focus",
@@ -5147,7 +5147,7 @@
         },
         {
           "type": "click",
-          "selector": "button[role=\"menuitem\"][aria-label=\"Editar\"]"
+          "selector": "button[aria-controls=\"application-menu-edit\"]"
         },
         {
           "type": "click",
@@ -5168,7 +5168,7 @@
         "width": 1440,
         "height": 800
       },
-      "readySelector": ".sheet-design-inspector button:last-child:disabled",
+      "readySelector": ".sheet-design-inspector > button:last-child:disabled",
       "actions": [
         {
           "type": "assert",
@@ -6181,6 +6181,191 @@
       },
       "readySelector": ".ui-problems-table",
       "actions": []
+    },
+    {
+      "id": "workspace-layout-favorites",
+      "title": "Layouts favoritos — estrelas nas duas origens",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=favorites&scale=1",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-favorites",
+        "reason": "A SPEC e o design 0030 definem estrelas por origem, cópias portáteis e ordem de Favoritos. O corpus usa definições e transições produzidas pelo Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__section:nth-of-type(3) .layout-panel__favorite[aria-pressed=\"true\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "click",
+          "selector": ".layout-panel__section:nth-of-type(2) .layout-panel__favorite"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__section:nth-of-type(2) .layout-panel__favorite[aria-pressed=\"true\"]"
+        },
+        {
+          "type": "click",
+          "selector": ".layout-panel__section:nth-of-type(3) .layout-panel__favorite"
+        },
+        {
+          "type": "focus",
+          "selector": ".pixi-canvas"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-favorites-125",
+      "title": "Layouts favoritos — estrelas nas duas origens a 125%",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=favorites&scale=1.25",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-favorites",
+        "reason": "A SPEC e o design 0030 definem estrelas por origem, cópias portáteis e ordem de Favoritos. O corpus usa definições e transições produzidas pelo Core."
+      },
+      "viewport": {
+        "width": 1800,
+        "height": 1000
+      },
+      "readySelector": ".layout-panel__section:nth-of-type(3) .layout-panel__favorite[aria-pressed=\"true\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "click",
+          "selector": ".layout-panel__section:nth-of-type(2) .layout-panel__favorite"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__section:nth-of-type(2) .layout-panel__favorite[aria-pressed=\"true\"]"
+        },
+        {
+          "type": "click",
+          "selector": ".layout-panel__section:nth-of-type(3) .layout-panel__favorite"
+        },
+        {
+          "type": "focus",
+          "selector": ".pixi-canvas"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-favorites-150",
+      "title": "Layouts favoritos — estrelas nas duas origens a 150%",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=favorites&scale=1.5",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-favorites",
+        "reason": "A SPEC e o design 0030 definem estrelas por origem, cópias portáteis e ordem de Favoritos. O corpus usa definições e transições produzidas pelo Core."
+      },
+      "viewport": {
+        "width": 2160,
+        "height": 1200
+      },
+      "readySelector": ".layout-panel__section:nth-of-type(3) .layout-panel__favorite[aria-pressed=\"true\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "click",
+          "selector": ".layout-panel__section:nth-of-type(2) .layout-panel__favorite"
+        },
+        {
+          "type": "assert",
+          "selector": ".layout-panel__section:nth-of-type(2) .layout-panel__favorite[aria-pressed=\"true\"]"
+        },
+        {
+          "type": "click",
+          "selector": ".layout-panel__section:nth-of-type(3) .layout-panel__favorite"
+        },
+        {
+          "type": "focus",
+          "selector": ".pixi-canvas"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-favorite-orphaned",
+      "title": "Layouts favoritos — cópia preservada sem origem",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=favorites&favorite-stage=orphaned",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-favorites",
+        "reason": "A SPEC e o design 0030 definem estrelas por origem, cópias portáteis e ordem de Favoritos. O corpus usa definições e transições produzidas pelo Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__section:nth-of-type(3) .layout-panel__favorite[aria-pressed=\"true\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "focus",
+          "selector": ".pixi-canvas"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout-favorite-unfavorited",
+      "title": "Layouts favoritos — cópia sem origem desfavoritada",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=favorites&favorite-stage=orphaned",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-favorites",
+        "reason": "A SPEC e o design 0030 definem estrelas por origem, cópias portáteis e ordem de Favoritos. O corpus usa definições e transições produzidas pelo Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": ".layout-panel__section:nth-of-type(3) [role=\"status\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "click",
+          "selector": ".layout-panel__section:nth-of-type(3) .layout-panel__favorite"
+        },
+        {
+          "type": "focus",
+          "selector": ".pixi-canvas"
+        }
+      ]
     }
   ]
 }

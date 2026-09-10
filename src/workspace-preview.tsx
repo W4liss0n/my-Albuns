@@ -53,6 +53,7 @@ const frameContext = previewParameters.get("frame");
 const layoutCase = layoutPanelCorpus.cases[previewParameters.get("layouts") ?? "mixed"];
 let preparedLayoutQuery: { query: LayoutQueryResult; previews: ComposedFrame[][] } | null = null;
 let layoutQuerySequence = 0;
+let layoutFavoriteStage = previewParameters.get("favorite-stage") ?? "before";
 let layoutCatalogStage: "initial" | "saved" | "deleted" = "initial";
 const sideSwapCase = sheetSideSwapCorpus.cases.find((item) => item.name === (previewParameters.get("side-swap") ?? "mixed"))!;
 const frameClipboardCase = frameClipboardCorpus.cases.find((item) => item.name === (previewParameters.get("clipboard") ?? "same-group"))!;
@@ -157,7 +158,7 @@ if (frameContext === "style") {
 }
 
 const projectCorePort: ProjectCorePort = {
-  refreshLayoutCatalog: async () => layoutCatalogStage === "deleted" ? 2 : layoutCatalogStage === "saved" ? 1
+  refreshLayoutCatalog: async () => layoutCase.favoriteStates ? layoutCase.favoriteStates[layoutFavoriteStage].queries[projection.state.album.sheets[0].id].query.catalogRevision : layoutCatalogStage === "deleted" ? 2 : layoutCatalogStage === "saved" ? 1
     : layoutCase.before.queries[layoutCase.before.projection.state.album.sheets[0].id].query.catalogRevision,
   saveCustomLayout: async (sheetId) => {
     if (frameContext !== "layouts" || !layoutCase.saveResult || sheetId !== projection.state.album.sheets[0].id) throw new Error("Captura de Layout fora do corpus.");
@@ -166,12 +167,17 @@ const projectCorePort: ProjectCorePort = {
     return result;
   },
   deleteCustomLayout: async (layoutId) => {
+    if (frameContext === "layouts" && layoutCase.favoriteStates && layoutFavoriteStage === "both" &&
+        preparedLayoutQuery?.query.listing.candidates.some((item) => item.customId === layoutId)) {
+      layoutFavoriteStage = "orphaned";
+      return 2;
+    }
     if (frameContext !== "layouts" || layoutId !== layoutCase.saveResult?.layoutId || !layoutCase.catalogDeleted) throw new Error("Exclusão de Layout fora do corpus.");
     layoutCatalogStage = "deleted";
     return 2;
   },
   queryLayouts: async (sheetId, expansion) => {
-    const samples = expansion ? [layoutCase.lockReady] : layoutCatalogStage === "saved" ? [layoutCase.catalogSaved]
+    const samples = layoutCase.favoriteStates ? [layoutCase.favoriteStates[layoutFavoriteStage]] : expansion ? [layoutCase.lockReady] : layoutCatalogStage === "saved" ? [layoutCase.catalogSaved]
       : layoutCatalogStage === "deleted" ? [layoutCase.catalogDeleted]
       : [layoutCase.before, layoutCase.applied, layoutCase.locked, layoutCase.unlocked, layoutCase.filled, layoutCase.cleared];
     const sample = samples.find((state) => state &&
@@ -363,7 +369,7 @@ function createPreviewProjection(
 ): EditorProjection {
   if (frameMode === "layouts") {
     const stage = previewParameters.get("layout-state");
-    const sample = stage === "locked" ? layoutCase.locked : stage === "filled" ? layoutCase.filled : stage === "cleared" ? layoutCase.cleared : layoutCase.before;
+    const sample = layoutCase.favoriteStates?.[layoutFavoriteStage] ?? (stage === "locked" ? layoutCase.locked : stage === "filled" ? layoutCase.filled : stage === "cleared" ? layoutCase.cleared : layoutCase.before);
     return structuredClone(sample!.projection);
   }
   if (frameMode === "style") return structuredClone(frameStyleCorpus.states[previewParameters.get("style") ?? "album"]);
@@ -492,6 +498,16 @@ function configurePhysicalPreview(
 }
 
 function applyPreviewIntent(intent: ProjectIntent): ProjectMutationOutcome {
+  if (intent.kind === "toggleLayoutFavorite") {
+    const transition = layoutCase.favoriteTransitions?.find((item) => item.from === layoutFavoriteStage && item.candidateIndex === intent.selection.candidateIndex);
+    if (frameContext !== "layouts" || !transition || !preparedLayoutQuery ||
+        intent.selection.queryId !== preparedLayoutQuery.query.queryId || projection.state.revision !== preparedLayoutQuery.query.revision) {
+      throw new Error("Favorito fora do corpus de Layouts desta prévia.");
+    }
+    layoutFavoriteStage = transition.to;
+    projection = finalizePhysicalPreviewMutation(structuredClone(layoutCase.favoriteStates![transition.to].projection), structuredClone(projection));
+    return { projection, affectedFrameId: null, affectedSheetId: null };
+  }
   if (intent.kind === "unlockLayout") {
     if (frameContext !== "layouts" || !layoutCase.unlocked || !projection.state.album.sheets.find((sheet) => sheet.id === intent.sheetId)?.layoutLocked) {
       throw new Error("Comando fora do corpus de travamento desta prévia.");

@@ -4,26 +4,26 @@ use super::*;
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct ProjectDocumentV9 {
-    document_type: String,
-    schema_version: u32,
+    pub(super) document_type: String,
+    pub(super) schema_version: u32,
     pub(super) project_id: String,
-    revision: u64,
-    project: ProjectPayloadV9,
+    pub(super) revision: u64,
+    pub(super) project: ProjectPayloadV9,
 }
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct ProjectPayloadV9 {
-    document: DocumentSettingsV1,
-    visual_defaults: VisualDefaultsV1,
-    layout_settings: LayoutSettingsV8,
-    media: Vec<MediaRefV2>,
-    sheets: Vec<SheetV9>,
+pub(super) struct ProjectPayloadV9 {
+    pub(super) document: DocumentSettingsV1,
+    pub(super) visual_defaults: VisualDefaultsV1,
+    pub(super) layout_settings: LayoutSettingsV8,
+    pub(super) media: Vec<MediaRefV2>,
+    pub(super) sheets: Vec<SheetV9>,
 }
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct SheetV9 {
+pub(super) struct SheetV9 {
     id: String,
     active_sides: ActiveSidesV1,
     frames: Vec<FrameV7>,

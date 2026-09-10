@@ -13,7 +13,7 @@ function query(id: string, target = sheetId, revision = initial.state.revision):
   return { queryId: id, projectId: initial.state.projectId, revision, catalogRevision: 0, sheetId: target,
     frameCount: frames.length, locked: false, settings: { permission: "pagesAndSheet", marginUm: 15000, gapUm: 5000, minimumSideUm: 20000 },
     listing: { algorithmVersion: 1, generationStatus: "candidates", candidates: [
-      { isLastApplied: false, customId: null, layout: { origin: "automatic", definition: {
+      { isLastApplied: false, customId: null, favoriteId: null, layout: { origin: "automatic", definition: {
         surface: { type: "doubleSheet", widthUm: 600000, heightUm: 300000 }, scope: "page",
         positions: frames.map((frame) => frame.clipRect),
       } } },
@@ -122,4 +122,27 @@ test.each([false, true])("confirmation retains the prepared selection behind a p
   await act(async () => { pending.resolve(!fails); await applied; });
   expect(commit).toHaveBeenCalledExactlyOnceWith({ kind: "applyLayout", selection: { queryId: `query-${sheetId}`, candidateIndex: 0 } });
   expect(view.result.current.panel.composition).toBe(initial.composition);
+});
+
+
+test.each([false, true])("starring retains its captured handle and rejects adjacent panel actions while pending, failure=%s", async (fails) => {
+  const { view, commit, queryLayouts } = harness();
+  const pending = deferred<boolean>();
+  commit.mockImplementationOnce(() => pending.promise);
+  act(() => view.result.current.panel.toggle(sheetId));
+  await waitFor(() => expect(view.result.current.panel.query).not.toBeNull());
+  act(() => view.result.current.panel.preview(0));
+  let starred!: Promise<boolean>;
+  act(() => { starred = view.result.current.panel.toggleFavorite(0); });
+  expect(view.result.current.panel.composition).toBe(initial.composition);
+  expect(view.result.current.panel.committing).toBe(true);
+  await act(async () => {
+    expect(await view.result.current.panel.toggleFavorite(0)).toBe(false);
+    expect(await view.result.current.panel.apply(0)).toBe(false);
+    expect(await view.result.current.panel.lock(0)).toBe(false);
+  });
+  await act(async () => { pending.resolve(!fails); expect(await starred).toBe(!fails); });
+  expect(commit).toHaveBeenCalledExactlyOnceWith({ kind: "toggleLayoutFavorite", selection: { queryId: `query-${sheetId}`, candidateIndex: 0 } });
+  await waitFor(() => expect(queryLayouts).toHaveBeenCalledTimes(2));
+  expect(view.result.current.panel.committing).toBe(false);
 });

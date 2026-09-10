@@ -555,6 +555,7 @@ pub struct ProjectDocument {
     media: Vec<MediaRef>,
     sheets: Vec<ProjectSheet>,
     layout_settings: crate::LayoutSettings,
+    favorite_layouts: Vec<crate::FavoriteLayout>,
 }
 
 impl ProjectDocument {
@@ -586,6 +587,7 @@ impl ProjectDocument {
             media,
             sheets,
             layout_settings: crate::LayoutSettings::default(),
+            favorite_layouts: Vec::new(),
         }
     }
 

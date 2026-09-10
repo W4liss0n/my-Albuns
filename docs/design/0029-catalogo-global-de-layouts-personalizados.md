@@ -22,7 +22,7 @@ ordem. A captura de Página única usa a superfície ativa local.
 
 A identidade geométrica compara escopo, tipo e proporção da superfície e a
 sequência normalizada de retângulos; não depende de DPI, Unidade ou tamanho
-fís­sico. Outra ordem representa outro Layout. Fotos, estilos e identidades
+físico. Outra ordem representa outro Layout. Fotos, estilos e identidades
 de Frames ou de Projetos não entram no catálogo.
 
 Conforme decisão do usuário de 09/09/2026, a deduplicação da apresentação ocorre

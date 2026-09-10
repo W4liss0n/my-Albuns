@@ -131,6 +131,13 @@ impl PersistentProjectSession {
         {
             return Err(CoreError::LockedLayoutHasNoPlaceholder);
         }
+        if let ProjectIntent::ToggleLayoutFavorite { selection } = &intent {
+            let (_, patch) = self.checked_layout_patch(selection)?;
+            let layout = patch.last_layout().ok_or(CoreError::IncompatibleLayout)?;
+            let next = self.project().with_toggled_layout_favorite(layout)?;
+            self.commit_edit(|_| Ok(next))?;
+            return Ok(outcome);
+        }
         if let ProjectIntent::UnlockLayout { sheet_id } = &intent {
             let next = self.project().with_layout_unlocked(sheet_id)?;
             if next != *self.project() {
@@ -247,7 +254,8 @@ impl PersistentProjectSession {
         }
         let custom = self.layout_catalog.entries.clone();
         self.commit_edit(|project| match intent {
-            ProjectIntent::ApplyLayout { .. }
+            ProjectIntent::ToggleLayoutFavorite { .. }
+            | ProjectIntent::ApplyLayout { .. }
             | ProjectIntent::LockLayout { .. }
             | ProjectIntent::UnlockLayout { .. }
             | ProjectIntent::SetLayoutSettings { .. } => {
@@ -476,6 +484,7 @@ impl PersistentProjectSession {
         let sources = crate::LayoutSources {
             last: sheet.last_layout(),
             custom: &self.layout_catalog.entries,
+            favorites: self.project().favorite_layouts(),
         };
         let mut listing = crate::LayoutRules::list_for_lock(&query, sources);
         if locked {
@@ -494,6 +503,7 @@ impl PersistentProjectSession {
                 0,
                 crate::LayoutCandidate {
                     custom_id: sources.custom_id(&current),
+                    favorite_id: sources.favorite_id(&current),
                     layout: current,
                     is_last_applied: true,
                 },

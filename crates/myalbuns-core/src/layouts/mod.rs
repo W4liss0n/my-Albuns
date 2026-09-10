@@ -4,10 +4,12 @@ use ts_rs::TS;
 use crate::RectUm;
 
 mod catalog;
+mod favorites;
 mod generator;
 mod rules;
 
 pub use catalog::{CustomLayout, CustomLayoutId, LayoutCatalogSnapshot, SaveCustomLayoutResult};
+pub use favorites::{FavoriteLayout, LayoutFavoriteId};
 pub use generator::generate_layouts;
 pub use rules::{LayoutPatch, LayoutRules, LayoutSources};
 
@@ -161,6 +163,7 @@ pub struct LayoutCandidate {
     pub layout: StoredLayout,
     pub is_last_applied: bool,
     pub custom_id: Option<CustomLayoutId>,
+    pub favorite_id: Option<LayoutFavoriteId>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]

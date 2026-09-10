@@ -107,7 +107,21 @@ fn record_expansion(
         }
         let mut query = serde_json::to_value(query).unwrap();
         query["queryId"] = json!(format!("{name}-{}", sheet.id));
-        queries.insert(sheet.id.clone(), json!({"query":query,"previews":previews}));
+        let mut sample = json!({"query":query,"previews":previews});
+        let mut ids = BTreeMap::new();
+        for (candidate, preview) in previews.iter().enumerate() {
+            for (index, frame) in preview.iter().enumerate().skip(sheet.frames.len()) {
+                ids.insert(
+                    frame.frame_id.clone(),
+                    format!(
+                        "{name}-{}-candidate-{candidate}-placeholder-{index}",
+                        sheet.id
+                    ),
+                );
+            }
+        }
+        normalize(&mut sample, &ids);
+        queries.insert(sheet.id.clone(), sample);
     }
     assert_eq!(
         project.projection(),
@@ -336,6 +350,7 @@ fn layout_panel_corpus_is_produced_by_the_public_core() {
         }
         cases.insert(name.into(), entry);
     }
+    cases.insert("favorites".into(), favorite_case());
     let mut value = json!({"cases":cases});
     let before = &value["cases"]["mixed"]["before"]["projection"];
     let ids: BTreeMap<String, String> = before["state"]["album"]["sheets"]
@@ -357,9 +372,9 @@ fn layout_panel_corpus_is_produced_by_the_public_core() {
     if std::env::var_os("MYALBUNS_UPDATE_LAYOUT_FIXTURE").is_some() {
         fs::write(&path, &serialized).unwrap();
     }
-    assert_eq!(
-        serialized,
-        fs::read_to_string(path).unwrap().replace("\r\n", "\n")
+    assert!(
+        serialized == fs::read_to_string(path).unwrap().replace("\r\n", "\n"),
+        "Layout corpus changed; regenerate with MYALBUNS_UPDATE_LAYOUT_FIXTURE and inspect the fixture diff"
     );
 }
 
@@ -384,4 +399,93 @@ fn normalize(value: &mut Value, ids: &BTreeMap<String, String>) {
         }
         _ => {}
     }
+}
+
+fn favorite_case() -> Value {
+    use myalbuns_core::{CustomLayout, LayoutCatalogSnapshot, LayoutOrigin};
+    let root = tempfile::tempdir().unwrap();
+    let mut project = fixture_project(root.path(), 4);
+    let sheet = project.projection().state.album.sheets[0].id.clone();
+    let custom_id = serde_json::from_value(json!("00000000-0000-4000-8000-000000000801")).unwrap();
+    let definition = project.capture_custom_layout(&sheet).unwrap();
+    project
+        .refresh_layout_catalog(LayoutCatalogSnapshot {
+            revision: 1,
+            entries: vec![CustomLayout {
+                id: custom_id,
+                definition,
+            }],
+        })
+        .unwrap();
+    let before = record(&mut project, "favorites-before");
+    let mut states = serde_json::Map::new();
+    states.insert("before".into(), before.clone());
+    let mut transitions = Vec::new();
+    for (from, to, origin) in [
+        ("before", "automatic", LayoutOrigin::Automatic),
+        ("automatic", "both", LayoutOrigin::Custom),
+    ] {
+        let query = project.query_layouts(&sheet).unwrap();
+        let index = query
+            .listing
+            .candidates
+            .iter()
+            .position(|item| item.layout.origin == origin)
+            .unwrap();
+        project
+            .apply(ProjectIntent::ToggleLayoutFavorite {
+                selection: LayoutSelection {
+                    query_id: query.query_id,
+                    candidate_index: index,
+                },
+            })
+            .unwrap();
+        states.insert(to.into(), record(&mut project, &format!("favorites-{to}")));
+        transitions.push(json!({"from":from,"to":to,"candidateIndex":index}));
+    }
+    let ids: BTreeMap<_, _> = project
+        .project()
+        .favorite_layouts()
+        .iter()
+        .enumerate()
+        .map(|(i, item)| {
+            (
+                item.id.to_string(),
+                format!("00000000-0000-4000-8000-{:012}", 901 + i),
+            )
+        })
+        .collect();
+    project
+        .refresh_layout_catalog(LayoutCatalogSnapshot {
+            revision: 2,
+            entries: vec![],
+        })
+        .unwrap();
+    states.insert(
+        "orphaned".into(),
+        record(&mut project, "favorites-orphaned"),
+    );
+    let query = project.query_layouts(&sheet).unwrap();
+    let index = query
+        .listing
+        .candidates
+        .iter()
+        .position(|item| item.layout.origin == LayoutOrigin::Custom)
+        .unwrap();
+    project
+        .apply(ProjectIntent::ToggleLayoutFavorite {
+            selection: LayoutSelection {
+                query_id: query.query_id,
+                candidate_index: index,
+            },
+        })
+        .unwrap();
+    states.insert(
+        "unfavorited".into(),
+        record(&mut project, "favorites-unfavorited"),
+    );
+    transitions.push(json!({"from":"orphaned","to":"unfavorited","candidateIndex":index}));
+    let mut result = json!({"before":before,"applied":null,"favoriteStates":states,"favoriteTransitions":transitions});
+    normalize(&mut result, &ids);
+    result
 }

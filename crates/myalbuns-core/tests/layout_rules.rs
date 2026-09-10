@@ -67,6 +67,7 @@ fn custom_and_automatic_geometry_stay_in_their_own_sections_and_keep_priority() 
         definition: generated.definition.clone(),
     };
     let sources = LayoutSources {
+        favorites: &[],
         last: Some(&last),
         custom: &custom,
     };
@@ -94,6 +95,7 @@ fn custom_and_automatic_geometry_stay_in_their_own_sections_and_keep_priority() 
         LayoutRules::automatic(
             &query,
             LayoutSources {
+                favorites: &[],
                 last: None,
                 custom: &custom
             },
@@ -210,6 +212,7 @@ fn last_layout_keeps_its_original_geometry_and_priority_after_manual_frame_edits
     let options = LayoutRules::list(
         &query,
         myalbuns_core::LayoutSources {
+            favorites: &[],
             last: Some(&last),
             ..Default::default()
         },
@@ -225,4 +228,98 @@ fn last_layout_keeps_its_original_geometry_and_priority_after_manual_frame_edits
         (30_000, 30_000, 360_000, 540_000)
     );
     assert_eq!(patch.last_layout(), Some(&last));
+}
+
+#[test]
+fn favorite_order_is_persistent_with_identity_tiebreak_and_last_keeps_precedence() {
+    use myalbuns_core::*;
+    let query: LayoutQuery = serde_json::from_value(serde_json::json!({
+        "surface":{"type":"singlePage","widthUm":210000,"heightUm":300000},
+        "frameOrientations":["vertical"],"permission":"pagesOnly", "marginUm":15000,
+        "gapUm":5000,"minimumSideUm":20000
+    }))
+    .unwrap();
+    let layout = |x, origin| StoredLayout {
+        origin,
+        definition: LayoutDefinition {
+            surface: query.surface.clone(),
+            scope: LayoutScope::Page,
+            positions: vec![RectUm {
+                x,
+                y: 10000,
+                width: 50000,
+                height: 100000,
+            }],
+        },
+    };
+    let a = FavoriteLayout {
+        id: serde_json::from_str("\"00000000-0000-4000-8000-000000000802\"").unwrap(),
+        order: 5,
+        layout: layout(10000, LayoutOrigin::Automatic),
+    };
+    let b = FavoriteLayout {
+        id: serde_json::from_str("\"00000000-0000-4000-8000-000000000801\"").unwrap(),
+        order: 5,
+        layout: layout(20000, LayoutOrigin::Custom),
+    };
+    let c = FavoriteLayout {
+        id: LayoutFavoriteId::generate(),
+        order: 2,
+        layout: layout(30000, LayoutOrigin::Automatic),
+    };
+    let favorites = [a.clone(), b.clone(), c.clone()];
+    let custom = [CustomLayout {
+        id: CustomLayoutId::generate(),
+        definition: layout(40000, LayoutOrigin::Custom).definition,
+    }];
+    let last = a.layout.clone();
+    let sources = LayoutSources {
+        last: Some(&last),
+        favorites: &favorites,
+        custom: &custom,
+    };
+    let candidates = LayoutRules::list(&query, sources).candidates;
+    assert_eq!(candidates[0].favorite_id, Some(a.id));
+    assert!(candidates[0].is_last_applied);
+    assert_eq!(candidates[1].favorite_id, Some(c.id));
+    assert_eq!(candidates[2].favorite_id, Some(b.id));
+    assert_eq!(candidates[3].custom_id, Some(custom[0].id));
+    let ids = [Uuid::new_v4()];
+    assert_eq!(
+        LayoutRules::automatic(&query, sources, &ids)
+            .unwrap()
+            .last_layout(),
+        Some(&last)
+    );
+    let sources = LayoutSources {
+        last: None,
+        ..sources
+    };
+    let candidates = LayoutRules::list(&query, sources).candidates;
+    assert_eq!(
+        candidates
+            .iter()
+            .take(3)
+            .map(|item| item.favorite_id.unwrap())
+            .collect::<Vec<_>>(),
+        [c.id, b.id, a.id]
+    );
+    assert_eq!(
+        LayoutRules::automatic(&query, sources, &ids)
+            .unwrap()
+            .last_layout(),
+        Some(&c.layout)
+    );
+    let reversed = [c, b, a];
+    assert_eq!(
+        LayoutRules::list(
+            &query,
+            LayoutSources {
+                favorites: &reversed,
+                ..sources
+            }
+        )
+        .candidates,
+        candidates
+    );
 }

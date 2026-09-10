@@ -447,8 +447,8 @@ export function InspectorPanel({
             sectionState={sectionState}
             defaultOpen
           >
-                <SheetDesignInspector
-                  saveLayout={saveLayout}
+            <SheetDesignInspector
+              saveLayout={saveLayout}
               mediaPreviewUrls={mediaPreviewUrls}
               scope={selectedSheetScope}
               sheet={context.sheet}

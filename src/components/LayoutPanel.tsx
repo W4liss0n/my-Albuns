@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { LockKeyhole, LockKeyholeOpen, RefreshCw, Trash2 } from "lucide-react";
+import { LockKeyhole, LockKeyholeOpen, RefreshCw, Star, Trash2 } from "lucide-react";
 import type { ComposedFrame, ComposedSheet } from "../domain/project";
 import { AppIcon } from "../ui";
 import { useDismissableSurface } from "../ui/useDismissableSurface";
@@ -81,6 +81,13 @@ export function LayoutPanel({ controller, sheet, catalog }: LayoutPanelProps) {
               onClick={() => { void controller.apply(index); }}
               title={extraPositions > 0 ? "Use o cadeado para aplicar e criar as posições adicionais." : `${candidate.layout.definition.scope === "page" ? "Por Página" : "Por Lâmina"}${candidate.isLastApplied ? " · Último aplicado" : ""}`}>
               <LayoutThumbnail sheet={sheet} frames={controller.previews[index]} />
+              </button>
+              <button className="layout-panel__lock layout-panel__favorite" type="button" disabled={busy || unavailable}
+                aria-label={`${candidate.favoriteId ? "Remover dos favoritos" : "Favoritar"} Layout ${index + 1}`}
+                aria-pressed={candidate.favoriteId !== null}
+                title={candidate.favoriteId ? "Remover dos favoritos deste Projeto" : "Favoritar neste Projeto"}
+                onClick={() => { void controller.toggleFavorite(index); }}>
+                <AppIcon icon={Star} size={12} />
               </button>
               <button className="layout-panel__lock" type="button" disabled={busy || unavailable}
                 aria-label={locked ? `Destravar Layout da Lâmina ${String(sheet.number).padStart(2, "0")}` : `Aplicar e travar Layout ${index + 1}`}

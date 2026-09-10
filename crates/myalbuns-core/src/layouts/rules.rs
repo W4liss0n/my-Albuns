@@ -33,9 +33,20 @@ pub struct LayoutRules;
 pub struct LayoutSources<'a> {
     pub last: Option<&'a StoredLayout>,
     pub custom: &'a [CustomLayout],
+    pub favorites: &'a [FavoriteLayout],
 }
 
 impl LayoutSources<'_> {
+    pub(crate) fn favorite_id(&self, layout: &StoredLayout) -> Option<LayoutFavoriteId> {
+        self.favorites
+            .iter()
+            .find(|item| {
+                item.layout.origin == layout.origin
+                    && LayoutRules::same_definition(&item.layout.definition, &layout.definition)
+            })
+            .map(|item| item.id)
+    }
+
     pub(crate) fn custom_id(&self, layout: &StoredLayout) -> Option<CustomLayoutId> {
         if layout.origin != LayoutOrigin::Custom {
             return None;
@@ -112,6 +123,26 @@ impl LayoutRules {
                 layout: last.clone(),
                 is_last_applied: true,
                 custom_id: sources.custom_id(last),
+                favorite_id: sources.favorite_id(last),
+            });
+        }
+        let mut favorites: Vec<_> = sources.favorites.iter().collect();
+        favorites.sort_by_key(|item| (item.order, item.id));
+        for favorite in favorites
+            .into_iter()
+            .filter(|item| accepts(&item.layout.definition))
+        {
+            if listing.candidates.iter().any(|item| {
+                item.layout.origin == favorite.layout.origin
+                    && Self::same_definition(&item.layout.definition, &favorite.layout.definition)
+            }) {
+                continue;
+            }
+            listing.candidates.push(LayoutCandidate {
+                layout: favorite.layout.clone(),
+                is_last_applied: false,
+                custom_id: sources.custom_id(&favorite.layout),
+                favorite_id: Some(favorite.id),
             });
         }
         for custom in sources
@@ -132,6 +163,7 @@ impl LayoutRules {
                 },
                 is_last_applied: false,
                 custom_id: Some(custom.id),
+                favorite_id: None,
             });
         }
         for candidate in generation.candidates {
@@ -148,6 +180,7 @@ impl LayoutRules {
                 },
                 is_last_applied: false,
                 custom_id: None,
+                favorite_id: None,
             });
         }
         listing

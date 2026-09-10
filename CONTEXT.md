@@ -281,7 +281,7 @@ Layout incluído pelo usuário no Catálogo global de Layouts. Sua identidade co
 Conjunto de Layouts personalizados disponível aos Projetos do mesmo usuário.
 
 **Layout favorito do Projeto**:
-Cópia local de um Layout mantida entre as preferências de um Projeto.
+Cópia integral de um Layout mantida no arquivo do Projeto, com identidade e ordem próprias. A estrela altera o Projeto em uma ação de Undo/Redo e conserva a origem da miniatura. Persistência e independência do catálogo seguem o [design 0030](docs/design/0030-favoritos-de-layouts-e-schema-v10.md).
 
 **Organização aplicada**:
 Geometria de Frames incorporada à Lâmina depois da aplicação de um Layout, sem vínculo vivo com o Layout de origem.

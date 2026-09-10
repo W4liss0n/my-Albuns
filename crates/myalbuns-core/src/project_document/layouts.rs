@@ -15,6 +15,48 @@ impl ProjectSheet {
 }
 
 impl ProjectDocument {
+    pub fn favorite_layouts(&self) -> &[crate::FavoriteLayout] {
+        &self.favorite_layouts
+    }
+
+    pub(crate) fn restore_favorite_layouts(
+        mut self,
+        favorites: Vec<crate::FavoriteLayout>,
+    ) -> Result<Self, ()> {
+        self.favorite_layouts = favorites;
+        validate_project_state(&self)?;
+        Ok(self)
+    }
+
+    pub(crate) fn with_toggled_layout_favorite(
+        &self,
+        layout: &StoredLayout,
+    ) -> Result<Self, CoreError> {
+        let mut next = self.clone();
+        if let Some(index) = next.favorite_layouts.iter().position(|item| {
+            item.layout.origin == layout.origin
+                && crate::LayoutRules::same_definition(&item.layout.definition, &layout.definition)
+        }) {
+            next.favorite_layouts.remove(index);
+        } else {
+            let order = next
+                .favorite_layouts
+                .iter()
+                .map(|item| item.order)
+                .max()
+                .map_or(Some(0), |order| order.checked_add(1))
+                .filter(|order| *order <= MAX_SAFE_INTEGER)
+                .ok_or(CoreError::InvalidLayoutQuery)?;
+            next.favorite_layouts.push(crate::FavoriteLayout {
+                id: crate::LayoutFavoriteId::generate(),
+                order,
+                layout: layout.clone(),
+            });
+        }
+        validate_project_state(&next).map_err(|_| CoreError::IncompatibleLayout)?;
+        Ok(next)
+    }
+
     pub(crate) fn restore_layout_locks(mut self, locks: Vec<bool>) -> Result<Self, ()> {
         if locks.len() != self.sheets.len() {
             return Err(());
@@ -123,6 +165,23 @@ impl ProjectDocument {
 
     pub(super) fn layout_state_is_valid(&self) -> bool {
         self.layout_settings.parameters.is_valid()
+            && self
+                .favorite_layouts
+                .iter()
+                .enumerate()
+                .all(|(index, item)| {
+                    item.id.is_valid()
+                        && item.order <= MAX_SAFE_INTEGER
+                        && crate::LayoutRules::definition_is_valid(&item.layout.definition)
+                        && !self.favorite_layouts[..index].iter().any(|previous| {
+                            previous.id == item.id
+                                || previous.layout.origin == item.layout.origin
+                                    && crate::LayoutRules::same_definition(
+                                        &previous.layout.definition,
+                                        &item.layout.definition,
+                                    )
+                        })
+                })
             && self.sheets.iter().all(|sheet| {
                 (!sheet.layout_locked
                     || sheet.last_layout.as_ref().is_some_and(|layout| {
@@ -230,6 +289,7 @@ impl ProjectDocument {
             crate::LayoutSources {
                 last: sheet.last_layout(),
                 custom,
+                favorites: &self.favorite_layouts,
             },
             &ids,
         )?;

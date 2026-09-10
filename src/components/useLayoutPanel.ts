@@ -137,6 +137,10 @@ export function useLayoutPanel(input: LayoutPanelInput) {
       if (!data?.previews[index] || data.query.locked) return Promise.resolve(false);
       return commit({ kind: "lockLayout", selection: { queryId: data.query.queryId, candidateIndex: index } });
     },
+    toggleFavorite(index: number) {
+      if (!data?.previews[index] || (data.query.locked && index !== 0)) return Promise.resolve(false);
+      return commit({ kind: "toggleLayoutFavorite", selection: { queryId: data.query.queryId, candidateIndex: index } });
+    },
     unlock() {
       if (!data?.query.locked) return Promise.resolve(false);
       return commit({ kind: "unlockLayout", sheetId: data.query.sheetId });

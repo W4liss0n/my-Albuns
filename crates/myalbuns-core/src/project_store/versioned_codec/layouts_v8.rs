@@ -153,7 +153,7 @@ impl ProjectDocumentV8 {
 }
 
 impl StoredLayoutV8 {
-    fn from_domain(layout: &StoredLayout) -> Self {
+    pub(super) fn from_domain(layout: &StoredLayout) -> Self {
         let definition = &layout.definition;
         Self {
             origin: layout.origin,
@@ -178,7 +178,7 @@ impl StoredLayoutV8 {
         }
     }
 
-    fn into_domain(self) -> Result<StoredLayout, DecodeFailure> {
+    pub(super) fn into_domain(self) -> Result<StoredLayout, DecodeFailure> {
         let positions = self
             .definition
             .positions
