@@ -109,7 +109,7 @@ export function useLayoutCatalog(input: LayoutCatalogInput) {
         if (outcome.status === "completed") {
           setRevision((previous) => Math.max(previous, observed));
           setRevealId((pending) => pending === layoutId ? null : pending);
-          setNotice("Layout removido de Personalizados.");
+          setNotice(null);
         }
       } catch (error: unknown) { await fail(error); }
     };

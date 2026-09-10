@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { LockKeyhole, LockKeyholeOpen, RefreshCw, Star, Trash2 } from "lucide-react";
+import { LockKeyhole, LockKeyholeOpen, Star, Trash2 } from "lucide-react";
 import type { ComposedFrame, ComposedSheet } from "../domain/project";
 import { AppIcon } from "../ui";
 import { useDismissableSurface } from "../ui/useDismissableSurface";
@@ -105,9 +105,6 @@ export function LayoutPanel({ controller, sheet, catalog }: LayoutPanelProps) {
             {candidates.length === 0 && <p role="status">{controller.error ?? (origin === "custom" && query ? "Nenhum Layout personalizado."
               : query ? emptyMessage : "Consultando Layouts…")}</p>}
           </div>
-          {origin === "custom" && catalog && <button className="layout-panel__refresh" type="button"
-            title="Atualizar Personalizados" aria-label="Atualizar Personalizados" disabled={catalog.busy}
-            onClick={() => { void catalog.refresh().then((refreshed) => { if (refreshed) controller.refresh(); }); }}><AppIcon icon={RefreshCw} size={14} /></button>}
         </div>;
       })}
     </section>

@@ -58,10 +58,10 @@ ausente só representa catálogo inicial quando a instância ainda não confirmo
 uma revisão persistida. O erro é apresentado ao usuário.
 
 O catálogo é hidratado no Host ao iniciar e consultado ao montar ou reconectar a
-interface, abrir o Painel de Layouts, receber foco ou clicar em Atualizar
-Personalizados. Uma revisão nova invalida as consultas preparadas no Core. Uma
+interface, abrir o Painel de Layouts ou receber foco. Não há botão de atualização
+manual. Uma revisão nova invalida as consultas preparadas no Core. Uma
 falha de atualização conserva as miniaturas anteriores sem habilitar uma
-consulta obsoleta. A atualização manual também permite repetir uma consulta.
+consulta obsoleta. Reabrir o Painel permite repetir uma consulta.
 
 A sessão do Core conserva o catálogo fora das revisões do Projeto. Undo/Redo
 não restaura versões globais antigas. A organização automática recebe essa
@@ -77,7 +77,8 @@ Uma abertura incompatível não consome essa indicação. Não há nome nem diá
 na criação.
 
 A lixeira usa o diálogo pertencente à Janela do Projeto, com Cancelar como
-fechamento padrão. A confirmação remove exclusivamente a entrada global.
+fechamento padrão. A confirmação remove exclusivamente a entrada global,
+sem apresentar aviso de sucesso após a exclusão.
 Geometria aplicada, Último Layout e cópias favoritas pertencem ao Projeto e
 permanecem válidos. A ausência da entrada global retira a lixeira dessas cópias.
 

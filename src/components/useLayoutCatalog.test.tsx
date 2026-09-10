@@ -111,6 +111,7 @@ test("deletion requires confirmation, dismisses cancellation, and preserves the 
   await waitFor(() => expect(h.view.result.current.catalog.busy).toBe(false));
   expect(h.deleteCustomLayout).toHaveBeenCalledExactlyOnceWith(layoutId);
   expect(h.view.result.current.catalog.revision).toBe(1);
+  expect(h.view.result.current.catalog.notice).toBeNull();
   expect(h.view.result.current.projection).toEqual(h.initial);
 });
 
