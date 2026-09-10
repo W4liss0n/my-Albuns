@@ -6206,12 +6206,20 @@
           "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
         },
         {
+          "type": "hover",
+          "selector": ".layout-panel__section:nth-of-type(2) .layout-panel__candidate"
+        },
+        {
           "type": "click",
           "selector": ".layout-panel__section:nth-of-type(2) .layout-panel__favorite"
         },
         {
           "type": "assert",
           "selector": ".layout-panel__section:nth-of-type(2) .layout-panel__favorite[aria-pressed=\"true\"]"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__section:nth-of-type(3) .layout-panel__candidate"
         },
         {
           "type": "click",
@@ -6247,12 +6255,20 @@
           "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
         },
         {
+          "type": "hover",
+          "selector": ".layout-panel__section:nth-of-type(2) .layout-panel__candidate"
+        },
+        {
           "type": "click",
           "selector": ".layout-panel__section:nth-of-type(2) .layout-panel__favorite"
         },
         {
           "type": "assert",
           "selector": ".layout-panel__section:nth-of-type(2) .layout-panel__favorite[aria-pressed=\"true\"]"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__section:nth-of-type(3) .layout-panel__candidate"
         },
         {
           "type": "click",
@@ -6288,12 +6304,20 @@
           "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
         },
         {
+          "type": "hover",
+          "selector": ".layout-panel__section:nth-of-type(2) .layout-panel__candidate"
+        },
+        {
           "type": "click",
           "selector": ".layout-panel__section:nth-of-type(2) .layout-panel__favorite"
         },
         {
           "type": "assert",
           "selector": ".layout-panel__section:nth-of-type(2) .layout-panel__favorite[aria-pressed=\"true\"]"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__section:nth-of-type(3) .layout-panel__candidate"
         },
         {
           "type": "click",
@@ -6356,6 +6380,10 @@
         {
           "type": "click",
           "selector": "button[aria-label=\"Layouts da Lâmina 01\"]"
+        },
+        {
+          "type": "hover",
+          "selector": ".layout-panel__section:nth-of-type(3) .layout-panel__candidate"
         },
         {
           "type": "click",

@@ -6,6 +6,7 @@ use crate::RectUm;
 mod catalog;
 mod favorites;
 mod generator;
+mod identity;
 mod rules;
 
 pub use catalog::{CustomLayout, CustomLayoutId, LayoutCatalogSnapshot, SaveCustomLayoutResult};

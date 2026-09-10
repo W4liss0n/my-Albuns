@@ -325,10 +325,21 @@ mod tests {
         let (_root, paths, store) = fixture();
         let (created, _) = store.create(definition()).unwrap();
         let before = fs::read(&store.file).unwrap();
-        for bytes in [
+        let mut invalid = vec![
             b"broken".to_vec(),
             br#"{"schemaVersion":99,"revision":2,"entries":[]}"#.to_vec(),
+        ];
+        for id in [
+            "not-a-uuid",
+            "550E8400-E29B-41D4-A716-446655440000",
+            "00000000-0000-1000-8000-000000000001",
         ] {
+            let mut document: serde_json::Value = serde_json::from_slice(&before).unwrap();
+            document["entries"][0]["id"] = id.into();
+            invalid.push(serde_json::to_vec(&document).unwrap());
+            assert!(serde_json::from_value::<CustomLayoutId>(id.into()).is_err());
+        }
+        for bytes in invalid {
             fs::write(&store.file, &bytes).unwrap();
             assert!(store.load().is_err());
             assert!(store.create(definition()).is_err());

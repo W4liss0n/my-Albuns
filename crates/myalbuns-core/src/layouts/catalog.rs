@@ -10,21 +10,13 @@ pub struct CustomLayoutId(#[ts(type = "string")] Uuid);
 
 impl Serialize for CustomLayoutId {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(&self.0.hyphenated().to_string())
+        super::identity::serialize(self.0, serializer)
     }
 }
 
 impl<'de> Deserialize<'de> for CustomLayoutId {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = String::deserialize(deserializer)?;
-        let parsed = Uuid::parse_str(&value).map_err(serde::de::Error::custom)?;
-        let id = Self(parsed);
-        if !id.is_valid() || parsed.hyphenated().to_string() != value {
-            return Err(serde::de::Error::custom(
-                "Identidade de Layout inválida; esperado UUID v4 canônico",
-            ));
-        }
-        Ok(id)
+        super::identity::deserialize(deserializer).map(Self)
     }
 }
 
@@ -34,7 +26,7 @@ impl CustomLayoutId {
     }
 
     pub fn is_valid(self) -> bool {
-        self.0.get_version() == Some(uuid::Version::Random)
+        super::identity::is_valid(self.0)
     }
 }
 

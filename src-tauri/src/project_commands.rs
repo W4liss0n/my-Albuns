@@ -60,6 +60,7 @@ pub(crate) async fn apply_project_intent(
     let intent_kind = match &intent {
         ProjectIntent::CopyFrames { .. } => "copy_frames",
         ProjectIntent::ApplyLayout { .. } => "apply_layout",
+        ProjectIntent::ToggleLayoutFavorite { .. } => "toggle_layout_favorite",
         ProjectIntent::LockLayout { .. } => "lock_layout",
         ProjectIntent::UnlockLayout { .. } => "unlock_layout",
         ProjectIntent::SetLayoutSettings { .. } => "set_layout_settings",

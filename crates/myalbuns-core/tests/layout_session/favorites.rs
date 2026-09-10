@@ -269,6 +269,8 @@ fn v10_rejects_incomplete_or_corrupt_favorites_without_rewriting_the_source() {
     cases.push(missing);
     for (field, value) in [
         ("id", json!("not-a-uuid")),
+        ("id", json!("550E8400-E29B-41D4-A716-446655440000")),
+        ("id", json!("00000000-0000-1000-8000-000000000001")),
         ("order", json!(-1)),
         ("order", json!(9007199254740992u64)),
         ("name", json!("extra")),
