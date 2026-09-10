@@ -177,11 +177,14 @@ const projectCorePort: ProjectCorePort = {
     return 2;
   },
   queryLayouts: async (sheetId, frameRequest) => {
-    const requested = [layoutCase.lockReady, layoutCase.reducedReady].filter((sample) => sample?.queries[sheetId]?.query
-      .listing.candidates[0]?.layout.definition.positions.length === frameRequest?.frameCount);
-    const samples = layoutCase.favoriteStates ? [layoutCase.favoriteStates[layoutFavoriteStage]] : frameRequest ? requested : layoutCatalogStage === "saved" ? [layoutCase.catalogSaved]
+    const currentSamples = layoutCase.favoriteStates ? [layoutCase.favoriteStates[layoutFavoriteStage]] : layoutCatalogStage === "saved" ? [layoutCase.catalogSaved]
       : layoutCatalogStage === "deleted" ? [layoutCase.catalogDeleted]
       : [layoutCase.before, layoutCase.applied, layoutCase.locked, layoutCase.unlocked, layoutCase.reduced, layoutCase.reducedLocked, layoutCase.filled, layoutCase.cleared];
+    const samples = frameRequest ? [layoutCase.lockReady, layoutCase.reducedReady, ...currentSamples].filter((sample) => {
+      const query = sample?.queries[sheetId]?.query;
+      return query && (query.listing.candidates.length > 0 ? query.listing.candidates.every((candidate) =>
+        candidate.layout.definition.positions.length === frameRequest.frameCount) : query.frameCount === frameRequest.frameCount);
+    }) : currentSamples;
     const sample = samples.find((state) => state &&
       JSON.stringify(state.projection.state.album) === JSON.stringify(projection.state.album));
     const prepared = sample?.queries[sheetId];

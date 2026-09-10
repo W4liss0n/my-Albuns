@@ -109,6 +109,8 @@ test("changing extra positions discards a late query and its preview", async () 
   await waitFor(() => expect(queryLayouts).toHaveBeenLastCalledWith(sheetId, { frameCount: frames.length + 2, orientation: "horizontal" }));
   await waitFor(() => expect(view.result.current.panel.query?.queryId).toBe(`query-${sheetId}`));
   expect(view.result.current.panel.composition).toBe(initial.composition);
+  act(() => view.result.current.panel.configurePositions(frames.length));
+  await waitFor(() => expect(queryLayouts).toHaveBeenLastCalledWith(sheetId, { frameCount: frames.length, orientation: "horizontal" }));
 });
 
 test("after unlocking, the requested count may drop to filled Frames and apply the smaller prepared Layout", async () => {
@@ -134,10 +136,18 @@ test("after unlocking, the requested count may drop to filled Frames and apply t
   act(() => h.view.result.current.panel.preview(0));
   expect(h.view.result.current.panel.composition.sheets[0].frames).toEqual(reduced.previews[0]);
   expect(h.commit).not.toHaveBeenCalled();
+  const applied = sample.reduced!;
+  h.queryLayouts.mockResolvedValue(applied.queries[sheetId].query);
+  h.commit.mockImplementationOnce(async () => {
+    h.view.result.current.setProjection(applied.projection);
+    return true;
+  });
   await act(async () => { expect(await h.view.result.current.panel.apply(0)).toBe(true); });
   expect(h.commit).toHaveBeenCalledExactlyOnceWith({ kind: "applyLayout", selection: {
     queryId: reduced.query.queryId, candidateIndex: 0,
   } });
+  await waitFor(() => expect(h.view.result.current.panel.query?.revision).toBe(applied.projection.state.revision));
+  expect(h.queryLayouts).toHaveBeenLastCalledWith(sheetId, { frameCount: 2, orientation: "horizontal" });
 });
 
 test("the count remains fixed while the Layout is locked, including its placeholders", async () => {
@@ -148,6 +158,21 @@ test("the count remains fixed while the Layout is locked, including its placehol
   act(() => h.view.result.current.panel.configurePositions(2));
   expect(h.view.result.current.panel.positionCount).toBe(6);
   expect(h.commit).not.toHaveBeenCalled();
+});
+
+test("adding Photos beyond automatic coverage releases an earlier count request", async () => {
+  const h = harness();
+  act(() => h.view.result.current.panel.toggle(sheetId));
+  act(() => h.view.result.current.panel.configurePositions(30));
+  await waitFor(() => expect(h.queryLayouts).toHaveBeenLastCalledWith(sheetId, { frameCount: 30, orientation: "horizontal" }));
+  const expanded = structuredClone(initial);
+  const sheet = expanded.state.album.sheets[0];
+  const filled = sheet.frames.find((frame) => frame.photo !== null)!;
+  sheet.frames = Array.from({ length: 31 }, (_, index) => ({ ...filled, id: `filled-${index}` }));
+  expanded.state.revision += 1;
+  act(() => h.view.result.current.setProjection(expanded));
+  await waitFor(() => expect(h.queryLayouts).toHaveBeenLastCalledWith(sheetId));
+  expect(h.view.result.current.panel.positionCount).toBe(31);
 });
 
 test.each([false, true])("confirmation retains the prepared selection behind a pending mutation, failure=%s", async (fails) => {

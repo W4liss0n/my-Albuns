@@ -35,10 +35,11 @@ export function useLayoutPanel(input: LayoutPanelInput) {
   const minimumPositionCount = sheet?.frames.filter((frame) => frame.photo !== null).length ?? 0;
   const [requestedPositions, setRequestedPositions] = useState<{ projectId: string; sheetId: string; count: number } | null>(null);
   const request = requestedPositions?.projectId === projectId && requestedPositions.sheetId === sheetId ? requestedPositions : null;
-  const positionCount = sheet?.layoutLocked ? frameCount : Math.max(minimumPositionCount, request?.count ?? frameCount);
+  const positionCount = sheet?.layoutLocked || minimumPositionCount > 30 ? frameCount : Math.max(minimumPositionCount, request?.count ?? frameCount);
+  const explicitPositionCount = request && positionCount <= 30 ? positionCount : null;
   const [refresh, setRefresh] = useState(0);
   const scope = useMemo(() => ({ active: false }),
-    [projectId, projection.state.revision, projection.composition, sheetId, editing, disabled, input.port.queryLayouts, input.catalogRevision, refresh, positionCount]);
+    [projectId, projection.state.revision, projection.composition, sheetId, editing, disabled, input.port.queryLayouts, input.catalogRevision, refresh, positionCount, explicitPositionCount]);
   const [prepared, setPrepared] = useState<PreparedLayouts | null>(null);
   const [hover, setHover] = useState<{ scope: object; index: number } | null>(null);
   const [error, setError] = useState<{ scope: object; message: string } | null>(null);
@@ -60,7 +61,7 @@ export function useLayoutPanel(input: LayoutPanelInput) {
       const outcome = await latest.current.runner.waitForIdle();
       if (!current() || outcome?.status === "obsolete") return null;
       if (outcome?.status === "failed") throw outcome.error;
-      return positionCount !== frameCount ? latest.current.port.queryLayouts(sheetId, { frameCount: positionCount, orientation: "horizontal" })
+      return explicitPositionCount !== null ? latest.current.port.queryLayouts(sheetId, { frameCount: explicitPositionCount, orientation: "horizontal" })
         : latest.current.port.queryLayouts(sheetId);
     });
     queries.current = task;
@@ -77,7 +78,7 @@ export function useLayoutPanel(input: LayoutPanelInput) {
       latest.current.onError(message);
     });
     return () => { active = false; };
-  }, [scope, visible, disabled, sheetId, projectId, positionCount, frameCount]);
+  }, [scope, visible, disabled, sheetId, projectId, explicitPositionCount, frameCount]);
 
   const data = visible && !disabled && prepared?.scope === scope ? prepared : null;
   // Keep the last thumbnails painted while this same target refreshes. Only
