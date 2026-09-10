@@ -160,22 +160,6 @@ fn derive_media_usage(album: &AlbumSnapshot, composition: &CompositionPlan) -> V
             counts.entry(overlay.media_id).or_default().overlays += 1;
         }
     }
-    // Single-page conversion preserves the inactive side's custom content.
-    // Those stored references remain uses even while they do not render.
-    for sheet in &album.sheets {
-        if let Some(visuals) = &sheet.visuals {
-            if let Some(ProjectedBackgroundContent::Media { media_id }) =
-                inactive_visual_content(&visuals.background, sheet.active_sides)
-            {
-                counts.entry(*media_id).or_default().backgrounds += 1;
-            }
-            if let Some(Some(ProjectedOverlayContent::Media { media_id })) =
-                inactive_visual_content(&visuals.overlay, sheet.active_sides)
-            {
-                counts.entry(*media_id).or_default().overlays += 1;
-            }
-        }
-    }
     let backgrounds = match &album.visual_defaults.background {
         ProjectedBackground::BothSides { both } => vec![both],
         ProjectedBackground::PerSide { left, right } => vec![left, right],
@@ -207,23 +191,6 @@ fn derive_media_usage(album: &AlbumSnapshot, composition: &CompositionPlan) -> V
         .collect()
 }
 
-fn inactive_visual_content<T>(
-    visual: &crate::SheetVisual<T>,
-    active: ProjectedActiveSides,
-) -> Option<&T> {
-    let crate::SheetVisual::PerSide { left, right } = visual else {
-        return None;
-    };
-    let side = match active {
-        ProjectedActiveSides::Both => return None,
-        ProjectedActiveSides::Left => right,
-        ProjectedActiveSides::Right => left,
-    };
-    match side {
-        crate::SideVisual::Custom { content, .. } => Some(content),
-        crate::SideVisual::Default => None,
-    }
-}
 /// The crate's only entry point that resolves an Album into a CompositionPlan.
 pub(crate) fn resolve_editor_projection(state: EditorState) -> EditorProjection {
     let composition = CompositionCore::compose(&state.album);
@@ -316,7 +283,16 @@ fn visual_regions<'a, T>(
                         .collect(),
                     SideVisual::Custom { content, mapping } => {
                         let draw_rect = if *mapping == VisualMapping::BothSides {
-                            surface.clone()
+                            RectUm {
+                                x: if active_sides == ProjectedActiveSides::Right {
+                                    -(full_width_um / 2)
+                                } else {
+                                    0
+                                },
+                                y: 0,
+                                width: full_width_um,
+                                height: height_um,
+                            }
                         } else {
                             rect.clone()
                         };

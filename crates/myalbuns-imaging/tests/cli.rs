@@ -1135,7 +1135,7 @@ fn processor_clips_decorative_media_without_stretching_the_retained_half() {
         }
     }
     original.save_with_format(&path, ImageFormat::Png).unwrap();
-    for background in [false, true] {
+    for (background, single_page) in [(false, false), (true, false), (false, true), (true, true)] {
         let mut snapshot = productive_photo_snapshot(&path, Some(&path));
         let sheet = &mut snapshot.composition.sheets[0];
         let mut decoration = sheet.overlays[0].clone();
@@ -1156,6 +1156,13 @@ fn processor_clips_decorative_media_without_stretching_the_retained_half() {
             width: 12_700,
             height: 12_700,
         });
+        if single_page {
+            sheet.width_um = 12_700;
+            sheet.active_sides = myalbuns_core::ProjectedActiveSides::Right;
+            sheet.base.draw_rect.width = 12_700;
+            decoration.draw_rect.x = -12_700;
+            decoration.clip_rect.as_mut().unwrap().x = 0;
+        }
         let media_id = decoration.media_id;
         if background {
             sheet.overlays.clear();
@@ -1170,7 +1177,9 @@ fn processor_clips_decorative_media_without_stretching_the_retained_half() {
         } else {
             sheet.overlays = vec![decoration];
         }
-        let output = root.path().join(format!("clipped-{background}.jpg"));
+        let output = root
+            .path()
+            .join(format!("clipped-{background}-{single_page}.jpg"));
         let result = invoke_real_processor(
             snapshot,
             &output,
@@ -1184,12 +1193,14 @@ fn processor_clips_decorative_media_without_stretching_the_retained_half() {
             String::from_utf8_lossy(&result.stderr)
         );
         let rendered = image::open(output).unwrap().to_rgb8();
-        let left = rendered.get_pixel(25, 25);
-        assert!(
-            left[0] > 245 && left[1] > 245 && left[2] > 245,
-            "the opposite side stays white: {left:?}"
-        );
-        let right = rendered.get_pixel(60, 25);
+        if !single_page {
+            let left = rendered.get_pixel(25, 25);
+            assert!(
+                left[0] > 245 && left[1] > 245 && left[2] > 245,
+                "the opposite side stays white: {left:?}"
+            );
+        }
+        let right = rendered.get_pixel(if single_page { 10 } else { 60 }, 25);
         assert!(
             right[0] < 15 && right[2] > 220,
             "the retained right portion stays blue without refitting the Original: {right:?}"

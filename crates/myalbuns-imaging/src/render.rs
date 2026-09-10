@@ -366,17 +366,21 @@ fn draw_stretched_media(
     raster: RasterPlan,
     source: &RgbaImage,
 ) -> Result<(), RenderFailure> {
-    let (left, top, right, bottom) = raster_rect(image, draw_rect, raster)?;
-    let width = right.saturating_sub(left).max(1);
-    let height = bottom.saturating_sub(top).max(1);
+    let edges @ (mapped_left, mapped_top, mapped_right, mapped_bottom) =
+        raster_edges(draw_rect, raster)?;
+    let (left, top, right, bottom) = clamp_raster_edges(image, edges);
+    let width = mapped_right.saturating_sub(mapped_left).max(1);
+    let height = mapped_bottom.saturating_sub(mapped_top).max(1);
     let (clip_left, clip_top, clip_right, clip_bottom) = clip_rect
         .map(|clip| raster_rect(image, clip, raster))
         .transpose()?
         .unwrap_or((left, top, right, bottom));
     for y in top.max(clip_top)..bottom.min(clip_bottom) {
         for x in left.max(clip_left)..right.min(clip_right) {
-            let horizontal = (x - left) as f32 / width.saturating_sub(1).max(1) as f32;
-            let vertical = (y - top) as f32 / height.saturating_sub(1).max(1) as f32;
+            let horizontal = i64::from(x).saturating_sub(mapped_left) as f32
+                / width.saturating_sub(1).max(1) as f32;
+            let vertical = i64::from(y).saturating_sub(mapped_top) as f32
+                / height.saturating_sub(1).max(1) as f32;
             blend_pixel(image, x, y, sample_bilinear(source, horizontal, vertical));
         }
     }
@@ -399,6 +403,26 @@ fn raster_rect(
     draw_rect: &RectUm,
     raster: RasterPlan,
 ) -> Result<(u32, u32, u32, u32), RenderFailure> {
+    Ok(clamp_raster_edges(image, raster_edges(draw_rect, raster)?))
+}
+
+fn clamp_raster_edges(
+    image: &RgbaImage,
+    (left, top, right, bottom): (i64, i64, i64, i64),
+) -> (u32, u32, u32, u32) {
+    let edge = |value: i64, limit: u32| value.clamp(0, i64::from(limit)) as u32;
+    (
+        edge(left, image.width()),
+        edge(top, image.height()),
+        edge(right, image.width()),
+        edge(bottom, image.height()),
+    )
+}
+
+fn raster_edges(
+    draw_rect: &RectUm,
+    raster: RasterPlan,
+) -> Result<(i64, i64, i64, i64), RenderFailure> {
     let far_x = draw_rect.x.checked_add(draw_rect.width).ok_or_else(|| {
         RenderFailure::typed(
             ImagingFailureCode::ResourceLimitExceeded,
@@ -415,15 +439,11 @@ fn raster_rect(
             "a borda vertical da composição excedeu o intervalo seguro",
         )
     })?;
-    let left = u32::try_from(raster.edge_px(draw_rect.x)?.max(0)).unwrap_or(u32::MAX);
-    let top = u32::try_from(raster.edge_px(draw_rect.y)?.max(0)).unwrap_or(u32::MAX);
-    let right = u32::try_from(raster.edge_px(far_x)?.max(0)).unwrap_or(u32::MAX);
-    let bottom = u32::try_from(raster.edge_px(far_y)?.max(0)).unwrap_or(u32::MAX);
     Ok((
-        left.min(image.width()),
-        top.min(image.height()),
-        right.min(image.width()),
-        bottom.min(image.height()),
+        raster.edge_px(draw_rect.x)?,
+        raster.edge_px(draw_rect.y)?,
+        raster.edge_px(far_x)?,
+        raster.edge_px(far_y)?,
     ))
 }
 

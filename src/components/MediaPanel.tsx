@@ -15,7 +15,7 @@ import type {
   MediaFileInfo,
   MediaPreviewDemand,
 } from "../application/projectPorts";
-import { matchProjectCommandShortcut, projectCommandDescriptor } from "../application/projectCommandCatalog";
+import { matchProjectCommandShortcut, projectCommandDescriptor, projectCommandShortcutLabel } from "../application/projectCommandCatalog";
 import { ContextMenuSurface } from "../ui/ContextMenuSurface";
 import type { MediaPanelPersistentPreference } from "../application/workspacePreferences";
 
@@ -647,7 +647,7 @@ export function MediaPanel({
                     className="media-availability"
                     role="status"
                   >
-                    {availabilityLabel}
+                    {preview?.state === "absent" ? "Ausente" : availabilityLabel}
                   </span>
                 )}
                 </MediaPreviewCard>
@@ -681,7 +681,7 @@ export function MediaPanel({
         onDismiss={() => { setContextMenu(null); panelHostRef.current?.focus({ preventScroll: true }); }}>
         <button type="button" role="menuitem" disabled={relinkDisabled || importPending || selectedMediaIds.size === 0}
           onClick={() => { setContextMenu(null); onRemoveMedia([...selectedMediaIds]); panelHostRef.current?.focus({ preventScroll: true }); }}>
-          <span>{projectCommandDescriptor("remove-media").label}</span><kbd aria-hidden="true">Delete</kbd>
+          <span>{projectCommandDescriptor("remove-media").label}</span><kbd aria-hidden="true">{projectCommandShortcutLabel("remove-media")}</kbd>
         </button>
       </ContextMenuSurface>}
     </section>

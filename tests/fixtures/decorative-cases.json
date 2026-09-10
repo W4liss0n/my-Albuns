@@ -8375,10 +8375,16 @@
           "activeSides": "right",
           "backgrounds": [
             {
-              "drawRect": {
+              "clipRect": {
                 "height": 300000,
                 "width": 300000,
                 "x": 0,
+                "y": 0
+              },
+              "drawRect": {
+                "height": 300000,
+                "width": 600000,
+                "x": -300000,
                 "y": 0
               },
               "kind": "media",
@@ -8695,10 +8701,16 @@
           "activeSides": "right",
           "backgrounds": [
             {
-              "drawRect": {
+              "clipRect": {
                 "height": 300000,
                 "width": 300000,
                 "x": 0,
+                "y": 0
+              },
+              "drawRect": {
+                "height": 300000,
+                "width": 600000,
+                "x": -300000,
                 "y": 0
               },
               "kind": "media",
@@ -9598,10 +9610,16 @@
             "activeSides": "right",
             "backgrounds": [
               {
-                "drawRect": {
+                "clipRect": {
                   "height": 300000,
                   "width": 300000,
                   "x": 0,
+                  "y": 0
+                },
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": -300000,
                   "y": 0
                 },
                 "kind": "media",
@@ -9791,11 +9809,11 @@
           "breakdown": {
             "albumBackgrounds": 0,
             "albumOverlays": 0,
-            "backgrounds": 1,
+            "backgrounds": 0,
             "frames": 0,
             "overlays": 1
           },
-          "count": 2,
+          "count": 1,
           "mediaId": "00000000-0000-4000-8000-000000000030"
         }
       ],
@@ -9893,12 +9911,7 @@
                 "background": {
                   "kind": "perSide",
                   "left": {
-                    "content": {
-                      "kind": "media",
-                      "mediaId": "00000000-0000-4000-8000-000000000030"
-                    },
-                    "kind": "custom",
-                    "mapping": "side"
+                    "kind": "default"
                   },
                   "right": {
                     "content": {
@@ -30177,11 +30190,11 @@
             "breakdown": {
               "albumBackgrounds": 0,
               "albumOverlays": 0,
-              "backgrounds": 1,
+              "backgrounds": 0,
               "frames": 0,
               "overlays": 1
             },
-            "count": 2,
+            "count": 1,
             "mediaId": "00000000-0000-4000-8000-000000000030"
           }
         ],
@@ -30279,12 +30292,7 @@
                   "background": {
                     "kind": "perSide",
                     "left": {
-                      "content": {
-                        "kind": "media",
-                        "mediaId": "00000000-0000-4000-8000-000000000030"
-                      },
-                      "kind": "custom",
-                      "mapping": "side"
+                      "kind": "default"
                     },
                     "right": {
                       "content": {
@@ -30375,10 +30383,16 @@
               "activeSides": "right",
               "backgrounds": [
                 {
-                  "drawRect": {
+                  "clipRect": {
                     "height": 300000,
                     "width": 300000,
                     "x": 0,
+                    "y": 0
+                  },
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": -300000,
                     "y": 0
                   },
                   "kind": "media",
@@ -30568,11 +30582,11 @@
             "breakdown": {
               "albumBackgrounds": 0,
               "albumOverlays": 0,
-              "backgrounds": 1,
+              "backgrounds": 0,
               "frames": 0,
               "overlays": 0
             },
-            "count": 1,
+            "count": 0,
             "mediaId": "00000000-0000-4000-8000-000000000030"
           }
         ],
@@ -30670,12 +30684,7 @@
                   "background": {
                     "kind": "perSide",
                     "left": {
-                      "content": {
-                        "kind": "media",
-                        "mediaId": "00000000-0000-4000-8000-000000000030"
-                      },
-                      "kind": "custom",
-                      "mapping": "side"
+                      "kind": "default"
                     },
                     "right": {
                       "content": {
@@ -30766,10 +30775,16 @@
               "activeSides": "right",
               "backgrounds": [
                 {
-                  "drawRect": {
+                  "clipRect": {
                     "height": 300000,
                     "width": 300000,
                     "x": 0,
+                    "y": 0
+                  },
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": -300000,
                     "y": 0
                   },
                   "kind": "media",
@@ -30959,11 +30974,11 @@
             "breakdown": {
               "albumBackgrounds": 0,
               "albumOverlays": 0,
-              "backgrounds": 1,
+              "backgrounds": 0,
               "frames": 0,
-              "overlays": 1
+              "overlays": 0
             },
-            "count": 2,
+            "count": 0,
             "mediaId": "00000000-0000-4000-8000-000000000030"
           }
         ],
@@ -31061,12 +31076,7 @@
                   "background": {
                     "kind": "perSide",
                     "left": {
-                      "content": {
-                        "kind": "media",
-                        "mediaId": "00000000-0000-4000-8000-000000000030"
-                      },
-                      "kind": "custom",
-                      "mapping": "side"
+                      "kind": "default"
                     },
                     "right": {
                       "content": {
@@ -31741,397 +31751,6 @@
             "breakdown": {
               "albumBackgrounds": 0,
               "albumOverlays": 0,
-              "backgrounds": 2,
-              "frames": 0,
-              "overlays": 1
-            },
-            "count": 3,
-            "mediaId": "00000000-0000-4000-8000-000000000030"
-          }
-        ],
-        "state": {
-          "album": {
-            "media": [
-              {
-                "id": "00000000-0000-4000-8000-000000000010",
-                "kind": "photo",
-                "name": "Foto.jpg",
-                "palette": [
-                  "#C22C24",
-                  "#248044",
-                  "#2454C2"
-                ],
-                "sourceHeightPx": 400,
-                "sourceWidthPx": 600
-              },
-              {
-                "id": "00000000-0000-4000-8000-000000000020",
-                "kind": "decorative",
-                "name": "Textura.png",
-                "palette": null,
-                "sourceHeightPx": null,
-                "sourceWidthPx": null
-              },
-              {
-                "id": "00000000-0000-4000-8000-000000000030",
-                "kind": "decorative",
-                "name": "Overlay.png",
-                "palette": null,
-                "sourceHeightPx": null,
-                "sourceWidthPx": null
-              }
-            ],
-            "sheets": [
-              {
-                "activeSides": "right",
-                "frames": [
-                  {
-                    "id": "00000000-0000-4000-8000-000000000101",
-                    "photo": {
-                      "mediaId": "00000000-0000-4000-8000-000000000010",
-                      "transform": {
-                        "blackAndWhite": false,
-                        "fineRotationDegrees": 0.0,
-                        "mirrorX": false,
-                        "panX": 0.25,
-                        "panY": -0.5,
-                        "quarterTurns": 0,
-                        "userZoom": 1.75
-                      }
-                    },
-                    "rect": {
-                      "height": 81538,
-                      "width": 122308,
-                      "x": 88846,
-                      "y": 15000
-                    },
-                    "style": {
-                      "borderRgb": "#000000",
-                      "borderWidthUm": 0,
-                      "opacityPercent": 100,
-                      "source": "album"
-                    },
-                    "zIndex": 0
-                  },
-                  {
-                    "id": "00000000-0000-4000-8000-000000000102",
-                    "photo": null,
-                    "rect": {
-                      "height": 183462,
-                      "width": 122308,
-                      "x": 88846,
-                      "y": 101538
-                    },
-                    "style": {
-                      "borderRgb": "#000000",
-                      "borderWidthUm": 0,
-                      "opacityPercent": 100,
-                      "source": "album"
-                    },
-                    "zIndex": 1
-                  }
-                ],
-                "heightUm": 300000,
-                "id": "00000000-0000-4000-8000-000000000001",
-                "layoutLocked": false,
-                "number": 1,
-                "pageNumbers": [
-                  1
-                ],
-                "role": "initial",
-                "visuals": {
-                  "background": {
-                    "kind": "perSide",
-                    "left": {
-                      "content": {
-                        "kind": "media",
-                        "mediaId": "00000000-0000-4000-8000-000000000030"
-                      },
-                      "kind": "custom",
-                      "mapping": "side"
-                    },
-                    "right": {
-                      "content": {
-                        "kind": "media",
-                        "mediaId": "00000000-0000-4000-8000-000000000030"
-                      },
-                      "kind": "custom",
-                      "mapping": "side"
-                    }
-                  },
-                  "overlay": {
-                    "content": {
-                      "kind": "media",
-                      "mediaId": "00000000-0000-4000-8000-000000000030"
-                    },
-                    "kind": "bothSides"
-                  }
-                },
-                "widthUm": 600000
-              },
-              {
-                "activeSides": "both",
-                "frames": [],
-                "heightUm": 300000,
-                "id": "00000000-0000-4000-8000-000000000002",
-                "layoutLocked": false,
-                "number": 2,
-                "pageNumbers": [
-                  2,
-                  3
-                ],
-                "role": "final",
-                "widthUm": 600000
-              }
-            ],
-            "visualDefaults": {
-              "background": {
-                "both": {
-                  "kind": "color",
-                  "rgb": "#FFFFFF"
-                },
-                "scope": "bothSides"
-              },
-              "frameBorder": {
-                "kind": "none"
-              },
-              "overlay": {
-                "both": null,
-                "scope": "bothSides"
-              }
-            }
-          },
-          "canRedo": false,
-          "canUndo": true,
-          "dirty": true,
-          "document": {
-            "bleedUm": 3000,
-            "displayUnit": "mm",
-            "dpi": 300,
-            "safetyUm": 3000,
-            "sheetHeightUm": 300000,
-            "sheetWidthUm": 600000
-          },
-          "projectId": "550e8400-e29b-41d4-a716-446655440000",
-          "projectName": "Decorativos",
-          "revision": 63,
-          "savedRevision": 9
-        }
-      }
-    },
-    {
-      "from": "single",
-      "intent": {
-        "kind": "applyDecorative",
-        "mediaId": "00000000-0000-4000-8000-000000000030",
-        "role": "overlay",
-        "scope": "bothSides",
-        "sheetId": "00000000-0000-4000-8000-000000000001"
-      },
-      "projection": {
-        "canPasteFrames": false,
-        "composition": {
-          "frameBorder": {
-            "kind": "none"
-          },
-          "sheets": [
-            {
-              "activeSides": "right",
-              "backgrounds": [
-                {
-                  "drawRect": {
-                    "height": 300000,
-                    "width": 300000,
-                    "x": 0,
-                    "y": 0
-                  },
-                  "kind": "media",
-                  "mediaId": "00000000-0000-4000-8000-000000000020",
-                  "name": "Textura.png"
-                }
-              ],
-              "base": {
-                "drawRect": {
-                  "height": 300000,
-                  "width": 300000,
-                  "x": 0,
-                  "y": 0
-                },
-                "rgb": "#FFFFFF"
-              },
-              "frames": [
-                {
-                  "border": {
-                    "kind": "none"
-                  },
-                  "borderFillRects": [],
-                  "clipRect": {
-                    "height": 81538,
-                    "width": 122308,
-                    "x": 88846,
-                    "y": 15000
-                  },
-                  "frameId": "00000000-0000-4000-8000-000000000101",
-                  "opacityByte": 255,
-                  "photo": {
-                    "blackAndWhite": false,
-                    "drawRect": {
-                      "height": 142693,
-                      "width": 214039,
-                      "x": 54447,
-                      "y": -30866
-                    },
-                    "mediaId": "00000000-0000-4000-8000-000000000010",
-                    "mirrorX": false,
-                    "name": "Foto.jpg",
-                    "palette": [
-                      "#C22C24",
-                      "#248044",
-                      "#2454C2"
-                    ],
-                    "placement": {
-                      "baseFillZoom": 203.84666666666666,
-                      "current": {
-                        "center": {
-                          "x": 72620.375,
-                          "y": 25480.33333333333
-                        },
-                        "size": {
-                          "height": 142692.6666666667,
-                          "width": 214039.0
-                        }
-                      },
-                      "currentPan": {
-                        "x": 0.25,
-                        "y": -0.5
-                      },
-                      "currentZoom": 1.75,
-                      "panOrigin": {
-                        "x": 61154.0,
-                        "y": 40769.0
-                      },
-                      "panRange": {
-                        "maximum": 1.0,
-                        "minimum": -1.0
-                      },
-                      "panToCenter": {
-                        "xx": 45865.5,
-                        "xy": -0.0,
-                        "yx": 0.0,
-                        "yy": 30577.333333333343
-                      },
-                      "panToCenterPerZoom": {
-                        "xx": 61154.0,
-                        "xy": -0.0,
-                        "yx": 0.0,
-                        "yy": 40769.333333333336
-                      },
-                      "sizePerZoom": {
-                        "height": 81538.66666666667,
-                        "width": 122308.0
-                      },
-                      "zoomRange": {
-                        "maximum": 4.0,
-                        "minimum": 1.0
-                      }
-                    },
-                    "rotationDegrees": 0.0
-                  },
-                  "zIndex": 0
-                },
-                {
-                  "border": {
-                    "kind": "none"
-                  },
-                  "borderFillRects": [],
-                  "clipRect": {
-                    "height": 183462,
-                    "width": 122308,
-                    "x": 88846,
-                    "y": 101538
-                  },
-                  "frameId": "00000000-0000-4000-8000-000000000102",
-                  "opacityByte": 255,
-                  "photo": null,
-                  "zIndex": 1
-                }
-              ],
-              "heightUm": 300000,
-              "number": 1,
-              "overlays": [
-                {
-                  "drawRect": {
-                    "height": 300000,
-                    "width": 300000,
-                    "x": 0,
-                    "y": 0
-                  },
-                  "mediaId": "00000000-0000-4000-8000-000000000030",
-                  "name": "Overlay.png"
-                }
-              ],
-              "sheetId": "00000000-0000-4000-8000-000000000001",
-              "widthUm": 300000
-            },
-            {
-              "activeSides": "both",
-              "backgrounds": [
-                {
-                  "drawRect": {
-                    "height": 300000,
-                    "width": 600000,
-                    "x": 0,
-                    "y": 0
-                  },
-                  "kind": "color",
-                  "rgb": "#FFFFFF"
-                }
-              ],
-              "base": {
-                "drawRect": {
-                  "height": 300000,
-                  "width": 600000,
-                  "x": 0,
-                  "y": 0
-                },
-                "rgb": "#FFFFFF"
-              },
-              "frames": [],
-              "heightUm": 300000,
-              "number": 2,
-              "overlays": [],
-              "sheetId": "00000000-0000-4000-8000-000000000002",
-              "widthUm": 600000
-            }
-          ]
-        },
-        "mediaUsage": [
-          {
-            "breakdown": {
-              "albumBackgrounds": 0,
-              "albumOverlays": 0,
-              "backgrounds": 0,
-              "frames": 1,
-              "overlays": 0
-            },
-            "count": 1,
-            "mediaId": "00000000-0000-4000-8000-000000000010"
-          },
-          {
-            "breakdown": {
-              "albumBackgrounds": 0,
-              "albumOverlays": 0,
-              "backgrounds": 1,
-              "frames": 0,
-              "overlays": 0
-            },
-            "count": 1,
-            "mediaId": "00000000-0000-4000-8000-000000000020"
-          },
-          {
-            "breakdown": {
-              "albumBackgrounds": 0,
-              "albumOverlays": 0,
               "backgrounds": 1,
               "frames": 0,
               "overlays": 1
@@ -32234,20 +31853,15 @@
                   "background": {
                     "kind": "perSide",
                     "left": {
+                      "kind": "default"
+                    },
+                    "right": {
                       "content": {
                         "kind": "media",
                         "mediaId": "00000000-0000-4000-8000-000000000030"
                       },
                       "kind": "custom",
                       "mapping": "side"
-                    },
-                    "right": {
-                      "content": {
-                        "kind": "media",
-                        "mediaId": "00000000-0000-4000-8000-000000000020"
-                      },
-                      "kind": "custom",
-                      "mapping": "bothSides"
                     }
                   },
                   "overlay": {
@@ -32292,7 +31906,7 @@
               }
             }
           },
-          "canRedo": true,
+          "canRedo": false,
           "canUndo": true,
           "dirty": true,
           "document": {
@@ -32305,7 +31919,7 @@
           },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
-          "revision": 57,
+          "revision": 63,
           "savedRevision": 9
         }
       }
@@ -32316,7 +31930,7 @@
         "kind": "applyDecorative",
         "mediaId": "00000000-0000-4000-8000-000000000030",
         "role": "overlay",
-        "scope": "right",
+        "scope": "bothSides",
         "sheetId": "00000000-0000-4000-8000-000000000001"
       },
       "projection": {
@@ -32330,10 +31944,16 @@
               "activeSides": "right",
               "backgrounds": [
                 {
-                  "drawRect": {
+                  "clipRect": {
                     "height": 300000,
                     "width": 300000,
                     "x": 0,
+                    "y": 0
+                  },
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": -300000,
                     "y": 0
                   },
                   "kind": "media",
@@ -32523,11 +32143,11 @@
             "breakdown": {
               "albumBackgrounds": 0,
               "albumOverlays": 0,
-              "backgrounds": 1,
+              "backgrounds": 0,
               "frames": 0,
-              "overlays": 2
+              "overlays": 1
             },
-            "count": 3,
+            "count": 1,
             "mediaId": "00000000-0000-4000-8000-000000000030"
           }
         ],
@@ -32625,12 +32245,399 @@
                   "background": {
                     "kind": "perSide",
                     "left": {
+                      "kind": "default"
+                    },
+                    "right": {
                       "content": {
                         "kind": "media",
-                        "mediaId": "00000000-0000-4000-8000-000000000030"
+                        "mediaId": "00000000-0000-4000-8000-000000000020"
                       },
                       "kind": "custom",
-                      "mapping": "side"
+                      "mapping": "bothSides"
+                    }
+                  },
+                  "overlay": {
+                    "content": {
+                      "kind": "media",
+                      "mediaId": "00000000-0000-4000-8000-000000000030"
+                    },
+                    "kind": "bothSides"
+                  }
+                },
+                "widthUm": 600000
+              },
+              {
+                "activeSides": "both",
+                "frames": [],
+                "heightUm": 300000,
+                "id": "00000000-0000-4000-8000-000000000002",
+                "layoutLocked": false,
+                "number": 2,
+                "pageNumbers": [
+                  2,
+                  3
+                ],
+                "role": "final",
+                "widthUm": 600000
+              }
+            ],
+            "visualDefaults": {
+              "background": {
+                "both": {
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                },
+                "scope": "bothSides"
+              },
+              "frameBorder": {
+                "kind": "none"
+              },
+              "overlay": {
+                "both": null,
+                "scope": "bothSides"
+              }
+            }
+          },
+          "canRedo": true,
+          "canUndo": true,
+          "dirty": true,
+          "document": {
+            "bleedUm": 3000,
+            "displayUnit": "mm",
+            "dpi": 300,
+            "safetyUm": 3000,
+            "sheetHeightUm": 300000,
+            "sheetWidthUm": 600000
+          },
+          "projectId": "550e8400-e29b-41d4-a716-446655440000",
+          "projectName": "Decorativos",
+          "revision": 57,
+          "savedRevision": 9
+        }
+      }
+    },
+    {
+      "from": "single",
+      "intent": {
+        "kind": "applyDecorative",
+        "mediaId": "00000000-0000-4000-8000-000000000030",
+        "role": "overlay",
+        "scope": "right",
+        "sheetId": "00000000-0000-4000-8000-000000000001"
+      },
+      "projection": {
+        "canPasteFrames": false,
+        "composition": {
+          "frameBorder": {
+            "kind": "none"
+          },
+          "sheets": [
+            {
+              "activeSides": "right",
+              "backgrounds": [
+                {
+                  "clipRect": {
+                    "height": 300000,
+                    "width": 300000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": -300000,
+                    "y": 0
+                  },
+                  "kind": "media",
+                  "mediaId": "00000000-0000-4000-8000-000000000020",
+                  "name": "Textura.png"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 300000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 81538,
+                    "width": 122308,
+                    "x": 88846,
+                    "y": 15000
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000101",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 142693,
+                      "width": 214039,
+                      "x": 54447,
+                      "y": -30866
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#C22C24",
+                      "#248044",
+                      "#2454C2"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 203.84666666666666,
+                      "current": {
+                        "center": {
+                          "x": 72620.375,
+                          "y": 25480.33333333333
+                        },
+                        "size": {
+                          "height": 142692.6666666667,
+                          "width": 214039.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.25,
+                        "y": -0.5
+                      },
+                      "currentZoom": 1.75,
+                      "panOrigin": {
+                        "x": 61154.0,
+                        "y": 40769.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 45865.5,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 30577.333333333343
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 61154.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 40769.333333333336
+                      },
+                      "sizePerZoom": {
+                        "height": 81538.66666666667,
+                        "width": 122308.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 183462,
+                    "width": 122308,
+                    "x": 88846,
+                    "y": 101538
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000102",
+                  "opacityByte": 255,
+                  "photo": null,
+                  "zIndex": 1
+                }
+              ],
+              "heightUm": 300000,
+              "number": 1,
+              "overlays": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 300000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "mediaId": "00000000-0000-4000-8000-000000000030",
+                  "name": "Overlay.png"
+                }
+              ],
+              "sheetId": "00000000-0000-4000-8000-000000000001",
+              "widthUm": 300000
+            },
+            {
+              "activeSides": "both",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [],
+              "heightUm": 300000,
+              "number": 2,
+              "overlays": [],
+              "sheetId": "00000000-0000-4000-8000-000000000002",
+              "widthUm": 600000
+            }
+          ]
+        },
+        "mediaUsage": [
+          {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 0,
+              "backgrounds": 0,
+              "frames": 1,
+              "overlays": 0
+            },
+            "count": 1,
+            "mediaId": "00000000-0000-4000-8000-000000000010"
+          },
+          {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 0,
+              "backgrounds": 1,
+              "frames": 0,
+              "overlays": 0
+            },
+            "count": 1,
+            "mediaId": "00000000-0000-4000-8000-000000000020"
+          },
+          {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 0,
+              "backgrounds": 0,
+              "frames": 0,
+              "overlays": 1
+            },
+            "count": 1,
+            "mediaId": "00000000-0000-4000-8000-000000000030"
+          }
+        ],
+        "state": {
+          "album": {
+            "media": [
+              {
+                "id": "00000000-0000-4000-8000-000000000010",
+                "kind": "photo",
+                "name": "Foto.jpg",
+                "palette": [
+                  "#C22C24",
+                  "#248044",
+                  "#2454C2"
+                ],
+                "sourceHeightPx": 400,
+                "sourceWidthPx": 600
+              },
+              {
+                "id": "00000000-0000-4000-8000-000000000020",
+                "kind": "decorative",
+                "name": "Textura.png",
+                "palette": null,
+                "sourceHeightPx": null,
+                "sourceWidthPx": null
+              },
+              {
+                "id": "00000000-0000-4000-8000-000000000030",
+                "kind": "decorative",
+                "name": "Overlay.png",
+                "palette": null,
+                "sourceHeightPx": null,
+                "sourceWidthPx": null
+              }
+            ],
+            "sheets": [
+              {
+                "activeSides": "right",
+                "frames": [
+                  {
+                    "id": "00000000-0000-4000-8000-000000000101",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000010",
+                      "transform": {
+                        "blackAndWhite": false,
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": 0.25,
+                        "panY": -0.5,
+                        "quarterTurns": 0,
+                        "userZoom": 1.75
+                      }
+                    },
+                    "rect": {
+                      "height": 81538,
+                      "width": 122308,
+                      "x": 88846,
+                      "y": 15000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 0
+                  },
+                  {
+                    "id": "00000000-0000-4000-8000-000000000102",
+                    "photo": null,
+                    "rect": {
+                      "height": 183462,
+                      "width": 122308,
+                      "x": 88846,
+                      "y": 101538
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 1
+                  }
+                ],
+                "heightUm": 300000,
+                "id": "00000000-0000-4000-8000-000000000001",
+                "layoutLocked": false,
+                "number": 1,
+                "pageNumbers": [
+                  1
+                ],
+                "role": "initial",
+                "visuals": {
+                  "background": {
+                    "kind": "perSide",
+                    "left": {
+                      "kind": "default"
                     },
                     "right": {
                       "content": {

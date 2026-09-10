@@ -15,7 +15,8 @@ Este contrato complementa a especificação do Painel e os contratos de
 
 ## Catálogo, preferências e ausência
 
-O Painel mantém seleção, âncora e busca por aba durante a Janela aberta.
+O Painel mantém a seleção e a âncora atuais e uma busca independente por aba
+durante a Janela aberta. A seleção se restringe aos itens da aba visível.
 A seleção solicitada após importar é um evento consumido uma vez; alterações
 de ordenação e filtro não o repetem. Ocultar o Painel conserva esse estado;
 trocar de Projeto o reinicia. Aba, chave e direção da ordenação, filtro de uso
@@ -97,7 +98,10 @@ acompanha o padrão sem substituir a personalização do outro lado.
 
 Aplicações de Ambos os lados usam a superfície ativa: em Página única ocupam
 a Página e se expandem quando a Lâmina volta a ser dupla. Aplicações específicas
-de um lado permanecem específicas desse lado. O papel de Fundo nunca altera
+de um lado permanecem específicas desse lado. Converter para Página única
+descarta as personalizações do lado desativado; voltar para dupla inicia esse
+lado no padrão. A decisão e o recorte do lado que permanece ativo são conservados.
+O papel de Fundo nunca altera
 o Overlay, a geometria dos Frames ou a seleção transitória.
 
 O formato público passa à versão 11. Ele conserva o conteúdo da versão 10 e
@@ -119,8 +123,7 @@ Respostas atrasadas, cancelamento e soltura fora da superfície não fazem commi
 
 Os indicadores de uso separam Frames, Fundos, Overlays, padrão de Fundo e padrão
 de Overlay. Um padrão continua contando como uso mesmo quando personalizações
-ocultam todas as suas aplicações. Personalizações conservadas no lado inativo
-de uma Página única também continuam contando como uso. Remover um Decorativo restaura o padrão nos
+ocultam todas as suas aplicações. Remover um Decorativo restaura o padrão nos
 alvos personalizados que o referenciavam; remover o próprio padrão usa branco
 para Fundo e ausência para Overlay, preservando as outras personalizações.
 

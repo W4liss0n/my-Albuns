@@ -7864,8 +7864,52 @@
       "readySelector": "[aria-label=\"Encerrar visualização de ausentes\"]",
       "actions": [
         {
+          "type": "click-text",
+          "text": "Ver arquivos ausentes"
+        }
+      ]
+    },
+    {
+      "id": "workspace-decorative-grid",
+      "title": "Decorativos — recorte preservado na Grade",
+      "implementationPath": "/workspace-preview.html?frame=decorations&decoration-state=split&mode=normal",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-complete",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A especificação e o design 0031 completam o Painel de imagens. A referência vigente antecede estes estados; a composição de Decorativos provém do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".sheet-grid .sheet-tile",
+      "actions": [
+        {
           "type": "click",
-          "selector": "[aria-label=\"Ver arquivos ausentes\"]"
+          "selector": "[aria-label=\"Decorativos\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-decorative-inspector",
+      "title": "Decorativos — recorte e valores por lado no Inspetor",
+      "implementationPath": "/workspace-preview.html?frame=decorations&decoration-state=split&context=sheet",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-complete",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A especificação e o design 0031 completam o Painel de imagens. A referência vigente antecede estes estados; a composição de Decorativos provém do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".sheet-design-inspector",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Decorativos\"]"
         }
       ]
     }

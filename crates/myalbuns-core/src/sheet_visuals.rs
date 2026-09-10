@@ -50,6 +50,19 @@ pub enum SheetVisual<T> {
 }
 
 impl<T: Clone> SheetVisual<T> {
+    pub(crate) fn retain_active_sides(&mut self, active: crate::ActiveSides) {
+        if let Self::PerSide { left, right } = self {
+            match active {
+                crate::ActiveSides::Both => (),
+                crate::ActiveSides::Left => *right = SideVisual::Default,
+                crate::ActiveSides::Right => *left = SideVisual::Default,
+            }
+            if matches!(left, SideVisual::Default) && matches!(right, SideVisual::Default) {
+                *self = Self::Default;
+            }
+        }
+    }
+
     pub(crate) fn apply(&mut self, scope: DecorativeScope, content: T) {
         if scope == DecorativeScope::BothSides {
             *self = Self::BothSides { content };

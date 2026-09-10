@@ -80,6 +80,7 @@ fn validate_composed_content(
             } = background
             {
                 validate_decorative_clip(draw_rect, clip, sheet)?;
+                continue;
             }
             let (id, draw_rect) = match background {
                 ComposedBackground::Color { rgb, draw_rect } => {
@@ -104,6 +105,7 @@ fn validate_composed_content(
         for overlay in &sheet.overlays {
             if let Some(clip) = &overlay.clip_rect {
                 validate_decorative_clip(&overlay.draw_rect, clip, sheet)?;
+                continue;
             }
             let media_id = overlay.media_id.to_string();
             validate_rect_within(
@@ -179,6 +181,13 @@ fn validate_decorative_clip(
     clip: &RectUm,
     sheet: &ComposedSheet,
 ) -> Result<(), CoreError> {
+    validate_positive_dimensions(
+        draw.width,
+        draw.height,
+        "Decorativo composto",
+        &sheet.sheet_id,
+        CoreError::InvalidSnapshot,
+    )?;
     validate_rect_within(
         clip,
         sheet.width_um,

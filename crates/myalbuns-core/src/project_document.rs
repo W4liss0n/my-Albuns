@@ -514,6 +514,13 @@ pub struct ProjectSheet {
 }
 
 impl ProjectSheet {
+    fn convert_active_sides(&mut self, active_sides: ActiveSides) {
+        self.active_sides = active_sides;
+        self.visuals.background.retain_active_sides(active_sides);
+        self.visuals.overlay.retain_active_sides(active_sides);
+        self.layout_locked = false;
+    }
+
     pub fn id(&self) -> Uuid {
         self.id
     }
@@ -679,14 +686,14 @@ impl ProjectDocument {
             .ok_or(())?;
         let last_index = candidate.sheets.len() - 1;
         let sheet = &mut candidate.sheets[sheet_index];
-        sheet.active_sides = match (sheet_index, sheet.active_sides) {
+        let active_sides = match (sheet_index, sheet.active_sides) {
             (0, ActiveSides::Both) => ActiveSides::Right,
             (0, ActiveSides::Right) => ActiveSides::Both,
             (index, ActiveSides::Both) if index == last_index => ActiveSides::Left,
             (index, ActiveSides::Left) if index == last_index => ActiveSides::Both,
             _ => return Err(()),
         };
-        sheet.layout_locked = false;
+        sheet.convert_active_sides(active_sides);
         candidate
             .reorganize_sheet(sheet_id, custom)
             .map_err(|_| ())?;
@@ -797,8 +804,7 @@ impl ProjectDocument {
             (last_index, information.last_sheet.active_sides(false), ProjectConfigurationValidationError::LastSheetConversionRequiresContentReorganization),
         ] {
             if candidate.sheets[index].active_sides != sides {
-                candidate.sheets[index].active_sides = sides;
-                candidate.sheets[index].layout_locked = false;
+                candidate.sheets[index].convert_active_sides(sides);
                 candidate.reorganize_sheet(candidate.sheets[index].id, custom).map_err(|_| vec![error])?;
             }
         }

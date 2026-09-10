@@ -116,6 +116,16 @@ export function SheetPreview({
     >
       <title>{label}</title>
       <defs>
+        {sheet.backgrounds.map((background, index) => background.kind === "media" && background.clipRect ? (
+          <clipPath id={`${instanceId}-background-${index}`} key={`background-${index}`} clipPathUnits="userSpaceOnUse">
+            <rect {...background.clipRect} />
+          </clipPath>
+        ) : null)}
+        {sheet.overlays.map((overlay, index) => overlay.clipRect ? (
+          <clipPath id={`${instanceId}-overlay-${index}`} key={`overlay-${index}`} clipPathUnits="userSpaceOnUse">
+            <rect {...overlay.clipRect} />
+          </clipPath>
+        ) : null)}
         {frames.map((frame, index) => (
           <clipPath
             id={clipId(instanceId, frame, index)}
@@ -146,6 +156,7 @@ export function SheetPreview({
       {sheet.backgrounds.map((background, index) => (
         <BackgroundPreview
           background={background}
+          clipPath={background.kind === "media" && background.clipRect ? `url(#${instanceId}-background-${index})` : undefined}
           key={`${background.kind}-${index}`}
           previewUrl={
             background.kind === "media"
@@ -180,12 +191,13 @@ export function SheetPreview({
         />
       ))}
 
-      {sheet.overlays.map((overlay) =>
+      {sheet.overlays.map((overlay, index) =>
         mediaPreviewUrls[overlay.mediaId] ? (
           <image
             data-preview-overlay-id={overlay.mediaId}
             href={mediaPreviewUrls[overlay.mediaId]}
-            key={overlay.mediaId}
+            key={`${overlay.mediaId}-${index}`}
+            clipPath={overlay.clipRect ? `url(#${instanceId}-overlay-${index})` : undefined}
             x={overlay.drawRect.x}
             y={overlay.drawRect.y}
             width={overlay.drawRect.width}
@@ -195,7 +207,8 @@ export function SheetPreview({
         ) : (
           <rect
             data-preview-overlay-id={overlay.mediaId}
-            key={overlay.mediaId}
+            key={`${overlay.mediaId}-${index}`}
+            clipPath={overlay.clipRect ? `url(#${instanceId}-overlay-${index})` : undefined}
             x={overlay.drawRect.x}
             y={overlay.drawRect.y}
             width={overlay.drawRect.width}
@@ -216,9 +229,11 @@ export function SheetPreview({
 
 function BackgroundPreview({
   background,
+  clipPath,
   previewUrl,
 }: {
   background: ComposedBackground;
+  clipPath?: string;
   previewUrl?: string;
 }) {
   const { drawRect } = background;
@@ -237,6 +252,7 @@ function BackgroundPreview({
   return previewUrl ? (
     <image
       data-preview-background-id={background.mediaId}
+      clipPath={clipPath}
       href={previewUrl}
       preserveAspectRatio="none"
       x={drawRect.x}
@@ -247,6 +263,7 @@ function BackgroundPreview({
   ) : (
     <rect
       data-preview-background-id={background.mediaId}
+      clipPath={clipPath}
       fill={SHEET_VISUAL_STYLE.mediaFallback.fill}
       x={drawRect.x}
       y={drawRect.y}

@@ -103,8 +103,10 @@ const undoStack: EditorProjection[] = [];
 const redoStack: EditorProjection[] = [];
 if (frameContext === "decorations") {
   const sheet = projection.state.album.sheets[0];
-  useEditorView.setState({ projectId: projection.state.projectId, editingSheetId: sheet.id,
-    focusedSheetId: sheet.id, centeredSheetId: sheet.id, selectedFrameIds: [sheet.frames[0].id] });
+  const normal = previewParameters.get("mode") === "normal";
+  useEditorView.setState({ projectId: projection.state.projectId, editingSheetId: normal ? null : sheet.id,
+    focusedSheetId: sheet.id, centeredSheetId: sheet.id,
+    selectedFrameIds: normal || previewParameters.get("context") === "sheet" ? [] : [sheet.frames[0].id] });
 }
 let addedSheetSequence = 0;
 if (frameContext === "deletion") {

@@ -90,6 +90,14 @@ fn applying_to_one_side_preserves_the_other_crop_and_history_through_save() {
         .map(|item| item.id)
         .collect::<Vec<_>>();
     let sheet_id = imported.projection.state.album.sheets[0].id.clone();
+    project
+        .apply(ProjectIntent::ApplyDecorative {
+            sheet_id: sheet_id.clone(),
+            media_id: ids[1],
+            role: DecorativeRole::Overlay,
+            scope: DecorativeScope::Left,
+        })
+        .unwrap();
     let whole = project
         .apply(ProjectIntent::ApplyDecorative {
             sheet_id: sheet_id.clone(),
@@ -123,24 +131,58 @@ fn applying_to_one_side_preserves_the_other_crop_and_history_through_save() {
         .open_editable(OpenProjectRequest::new(location(&path)))
         .unwrap();
     assert_eq!(reopened.projection().composition, divided.composition);
-    let single = reopened
-        .apply(ProjectIntent::ConvertEdgeSheet { sheet_id })
-        .unwrap();
-    assert_eq!(
-        single.state.album.sheets[0].active_sides,
-        ProjectedActiveSides::Right
-    );
-    // Conversion hides the left application but retains its reference for the
-    // next conversion. The panel must still classify that Decorative as used.
-    assert_eq!(
-        single
-            .media_usage
-            .iter()
-            .find(|usage| usage.media_id == ids[1])
-            .unwrap()
-            .count,
-        1
-    );
+    for through_information in [false, true] {
+        let intent = if through_information {
+            ProjectIntent::SetAlbumInformation {
+                information: AlbumInformation {
+                    display_unit: DisplayUnit::Mm,
+                    sheet_width_um: 600_000,
+                    sheet_height_um: 300_000,
+                    dpi: 300,
+                    bleed_um: 3_000,
+                    safety_um: 3_000,
+                    first_sheet: EndSheetFormat::SinglePage,
+                    last_sheet: EndSheetFormat::Double,
+                },
+            }
+        } else {
+            ProjectIntent::ConvertEdgeSheet {
+                sheet_id: sheet_id.clone(),
+            }
+        };
+        let single = reopened.apply(intent).unwrap();
+        assert_eq!(
+            single.state.album.sheets[0].active_sides,
+            ProjectedActiveSides::Right
+        );
+        assert_eq!(
+            single
+                .media_usage
+                .iter()
+                .find(|usage| usage.media_id == ids[1])
+                .unwrap()
+                .count,
+            0
+        );
+        assert!(single.composition.sheets[0].overlays.is_empty());
+        assert!(
+            matches!(&single.composition.sheets[0].backgrounds[0], ComposedBackground::Media { draw_rect, clip_rect: Some(clip), .. } if draw_rect.x == -300_000 && draw_rect.width == 600_000 && clip.x == 0 && clip.width == 300_000)
+        );
+        let expanded = reopened
+            .apply(ProjectIntent::ConvertEdgeSheet {
+                sheet_id: sheet_id.clone(),
+            })
+            .unwrap();
+        assert!(
+            matches!(&expanded.composition.sheets[0].backgrounds[0], ComposedBackground::Color { rgb, .. } if rgb == "#FFFFFF")
+        );
+        assert!(
+            matches!(&expanded.composition.sheets[0].backgrounds[1], ComposedBackground::Media { media_id, .. } if *media_id == ids[0])
+        );
+        assert!(expanded.composition.sheets[0].overlays.is_empty());
+        reopened.undo().unwrap();
+        assert_eq!(reopened.undo().unwrap().composition, divided.composition);
+    }
 }
 
 #[test]
