@@ -58,6 +58,7 @@ pub(crate) async fn apply_project_intent(
     let previous_bindings = state.authorized_media_catalog()?.bindings;
     let previous = state.projection()?;
     let intent_kind = match &intent {
+        ProjectIntent::RemoveMedia { .. } => "remove_media",
         ProjectIntent::CopyFrames { .. } => "copy_frames",
         ProjectIntent::ApplyLayout { .. } => "apply_layout",
         ProjectIntent::ToggleLayoutFavorite { .. } => "toggle_layout_favorite",

@@ -6622,6 +6622,49 @@ test("resolves a mode-free target while dropping a Photo in the current Canvas m
   expect(resolvePhotoDropTarget).toHaveBeenCalledTimes(2);
 });
 
+test.each(["Delete", "context menu"])("removes the selected Photos through one consolidated decision from %s", async (source) => {
+  const dialog = projectDialogHarness();
+  const apply = vi.fn(async () => projection);
+  const input = { ...projection, mediaUsage: projection.mediaUsage.map((usage) => ({ ...usage, count: 1 })) };
+  render(<ProjectWorkspace exportPipelinePort={exportPipelinePort} projection={input}
+    projectDialogPort={dialog.port} projectCorePort={projectCorePortWithApply(apply)} onProjectionChange={() => undefined} />);
+  const panel = screen.getByRole("region", { name: "Painel de imagens" });
+  const photos = within(panel).getAllByRole("button").filter((button) => button.hasAttribute("data-media-id"));
+  fireEvent.click(photos[0]);
+  fireEvent.click(photos[1], { ctrlKey: true });
+  const ids = [photos[0].getAttribute("data-media-id"), photos[1].getAttribute("data-media-id")];
+  if (source === "Delete") fireEvent.keyDown(photos[1], { key: "Delete" });
+  else {
+    fireEvent.contextMenu(photos[0], { clientX: 80, clientY: 500 });
+    fireEvent.click(screen.getByRole("menuitem", { name: "Remover" }));
+  }
+  await waitFor(() => expect(dialog.present).toHaveBeenCalledWith(expect.objectContaining({ kind: "mediaRemovalConfirmation", count: 2, usedCount: 2, busy: false })));
+  expect(apply).not.toHaveBeenCalled();
+  await act(async () => { dialog.emit("removeMediaKeepFrames"); });
+  await waitFor(() => expect(apply).toHaveBeenCalledOnce());
+  expect(apply).toHaveBeenCalledWith({ kind: "removeMedia", mediaIds: ids, mode: "keepFrames" });
+  expect(dialog.dismiss).toHaveBeenCalledOnce();
+});
+
+test("Delete respects text focus and an unused Photo selection is removed directly once", async () => {
+  const dialog = projectDialogHarness();
+  const apply = vi.fn(async () => projection);
+  const input = { ...projection, mediaUsage: projection.mediaUsage.map((usage) => ({ ...usage, count: 0 })) };
+  render(<ProjectWorkspace exportPipelinePort={exportPipelinePort} projection={input}
+    projectDialogPort={dialog.port} projectCorePort={projectCorePortWithApply(apply)} onProjectionChange={() => undefined} />);
+  const panel = screen.getByRole("region", { name: "Painel de imagens" });
+  const photos = within(panel).getAllByRole("button").filter((button) => button.hasAttribute("data-media-id"));
+  fireEvent.click(photos[0]);
+  fireEvent.keyDown(screen.getByRole("searchbox", { name: "Buscar Fotos" }), { key: "Delete" });
+  fireEvent.keyDown(document.body, { key: "Delete" });
+  expect(apply).not.toHaveBeenCalled();
+  fireEvent.contextMenu(photos[1], { clientX: 80, clientY: 500 });
+  fireEvent.click(screen.getByRole("menuitem", { name: "Remover" }));
+  await waitFor(() => expect(apply).toHaveBeenCalledOnce());
+  expect(apply).toHaveBeenCalledWith({ kind: "removeMedia", mediaIds: [photos[1].getAttribute("data-media-id")], mode: "removeAll" });
+  expect(dialog.present).not.toHaveBeenCalled();
+});
+
 test("starts a pointer drag for the directly pressed Photo and cancels it with Escape", async () => {
   render(<ProjectWorkspace exportPipelinePort={exportPipelinePort} projection={projection}
     projectCorePort={projectCorePortWithApply(async () => projection)} onProjectionChange={() => undefined} />);

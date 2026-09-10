@@ -20,6 +20,9 @@ type ProjectDialogProgressKind = ProjectDialogProgress["kind"];
 type IpcProjectDialogProgressKind = IpcProjectDialogProgress["kind"];
 
 const projectDialogActionMap = {
+  cancelMediaRemoval: "cancelMediaRemoval",
+  removeAllMedia: "removeAllMedia",
+  removeMediaKeepFrames: "removeMediaKeepFrames",
   cancelLayoutDeletion: "cancelLayoutDeletion",
   confirmLayoutDeletion: "confirmLayoutDeletion",
   cancelAlbumInformation: "cancelAlbumInformation",
@@ -125,6 +128,11 @@ const stateDecoders: Record<
   StateDecoder
 > &
   Record<ProjectDialogStateKind, StateDecoder> = {
+  mediaRemovalConfirmation: (value) => typeof value.busy === "boolean" &&
+    (value.mediaKind === "photo" || value.mediaKind === "decorative") &&
+    isWireU64(value.count) && isWireU64(value.usedCount) && isWireU64(value.usageCount)
+    ? { kind: "mediaRemovalConfirmation", busy: value.busy, mediaKind: value.mediaKind,
+      count: value.count, usedCount: value.usedCount, usageCount: value.usageCount } : null,
   layoutDeletionConfirmation: (value) => typeof value.busy === "boolean"
     ? { kind: "layoutDeletionConfirmation", busy: value.busy } : null,
   imageProcessingProgress: (value) => {
@@ -270,6 +278,7 @@ export function toIpcProjectDialogState(
   state: ProjectDialogState,
 ): IpcProjectDialogState {
   switch (state.kind) {
+    case "mediaRemovalConfirmation": return { ...state };
     case "exportProblems":
       return { kind: state.kind, projectName: state.projectName, problems: state.problems.map((problem) => ({ ...problem })) };
     case "imageProcessingProgress":
@@ -313,6 +322,7 @@ function fromIpcProjectDialogState(
   state: IpcProjectDialogState,
 ): ProjectDialogState {
   switch (state.kind) {
+    case "mediaRemovalConfirmation": return { ...state };
     case "exportProblems":
       return { kind: state.kind, projectName: state.projectName, problems: state.problems.map((problem) => ({ ...problem })) };
     case "imageProcessingProgress":

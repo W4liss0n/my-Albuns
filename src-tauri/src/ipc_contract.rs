@@ -39,6 +39,13 @@ pub struct ProjectDialogDetail {
 )]
 #[ts(tag = "kind")]
 pub enum ProjectDialogState {
+    MediaRemovalConfirmation {
+        media_kind: myalbuns_core::MediaKind,
+        count: u32,
+        used_count: u32,
+        usage_count: u32,
+        busy: bool,
+    },
     LayoutDeletionConfirmation {
         busy: bool,
     },
@@ -94,6 +101,9 @@ pub struct ProjectDialogPresentation {
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub enum ProjectDialogAction {
+    CancelMediaRemoval,
+    RemoveAllMedia,
+    RemoveMediaKeepFrames,
     CancelLayoutDeletion,
     ConfirmLayoutDeletion,
     CancelAlbumInformation,

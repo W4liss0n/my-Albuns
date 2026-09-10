@@ -84,6 +84,77 @@ fn project_with_frames(root: &Path) -> EditableProject {
 }
 
 #[test]
+fn removing_a_photo_from_the_panel_updates_all_sheets_once_and_preserves_locked_positions() {
+    for mode in [
+        myalbuns_core::MediaRemovalMode::RemoveAll,
+        myalbuns_core::MediaRemovalMode::KeepFrames,
+    ] {
+        let root = tempfile::tempdir().unwrap();
+        let mut project = project_with_frames(root.path());
+        let before = project.projection();
+        let media_id = before.state.album.media[0].id;
+        let sheet = before.state.album.sheets[0].id.clone();
+        let other = before.state.album.sheets[1].id.clone();
+        let query = project.query_layouts(&sheet).unwrap();
+        project
+            .apply(ProjectIntent::LockLayout {
+                selection: myalbuns_core::LayoutSelection {
+                    query_id: query.query_id,
+                    candidate_index: 0,
+                },
+            })
+            .unwrap();
+        project
+            .apply(ProjectIntent::AddPhoto {
+                sheet_id: other,
+                media_id,
+                mode: PhotoPlacementMode::Edit,
+            })
+            .unwrap();
+        let unused_path = root.path().join("sem uso.png");
+        fs::write(&unused_path, b"unused Original").unwrap();
+        let unused = project
+            .import_photo(ImportPhoto::new(
+                unused_path.clone(),
+                PhotoSourceMetadata::new(
+                    30,
+                    20,
+                    ["#112233".into(), "#223344".into(), "#334455".into()],
+                )
+                .unwrap(),
+            ))
+            .unwrap()
+            .media_id;
+        let before = project.projection();
+        project.save(before.state.revision).unwrap();
+        let removed = project
+            .apply(ProjectIntent::RemoveMedia {
+                media_ids: vec![media_id, unused],
+                mode,
+            })
+            .unwrap();
+        assert_eq!(removed.state.revision, before.state.revision + 1);
+        assert!(removed.state.album.media.is_empty());
+        assert!(removed.state.album.sheets[0].layout_locked);
+        assert_eq!(removed.state.album.sheets[0].frames.len(), 4);
+        assert!(
+            removed.state.album.sheets[0]
+                .frames
+                .iter()
+                .all(|frame| frame.photo.is_none())
+        );
+        assert_eq!(
+            removed.state.album.sheets[1].frames.len(),
+            usize::from(mode == myalbuns_core::MediaRemovalMode::KeepFrames)
+        );
+        assert_eq!(fs::read(root.path().join("Foto.jpg")).unwrap(), b"original");
+        assert_eq!(fs::read(unused_path).unwrap(), b"unused Original");
+        assert_eq!(project.undo().unwrap().state.album, before.state.album);
+        assert_eq!(project.redo().unwrap().state.album, removed.state.album);
+    }
+}
+
+#[test]
 fn deleting_a_mixed_selection_preserves_remaining_frames_media_and_frozen_export() {
     let root = tempfile::tempdir().unwrap();
     let mut project = project_with_frames(root.path());

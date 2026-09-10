@@ -15,7 +15,8 @@ import type {
   MediaFileInfo,
   MediaPreviewDemand,
 } from "../application/projectPorts";
-import { matchProjectCommandShortcut } from "../application/projectCommandCatalog";
+import { matchProjectCommandShortcut, projectCommandDescriptor } from "../application/projectCommandCatalog";
+import { ContextMenuSurface } from "../ui/ContextMenuSurface";
 import type { MediaPanelPersistentPreference } from "../application/workspacePreferences";
 
 import type {
@@ -89,6 +90,7 @@ interface MediaPanelProps {
   selectionRequest?: { mediaId: string } | null;
   importPending?: boolean;
   onImportMedia(selection: MediaImportSelection): void;
+  onRemoveMedia(mediaIds: readonly string[]): void;
   dropPort?: import("../application/projectPorts").MediaDropPort;
   onMediaDragChange(drag: MediaDrag | null): void;
   dragThreshold?: import("../application/projectPorts").PointerDragThreshold | null;
@@ -115,6 +117,7 @@ export function MediaPanel({
   selectionRequest,
   importPending = false,
   onImportMedia,
+  onRemoveMedia,
   dropPort,
   onMediaDragChange,
   dragThreshold = { x: 5, y: 5 },
@@ -125,6 +128,7 @@ export function MediaPanel({
   previewSource,
 }: MediaPanelProps) {
   const mediaPreviews = previewSource.previews ?? {};
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const onMediaDemandChange =
     previewSource.kind === "connected" ? previewSource.onDemandChange : null;
   const controlledPersistent =
@@ -143,6 +147,7 @@ export function MediaPanel({
     useState<MediaKind>("photo");
   const preferredActiveMediaKind = preferenceMode.kind === "controlled" ? preferenceMode.activeKind : localActiveMediaKind;
   const activeMediaKind = missingReview?.activeKind ?? preferredActiveMediaKind;
+  useEffect(() => { setContextMenu(null); }, [activeMediaKind, hidden]);
   function setActiveMediaKind(activeKind: MediaKind) {
     if (missingReview) setMissingReview({ ...missingReview, activeKind });
     else if (preferenceMode.kind === "controlled") preferenceMode.onActiveKindChange(activeKind);
@@ -483,6 +488,14 @@ export function MediaPanel({
   }
 
   function selectAllVisibleMedia(event: KeyboardEvent<HTMLElement>) {
+    if (isTextEntryTarget(event.target)) return;
+    if (matchProjectCommandShortcut(event, "media-panel") === "remove-media") {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!relinkDisabled && !importPending) onRemoveMedia([...selectedMediaIds]);
+      setContextMenu(null);
+      return;
+    }
     if (
       matchProjectCommandShortcut(event, "media-panel") !== "select-all" ||
       isTextEntryTarget(event.target)
@@ -519,6 +532,7 @@ export function MediaPanel({
       ref={panelHostRef}
       className={`media-panel${fileDrop.over ? " media-panel--file-drop" : ""}`}
       hidden={hidden}
+      tabIndex={-1}
       data-project-command-context="media-panel"
       aria-label="Painel de imagens"
       onKeyDown={selectAllVisibleMedia}
@@ -607,7 +621,11 @@ export function MediaPanel({
                 previewUrl={preview?.url ?? undefined}
                 selected={isSelected}
                 onClick={(event) => { if (!mediaDrag.suppressClick()) selectMedia(media.id, event); }}
-                onContextMenu={() => selectMediaForContextMenu(media.id)}
+                onContextMenu={(event) => {
+                  event.preventDefault();
+                  selectMediaForContextMenu(media.id);
+                  setContextMenu({ x: event.clientX, y: event.clientY });
+                }}
                 onPointerDown={(event) => mediaDrag.start(media.id, media.kind, event)}
                 onDoubleClick={
                   media.kind === "photo"
@@ -656,6 +674,13 @@ export function MediaPanel({
           })
         )}
       </div>
+      {contextMenu && <ContextMenuSurface label="Ações das imagens" position={contextMenu}
+        onDismiss={() => { setContextMenu(null); panelHostRef.current?.focus({ preventScroll: true }); }}>
+        <button type="button" role="menuitem" disabled={relinkDisabled || importPending || selectedMediaIds.size === 0}
+          onClick={() => { setContextMenu(null); onRemoveMedia([...selectedMediaIds]); panelHostRef.current?.focus({ preventScroll: true }); }}>
+          <span>{projectCommandDescriptor("remove-media").label}</span><kbd aria-hidden="true">Delete</kbd>
+        </button>
+      </ContextMenuSurface>}
     </section>
   );
 }

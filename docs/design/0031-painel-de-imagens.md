@@ -54,6 +54,20 @@ Assim, mover uma miniatura dentro do programa coexiste com a recepção de
 arquivos externos. Solturas de Fotos consultam o alvo atual no Core;
 respostas de movimentos anteriores e gestos cancelados não fazem commit.
 
+## Remoção da seleção
+
+O Painel é dono do alvo de `Delete` e do menu `Remover`. Campos de texto
+conservam seu tratamento de teclado; a seleção e a âncora continuam transitórias.
+A confirmação aguarda comandos já pendentes antes de contar os usos e bloqueia
+novas interações enquanto estiver aberta. A decisão referencia uma única revisão
+criativa; outra revisão exige revisar a seleção novamente.
+
+O Core recebe a seleção inteira em uma ação. Remover tudo elimina Frames
+destravados que usavam as Fotos; posições travadas são esvaziadas. Manter Frames
+esvazia todas as ocorrências e preserva a estrutura. Itens sem uso saem junto
+com o restante da seleção. Os Originais permanecem intactos e Undo restaura o
+catálogo e a composição juntos.
+
 ## Contratos externos
 
 Versões verificadas: React 19.2.8, API JavaScript do Tauri 2.11.1,

@@ -19,6 +19,7 @@ export interface ProjectDialogDetail {
 }
 
 export type ProjectDialogState =
+  | { kind: "mediaRemovalConfirmation"; mediaKind: "photo" | "decorative"; count: number; usedCount: number; usageCount: number; busy: boolean }
   | { kind: "layoutDeletionConfirmation"; busy: boolean }
   | { kind: "exportProblems"; projectName: string; problems: readonly LayoutExportProblem[] }
   | { kind: "imageProcessingProgress"; progress: ProjectDialogProgress }
@@ -66,6 +67,9 @@ export type ProjectDialogState =
     };
 
 export type ProjectDialogAction =
+  | "cancelMediaRemoval"
+  | "removeAllMedia"
+  | "removeMediaKeepFrames"
   | "cancelLayoutDeletion"
   | "confirmLayoutDeletion"
   | "cancelAlbumInformation"

@@ -42,6 +42,7 @@ import { createProjectApplicationMenus } from "./projectApplicationMenus";
 import { useProjectCommandShortcuts } from "./useProjectCommandShortcuts";
 import { useProjectCloseController } from "./useProjectCloseController";
 import { useProjectEditorController } from "./useProjectEditorController";
+import { useMediaRemoval } from "./useMediaRemoval";
 import { useProjectGraphicsFailureDialog } from "./useProjectGraphicsFailureDialog";
 import { useProjectOperationResultDialog } from "./useProjectOperationResultDialog";
 import { useImageProcessingProgressDialog } from "./useImageProcessingProgressDialog";
@@ -187,6 +188,8 @@ export function ProjectWorkspace({
   const reportCloseError = useCallback((value: string) => {
     setCloseMessage(value);
   }, []);
+  const mediaRemoval = useMediaRemoval({ projection, runner: runProjectMutation, dialogPort: projectDialogPort,
+    onProjectionChange, onError: reportCloseError });
   const changeSaveAsBarrier = useCallback((active: boolean) => {
     saveAsBarrierRef.current = active;
     setSaveAsBarrierActive(active);
@@ -205,7 +208,7 @@ export function ProjectWorkspace({
   const projectClose = useProjectCloseController({
     projectDialogPort,
     projectWindowPort,
-    requestBlocked: saveAsBarrierActive,
+    requestBlocked: saveAsBarrierActive || mediaRemoval.active,
     waitForPendingMutations: runProjectMutation.waitForIdle,
     onProjectionChange,
     onError: reportCloseError,
@@ -219,6 +222,7 @@ export function ProjectWorkspace({
   const controller = useProjectEditorController({
     projectDialogPort,
     interactionBlocked:
+      mediaRemoval.active ||
       exportActive ||
       projectClose.interactionBlocked ||
       saveAsBarrierActive ||
@@ -348,13 +352,14 @@ export function ProjectWorkspace({
       }
     : null;
   const commandsBlocked =
+    mediaRemoval.active ||
     exportActive ||
     projectClose.interactionBlocked ||
     albumInformationApply.active ||
     saveAsBarrierActive ||
     graphicsFailure !== null;
   const workspaceInteractionBlocked =
-    saveAsBarrierActive || graphicsFailure !== null;
+    mediaRemoval.active || saveAsBarrierActive || graphicsFailure !== null;
   const sheetOrderSignature = projection.state.album.sheets
     .map((sheet) => sheet.id)
     .join(",");
@@ -791,6 +796,7 @@ export function ProjectWorkspace({
           mediaItems={projection.state.album.media}
           mediaUsage={projection.mediaUsage}
           onFillPhoto={controller.fillMedia}
+          onRemoveMedia={(ids) => { if (!commandsBlocked) void mediaRemoval.request(ids); }}
           selectionRequest={mediaSelectionRequest}
           importPending={controller.importPending}
           onImportMedia={(selection) => {

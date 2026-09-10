@@ -22,6 +22,7 @@ const mediaUsage: readonly MediaUsage[] = [
 
 const mediaPanelInteractions = {
   onImportMedia: () => undefined,
+  onRemoveMedia: () => undefined,
   onMediaDragChange: () => undefined,
   onRelinkMedia: () => undefined,
   onRetryUnavailableMedia: async () => undefined,

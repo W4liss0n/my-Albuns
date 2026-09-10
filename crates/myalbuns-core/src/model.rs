@@ -836,6 +836,11 @@ pub enum FrameStackAction {
 )]
 #[ts(tag = "kind")]
 pub enum ProjectIntent {
+    RemoveMedia {
+        #[ts(type = "Array<string>")]
+        media_ids: Vec<MediaId>,
+        mode: MediaRemovalMode,
+    },
     LockLayout {
         selection: crate::LayoutSelection,
     },
@@ -942,6 +947,13 @@ pub enum PhotoOrientationAction {
     RotateCounterClockwise,
     ResetRotation,
     ToggleHorizontalMirror,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum MediaRemovalMode {
+    RemoveAll,
+    KeepFrames,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]

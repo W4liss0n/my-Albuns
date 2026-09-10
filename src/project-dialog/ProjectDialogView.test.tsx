@@ -278,7 +278,7 @@ test("shows rejected photo files in Problems and closes without a creative actio
   expect(within(dialog).getByRole("columnheader", { name: "Arquivo" })).toBeInTheDocument();
   expect(within(dialog).getByRole("columnheader", { name: "Motivo" })).toBeInTheDocument();
   expect(within(dialog).getByRole("row", { name: "quebrada.jpg JPEG corrompido" })).toBeInTheDocument();
-  expect(within(dialog).getByText("2 Fotos importadas. Confira os arquivos que não puderam ser processados por completo.")).toBeInTheDocument();
+  expect(within(dialog).getByText("2 imagens importadas. Confira os arquivos que não puderam ser processados por completo.")).toBeInTheDocument();
   expect(within(dialog).getByRole("button", { name: "Fechar" })).toHaveFocus();
   await user.keyboard("{Escape}");
   expect(onAction).toHaveBeenCalledExactlyOnceWith("dismissImageProcessingProblems");

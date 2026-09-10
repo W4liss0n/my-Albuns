@@ -17,6 +17,7 @@ import {
 
 const states: readonly ProjectDialogState[] = [
   { kind: "layoutDeletionConfirmation", busy: false },
+  { kind: "mediaRemovalConfirmation", mediaKind: "photo", count: 3, usedCount: 2, usageCount: 4, busy: false },
   { kind: "exportProblems", projectName: "Álbum", problems: [{ sheetId: "sheet-001", sheetNumber: 1, frameId: "frame-002", frameNumber: 2 }] },
   { kind: "imageProcessingProgress", progress: { kind: "determinate", completed: 5, total: 12, status: "5 de 12" } },
   { kind: "imageProcessingProblems", importedCount: 2, problems: [{ fileName: "ruim.jpg", reason: "JPEG corrompido" }] },
@@ -52,6 +53,9 @@ const states: readonly ProjectDialogState[] = [
 const actions: readonly ProjectDialogAction[] = [
   "cancelLayoutDeletion",
   "confirmLayoutDeletion",
+  "cancelMediaRemoval",
+  "removeAllMedia",
+  "removeMediaKeepFrames",
   "cancelAlbumInformation",
   "cancelExport",
   "cancelProjectClose",
