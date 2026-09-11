@@ -140,6 +140,7 @@ pub(crate) fn resolve(
             }
         }
         if matches!(gesture, FrameGeometryGesture::Resize { .. }) {
+            let mut dimensions = Vec::new();
             for reference in &references {
                 let value = if axis == 0 {
                     reference.width()
@@ -147,7 +148,7 @@ pub(crate) fn resolve(
                     reference.height()
                 } as f64;
                 let delta = (value - motion.size(axis)) / motion.multipliers[axis];
-                candidates.push(Candidate {
+                dimensions.push(Candidate {
                     id: format!("d:{axis}:{value}"),
                     axis,
                     kind: FrameSnapKind::Dimension,
@@ -159,6 +160,17 @@ pub(crate) fn resolve(
                     spacing: None,
                 });
             }
+            dimensions.retain(|candidate| {
+                let proposal = crate::frame_geometry::snapped_rects(
+                    rects,
+                    surface.width,
+                    surface.height,
+                    gesture,
+                    motion.corrected(motion.delta, candidate.axis, candidate.delta),
+                );
+                reached(candidate, bounds(&proposal))
+            });
+            candidates.extend(canonical_dimensions(dimensions));
         }
         candidates.extend(spacing::candidates(
             surface,
@@ -313,6 +325,28 @@ pub(crate) fn resolve(
     Ok((result, feedback))
 }
 
+fn canonical_dimensions(mut dimensions: Vec<Candidate>) -> Vec<Candidate> {
+    dimensions.sort_by(|a, b| a.value.total_cmp(&b.value));
+    let mut remaining = dimensions.into_iter().peekable();
+    let mut result = Vec::new();
+    while let Some(mut reference) = remaining.next() {
+        // Bound the whole group to one micrometer. Adjacent values must not
+        // chain together and absorb a genuinely different dimension.
+        let smallest = reference.value;
+        while remaining
+            .peek()
+            .is_some_and(|candidate| candidate.value - smallest <= 1.0)
+        {
+            let candidate = remaining.next().unwrap();
+            if candidate.reference_position() < reference.reference_position() {
+                reference = candidate;
+            }
+        }
+        result.push(reference);
+    }
+    result
+}
+
 fn reached(candidate: &Candidate, rect: ProjectRect) -> bool {
     if candidate.kind == FrameSnapKind::Dimension {
         let size = if candidate.axis == 0 {
@@ -320,7 +354,7 @@ fn reached(candidate: &Candidate, rect: ProjectRect) -> bool {
         } else {
             rect.height()
         } as f64;
-        return (size - candidate.value).abs() <= 1.0;
+        return size == candidate.value;
     }
     (coordinate(rect, candidate.axis, candidate.factor) - candidate.value).abs() <= 1.0
 }

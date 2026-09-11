@@ -8385,6 +8385,54 @@
           "key": "ArrowRight"
         }
       ]
+    },
+    {
+      "id": "canvas-snap-micrometer-width",
+      "title": "Snap de Frames — larguras com diferença de 1 µm",
+      "implementationPath": "/frame-snap-preview.html?case=micrometer-width&unit=cm",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-snap-guides",
+        "reason": "Guias transitórias definidas no contrato aceito 0033. A cena Pixi de produção apresenta geometria e cotas obtidas pela prévia pública do Core; esta captura não simula o transporte IPC nativo."
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "readySelector": "[data-snap-case=\"micrometer-width\"] canvas",
+      "actions": []
+    },
+    {
+      "id": "canvas-snap-micrometer-height",
+      "title": "Snap de Frames — alturas com diferença de 1 µm",
+      "implementationPath": "/frame-snap-preview.html?case=micrometer-height&unit=cm",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-snap-guides",
+        "reason": "Guias transitórias definidas no contrato aceito 0033. A cena Pixi de produção apresenta geometria e cotas obtidas pela prévia pública do Core; esta captura não simula o transporte IPC nativo."
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "readySelector": "[data-snap-case=\"micrometer-height\"] canvas",
+      "actions": []
+    },
+    {
+      "id": "canvas-snap-micrometer-width-small",
+      "title": "Snap de Frames — cota em centímetros em escala menor",
+      "implementationPath": "/frame-snap-preview.html?case=micrometer-width&unit=cm&scale=small",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-snap-guides",
+        "reason": "Guias transitórias definidas no contrato aceito 0033. A cena Pixi de produção apresenta geometria e cotas obtidas pela prévia pública do Core; esta captura não simula o transporte IPC nativo."
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "readySelector": "[data-snap-case=\"micrometer-width\"] canvas",
+      "actions": []
     }
   ]
 }

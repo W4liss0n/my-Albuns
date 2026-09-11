@@ -37,7 +37,7 @@ export function createFrameSnapGuideRenderNode(widthUm: number, heightUm: number
             drawing.moveTo(x1 - tick, y1).lineTo(x1 + tick, y1).moveTo(x2 - tick, y2).lineTo(x2 + tick, y2);
           }
           const text = new Text({
-            text: formatPhysicalMeasurement(Math.round(guide.measurementUm), unit),
+            text: formatPhysicalMeasurement(Math.round(guide.measurementUm), unit, unit === "cm" ? 2 : undefined),
             style: { fontFamily: '"Segoe UI", sans-serif', fontSize: 11, fill: SNAP_COLOR },
           });
           text.label = "frame-snap-measurement";

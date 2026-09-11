@@ -189,6 +189,13 @@ valor inicial de `5 mm`, conforme a
 - Referências que resultam na mesma geometria são consolidadas em um único
   encaixe. O indicador pode identificar as correspondências simultâneas sem
   repetir linhas sobrepostas.
+- Dimensões que diferem até `1 µm` formam uma única referência de snap no mesmo
+  eixo. Agrupar as medidas em ordem crescente, com amplitude máxima de `1 µm`
+  por grupo, sem encadear diferenças sucessivas. Entre as referências alcançáveis
+  do grupo, escolher pela ordem geométrica acima; a posição do ponteiro e a Pilha
+  visual não mudam essa escolha. O encaixe copia a dimensão exata da referência,
+  preservando a precisão interna e as restrições do gesto. Uma dimensão que não
+  possa ser alcançada exatamente não recebe indicação de igualdade.
 
 Os valores `6 px` e `10 px` são o ponto inicial da calibração no Canvas real.
 A validação precisa verificar tanto precisão quanto facilidade de sair do snap.
@@ -263,6 +270,10 @@ com o snap de alinhamento correspondente.
 - No alinhamento, ligar visualmente as referências que coincidiram.
 - Na igualdade de dimensão, indicar a dimensão do conjunto manipulado e a
   dimensão de referência, com a mesma medida na Unidade do Projeto.
+- Nas cotas em centímetros, mostrar até duas casas decimais: `8,6666 cm` e
+  `8,6667 cm` são apresentados como `8,67 cm`. Esse arredondamento pertence
+  somente às cotas; os campos de edição e a geometria persistida conservam sua
+  precisão. As demais unidades mantêm a apresentação existente.
 - No espaçamento padrão, mostrar uma cota no intervalo alcançado. No espaçamento
   igual, indicar os intervalos correspondentes com a mesma medida.
 - Exibir somente as guias do resultado realmente alcançado, com identificação

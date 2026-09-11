@@ -18,6 +18,155 @@ fn snapped_edit(
 }
 
 #[test]
+fn micrometer_dimension_variants_share_a_stable_exact_snap_reference() {
+    for handle in [FrameResizeHandle::Right, FrameResizeHandle::Bottom] {
+        for reverse in [false, true] {
+            let root = tempfile::tempdir().unwrap();
+            let mut rectangles = vec![
+                [213_000, 79_000, 60_000, 40_000],
+                [55_000, 190_000, 86_666, 86_666],
+                [420_000, 170_000, 86_667, 86_667],
+            ];
+            if reverse {
+                rectangles.swap(1, 2);
+            }
+            let mut project = project_with_rectangles(root.path(), 0, false, &rectangles);
+            let before = project.projection();
+            let mut acquired = None;
+            for free_size in [86_666, 86_667, 86_666, 86_667] {
+                let horizontal = handle == FrameResizeHandle::Right;
+                let edit = snapped_edit(
+                    &project,
+                    FrameGeometryGesture::Resize {
+                        handle,
+                        delta_x_um: if horizontal { free_size - 60_000 } else { 0 },
+                        delta_y_um: if horizontal { 0 } else { free_size - 40_000 },
+                        preserve_aspect_ratio: false,
+                        from_center: false,
+                    },
+                );
+                // Fresh acquisitions from either side choose the same reference,
+                // even when frame stack order changes.
+                let preview = project.preview_frame_geometry(&edit).unwrap();
+                let rect = &preview.frames[0].clip_rect;
+                assert_eq!(if horizontal { rect.width } else { rect.height }, 86_666);
+                if let Some(retained) = &acquired {
+                    assert_eq!(&preview.snap.retained, retained);
+                }
+                acquired = Some(preview.snap.retained);
+                assert!(preview.snap.guides.iter().any(|guide| {
+                    guide.kind == FrameSnapKind::Dimension
+                        && guide.measurement_um == Some(86_666.0)
+                        && if horizontal {
+                            guide.x1 == 55_000.0
+                        } else {
+                            guide.y1 == 190_000.0
+                        }
+                }));
+                assert_eq!(project.projection(), before);
+            }
+            let horizontal = handle == FrameResizeHandle::Right;
+            let edit = snapped_edit(
+                &project,
+                FrameGeometryGesture::Resize {
+                    handle,
+                    delta_x_um: if horizontal { 26_667 } else { 0 },
+                    delta_y_um: if horizontal { 0 } else { 46_667 },
+                    preserve_aspect_ratio: false,
+                    from_center: false,
+                },
+            );
+            let after = project
+                .apply(ProjectIntent::EditFrameGeometry { edit })
+                .unwrap();
+            let frames = &after.state.album.sheets[0].frames;
+            assert_eq!(
+                if horizontal {
+                    frames[0].rect.width
+                } else {
+                    frames[0].rect.height
+                },
+                86_666
+            );
+            assert_eq!(&frames[1..], &before.state.album.sheets[0].frames[1..]);
+        }
+    }
+}
+
+#[test]
+fn consecutive_micrometer_values_do_not_merge_distinct_dimension_groups() {
+    let root = tempfile::tempdir().unwrap();
+    let project = project_with_rectangles(
+        root.path(),
+        0,
+        false,
+        &[
+            [213_000, 79_000, 60_000, 40_000],
+            [55_000, 190_000, 86_666, 70_000],
+            [420_000, 170_000, 86_667, 80_000],
+            [180_000, 190_000, 86_668, 60_000],
+        ],
+    );
+    let edit = snapped_edit(
+        &project,
+        FrameGeometryGesture::Resize {
+            handle: FrameResizeHandle::Right,
+            delta_x_um: 26_668,
+            delta_y_um: 0,
+            preserve_aspect_ratio: false,
+            from_center: false,
+        },
+    );
+    let preview = project.preview_frame_geometry(&edit).unwrap();
+    assert_eq!(preview.frames[0].clip_rect.width, 86_668);
+    assert!(preview.snap.guides.iter().any(|guide| {
+        guide.kind == FrameSnapKind::Dimension && guide.measurement_um == Some(86_668.0)
+    }));
+}
+
+#[test]
+fn a_dimension_group_uses_an_exactly_reachable_reference_at_the_resize_limit() {
+    for has_valid_reference in [false, true] {
+        let root = tempfile::tempdir().unwrap();
+        let mut rectangles = vec![
+            [213_000, 79_000, 60_000, 40_000],
+            [55_000, 190_000, 11_999, 70_000],
+        ];
+        if has_valid_reference {
+            rectangles.push([420_000, 170_000, 12_000, 80_000]);
+        }
+        let project = project_with_rectangles(root.path(), 0, false, &rectangles);
+        let edit = snapped_edit(
+            &project,
+            FrameGeometryGesture::Resize {
+                handle: FrameResizeHandle::Right,
+                delta_x_um: -48_000,
+                delta_y_um: 0,
+                preserve_aspect_ratio: false,
+                from_center: false,
+            },
+        );
+        let preview = project.preview_frame_geometry(&edit).unwrap();
+        assert_eq!(preview.frames[0].clip_rect.width, 12_000);
+        let measurements: Vec<_> = preview
+            .snap
+            .guides
+            .iter()
+            .filter(|guide| guide.kind == FrameSnapKind::Dimension)
+            .map(|guide| guide.measurement_um)
+            .collect();
+        assert_eq!(
+            measurements,
+            if has_valid_reference {
+                vec![Some(12_000.0); 2]
+            } else {
+                vec![]
+            }
+        );
+    }
+}
+
+#[test]
 fn confirmed_album_gap_drives_generation_and_snap_without_reflowing_existing_frames() {
     let root = tempfile::tempdir().unwrap();
     let mut project = project_with_rectangles(
@@ -442,6 +591,28 @@ fn snap_visual_corpus_uses_public_core_previews() {
             1,
             false,
             resize(FrameResizeHandle::Bottom, 0, 38_000, false, false),
+        ),
+        (
+            "micrometer-width",
+            vec![
+                [213_000, 79_000, 60_000, 40_000],
+                [55_000, 190_000, 86_666, 86_666],
+                [420_000, 170_000, 86_667, 86_667],
+            ],
+            1,
+            false,
+            resize(FrameResizeHandle::Right, 26_667, 0, false, false),
+        ),
+        (
+            "micrometer-height",
+            vec![
+                [213_000, 79_000, 60_000, 40_000],
+                [55_000, 190_000, 86_666, 86_666],
+                [420_000, 170_000, 86_667, 86_667],
+            ],
+            1,
+            false,
+            resize(FrameResizeHandle::Bottom, 0, 46_667, false, false),
         ),
         (
             "corner",
