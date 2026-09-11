@@ -19,7 +19,7 @@ const supportedKeys = new Set([
   "Minus",
   "Plus",
 ]);
-const supportedModifiers = new Set(["Control"]);
+const supportedModifiers = new Set(["Control", "Shift"]);
 
 function invariant(condition, message) {
   if (!condition) throw new Error(`Invalid UI acceptance manifest: ${message}`);
@@ -138,10 +138,10 @@ export function validateUiAcceptanceManifest(manifest) {
         const actionLocation = `${location}.${groupName}[${actionIndex}]`;
         invariant(action && typeof action === "object", `${actionLocation} must be an object`);
         invariant(
-          ["assert", "assert-single-line", "click", "click-text", "context-click", "drag", "focus", "hover", "input", "key", "pointer-click", "selection-drag", "wheel"].includes(action.type),
+          ["assert", "assert-single-line", "click", "click-text", "context-click", "double-click", "drag", "focus", "hover", "input", "key", "pointer-click", "selection-drag", "wheel"].includes(action.type),
           `${actionLocation}.type is not supported`,
         );
-        if (["assert", "assert-single-line", "click", "context-click", "drag", "focus", "hover", "input", "pointer-click", "selection-drag", "wheel"].includes(action.type)) {
+        if (["assert", "assert-single-line", "click", "context-click", "double-click", "drag", "focus", "hover", "input", "pointer-click", "selection-drag", "wheel"].includes(action.type)) {
           invariant(typeof action.selector === "string" && action.selector.trim(), `${actionLocation}.selector is required`);
         }
         if (action.type === "click-text") {
@@ -166,11 +166,13 @@ export function validateUiAcceptanceManifest(manifest) {
         );
         if (modifiers !== undefined) {
           invariant(
-            ["click", "key", "wheel"].includes(action.type),
+            ["click", "key", "wheel"].includes(action.type) || (action.type === "drag" && action.gesture === "pointer"),
             `${actionLocation}.modifiers are not valid for ${action.type}`,
           );
           const seenModifiers = new Set();
           for (const modifier of modifiers) {
+            invariant(modifier !== "Shift" || ["key", "drag"].includes(action.type),
+              `${actionLocation}.Shift is supported for keys and pointer drags`);
             invariant(
               supportedModifiers.has(modifier),
               `${actionLocation}.modifier ${modifier} is not supported`,

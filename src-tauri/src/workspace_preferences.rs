@@ -9,13 +9,13 @@ use crate::local_store_io::{CrossProcessStoreGuard, store_mutex_name};
 
 use crate::{
     ipc_contract::{
-        MediaPreferenceKind, MediaThumbnailSizes, WorkspacePanelKind, WorkspacePanelPreference,
-        WorkspacePanelPreferences, WorkspacePreferenceChange, WorkspacePreferences,
+        WorkspacePanelKind, WorkspacePanelPreference, WorkspacePanelPreferences,
+        WorkspacePreferenceChange, WorkspacePreferences,
     },
     local_store_io::write_atomically,
 };
 
-const SCHEMA_VERSION: u16 = 1;
+const SCHEMA_VERSION: u16 = 2;
 const MIN_THUMBNAIL_SIZE: u16 = 58;
 const MAX_THUMBNAIL_SIZE: u16 = 132;
 const DEFAULT_THUMBNAIL_SIZE: u16 = 84;
@@ -47,9 +47,17 @@ pub(crate) fn update_workspace_preference(
 struct WorkspacePreferencesEnvelope {
     schema_version: u16,
     inspector_sections: BTreeMap<String, bool>,
-    media_thumbnail_sizes: MediaThumbnailSizes,
+    #[serde(default)]
+    media_thumbnail_size: Option<u16>,
+    #[serde(default, skip_serializing)]
+    media_thumbnail_sizes: Option<LegacyMediaThumbnailSizes>,
     #[serde(default)]
     workspace_panels: WorkspacePanelPreferences,
+}
+
+#[derive(Deserialize)]
+struct LegacyMediaThumbnailSizes {
+    photo: u16,
 }
 
 pub(crate) struct WorkspacePreferencesStore {
@@ -107,16 +115,9 @@ impl WorkspacePreferencesStore {
                 }
                 preferences.inspector_sections.insert(preference_key, open);
             }
-            WorkspacePreferenceChange::MediaThumbnailSize { media_kind, size } => {
-                let size = size.clamp(MIN_THUMBNAIL_SIZE, MAX_THUMBNAIL_SIZE);
-                match media_kind {
-                    MediaPreferenceKind::Decorative => {
-                        preferences.media_thumbnail_sizes.decorative = size;
-                    }
-                    MediaPreferenceKind::Photo => {
-                        preferences.media_thumbnail_sizes.photo = size;
-                    }
-                }
+            WorkspacePreferenceChange::MediaThumbnailSize { size } => {
+                preferences.media_thumbnail_size =
+                    size.clamp(MIN_THUMBNAIL_SIZE, MAX_THUMBNAIL_SIZE);
             }
             WorkspacePreferenceChange::WorkspacePanelSize { panel, size } => {
                 workspace_panel_mut(&mut preferences.workspace_panels, panel).size =
@@ -141,8 +142,16 @@ impl WorkspacePreferencesStore {
         let Ok(envelope) = serde_json::from_slice::<WorkspacePreferencesEnvelope>(&bytes) else {
             return default_preferences();
         };
-        if envelope.schema_version != SCHEMA_VERSION
-            || envelope.inspector_sections.len() > MAX_INSPECTOR_SECTIONS
+        let size = match (
+            envelope.schema_version,
+            envelope.media_thumbnail_size,
+            envelope.media_thumbnail_sizes,
+        ) {
+            (1, _, Some(legacy)) => legacy.photo,
+            (SCHEMA_VERSION, Some(size), _) => size,
+            _ => return default_preferences(),
+        };
+        if envelope.inspector_sections.len() > MAX_INSPECTOR_SECTIONS
             || !envelope
                 .inspector_sections
                 .keys()
@@ -152,16 +161,7 @@ impl WorkspacePreferencesStore {
         }
         WorkspacePreferences {
             inspector_sections: envelope.inspector_sections,
-            media_thumbnail_sizes: MediaThumbnailSizes {
-                decorative: envelope
-                    .media_thumbnail_sizes
-                    .decorative
-                    .clamp(MIN_THUMBNAIL_SIZE, MAX_THUMBNAIL_SIZE),
-                photo: envelope
-                    .media_thumbnail_sizes
-                    .photo
-                    .clamp(MIN_THUMBNAIL_SIZE, MAX_THUMBNAIL_SIZE),
-            },
+            media_thumbnail_size: size.clamp(MIN_THUMBNAIL_SIZE, MAX_THUMBNAIL_SIZE),
             workspace_panels: WorkspacePanelPreferences {
                 inspector: envelope.workspace_panels.inspector.map(|preference| {
                     WorkspacePanelPreference {
@@ -184,7 +184,8 @@ impl WorkspacePreferencesStore {
         let bytes = serde_json::to_vec_pretty(&WorkspacePreferencesEnvelope {
             schema_version: SCHEMA_VERSION,
             inspector_sections: preferences.inspector_sections.clone(),
-            media_thumbnail_sizes: preferences.media_thumbnail_sizes,
+            media_thumbnail_size: Some(preferences.media_thumbnail_size),
+            media_thumbnail_sizes: None,
             workspace_panels: preferences.workspace_panels,
         })
         .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
@@ -216,10 +217,7 @@ fn default_panel_preference(panel: WorkspacePanelKind) -> WorkspacePanelPreferen
 fn default_preferences() -> WorkspacePreferences {
     WorkspacePreferences {
         inspector_sections: BTreeMap::new(),
-        media_thumbnail_sizes: MediaThumbnailSizes {
-            decorative: DEFAULT_THUMBNAIL_SIZE,
-            photo: DEFAULT_THUMBNAIL_SIZE,
-        },
+        media_thumbnail_size: DEFAULT_THUMBNAIL_SIZE,
         workspace_panels: WorkspacePanelPreferences {
             inspector: None,
             media: None,
@@ -249,8 +247,7 @@ mod tests {
     use myalbuns_paths::AppPaths;
 
     use crate::ipc_contract::{
-        MediaPreferenceKind, WorkspacePanelKind, WorkspacePanelPreference,
-        WorkspacePreferenceChange,
+        WorkspacePanelKind, WorkspacePanelPreference, WorkspacePreferenceChange,
     };
 
     use super::{WorkspacePreferencesStore, default_preferences};
@@ -281,11 +278,8 @@ mod tests {
             })
             .expect("the Inspector preference persists");
         first_host
-            .update(WorkspacePreferenceChange::MediaThumbnailSize {
-                media_kind: MediaPreferenceKind::Photo,
-                size: 124,
-            })
-            .expect("the per-tab size persists");
+            .update(WorkspacePreferenceChange::MediaThumbnailSize { size: 124 })
+            .expect("the shared size persists");
 
         let second_host = WorkspacePreferencesStore::new(&paths);
         let loaded = second_host.load();
@@ -293,8 +287,7 @@ mod tests {
             loaded.inspector_sections,
             BTreeMap::from([("album.design".into(), true)])
         );
-        assert_eq!(loaded.media_thumbnail_sizes.photo, 124);
-        assert_eq!(loaded.media_thumbnail_sizes.decorative, 84);
+        assert_eq!(loaded.media_thumbnail_size, 124);
     }
 
     #[test]
@@ -339,16 +332,38 @@ mod tests {
     }
 
     #[test]
+    fn legacy_sizes_migrate_from_photos_without_rewriting_until_an_update() {
+        let (_root, paths, store) = store();
+        let file = paths.workspace_preferences_file();
+        fs::create_dir_all(file.parent().expect("State parent")).expect("State is writable");
+        let legacy = br#"{"schemaVersion":1,"inspectorSections":{"album.design":true},"mediaThumbnailSizes":{"decorative":110,"photo":124},"workspacePanels":{"inspector":{"size":350,"visible":false},"media":null}}"#;
+        fs::write(&file, legacy).expect("legacy state fixture is writable");
+
+        let loaded = store.load();
+        assert_eq!(loaded.media_thumbnail_size, 124);
+        assert_eq!(loaded.inspector_sections.get("album.design"), Some(&true));
+        assert_eq!(loaded.workspace_panels.inspector.unwrap().size, 350);
+        assert!(!loaded.workspace_panels.inspector.unwrap().visible);
+        assert_eq!(fs::read(&file).unwrap(), legacy);
+
+        let updated = store
+            .update(WorkspacePreferenceChange::MediaThumbnailSize { size: 110 })
+            .expect("the shared size persists");
+        let saved: serde_json::Value = serde_json::from_slice(&fs::read(&file).unwrap()).unwrap();
+        assert_eq!(saved["schemaVersion"], 2);
+        assert_eq!(saved["mediaThumbnailSize"], 110);
+        assert!(saved.get("mediaThumbnailSizes").is_none());
+        assert_eq!(WorkspacePreferencesStore::new(&paths).load(), updated);
+    }
+
+    #[test]
     fn size_updates_are_clamped_and_invalid_section_keys_are_rejected() {
         let (_root, paths, store) = store();
 
         let updated = store
-            .update(WorkspacePreferenceChange::MediaThumbnailSize {
-                media_kind: MediaPreferenceKind::Decorative,
-                size: u16::MAX,
-            })
+            .update(WorkspacePreferenceChange::MediaThumbnailSize { size: u16::MAX })
             .expect("out-of-range UI state is normalized");
-        assert_eq!(updated.media_thumbnail_sizes.decorative, 132);
+        assert_eq!(updated.media_thumbnail_size, 132);
 
         assert!(
             store

@@ -231,6 +231,35 @@ impl PersistentProjectSession {
                 return Ok(outcome);
             }
         }
+        if let ProjectIntent::DropDecorative { request } = &intent {
+            let next = self.project().with_dropped_decorative(request)?;
+            if next != *self.project() {
+                self.commit_edit(|_| Ok(next))?;
+            }
+            return Ok(outcome);
+        }
+        if let ProjectIntent::ApplyDecorative {
+            sheet_id,
+            media_id,
+            role,
+            scope,
+        } = &intent
+        {
+            let next = self
+                .project()
+                .with_applied_decorative(sheet_id, *media_id, *role, *scope)?;
+            if next != *self.project() {
+                self.commit_edit(|_| Ok(next))?;
+            }
+            return Ok(outcome);
+        }
+        if let ProjectIntent::RemoveMedia { media_ids, mode } = &intent {
+            let next = self.project().with_removed_media(media_ids, *mode)?;
+            if next != *self.project() {
+                self.commit_edit(|_| Ok(next))?;
+            }
+            return Ok(outcome);
+        }
         if let ProjectIntent::DeleteFrames { frame_ids, mode } = &intent {
             let next = self.project().with_deleted_frames(
                 frame_ids,
@@ -282,7 +311,10 @@ impl PersistentProjectSession {
             ProjectIntent::SwapFrameContents { frame_ids } => {
                 project.with_swapped_frame_contents(&frame_ids)
             }
-            ProjectIntent::DeleteFrames { .. } => {
+            ProjectIntent::DropDecorative { .. }
+            | ProjectIntent::ApplyDecorative { .. }
+            | ProjectIntent::RemoveMedia { .. }
+            | ProjectIntent::DeleteFrames { .. } => {
                 unreachable!("Frame deletion commits its prepared document once")
             }
             ProjectIntent::ArrangeFrames { frame_ids, action } => {
@@ -423,13 +455,14 @@ impl PersistentProjectSession {
         Ok(outcome)
     }
 
-    pub(crate) fn import_photos(
+    pub(crate) fn import_media(
         &mut self,
+        kind: crate::MediaKind,
         links: Vec<(Uuid, std::path::PathBuf)>,
     ) -> Result<(), CoreError> {
         self.commit_edit(move |project| {
-            project.with_imported_photos(links).map_err(|()| {
-                CoreError::InvalidProject("o vínculo externo da Foto não é válido".into())
+            project.with_imported_media(kind, links).map_err(|()| {
+                CoreError::InvalidProject("o vínculo externo da imagem não é válido".into())
             })
         })
     }

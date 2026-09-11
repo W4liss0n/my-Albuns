@@ -1,6 +1,6 @@
-import type { ImageProcessingProblem, MediaPreview, MediaPreviewDemand, PhotoImportCompletion } from "./projectPorts";
+import type { ImageProcessingProblem, MediaPreview, MediaPreviewDemand, MediaImportCompletion } from "./projectPorts";
 
-export type PrepareImportedMedia = (imported: PhotoImportCompletion) => Promise<readonly ImageProcessingProblem[]>;
+export type PrepareImportedMedia = (imported: MediaImportCompletion) => Promise<readonly ImageProcessingProblem[]>;
 
 export function mergeMediaPreviewDemands(...demands: readonly MediaPreviewDemand[]): MediaPreviewDemand {
   const visible = new Set(demands.flatMap((demand) => [...demand.visibleMediaIds]));

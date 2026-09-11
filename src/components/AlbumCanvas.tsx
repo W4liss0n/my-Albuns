@@ -1,9 +1,9 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
-  type DragEvent,
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { Layers3 } from "lucide-react";
@@ -17,6 +17,7 @@ import type { GraphicsDiagnostic } from "../application/graphics";
 import type { PhotoDropTarget } from "../domain/project";
 import { AppIcon, EmptyState } from "../ui";
 import { AlbumCanvasScene } from "./albumCanvasScene";
+import { useDecorativeDropPreview } from "./useDecorativeDropPreview";
 import type {
   AlbumCanvasProps,
   CanvasPhotoDropPoint,
@@ -52,6 +53,21 @@ export type {
 } from "./albumCanvasContract";
 
 export function AlbumCanvas(props: AlbumCanvasProps) {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const sceneRef = useRef<AlbumCanvasScene | null>(null);
+  const decorative = useDecorativeDropPreview({
+    projectId: props.projectId, revision: props.revision, drag: props.mediaDrag,
+    preview: props.onPreviewDecorativeDrop, commit: props.onDropDecorative, cancel: props.onPhotoDragCancel,
+    point: (x, y) => {
+      const bounds = hostRef.current?.querySelector("canvas")?.getBoundingClientRect();
+      if (!bounds || x < bounds.left || x >= bounds.right || y < bounds.top || y >= bounds.bottom) return null;
+      return sceneRef.current?.resolvePhotoDropPoint(x, y) ?? null;
+    },
+  });
+  const displayedComposition = useMemo(() => decorative.preview ? {
+    ...props.composition,
+    sheets: props.composition.sheets.map((sheet) => sheet.sheetId === decorative.preview!.sheet.sheetId ? decorative.preview!.sheet : sheet),
+  } : props.composition, [decorative.preview, props.composition]);
   const [resolvedPhotoDrop, setResolvedPhotoDrop] = useState<{
     request: number;
     mediaId: string;
@@ -102,6 +118,8 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
   }));
   const sceneProps = {
     ...props,
+    composition: displayedComposition,
+    decorativeDropPreview: decorative.preview,
     sheetReorder: props.sheetReorder && isolated ? { ...props.sheetReorder, disabled: true } : props.sheetReorder,
     sheetBarMetadata,
     photoDropHighlight: resolvedPhotoDrop?.target ?? null,
@@ -109,8 +127,6 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
   };
   const latestPropsRef = useRef(sceneProps);
   latestPropsRef.current = sceneProps;
-  const hostRef = useRef<HTMLDivElement>(null);
-  const sceneRef = useRef<AlbumCanvasScene | null>(null);
   const sceneInstanceIdRef = useRef<string | null>(null);
   const materializedSceneRef = useRef<AlbumCanvasScene | null>(null);
   const tracedPreviewUrlsRef = useRef(new Set<string>());
@@ -166,22 +182,43 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
   }, [props.mode.kind, props.sheetReorder]);
 
   useEffect(() => {
-    if (!props.draggedPhotoId) {
-      dragRequestRef.current += 1;
-      setResolvedPhotoDrop(null);
+    const drag = props.mediaDrag;
+    const request = ++dragRequestRef.current;
+    setResolvedPhotoDrop(null);
+    if (!drag || drag.kind !== "photo") return;
+    const bounds = hostRef.current?.querySelector("canvas")?.getBoundingClientRect();
+    const inside = bounds && drag.x >= bounds.left && drag.x <= bounds.right && drag.y >= bounds.top && drag.y <= bounds.bottom;
+    const point = inside ? sceneRef.current?.resolvePhotoDropPoint(drag.x, drag.y) : null;
+    const latest = latestPropsRef.current;
+    if (drag.kind !== "photo" || !point || !latest.onResolvePhotoDropTarget) {
+      if (drag.phase === "drop") latest.onPhotoDragCancel?.();
+      return;
     }
-  }, [props.draggedPhotoId]);
+    void latest.onResolvePhotoDropTarget(drag.mediaId, point).then((target) => {
+      if (request !== dragRequestRef.current) return;
+      if (drag.phase === "drop") {
+        latestPropsRef.current.onPhotoDragCancel?.();
+        if (target.kind !== "invalid") void latestPropsRef.current.onDropPhoto?.(drag.mediaId, point);
+      } else if (target.kind !== "invalid") {
+        setResolvedPhotoDrop({ request, mediaId: drag.mediaId, point, target });
+      }
+    }, () => {
+      if (request === dragRequestRef.current && drag.phase === "drop") latestPropsRef.current.onPhotoDragCancel?.();
+    });
+    return () => { if (request === dragRequestRef.current) dragRequestRef.current += 1; };
+  }, [props.mediaDrag, props.projectId]);
 
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || !props.draggedPhotoId) return;
+      if (event.key !== "Escape" || !props.mediaDrag) return;
       dragRequestRef.current += 1;
       setResolvedPhotoDrop(null);
+      decorative.clear();
       props.onPhotoDragCancel?.();
     };
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [props.draggedPhotoId, props.onPhotoDragCancel]);
+  }, [props.mediaDrag, props.onPhotoDragCancel, decorative.clear]);
 
   useEffect(() => {
     if (!hostRef.current || !hasSheets) return;
@@ -455,70 +492,6 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
     }
   });
 
-  function handlePhotoDragOver(event: DragEvent<HTMLDivElement>) {
-    const mediaId = props.draggedPhotoId;
-    const point = sceneRef.current?.resolvePhotoDropPoint(
-      event.clientX,
-      event.clientY,
-    );
-    if (!mediaId || !point || !props.onResolvePhotoDropTarget) {
-      dragRequestRef.current += 1;
-      setResolvedPhotoDrop(null);
-      return;
-    }
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "copy";
-    const request = dragRequestRef.current + 1;
-    dragRequestRef.current = request;
-    setResolvedPhotoDrop(null);
-    void props.onResolvePhotoDropTarget(mediaId, point).then(
-      (target) => {
-        if (
-          dragRequestRef.current === request &&
-          props.draggedPhotoId === mediaId
-        ) {
-          setResolvedPhotoDrop(
-            target.kind === "invalid"
-              ? null
-              : { request, mediaId, point, target },
-          );
-        }
-      },
-      () => {
-        if (dragRequestRef.current === request) setResolvedPhotoDrop(null);
-      },
-    );
-  }
-
-  function handlePhotoDragLeave(event: DragEvent<HTMLDivElement>) {
-    if (event.currentTarget.contains(event.relatedTarget as Node | null)) {
-      return;
-    }
-    dragRequestRef.current += 1;
-    setResolvedPhotoDrop(null);
-  }
-
-  function handlePhotoDrop(event: DragEvent<HTMLDivElement>) {
-    const mediaId = props.draggedPhotoId;
-    const point = sceneRef.current?.resolvePhotoDropPoint(
-      event.clientX,
-      event.clientY,
-    );
-    const validTarget =
-      resolvedPhotoDrop !== null &&
-      resolvedPhotoDrop.request === dragRequestRef.current &&
-      resolvedPhotoDrop.mediaId === mediaId &&
-      resolvedPhotoDrop.point.sheetId === point?.sheetId &&
-      Object.is(resolvedPhotoDrop.point.xUm, point?.xUm) &&
-      Object.is(resolvedPhotoDrop.point.yUm, point?.yUm);
-    dragRequestRef.current += 1;
-    setResolvedPhotoDrop(null);
-    props.onPhotoDragCancel?.();
-    if (!mediaId || !point || !validTarget || !props.onDropPhoto) return;
-    event.preventDefault();
-    void props.onDropPhoto(mediaId, point);
-  }
-
   function handleSheetContextMenu(event: ReactMouseEvent<HTMLDivElement>) {
     event.preventDefault();
     if (props.mode.kind !== "normal") return;
@@ -548,15 +521,19 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
     <div className={`canvas-shell${isolated ? " canvas-shell--isolated" : ""}`}>
       <div
         className="canvas-host"
+        data-media-drag={props.mediaDrag?.kind}
         data-centered-sheet-id={props.centeredSheetId ?? undefined}
         data-isolated-sheet-id={props.mode.kind === "normal" ? props.mode.isolatedSheetId : undefined}
         data-viewport-offset-x={props.viewport.offsetX}
         ref={hostRef}
-        onDragLeave={handlePhotoDragLeave}
-        onDragOver={handlePhotoDragOver}
-        onDrop={handlePhotoDrop}
         onContextMenu={handleSheetContextMenu}
       >
+        {decorative.preview && props.mediaDrag && <span
+          className="canvas-decorative-drop-label" role="status" aria-label="Aplicação do Decorativo"
+          style={{ left: Math.max(8, Math.min((hostRef.current?.clientWidth ?? 0) - 210, props.mediaDrag.x - (hostRef.current?.getBoundingClientRect().left ?? 0) + 14)),
+            top: Math.max(8, Math.min((hostRef.current?.clientHeight ?? 0) - 36, props.mediaDrag.y - (hostRef.current?.getBoundingClientRect().top ?? 0) + 14)) }}>
+          {decorative.preview.role === "background" ? "Fundo" : "Overlay"} · {decorative.preview.scope === "bothSides" ? "Ambos os lados" : decorative.preview.scope === "left" ? "Lado esquerdo" : "Lado direito"}
+        </span>}
         {graphicsState === "initializing" && (
           <span className="canvas-loading">Iniciando WebGL2…</span>
         )}
@@ -570,7 +547,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
             O editor gráfico está indisponível.
           </span>
         )}
-        {props.mode.kind === "normal" && props.sheetReorder ? (
+        {props.mode.kind === "normal" && props.sheetReorder && props.mediaDrag?.kind !== "decorative" ? (
           <SheetBarOverlay
             bleedUm={props.technicalGuides?.bleedUm}
             disabled={props.sheetReorder.disabled || isolated}

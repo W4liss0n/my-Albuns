@@ -26,6 +26,8 @@ mod layout_catalog_store;
 mod layout_commands;
 mod local_store_io;
 mod logging;
+mod media_file_drop;
+mod media_import_selection;
 mod media_preview_commands;
 mod media_runtime;
 mod named_mutex;

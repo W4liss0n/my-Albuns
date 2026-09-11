@@ -17,8 +17,10 @@ use crate::model::{
 
 pub(crate) const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
 
+mod decorations;
 mod frame_clipboard;
 mod layouts;
+mod media;
 pub(crate) use frame_clipboard::FrameClipboard;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
@@ -503,6 +505,7 @@ impl MediaRef {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProjectSheet {
+    visuals: crate::SheetVisuals,
     id: Uuid,
     active_sides: ActiveSides,
     frames: Vec<ProjectFrame>,
@@ -511,6 +514,13 @@ pub struct ProjectSheet {
 }
 
 impl ProjectSheet {
+    fn convert_active_sides(&mut self, active_sides: ActiveSides) {
+        self.active_sides = active_sides;
+        self.visuals.background.retain_active_sides(active_sides);
+        self.visuals.overlay.retain_active_sides(active_sides);
+        self.layout_locked = false;
+    }
+
     pub fn id(&self) -> Uuid {
         self.id
     }
@@ -525,6 +535,7 @@ impl ProjectSheet {
 
     pub(crate) fn new(id: Uuid, active_sides: ActiveSides) -> Self {
         Self {
+            visuals: crate::SheetVisuals::default(),
             id,
             active_sides,
             frames: Vec::new(),
@@ -539,6 +550,7 @@ impl ProjectSheet {
         frames: Vec<ProjectFrame>,
     ) -> Self {
         Self {
+            visuals: crate::SheetVisuals::default(),
             id,
             active_sides,
             frames,
@@ -674,14 +686,14 @@ impl ProjectDocument {
             .ok_or(())?;
         let last_index = candidate.sheets.len() - 1;
         let sheet = &mut candidate.sheets[sheet_index];
-        sheet.active_sides = match (sheet_index, sheet.active_sides) {
+        let active_sides = match (sheet_index, sheet.active_sides) {
             (0, ActiveSides::Both) => ActiveSides::Right,
             (0, ActiveSides::Right) => ActiveSides::Both,
             (index, ActiveSides::Both) if index == last_index => ActiveSides::Left,
             (index, ActiveSides::Left) if index == last_index => ActiveSides::Both,
             _ => return Err(()),
         };
-        sheet.layout_locked = false;
+        sheet.convert_active_sides(active_sides);
         candidate
             .reorganize_sheet(sheet_id, custom)
             .map_err(|_| ())?;
@@ -792,8 +804,7 @@ impl ProjectDocument {
             (last_index, information.last_sheet.active_sides(false), ProjectConfigurationValidationError::LastSheetConversionRequiresContentReorganization),
         ] {
             if candidate.sheets[index].active_sides != sides {
-                candidate.sheets[index].active_sides = sides;
-                candidate.sheets[index].layout_locked = false;
+                candidate.sheets[index].convert_active_sides(sides);
                 candidate.reorganize_sheet(candidate.sheets[index].id, custom).map_err(|_| vec![error])?;
             }
         }
@@ -801,12 +812,16 @@ impl ProjectDocument {
         Ok(candidate)
     }
 
-    pub(crate) fn with_imported_photos(&self, links: Vec<(Uuid, PathBuf)>) -> Result<Self, ()> {
+    pub(crate) fn with_imported_media(
+        &self,
+        kind: MediaKind,
+        links: Vec<(Uuid, PathBuf)>,
+    ) -> Result<Self, ()> {
         let mut candidate = self.clone();
         candidate.media.extend(
             links
                 .into_iter()
-                .map(|(media_id, path)| MediaRef::new(media_id, MediaKind::Photo, path)),
+                .map(|(media_id, path)| MediaRef::new(media_id, kind, path)),
         );
         validate_project_state(&candidate)?;
         Ok(candidate)
@@ -1954,7 +1969,7 @@ impl ProjectRevision {
 }
 
 pub(crate) fn validate_project_state(project: &ProjectDocument) -> Result<(), ()> {
-    if !project.layout_state_is_valid() {
+    if !project.layout_state_is_valid() || !project.sheet_visuals_are_valid() {
         return Err(());
     }
     let settings = project.document();

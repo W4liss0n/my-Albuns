@@ -31,6 +31,14 @@ export function ProjectDialogView({
   }, [state.kind]);
 
   switch (state.kind) {
+    case "mediaRemovalConfirmation":
+      return <ConfirmationDialog title={`Remover ${state.count} ${state.mediaKind === "photo" ? (state.count === 1 ? "Foto" : "Fotos") : (state.count === 1 ? "Decorativo" : "Decorativos")}?`} tone="danger"
+        description={state.mediaKind === "photo"
+          ? `${state.usedCount} da seleção em uso, em ${state.usageCount} Frames. Remover tudo exclui Frames destravados e mantém as posições travadas vazias.`
+          : `${state.usedCount} da seleção em uso. As aplicações removidas voltam ao padrão do Álbum; padrões removidos passam a Background branco ou Overlay ausente.`}
+        cancelAction={{ label: "Cancelar", disabled: state.busy, onClick: () => onAction("cancelMediaRemoval") }}
+        leadingAction={state.mediaKind === "photo" ? { label: "Remover imagens e manter os Frames", disabled: state.busy, onClick: () => onAction("removeMediaKeepFrames") } : undefined}
+        confirmAction={{ label: state.busy ? "Removendo…" : state.mediaKind === "photo" ? "Remover tudo" : "Remover", disabled: state.busy, onClick: () => onAction("removeAllMedia") }} />;
     case "layoutDeletionConfirmation":
       return <ConfirmationDialog title="Excluir Layout personalizado?" tone="danger"
         description="O Layout será removido do catálogo em todas as Janelas. As composições aplicadas e as cópias guardadas nos Projetos serão preservadas."
@@ -47,9 +55,15 @@ export function ProjectDialogView({
     case "imageProcessingProgress":
       return <ProgressDialog title="Processando Imagens" progress={state.progress} />;
     case "imageProcessingProblems": {
-      const imported = state.importedCount === null ? "" : state.importedCount === 0 ? "Nenhuma Foto nova foi importada." :
-        state.importedCount === 1 ? "1 Foto importada." : `${state.importedCount} Fotos importadas.`;
-      return <ProblemsDialog title="Problemas no processamento" description={`${imported} Confira os arquivos que não puderam ser processados por completo.`.trim()}
+      const imported = state.importedCount === null ? "" : state.importedCount === 0 ? "Nenhuma imagem nova foi importada." :
+        state.importedCount === 1 ? "1 imagem importada." : `${state.importedCount} imagens importadas.`;
+      const title = state.operationProblem ? state.importedCount === null ? "Processamento interrompido" : "Importação interrompida" : "Problemas no processamento";
+      const description = `${imported} ${state.operationProblem ?? "Confira os arquivos que não puderam ser processados por completo."}`.trim();
+      if (state.operationProblem && state.problems.length === 0) {
+        return <MessageDialog title={title} tone="error" description={description}
+          secondaryAction={{ label: "Fechar", onClick: () => onAction("dismissImageProcessingProblems") }} />;
+      }
+      return <ProblemsDialog title={title} description={description}
         columns={["Arquivo", "Motivo"]}
         rows={state.problems.map(problem => [problem.fileName, problem.reason])}
         onClose={() => onAction("dismissImageProcessingProblems")} />;

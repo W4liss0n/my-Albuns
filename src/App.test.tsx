@@ -117,13 +117,14 @@ const projectCorePort: ProjectCorePort = {
     affectedFrameId: null,
     affectedSheetId: null,
   }),
-  importPhoto: async () => ({ kind: "cancelled", projection }),
+  importMedia: async () => ({ kind: "cancelled", projection }),
   ...emptyLayoutCatalogPort,
   readFrameDragThreshold: async () => ({ x: 5, y: 5 }),
   readSliderDoubleClickTime: async () => 500,
     queryLayouts: async () => { throw new Error("Layouts are not configured in this fixture."); },
     previewLayout: async () => { throw new Error("Layouts are not configured in this fixture."); },
     previewFrameStyle: async () => { throw new Error("Frame style preview is not configured in this fixture."); },
+    previewDecorativeDrop: async () => { throw new Error("Decorative preview is not configured in this fixture."); },
     previewPhotoAngle: async () => { throw new Error("Photo angle preview is not configured in this fixture."); },
     previewFrameGeometry: async () => { throw new Error("Frame geometry preview is not configured in this fixture."); },
   resolvePhotoDropTarget: async () => ({ kind: "invalid" }),
@@ -138,6 +139,7 @@ const projectCorePort: ProjectCorePort = {
   },
 };
 const mediaPreviewPort: MediaPreviewPort = {
+  readMediaFiles: async () => ({ projectId: "", files: [] }),
   prepareMediaPreviews: async () => null,
   retryUnavailableMedia: async (mediaId) => ({
     mediaId,
@@ -2037,8 +2039,8 @@ test.each([
   { outcome: "success", alreadyReading: true },
 ])("reveals an import batch after $outcome when the monitor is already reading: $alreadyReading", async ({ outcome, alreadyReading }) => {
   let notify: Parameters<MediaPreviewPort["onMediaChanged"]>[0] = () => undefined;
-  let progress: Parameters<ProjectCorePort["importPhoto"]>[0] = () => undefined;
-  let finish!: (result: Awaited<ReturnType<ProjectCorePort["importPhoto"]>>) => void;
+  let progress: Parameters<ProjectCorePort["importMedia"]>[0] = () => undefined;
+  let finish!: (result: Awaited<ReturnType<ProjectCorePort["importMedia"]>>) => void;
   let fail!: (reason: Error) => void;
   let finishEarlyRead!: (projection: typeof representativeProjection) => void;
   const newPhotos = [1, 2].map((number) => ({
@@ -2064,7 +2066,7 @@ test.each([
     }));
   }
   load.mockResolvedValue(imported);
-  const importPhoto = vi.fn<ProjectCorePort["importPhoto"]>((onProgress) => {
+  const importMedia = vi.fn<ProjectCorePort["importMedia"]>((onProgress) => {
     progress = onProgress;
     return new Promise((resolve, reject) => {
       finish = resolve;
@@ -2075,7 +2077,7 @@ test.each([
     <App
       projectStartupPort={projectStartupPort}
       projectWindowPort={projectWindowPort}
-      projectCorePort={{ ...projectCorePort, load, importPhoto }}
+      projectCorePort={{ ...projectCorePort, load, importMedia }}
       mediaPreviewPort={{
         ...mediaPreviewPort,
         onMediaChanged: async (listener) => {
@@ -2094,8 +2096,8 @@ test.each([
     await waitFor(() => expect(load).toHaveBeenCalledTimes(2));
   }
   fireEvent.click(screen.getByRole("button", { name: "Importar" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos JPEG…" }));
-  await waitFor(() => expect(importPhoto).toHaveBeenCalledOnce());
+  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos…" }));
+  await waitFor(() => expect(importMedia).toHaveBeenCalledOnce());
   if (alreadyReading) {
     await act(async () => finishEarlyRead(imported));
     expect(screen.queryByRole("button", { name: "Nova 1.jpg" })).not.toBeInTheDocument();
@@ -2129,6 +2131,28 @@ test.each([
   expect(await screen.findByRole("button", { name: "Nova 1.jpg" })).toBeVisible();
   expect(screen.getByRole("button", { name: "Nova 2.jpg" })).toBeVisible();
   await waitFor(() => expect(load).toHaveBeenCalledTimes(alreadyReading ? 3 : 2));
+});
+
+test("reports absent Originals without a thumbnail and refreshes the warning when the Original returns", async () => {
+  let notify: Parameters<MediaPreviewPort["onMediaChanged"]>[0] = () => undefined;
+  const readMediaFiles = vi.fn<MediaPreviewPort["readMediaFiles"]>()
+    .mockResolvedValueOnce({ projectId: representativeProjection.state.projectId, files: [
+      { mediaId: "media-002", state: "absent", createdAtMs: null, modifiedAtMs: null },
+    ] })
+    .mockResolvedValue({ projectId: representativeProjection.state.projectId, files: [
+      { mediaId: "media-002", state: "available", createdAtMs: 100, modifiedAtMs: 200 },
+    ] });
+  render(<App projectStartupPort={projectStartupPort} projectWindowPort={projectWindowPort}
+    projectCorePort={{ ...projectCorePort, load: async () => representativeProjection }}
+    mediaPreviewPort={{ ...mediaPreviewPort, readMediaFiles,
+      onMediaChanged: async (listener) => { notify = listener; return () => undefined; } }}
+    graphicsProbe={canvasGraphicsDiagnosticProbe} canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+    logger={silentLogger} />);
+  expect(await screen.findByRole("button", { name: "Ver arquivos ausentes" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Campo.jpg. Arquivo ausente" })).toBeVisible();
+  act(() => notify(["media-002"]));
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Ver arquivos ausentes" })).not.toBeInTheDocument());
+  expect(screen.getByRole("button", { name: "Campo.jpg" })).toBeVisible();
 });
 
 test("keeps a completed Save authoritative when a monitor read finishes during saving", async () => {
@@ -2220,7 +2244,7 @@ test.each(["ready", "decode_failed", "native_unavailable"] as const)("delivers i
       projectDialogPort={dialog.port}
       projectCorePort={{ ...projectCorePort,
         load: async () => representativeProjection,
-        importPhoto: async (publish) => {
+        importMedia: async (publish) => {
           publish?.({ completedFiles: 2, totalFiles: 2 });
           await new Promise<void>((resolve) => { finishImport = resolve; });
           return { kind: "completed", projection: imported,
@@ -2236,7 +2260,7 @@ test.each(["ready", "decode_failed", "native_unavailable"] as const)("delivers i
       clientWidth: { value: 600 }, clientHeight: { value: 200 },
     });
     fireEvent.click(screen.getByRole("button", { name: "Importar" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos JPEG…" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos…" }));
     await waitFor(() => expect(dialog.present).toHaveBeenCalledWith({
       kind: "imageProcessingProgress",
       progress: { kind: "determinate", completed: 2, total: 2, status: "2 de 2" },

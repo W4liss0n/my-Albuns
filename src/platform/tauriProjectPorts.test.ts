@@ -71,7 +71,7 @@ test("Layout queries send the requested total Frame count across the native boun
 test("composes machine-local State with roaming Settings and routes updates to the owning store", async () => {
   const state = {
     inspectorSections: { "album.design": true },
-    mediaThumbnailSizes: { decorative: 110, photo: 124 },
+    mediaThumbnailSize: 124,
     workspacePanels: {
       inspector: { size: 350, visible: true },
       media: null,
@@ -79,8 +79,8 @@ test("composes machine-local State with roaming Settings and routes updates to t
   };
   const settings = {
     mediaPanel: {
-      decorative: { sortDirection: "ascending", usageFilter: "all" },
-      photo: { sortDirection: "descending", usageFilter: "used" },
+      decorative: { sortKey: "name", sortDirection: "ascending", usageFilter: "all" },
+      photo: { sortKey: "name", sortDirection: "descending", usageFilter: "used" },
     },
   };
   vi.mocked(invoke).mockImplementation(async (command) => {
@@ -95,6 +95,7 @@ test("composes machine-local State with roaming Settings and routes updates to t
 
   const preferences = {
     ...state,
+    mediaPanelActiveKind: "photo",
     mediaPanel: settings.mediaPanel,
   };
 
@@ -439,9 +440,10 @@ test.each(["completed", "failed"])("streams photo import progress per attempt an
     finish = () => outcome === "completed" ? resolve() : reject(new Error("Falhou"));
   }));
   const onProgress = vi.fn();
-  const completion = tauriProjectCorePort.importPhoto(onProgress).catch(() => undefined);
+  const selection = { mediaKind: "decorative" as const, source: { kind: "folder" as const } };
+  const completion = tauriProjectCorePort.importMedia(onProgress, selection).catch(() => undefined);
   const channel = tauriBoundary.channels[0];
-  expect(invoke).toHaveBeenCalledWith("import_photo", { onProgress: channel });
+  expect(invoke).toHaveBeenCalledWith("import_media", { selection, onProgress: channel });
   expect(onProgress).not.toHaveBeenCalled();
   channel.onmessage({ completedFiles: 0, totalFiles: 12 });
   channel.onmessage({ completedFiles: 5, totalFiles: 12 });
@@ -479,7 +481,7 @@ test("maps Photo import, target resolution, and affected Frame outcomes", async 
   await expect(
     tauriProjectCorePort.applyWithOutcome(intent),
   ).resolves.toEqual(mutationOutcome);
-  await expect(tauriProjectCorePort.importPhoto(vi.fn())).resolves.toEqual(
+  await expect(tauriProjectCorePort.importMedia(vi.fn(), { mediaKind: "photo", source: { kind: "files" } })).resolves.toEqual(
     importOutcome,
   );
   await expect(
@@ -494,7 +496,7 @@ test("maps Photo import, target resolution, and affected Frame outcomes", async 
     intent,
     onProgress: tauriBoundary.channels[0],
   });
-  expect(invoke).toHaveBeenNthCalledWith(2, "import_photo", { onProgress: tauriBoundary.channels[1] });
+  expect(invoke).toHaveBeenNthCalledWith(2, "import_media", { selection: { mediaKind: "photo", source: { kind: "files" } }, onProgress: tauriBoundary.channels[1] });
   expect(invoke).toHaveBeenNthCalledWith(3, "photo_drop_target", {
     sheetId: "sheet-001",
     xUm: 12_000,

@@ -7,6 +7,7 @@ export function defaultProjectDialogCloseAction(
   state: ProjectDialogState,
 ): ProjectDialogAction | null {
   switch (state.kind) {
+    case "mediaRemovalConfirmation": return state.busy ? null : "cancelMediaRemoval";
     case "layoutDeletionConfirmation":
       return state.busy ? null : "cancelLayoutDeletion";
     case "imageProcessingProgress":

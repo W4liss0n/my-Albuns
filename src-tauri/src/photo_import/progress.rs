@@ -1,6 +1,11 @@
-use std::{collections::HashMap, sync::Mutex};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Mutex,
+};
 
-use myalbuns_imaging_protocol::{ImagingProgress, ImagingProgressStage, PhotoImportRequest};
+use myalbuns_imaging_protocol::{
+    ImagingProgress, ImagingProgressStage, PhotoImportRequest, PhotoImportSourceId,
+};
 
 use crate::{image_processing::ImageProcessingBatch, ipc_contract::ImageProcessingProgress};
 
@@ -13,6 +18,9 @@ pub(super) struct NativeImportProgress<F: FnMut(ImageProcessingProgress)> {
 struct ProgressState<F: FnMut(ImageProcessingProgress)> {
     batch: ImageProcessingBatch<F>,
     requests: HashMap<String, (u32, u32)>,
+    source_requests: HashMap<PhotoImportSourceId, String>,
+    completed_sources: HashSet<PhotoImportSourceId>,
+    unattributed: HashMap<String, u32>,
     completed: u32,
 }
 
@@ -30,9 +38,62 @@ impl<F: FnMut(ImageProcessingProgress)> NativeImportProgress<F> {
                         )
                     })
                     .collect(),
+                source_requests: requests
+                    .iter()
+                    .flat_map(|request| {
+                        request.candidates.iter().map(|candidate| {
+                            (candidate.source_id.clone(), request.request_id.clone())
+                        })
+                    })
+                    .collect(),
+                completed_sources: HashSet::new(),
+                unattributed: HashMap::new(),
                 completed: 0,
             }),
         }
+    }
+
+    /// Native streams have drained. Attribute their counts to validated sources;
+    /// a failed process can leave counts whose source identities were not returned.
+    pub(super) fn begin_inspection<'a>(
+        &self,
+        validated: impl Iterator<Item = &'a PhotoImportSourceId>,
+    ) {
+        let mut state = self.state.lock().expect("import progress is available");
+        let mut validated_counts = HashMap::<String, u32>::new();
+        for source in validated {
+            if state.completed_sources.insert(source.clone())
+                && let Some(request) = state.source_requests.get(source)
+            {
+                *validated_counts.entry(request.clone()).or_default() += 1;
+            }
+        }
+        for (request, (_, reported)) in state.requests.clone() {
+            let validated = validated_counts.get(&request).copied().unwrap_or_default();
+            state
+                .unattributed
+                .insert(request, reported.saturating_sub(validated));
+            for _ in reported..validated {
+                state.completed += 1;
+                state.batch.complete(None);
+            }
+        }
+    }
+
+    pub(super) fn complete_inspection(&self, source: &PhotoImportSourceId) {
+        let mut state = self.state.lock().expect("import progress is available");
+        if !state.completed_sources.insert(source.clone()) {
+            return;
+        }
+        if let Some(request) = state.source_requests.get(source).cloned()
+            && let Some(remaining) = state.unattributed.get_mut(&request)
+            && *remaining > 0
+        {
+            *remaining -= 1;
+            return;
+        }
+        state.completed += 1;
+        state.batch.complete(None);
     }
 
     pub(super) fn report(&self, event: ImagingProgress) {
@@ -61,13 +122,19 @@ impl<F: FnMut(ImageProcessingProgress)> NativeImportProgress<F> {
             .state
             .into_inner()
             .expect("import progress is available");
-        // Alternate inspection and rejected selections become terminal only
-        // after the Host finishes them. Existing catalog entries are counted by
-        // their own Cache preparation after this native phase.
+        // Rejected selections without a source identity are terminal now.
+        // Existing catalog entries retain their own Cache preparation counts.
         for _ in state.completed..new_sources_and_unsupported {
             state.batch.complete(None);
         }
         state.batch
+    }
+
+    pub(super) fn interrupt(self) -> ImageProcessingBatch<F> {
+        self.state
+            .into_inner()
+            .expect("import progress is available")
+            .batch
     }
 }
 
@@ -94,6 +161,9 @@ mod tests {
             state: Mutex::new(ProgressState {
                 batch,
                 requests: HashMap::from([("first".into(), (3, 0)), ("second".into(), (2, 0))]),
+                source_requests: HashMap::new(),
+                completed_sources: HashSet::new(),
+                unattributed: HashMap::new(),
                 completed: 0,
             }),
         };
@@ -115,5 +185,54 @@ mod tests {
         let mut batch = progress.finish(5);
         batch.complete(None); // one existing photo is prepared separately
         assert_eq!(observed, vec![0, 1, 2, 3, 4, 5, 6]);
+    }
+
+    #[test]
+    fn interruption_keeps_unprocessed_sources_pending() {
+        let mut observed = Vec::new();
+        let batch = ImageProcessingBatch::new(5, |event| observed.push(event.completed_files));
+        let progress = NativeImportProgress::new(batch, &[]);
+        let source = PhotoImportSourceId::new("prepared").unwrap();
+        progress.complete_inspection(&source);
+        drop(progress.interrupt());
+        assert_eq!(observed, [0, 1]);
+    }
+
+    #[test]
+    fn alternate_inspections_count_each_source_once_after_partial_native_failure() {
+        let ids = (0..5)
+            .map(|index| PhotoImportSourceId::new(format!("source-{index}")).unwrap())
+            .collect::<Vec<_>>();
+        let observed = Mutex::new(Vec::new());
+        let progress = NativeImportProgress {
+            state: Mutex::new(ProgressState {
+                batch: ImageProcessingBatch::new(5, |event| {
+                    observed.lock().unwrap().push(event.completed_files)
+                }),
+                requests: HashMap::from([("completed".into(), (2, 0)), ("failed".into(), (2, 0))]),
+                source_requests: HashMap::from([
+                    (ids[0].clone(), "completed".into()),
+                    (ids[1].clone(), "completed".into()),
+                    (ids[2].clone(), "failed".into()),
+                    (ids[3].clone(), "failed".into()),
+                ]),
+                completed_sources: HashSet::new(),
+                unattributed: HashMap::new(),
+                completed: 0,
+            }),
+        };
+        progress.report(event("completed", 1, 2));
+        progress.report(event("failed", 1, 2));
+        progress.begin_inspection([&ids[0]].into_iter());
+        progress.complete_inspection(&ids[0]); // changed after its native preparation
+        progress.complete_inspection(&ids[1]); // known native fallback
+        assert_eq!(*observed.lock().unwrap(), [0, 1, 2, 3]);
+        progress.complete_inspection(&ids[2]); // already included in the failed stream
+        assert_eq!(*observed.lock().unwrap(), [0, 1, 2, 3]);
+        progress.complete_inspection(&ids[3]);
+        progress.complete_inspection(&ids[3]);
+        progress.complete_inspection(&ids[4]); // source without an admitted native request
+        progress.finish(5);
+        assert_eq!(*observed.lock().unwrap(), [0, 1, 2, 3, 4, 5]);
     }
 }

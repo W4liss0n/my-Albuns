@@ -278,9 +278,25 @@ test("shows rejected photo files in Problems and closes without a creative actio
   expect(within(dialog).getByRole("columnheader", { name: "Arquivo" })).toBeInTheDocument();
   expect(within(dialog).getByRole("columnheader", { name: "Motivo" })).toBeInTheDocument();
   expect(within(dialog).getByRole("row", { name: "quebrada.jpg JPEG corrompido" })).toBeInTheDocument();
-  expect(within(dialog).getByText("2 Fotos importadas. Confira os arquivos que não puderam ser processados por completo.")).toBeInTheDocument();
+  expect(within(dialog).getByText("2 imagens importadas. Confira os arquivos que não puderam ser processados por completo.")).toBeInTheDocument();
   expect(within(dialog).getByRole("button", { name: "Fechar" })).toHaveFocus();
   await user.keyboard("{Escape}");
+  expect(onAction).toHaveBeenCalledExactlyOnceWith("dismissImageProcessingProblems");
+});
+
+test("shows a resource interruption once without presenting files as rejected", async () => {
+  const user = userEvent.setup();
+  const onAction = vi.fn();
+  render(<ProjectDialogView onAction={onAction} state={{
+    kind: "imageProcessingProblems", importedCount: 2, problems: [],
+    operationProblem: "Não foi possível continuar o processamento por falta de memória.",
+  }} />);
+  const dialog = screen.getByRole("dialog", { name: "Importação interrompida" });
+  expect(within(dialog).getByText(/2 imagens importadas/)).toBeInTheDocument();
+  expect(within(dialog).getAllByText(/Não foi possível continuar o processamento/)).toHaveLength(1);
+  expect(within(dialog).queryByRole("table")).not.toBeInTheDocument();
+  expect(within(dialog).queryByText(/Confira os arquivos/)).not.toBeInTheDocument();
+  await user.click(within(dialog).getByRole("button", { name: "Fechar" }));
   expect(onAction).toHaveBeenCalledExactlyOnceWith("dismissImageProcessingProblems");
 });
 
@@ -294,4 +310,17 @@ test("export placeholders list the Project, exact position and Open Project acti
   expect(within(dialog).getByRole("row", { name: "Álbum da turma Lâmina 01, posição 3: Frame vazio. Abrir Projeto" })).toBeInTheDocument();
   await user.click(within(dialog).getByRole("button", { name: "Abrir Projeto" }));
   expect(onAction).toHaveBeenCalledExactlyOnceWith("openExportProject");
+});
+
+test("keeps the operation reason separate from genuine file problems", () => {
+  render(<ProjectDialogView onAction={vi.fn()} state={{
+    kind: "imageProcessingProblems", importedCount: 2,
+    operationProblem: "Não foi possível continuar o processamento por falta de memória.",
+    problems: [{ fileName: "quebrada.jpg", reason: "JPEG corrompido" }],
+  }} />);
+  const dialog = screen.getByRole("dialog", { name: "Importação interrompida" });
+  expect(within(dialog).getAllByText(/Não foi possível continuar o processamento/)).toHaveLength(1);
+  expect(within(dialog).getByRole("table")).not.toHaveTextContent("memória");
+  expect(within(dialog).getAllByRole("row")).toHaveLength(2);
+  expect(within(dialog).getByRole("row", { name: "quebrada.jpg JPEG corrompido" })).toBeInTheDocument();
 });

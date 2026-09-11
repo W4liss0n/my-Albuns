@@ -41,7 +41,7 @@ function projectSessionPort(
       affectedFrameId: null,
       affectedSheetId: null,
     }),
-    importPhoto: async () => ({
+    importMedia: async () => ({
       kind: "cancelled",
       projection: representativeProjection,
     }),
@@ -51,6 +51,7 @@ function projectSessionPort(
     queryLayouts: async () => { throw new Error("Layouts are not configured in this fixture."); },
     previewLayout: async () => { throw new Error("Layouts are not configured in this fixture."); },
     previewFrameStyle: async () => { throw new Error("Frame style preview is not configured in this fixture."); },
+    previewDecorativeDrop: async () => { throw new Error("Decorative preview is not configured in this fixture."); },
     previewPhotoAngle: async () => { throw new Error("Photo angle preview is not configured in this fixture."); },
     previewFrameGeometry: async () => { throw new Error("Frame geometry preview is not configured in this fixture."); },
     resolvePhotoDropTarget: async () => ({ kind: "invalid" }),
@@ -314,7 +315,7 @@ test("preserves Redo when preceding History already materialized the Album Desig
 test.each(["completed", "cancelled", "failed"] as const)(
   "orders adjacent Save/Undo after a pending photo selection (%s)",
   async (terminal) => {
-    type Result = Awaited<ReturnType<ProjectCorePort["importPhoto"]>>;
+    type Result = Awaited<ReturnType<ProjectCorePort["importMedia"]>>;
     let resolve!: (value: Result) => void;
     let reject!: (error: Error) => void;
     const pending = new Promise<Result>((done, fail) => { resolve = done; reject = fail; });
@@ -325,7 +326,7 @@ test.each(["completed", "cancelled", "failed"] as const)(
     imported.state.canUndo = true;
     imported.state.dirty = true;
     const port = projectSessionPort(async () => initial, vi.fn(async () => initial));
-    port.importPhoto = vi.fn(() => pending);
+    port.importMedia = vi.fn(() => pending);
     port.save = vi.fn<ProjectCorePort["save"]>(async (revision) => ({
       outcome: { kind: "saved", revision }, projection: revision === initial.state.revision ? initial : imported,
     }));
@@ -339,13 +340,13 @@ test.each(["completed", "cancelled", "failed"] as const)(
     }));
     let completion!: Promise<string | null>;
     act(() => {
-      completion = view.result.current.importPhoto();
-      void view.result.current.importPhoto();
+      completion = view.result.current.importMedia();
+      void view.result.current.importMedia();
       view.result.current.save();
       view.result.current.undo();
     });
     expect(view.result.current.importPending).toBe(true);
-    expect(port.importPhoto).toHaveBeenCalledOnce();
+    expect(port.importMedia).toHaveBeenCalledOnce();
     expect(port.save).not.toHaveBeenCalled();
     expect(port.undo).not.toHaveBeenCalled();
     await act(async () => {
@@ -373,14 +374,14 @@ test.each(["completed", "cancelled", "failed"] as const)(
   },
 );
 
-test("waits for image cache before Save and keeps its warning through a queued edit", async () => {
-  let finish!: (result: Awaited<ReturnType<ProjectCorePort["importPhoto"]>>) => void;
+test.each(["file", "operation"] as const)("waits for image cache before Save and keeps its %s warning through a queued edit", async (failureKind) => {
+  let finish!: (result: Awaited<ReturnType<ProjectCorePort["importMedia"]>>) => void;
   let publish!: (progress: ImageProcessingProgress) => void;
   const imported = structuredClone(representativeProjection);
   imported.state.revision += 1;
   imported.state.dirty = true;
   const port = projectSessionPort(vi.fn(async () => imported), async () => imported);
-  port.importPhoto = vi.fn<ProjectCorePort["importPhoto"]>((onProgress) => {
+  port.importMedia = vi.fn<ProjectCorePort["importMedia"]>((onProgress) => {
     publish = onProgress;
     publish({ completedFiles: 0, totalFiles: 1 });
     return new Promise((resolve) => { finish = resolve; });
@@ -398,7 +399,7 @@ test("waits for image cache before Save and keeps its warning through a queued e
   let importing!: Promise<string | null>;
   let editing!: Promise<boolean>;
   act(() => {
-    importing = view.result.current.importPhoto();
+    importing = view.result.current.importMedia();
     view.result.current.save();
     editing = view.result.current.applyIntent({ kind: "setDpi", dpi: 200 });
   });
@@ -406,8 +407,10 @@ test("waits for image cache before Save and keeps its warning through a queued e
   expect(port.save).not.toHaveBeenCalled();
   expect(port.apply).not.toHaveBeenCalled();
   const problem = { fileName: "Foto.jpg", reason: "A Foto foi vinculada, mas seu Cache não pôde ser preparado." };
+  const operationProblem = "Não foi possível continuar o processamento por falta de memória.";
+  const warning = failureKind === "file" ? { problem } : { operationProblem };
   await act(async () => {
-    publish({ completedFiles: 1, totalFiles: 1, problem });
+    publish({ completedFiles: 1, totalFiles: 1, ...warning });
     finish({ kind: "completed", projection: imported, importedCount: 1, mediaIds: ["media-001"], problems: [] });
     await importing;
     await editing;
@@ -415,7 +418,9 @@ test("waits for image cache before Save and keeps its warning through a queued e
   expect(port.save).toHaveBeenCalledWith(imported.state.revision);
   expect(view.result.current.photoImportResult?.importedCount).toBe(1);
   expect(view.result.current.imageProcessingProgress).toBeNull();
-  expect(view.result.current.imageProcessingProblems).toEqual([problem]);
+  expect(view.result.current.imageProcessingProblems).toEqual(failureKind === "file" ? [problem] : []);
+  expect(view.result.current.imageProcessingOperationProblem).toBe(failureKind === "operation" ? operationProblem : null);
   act(() => view.result.current.dismissImageProcessingProblems());
   expect(view.result.current.imageProcessingProblems).toEqual([]);
+  expect(view.result.current.imageProcessingOperationProblem).toBeNull();
 });

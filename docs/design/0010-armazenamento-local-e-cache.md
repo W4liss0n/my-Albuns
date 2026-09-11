@@ -89,7 +89,7 @@ A divisão entre as duas raízes segue o que a preferência representa:
 |---|---|---|
 | Altura e visibilidade do Painel de imagens | `%LOCALAPPDATA%` | proporção ajustada a um monitor |
 | Largura e visibilidade do Painel contextual | `%LOCALAPPDATA%` | proporção ajustada a um monitor |
-| Tamanho das miniaturas, por aba | `%LOCALAPPDATA%` | densidade ajustada a uma resolução |
+| Tamanho único das miniaturas de Fotos e Decorativos | `%LOCALAPPDATA%` | densidade ajustada a uma resolução |
 | Seções recolhidas, por contexto | `%LOCALAPPDATA%` | acompanha o espaço vertical disponível |
 | Ordenação, por aba | `%APPDATA%` | hábito de trabalho, independente da tela |
 | Filtro de uso, por aba | `%APPDATA%` | hábito de trabalho, independente da tela |

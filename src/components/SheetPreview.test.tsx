@@ -7,6 +7,39 @@ import type {
   PhotoPlacementPlan,
 } from "../domain/project";
 import { SheetPreview } from "./SheetPreview";
+import { decorativeCorpus } from "../test/decorativePreview";
+import { SheetDesignInspector } from "./SheetDesignInspector";
+
+test.each([false, true])("clips decorative previews with Cache available: %s", (withCache) => {
+  const sheet = decorativeCorpus.states.split.composition.sheets[0];
+  const background = sheet.backgrounds.find((item) => item.kind === "media" && item.clipRect);
+  if (!background || background.kind !== "media" || !background.clipRect) throw new Error("Missing Core crop fixture");
+  const previewSheet = { ...sheet, overlays: [background, background] };
+  const { container } = render(<SheetPreview sheet={previewSheet} mediaPreviewUrls={withCache ? { [background.mediaId]: "asset://localhost/decorative.png" } : {}} />);
+  const nodes = container.querySelectorAll(`[data-preview-background-id="${background.mediaId}"], [data-preview-overlay-id="${background.mediaId}"]`);
+  expect(nodes).toHaveLength(3);
+  const clipPaths = new Set<string>();
+  for (const node of nodes) {
+    const path = node.getAttribute("clip-path");
+    expect(path).toMatch(/^url\(#.+\)$/);
+    clipPaths.add(path!);
+    const clip = container.querySelector(`${path!.slice(4, -1)} rect`);
+    expect(clip).toHaveAttribute("x", String(background.clipRect.x));
+    expect(clip).toHaveAttribute("width", String(background.clipRect.width));
+    expect(node).toHaveAttribute("width", String(background.drawRect.width));
+  }
+  expect(clipPaths.size).toBe(3);
+});
+
+test("shows the clipped Decorative belonging to each Inspector side", () => {
+  const sheet = decorativeCorpus.states.split.composition.sheets[0];
+  const { container } = render(<SheetDesignInspector sheet={sheet} scope="both" mediaPreviewUrls={{}} onScopeChange={() => {}} />);
+  const labels = Array.from(container.querySelectorAll(".sheet-design-role:first-of-type .sheet-design-value__copy"), (node) => node.textContent);
+  expect(labels).toHaveLength(2);
+  sheet.backgrounds.forEach((background, index) => {
+    if (background.kind === "media") expect(labels[index]).toContain(background.name);
+  });
+});
 
 const photoSheet: ComposedSheet = {
   sheetId: "sheet-001",

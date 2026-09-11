@@ -514,6 +514,13 @@
     },
     "mediaUsage": [
       {
+        "breakdown": {
+          "albumBackgrounds": 0,
+          "albumOverlays": 0,
+          "backgrounds": 0,
+          "frames": 4,
+          "overlays": 0
+        },
         "count": 4,
         "mediaId": "00000000-0000-4000-8000-000000000001"
       }
@@ -1420,6 +1427,13 @@
         },
         "mediaUsage": [
           {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 0,
+              "backgrounds": 0,
+              "frames": 5,
+              "overlays": 0
+            },
             "count": 5,
             "mediaId": "00000000-0000-4000-8000-000000000001"
           }
@@ -2367,6 +2381,13 @@
         },
         "mediaUsage": [
           {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 0,
+              "backgrounds": 0,
+              "frames": 5,
+              "overlays": 0
+            },
             "count": 5,
             "mediaId": "00000000-0000-4000-8000-000000000001"
           }
@@ -3311,6 +3332,13 @@
         },
         "mediaUsage": [
           {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 0,
+              "backgrounds": 0,
+              "frames": 5,
+              "overlays": 0
+            },
             "count": 5,
             "mediaId": "00000000-0000-4000-8000-000000000001"
           }
@@ -4274,6 +4302,13 @@
         },
         "mediaUsage": [
           {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 0,
+              "backgrounds": 0,
+              "frames": 5,
+              "overlays": 0
+            },
             "count": 5,
             "mediaId": "00000000-0000-4000-8000-000000000001"
           }
@@ -5237,6 +5272,13 @@
         },
         "mediaUsage": [
           {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 0,
+              "backgrounds": 0,
+              "frames": 5,
+              "overlays": 0
+            },
             "count": 5,
             "mediaId": "00000000-0000-4000-8000-000000000001"
           }
@@ -6200,6 +6242,13 @@
         },
         "mediaUsage": [
           {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 0,
+              "backgrounds": 0,
+              "frames": 5,
+              "overlays": 0
+            },
             "count": 5,
             "mediaId": "00000000-0000-4000-8000-000000000001"
           }
@@ -7163,6 +7212,13 @@
         },
         "mediaUsage": [
           {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 0,
+              "backgrounds": 0,
+              "frames": 5,
+              "overlays": 0
+            },
             "count": 5,
             "mediaId": "00000000-0000-4000-8000-000000000001"
           }
@@ -8126,6 +8182,13 @@
         },
         "mediaUsage": [
           {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 0,
+              "backgrounds": 0,
+              "frames": 5,
+              "overlays": 0
+            },
             "count": 5,
             "mediaId": "00000000-0000-4000-8000-000000000001"
           }
@@ -8980,6 +9043,13 @@
         },
         "mediaUsage": [
           {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 0,
+              "backgrounds": 0,
+              "frames": 4,
+              "overlays": 0
+            },
             "count": 4,
             "mediaId": "00000000-0000-4000-8000-000000000001"
           }
@@ -9789,6 +9859,13 @@
         },
         "mediaUsage": [
           {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 0,
+              "backgrounds": 0,
+              "frames": 4,
+              "overlays": 0
+            },
             "count": 4,
             "mediaId": "00000000-0000-4000-8000-000000000001"
           }
@@ -10612,6 +10689,13 @@
     },
     "mediaUsage": [
       {
+        "breakdown": {
+          "albumBackgrounds": 0,
+          "albumOverlays": 0,
+          "backgrounds": 0,
+          "frames": 4,
+          "overlays": 0
+        },
         "count": 4,
         "mediaId": "00000000-0000-4000-8000-000000000001"
       }

@@ -6,11 +6,13 @@ const NO_PROBLEMS: readonly ImageProcessingProblem[] = [];
 export function useImageProcessing(projectId: string, operationContext: object) {
   const [progress, setProgress] = useState<ImageProcessingProgress | null>(null);
   const [problems, setProblems] = useState(NO_PROBLEMS);
+  const [operationProblem, setOperationProblem] = useState<string | null>(null);
   const context = useRef({});
   useEffect(() => {
     context.current = {};
     setProgress(null);
     setProblems(NO_PROBLEMS);
+    setOperationProblem(null);
     return () => { context.current = {}; };
   }, [projectId, operationContext]);
 
@@ -21,6 +23,7 @@ export function useImageProcessing(projectId: string, operationContext: object) 
       return await operation((next) => {
         if (context.current !== attempt) return;
         setProgress(next);
+        if (next.operationProblem) setOperationProblem(next.operationProblem);
         if (next.problem) {
           const problem = next.problem;
           setProblems((current) => [...current, problem]);
@@ -34,5 +37,8 @@ export function useImageProcessing(projectId: string, operationContext: object) 
     }
   }
 
-  return { progress, problems, run, dismissProblems: () => setProblems(NO_PROBLEMS) };
+  return { progress, problems, operationProblem, run, dismissProblems: () => {
+    setProblems(NO_PROBLEMS);
+    setOperationProblem(null);
+  } };
 }

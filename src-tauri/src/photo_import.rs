@@ -7,6 +7,7 @@ use progress::NativeImportProgress;
 use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
+    sync::atomic::{AtomicBool, Ordering},
 };
 
 use futures_util::{StreamExt, stream};
@@ -32,7 +33,7 @@ use crate::{
         ImageMemoryEstimate, ImagingProcessor, InvocationContext, InvocationControl,
         InvocationFailureStage, ProcessorAdmissionFailure, TauriImagingTransport,
     },
-    ipc_contract::{ImageProcessingProblem, ImageProcessingProgress, ImportPhotoResult},
+    ipc_contract::{ImageProcessingProblem, ImageProcessingProgress, ImportMediaResult},
     logging::LoggingState,
     media_runtime::{
         ImportedPhotoInspection, MediaBinding, MediaMonitor, MediaObservation, MediaResolver,
@@ -47,22 +48,35 @@ struct SelectedSource {
 }
 
 struct PhotoImportAttempt {
+    kind: MediaKind,
     id: String,
     catalog: AuthorizedMediaCatalog,
     namespace: AuthorizedCacheNamespace,
     roots: RootBindingPlan,
     paths: Vec<PathBuf>,
     sources: Vec<SelectedSource>,
+    selection_problems: Vec<ImageProcessingProblem>,
+    operation_problem: Option<String>,
 }
 
 impl PhotoImportAttempt {
+    #[cfg(test)]
     fn capture(
         catalog: AuthorizedMediaCatalog,
         namespace: AuthorizedCacheNamespace,
         paths: Vec<PathBuf>,
     ) -> Result<Self, String> {
+        Self::capture_for_kind(MediaKind::Photo, catalog, namespace, paths)
+    }
+
+    fn capture_for_kind(
+        kind: MediaKind,
+        catalog: AuthorizedMediaCatalog,
+        namespace: AuthorizedCacheNamespace,
+        paths: Vec<PathBuf>,
+    ) -> Result<Self, String> {
         if catalog.project_id != namespace.project_id() {
-            return Err("O Projeto mudou durante a importação das Fotos.".into());
+            return Err("O Projeto mudou durante a importação das imagens.".into());
         }
         let mut seen = HashSet::new();
         let paths = paths
@@ -72,7 +86,7 @@ impl PhotoImportAttempt {
         let existing = catalog
             .bindings
             .iter()
-            .filter(|binding| binding.kind == MediaKind::Photo)
+            .filter(|binding| binding.kind == kind)
             .map(|binding| binding.logical_path.as_path())
             .collect::<HashSet<_>>();
         let mut context = OperationPathContext::new();
@@ -90,6 +104,7 @@ impl PhotoImportAttempt {
             let _ = context.capture(path);
         }
         let roots = context.freeze();
+        let (paths, selection_problems) = crate::media_import_selection::expand(paths, &roots);
         let sources = paths
             .iter()
             .filter(|path| !existing.contains(path.as_path()))
@@ -100,17 +115,20 @@ impl PhotoImportAttempt {
                     source_path: NativePathDto::from(path.clone()),
                     generation_id: uuid::Uuid::new_v4().simple().to_string(),
                 };
-                let before = MediaResolver.observe_in_plan(&roots, &source_binding(path));
+                let before = MediaResolver.observe_in_plan(&roots, &source_binding(kind, path));
                 SelectedSource { candidate, before }
             })
             .collect();
         Ok(Self {
+            kind,
             id: uuid::Uuid::new_v4().simple().to_string(),
             catalog,
             namespace,
             roots,
             paths,
             sources,
+            selection_problems,
+            operation_problem: None,
         })
     }
 
@@ -144,21 +162,25 @@ impl PhotoImportAttempt {
     }
 }
 
-pub(crate) async fn import_selected_photos(
+pub(crate) async fn import_selected_media(
     app: &AppHandle,
+    kind: MediaKind,
     paths: Vec<PathBuf>,
-    unsupported: Vec<ImageProcessingProblem>,
-    publish: impl FnMut(ImageProcessingProgress) + Send,
-) -> Result<ImportPhotoResult, String> {
+    mut unsupported: Vec<ImageProcessingProblem>,
+    mut publish: impl FnMut(ImageProcessingProgress) + Send + 'static,
+) -> Result<ImportMediaResult, String> {
     let host = app.state::<ProjectHost>();
     let catalog = host.authorized_media_catalog()?;
     let namespace = app.state::<ActiveCacheNamespace>().namespace();
-    let total = paths.iter().collect::<HashSet<_>>().len() + unsupported.len();
-    let progress = ImageProcessingBatch::new(total as u32, publish);
-    let unsupported_count = unsupported.len();
+    publish(ImageProcessingProgress {
+        completed_files: 0,
+        total_files: 0,
+        problem: None,
+        operation_problem: None,
+    });
     let capture_app = app.clone();
-    let (attempt, mut stage, stage_error) = tauri::async_runtime::spawn_blocking(move || {
-        let attempt = PhotoImportAttempt::capture(catalog, namespace, paths)?;
+    let (mut attempt, mut stage, stage_error) = tauri::async_runtime::spawn_blocking(move || {
+        let attempt = PhotoImportAttempt::capture_for_kind(kind, catalog, namespace, paths)?;
         let candidates = attempt
             .sources
             .iter()
@@ -177,7 +199,11 @@ pub(crate) async fn import_selected_photos(
         Ok::<_, String>((attempt, stage, error))
     })
     .await
-    .map_err(|_| "Não foi possível preparar a importação das Fotos.".to_string())??;
+    .map_err(|_| "Não foi possível preparar a importação das imagens.".to_string())??;
+    unsupported.append(&mut attempt.selection_problems);
+    let unsupported_count = unsupported.len();
+    let total = attempt.paths.len() + unsupported_count;
+    let progress = ImageProcessingBatch::new(total as u32, publish);
 
     let requests = if stage.is_some() {
         attempt.requests(app.state::<ImagingProcessor>().cache_capacity())
@@ -186,26 +212,34 @@ pub(crate) async fn import_selected_photos(
     };
     let new_source_count = attempt.sources.len();
     let native_progress = NativeImportProgress::new(progress, &requests);
+    let interrupted = AtomicBool::new(false);
     let batches = stream::iter(requests)
         .map(|request| {
             let progress = &native_progress;
+            let interrupted = &interrupted;
             async move {
-                let result =
-                    execute_import_batch(app, &request, &|event| progress.report(event)).await;
+                let result = if interrupted.load(Ordering::Acquire) {
+                    Err(BatchFailure::MemoryPressure)
+                } else {
+                    execute_import_batch(app, &request, &|event| progress.report(event)).await
+                };
+                if matches!(result, Err(BatchFailure::MemoryPressure)) {
+                    interrupted.store(true, Ordering::Release);
+                }
                 (request, result)
             }
         })
         .buffer_unordered(app.state::<ImagingProcessor>().cache_capacity())
         .collect::<Vec<_>>()
         .await;
-    if let Some(failure) = batches
-        .iter()
-        .find_map(|(_, result)| result.as_ref().err().filter(|failure| failure.quarantined))
-    {
+    if let Some(message) = batches.iter().find_map(|(_, result)| match result {
+        Err(BatchFailure::Quarantined(message)) => Some(message),
+        _ => None,
+    }) {
         if let Some(stage) = &mut stage {
             stage.defer_cleanup_until_restart();
         }
-        return Err(failure.message.clone());
+        return Err(message.clone());
     }
     let mut outcomes = HashMap::new();
     let mut cache_problems = HashMap::new();
@@ -217,9 +251,13 @@ pub(crate) async fn import_selected_photos(
                     .into_iter()
                     .map(|photo| (photo.source_id, photo.outcome)),
             ),
-            Err(failure) => {
+            Err(BatchFailure::MemoryPressure) => {
+                attempt.operation_problem =
+                    Some(ProcessorAdmissionFailure::MemoryPressure.to_string());
+            }
+            Err(BatchFailure::Recoverable(message) | BatchFailure::Quarantined(message)) => {
                 for candidate in request.candidates {
-                    cache_problems.insert(candidate.path().to_path_buf(), failure.message.clone());
+                    cache_problems.insert(candidate.path().to_path_buf(), message.clone());
                 }
             }
         }
@@ -229,27 +267,34 @@ pub(crate) async fn import_selected_photos(
     let finish_app = app.clone();
     let inspection_roots = attempt.roots.clone();
     let inspection_bindings = attempt.catalog.bindings.clone();
-    let prepared = tauri::async_runtime::spawn_blocking(move || {
-        prepare_proposal_with_inspection(
+    native_progress.begin_inspection(outcomes.iter().filter_map(|(source, outcome)| {
+        matches!(outcome, PhotoImportOutcome::Validated { .. }).then_some(source)
+    }));
+    let (prepared, native_progress) = tauri::async_runtime::spawn_blocking(move || {
+        let prepared = prepare_proposal_with_inspection(
             attempt,
             stage,
             outcomes,
             cache_problems,
             stage_error,
             unsupported,
-            |path| {
-                inspect_with_capacity(
+            |candidate| {
+                let proposal = inspect_with_capacity(
+                    kind,
                     finish_app.state::<CacheEngine>().inner(),
                     finish_app.state::<ImagingProcessor>().inner(),
-                    path,
+                    candidate.path(),
                     &inspection_bindings,
                     &inspection_roots,
-                )
+                );
+                native_progress.complete_inspection(&candidate.source_id);
+                proposal
             },
-        )
+        )?;
+        Ok::<_, String>((prepared, native_progress))
     })
     .await
-    .map_err(|_| "Não foi possível validar a importação das Fotos.".to_string())??;
+    .map_err(|_| "Não foi possível validar a importação das imagens.".to_string())??;
 
     let engine = app.state::<CacheEngine>();
     let _commit_permit = engine
@@ -273,16 +318,29 @@ pub(crate) async fn import_selected_photos(
         )
     })
     .await
-    .map_err(|_| "Não foi possível concluir a importação das Fotos.".to_string())??;
+    .map_err(|_| "Não foi possível concluir a importação das imagens.".to_string())??;
     drop(_commit_permit);
-    let mut progress = native_progress.finish((new_source_count + unsupported_count) as u32);
+    let interrupted = matches!(
+        &result,
+        ImportMediaResult::Completed {
+            operation_problem: Some(_),
+            ..
+        }
+    );
+    let mut progress = if interrupted {
+        native_progress.interrupt()
+    } else {
+        native_progress.finish((new_source_count + unsupported_count) as u32)
+    };
     for path in new_paths {
         if let Some(reason) = cache_problems.get(&path) {
             progress.report_problem(cache_problem(&path, reason.clone()));
         }
     }
-    progress.prepare_all_in_plan(app, existing, roots).await;
-    if let ImportPhotoResult::Completed { projection, .. } = &mut result {
+    if !interrupted {
+        progress.prepare_all_in_plan(app, existing, roots).await;
+    }
+    if let ImportMediaResult::Completed { projection, .. } = &mut result {
         *projection = host.projection()?;
     }
     Ok(result)
@@ -303,7 +361,7 @@ fn prepare_proposal_with_inspection(
     mut cache_problems: HashMap<PathBuf, String>,
     stage_error: Option<String>,
     unsupported: Vec<ImageProcessingProblem>,
-    inspect: impl Fn(&Path) -> PhotoImportsProposal,
+    inspect: impl Fn(&PhotoImportCandidate) -> PhotoImportsProposal,
 ) -> Result<PreparedImport, String> {
     let sources = attempt
         .sources
@@ -311,8 +369,10 @@ fn prepare_proposal_with_inspection(
         .map(|source| (source.candidate.path(), source))
         .collect::<HashMap<_, _>>();
     let mut proposal = PhotoImportsProposal {
+        kind: attempt.kind,
         commands: Vec::new(),
         problems: unsupported,
+        operation_problem: attempt.operation_problem.clone(),
         inspections: Vec::new(),
     };
     let mut accepted_paths = Vec::new();
@@ -329,7 +389,8 @@ fn prepare_proposal_with_inspection(
             preview,
         }) = outcomes.remove(&source.candidate.source_id)
         {
-            let current = MediaResolver.observe_in_plan(&attempt.roots, &source_binding(path));
+            let current =
+                MediaResolver.observe_in_plan(&attempt.roots, &source_binding(attempt.kind, path));
             if source.before.same_source(&current) && current.matches_fingerprint(&fingerprint) {
                 let metadata = PhotoSourceMetadata::new(
                     dimensions.width_px,
@@ -365,17 +426,21 @@ fn prepare_proposal_with_inspection(
                 "O Original mudou durante a preparação da miniatura.".into(),
             );
         }
-        let fallback = inspect(path);
+        if proposal.operation_problem.is_some() {
+            continue;
+        }
+        let fallback = inspect(&source.candidate);
         if !fallback.commands.is_empty() {
             accepted_paths.push(path.clone());
             cache_problems.entry(path.clone()).or_insert_with(|| {
                 stage_error.clone().unwrap_or_else(|| {
-                    "A Foto exige uma nova tentativa de preparação da miniatura.".into()
+                    "A imagem exige uma nova tentativa de preparação da miniatura.".into()
                 })
             });
         }
         proposal.commands.extend(fallback.commands);
         proposal.problems.extend(fallback.problems);
+        proposal.operation_problem = fallback.operation_problem;
         proposal.inspections.extend(fallback.inspections);
     }
     Ok(PreparedImport {
@@ -388,7 +453,7 @@ fn prepare_proposal_with_inspection(
 }
 
 struct CommittedImport {
-    result: ImportPhotoResult,
+    result: ImportMediaResult,
     existing: Vec<MediaBinding>,
     roots: RootBindingPlan,
     cache_problems: HashMap<PathBuf, String>,
@@ -429,10 +494,10 @@ fn commit_prepared_import(
         .filter(|command| {
             new_paths.contains(command.path())
                 && !evidence.get(command.path()).is_some_and(|observed| {
-                    observed.same_source(
-                        &MediaResolver
-                            .observe_in_plan(&attempt.roots, &source_binding(command.path())),
-                    )
+                    observed.same_source(&MediaResolver.observe_in_plan(
+                        &attempt.roots,
+                        &source_binding(attempt.kind, command.path()),
+                    ))
                 })
         })
         .map(|command| command.path().to_path_buf())
@@ -457,7 +522,7 @@ fn commit_prepared_import(
                 .to_string_lossy()
                 .into_owned(),
             reason:
-                "O Original mudou antes da conclusão da importação. Selecione a Foto novamente."
+                "O Original mudou antes da conclusão da importação. Selecione a imagem novamente."
                     .into(),
         });
     }
@@ -485,7 +550,7 @@ fn commit_prepared_import(
     let by_path = catalog
         .bindings
         .iter()
-        .filter(|binding| binding.kind == MediaKind::Photo)
+        .filter(|binding| binding.kind == attempt.kind)
         .map(|binding| (binding.logical_path.as_path(), binding))
         .collect::<HashMap<_, _>>();
     let inspections = inspections
@@ -533,7 +598,7 @@ fn commit_prepared_import(
         .bindings
         .into_iter()
         .filter(|binding| {
-            binding.kind == MediaKind::Photo && selected.contains(binding.logical_path.as_path())
+            binding.kind == attempt.kind && selected.contains(binding.logical_path.as_path())
         })
         .collect();
     Ok(CommittedImport {
@@ -545,9 +610,10 @@ fn commit_prepared_import(
     })
 }
 
-struct BatchFailure {
-    message: String,
-    quarantined: bool,
+enum BatchFailure {
+    Recoverable(String),
+    MemoryPressure,
+    Quarantined(String),
 }
 
 async fn execute_import_batch(
@@ -573,19 +639,17 @@ async fn execute_import_batch(
         )
     })
     .await
-    .map_err(|_| BatchFailure {
-        message: "Não foi possível estimar os recursos do lote.".into(),
-        quarantined: false,
+    .map_err(|_| {
+        BatchFailure::Recoverable("Não foi possível estimar os recursos do lote.".into())
     })?;
     loop {
         if !app
             .state::<ProjectHost>()
             .is_current_project(&request.project_id)
         {
-            return Err(BatchFailure {
-                message: "O Projeto mudou durante a importação.".into(),
-                quarantined: false,
-            });
+            return Err(BatchFailure::Recoverable(
+                "O Projeto mudou durante a importação.".into(),
+            ));
         }
         if cancellation.reason() == Some(CacheCancellationReason::Paused) {
             cancellation.resume_after_pause();
@@ -596,10 +660,9 @@ async fn execute_import_batch(
             continue;
         }
         if engine.processor_status() == CacheProcessorStatus::Suspended {
-            return Err(BatchFailure {
-                message: "O Processador de Imagens está suspenso.".into(),
-                quarantined: false,
-            });
+            return Err(BatchFailure::Recoverable(
+                "O Processador de Imagens está suspenso.".into(),
+            ));
         }
         let reservation = match processor
             .reserve_cache_for(estimate, cancellation.flag())
@@ -610,12 +673,15 @@ async fn execute_import_batch(
                 drop(permit);
                 continue;
             }
-            Err(error) => {
-                return Err(BatchFailure {
-                    message: error.to_string(),
-                    quarantined: error == ProcessorAdmissionFailure::Unavailable,
-                });
+            Err(ProcessorAdmissionFailure::MemoryPressure) => {
+                return Err(BatchFailure::MemoryPressure);
             }
+            Err(ProcessorAdmissionFailure::Unavailable) => {
+                return Err(BatchFailure::Quarantined(
+                    ProcessorAdmissionFailure::Unavailable.to_string(),
+                ));
+            }
+            Err(error) => return Err(BatchFailure::Recoverable(error.to_string())),
         };
         if cancellation.reason().is_some() {
             drop(reservation);
@@ -644,18 +710,13 @@ async fn execute_import_batch(
             )) if request_id == request.request_id => {
                 completion
                     .validate_for(request)
-                    .map_err(|message| BatchFailure {
-                        message,
-                        quarantined: false,
-                    })?;
+                    .map_err(BatchFailure::Recoverable)?;
                 return Ok(completion);
             }
             Ok(_) => {
-                return Err(BatchFailure {
-                    message: "O Processador devolveu uma conclusão incompatível com a importação."
-                        .into(),
-                    quarantined: false,
-                });
+                return Err(BatchFailure::Recoverable(
+                    "O Processador devolveu uma conclusão incompatível com a importação.".into(),
+                ));
             }
             Err(failure)
                 if failure.stage
@@ -663,10 +724,7 @@ async fn execute_import_batch(
                         InvocationFailureStage::TerminationUnconfirmed,
                     ) =>
             {
-                return Err(BatchFailure {
-                    message: failure.message,
-                    quarantined: true,
-                });
+                return Err(BatchFailure::Quarantined(failure.message));
             }
             Err(failure) => {
                 if matches!(
@@ -677,24 +735,22 @@ async fn execute_import_batch(
                 {
                     continue;
                 }
-                return Err(BatchFailure {
-                    message: failure.message,
-                    quarantined: false,
-                });
+                return Err(BatchFailure::Recoverable(failure.message));
             }
         }
     }
 }
 
-fn source_binding(path: &Path) -> MediaBinding {
+fn source_binding(kind: MediaKind, path: &Path) -> MediaBinding {
     MediaBinding {
         media_id: String::new(),
-        kind: MediaKind::Photo,
+        kind,
         logical_path: path.to_path_buf(),
     }
 }
 
 fn inspect_with_capacity(
+    kind: MediaKind,
     engine: &CacheEngine,
     processor: &ImagingProcessor,
     path: &Path,
@@ -727,7 +783,8 @@ fn inspect_with_capacity(
             }
             // This function runs on the blocking pool. A started decoder is
             // drained before returning its memory and exclusive CPU reservation.
-            let proposal = MediaResolver.propose_photo_imports_in_plan(
+            let proposal = MediaResolver.propose_media_imports_in_plan(
+                kind,
                 vec![path.to_path_buf()],
                 bindings,
                 roots,
@@ -739,16 +796,23 @@ fn inspect_with_capacity(
         }
     });
     result.unwrap_or_else(|error| PhotoImportsProposal {
+        kind,
         commands: Vec::new(),
         inspections: Vec::new(),
-        problems: vec![ImageProcessingProblem {
-            file_name: path
-                .file_name()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .into_owned(),
-            reason: error.to_string(),
-        }],
+        operation_problem: (error == ProcessorAdmissionFailure::MemoryPressure)
+            .then(|| error.to_string()),
+        problems: if error == ProcessorAdmissionFailure::MemoryPressure {
+            Vec::new()
+        } else {
+            vec![ImageProcessingProblem {
+                file_name: path
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .into_owned(),
+                reason: error.to_string(),
+            }]
+        },
     })
 }
 
@@ -792,9 +856,9 @@ mod tests {
             problems,
             stage_error,
             unsupported,
-            |path| {
+            |candidate| {
                 MediaResolver.propose_photo_imports_in_plan(
-                    vec![path.to_path_buf()],
+                    vec![candidate.path().to_path_buf()],
                     &bindings,
                     &roots,
                     |_| {},
@@ -910,7 +974,7 @@ mod tests {
             .host
             .commit_photo_import_proposal(fixture.namespace.project_id(), prepared.proposal)
             .unwrap();
-        let ImportPhotoResult::Completed {
+        let ImportMediaResult::Completed {
             imported_count,
             media_ids,
             projection,
@@ -949,7 +1013,7 @@ mod tests {
             prepared,
         )
         .unwrap();
-        let ImportPhotoResult::Completed {
+        let ImportMediaResult::Completed {
             imported_count,
             problems,
             projection,
@@ -1001,7 +1065,7 @@ mod tests {
             .unwrap();
         assert!(matches!(
             result,
-            ImportPhotoResult::Completed {
+            ImportMediaResult::Completed {
                 imported_count: 0,
                 ..
             }
@@ -1034,6 +1098,158 @@ mod tests {
                 .is_err()
         );
         assert_eq!(other.host.projection().unwrap().state.revision, 0);
+    }
+
+    #[test]
+    fn native_memory_interruption_preserves_prepared_sources_without_fallback_inspections() {
+        let fixture = Fixture::new();
+        let pending = fixture.photo("pendente.jpg");
+        let prepared_path = fixture.photo("preparada.jpg");
+        let mut attempt = fixture.attempt(vec![pending, prepared_path]);
+        attempt.operation_problem = Some(ProcessorAdmissionFailure::MemoryPressure.to_string());
+        let prepared_source = &attempt.sources[1];
+        let outcomes = HashMap::from([(
+            prepared_source.candidate.source_id.clone(),
+            validated(prepared_source),
+        )]);
+        let prepared = prepare_proposal_with_inspection(
+            attempt,
+            None,
+            outcomes,
+            HashMap::new(),
+            None,
+            Vec::new(),
+            |_| panic!("native interruption must not start fallback inspection"),
+        )
+        .unwrap();
+        let ImportMediaResult::Completed {
+            imported_count,
+            problems,
+            operation_problem,
+            ..
+        } = fixture
+            .host
+            .commit_photo_import_proposal(fixture.namespace.project_id(), prepared.proposal)
+            .unwrap()
+        else {
+            panic!("prepared source completes the partial action")
+        };
+        assert_eq!(imported_count, 1);
+        assert!(problems.is_empty());
+        assert_eq!(
+            operation_problem,
+            Some(ProcessorAdmissionFailure::MemoryPressure.to_string())
+        );
+    }
+
+    #[test]
+    fn memory_pressure_keeps_partial_imports_and_allows_retry_without_duplicates() {
+        let fixture = Fixture::new();
+        let first = fixture.photo("preparada.jpg");
+        let second = fixture.photo("pendente.jpg");
+        let third = fixture.photo("ainda-nao-processada.jpg");
+        let engine = CacheEngine::default();
+        let blocked = ImagingProcessor::with_available_memory_for_test(350, 32);
+        let attempt = fixture.attempt(vec![second.clone(), first.clone(), third.clone()]);
+        let inspections = std::cell::Cell::new(0);
+        let roots = attempt.roots.clone();
+        let outcomes = attempt
+            .sources
+            .iter()
+            .filter(|source| source.candidate.path() == first)
+            .map(|source| (source.candidate.source_id.clone(), validated(source)))
+            .collect();
+        let prepared = prepare_proposal_with_inspection(
+            attempt,
+            None,
+            outcomes,
+            HashMap::new(),
+            None,
+            Vec::new(),
+            |candidate| {
+                inspections.set(inspections.get() + 1);
+                inspect_with_capacity(
+                    MediaKind::Photo,
+                    &engine,
+                    &blocked,
+                    candidate.path(),
+                    &[],
+                    &roots,
+                )
+            },
+        )
+        .unwrap();
+        let ImportMediaResult::Completed {
+            imported_count,
+            problems,
+            operation_problem,
+            ..
+        } = fixture
+            .host
+            .commit_photo_import_proposal(fixture.namespace.project_id(), prepared.proposal)
+            .unwrap()
+        else {
+            panic!("partial import completes");
+        };
+        assert_eq!(imported_count, 1);
+        assert_eq!(
+            inspections.get(),
+            1,
+            "pending sources stop after the resource interruption"
+        );
+        assert!(
+            problems.is_empty(),
+            "a resource interruption does not reject files"
+        );
+        assert_eq!(
+            operation_problem,
+            Some(ProcessorAdmissionFailure::MemoryPressure.to_string())
+        );
+        let first_binding = fixture.host.authorized_media_catalog().unwrap().bindings[0].clone();
+
+        let available = ImagingProcessor::with_available_memory_for_test(350, 7168);
+        let attempt = fixture.attempt(vec![first, second, third]);
+        let roots = attempt.roots.clone();
+        let bindings = attempt.catalog.bindings.clone();
+        let prepared = prepare_proposal_with_inspection(
+            attempt,
+            None,
+            HashMap::new(),
+            HashMap::new(),
+            None,
+            Vec::new(),
+            |candidate| {
+                inspect_with_capacity(
+                    MediaKind::Photo,
+                    &engine,
+                    &available,
+                    candidate.path(),
+                    &bindings,
+                    &roots,
+                )
+            },
+        )
+        .unwrap();
+        let ImportMediaResult::Completed {
+            imported_count,
+            problems,
+            projection,
+            ..
+        } = fixture
+            .host
+            .commit_photo_import_proposal(fixture.namespace.project_id(), prepared.proposal)
+            .unwrap()
+        else {
+            panic!("retry completes");
+        };
+        assert_eq!(imported_count, 2, "retry adds only the remaining images");
+        assert!(problems.is_empty());
+        assert_eq!(projection.state.album.media.len(), 3);
+        assert_eq!(fixture.host.undo().unwrap().state.album.media.len(), 1);
+        assert_eq!(
+            fixture.host.authorized_media_catalog().unwrap().bindings[0].media_id,
+            first_binding.media_id
+        );
     }
 
     #[test]

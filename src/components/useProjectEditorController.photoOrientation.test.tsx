@@ -36,9 +36,10 @@ function harness(effects = false) {
     queryLayouts: async () => { throw new Error("Layouts are not configured in this fixture."); },
     previewLayout: async () => { throw new Error("Layouts are not configured in this fixture."); },
     previewFrameStyle: async () => { throw new Error("Frame style preview is not configured in this fixture."); },
+    previewDecorativeDrop: async () => { throw new Error("Decorative preview is not configured in this fixture."); },
     previewPhotoAngle: async () => { throw new Error("Photo angle preview is not configured in this fixture."); },
     previewFrameGeometry: unsupported,
-    saveAs: unsupported, validateAlbumInformation: unsupported, importPhoto: unsupported,
+    saveAs: unsupported, validateAlbumInformation: unsupported, importMedia: unsupported,
     resolvePhotoDropTarget: unsupported, relink: unsupported,
   };
   useEditorView.setState({ projectId: initial.state.projectId, editingSheetId: "sheet-001",

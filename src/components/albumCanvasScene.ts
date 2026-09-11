@@ -512,6 +512,7 @@ export class AlbumCanvasScene {
           previewStates,
           backgroundPreviewStates,
           overlayPreviewStates,
+          this.input.decorativeDropPreview?.sheet.sheetId === sheet.sheetId ? this.input.decorativeDropPreview.scope : null,
         ]),
       );
     }
@@ -548,6 +549,7 @@ export class AlbumCanvasScene {
         setSheetBarActionFocused(node.sheetBar, this.focusedBarAction.action, true);
       }
       applyPlaceholderLabelScale(node, scale);
+      node.decorativeDropFeedback?.applyScale(scale);
       for (const selection of node.frameSelections.values()) {
         applyFrameSelectionScale(selection, scale);
       }
@@ -684,36 +686,42 @@ export class AlbumCanvasScene {
       {
         previewTextureFor: (mediaId) => this.previewTextureFor(mediaId),
         onSheetTap: (sheetId) => {
+          if (this.input?.mediaDrag) return;
           if (!this.input || this.frameInteractions.ignoresTap || this.frameContentDrag.ignoresTap) return;
           this.input.onSelectFrame(null);
           this.input.onFocusSheet(sheetId);
         },
         onSheetDoubleTap: (sheetId) => {
+          if (this.input?.mediaDrag) return;
           if (this.frameInteractions.ignoresTap || this.frameContentDrag.ignoresTap) return;
           this.input?.onEditSheet(sheetId);
         },
         onFrameTap: (sheetId, frameId, toggle) => {
+          if (this.input?.mediaDrag) return;
           if (!this.input || this.frameInteractions.ignoresTap || this.frameContentDrag.ignoresTap) return;
           if (toggle) this.input.onSelectFrame(frameId, true);
           else this.input.onSelectFrame(frameId);
           this.input.onFocusSheet(sheetId);
         },
         onPhotoPanStart: (photoNode, event) => {
+          if (this.input?.mediaDrag) return;
           this.photoInteractions.startPan(photoNode, event);
         },
-        onPhotoContentDragStart: (frameId, event) => this.frameContentDrag.start(frameId, event),
+        onPhotoContentDragStart: (frameId, event) => { if (!this.input?.mediaDrag) this.frameContentDrag.start(frameId, event); },
         onFrameContextMenu: (frameId, position) => {
           if (!this.input || this.input.frameGeometry?.disabled || this.frameInteractions.ignoresTap) return;
           this.input.onOpenFrameContextMenu?.(frameId, position);
         },
         onEmptyCanvasContextMenu: (sheetId, position) => this.openEmptyCanvasContextMenu(sheetId, position),
         onFrameGeometryStart: (frameId, handle, event) => {
+          if (this.input?.mediaDrag) return;
           this.frameInteractions.start(frameId, handle, event);
         },
         onPhotoWheel: (photoNode, event) => {
           this.photoInteractions.handleWheel(photoNode, event);
         },
       },
+      this.input?.decorativeDropPreview?.sheet.sheetId === sheet.sheetId ? this.input.decorativeDropPreview : null,
     );
     for (const photoNode of node.photoNodes) {
       this.photoNodes.set(photoNode.frameId, photoNode);
@@ -741,10 +749,13 @@ export class AlbumCanvasScene {
         ? this.frameContentDrag.highlight.frameId : "";
     } else delete this.app.canvas.dataset.frameContentDragTarget;
     const highlight = this.input.photoDropHighlight;
+    const decorativeDragging = this.input.mediaDrag?.kind === "decorative";
     for (const [sheetId, node] of this.sheetNodes) {
       node.container.visible =
         sheetId !== this.sheetReorderPlaceholderSheetId;
-      node.focusOutline.visible = sheetId === this.input.focusedSheetId;
+      node.focusOutline.visible = !decorativeDragging && sheetId === this.input.focusedSheetId;
+      node.frameSelectionLayer.visible = !decorativeDragging;
+      node.sheetBar.container.visible = !decorativeDragging && albumCanvasModePolicy(this.input.mode).showsSheetBar;
       node.sheetDropOutline.visible =
         this.input.photoDropHighlight?.kind === "sheet" &&
         this.input.photoDropHighlight.sheetId === sheetId;

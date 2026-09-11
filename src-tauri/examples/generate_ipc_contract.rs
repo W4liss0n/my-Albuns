@@ -4,9 +4,9 @@ use myalbuns_desktop_lib::ipc_contract::{
     ApplicationSettings, CacheClearAllOutcome, CacheFreeResult, CacheProcessorState,
     CacheProcessorWarning, CacheServiceCommandError, CacheServiceStatus, CancelDisposition,
     ExportCommandError, ExportEvent, ExportResult, FrontendLogEvent, ImageProcessingProgress,
-    ImportPhotoResult, LinkedMediaChanged, MediaPanelSettings, MediaPanelTabSettings,
-    MediaPreferenceKind, MediaPreview, MediaPreviewCommandError, MediaPreviewDemand,
-    MediaPreviewState, MediaSortDirection, MediaThumbnailSizes, MediaUsageFilter,
+    ImportMediaResult, LinkedMediaChanged, MediaFileCatalog, MediaPanelSettings,
+    MediaPanelTabSettings, MediaPreferenceKind, MediaPreview, MediaPreviewCommandError,
+    MediaPreviewDemand, MediaPreviewState, MediaSortDirection, MediaUsageFilter,
     OpeningExternalCopyDecision, PointerDragThreshold, ProjectCloseChoice,
     ProjectCloseRequestOutcome, ProjectCloseResolution, ProjectDialogAction,
     ProjectDialogActionEvent, ProjectDialogPresentation, ProjectDialogState,
@@ -53,7 +53,13 @@ fn main() {
         .expect("media panel settings bindings should be generated");
     MediaPanelTabSettings::export_all(&config)
         .expect("media panel tab settings bindings should be generated");
-    ImportPhotoResult::export_all(&config).expect("Photo import bindings should be generated");
+    ImportMediaResult::export_all(&config).expect("Media import bindings should be generated");
+    myalbuns_desktop_lib::ipc_contract::MediaImportSelection::export_all(&config)
+        .expect("Media selection bindings should be generated");
+    myalbuns_desktop_lib::ipc_contract::MediaFileDrag::export_all(&config)
+        .expect("Native media drag bindings should be generated");
+    MediaFileCatalog::export_all(&config)
+        .expect("Original file information bindings should be generated");
     ImageProcessingProgress::export_all(&config)
         .expect("Photo import progress bindings should be generated");
     MediaPreview::export_all(&config).expect("media preview bindings should be generated");
@@ -67,8 +73,6 @@ fn main() {
         .expect("media preference kind bindings should be generated");
     MediaSortDirection::export_all(&config)
         .expect("media sort direction bindings should be generated");
-    MediaThumbnailSizes::export_all(&config)
-        .expect("media thumbnail size bindings should be generated");
     MediaUsageFilter::export_all(&config).expect("media usage filter bindings should be generated");
     ProjectDialogAction::export_all(&config)
         .expect("Project dialog action bindings should be generated");

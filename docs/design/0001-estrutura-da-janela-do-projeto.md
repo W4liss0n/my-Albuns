@@ -331,9 +331,9 @@ Quando o Zoom ultrapassa `Ajustar Lâmina`, `Espaço` + arraste com o botão esq
 - Busca e demais filtros formam uma interseção: por exemplo, `Não usadas` com um texto mostra apenas os itens que atendem às duas condições. A Ordenação escolhida continua determinando a sequência dos resultados.
 - `Fotos` e `Decorativos` conservam textos de busca independentes enquanto a Janela do Projeto estiver aberta. Um `X` dentro do campo limpa somente o texto da aba atual.
 - O texto buscado é estado temporário da Janela: não altera o Projeto, não participa de Undo/Redo e não volta na sessão seguinte.
-- Um slider único no popover `Filtro, ordem e tamanho` ajusta continuamente o tamanho das miniaturas da aba ativa. A grade se reorganiza em tempo real durante o gesto.
+- Um slider único no popover `Filtro, ordem e tamanho` ajusta continuamente o tamanho compartilhado das miniaturas de Fotos e Decorativos. A grade se reorganiza em tempo real durante o gesto.
 - Cada miniatura preserva a proporção inteira da imagem, sem corte. Dois cliques no slider restauram o tamanho médio padrão, seguindo a convenção geral dos sliders do aplicativo.
-- `Fotos` e `Decorativos` guardam tamanhos independentes como preferências globais do usuário, reutilizadas entre Projetos e sessões e sem efeito no Projeto ou em Undo/Redo.
+- `Fotos` e `Decorativos` compartilham o tamanho das miniaturas como uma preferência global do usuário, reutilizada entre Projetos e sessões e sem efeito no Projeto ou em Undo/Redo. Alterar ou restaurar o slider em qualquer aba atualiza o valor de ambas.
 - O slider usa o intervalo de `58 px` a `132 px`, em passos de `2 px`, e restaura `84 px` como tamanho médio.
 - Um clique simples seleciona somente a mídia acionada e a torna a âncora da seleção; `Ctrl` + clique adiciona ou remove itens individualmente.
 - `Shift` + clique seleciona o intervalo contínuo entre a âncora e o item acionado na ordem atualmente visível, já considerando Busca, filtros e Ordenação.

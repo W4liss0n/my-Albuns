@@ -6,16 +6,16 @@ use crate::{FavoriteLayout, LayoutFavoriteId};
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct ProjectDocumentV10 {
-    document_type: String,
-    schema_version: u32,
+    pub(super) document_type: String,
+    pub(super) schema_version: u32,
     pub(super) project_id: String,
-    revision: u64,
-    project: ProjectPayloadV10,
+    pub(super) revision: u64,
+    pub(super) project: ProjectPayloadV10,
 }
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct ProjectPayloadV10 {
+pub(super) struct ProjectPayloadV10 {
     document: DocumentSettingsV1,
     visual_defaults: VisualDefaultsV1,
     layout_settings: LayoutSettingsV8,

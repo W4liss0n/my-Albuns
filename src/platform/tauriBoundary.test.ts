@@ -302,10 +302,10 @@ test("consumes the generated import result at the Tauri boundary", () => {
   const projectPortSource = sourceFiles["./tauriProjectPorts.ts"];
 
   expect(projectPortSource).toContain(
-    'import type { ImportPhotoResult as IpcImportPhotoResult } from "./generated/ImportPhotoResult";',
+    'import type { ImportMediaResult as IpcImportMediaResult } from "./generated/ImportMediaResult";',
   );
   expect(projectPortSource).toContain(
-    'invokeImageProcessing<IpcImportPhotoResult>("import_photo", {}, onProgress)',
+    'invokeImageProcessing<IpcImportMediaResult>("import_media", { selection }, onProgress)',
   );
 });
 

@@ -14,6 +14,7 @@ import type {
   ComposedSheet,
   FrameResizeHandle,
   NormalizedPan,
+  RectUm,
 } from "../domain/project";
 import type {
   CanvasTechnicalGuides,
@@ -29,6 +30,7 @@ import {
   type CanvasBounds,
 } from "./canvasSheetViewGeometry";
 import { pixiColor } from "./pixiColor";
+import { createDecorativeDropFeedback } from "./decorativeDropFeedback";
 import { createPhotoBlackAndWhiteFilter } from "./photoBlackAndWhite";
 import {
   createPhotoGeometry,
@@ -87,6 +89,7 @@ export interface SheetRenderNode {
   frameGroupSelection: { signature: string; node: FrameSelectionRenderNode } | null;
   frameDropOutlines: Map<string, Graphics>;
   frameContentDropHighlights: Map<string, Graphics>;
+  decorativeDropFeedback: ReturnType<typeof createDecorativeDropFeedback> | null;
   focusOutline: Graphics;
   sheetDropOutline: Graphics;
   sheetBar: SheetBarRenderNode;
@@ -136,6 +139,7 @@ export function createSheetRenderNode(
   modePolicy: AlbumCanvasModePolicy,
   signature: string,
   callbacks: SheetRenderNodeCallbacks,
+  decorativePreview?: import("../domain/project").DecorativeDropPreview | null,
 ): SheetRenderNode {
   const sheetContainer = new Container();
   const presentation = createCanvasSheetPresentation(sheet);
@@ -215,14 +219,14 @@ export function createSheetRenderNode(
       sprite.width = backgroundWidth;
       sprite.height = backgroundHeight;
       sprite.eventMode = "none";
-      activeContent.addChild(sprite);
+      addDecorativeRenderNode(activeContent, sprite, background.clipRect);
     } else {
       const fallback = new Graphics()
         .rect(x, y, backgroundWidth, backgroundHeight)
         .fill({ color: pixiColor(SHEET_VISUAL_STYLE.mediaFallback.fill) });
       fallback.label = `background-media-fallback-${background.mediaId}`;
       fallback.eventMode = "none";
-      activeContent.addChild(fallback);
+      addDecorativeRenderNode(activeContent, fallback, background.clipRect);
     }
   }
 
@@ -457,7 +461,7 @@ export function createSheetRenderNode(
       overlay.height =
         composedOverlay.drawRect.height * MICROMETER_TO_CANVAS_PIXEL;
       overlay.eventMode = "none";
-      activeContent.addChild(overlay);
+      addDecorativeRenderNode(activeContent, overlay, composedOverlay.clipRect);
     } else {
       const overlayStyle = SHEET_VISUAL_STYLE.overlay;
       const overlay = new Graphics()
@@ -475,7 +479,7 @@ export function createSheetRenderNode(
         });
       overlay.label = `decorative-overlay-fallback-${composedOverlay.mediaId}`;
       overlay.eventMode = "none";
-      activeContent.addChild(overlay);
+      addDecorativeRenderNode(activeContent, overlay, composedOverlay.clipRect);
     }
   }
 
@@ -499,6 +503,9 @@ export function createSheetRenderNode(
     }
   }
   activeContent.addChild(frameSelectionLayer);
+  const decorativeDropFeedback = decorativePreview
+    ? createDecorativeDropFeedback(decorativePreview, viewGeometry.activeBounds) : null;
+  if (decorativeDropFeedback) sheetContainer.addChild(decorativeDropFeedback.container);
 
   const sheetBar = createSheetBarRenderNode(
     sheet,
@@ -566,6 +573,7 @@ export function createSheetRenderNode(
     frameGroupSelection: null,
     frameDropOutlines,
     frameContentDropHighlights,
+    decorativeDropFeedback,
     focusOutline,
     sheetDropOutline,
     sheetBar,
@@ -725,4 +733,23 @@ function setPhotoLayersScale(
 ) {
   node.layer.scale.set(x, y);
   node.outsideLayer.scale.set(x, y);
+}
+
+function addDecorativeRenderNode(
+  parent: Container,
+  node: Sprite | Graphics,
+  clipRect?: RectUm,
+) {
+  parent.addChild(node);
+  if (!clipRect) return;
+  const mask = new Graphics().rect(
+    clipRect.x * MICROMETER_TO_CANVAS_PIXEL,
+    clipRect.y * MICROMETER_TO_CANVAS_PIXEL,
+    clipRect.width * MICROMETER_TO_CANVAS_PIXEL,
+    clipRect.height * MICROMETER_TO_CANVAS_PIXEL,
+  ).fill({ color: 0xffffff });
+  mask.label = `${node.label}-clip`;
+  mask.eventMode = "none";
+  parent.addChild(mask);
+  node.mask = mask;
 }

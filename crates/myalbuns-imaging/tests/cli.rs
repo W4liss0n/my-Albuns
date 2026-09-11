@@ -670,7 +670,7 @@ fn processor_never_replaces_an_existing_preparation() {
 
 #[test]
 fn processor_builds_one_reduced_representation_per_real_photo() {
-    assert_reduced_photo_cache_round_trip(&[]);
+    assert_reduced_photo_cache_round_trip(&[], false);
 }
 
 #[cfg(windows)]
@@ -689,10 +689,11 @@ fn processor_builds_preview_for_adobe_jpeg_with_standard_windows_srgb() {
     metadata.extend_from_slice(b"ICC_PROFILE\0\x01\x01");
     metadata.extend_from_slice(&profile);
 
-    assert_reduced_photo_cache_round_trip(&metadata);
+    assert_reduced_photo_cache_round_trip(&metadata, false);
+    assert_reduced_photo_cache_round_trip(&metadata, true);
 }
 
-fn assert_reduced_photo_cache_round_trip(jpeg_metadata: &[u8]) {
+fn assert_reduced_photo_cache_round_trip(jpeg_metadata: &[u8], zero_based_components: bool) {
     let source_dir = tempfile::tempdir().expect("temporary source directory");
     let cache = TestCache::new("build");
     let log_dir = tempfile::tempdir().expect("temporary log directory");
@@ -707,6 +708,29 @@ fn assert_reduced_photo_cache_round_trip(jpeg_metadata: &[u8]) {
     if !jpeg_metadata.is_empty() {
         let mut bytes = std::fs::read(&source_path).expect("the generated JPEG is readable");
         bytes.splice(2..2, jpeg_metadata.iter().copied());
+        if zero_based_components {
+            // The encoder fixture has one baseline frame and one scan. Keep
+            // the compressed samples unchanged while renaming both selectors.
+            let mut cursor = 2;
+            loop {
+                let marker = bytes[cursor + 1];
+                let length =
+                    usize::from(u16::from_be_bytes([bytes[cursor + 2], bytes[cursor + 3]]));
+                let payload = cursor + 4;
+                if marker == 0xc0 {
+                    for index in 0..3 {
+                        bytes[payload + 6 + index * 3] = index as u8;
+                    }
+                }
+                if marker == 0xda {
+                    for index in 0..3 {
+                        bytes[payload + 1 + index * 2] = index as u8;
+                    }
+                    break;
+                }
+                cursor += 2 + length;
+            }
+        }
         std::fs::write(&source_path, bytes).expect("the fixture receives exporter metadata");
     }
     let original_source = std::fs::read(&source_path).expect("the source is readable");
@@ -1122,6 +1146,90 @@ fn processor_composites_a_transparent_decorative_from_its_original_png() {
         std::fs::read(decorative_path).expect("the original remains readable"),
         decorative_bytes
     );
+}
+
+#[test]
+fn processor_clips_decorative_media_without_stretching_the_retained_half() {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("decorative.png");
+    let mut original = RgbaImage::from_pixel(100, 50, Rgba([0, 0, 240, 255]));
+    for y in 0..50 {
+        for x in 0..50 {
+            original.put_pixel(x, y, Rgba([240, 0, 0, 255]));
+        }
+    }
+    original.save_with_format(&path, ImageFormat::Png).unwrap();
+    for (background, single_page) in [(false, false), (true, false), (false, true), (true, true)] {
+        let mut snapshot = productive_photo_snapshot(&path, Some(&path));
+        let sheet = &mut snapshot.composition.sheets[0];
+        let mut decoration = sheet.overlays[0].clone();
+        sheet.width_um = 25_400;
+        sheet.height_um = 12_700;
+        sheet.base.draw_rect = myalbuns_core::RectUm {
+            x: 0,
+            y: 0,
+            width: 25_400,
+            height: 12_700,
+        };
+        sheet.frames.clear();
+        sheet.backgrounds.clear();
+        decoration.draw_rect = sheet.base.draw_rect.clone();
+        decoration.clip_rect = Some(myalbuns_core::RectUm {
+            x: 12_700,
+            y: 0,
+            width: 12_700,
+            height: 12_700,
+        });
+        if single_page {
+            sheet.width_um = 12_700;
+            sheet.active_sides = myalbuns_core::ProjectedActiveSides::Right;
+            sheet.base.draw_rect.width = 12_700;
+            decoration.draw_rect.x = -12_700;
+            decoration.clip_rect.as_mut().unwrap().x = 0;
+        }
+        let media_id = decoration.media_id;
+        if background {
+            sheet.overlays.clear();
+            sheet
+                .backgrounds
+                .push(myalbuns_core::ComposedBackground::Media {
+                    media_id,
+                    name: "Decorativo".into(),
+                    draw_rect: decoration.draw_rect,
+                    clip_rect: decoration.clip_rect,
+                });
+        } else {
+            sheet.overlays = vec![decoration];
+        }
+        let output = root
+            .path()
+            .join(format!("clipped-{background}-{single_page}.jpg"));
+        let result = invoke_real_processor(
+            snapshot,
+            &output,
+            "clipped-001",
+            100,
+            vec![RenderSource::new(media_id, path.clone()).unwrap()],
+        );
+        assert!(
+            result.status.success(),
+            "{}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+        let rendered = image::open(output).unwrap().to_rgb8();
+        if !single_page {
+            let left = rendered.get_pixel(25, 25);
+            assert!(
+                left[0] > 245 && left[1] > 245 && left[2] > 245,
+                "the opposite side stays white: {left:?}"
+            );
+        }
+        let right = rendered.get_pixel(if single_page { 10 } else { 60 }, 25);
+        assert!(
+            right[0] < 15 && right[2] > 220,
+            "the retained right portion stays blue without refitting the Original: {right:?}"
+        );
+    }
 }
 
 #[test]

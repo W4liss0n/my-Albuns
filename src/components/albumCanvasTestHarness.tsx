@@ -243,6 +243,14 @@ vi.mock("pixi.js", () => {
     }> = [];
     strokeStyles: unknown[] = [];
 
+    clear() {
+      this.fillStyles = [];
+      this.rectCommands = [];
+      this.strokeStyles = [];
+      this.pathCommands = [];
+      return this;
+    }
+
     circle() {
       return this;
     }

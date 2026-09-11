@@ -380,6 +380,9 @@ impl Default for ProjectedVisualDefaults {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct SheetSnapshot {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub visuals: Option<crate::SheetVisuals>,
     pub id: String,
     pub layout_locked: bool,
     pub number: usize,
@@ -478,6 +481,9 @@ pub struct ComposedFrame {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct ComposedDecorative {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub clip_rect: Option<RectUm>,
     #[ts(type = "string")]
     pub media_id: MediaId,
     pub name: String,
@@ -508,6 +514,9 @@ pub enum ComposedBackground {
         media_id: MediaId,
         name: String,
         draw_rect: RectUm,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        clip_rect: Option<RectUm>,
     },
 }
 
@@ -569,6 +578,29 @@ pub struct MediaUsage {
     #[ts(type = "string")]
     pub media_id: MediaId,
     pub count: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub breakdown: Option<MediaUsageBreakdown>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct MediaUsageBreakdown {
+    pub frames: usize,
+    pub backgrounds: usize,
+    pub overlays: usize,
+    pub album_backgrounds: usize,
+    pub album_overlays: usize,
+}
+
+impl MediaUsageBreakdown {
+    pub fn count(&self) -> usize {
+        self.frames
+            + self.backgrounds
+            + self.overlays
+            + self.album_backgrounds
+            + self.album_overlays
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
@@ -635,14 +667,17 @@ fn is_canonical_rgb(value: &str) -> bool {
 }
 
 /// Trusted native import command. The Host constructs it only after the
-/// selected JPEG has passed path and codec inspection.
+/// selected image has passed path and codec inspection.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ImportPhoto {
+pub struct ImportMedia {
     pub(crate) path: PathBuf,
     pub(crate) source_metadata: Option<PhotoSourceMetadata>,
 }
 
-impl ImportPhoto {
+/// Compatibility name for callers that import only Photos.
+pub type ImportPhoto = ImportMedia;
+
+impl ImportMedia {
     pub fn path(&self) -> &std::path::Path {
         &self.path
     }
@@ -833,6 +868,21 @@ pub enum FrameStackAction {
 )]
 #[ts(tag = "kind")]
 pub enum ProjectIntent {
+    DropDecorative {
+        request: crate::DecorativeDropRequest,
+    },
+    ApplyDecorative {
+        sheet_id: String,
+        #[ts(type = "string")]
+        media_id: MediaId,
+        role: crate::DecorativeRole,
+        scope: crate::DecorativeScope,
+    },
+    RemoveMedia {
+        #[ts(type = "Array<string>")]
+        media_ids: Vec<MediaId>,
+        mode: MediaRemovalMode,
+    },
     LockLayout {
         selection: crate::LayoutSelection,
     },
@@ -939,6 +989,13 @@ pub enum PhotoOrientationAction {
     RotateCounterClockwise,
     ResetRotation,
     ToggleHorizontalMirror,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum MediaRemovalMode {
+    RemoveAll,
+    KeepFrames,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]

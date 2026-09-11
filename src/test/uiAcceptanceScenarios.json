@@ -819,6 +819,108 @@
       ]
     },
     {
+      "id": "media-panel-shared-size-decorative",
+      "title": "Painel de imagens — tamanho ajustado em Fotos acompanha Decorativos",
+      "implementationPath": "/media-panel-preview.html?acceptance=editor",
+      "comparison": {"kind":"implementation-only","surface":"media-panel","implementationCaptureSelector":".media-panel-preview[data-acceptance-surface=\"editor\"] > .media-panel","reason":"A decisão aceita no design 0031 compartilha um único tamanho entre Fotos e Decorativos, inclusive na restauração do padrão."},
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": ".media-grid[aria-label=\"Grade de Decorativos\"][style*=\"124px\"]",
+      "actions": [
+        {"type":"click","selector":"button[aria-label=\"Filtro, ordem e tamanho\"]"},
+        {"type":"focus","selector":"input[aria-label=\"Tamanho das miniaturas\"]"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"click","selector":"button[aria-label=\"Decorativos\"]"},
+        {"type":"click","selector":"button[aria-label=\"Filtro, ordem e tamanho\"]"},
+        {"type":"assert","selector":"input[aria-label=\"Tamanho das miniaturas\"][title=\"Tamanho das miniaturas: 124 px\"]"}
+      ]
+    },
+    {
+      "id": "media-panel-shared-size-photo",
+      "title": "Painel de imagens — tamanho ajustado em Decorativos acompanha Fotos",
+      "implementationPath": "/media-panel-preview.html?acceptance=editor",
+      "comparison": {"kind":"implementation-only","surface":"media-panel","implementationCaptureSelector":".media-panel-preview[data-acceptance-surface=\"editor\"] > .media-panel","reason":"A decisão aceita no design 0031 compartilha um único tamanho entre Fotos e Decorativos, inclusive na restauração do padrão."},
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": ".media-grid[aria-label=\"Grade de Fotos\"][style*=\"110px\"]",
+      "actions": [
+        {"type":"click","selector":"button[aria-label=\"Decorativos\"]"},
+        {"type":"click","selector":"button[aria-label=\"Filtro, ordem e tamanho\"]"},
+        {"type":"focus","selector":"input[aria-label=\"Tamanho das miniaturas\"]"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"click","selector":"button[aria-label=\"Fotos\"]"},
+        {"type":"click","selector":"button[aria-label=\"Filtro, ordem e tamanho\"]"},
+        {"type":"assert","selector":"input[aria-label=\"Tamanho das miniaturas\"][title=\"Tamanho das miniaturas: 110 px\"]"}
+      ]
+    },
+    {
+      "id": "media-panel-shared-size-reset",
+      "title": "Painel de imagens — restaurar o slider em Decorativos também restaura Fotos",
+      "implementationPath": "/media-panel-preview.html?acceptance=editor",
+      "comparison": {"kind":"implementation-only","surface":"media-panel","implementationCaptureSelector":".media-panel-preview[data-acceptance-surface=\"editor\"] > .media-panel","reason":"A decisão aceita no design 0031 compartilha um único tamanho entre Fotos e Decorativos, inclusive na restauração do padrão."},
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": ".media-grid[aria-label=\"Grade de Fotos\"][style*=\"84px\"]",
+      "actions": [
+        {"type":"click","selector":"button[aria-label=\"Filtro, ordem e tamanho\"]"},
+        {"type":"focus","selector":"input[aria-label=\"Tamanho das miniaturas\"]"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"key","key":"ArrowRight"},
+        {"type":"click","selector":"button[aria-label=\"Decorativos\"]"},
+        {"type":"click","selector":"button[aria-label=\"Filtro, ordem e tamanho\"]"},
+        {"type":"double-click","selector":"input[aria-label=\"Tamanho das miniaturas\"]"},
+        {"type":"click","selector":"button[aria-label=\"Fotos\"]"},
+        {"type":"click","selector":"button[aria-label=\"Filtro, ordem e tamanho\"]"},
+        {"type":"assert","selector":"input[aria-label=\"Tamanho das miniaturas\"][title=\"Tamanho das miniaturas: 84 px\"]"}
+      ]
+    },
+    {
       "id": "media-panel-popup-keyboard",
       "title": "Painel de imagens — popup por teclado",
       "implementationPath": "/media-panel-preview.html?acceptance=editor",
@@ -1546,7 +1648,7 @@
     },
     {
       "id": "media-panel-import-menu",
-      "title": "Painel de imagens — seleção de vários JPEGs",
+      "title": "Painel de imagens — importar JPEG, PNG, TIFF ou pasta",
       "implementationPath": "/media-panel-preview.html?acceptance=editor&import=menu",
       "comparison": {
         "kind": "implementation-only",
@@ -7392,6 +7494,585 @@
           "selector": ".pixi-canvas"
         }
       ]
+    },
+    {
+      "id": "media-panel-dates",
+      "title": "Painel de imagens — datas, usos e arquivos ausentes",
+      "implementationPath": "/media-panel-preview.html?acceptance=editor&files=dates",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-complete",
+        "implementationCaptureSelector": ".media-panel",
+        "reason": "A especificação e o design 0031 completam o Painel de imagens. A referência vigente antecede estes estados; a composição de Decorativos provém do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "#media-panel-options",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Filtro, ordem e tamanho\"]"
+        }
+      ]
+    },
+    {
+      "id": "media-panel-absent",
+      "title": "Painel de imagens — somente arquivos ausentes",
+      "implementationPath": "/media-panel-preview.html?acceptance=editor&files=absent",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-complete",
+        "implementationCaptureSelector": ".media-panel",
+        "reason": "A especificação e o design 0031 completam o Painel de imagens. A referência vigente antecede estes estados; a composição de Decorativos provém do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".media-grid [data-media-id=\"test-media-003\"]",
+      "actions": [
+        {
+          "type": "click",
+          "selector": ".media-folder-chip:not([aria-label])"
+        }
+      ]
+    },
+    {
+      "id": "media-panel-removal-menu",
+      "title": "Painel de imagens — seleção e menu Remover",
+      "implementationPath": "/media-panel-preview.html?acceptance=editor",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-complete",
+        "implementationCaptureSelector": ".media-panel-preview",
+        "reason": "A especificação e o design 0031 completam o Painel de imagens. A referência vigente antecede estes estados; a composição de Decorativos provém do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "[role=\"menuitem\"]",
+      "actions": [
+        {
+          "type": "context-click",
+          "selector": ".media-grid [data-media-id=\"test-media-001\"]"
+        }
+      ]
+    },
+    {
+      "id": "media-removal-photo",
+      "title": "Remoção de Fotos — confirmação conjunta",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22mediaRemovalConfirmation%22%2C%22mediaKind%22%3A%22photo%22%2C%22count%22%3A12%2C%22usedCount%22%3A7%2C%22usageCount%22%3A28%2C%22busy%22%3Afalse%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-complete",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "A especificação e o design 0031 completam o Painel de imagens. A referência vigente antecede estes estados; a composição de Decorativos provém do Core."
+      },
+      "viewport": {
+        "width": 660,
+        "height": 320
+      },
+      "readySelector": ".ui-owned-window-shell",
+      "actions": []
+    },
+    {
+      "id": "media-removal-decorative",
+      "title": "Remoção de Decorativos — confirmação conjunta",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22mediaRemovalConfirmation%22%2C%22mediaKind%22%3A%22decorative%22%2C%22count%22%3A12%2C%22usedCount%22%3A7%2C%22usageCount%22%3A28%2C%22busy%22%3Afalse%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-complete",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "A especificação e o design 0031 completam o Painel de imagens. A referência vigente antecede estes estados; a composição de Decorativos provém do Core."
+      },
+      "viewport": {
+        "width": 660,
+        "height": 320
+      },
+      "readySelector": ".ui-owned-window-shell",
+      "actions": []
+    },
+    {
+      "id": "workspace-decorative-whole",
+      "title": "Decorativos — aplicação inteira",
+      "implementationPath": "/workspace-preview.html?frame=decorations&decoration-state=whole",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-complete",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A especificação e o design 0031 completam o Painel de imagens. A referência vigente antecede estes estados; a composição de Decorativos provém do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".canvas-host canvas.pixi-canvas",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Decorativos\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-decorative-split",
+      "title": "Decorativos — aplicação dividida",
+      "implementationPath": "/workspace-preview.html?frame=decorations&decoration-state=split",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-complete",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A especificação e o design 0031 completam o Painel de imagens. A referência vigente antecede estes estados; a composição de Decorativos provém do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".canvas-host canvas.pixi-canvas",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Decorativos\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-decorative-overlay",
+      "title": "Decorativos — Overlay sobre Fotos e Frames",
+      "implementationPath": "/workspace-preview.html?frame=decorations&decoration-state=overlay",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-complete",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A especificação e o design 0031 completam o Painel de imagens. A referência vigente antecede estes estados; a composição de Decorativos provém do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".canvas-host canvas.pixi-canvas",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Decorativos\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-decorative-single",
+      "title": "Decorativos — Página única",
+      "implementationPath": "/workspace-preview.html?frame=decorations&decoration-state=single",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-complete",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A especificação e o design 0031 completam o Painel de imagens. A referência vigente antecede estes estados; a composição de Decorativos provém do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".canvas-host canvas.pixi-canvas",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Decorativos\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-decorative-preview-left",
+      "title": "Decorativos — prévia de Fundo à esquerda",
+      "implementationPath": "/workspace-preview.html?frame=decorations",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-complete",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A especificação e o design 0031 completam o Painel de imagens. A referência vigente antecede estes estados; a composição de Decorativos provém do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".canvas-decorative-drop-label",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Decorativos\"]"
+        },
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": ".media-grid [data-media-id=\"00000000-0000-4000-8000-000000000030\"]",
+          "targetSelector": ".canvas-host canvas.pixi-canvas",
+          "targetOffsetX": -200,
+          "phase": "preview"
+        }
+      ]
+    },
+    {
+      "id": "workspace-decorative-preview-center",
+      "title": "Decorativos — prévia de Fundo em ambos os lados",
+      "implementationPath": "/workspace-preview.html?frame=decorations",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-complete",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A especificação e o design 0031 completam o Painel de imagens. A referência vigente antecede estes estados; a composição de Decorativos provém do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".canvas-decorative-drop-label",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Decorativos\"]"
+        },
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": ".media-grid [data-media-id=\"00000000-0000-4000-8000-000000000030\"]",
+          "targetSelector": ".canvas-host canvas.pixi-canvas",
+          "targetOffsetX": 0,
+          "phase": "preview"
+        }
+      ]
+    },
+    {
+      "id": "workspace-decorative-preview-right",
+      "title": "Decorativos — prévia de Fundo à direita",
+      "implementationPath": "/workspace-preview.html?frame=decorations",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-complete",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A especificação e o design 0031 completam o Painel de imagens. A referência vigente antecede estes estados; a composição de Decorativos provém do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".canvas-decorative-drop-label",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Decorativos\"]"
+        },
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": ".media-grid [data-media-id=\"00000000-0000-4000-8000-000000000030\"]",
+          "targetSelector": ".canvas-host canvas.pixi-canvas",
+          "targetOffsetX": 200,
+          "phase": "preview"
+        }
+      ]
+    },
+    {
+      "id": "workspace-decorative-drag-overlay",
+      "title": "Decorativos — prévia de Overlay com Shift",
+      "implementationPath": "/workspace-preview.html?frame=decorations",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-complete",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A especificação e o design 0031 completam o Painel de imagens. A referência vigente antecede estes estados; a composição de Decorativos provém do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".canvas-decorative-drop-label",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Decorativos\"]"
+        },
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": ".media-grid [data-media-id=\"00000000-0000-4000-8000-000000000030\"]",
+          "targetSelector": ".canvas-host canvas.pixi-canvas",
+          "phase": "preview",
+          "modifiers": [
+            "Shift"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "workspace-decorative-drag-commit",
+      "title": "Decorativos — soltura confirmada",
+      "implementationPath": "/workspace-preview.html?frame=decorations",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-complete",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A especificação e o design 0031 completam o Painel de imagens. A referência vigente antecede estes estados; a composição de Decorativos provém do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-decorative-applied=\"background-bothSides\"]",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Decorativos\"]"
+        },
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": ".media-grid [data-media-id=\"00000000-0000-4000-8000-000000000030\"]",
+          "targetSelector": ".canvas-host canvas.pixi-canvas",
+          "phase": "drop",
+          "modifiers": []
+        }
+      ]
+    },
+    {
+      "id": "workspace-decorative-drag-escape",
+      "title": "Decorativos — cancelamento com Esc",
+      "implementationPath": "/workspace-preview.html?frame=decorations",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-complete",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A especificação e o design 0031 completam o Painel de imagens. A referência vigente antecede estes estados; a composição de Decorativos provém do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".canvas-host:not(:has(.canvas-decorative-drop-label))",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Decorativos\"]"
+        },
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": ".media-grid [data-media-id=\"00000000-0000-4000-8000-000000000030\"]",
+          "targetSelector": ".canvas-host canvas.pixi-canvas",
+          "phase": "escape",
+          "modifiers": []
+        }
+      ]
+    },
+    {
+      "id": "media-panel-photo-drag-preview",
+      "title": "Foto do Painel — destino destacado sem trocar conteúdo",
+      "implementationPath": "/workspace-preview.html?frame=swap&mode=normal&swap=photos",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-complete",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "O gesto interno usa ponteiro para coexistir com a soltura nativa do Windows, conforme design 0031. O alvo é produzido pelo Core."
+      },
+      "viewport": {
+        "width": 1896,
+        "height": 720
+      },
+      "readySelector": ".canvas-host[data-media-drag=\"photo\"]",
+      "actions": [
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": ".media-grid [data-media-id=\"00000000-0000-4000-8000-000000000001\"]",
+          "targetSelector": ".canvas-host canvas",
+          "targetOffsetX": -473,
+          "targetOffsetY": -13,
+          "phase": "preview"
+        }
+      ]
+    },
+    {
+      "id": "media-panel-photo-drag-escape",
+      "title": "Foto do Painel — Esc cancela o arraste",
+      "implementationPath": "/workspace-preview.html?frame=swap&mode=normal&swap=photos",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-complete",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "O gesto interno usa ponteiro para coexistir com a soltura nativa do Windows, conforme design 0031. O alvo é produzido pelo Core."
+      },
+      "viewport": {
+        "width": 1896,
+        "height": 720
+      },
+      "readySelector": ".canvas-host:not([data-media-drag])",
+      "actions": [
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": ".media-grid [data-media-id=\"00000000-0000-4000-8000-000000000001\"]",
+          "targetSelector": ".canvas-host canvas",
+          "targetOffsetX": -473,
+          "targetOffsetY": -13,
+          "phase": "escape"
+        }
+      ]
+    },
+    {
+      "id": "workspace-decorative-preview-single",
+      "title": "Decorativos — prévia na Página única sem faixa central",
+      "implementationPath": "/workspace-preview.html?frame=decorations&decoration-state=single",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-complete",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A especificação e o design 0031 completam o Painel de imagens. A referência vigente antecede estes estados; a composição de Decorativos provém do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".canvas-decorative-drop-label",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Decorativos\"]"
+        },
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": ".media-grid [data-media-id=\"00000000-0000-4000-8000-000000000030\"]",
+          "targetSelector": ".canvas-host canvas.pixi-canvas",
+          "targetOffsetX": 0,
+          "phase": "preview"
+        }
+      ]
+    },
+    {
+      "id": "media-panel-missing-review",
+      "title": "Painel de imagens — revisão de ausentes aberta pelo aviso do Álbum",
+      "implementationPath": "/workspace-preview.html?files=absent",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-complete",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A revisão temporária de ausentes segue a especificação e o design 0031, posteriores à referência vigente."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "[aria-label=\"Encerrar visualização de ausentes\"]",
+      "actions": [
+        {
+          "type": "click-text",
+          "text": "Ver arquivos ausentes"
+        }
+      ]
+    },
+    {
+      "id": "workspace-decorative-grid",
+      "title": "Decorativos — recorte preservado na Grade",
+      "implementationPath": "/workspace-preview.html?frame=decorations&decoration-state=split&mode=normal",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-complete",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A especificação e o design 0031 completam o Painel de imagens. A referência vigente antecede estes estados; a composição de Decorativos provém do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".sheet-grid .sheet-tile",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Decorativos\"]"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Informações do Álbum\"]"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Design do Álbum\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-decorative-inspector",
+      "title": "Decorativos — recorte e valores por lado no Inspetor",
+      "implementationPath": "/workspace-preview.html?frame=decorations&decoration-state=split&context=sheet",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-complete",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A especificação e o design 0031 completam o Painel de imagens. A referência vigente antecede estes estados; a composição de Decorativos provém do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".sheet-design-inspector",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Decorativos\"]"
+        }
+      ]
+    },
+    {
+      "id": "photo-import-memory-interruption",
+      "title": "Importação — interrupção única por memória",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22imageProcessingProblems%22%2C%22importedCount%22%3A2%2C%22problems%22%3A%5B%5D%2C%22operationProblem%22%3A%22N%C3%A3o%20foi%20poss%C3%ADvel%20continuar%20o%20processamento%20por%20falta%20de%20mem%C3%B3ria.%20Tente%20novamente%20mais%20tarde.%22%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-message-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "A revisão aceita em docs/design/0032-revisao-da-admissao-por-memoria.md distingue a interrupção da operação dos problemas reais de arquivo, usando os diálogos canônicos."
+      },
+      "viewport": {
+        "width": 520,
+        "height": 320
+      },
+      "readySelector": ".ui-standard-message[role=\"alert\"]",
+      "actions": []
+    },
+    {
+      "id": "photo-import-memory-with-file-problems",
+      "title": "Importação — interrupção por memória e arquivo corrompido",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22imageProcessingProblems%22%2C%22importedCount%22%3A2%2C%22problems%22%3A%5B%7B%22fileName%22%3A%22DSC_0148.jpg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%5D%2C%22operationProblem%22%3A%22N%C3%A3o%20foi%20poss%C3%ADvel%20continuar%20o%20processamento%20por%20falta%20de%20mem%C3%B3ria.%20Tente%20novamente%20mais%20tarde.%22%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-problems-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "A revisão aceita em docs/design/0032-revisao-da-admissao-por-memoria.md distingue a interrupção da operação dos problemas reais de arquivo, usando os diálogos canônicos."
+      },
+      "viewport": {
+        "width": 640,
+        "height": 438
+      },
+      "readySelector": ".ui-problems-table",
+      "actions": []
+    },
+    {
+      "id": "image-processing-memory-interruption",
+      "title": "Processamento — interrupção única por memória",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22imageProcessingProblems%22%2C%22importedCount%22%3Anull%2C%22problems%22%3A%5B%5D%2C%22operationProblem%22%3A%22N%C3%A3o%20foi%20poss%C3%ADvel%20continuar%20o%20processamento%20por%20falta%20de%20mem%C3%B3ria.%20Tente%20novamente%20mais%20tarde.%22%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-message-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "A revisão aceita em docs/design/0032-revisao-da-admissao-por-memoria.md distingue a interrupção da operação dos problemas reais de arquivo, usando os diálogos canônicos."
+      },
+      "viewport": {
+        "width": 520,
+        "height": 320
+      },
+      "readySelector": ".ui-standard-message[role=\"alert\"]",
+      "actions": []
     }
   ]
 }

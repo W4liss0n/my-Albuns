@@ -40,10 +40,11 @@ import { LayoutExportBlockedError } from "../application/projectPorts";
 import { parseLayoutExportProblems } from "./layoutExportContract";
 import type { ExportEvent as IpcExportEvent } from "./generated/ExportEvent";
 import type { ExportResult as IpcExportResult } from "./generated/ExportResult";
-import type { ImportPhotoResult as IpcImportPhotoResult } from "./generated/ImportPhotoResult";
+import type { ImportMediaResult as IpcImportMediaResult } from "./generated/ImportMediaResult";
 import type { ImageProcessingProgress as IpcImageProcessingProgress } from "./generated/ImageProcessingProgress";
 import type { LinkedMediaChanged as IpcLinkedMediaChanged } from "./generated/LinkedMediaChanged";
 import type { MediaPreview as IpcMediaPreview } from "./generated/MediaPreview";
+import type { MediaFileCatalog as IpcMediaFileCatalog } from "./generated/MediaFileCatalog";
 import type { MediaPreviewCommandError as IpcMediaPreviewCommandError } from "./generated/MediaPreviewCommandError";
 import type { PointerDragThreshold } from "./generated/PointerDragThreshold";
 import type { SaveProjectOutcome as IpcSaveProjectOutcome } from "./generated/SaveProjectOutcome";
@@ -298,6 +299,7 @@ export const tauriProjectCorePort: ProjectCorePort = {
   readFrameDragThreshold: () => invoke<PointerDragThreshold>("frame_drag_threshold"),
   readSliderDoubleClickTime: () => invoke<number>("slider_double_click_time"),
   previewPhotoAngle: (edit) => invoke<ComposedFrame[]>("preview_photo_angle", { edit }),
+  previewDecorativeDrop: (request) => invoke<import("../domain/project").DecorativeDropPreview | null>("preview_decorative_drop", { request }),
   previewFrameStyle: (edit) => invoke<ComposedFrame[]>("preview_frame_style", { edit }),
   queryLayouts: (sheetId, frameRequest) => invoke<LayoutQueryResult>("query_layouts", frameRequest ? { sheetId, frameRequest } : { sheetId }),
   refreshLayoutCatalog: () => invoke<number>("refresh_layout_catalog"),
@@ -319,7 +321,7 @@ export const tauriProjectCorePort: ProjectCorePort = {
     ).projection,
   applyWithOutcome: (intent: ProjectIntent, onProgress) =>
     invokeImageProcessing<ProjectMutationOutcome>("apply_project_intent", { intent }, onProgress),
-  importPhoto: (onProgress) => invokeImageProcessing<IpcImportPhotoResult>("import_photo", {}, onProgress),
+  importMedia: (onProgress, selection) => invokeImageProcessing<IpcImportMediaResult>("import_media", { selection }, onProgress),
   resolvePhotoDropTarget: (
     sheetId: string,
     xUm: number,
@@ -371,7 +373,8 @@ async function loadWorkspacePreferences(): Promise<WorkspacePreferences> {
   return createWorkspacePreferences({
     inspectorSections: state.inspectorSections,
     mediaPanel: settings.mediaPanel,
-    mediaThumbnailSizes: state.mediaThumbnailSizes,
+    mediaPanelActiveKind: settings.mediaPanel.activeKind,
+    mediaThumbnailSize: state.mediaThumbnailSize,
     workspacePanels: state.workspacePanels,
   });
 }
@@ -381,6 +384,8 @@ export const tauriWorkspacePreferencesPort: WorkspacePreferencesPort = {
   update: async (change: WorkspacePreferenceChange) => {
     if (
       change.kind === "mediaPanelSortDirection" ||
+      change.kind === "mediaPanelActiveKind" ||
+      change.kind === "mediaPanelSortKey" ||
       change.kind === "mediaPanelUsageFilter"
     ) {
       await invoke<IpcApplicationSettings>("update_application_setting", {
@@ -396,6 +401,7 @@ export const tauriWorkspacePreferencesPort: WorkspacePreferencesPort = {
 };
 
 export const tauriMediaPreviewPort: MediaPreviewPort = {
+  readMediaFiles: () => invoke<IpcMediaFileCatalog>("read_media_files"),
   prepareMediaPreviews: async (demand, publish) => {
     const onPreview = new Channel<IpcMediaPreview>();
     let active = true;

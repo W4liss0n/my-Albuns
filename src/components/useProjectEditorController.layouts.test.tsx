@@ -61,9 +61,10 @@ function harness(pendingKind: "applyLayout" | "lockLayout" | "unlockLayout" | "s
       checkSelection(selection);
       return structuredClone(sample.before.queries[sheetId].previews[selection.candidateIndex]);
     },
+    previewDecorativeDrop: async () => { throw new Error("Decorative preview is not configured in this fixture."); },
     previewFrameStyle: unsupported, previewPhotoAngle: unsupported, previewFrameGeometry: unsupported,
     saveAs: unsupported, validateAlbumInformation: unsupported, applyWithOutcome: unsupported,
-    importPhoto: unsupported, resolvePhotoDropTarget: unsupported, relink: unsupported,
+    importMedia: unsupported, resolvePhotoDropTarget: unsupported, relink: unsupported,
   };
   const view = renderHook(() => {
     const [projection, setProjection] = useState<EditorProjection>(initial);

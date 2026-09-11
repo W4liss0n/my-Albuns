@@ -24,6 +24,115 @@ import {
 setupAlbumCanvasTestHarness();
 const pixiLifecycle = getPixiLifecycle();
 
+test("composes the Decorative preview below Frames, switches role with Shift, and commits only the released gesture", async () => {
+  const onSelectFrame = vi.fn();
+  const onDropDecorative = vi.fn(async () => true);
+  const onPhotoDragCancel = vi.fn();
+  const onPreviewDecorativeDrop = vi.fn(async (request: import("../domain/project").DecorativeDropRequest): Promise<import("../domain/project").DecorativeDropPreview> => {
+    const content = { mediaId: request.mediaId, name: "Papel", drawRect: { x: 0, y: 0, width: 600_000, height: 300_000 } };
+    return {
+      revision: 1, role: request.role, scope: "bothSides",
+      zoneRect: { x: 240_000, y: 0, width: 120_000, height: 300_000 },
+      centerRect: { x: 240_000, y: 0, width: 120_000, height: 300_000 },
+      sheet: { ...interactiveComposition.sheets[0],
+        backgrounds: request.role === "background" ? [{ kind: "media", ...content }] : interactiveComposition.sheets[0].backgrounds,
+        overlays: request.role === "overlay" ? [content] : [],
+      },
+    };
+  });
+  const view = renderCanvas({ compositionPlan: interactiveComposition, selectedFrameIds: ["frame-001"], onSelectFrame, onPhotoDragCancel });
+  await finishPixiInitialization();
+  vi.spyOn(pixiLifecycle.instances[0].canvas, "getBoundingClientRect").mockReturnValue({
+    left: 0, top: 0, width: 1_200, height: 500, right: 1_200, bottom: 500, x: 0, y: 0, toJSON: () => ({}),
+  });
+  const mediaDrag = { gestureId: 1, mediaId: "decorative-001", kind: "decorative" as const, x: 600, y: 250, shiftKey: false, phase: "dragging" as const };
+  const callbacks = { revision: 1, onPreviewDecorativeDrop, onDropDecorative };
+  view.rerenderCanvas({ ...callbacks, mediaDrag });
+  await waitFor(() => expect(screen.getByRole("status", { name: "Aplicação do Decorativo" })).toHaveTextContent("Fundo · Ambos os lados"));
+  await waitFor(() => expect(displayWithLabel("background-media-fallback-decorative-001")).toBeDefined());
+  expect(displayWithLabel("decorative-drop-target-sheet-001")).toMatchObject({ rectCommands: [{ x: 0, y: 0, width: 600, height: 300 }], fillStyles: [] });
+  expect(displayWithLabel("decorative-drop-center-sheet-001")).toMatchObject({ rectCommands: [], fillStyles: [] });
+  expect(displayWithLabel("sheet-focus-sheet-001")).toMatchObject({ visible: false });
+  expect(displayWithLabel("frame-selection-layer-sheet-001")).toMatchObject({ visible: false });
+  expect(onDropDecorative).not.toHaveBeenCalled();
+  expect(onSelectFrame).not.toHaveBeenCalled();
+  view.rerenderCanvas({ ...callbacks, mediaDrag: { ...mediaDrag, shiftKey: true } });
+  await waitFor(() => expect(screen.getByRole("status", { name: "Aplicação do Decorativo" })).toHaveTextContent("Overlay · Ambos os lados"));
+  expect(onPreviewDecorativeDrop).toHaveBeenLastCalledWith(expect.objectContaining({ role: "overlay" }));
+  await waitFor(() => expect(displayWithLabel("decorative-overlay-fallback-decorative-001")).toBeDefined());
+  view.rerenderCanvas({ ...callbacks, mediaDrag: { ...mediaDrag, shiftKey: true, phase: "drop" } });
+  await waitFor(() => expect(onDropDecorative).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ mediaId: "decorative-001", role: "overlay" })));
+  expect(onSelectFrame).not.toHaveBeenCalled();
+  expect(onPhotoDragCancel).toHaveBeenCalledOnce();
+  view.rerenderCanvas({ ...callbacks, mediaDrag: null });
+  const selectionLayers = pixiLifecycle.displays.filter((node) => node.label === "frame-selection-layer-sheet-001");
+  expect(selectionLayers[selectionLayers.length - 1]).toMatchObject({ visible: true });
+});
+
+test.each(["left", "right"] as const)("outlines the entire %s Page instead of the narrower pointer zone", async (scope) => {
+  const onPreviewDecorativeDrop = vi.fn(async (): Promise<import("../domain/project").DecorativeDropPreview> => ({
+    revision: 1, role: "background", scope,
+    zoneRect: { x: scope === "left" ? 0 : 360_000, y: 0, width: 240_000, height: 300_000 },
+    centerRect: { x: 240_000, y: 0, width: 120_000, height: 300_000 },
+    sheet: composition.sheets[0],
+  }));
+  const view = renderCanvas();
+  await finishPixiInitialization();
+  vi.spyOn(pixiLifecycle.instances[0].canvas, "getBoundingClientRect").mockReturnValue({
+    left: 0, top: 0, width: 1_200, height: 500, right: 1_200, bottom: 500, x: 0, y: 0, toJSON: () => ({}),
+  });
+  view.rerenderCanvas({ revision: 1, onPreviewDecorativeDrop,
+    mediaDrag: { gestureId: 1, mediaId: "decorative-001", kind: "decorative", x: scope === "left" ? 300 : 900, y: 250, shiftKey: false, phase: "dragging" } });
+  await waitFor(() => expect(screen.getByRole("status", { name: "Aplicação do Decorativo" })).toBeInTheDocument());
+  expect(displayWithLabel("decorative-drop-target-sheet-001")).toMatchObject({
+    rectCommands: [{ x: scope === "left" ? 0 : 300, y: 0, width: 300, height: 300 }], fillStyles: [],
+  });
+  expect(displayWithLabel("decorative-drop-center-sheet-001")).toMatchObject({ rectCommands: [], fillStyles: [] });
+});
+
+test("ignores obsolete Decorative previews and cancels a pending release with Escape", async () => {
+  type Preview = import("../domain/project").DecorativeDropPreview;
+  let resolveOld!: (preview: Preview) => void;
+  let resolveDrop!: (preview: Preview) => void;
+  const preview: Preview = {
+    revision: 1, role: "overlay", scope: "bothSides",
+    zoneRect: { x: 240_000, y: 0, width: 120_000, height: 300_000 },
+    centerRect: { x: 240_000, y: 0, width: 120_000, height: 300_000 },
+    sheet: interactiveComposition.sheets[0],
+  };
+  const onPreviewDecorativeDrop = vi.fn()
+    .mockImplementationOnce(() => new Promise<Preview>((resolve) => { resolveOld = resolve; }))
+    .mockResolvedValueOnce(preview)
+    .mockImplementationOnce(() => new Promise<Preview>((resolve) => { resolveDrop = resolve; }));
+  const onDropDecorative = vi.fn(async () => true);
+  const onPhotoDragCancel = vi.fn();
+  const view = renderCanvas({ compositionPlan: interactiveComposition, onPhotoDragCancel });
+  await finishPixiInitialization();
+  vi.spyOn(pixiLifecycle.instances[0].canvas, "getBoundingClientRect").mockReturnValue({
+    left: 0, top: 0, width: 1_200, height: 500, right: 1_200, bottom: 500, x: 0, y: 0, toJSON: () => ({}),
+  });
+  const mediaDrag = { gestureId: 1, mediaId: "decorative-001", kind: "decorative" as const, x: 600, y: 250, shiftKey: false, phase: "dragging" as const };
+  const callbacks = { revision: 1, onPreviewDecorativeDrop, onDropDecorative };
+  view.rerenderCanvas({ ...callbacks, mediaDrag });
+  await waitFor(() => expect(onPreviewDecorativeDrop).toHaveBeenCalledOnce());
+  view.rerenderCanvas({ ...callbacks, mediaDrag: { ...mediaDrag, shiftKey: true } });
+  await waitFor(() => expect(screen.getByRole("status", { name: "Aplicação do Decorativo" })).toHaveTextContent("Overlay"));
+  await act(async () => resolveOld({ ...preview, role: "background" }));
+  expect(screen.getByRole("status", { name: "Aplicação do Decorativo" })).toHaveTextContent("Overlay");
+  view.rerenderCanvas({ ...callbacks, mediaDrag: { ...mediaDrag, x: 605, shiftKey: true } });
+  expect(onPreviewDecorativeDrop).toHaveBeenCalledTimes(2);
+  view.rerenderCanvas({ ...callbacks, mediaDrag: { ...mediaDrag, shiftKey: true, phase: "drop" } });
+  await waitFor(() => expect(onPreviewDecorativeDrop).toHaveBeenCalledTimes(3));
+  fireEvent.keyDown(window, { key: "Escape" });
+  await act(async () => resolveDrop(preview));
+  expect(screen.queryByRole("status", { name: "Aplicação do Decorativo" })).not.toBeInTheDocument();
+  expect(onDropDecorative).not.toHaveBeenCalled();
+  expect(onPhotoDragCancel).toHaveBeenCalledOnce();
+  view.rerenderCanvas({ ...callbacks, mediaDrag: { ...mediaDrag, gestureId: 2, x: 1_300, phase: "drop" } });
+  await waitFor(() => expect(onPhotoDragCancel).toHaveBeenCalledTimes(2));
+  expect(onPreviewDecorativeDrop).toHaveBeenCalledTimes(3);
+});
+
 test("fits the complete sheet to the continuous Canvas at device resolution", async () => {
   renderCanvas();
   await finishPixiInitialization();
@@ -394,17 +503,16 @@ test("shows only the resolved Photo target and drops only after a valid highligh
     y: 0,
     toJSON: () => ({}),
   });
-  const host = view.container.querySelector(".canvas-host")!;
-  const dataTransfer = { dropEffect: "none" };
 
-  fireEvent.dragOver(host, { clientX: 600, clientY: 250, dataTransfer });
+
+  view.rerenderCanvas({ mediaDrag: { gestureId: 1, mediaId: "media-002", kind: "photo", x: 600, y: 250, shiftKey: false, phase: "dragging" } });
   await waitFor(() => {
     expect(displayWithLabel("frame-photo-drop-frame-001").visible).toBe(true);
   });
   expect(displayWithLabel("sheet-photo-drop-sheet-001").visible).toBe(false);
-  expect(dataTransfer.dropEffect).toBe("copy");
 
-  fireEvent.drop(host, { clientX: 600, clientY: 250, dataTransfer });
+
+  view.rerenderCanvas({ mediaDrag: { gestureId: 1, mediaId: "media-002", kind: "photo", x: 600, y: 250, shiftKey: false, phase: "drop" } });
   await waitFor(() => expect(onDropPhoto).toHaveBeenCalledOnce());
   expect(onDropPhoto).toHaveBeenCalledWith(
     "media-002",
@@ -413,7 +521,7 @@ test("shows only the resolved Photo target and drops only after a valid highligh
   expect(onPhotoDragCancel).toHaveBeenCalledOnce();
 });
 
-test("does not drop on a new point while its resolved highlight is still pending", async () => {
+test("waits for the released point and ignores an older pending hover result", async () => {
   let resolveFirst!: (target: {
     kind: "frame";
     frameId: string;
@@ -422,6 +530,7 @@ test("does not drop on a new point while its resolved highlight is still pending
     kind: "frame";
     frameId: string;
   }) => void;
+  let resolveDrop!: (target: { kind: "frame"; frameId: string }) => void;
   const onResolvePhotoDropTarget = vi
     .fn()
     .mockImplementationOnce(
@@ -435,7 +544,8 @@ test("does not drop on a new point while its resolved highlight is still pending
         new Promise((resolve) => {
           resolveSecond = resolve;
         }),
-    );
+    )
+    .mockImplementationOnce(() => new Promise((resolve) => { resolveDrop = resolve; }));
   const onDropPhoto = vi.fn(async () => true);
   const view = renderCanvas({
     compositionPlan: interactiveComposition,
@@ -456,10 +566,9 @@ test("does not drop on a new point while its resolved highlight is still pending
     y: 0,
     toJSON: () => ({}),
   });
-  const host = view.container.querySelector(".canvas-host")!;
-  const dataTransfer = { dropEffect: "none" };
 
-  fireEvent.dragOver(host, { clientX: 560, clientY: 250, dataTransfer });
+
+  view.rerenderCanvas({ mediaDrag: { gestureId: 1, mediaId: "media-002", kind: "photo", x: 560, y: 250, shiftKey: false, phase: "dragging" } });
   await waitFor(() => expect(onResolvePhotoDropTarget).toHaveBeenCalledOnce());
   await act(async () => {
     resolveFirst({ kind: "frame", frameId: "frame-001" });
@@ -468,15 +577,18 @@ test("does not drop on a new point while its resolved highlight is still pending
     expect(displayWithLabel("frame-photo-drop-frame-001").visible).toBe(true);
   });
 
-  fireEvent.dragOver(host, { clientX: 680, clientY: 250, dataTransfer });
+  view.rerenderCanvas({ mediaDrag: { gestureId: 1, mediaId: "media-002", kind: "photo", x: 680, y: 250, shiftKey: false, phase: "dragging" } });
   await waitFor(() => expect(onResolvePhotoDropTarget).toHaveBeenCalledTimes(2));
-  fireEvent.drop(host, { clientX: 680, clientY: 250, dataTransfer });
+  view.rerenderCanvas({ mediaDrag: { gestureId: 1, mediaId: "media-002", kind: "photo", x: 680, y: 250, shiftKey: false, phase: "drop" } });
 
   expect(onDropPhoto).not.toHaveBeenCalled();
   await act(async () => {
     resolveSecond({ kind: "frame", frameId: "frame-001" });
   });
   expect(displayWithLabel("frame-photo-drop-frame-001").visible).toBe(false);
+  expect(onDropPhoto).not.toHaveBeenCalled();
+  await act(async () => { resolveDrop({ kind: "frame", frameId: "frame-001" }); });
+  expect(onDropPhoto).toHaveBeenCalledOnce();
 });
 
 test("Esc and an invalid Photo target cancel without a Project mutation", async () => {
@@ -505,12 +617,11 @@ test("Esc and an invalid Photo target cancel without a Project mutation", async 
     y: 0,
     toJSON: () => ({}),
   });
-  const host = view.container.querySelector(".canvas-host")!;
-  const dataTransfer = { dropEffect: "none" };
 
-  fireEvent.dragOver(host, { clientX: 600, clientY: 250, dataTransfer });
+
+  view.rerenderCanvas({ mediaDrag: { gestureId: 1, mediaId: "media-002", kind: "photo", x: 600, y: 250, shiftKey: false, phase: "dragging" } });
   await waitFor(() => expect(onResolvePhotoDropTarget).toHaveBeenCalled());
-  fireEvent.drop(host, { clientX: 600, clientY: 250, dataTransfer });
+  view.rerenderCanvas({ mediaDrag: { gestureId: 1, mediaId: "media-002", kind: "photo", x: 600, y: 250, shiftKey: false, phase: "drop" } });
   expect(onDropPhoto).not.toHaveBeenCalled();
 
   fireEvent.keyDown(window, { key: "Escape" });

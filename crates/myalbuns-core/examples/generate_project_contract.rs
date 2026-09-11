@@ -24,6 +24,8 @@ fn main() {
     ProjectMutationOutcome::export_all(&config)
         .expect("Project mutation outcome bindings should be generated");
     PhotoDropTarget::export_all(&config).expect("Photo drop target bindings should be generated");
+    myalbuns_core::DecorativeDropPreview::export_all(&config)
+        .expect("Decorative preview bindings should be generated");
     LayoutQueryResult::export_all(&config).expect("Layout query bindings should be generated");
     myalbuns_core::LayoutFrameRequest::export_all(&config)
         .expect("Layout expansion bindings should be generated");

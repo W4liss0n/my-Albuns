@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { PhotoImportCompletion, ImageProcessingProgress } from "../application/projectPorts";
+import type { MediaImportCompletion, MediaImportSelection, ImageProcessingProgress } from "../application/projectPorts";
 import { createLogInstanceId } from "../application/logging";
 import { useImageProcessing } from "./useImageProcessing";
 import type { CanvasPhotoDropPoint } from "./albumCanvasContract";
@@ -63,7 +63,7 @@ export function useProjectMutations({
   const [importPending, setImportPending] = useState(false);
   const imageProcessing = useImageProcessing(projection.state.projectId, runProjectMutation);
   const importAttemptRef = useRef({ pending: false });
-  const [photoImportResult, setPhotoImportResult] = useState<PhotoImportCompletion | null>(null);
+  const [photoImportResult, setPhotoImportResult] = useState<MediaImportCompletion | null>(null);
   const feedbackTokenRef = useRef(0);
   const saveAsBarrierRef = useRef(false);
   const [pendingFrameCopies, setPendingFrameCopies] = useState(0);
@@ -439,6 +439,7 @@ export function useProjectMutations({
     importPending,
     imageProcessingProgress: imageProcessing.progress,
     imageProcessingProblems: imageProcessing.problems,
+    imageProcessingOperationProblem: imageProcessing.operationProblem,
     dismissImageProcessingProblems: imageProcessing.dismissProblems,
     photoImportResult,
     applyIntent,
@@ -458,17 +459,17 @@ export function useProjectMutations({
     copyFrames,
     pasteFrames,
     frameCopyPending: pendingFrameCopies > 0,
-    importPhoto: async () => {
+    importMedia: async (selection: MediaImportSelection = { mediaKind: "photo", source: { kind: "files" } }) => {
       if (importAttemptRef.current.pending || saveAsBarrierRef.current) return null;
       const attempt = { pending: true };
       importAttemptRef.current = attempt;
       setImportPending(true);
       setPhotoImportResult(null);
-      let result: PhotoImportCompletion | null = null;
+      let result: MediaImportCompletion | null = null;
       try {
         const completed = await runWithErrorFeedback(async (port) => {
           const imported = await imageProcessing.run(async (publish) => {
-            const imported = await port.importPhoto(publish);
+            const imported = await port.importMedia(publish, selection);
             if (imported.kind !== "completed" || imported.mediaIds.length === 0 || !prepareImportedMedia) return imported;
             const problems = await prepareImportedMedia(imported);
             return { ...imported, problems: [...imported.problems, ...problems] };
@@ -477,7 +478,7 @@ export function useProjectMutations({
           return imported.projection;
         });
         if (!completed || importAttemptRef.current !== attempt) return null;
-        const completion = result as PhotoImportCompletion | null;
+        const completion = result as MediaImportCompletion | null;
         setPhotoImportResult(completion);
         return completion?.mediaIds[completion.mediaIds.length - 1] ?? null;
       } finally {

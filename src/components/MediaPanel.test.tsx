@@ -1,5 +1,5 @@
-import { createRef } from "react";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { createRef, useState, type ComponentProps } from "react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 
@@ -21,14 +21,31 @@ const mediaUsage: readonly MediaUsage[] = [
 ];
 
 const mediaPanelInteractions = {
-  selectedMediaId: null,
-  onImportPhoto: () => undefined,
-  onSelectMedia: () => undefined,
-  onPhotoDragStart: () => undefined,
-  onPhotoDragEnd: () => undefined,
+  onApplyDecorative: () => undefined,
+  onImportMedia: () => undefined,
+  onRemoveMedia: () => undefined,
+  onMediaDragChange: () => undefined,
   onRelinkMedia: () => undefined,
   onRetryUnavailableMedia: async () => undefined,
 };
+
+test("applies only the double-clicked Decorative and distinguishes each usage role", () => {
+  const onApplyDecorative = vi.fn();
+  render(<MediaPanel {...mediaPanelInteractions} onApplyDecorative={onApplyDecorative}
+    mediaItems={[...mediaItems, media("decorative-other", "decorative", "Textura")]} mediaUsage={[
+      { mediaId: "decorative-overlay", count: 5, breakdown: { frames: 0, backgrounds: 2, overlays: 1, albumBackgrounds: 1, albumOverlays: 1 } },
+    ]} onFillPhoto={vi.fn()} preferences={{ kind: "local" }} previewSource={{ kind: "static" }} />);
+  fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
+  const overlay = screen.getByRole("button", { name: /Overlay dourado/ });
+  fireEvent.click(overlay);
+  fireEvent.click(screen.getByRole("button", { name: /Textura/ }), { ctrlKey: true });
+  fireEvent.doubleClick(overlay);
+  expect(onApplyDecorative).toHaveBeenLastCalledWith("decorative-overlay", "background");
+  fireEvent.doubleClick(overlay, { shiftKey: true });
+  expect(onApplyDecorative).toHaveBeenLastCalledWith("decorative-overlay", "overlay");
+  expect(onApplyDecorative).toHaveBeenCalledTimes(2);
+  expect(overlay).toHaveAccessibleName(/2 Fundos.*1 Overlay.*1 padrão de Fundo.*1 padrão de Overlay/);
+});
 
 test("requests the initial measured viewport without waiting for a scroll or observer paint", () => {
   vi.stubGlobal("IntersectionObserver", class {
@@ -90,7 +107,7 @@ test("prepares only the future viewport with the panel's active ordering and fil
     ...mediaPanelInteractions, mediaUsage: [], onFillPhoto: vi.fn(),
     previewSource: { kind: "connected" as const, onDemandChange: demand, previews: {} },
     preferences: { kind: "local" as const, initial: { photo: {
-      thumbnailSize: 84, sortDirection: "descending" as const, usageFilter: "all" as const,
+      sortKey: "name" as const, sortDirection: "descending" as const, usageFilter: "all" as const,
     } } },
   };
   const view = render(<MediaPanel {...props} ref={ref} mediaItems={mediaItems} />);
@@ -148,16 +165,44 @@ test("matches the reference toolbar and marks only unavailable import actions as
   await user.click(screen.getByRole("button", { name: "Importar" }));
   const importMenu = screen.getByRole("menu", { name: "Importar" });
   expect(
-    within(importMenu).getByRole("menuitem", { name: "Arquivos JPEG…" }),
+    within(importMenu).getByRole("menuitem", { name: "Arquivos…" }),
   ).toBeEnabled();
   const folderItem = within(importMenu).getByRole("menuitem", {
     name: "Pasta…",
   });
-  expect(folderItem).toBeDisabled();
-  expect(folderItem).toHaveAttribute(
-    "data-placeholder-feature",
-    "import-media-folder",
-  );
+  expect(folderItem).toBeEnabled();
+});
+
+test("imports files or a folder into the active media tab", async () => {
+  const user = userEvent.setup();
+  const onImportMedia = vi.fn();
+  render(<MediaPanel {...mediaPanelInteractions} onImportMedia={onImportMedia} mediaItems={mediaItems} mediaUsage={mediaUsage} onFillPhoto={vi.fn()} previewSource={{ kind: "static" }} preferences={{ kind: "local" }} />);
+  await user.click(screen.getByRole("button", { name: "Importar" }));
+  await user.click(screen.getByRole("menuitem", { name: "Arquivos…" }));
+  expect(onImportMedia).toHaveBeenLastCalledWith({ mediaKind: "photo", source: { kind: "files" } });
+  await user.click(screen.getByRole("button", { name: "Decorativos" }));
+  await user.click(screen.getByRole("button", { name: "Importar" }));
+  await user.click(screen.getByRole("menuitem", { name: "Pasta…" }));
+  expect(onImportMedia).toHaveBeenLastCalledWith({ mediaKind: "decorative", source: { kind: "folder" } });
+});
+
+test("imports a Windows drop anywhere inside the visible panel into the current tab", async () => {
+  const user = userEvent.setup();
+  let publish!: (event: import("../application/projectPorts").MediaFileDrag) => void;
+  const stop = vi.fn();
+  const dropPort = { subscribe: async (listener: typeof publish) => { publish = listener; return stop; } };
+  const onImportMedia = vi.fn();
+  const view = render(<MediaPanel {...mediaPanelInteractions} dropPort={dropPort} onImportMedia={onImportMedia} mediaItems={mediaItems} mediaUsage={mediaUsage} onFillPhoto={vi.fn()} previewSource={{ kind: "static" }} preferences={{ kind: "local" }} />);
+  vi.spyOn(screen.getByRole("region", { name: "Painel de imagens" }), "getBoundingClientRect").mockReturnValue({ left: 10, right: 510, top: 400, bottom: 600 } as DOMRect);
+  await user.click(screen.getByRole("button", { name: "Decorativos" }));
+  act(() => publish({ kind: "over", x: 15, y: 405 }));
+  expect(screen.getByText("Solte para importar em Decorativos")).toBeVisible();
+  act(() => publish({ kind: "drop", x: 15, y: 405, dropId: "native-drop-1" }));
+  expect(onImportMedia).toHaveBeenCalledWith({ mediaKind: "decorative", source: { kind: "drop", dropId: "native-drop-1" } });
+  act(() => publish({ kind: "drop", x: 15, y: 100, dropId: "native-drop-2" }));
+  expect(onImportMedia).toHaveBeenCalledOnce();
+  view.unmount();
+  expect(stop).toHaveBeenCalledOnce();
 });
 
 test("renders only centered copy when the media catalog is empty", () => {
@@ -241,6 +286,26 @@ test("combines accent-insensitive search with the usage filter and natural name 
   );
 });
 
+test("orders by the Original dates and keeps absent files last in both directions", async () => {
+  const user = userEvent.setup();
+  render(<MediaPanel {...mediaPanelInteractions} mediaItems={mediaItems} mediaUsage={mediaUsage}
+    onFillPhoto={vi.fn()} previewSource={{ kind: "static" }} preferences={{ kind: "local" }}
+    mediaFiles={{
+      "photo-album-10": { mediaId: "photo-album-10", state: "available", createdAtMs: 100, modifiedAtMs: 300 },
+      "photo-album-2": { mediaId: "photo-album-2", state: "available", createdAtMs: 200, modifiedAtMs: 100 },
+      "photo-retrato": { mediaId: "photo-retrato", state: "absent", createdAtMs: null, modifiedAtMs: null },
+    }} />);
+  await user.click(screen.getByRole("button", { name: "Filtro, ordem e tamanho" }));
+  await user.selectOptions(screen.getByRole("combobox", { name: "Ordenar por" }), "createdAt-ascending");
+  expect(visibleMediaIds()).toEqual(["photo-album-10", "photo-album-2", "photo-retrato"]);
+  await user.selectOptions(screen.getByRole("combobox", { name: "Ordenar por" }), "createdAt-descending");
+  expect(visibleMediaIds()).toEqual(["photo-album-2", "photo-album-10", "photo-retrato"]);
+  await user.selectOptions(screen.getByRole("combobox", { name: "Ordenar por" }), "modifiedAt-ascending");
+  expect(visibleMediaIds()).toEqual(["photo-album-2", "photo-album-10", "photo-retrato"]);
+  await user.selectOptions(screen.getByRole("combobox", { name: "Ordenar por" }), "name-descending");
+  expect(visibleMediaIds()).toEqual(["photo-album-10", "photo-album-2", "photo-retrato"]);
+});
+
 test("treats compact options as a disclosure and restores its trigger on Escape", async () => {
   const user = userEvent.setup();
   renderPanel();
@@ -281,7 +346,7 @@ test("keeps independent search text for Fotos and Decorativos", async () => {
   );
 });
 
-test("resizes thumbnails independently per tab and marks unavailable date ordering in code", async () => {
+test("shares thumbnail size between tabs and resets both tabs together", async () => {
   const user = userEvent.setup();
   renderPanel();
 
@@ -296,11 +361,7 @@ test("resizes thumbnails independently per tab and marks unavailable date orderi
   });
 
   const dateOption = screen.getByRole("option", { name: "Data de criação" });
-  expect(dateOption).toBeDisabled();
-  expect(dateOption).toHaveAttribute(
-    "data-placeholder-feature",
-    "sort-media-by-created-at",
-  );
+  expect(dateOption).toBeEnabled();
 
   await user.click(screen.getByRole("button", { name: "Decorativos" }));
   await user.click(
@@ -309,7 +370,10 @@ test("resizes thumbnails independently per tab and marks unavailable date orderi
   const decorativeSize = screen.getByRole("slider", {
     name: "Tamanho das miniaturas",
   });
-  expect(decorativeSize).toHaveValue("84");
+  expect(decorativeSize).toHaveValue("124");
+  expect(screen.getByRole("group", { name: "Grade de Decorativos" })).toHaveStyle({
+    "--media-thumbnail-size": "124px",
+  });
   fireEvent.change(decorativeSize, { target: { value: "110" } });
 
   await user.click(screen.getByRole("button", { name: "Fotos" }));
@@ -319,16 +383,20 @@ test("resizes thumbnails independently per tab and marks unavailable date orderi
   const restoredPhotoSize = screen.getByRole("slider", {
     name: "Tamanho das miniaturas",
   });
-  expect(restoredPhotoSize).toHaveValue("124");
+  expect(restoredPhotoSize).toHaveValue("110");
   fireEvent.doubleClick(restoredPhotoSize);
   expect(restoredPhotoSize).toHaveValue("84");
+  await user.click(screen.getByRole("button", { name: "Decorativos" }));
+  expect(screen.getByRole("group", { name: "Grade de Decorativos" })).toHaveStyle({
+    "--media-thumbnail-size": "84px",
+  });
 });
 
-test("hydrates per-tab thumbnail sizes and publishes later changes", async () => {
+test("hydrates a shared thumbnail size and publishes changes without a tab", async () => {
   const user = userEvent.setup();
   const onThumbnailSizeChange = vi.fn();
   render(
-    <MediaPanel
+    <PersistentMediaPanel
       {...mediaPanelInteractions}
       mediaItems={mediaItems}
       mediaUsage={mediaUsage}
@@ -337,11 +405,12 @@ test("hydrates per-tab thumbnail sizes and publishes later changes", async () =>
       preferences={{
         kind: "controlled",
         persistent: {
-          decorative: { sortDirection: "ascending", usageFilter: "all" },
-          photo: { sortDirection: "ascending", usageFilter: "all" },
+          decorative: { sortKey: "name", sortDirection: "ascending", usageFilter: "all" },
+          photo: { sortKey: "name", sortDirection: "ascending", usageFilter: "all" },
         },
-        thumbnailSizes: { decorative: 110, photo: 124 },
+        thumbnailSize: 124,
         onSortDirectionChange: vi.fn(),
+        onSortKeyChange: vi.fn(),
         onThumbnailSizeChange,
         onUsageFilterChange: vi.fn(),
       }}
@@ -356,7 +425,7 @@ test("hydrates per-tab thumbnail sizes and publishes later changes", async () =>
   });
   expect(photoSize).toHaveValue("124");
   fireEvent.change(photoSize, { target: { value: "126" } });
-  expect(onThumbnailSizeChange).toHaveBeenCalledWith("photo", 126);
+  expect(onThumbnailSizeChange).toHaveBeenCalledWith(126);
 
   await user.click(screen.getByRole("button", { name: "Decorativos" }));
   await user.click(
@@ -364,7 +433,7 @@ test("hydrates per-tab thumbnail sizes and publishes later changes", async () =>
   );
   expect(
     screen.getByRole("slider", { name: "Tamanho das miniaturas" }),
-  ).toHaveValue("110");
+  ).toHaveValue("126");
 });
 
 test("hydrates authoritative per-tab settings and publishes only the changed field", async () => {
@@ -372,7 +441,7 @@ test("hydrates authoritative per-tab settings and publishes only the changed fie
   const onSortDirectionChange = vi.fn();
   const onUsageFilterChange = vi.fn();
   render(
-    <MediaPanel
+    <PersistentMediaPanel
       {...mediaPanelInteractions}
       mediaItems={mediaItems}
       mediaUsage={mediaUsage}
@@ -381,11 +450,12 @@ test("hydrates authoritative per-tab settings and publishes only the changed fie
       preferences={{
         kind: "controlled",
         persistent: {
-          decorative: { sortDirection: "ascending", usageFilter: "all" },
-          photo: { sortDirection: "descending", usageFilter: "unused" },
+          decorative: { sortKey: "name", sortDirection: "ascending", usageFilter: "all" },
+          photo: { sortKey: "name", sortDirection: "descending", usageFilter: "unused" },
         },
-        thumbnailSizes: { decorative: 84, photo: 84 },
+        thumbnailSize: 84,
         onSortDirectionChange,
+        onSortKeyChange: vi.fn(),
         onThumbnailSizeChange: vi.fn(),
         onUsageFilterChange,
       }}
@@ -572,9 +642,9 @@ test("uses image orientation and opacity without visible names or usage counts",
   );
 
   expect(usedCard).toHaveAttribute("data-used", "true");
-  expect(usedCard).toHaveAccessibleName("Álbum 10. Já usada");
+  expect(usedCard).toHaveAccessibleName("Álbum 10. Já usada. 2 usos");
   expect(usedCard).not.toHaveTextContent("Álbum 10");
-  expect(usedCard?.querySelector(".media-usage-badge")).toBeNull();
+  expect(usedCard).not.toHaveTextContent("2");
   expect(usedCard?.querySelector(".media-meta")).toBeNull();
   const landscapeThumb = usedCard?.querySelector<HTMLElement>(
     ".media-preview-thumbnail",
@@ -598,10 +668,10 @@ test("keeps selection on media ids and supports click, Ctrl, Shift, and Ctrl+A",
 
   const album2 = screen.getByRole("button", { name: "album 2" });
   const album10 = screen.getByRole("button", {
-    name: "Álbum 10. Já usada",
+    name: "Álbum 10. Já usada. 2 usos",
   });
   const portrait = screen.getByRole("button", {
-    name: "Retrato. Já usada",
+    name: "Retrato. Já usada. 1 uso",
   });
   const grid = screen.getByRole("group", { name: "Grade de Fotos" });
 
@@ -630,10 +700,10 @@ test("preserves a selected group on right click and replaces it for an unselecte
 
   const album2 = screen.getByRole("button", { name: "album 2" });
   const album10 = screen.getByRole("button", {
-    name: "Álbum 10. Já usada",
+    name: "Álbum 10. Já usada. 2 usos",
   });
   const portrait = screen.getByRole("button", {
-    name: "Retrato. Já usada",
+    name: "Retrato. Já usada. 1 uso",
   });
 
   fireEvent.click(album2);
@@ -761,6 +831,13 @@ function renderPanel() {
       preferences={{ kind: "local" }}
     />,
   );
+}
+
+function PersistentMediaPanel(props: Omit<ComponentProps<typeof MediaPanel>, "preferences"> & {
+  preferences: Omit<Extract<ComponentProps<typeof MediaPanel>["preferences"], { kind: "controlled" }>, "activeKind" | "onActiveKindChange">;
+}) {
+  const [activeKind, setActiveKind] = useState<MediaCatalogItem["kind"]>("photo");
+  return <MediaPanel {...props} preferences={{ ...props.preferences, activeKind, onActiveKindChange: setActiveKind }} />;
 }
 
 function media(

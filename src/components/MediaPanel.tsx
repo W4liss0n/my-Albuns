@@ -11,9 +11,12 @@ import {
 } from "react";
 import type {
   MediaPreview,
+  MediaImportSelection,
+  MediaFileInfo,
   MediaPreviewDemand,
 } from "../application/projectPorts";
-import { matchProjectCommandShortcut } from "../application/projectCommandCatalog";
+import { matchProjectCommandShortcut, projectCommandDescriptor, projectCommandShortcutLabel } from "../application/projectCommandCatalog";
+import { ContextMenuSurface } from "../ui/ContextMenuSurface";
 import type { MediaPanelPersistentPreference } from "../application/workspacePreferences";
 
 import type {
@@ -22,7 +25,8 @@ import type {
   MediaUsage,
 } from "../domain/project";
 import {
-  createMediaPanelViewPreferences,
+  createMediaPanelTabPreferences,
+  MEDIA_THUMBNAIL_DEFAULT_SIZE,
   type MediaPanelViewPreferences,
   type MediaUsageFilter,
 } from "../state/mediaPanelPreferences";
@@ -30,10 +34,13 @@ import { MediaPanelEmptyState } from "./MediaPanelEmptyState";
 import { MediaPanelToolbar } from "./MediaPanelToolbar";
 import { MediaPreviewCard } from "./MediaPreviewCard";
 import { isTextEntryTarget } from "./isTextEntryTarget";
+import { useMediaFileDrop } from "./useMediaFileDrop";
+import { useMediaDragGesture, type MediaDrag } from "./useMediaDragGesture";
 import "./MediaPanel.css";
 import { MEDIA_PANEL_PRELOAD_MARGIN, mediaPanelViewportDemand } from "./mediaPanelViewport";
 
 export interface MediaPanelHandle {
+  showAbsent(): void;
   planCatalog(mediaItems: readonly MediaCatalogItem[], mediaUsage: readonly MediaUsage[]): {
     demand: MediaPreviewDemand;
     commit(): void;
@@ -43,8 +50,11 @@ export interface MediaPanelHandle {
 type MediaPanelPreferenceMode =
   | {
       kind: "controlled";
+      activeKind: MediaKind;
+      onActiveKindChange(mediaKind: MediaKind): void;
+      onSortKeyChange(mediaKind: MediaKind, sortKey: MediaPanelPersistentPreference["sortKey"]): void;
       persistent: Readonly<Record<MediaKind, MediaPanelPersistentPreference>>;
-      thumbnailSizes: Readonly<Record<MediaKind, number>>;
+      thumbnailSize: number;
       onSortDirectionChange(
         mediaKind: MediaKind,
         sortDirection: MediaPanelPersistentPreference["sortDirection"],
@@ -53,11 +63,12 @@ type MediaPanelPreferenceMode =
         mediaKind: MediaKind,
         usageFilter: MediaPanelPersistentPreference["usageFilter"],
       ): void;
-      onThumbnailSizeChange(mediaKind: MediaKind, size: number): void;
+      onThumbnailSizeChange(size: number): void;
     }
   | {
       kind: "local";
-      initial?: Partial<Record<MediaKind, MediaPanelViewPreferences>>;
+      initial?: Partial<Record<MediaKind, MediaPanelPersistentPreference>>;
+      initialThumbnailSize?: number;
     };
 
 type MediaPanelPreviewSource =
@@ -76,13 +87,16 @@ interface MediaPanelProps {
   hidden?: boolean;
   mediaItems: readonly MediaCatalogItem[];
   mediaUsage: readonly MediaUsage[];
+  mediaFiles?: Readonly<Record<string, MediaFileInfo>>;
   onFillPhoto(mediaId: string): void;
-  selectedMediaId: string | null;
+  onApplyDecorative(mediaId: string, role: import("../domain/project").DecorativeRole): void;
+  selectionRequest?: { mediaId: string } | null;
   importPending?: boolean;
-  onImportPhoto(): void;
-  onSelectMedia(mediaId: string): void;
-  onPhotoDragStart(mediaId: string): void;
-  onPhotoDragEnd(): void;
+  onImportMedia(selection: MediaImportSelection): void;
+  onRemoveMedia(mediaIds: readonly string[]): void;
+  dropPort?: import("../application/projectPorts").MediaDropPort;
+  onMediaDragChange(drag: MediaDrag | null): void;
+  dragThreshold?: import("../application/projectPorts").PointerDragThreshold | null;
   onRelinkMedia(mediaId: string): void;
   onRetryUnavailableMedia(mediaId: string): Promise<void>;
   relinkDisabled?: boolean;
@@ -94,19 +108,23 @@ const naturalNameCollator = new Intl.Collator("pt-BR", {
   numeric: true,
   sensitivity: "base",
 });
+const EMPTY_MEDIA_FILES: Readonly<Record<string, MediaFileInfo>> = {};
 
 export function MediaPanel({
   ref,
   hidden = false,
   mediaItems,
   mediaUsage,
+  mediaFiles = EMPTY_MEDIA_FILES,
   onFillPhoto,
-  selectedMediaId,
+  onApplyDecorative,
+  selectionRequest,
   importPending = false,
-  onImportPhoto,
-  onSelectMedia,
-  onPhotoDragStart,
-  onPhotoDragEnd,
+  onImportMedia,
+  onRemoveMedia,
+  dropPort,
+  onMediaDragChange,
+  dragThreshold = { x: 5, y: 5 },
   onRelinkMedia,
   onRetryUnavailableMedia,
   relinkDisabled = false,
@@ -114,29 +132,61 @@ export function MediaPanel({
   previewSource,
 }: MediaPanelProps) {
   const mediaPreviews = previewSource.previews ?? {};
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const onMediaDemandChange =
     previewSource.kind === "connected" ? previewSource.onDemandChange : null;
   const controlledPersistent =
     preferenceMode.kind === "controlled" ? preferenceMode.persistent : null;
-  const controlledThumbnailSizes =
+  const controlledThumbnailSize =
     preferenceMode.kind === "controlled"
-      ? preferenceMode.thumbnailSizes
+      ? preferenceMode.thumbnailSize
       : null;
-  const [activeMediaKind, setActiveMediaKind] =
+  const [missingReview, setMissingReview] = useState<{
+    activeKind: MediaKind;
+    searches: Record<MediaKind, string>;
+    usageFilters: Record<MediaKind, MediaUsageFilter>;
+  } | null>(null);
+  const [missingOnlyByKind, setMissingOnlyByKind] = useState<Record<MediaKind, boolean>>({ photo: false, decorative: false });
+  const [localActiveMediaKind, setLocalActiveMediaKind] =
     useState<MediaKind>("photo");
+  const preferredActiveMediaKind = preferenceMode.kind === "controlled" ? preferenceMode.activeKind : localActiveMediaKind;
+  const activeMediaKind = missingReview?.activeKind ?? preferredActiveMediaKind;
+  useEffect(() => { setContextMenu(null); }, [activeMediaKind, hidden]);
+  function setActiveMediaKind(activeKind: MediaKind) {
+    if (missingReview) setMissingReview({ ...missingReview, activeKind });
+    else if (preferenceMode.kind === "controlled") preferenceMode.onActiveKindChange(activeKind);
+    else setLocalActiveMediaKind(activeKind);
+  }
+  const fileInformation = useMemo(() => {
+    const result = { ...mediaFiles };
+    for (const media of mediaItems) {
+      const preview = mediaPreviews[media.id];
+      if (!result[media.id] && (preview?.state === "absent" || preview?.state === "unavailable")) {
+        result[media.id] = { mediaId: media.id, state: preview.state, createdAtMs: null, modifiedAtMs: null };
+      }
+    }
+    return result;
+  }, [mediaFiles, mediaItems, previewSource.previews]);
+  const missingCounts = useMemo(() => {
+    const counts = { photo: 0, decorative: 0 };
+    for (const media of mediaItems) if (fileInformation[media.id]?.state === "absent") counts[media.kind] += 1;
+    return counts;
+  }, [mediaItems, fileInformation]);
   const [searchByKind, setSearchByKind] = useState<Record<MediaKind, string>>({
     decorative: "",
     photo: "",
   });
+  const [thumbnailSize, setThumbnailSize] = useState(() => preferenceMode.kind === "controlled"
+    ? preferenceMode.thumbnailSize : preferenceMode.initialThumbnailSize ?? MEDIA_THUMBNAIL_DEFAULT_SIZE);
   const [preferencesByKind, setPreferencesByKind] = useState<
-    Record<MediaKind, MediaPanelViewPreferences>
+    Record<MediaKind, MediaPanelPersistentPreference>
   >(() => ({
     decorative: {
-      ...createMediaPanelViewPreferences(),
+      ...createMediaPanelTabPreferences(),
       ...initialPreferences(preferenceMode, "decorative"),
     },
     photo: {
-      ...createMediaPanelViewPreferences(),
+      ...createMediaPanelTabPreferences(),
       ...initialPreferences(preferenceMode, "photo"),
     },
   }));
@@ -146,20 +196,25 @@ export function MediaPanel({
   const [selectionAnchorId, setSelectionAnchorId] = useState<string | null>(
     null,
   );
+  const handledSelectionRequest = useRef<typeof selectionRequest>(null);
   const mediaUsageById = useMemo(
     () => new Map(mediaUsage.map((usage) => [usage.mediaId, usage.count])),
     [mediaUsage],
   );
+  const usageDetailsById = useMemo(() => new Map(mediaUsage.map((usage) => [usage.mediaId, mediaUsageLabel(usage)])), [mediaUsage]);
   const activeMediaItems = useMemo(
     () => mediaItems.filter((media) => media.kind === activeMediaKind),
     [activeMediaKind, mediaItems],
   );
-  const search = searchByKind[activeMediaKind];
-  const preferences = preferencesByKind[activeMediaKind];
-  const { sortDirection, thumbnailSize, usageFilter } = preferences;
+  const search = (missingReview?.searches ?? searchByKind)[activeMediaKind];
+  const storedPreferences = preferencesByKind[activeMediaKind];
+  const preferences = { ...storedPreferences, thumbnailSize,
+    usageFilter: missingReview ? missingReview.usageFilters[activeMediaKind] : storedPreferences.usageFilter };
+  const missingOnly = missingReview !== null || missingOnlyByKind[activeMediaKind];
+  const { sortKey, sortDirection, usageFilter } = preferences;
   const visibleMediaItems = useMemo(() => filterMediaItems(
-    activeMediaItems, mediaUsageById, search, sortDirection, usageFilter,
-  ), [activeMediaItems, mediaUsageById, search, sortDirection, usageFilter]);
+    activeMediaItems, mediaUsageById, search, sortKey, sortDirection, usageFilter, fileInformation, missingOnly,
+  ), [activeMediaItems, mediaUsageById, search, sortKey, sortDirection, usageFilter, fileInformation, missingOnly]);
   const visibleMediaIds = useMemo(
     () => visibleMediaItems.map(({ id }) => id),
     [visibleMediaItems],
@@ -175,18 +230,27 @@ export function MediaPanel({
         ? "filtered"
         : null;
   const gridRef = useRef<HTMLDivElement>(null);
-  const transparentDragImageRef = useRef<HTMLCanvasElement>(null);
+  const mediaDrag = useMediaDragGesture({ threshold: dragThreshold, disabled: Boolean(hidden) || importPending || relinkDisabled, onChange: onMediaDragChange });
+  const panelHostRef = useRef<HTMLElement>(null);
+  const fileDrop = useMediaFileDrop({ port: dropPort, host: panelHostRef,
+    hidden: Boolean(hidden), disabled: importPending || relinkDisabled,
+    mediaKind: activeMediaKind, onImport: onImportMedia });
   const observedDemandByKind = useRef<Record<MediaKind, MediaPreviewDemand>>({
     photo: { visibleMediaIds: [], preloadMediaIds: [] },
     decorative: { visibleMediaIds: [], preloadMediaIds: [] },
   });
 
   useImperativeHandle(ref, () => ({
+    showAbsent() {
+      if (!missingCounts.photo && !missingCounts.decorative) return;
+      setMissingReview({ activeKind: missingCounts[activeMediaKind] ? activeMediaKind : activeMediaKind === "photo" ? "decorative" : "photo",
+        searches: { photo: "", decorative: "" }, usageFilters: { photo: "all", decorative: "all" } });
+    },
     planCatalog(nextItems, nextUsage) {
       const ordered = filterMediaItems(
         nextItems.filter((media) => media.kind === activeMediaKind),
         new Map(nextUsage.map((usage) => [usage.mediaId, usage.count])),
-        search, sortDirection, usageFilter,
+        search, sortKey, sortDirection, usageFilter, fileInformation, missingOnly,
       );
       const demand = mediaPanelViewportDemand(gridRef.current, ordered.map(({ id }) => id), thumbnailSize);
       const inactive = observedDemandByKind.current[activeMediaKind === "photo" ? "decorative" : "photo"];
@@ -200,18 +264,8 @@ export function MediaPanel({
   }));
 
   useEffect(() => {
-    if (!controlledThumbnailSizes) return;
-    setPreferencesByKind((current) => ({
-      decorative: {
-        ...current.decorative,
-        thumbnailSize: controlledThumbnailSizes.decorative,
-      },
-      photo: {
-        ...current.photo,
-        thumbnailSize: controlledThumbnailSizes.photo,
-      },
-    }));
-  }, [controlledThumbnailSizes]);
+    if (controlledThumbnailSize !== null) setThumbnailSize(controlledThumbnailSize);
+  }, [controlledThumbnailSize]);
 
   useEffect(() => {
     if (!controlledPersistent) return;
@@ -240,10 +294,12 @@ export function MediaPanel({
   }, [visibleMediaIdSet]);
 
   useEffect(() => {
-    if (!selectedMediaId || !visibleMediaIdSet.has(selectedMediaId)) return;
-    setSelectedMediaIds(new Set([selectedMediaId]));
-    setSelectionAnchorId(selectedMediaId);
-  }, [selectedMediaId, visibleMediaIdSet]);
+    if (selectionRequest === handledSelectionRequest.current) return;
+    handledSelectionRequest.current = selectionRequest;
+    if (!selectionRequest || !visibleMediaIdSet.has(selectionRequest.mediaId)) return;
+    setSelectedMediaIds(new Set([selectionRequest.mediaId]));
+    setSelectionAnchorId(selectionRequest.mediaId);
+  }, [selectionRequest, visibleMediaIdSet]);
 
   useEffect(() => {
     if (!onMediaDemandChange) return;
@@ -352,14 +408,19 @@ export function MediaPanel({
   function updatePreferences(
     nextPreferences: Partial<MediaPanelViewPreferences>,
   ) {
-    if (
-      preferenceMode.kind === "controlled" &&
-      nextPreferences.thumbnailSize !== undefined
-    ) {
-      preferenceMode.onThumbnailSizeChange(
-        activeMediaKind,
-        nextPreferences.thumbnailSize,
-      );
+    if (missingReview && nextPreferences.usageFilter !== undefined) {
+      setMissingReview({ ...missingReview, usageFilters: { ...missingReview.usageFilters, [activeMediaKind]: nextPreferences.usageFilter } });
+      const { usageFilter: _filter, ...remaining } = nextPreferences;
+      nextPreferences = remaining;
+    }
+    if (preferenceMode.kind === "controlled" && nextPreferences.sortKey !== undefined) {
+      preferenceMode.onSortKeyChange(activeMediaKind, nextPreferences.sortKey);
+    }
+    if (nextPreferences.thumbnailSize !== undefined) {
+      setThumbnailSize(nextPreferences.thumbnailSize);
+      if (preferenceMode.kind === "controlled") preferenceMode.onThumbnailSizeChange(nextPreferences.thumbnailSize);
+      const { thumbnailSize: _size, ...remaining } = nextPreferences;
+      nextPreferences = remaining;
     }
     if (
       preferenceMode.kind === "controlled" &&
@@ -392,7 +453,6 @@ export function MediaPanel({
     mediaId: string,
     event: MouseEvent<HTMLButtonElement>,
   ) {
-    onSelectMedia(mediaId);
     if (
       event.shiftKey &&
       selectionAnchorId &&
@@ -423,6 +483,14 @@ export function MediaPanel({
   }
 
   function selectAllVisibleMedia(event: KeyboardEvent<HTMLElement>) {
+    if (isTextEntryTarget(event.target)) return;
+    if (matchProjectCommandShortcut(event, "media-panel") === "remove-media") {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!relinkDisabled && !importPending) onRemoveMedia([...selectedMediaIds]);
+      setContextMenu(null);
+      return;
+    }
     if (
       matchProjectCommandShortcut(event, "media-panel") !== "select-all" ||
       isTextEntryTarget(event.target)
@@ -456,42 +524,40 @@ export function MediaPanel({
   return (
     <section
       id="media-panel"
-      className="media-panel"
+      ref={panelHostRef}
+      className={`media-panel${fileDrop.over ? " media-panel--file-drop" : ""}`}
       hidden={hidden}
+      tabIndex={-1}
       data-project-command-context="media-panel"
       aria-label="Painel de imagens"
       onKeyDown={selectAllVisibleMedia}
     >
-      <canvas
-        aria-hidden="true"
-        height={1}
-        ref={transparentDragImageRef}
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          width: 1,
-          height: 1,
-          pointerEvents: "none",
-        }}
-        width={1}
-      />
+      {fileDrop.over && <div className="media-file-drop-hint" role="status">Solte para importar em {activeMediaKind === "photo" ? "Fotos" : "Decorativos"}</div>}
+      {fileDrop.error && <div className="media-file-drop-error" role="status">{fileDrop.error}</div>}
       <MediaPanelToolbar
         activeMediaKind={activeMediaKind}
+        missingCounts={missingCounts}
+        missingOnly={missingOnly}
+        reviewingMissing={missingReview !== null}
+        onMissingOnlyChange={(value) => {
+          if (missingReview && !value) setMissingReview(null);
+          else setMissingOnlyByKind((current) => ({ ...current, [activeMediaKind]: value }));
+        }}
         itemCount={activeMediaItems.length}
         preferences={preferences}
         search={search}
         importDisabled={relinkDisabled || importPending}
         importPending={importPending}
-        onImportPhoto={onImportPhoto}
+        onImportMedia={(kind) => onImportMedia({ mediaKind: activeMediaKind, source: { kind } })}
         onActiveMediaKindChange={setActiveMediaKind}
         onPreferencesChange={updatePreferences}
-        onSearchChange={(nextSearch) =>
-          setSearchByKind((current) => ({
+        onSearchChange={(nextSearch) => {
+          if (missingReview) setMissingReview({ ...missingReview, searches: { ...missingReview.searches, [activeMediaKind]: nextSearch } });
+          else setSearchByKind((current) => ({
             ...current,
             [activeMediaKind]: nextSearch,
-          }))
-        }
+          }));
+        }}
       />
       <div
         aria-label={
@@ -521,13 +587,18 @@ export function MediaPanel({
             const usageCount = mediaUsageById.get(media.id) ?? 0;
             const isUsed = usageCount > 0;
             const isSelected = selectedMediaIds.has(media.id);
-            const preview = mediaPreviews[media.id];
+            const cachedPreview = mediaPreviews[media.id];
+            const file = fileInformation[media.id];
+            const preview = file && file.state !== "available" ? {
+              mediaId: media.id, state: file.state, url: cachedPreview?.url ?? null,
+            } : cachedPreview;
             const availabilityLabel = preview
               ? mediaAvailabilityLabel(preview)
               : null;
             const accessibleLabel = [
               media.name,
               isUsed ? "Já usada" : null,
+              usageDetailsById.get(media.id),
               availabilityLabel,
             ]
               .filter(Boolean)
@@ -540,40 +611,26 @@ export function MediaPanel({
                 data-media-id={media.id}
                 data-used={String(isUsed)}
                 dimmed={isUsed}
-                draggable={media.kind === "photo"}
+                draggable={false}
                 kind="media"
                 media={media}
                 previewUrl={preview?.url ?? undefined}
                 selected={isSelected}
-                onClick={(event) => selectMedia(media.id, event)}
-                onContextMenu={() => selectMediaForContextMenu(media.id)}
-                onDragStart={
-                  media.kind === "photo"
-                    ? (event) => {
-                        event.dataTransfer.effectAllowed = "copy";
-                        const dragImage = transparentDragImageRef.current;
-                        if (dragImage) event.dataTransfer.setDragImage(dragImage, 0, 0);
-                        event.dataTransfer.setData(
-                          "application/x-myalbuns-photo",
-                          media.id,
-                        );
-                        onPhotoDragStart(media.id);
-                      }
-                    : undefined
-                }
-                onDragEnd={
-                  media.kind === "photo" ? onPhotoDragEnd : undefined
-                }
-                onDoubleClick={
-                  media.kind === "photo"
-                    ? () => onFillPhoto(media.id)
-                    : undefined
-                }
-                title={
-                  media.kind === "photo"
-                    ? "Duplo clique para preencher o placeholder mais à esquerda da Lâmina centralizada"
-                    : undefined
-                }
+                onClick={(event) => { if (!mediaDrag.suppressClick()) selectMedia(media.id, event); }}
+                onContextMenu={(event) => {
+                  event.preventDefault();
+                  selectMediaForContextMenu(media.id);
+                  setContextMenu({ x: event.clientX, y: event.clientY });
+                }}
+                onPointerDown={(event) => mediaDrag.start(media.id, media.kind, event)}
+                onDoubleClick={(event) => {
+                  if (relinkDisabled || importPending) return;
+                  if (media.kind === "photo") onFillPhoto(media.id);
+                  else onApplyDecorative(media.id, event.shiftKey ? "overlay" : "background");
+                }}
+                title={[media.name, usageDetailsById.get(media.id), media.kind === "photo"
+                  ? "Duplo clique para preencher o placeholder mais à esquerda da Lâmina centralizada"
+                  : "Duplo clique aplica Fundo. Shift + duplo clique aplica Overlay."].filter(Boolean).join("\n")}
               >
                 {availabilityLabel && (
                   <span
@@ -581,7 +638,7 @@ export function MediaPanel({
                     className="media-availability"
                     role="status"
                   >
-                    {availabilityLabel}
+                    {preview?.state === "absent" ? "Ausente" : availabilityLabel}
                   </span>
                 )}
                 </MediaPreviewCard>
@@ -611,6 +668,13 @@ export function MediaPanel({
           })
         )}
       </div>
+      {contextMenu && <ContextMenuSurface label="Ações das imagens" position={contextMenu}
+        onDismiss={() => { setContextMenu(null); panelHostRef.current?.focus({ preventScroll: true }); }}>
+        <button type="button" role="menuitem" disabled={relinkDisabled || importPending || selectedMediaIds.size === 0}
+          onClick={() => { setContextMenu(null); onRemoveMedia([...selectedMediaIds]); panelHostRef.current?.focus({ preventScroll: true }); }}>
+          <span>{projectCommandDescriptor("remove-media").label}</span><kbd aria-hidden="true">{projectCommandShortcutLabel("remove-media")}</kbd>
+        </button>
+      </ContextMenuSurface>}
     </section>
   );
 }
@@ -632,11 +696,10 @@ function mediaAvailabilityLabel(preview: MediaPreview) {
 function initialPreferences(
   mode: MediaPanelPreferenceMode,
   mediaKind: MediaKind,
-): Partial<MediaPanelViewPreferences> {
+): Partial<MediaPanelPersistentPreference> {
   return mode.kind === "controlled"
     ? {
         ...mode.persistent[mediaKind],
-        thumbnailSize: mode.thumbnailSizes[mediaKind],
       }
     : mode.initial?.[mediaKind] ?? {};
 }
@@ -652,15 +715,31 @@ function filterMediaItems(
   items: readonly MediaCatalogItem[],
   usage: ReadonlyMap<string, number>,
   search: string,
+  sortKey: MediaPanelViewPreferences["sortKey"],
   sortDirection: MediaPanelViewPreferences["sortDirection"],
   usageFilter: MediaUsageFilter,
+  files: Readonly<Record<string, MediaFileInfo>>,
+  missingOnly: boolean,
 ) {
   const normalizedSearch = normalizeSearchText(search);
   const direction = sortDirection === "ascending" ? 1 : -1;
   return items.filter((media) =>
+    (!missingOnly || files[media.id]?.state === "absent") &&
     passesUsageFilter(usage.get(media.id) ?? 0, usageFilter) &&
     normalizeSearchText(media.name).includes(normalizedSearch),
-  ).sort((left, right) => direction * naturalNameCollator.compare(left.name, right.name));
+  ).sort((left, right) => {
+    const leftFile = files[left.id];
+    const rightFile = files[right.id];
+    const absent = Number(leftFile?.state === "absent") - Number(rightFile?.state === "absent");
+    if (absent) return absent;
+    if (sortKey !== "name") {
+      const leftDate = sortKey === "createdAt" ? leftFile?.createdAtMs : leftFile?.modifiedAtMs;
+      const rightDate = sortKey === "createdAt" ? rightFile?.createdAtMs : rightFile?.modifiedAtMs;
+      if (leftDate != null && rightDate != null && leftDate !== rightDate) return direction * (leftDate - rightDate);
+      if ((leftDate == null) !== (rightDate == null)) return leftDate == null ? 1 : -1;
+    }
+    return direction * naturalNameCollator.compare(left.name, right.name);
+  });
 }
 
 function passesUsageFilter(
@@ -670,4 +749,16 @@ function passesUsageFilter(
   if (usageFilter === "used") return usageCount > 0;
   if (usageFilter === "unused") return usageCount === 0;
   return true;
+}
+
+function mediaUsageLabel(usage: MediaUsage): string {
+  if (!usage.breakdown) return usage.count ? `${usage.count} ${usage.count === 1 ? "uso" : "usos"}` : "";
+  const { frames, backgrounds, overlays, albumBackgrounds, albumOverlays } = usage.breakdown;
+  return [
+    frames ? `${frames} ${frames === 1 ? "Frame" : "Frames"}` : "",
+    backgrounds ? `${backgrounds} ${backgrounds === 1 ? "Fundo" : "Fundos"}` : "",
+    overlays ? `${overlays} ${overlays === 1 ? "Overlay" : "Overlays"}` : "",
+    albumBackgrounds ? `${albumBackgrounds} ${albumBackgrounds === 1 ? "padrão" : "padrões"} de Fundo` : "",
+    albumOverlays ? `${albumOverlays} ${albumOverlays === 1 ? "padrão" : "padrões"} de Overlay` : "",
+  ].filter(Boolean).join(" · ");
 }

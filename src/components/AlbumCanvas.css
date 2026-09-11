@@ -18,6 +18,20 @@
   grid-template-rows: minmax(0, 1fr);
 }
 
+.canvas-decorative-drop-label {
+  position: absolute;
+  z-index: 6;
+  padding: 6px 9px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface-raised);
+  color: var(--ui-text);
+  box-shadow: var(--ui-shadow-menu);
+  font-size: var(--ui-font-size-action);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 .canvas-empty {
   width: 100%;
   height: 100%;
@@ -28,6 +42,10 @@
   width: 100%;
   height: 100%;
   outline: none;
+}
+
+.canvas-host[data-media-drag] .pixi-canvas {
+  cursor: copy !important;
 }
 
 /* During capture, the gesture owns the cursor. Pixi's hover hit-testing keeps

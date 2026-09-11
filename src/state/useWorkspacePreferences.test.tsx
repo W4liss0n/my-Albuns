@@ -16,7 +16,6 @@ test("keeps the non-desktop fallback authoritative for the lifetime of its works
 
   await port.update({
     kind: "mediaThumbnailSize",
-    mediaKind: "decorative",
     size: 110,
   });
   await port.update({
@@ -49,10 +48,10 @@ test("keeps the non-desktop fallback authoritative for the lifetime of its works
     createWorkspacePreferences({
       inspectorSections: { "album.design": false },
       mediaPanel: {
-        decorative: { sortDirection: "ascending", usageFilter: "all" },
-        photo: { sortDirection: "descending", usageFilter: "used" },
+        decorative: { sortKey: "name", sortDirection: "ascending", usageFilter: "all" },
+        photo: { sortKey: "name", sortDirection: "descending", usageFilter: "used" },
       },
-      mediaThumbnailSizes: { decorative: 110, photo: 84 },
+      mediaThumbnailSize: 110,
       workspacePanels: {
         inspector: null,
         media: { size: 240, visible: false },
@@ -64,11 +63,11 @@ test("keeps the non-desktop fallback authoritative for the lifetime of its works
 test("hydrates shared UI state and refreshes it when another Project window gains focus", async () => {
   const initial = createWorkspacePreferences({
     inspectorSections: { "album.design": false },
-    mediaThumbnailSizes: { decorative: 110, photo: 124 },
+    mediaThumbnailSize: 124,
   });
   const refreshed = createWorkspacePreferences({
     inspectorSections: { "album.design": true },
-    mediaThumbnailSizes: { decorative: 96, photo: 118 },
+    mediaThumbnailSize: 118,
   });
   const port: WorkspacePreferencesPort = {
     load: vi
@@ -105,18 +104,17 @@ test("applies changes immediately while the StateStore publishes them", async ()
   act(() => {
     result.current.update({
       kind: "mediaThumbnailSize",
-      mediaKind: "photo",
       size: 124,
     });
   });
 
-  expect(result.current.preferences.mediaThumbnailSizes.photo).toBe(124);
+  expect(result.current.preferences.mediaThumbnailSize).toBe(124);
   await waitFor(() => expect(update).toHaveBeenCalledOnce());
 });
 
 test("restores the last confirmed preferences when publishing a change fails", async () => {
   const confirmed = createWorkspacePreferences({
-    mediaThumbnailSizes: { decorative: 84, photo: 110 },
+    mediaThumbnailSize: 110,
   });
   const port: WorkspacePreferencesPort = {
     load: async () => confirmed,
@@ -126,20 +124,19 @@ test("restores the last confirmed preferences when publishing a change fails", a
   };
   const { result } = renderHook(() => useWorkspacePreferences(port));
   await waitFor(() =>
-    expect(result.current.preferences.mediaThumbnailSizes.photo).toBe(110),
+    expect(result.current.preferences.mediaThumbnailSize).toBe(110),
   );
 
   act(() => {
     result.current.update({
       kind: "mediaThumbnailSize",
-      mediaKind: "photo",
       size: 124,
     });
   });
-  expect(result.current.preferences.mediaThumbnailSizes.photo).toBe(124);
+  expect(result.current.preferences.mediaThumbnailSize).toBe(124);
 
   await waitFor(() =>
-    expect(result.current.preferences.mediaThumbnailSizes.photo).toBe(110),
+    expect(result.current.preferences.mediaThumbnailSize).toBe(110),
   );
 });
 
@@ -171,14 +168,13 @@ test("keeps a local update when an older focus refresh completes later", async (
   act(() => {
     result.current.update({
       kind: "mediaThumbnailSize",
-      mediaKind: "photo",
       size: 124,
     });
   });
   act(() => finishRefresh(createWorkspacePreferences()));
 
   await waitFor(() => expect(port.update).toHaveBeenCalledOnce());
-  expect(result.current.preferences.mediaThumbnailSizes.photo).toBe(124);
+  expect(result.current.preferences.mediaThumbnailSize).toBe(124);
 });
 
 test("accepts the latest authoritative response including another host's fields", async () => {
@@ -198,7 +194,6 @@ test("accepts the latest authoritative response including another host's fields"
   act(() => {
     result.current.update({
       kind: "mediaThumbnailSize",
-      mediaKind: "photo",
       size: 124,
     });
   });
@@ -207,7 +202,7 @@ test("accepts the latest authoritative response including another host's fields"
     expect(result.current.preferences).toEqual(
       createWorkspacePreferences({
         inspectorSections: { "sheet.design": false },
-        mediaThumbnailSizes: { decorative: 84, photo: 124 },
+        mediaThumbnailSize: 124,
       }),
     ),
   );

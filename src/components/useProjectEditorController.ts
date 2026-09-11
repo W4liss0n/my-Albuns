@@ -291,6 +291,7 @@ export function useProjectEditorController({
   };
 
   const canvasProps: AlbumCanvasProps = {
+    revision: projection.state.revision,
     projectId: projection.state.projectId,
     mode: canvasMode.kind === "normal" && layoutPanel.visible && layoutPanel.sheetId
       ? { kind: "normal", isolatedSheetId: layoutPanel.sheetId } : canvasMode,
@@ -353,6 +354,8 @@ export function useProjectEditorController({
         yUm: point.yUm,
         mode: canvasMode.kind === "sheet-editing" ? "edit" : "normal",
       }),
+    onPreviewDecorativeDrop: (request) => projectCorePort.previewDecorativeDrop(request),
+    onDropDecorative: (request) => mutations.applyIntent({ kind: "dropDecorative", request }),
     onCanvasMetricsChange: navigation.handleCanvasMetricsChange,
   };
 
@@ -456,6 +459,7 @@ export function useProjectEditorController({
     importPending: mutations.importPending,
     imageProcessingProgress: mutations.imageProcessingProgress,
     imageProcessingProblems: mutations.imageProcessingProblems,
+    imageProcessingOperationProblem: mutations.imageProcessingOperationProblem,
     dismissImageProcessingProblems: mutations.dismissImageProcessingProblems,
     retryUnavailableMedia: mutations.retryUnavailableMedia,
     photoImportResult: mutations.photoImportResult,
@@ -479,7 +483,7 @@ export function useProjectEditorController({
     applyAlbumDesign: mutations.applyAlbumDesign,
     applyDpi: mutations.applyDpi,
     relinkMedia: mutations.relinkMedia,
-    importPhoto: mutations.importPhoto,
+    importMedia: mutations.importMedia,
     addSheetBefore,
     addSheetAfter,
     convertEdge,
@@ -497,6 +501,11 @@ export function useProjectEditorController({
           mediaId,
           mode: canvasMode.kind === "sheet-editing" ? "edit" : "normal",
         });
+      }
+    },
+    applyDecorative: (mediaId: string, role: import("../domain/project").DecorativeRole) => {
+      if (!interactionBlocked && navigation.implicitSheetId) {
+        void mutations.applyIntent({ kind: "applyDecorative", sheetId: navigation.implicitSheetId, mediaId, role, scope: "bothSides" });
       }
     },
     dismissFeedback: mutations.dismissFeedback,

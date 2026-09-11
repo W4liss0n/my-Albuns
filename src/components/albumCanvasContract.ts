@@ -101,6 +101,11 @@ export interface AlbumCanvasProps {
   centeredSheetId: string | null;
   viewport: ViewportState;
   draggedPhotoId?: string | null;
+  mediaDrag?: import("./useMediaDragGesture").MediaDrag | null;
+  decorativeDropPreview?: import("../domain/project").DecorativeDropPreview | null;
+  revision?: number;
+  onPreviewDecorativeDrop?(request: import("../domain/project").DecorativeDropRequest): Promise<import("../domain/project").DecorativeDropPreview | null>;
+  onDropDecorative?(request: import("../domain/project").DecorativeDropRequest): Promise<boolean>;
   sheetReorder?: CanvasSheetReorder;
   sheetSideSwap?: {
     disabled: boolean;

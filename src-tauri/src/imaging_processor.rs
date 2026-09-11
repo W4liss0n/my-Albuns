@@ -56,6 +56,17 @@ impl Default for ImagingProcessor {
 }
 
 impl ImagingProcessor {
+    #[cfg(test)]
+    pub(crate) fn with_available_memory_for_test(physical_mib: u64, commit_mib: u64) -> Self {
+        Self {
+            resources: Arc::new(ResourceBudget::with_available_memory_for_test(
+                physical_mib,
+                commit_mib,
+            )),
+            ..Self::default()
+        }
+    }
+
     fn with_capacity(capacity: usize) -> Self {
         assert!((1..=IMAGE_PROCESSING_CONCURRENCY).contains(&capacity));
         Self {

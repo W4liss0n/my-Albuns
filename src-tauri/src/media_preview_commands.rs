@@ -44,6 +44,22 @@ impl From<CachePreviewError> for MediaPreviewCommandError {
     }
 }
 
+#[tauri::command]
+pub(crate) fn read_media_files(
+    window: WebviewWindow,
+    project_host: State<'_, ProjectHost>,
+    runtime: State<'_, MediaRuntime>,
+) -> Result<crate::ipc_contract::MediaFileCatalog, String> {
+    if window.label() != PROJECT_WINDOW_LABEL {
+        return Err("Os arquivos estão disponíveis somente na Janela do Projeto.".into());
+    }
+    let catalog = project_host.authorized_media_catalog()?;
+    Ok(crate::ipc_contract::MediaFileCatalog {
+        project_id: catalog.project_id,
+        files: runtime.files_for(&catalog.bindings),
+    })
+}
+
 impl MediaPreviewCommandError {
     fn read_failed() -> Self {
         Self {

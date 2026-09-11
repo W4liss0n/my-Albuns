@@ -639,11 +639,52 @@ impl EditableProject {
         Ok(self.preview_frame_composition(candidate, &edit.frame_ids))
     }
 
+    pub fn preview_decorative_drop(
+        &self,
+        request: &crate::DecorativeDropRequest,
+    ) -> Result<Option<crate::DecorativeDropPreview>, CoreError> {
+        if !self.session_valid {
+            return Err(CoreError::EditableSessionInvalidated);
+        }
+        let Some(zone) = self.project().decorative_drop_zone(request)? else {
+            return Ok(None);
+        };
+        let candidate = self.project().with_applied_decorative(
+            &request.sheet_id,
+            request.media_id,
+            request.role,
+            zone.scope,
+        )?;
+        let sheet = self
+            .preview_composition(candidate)
+            .sheets
+            .into_iter()
+            .find(|sheet| sheet.sheet_id == request.sheet_id)
+            .expect("the validated target sheet was composed");
+        Ok(Some(crate::DecorativeDropPreview {
+            revision: self.revision(),
+            role: request.role,
+            scope: zone.scope,
+            zone_rect: zone.rect,
+            center_rect: zone.center,
+            sheet,
+        }))
+    }
+
     fn preview_frame_composition(
         &self,
         candidate: ProjectDocument,
         frame_ids: &[String],
     ) -> Vec<crate::ComposedFrame> {
+        self.preview_composition(candidate)
+            .sheets
+            .into_iter()
+            .flat_map(|sheet| sheet.frames)
+            .filter(|frame| frame_ids.contains(&frame.frame_id))
+            .collect()
+    }
+
+    fn preview_composition(&self, candidate: ProjectDocument) -> crate::CompositionPlan {
         let transient = PersistentProjectSession::from_persisted(
             crate::project_document::ProjectRevision::new(
                 self.session.project_id(),
@@ -659,11 +700,6 @@ impl EditableProject {
             &self.photo_sources,
         )
         .composition
-        .sheets
-        .into_iter()
-        .flat_map(|sheet| sheet.frames)
-        .filter(|frame| frame_ids.contains(&frame.frame_id))
-        .collect()
     }
 
     /// Freezes one resolved editor projection and only the exact linked
@@ -739,6 +775,14 @@ impl EditableProject {
         &mut self,
         commands: Vec<ImportPhoto>,
     ) -> Result<ImportPhotosOutcome, CoreError> {
+        self.import_media(crate::MediaKind::Photo, commands)
+    }
+
+    pub fn import_media(
+        &mut self,
+        kind: crate::MediaKind,
+        commands: Vec<crate::ImportMedia>,
+    ) -> Result<ImportPhotosOutcome, CoreError> {
         if !self.session_valid {
             return Err(CoreError::EditableSessionInvalidated);
         }
@@ -746,7 +790,7 @@ impl EditableProject {
             .project()
             .media()
             .iter()
-            .filter(|media| media.kind() == crate::MediaKind::Photo)
+            .filter(|media| media.kind() == kind)
             .map(|media| (media.path().to_path_buf(), MediaId::from_uuid(media.id())))
             .collect::<HashMap<_, _>>();
         let mut new_links = Vec::new();
@@ -759,7 +803,7 @@ impl EditableProject {
             } else {
                 if command.source_metadata.is_none() {
                     return Err(CoreError::InvalidProject(
-                        "O vínculo da Foto selecionada não está mais no Projeto.".into(),
+                        "O vínculo da imagem selecionada não está mais no Projeto.".into(),
                     ));
                 }
                 let media_id = MediaId::from_uuid(Uuid::new_v4());
@@ -776,7 +820,7 @@ impl EditableProject {
         }
         let imported_count = new_links.len();
         if !new_links.is_empty() {
-            self.session.import_photos(new_links)?;
+            self.session.import_media(kind, new_links)?;
         }
         for (media_id, path, metadata) in observations {
             self.photo_sources

@@ -37,10 +37,11 @@ test.each([false, true])("creation followed by Save and Undo respects the queue 
     queryLayouts: async () => { throw new Error("Layouts are not configured in this fixture."); },
     previewLayout: async () => { throw new Error("Layouts are not configured in this fixture."); },
     previewFrameStyle: async () => { throw new Error("Frame style preview is not configured in this fixture."); },
+    previewDecorativeDrop: async () => { throw new Error("Decorative preview is not configured in this fixture."); },
     previewPhotoAngle: async () => { throw new Error("Photo angle preview is not configured in this fixture."); },
     previewFrameGeometry: unsupported, redo: unsupported, saveAs: unsupported,
     validateAlbumInformation: unsupported, apply: unsupported,
-    importPhoto: unsupported, resolvePhotoDropTarget: unsupported, relink: unsupported,
+    importMedia: unsupported, resolvePhotoDropTarget: unsupported, relink: unsupported,
   };
   useEditorView.setState({ projectId: initial.state.projectId, editingSheetId: "sheet-001",
     focusedSheetId: "sheet-001", centeredSheetId: "sheet-001", selectedFrameIds: ["frame-001"] });

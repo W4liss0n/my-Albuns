@@ -25,8 +25,10 @@ pub(crate) fn photo_source_decode_count() -> usize {
 }
 
 pub(crate) struct PhotoImportsProposal {
+    pub(crate) kind: MediaKind,
     pub(crate) commands: Vec<ImportPhoto>,
     pub(crate) problems: Vec<ImageProcessingProblem>,
+    pub(crate) operation_problem: Option<String>,
     pub(crate) inspections: Vec<ImportedPhotoInspection>,
 }
 
@@ -272,8 +274,20 @@ impl MediaResolver {
         self.propose_photo_imports_in_plan(paths, bindings, &context.freeze(), on_progress)
     }
 
+    #[cfg(test)]
     pub(crate) fn propose_photo_imports_in_plan(
         &self,
+        paths: Vec<PathBuf>,
+        bindings: &[MediaBinding],
+        plan: &RootBindingPlan,
+        on_progress: impl FnMut(crate::ipc_contract::ImageProcessingProgress),
+    ) -> PhotoImportsProposal {
+        self.propose_media_imports_in_plan(MediaKind::Photo, paths, bindings, plan, on_progress)
+    }
+
+    pub(crate) fn propose_media_imports_in_plan(
+        &self,
+        kind: MediaKind,
         paths: Vec<PathBuf>,
         bindings: &[MediaBinding],
         plan: &RootBindingPlan,
@@ -281,7 +295,7 @@ impl MediaResolver {
     ) -> PhotoImportsProposal {
         let existing = bindings
             .iter()
-            .filter(|binding| binding.kind == MediaKind::Photo)
+            .filter(|binding| binding.kind == kind)
             .map(|binding| binding.logical_path.as_path())
             .collect::<HashSet<_>>();
         let mut seen = HashSet::new();
@@ -294,6 +308,7 @@ impl MediaResolver {
             completed_files: 0,
             total_files,
             problem: None,
+            operation_problem: None,
         });
         let candidates = paths
             .into_iter()
@@ -316,11 +331,11 @@ impl MediaResolver {
                     .and_then(|()| {
                         let binding = MediaBinding {
                             media_id: String::new(),
-                            kind: MediaKind::Photo,
+                            kind,
                             logical_path: path.clone(),
                         };
                         let before = self.observe_in_plan(plan, &binding);
-                        let metadata = inspect_media_source_in_plan(plan, &path, true)?;
+                        let metadata = inspect_media_source_in_plan(plan, &path, false)?;
                         let after = self.observe_in_plan(plan, &binding);
                         if !before.same_source(&after) {
                             return Err("O Original mudou durante a inspeção.".into());
@@ -344,6 +359,7 @@ impl MediaResolver {
                     completed_files,
                     total_files,
                     problem: None,
+                    operation_problem: None,
                 })
             },
         );
@@ -360,8 +376,10 @@ impl MediaResolver {
             }
         }
         PhotoImportsProposal {
+            kind,
             commands,
             problems,
+            operation_problem: None,
             inspections,
         }
     }
@@ -620,6 +638,42 @@ pub(crate) struct MediaRuntime {
 }
 
 impl MediaRuntime {
+    /// UI metadata comes only from stabilized observations of current bindings.
+    /// Reading the catalog neither inspects Originals nor consults Cache demand.
+    pub(crate) fn files_for(
+        &self,
+        bindings: &[MediaBinding],
+    ) -> Vec<crate::ipc_contract::MediaFileInfo> {
+        use crate::ipc_contract::{MediaFileInfo, MediaFileState};
+        let Some(snapshot) = self.snapshot() else {
+            return Vec::new();
+        };
+        let by_id: HashMap<_, _> = snapshot
+            .observations
+            .iter()
+            .map(|file| (file.media_id.as_str(), file))
+            .collect();
+        bindings
+            .iter()
+            .filter_map(|binding| {
+                let file = by_id.get(binding.media_id.as_str())?;
+                if file.logical_path != binding.logical_path || file.kind != binding.kind {
+                    return None;
+                }
+                Some(MediaFileInfo {
+                    media_id: binding.media_id.clone(),
+                    state: match file.availability {
+                        MediaAvailability::Candidate => MediaFileState::Available,
+                        MediaAvailability::Absent => MediaFileState::Absent,
+                        MediaAvailability::Unavailable => MediaFileState::Unavailable,
+                    },
+                    created_at_ms: file.source_created_unix_ms,
+                    modified_at_ms: file.source_modified_unix_ms,
+                })
+            })
+            .collect()
+    }
+
     pub(crate) fn apply(&self, proposal: MediaResolutionProposal) -> MediaRuntimeUpdate {
         let mut current = self
             .current
@@ -1057,6 +1111,26 @@ mod tests {
     };
 
     #[test]
+    fn image_import_accepts_png_and_tiff_alongside_photos() {
+        let root = tempfile::tempdir().unwrap();
+        let paths = [
+            ("fundo.png", ImageFormat::Png),
+            ("overlay.tiff", ImageFormat::Tiff),
+        ]
+        .map(|(name, format)| {
+            let path = root.path().join(name);
+            RgbImage::from_pixel(37, 23, Rgb([20, 80, 160]))
+                .save_with_format(&path, format)
+                .unwrap();
+            path
+        });
+        let result = MediaResolver.propose_photo_imports(paths.to_vec(), &[], |_| {});
+        assert!(result.problems.is_empty(), "{:?}", result.problems);
+        assert_eq!(result.commands.len(), 2);
+        assert_eq!(result.inspections.len(), 2);
+    }
+
+    #[test]
     fn multiple_photo_import_keeps_valid_files_and_reports_each_rejection() {
         let root = tempfile::tempdir().unwrap();
         let good = root.path().join("boa.JPG");
@@ -1070,9 +1144,7 @@ mod tests {
         original
             .save_with_format(&second, ImageFormat::Jpeg)
             .unwrap();
-        original
-            .save_with_format(&invalid, ImageFormat::Png)
-            .unwrap();
+        std::fs::write(&invalid, b"GIF89a unsupported image").unwrap();
         let before = std::fs::read(&good).unwrap();
         let scan = before
             .windows(2)
@@ -1147,7 +1219,7 @@ mod tests {
     }
 
     #[test]
-    fn photo_import_rejects_non_jpeg_content_even_with_a_jpg_extension() {
+    fn photo_import_accepts_supported_content_even_with_a_different_extension() {
         let root = tempfile::tempdir().expect("temporary invalid JPEG fixture");
         let source = root.path().join("Nao e JPEG.jpg");
         RgbImage::from_pixel(12, 8, Rgb([90, 30, 10]))
@@ -1156,8 +1228,8 @@ mod tests {
         let before = std::fs::read(&source).expect("the renamed Original is readable");
 
         let proposal = MediaResolver.propose_photo_imports(vec![source.clone()], &[], |_| {});
-        assert!(proposal.commands.is_empty());
-        assert!(proposal.problems[0].reason.contains("JPEG válido"));
+        assert_eq!(proposal.commands.len(), 1);
+        assert!(proposal.problems.is_empty());
         assert_eq!(
             std::fs::read(source).expect("the rejected file remains"),
             before
@@ -1492,6 +1564,7 @@ mod tests {
         let monitor = MediaMonitor::default();
 
         let first = monitor.poll(&runtime, &bindings);
+        assert!(runtime.files_for(&bindings).is_empty());
         assert!(
             first.confirmed_observation().is_none(),
             "one raw filesystem sample cannot reach Runtime"
@@ -1512,6 +1585,30 @@ mod tests {
             confirmed.confirmed_observation().cloned()
         );
         assert_eq!(bindings[0].logical_path, root.path().join("photo.jpg"));
+        let files = runtime.files_for(&bindings);
+        assert_eq!(files.len(), 2);
+        assert_eq!(
+            files[0].state,
+            crate::ipc_contract::MediaFileState::Available
+        );
+        let metadata = std::fs::metadata(&bindings[0].logical_path).unwrap();
+        assert_eq!(
+            files[0].created_at_ms,
+            super::file_time_millis(metadata.created())
+        );
+        assert_eq!(
+            files[0].modified_at_ms,
+            super::file_time_millis(metadata.modified())
+        );
+        assert_eq!(files[1].state, crate::ipc_contract::MediaFileState::Absent);
+        assert_eq!(files[1].created_at_ms, None);
+        let mut relinked = bindings.clone();
+        relinked[0].logical_path = root.path().join("new-original.jpg");
+        assert_eq!(
+            runtime.files_for(&relinked).len(),
+            1,
+            "old-path metadata cannot survive relinking"
+        );
     }
 
     #[test]

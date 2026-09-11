@@ -65,7 +65,6 @@ try {
         'photo_import::native_flow_tests::real_import_flow' `
         -- `
         --ignored `
-        --exact `
         --test-threads=1
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE

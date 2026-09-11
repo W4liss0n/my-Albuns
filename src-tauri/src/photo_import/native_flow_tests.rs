@@ -75,12 +75,17 @@ fn inputs(root: &Path) -> InputSet {
         .save_with_format(&png, ImageFormat::Png)
         .unwrap();
     paths.push(png);
+    let tiff = root.join("overlay.tiff");
+    image::RgbaImage::from_pixel(37, 23, image::Rgba([40, 80, 160, 100]))
+        .save_with_format(&tiff, ImageFormat::Tiff)
+        .unwrap();
+    paths.push(tiff);
     paths.push(paths[0].clone());
     InputSet {
         paths,
-        imported: 42,
-        previews: 41,
-        rejected: 2,
+        imported: 44,
+        previews: 43,
+        rejected: 1,
         host_decodes: 1,
     }
 }
@@ -88,11 +93,84 @@ fn inputs(root: &Path) -> InputSet {
 #[test]
 #[ignore = "executed by scripts/Test-Rust.ps1 with the real debug sidecar"]
 fn real_import_flow() {
+    run_real_import_flow(MediaKind::Photo, inputs, false);
+    if std::env::var_os("MYALBUNS_IMPORT_MEASUREMENT_INPUTS").is_none() {
+        run_real_import_flow(MediaKind::Decorative, inputs, false);
+    }
+}
+
+#[test]
+#[ignore = "executed with the real debug sidecar"]
+fn real_import_flow_reports_each_alternate_inspection_for_files_and_folder() {
+    fn rejected_inputs(root: &Path) -> InputSet {
+        let paths = (0..2)
+            .map(|index| {
+                let path = root.join(format!("unreadable-{index}.jpg"));
+                std::fs::write(&path, b"invalid JPEG").unwrap();
+                path
+            })
+            .collect();
+        InputSet {
+            paths,
+            imported: 0,
+            previews: 0,
+            rejected: 2,
+            host_decodes: 0,
+        }
+    }
+    for by_folder in [false, true] {
+        run_real_import_flow(MediaKind::Photo, rejected_inputs, by_folder);
+    }
+}
+
+fn run_real_import_flow(kind: MediaKind, build_inputs: fn(&Path) -> InputSet, by_folder: bool) {
+    run_real_import_flow_with_memory(kind, build_inputs, by_folder, None);
+}
+
+#[test]
+#[ignore = "executed with the real debug sidecar"]
+fn real_import_flow_finishes_serially_under_memory_pressure() {
+    fn small_inputs(root: &Path) -> InputSet {
+        let paths = (0..8)
+            .map(|index| {
+                let path = root.join(format!("serial-{index}.jpg"));
+                RgbImage::from_pixel(37, 23, Rgb([index, 80, 160]))
+                    .save(&path)
+                    .unwrap();
+                path
+            })
+            .collect();
+        InputSet {
+            paths,
+            imported: 8,
+            previews: 8,
+            rejected: 0,
+            host_decodes: 0,
+        }
+    }
+    for by_folder in [false, true] {
+        run_real_import_flow_with_memory(
+            MediaKind::Photo,
+            small_inputs,
+            by_folder,
+            Some((350, 7168)),
+        );
+    }
+}
+
+fn run_real_import_flow_with_memory(
+    kind: MediaKind,
+    build_inputs: fn(&Path) -> InputSet,
+    by_folder: bool,
+    available_memory_mib: Option<(u64, u64)>,
+) {
     let executable = PathBuf::from(
         std::env::var_os("MYALBUNS_TEST_IMAGING_PROCESSOR").expect("real Processor path"),
     );
     let fixture = tempfile::tempdir().unwrap();
-    let inputs = inputs(fixture.path());
+    let source_directory = fixture.path().join("originals");
+    std::fs::create_dir(&source_directory).unwrap();
+    let inputs = build_inputs(&source_directory);
     let original_hashes = inputs
         .paths
         .iter()
@@ -127,15 +205,23 @@ fn real_import_flow() {
             AuthorizedCacheNamespace::mount(&app_paths, project.identity_authority()).unwrap();
         let host = ProjectHost::new(project);
         let engine = CacheEngine::default();
-        let processor = ImagingProcessor::default();
+        // Success-path tests must not depend on other applications' memory use.
+        // The pressure scenario supplies its own constrained snapshot.
+        let (physical, commit) = available_memory_mib.unwrap_or((16 * 1024, 16 * 1024));
+        let processor = ImagingProcessor::with_available_memory_for_test(physical, commit);
         let registry = CachePreviewRegistry::new("import-flow");
         let monitor = MediaMonitor::default();
         let runtime = MediaRuntime::default();
         let total_started = Instant::now();
-        let attempt = PhotoImportAttempt::capture(
+        let attempt = PhotoImportAttempt::capture_for_kind(
+            kind,
             host.authorized_media_catalog().unwrap(),
             namespace.clone(),
-            inputs.paths.clone(),
+            if by_folder {
+                vec![source_directory.clone()]
+            } else {
+                inputs.paths.clone()
+            },
         )
         .unwrap();
         let candidates = attempt
@@ -252,8 +338,15 @@ fn real_import_flow() {
         let native_ms = milliseconds(native_started);
         assert_eq!(active.load(Ordering::Acquire), 0);
         assert!(peak_active.load(Ordering::Acquire) <= processor.cache_capacity());
+        if available_memory_mib.is_some() {
+            assert_eq!(
+                peak_active.load(Ordering::Acquire),
+                1,
+                "memory pressure keeps the real workers serial"
+            );
+        }
         assert!(!namespace.paths().metadata_file().exists());
-        let outcomes = completions
+        let outcomes: HashMap<_, _> = completions
             .into_iter()
             .flat_map(|completion| completion.photos)
             .map(|photo| (photo.source_id, photo.outcome))
@@ -262,6 +355,10 @@ fn real_import_flow() {
         let bindings = attempt.catalog.bindings.clone();
         let roots = attempt.roots.clone();
         let decoded_before = crate::media_runtime::photo_source_decode_count();
+        import_progress.begin_inspection(outcomes.iter().filter_map(|(source, outcome)| {
+            matches!(outcome, PhotoImportOutcome::Validated { .. }).then_some(source)
+        }));
+        active.fetch_add(1, Ordering::AcqRel);
         let prepared = prepare_proposal_with_inspection(
             attempt,
             Some(stage),
@@ -269,9 +366,21 @@ fn real_import_flow() {
             HashMap::new(),
             None,
             Vec::new(),
-            |path| inspect_with_capacity(&engine, &processor, path, &bindings, &roots),
+            |candidate| {
+                let proposal = inspect_with_capacity(
+                    kind,
+                    &engine,
+                    &processor,
+                    candidate.path(),
+                    &bindings,
+                    &roots,
+                );
+                import_progress.complete_inspection(&candidate.source_id);
+                proposal
+            },
         )
         .unwrap();
+        active.fetch_sub(1, Ordering::AcqRel);
         assert_eq!(
             crate::media_runtime::photo_source_decode_count() - decoded_before,
             inputs.host_decodes
@@ -316,7 +425,7 @@ fn real_import_flow() {
                     && completed < u64::from(unique_count)
                     && sample["activeJobs"].as_u64().unwrap() > 0
             }),
-            "intermediate progress must arrive while native jobs are still active"
+            "intermediate progress must arrive while native preparation or alternate inspection is still active (folder: {by_folder})"
         );
         assert!(committed.existing.is_empty());
         assert_eq!(committed.new_paths.len(), inputs.imported);
@@ -324,7 +433,7 @@ fn real_import_flow() {
             committed.cache_problems.len(),
             inputs.imported - inputs.previews
         );
-        let ImportPhotoResult::Completed {
+        let ImportMediaResult::Completed {
             imported_count,
             problems,
             projection,
@@ -335,7 +444,15 @@ fn real_import_flow() {
         };
         assert_eq!(imported_count as usize, inputs.imported);
         assert_eq!(problems.len(), inputs.rejected);
-        assert_eq!(projection.state.revision, 1);
+        assert_eq!(projection.state.revision, u64::from(inputs.imported > 0));
+        assert!(
+            projection
+                .state
+                .album
+                .media
+                .iter()
+                .all(|media| media.kind == kind)
+        );
         let catalog = host.authorized_media_catalog().unwrap();
         assert!(
             monitor
@@ -462,7 +579,9 @@ fn real_import_flow() {
             crate::media_runtime::photo_source_decode_count() - decoded_before,
             inputs.host_decodes
         );
-        assert!(host.undo().unwrap().state.album.media.is_empty());
+        if inputs.imported > 0 {
+            assert!(host.undo().unwrap().state.album.media.is_empty());
+        }
         measurements.push(serde_json::json!({
             "round": round, "imported": inputs.imported, "previews": inputs.previews, "rejected": inputs.rejected,
             "capacity": processor.cache_capacity(), "peakActiveJobs": peak_active.load(Ordering::Acquire),

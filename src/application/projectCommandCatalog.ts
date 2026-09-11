@@ -247,6 +247,15 @@ const DEFINITIONS = [
     shortcuts: [shortcut("delete", "Delete")],
   }),
   command({
+    id: "remove-media",
+    label: "Remover",
+    description: "Remove as imagens selecionadas na aba ativa do Painel.",
+    kind: "domain",
+    contexts: ["media-panel"],
+    availability: "implemented",
+    shortcuts: [shortcut("delete", "Delete")],
+  }),
+  command({
     id: "bring-frames-to-front",
     label: "Trazer para frente",
     description: "Move os Frames selecionados para a frente.",

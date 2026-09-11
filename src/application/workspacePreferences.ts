@@ -7,6 +7,7 @@ export const MEDIA_THUMBNAIL_DEFAULT_SIZE = 84;
 export type WorkspacePanel = "inspector" | "media";
 export type MediaUsageFilter = "all" | "used" | "unused";
 export type MediaSortDirection = "ascending" | "descending";
+export type MediaSortKey = "name" | "createdAt" | "modifiedAt";
 
 export interface WorkspacePanelPreference {
   size: number;
@@ -14,20 +15,24 @@ export interface WorkspacePanelPreference {
 }
 
 export interface MediaPanelPersistentPreference {
+  sortKey: MediaSortKey;
   sortDirection: MediaSortDirection;
   usageFilter: MediaUsageFilter;
 }
 
 export interface WorkspacePreferences {
   inspectorSections: Readonly<Record<string, boolean>>;
+  mediaPanelActiveKind: MediaKind;
   mediaPanel: Readonly<Record<MediaKind, MediaPanelPersistentPreference>>;
-  mediaThumbnailSizes: Readonly<Record<MediaKind, number>>;
+  mediaThumbnailSize: number;
   workspacePanels: Readonly<
     Record<WorkspacePanel, WorkspacePanelPreference | null>
   >;
 }
 
 export type WorkspacePreferenceChange =
+  | { kind: "mediaPanelActiveKind"; mediaKind: MediaKind }
+  | { kind: "mediaPanelSortKey"; mediaKind: MediaKind; sortKey: MediaSortKey }
   | {
       kind: "inspectorSection";
       preferenceKey: string;
@@ -35,7 +40,6 @@ export type WorkspacePreferenceChange =
     }
   | {
       kind: "mediaThumbnailSize";
-      mediaKind: MediaKind;
       size: number;
     }
   | {
@@ -79,6 +83,7 @@ export const WORKSPACE_PANEL_SIZE_LIMITS: Readonly<
 };
 
 const MEDIA_PANEL_DEFAULT: MediaPanelPersistentPreference = {
+  sortKey: "name",
   sortDirection: "ascending",
   usageFilter: "all",
 };
@@ -88,18 +93,14 @@ export function createWorkspacePreferences(
 ): WorkspacePreferences {
   return {
     inspectorSections: { ...(overrides.inspectorSections ?? {}) },
+    mediaPanelActiveKind: overrides.mediaPanelActiveKind === "decorative" ? "decorative" : "photo",
     mediaPanel: {
       decorative: normalizeMediaPanelPreference(
         overrides.mediaPanel?.decorative,
       ),
       photo: normalizeMediaPanelPreference(overrides.mediaPanel?.photo),
     },
-    mediaThumbnailSizes: {
-      decorative: normalizeThumbnailSize(
-        overrides.mediaThumbnailSizes?.decorative,
-      ),
-      photo: normalizeThumbnailSize(overrides.mediaThumbnailSizes?.photo),
-    },
+    mediaThumbnailSize: normalizeThumbnailSize(overrides.mediaThumbnailSize),
     workspacePanels: {
       inspector: normalizePanelPreference(
         "inspector",
@@ -124,6 +125,7 @@ export function applyWorkspacePreferenceChange(
   preferences: WorkspacePreferences,
   change: WorkspacePreferenceChange,
 ): WorkspacePreferences {
+  if (change.kind === "mediaPanelActiveKind") return { ...preferences, mediaPanelActiveKind: change.mediaKind };
   if (change.kind === "inspectorSection") {
     return {
       ...preferences,
@@ -136,10 +138,7 @@ export function applyWorkspacePreferenceChange(
   if (change.kind === "mediaThumbnailSize") {
     return {
       ...preferences,
-      mediaThumbnailSizes: {
-        ...preferences.mediaThumbnailSizes,
-        [change.mediaKind]: normalizeThumbnailSize(change.size),
-      },
+      mediaThumbnailSize: normalizeThumbnailSize(change.size),
     };
   }
   if (
@@ -171,6 +170,7 @@ export function applyWorkspacePreferenceChange(
         ...current,
         ...(change.kind === "mediaPanelSortDirection"
           ? { sortDirection: change.sortDirection }
+          : change.kind === "mediaPanelSortKey" ? { sortKey: change.sortKey }
           : { usageFilter: change.usageFilter }),
       }),
     },
@@ -215,6 +215,7 @@ function normalizeMediaPanelPreference(
   value: Partial<MediaPanelPersistentPreference> | undefined,
 ): MediaPanelPersistentPreference {
   return {
+    sortKey: value?.sortKey === "createdAt" || value?.sortKey === "modifiedAt" ? value.sortKey : "name",
     sortDirection:
       value?.sortDirection === "descending" ? "descending" : "ascending",
     usageFilter:

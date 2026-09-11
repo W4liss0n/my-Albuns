@@ -285,7 +285,7 @@ function visualValueAtSide(
   if (role === "overlay") {
     const overlay = [...sheet.overlays]
       .reverse()
-      .find(({ drawRect }) => containsX(drawRect, sampleX));
+      .find(({ drawRect, clipRect }) => containsX(clipRect ?? drawRect, sampleX));
     return overlay
       ? { kind: "media", label: overlay.name, mediaId: overlay.mediaId }
       : { kind: "none", label: "Sem overlay" };
@@ -293,7 +293,7 @@ function visualValueAtSide(
 
   const background = [...sheet.backgrounds]
     .reverse()
-    .find(({ drawRect }) => containsX(drawRect, sampleX));
+    .find((background) => containsX(background.kind === "media" ? background.clipRect ?? background.drawRect : background.drawRect, sampleX));
   if (!background) {
     return { kind: "color", label: sheet.base.rgb, rgb: sheet.base.rgb };
   }

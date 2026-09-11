@@ -291,6 +291,13 @@
           },
           "mediaUsage": [
             {
+              "breakdown": {
+                "albumBackgrounds": 0,
+                "albumOverlays": 0,
+                "backgrounds": 0,
+                "frames": 2,
+                "overlays": 0
+              },
               "count": 2,
               "mediaId": "00000000-0000-4000-8000-000000000010"
             }
@@ -4157,6 +4164,13 @@
           },
           "mediaUsage": [
             {
+              "breakdown": {
+                "albumBackgrounds": 0,
+                "albumOverlays": 0,
+                "backgrounds": 0,
+                "frames": 2,
+                "overlays": 0
+              },
               "count": 2,
               "mediaId": "00000000-0000-4000-8000-000000000010"
             }
@@ -8023,6 +8037,13 @@
           },
           "mediaUsage": [
             {
+              "breakdown": {
+                "albumBackgrounds": 0,
+                "albumOverlays": 0,
+                "backgrounds": 0,
+                "frames": 2,
+                "overlays": 0
+              },
               "count": 2,
               "mediaId": "00000000-0000-4000-8000-000000000010"
             }
@@ -11520,6 +11541,13 @@
           },
           "mediaUsage": [
             {
+              "breakdown": {
+                "albumBackgrounds": 0,
+                "albumOverlays": 0,
+                "backgrounds": 0,
+                "frames": 2,
+                "overlays": 0
+              },
               "count": 2,
               "mediaId": "00000000-0000-4000-8000-000000000010"
             }
@@ -15394,6 +15422,13 @@
           },
           "mediaUsage": [
             {
+              "breakdown": {
+                "albumBackgrounds": 0,
+                "albumOverlays": 0,
+                "backgrounds": 0,
+                "frames": 2,
+                "overlays": 0
+              },
               "count": 2,
               "mediaId": "00000000-0000-4000-8000-000000000010"
             }
@@ -18520,6 +18555,13 @@
           },
           "mediaUsage": [
             {
+              "breakdown": {
+                "albumBackgrounds": 0,
+                "albumOverlays": 0,
+                "backgrounds": 0,
+                "frames": 2,
+                "overlays": 0
+              },
               "count": 2,
               "mediaId": "00000000-0000-4000-8000-000000000010"
             }
@@ -22017,6 +22059,13 @@
           },
           "mediaUsage": [
             {
+              "breakdown": {
+                "albumBackgrounds": 0,
+                "albumOverlays": 0,
+                "backgrounds": 0,
+                "frames": 2,
+                "overlays": 0
+              },
               "count": 2,
               "mediaId": "00000000-0000-4000-8000-000000000010"
             }
@@ -25673,6 +25722,13 @@
           },
           "mediaUsage": [
             {
+              "breakdown": {
+                "albumBackgrounds": 0,
+                "albumOverlays": 0,
+                "backgrounds": 0,
+                "frames": 0,
+                "overlays": 0
+              },
               "count": 0,
               "mediaId": "00000000-0000-4000-8000-000000000010"
             }
@@ -25881,6 +25937,13 @@
           },
           "mediaUsage": [
             {
+              "breakdown": {
+                "albumBackgrounds": 0,
+                "albumOverlays": 0,
+                "backgrounds": 0,
+                "frames": 0,
+                "overlays": 0
+              },
               "count": 0,
               "mediaId": "00000000-0000-4000-8000-000000000010"
             }
@@ -26182,6 +26245,13 @@
           },
           "mediaUsage": [
             {
+              "breakdown": {
+                "albumBackgrounds": 0,
+                "albumOverlays": 0,
+                "backgrounds": 0,
+                "frames": 1,
+                "overlays": 0
+              },
               "count": 1,
               "mediaId": "00000000-0000-4000-8000-000000000010"
             }
@@ -26735,6 +26805,13 @@
           },
           "mediaUsage": [
             {
+              "breakdown": {
+                "albumBackgrounds": 0,
+                "albumOverlays": 0,
+                "backgrounds": 0,
+                "frames": 2,
+                "overlays": 0
+              },
               "count": 2,
               "mediaId": "00000000-0000-4000-8000-000000000010"
             }
@@ -27189,6 +27266,13 @@
           },
           "mediaUsage": [
             {
+              "breakdown": {
+                "albumBackgrounds": 0,
+                "albumOverlays": 0,
+                "backgrounds": 0,
+                "frames": 0,
+                "overlays": 0
+              },
               "count": 0,
               "mediaId": "00000000-0000-4000-8000-000000000010"
             }
@@ -27493,6 +27577,13 @@
           },
           "mediaUsage": [
             {
+              "breakdown": {
+                "albumBackgrounds": 0,
+                "albumOverlays": 0,
+                "backgrounds": 0,
+                "frames": 0,
+                "overlays": 0
+              },
               "count": 0,
               "mediaId": "00000000-0000-4000-8000-000000000010"
             }
@@ -27832,6 +27923,13 @@
           },
           "mediaUsage": [
             {
+              "breakdown": {
+                "albumBackgrounds": 0,
+                "albumOverlays": 0,
+                "backgrounds": 0,
+                "frames": 0,
+                "overlays": 0
+              },
               "count": 0,
               "mediaId": "00000000-0000-4000-8000-000000000010"
             }
@@ -28359,6 +28457,13 @@
           },
           "mediaUsage": [
             {
+              "breakdown": {
+                "albumBackgrounds": 0,
+                "albumOverlays": 0,
+                "backgrounds": 0,
+                "frames": 2,
+                "overlays": 0
+              },
               "count": 2,
               "mediaId": "00000000-0000-4000-8000-000000000010"
             }
@@ -31706,6 +31811,13 @@
           },
           "mediaUsage": [
             {
+              "breakdown": {
+                "albumBackgrounds": 0,
+                "albumOverlays": 0,
+                "backgrounds": 0,
+                "frames": 5,
+                "overlays": 0
+              },
               "count": 5,
               "mediaId": "00000000-0000-4000-8000-000000000010"
             }
@@ -37539,6 +37651,13 @@
           },
           "mediaUsage": [
             {
+              "breakdown": {
+                "albumBackgrounds": 0,
+                "albumOverlays": 0,
+                "backgrounds": 0,
+                "frames": 6,
+                "overlays": 0
+              },
               "count": 6,
               "mediaId": "00000000-0000-4000-8000-000000000010"
             }
@@ -43703,6 +43822,13 @@
           },
           "mediaUsage": [
             {
+              "breakdown": {
+                "albumBackgrounds": 0,
+                "albumOverlays": 0,
+                "backgrounds": 0,
+                "frames": 2,
+                "overlays": 0
+              },
               "count": 2,
               "mediaId": "00000000-0000-4000-8000-000000000010"
             }
@@ -47301,6 +47427,13 @@
           },
           "mediaUsage": [
             {
+              "breakdown": {
+                "albumBackgrounds": 0,
+                "albumOverlays": 0,
+                "backgrounds": 0,
+                "frames": 2,
+                "overlays": 0
+              },
               "count": 2,
               "mediaId": "00000000-0000-4000-8000-000000000010"
             }
@@ -50869,6 +51002,13 @@
           },
           "mediaUsage": [
             {
+              "breakdown": {
+                "albumBackgrounds": 0,
+                "albumOverlays": 0,
+                "backgrounds": 0,
+                "frames": 2,
+                "overlays": 0
+              },
               "count": 2,
               "mediaId": "00000000-0000-4000-8000-000000000010"
             }
@@ -52187,6 +52327,13 @@
           },
           "mediaUsage": [
             {
+              "breakdown": {
+                "albumBackgrounds": 0,
+                "albumOverlays": 0,
+                "backgrounds": 0,
+                "frames": 2,
+                "overlays": 0
+              },
               "count": 2,
               "mediaId": "00000000-0000-4000-8000-000000000010"
             }
@@ -53569,6 +53716,13 @@
           },
           "mediaUsage": [
             {
+              "breakdown": {
+                "albumBackgrounds": 0,
+                "albumOverlays": 0,
+                "backgrounds": 0,
+                "frames": 2,
+                "overlays": 0
+              },
               "count": 2,
               "mediaId": "00000000-0000-4000-8000-000000000010"
             }
@@ -55019,6 +55173,13 @@
           },
           "mediaUsage": [
             {
+              "breakdown": {
+                "albumBackgrounds": 0,
+                "albumOverlays": 0,
+                "backgrounds": 0,
+                "frames": 2,
+                "overlays": 0
+              },
               "count": 2,
               "mediaId": "00000000-0000-4000-8000-000000000010"
             }
@@ -58622,6 +58783,13 @@
           },
           "mediaUsage": [
             {
+              "breakdown": {
+                "albumBackgrounds": 0,
+                "albumOverlays": 0,
+                "backgrounds": 0,
+                "frames": 2,
+                "overlays": 0
+              },
               "count": 2,
               "mediaId": "00000000-0000-4000-8000-000000000010"
             }
@@ -62120,6 +62288,13 @@
             },
             "mediaUsage": [
               {
+                "breakdown": {
+                  "albumBackgrounds": 0,
+                  "albumOverlays": 0,
+                  "backgrounds": 0,
+                  "frames": 2,
+                  "overlays": 0
+                },
                 "count": 2,
                 "mediaId": "00000000-0000-4000-8000-000000000010"
               }
@@ -65725,6 +65900,13 @@
             },
             "mediaUsage": [
               {
+                "breakdown": {
+                  "albumBackgrounds": 0,
+                  "albumOverlays": 0,
+                  "backgrounds": 0,
+                  "frames": 2,
+                  "overlays": 0
+                },
                 "count": 2,
                 "mediaId": "00000000-0000-4000-8000-000000000010"
               }
@@ -69222,6 +69404,13 @@
             },
             "mediaUsage": [
               {
+                "breakdown": {
+                  "albumBackgrounds": 0,
+                  "albumOverlays": 0,
+                  "backgrounds": 0,
+                  "frames": 2,
+                  "overlays": 0
+                },
                 "count": 2,
                 "mediaId": "00000000-0000-4000-8000-000000000010"
               }
@@ -72827,6 +73016,13 @@
             },
             "mediaUsage": [
               {
+                "breakdown": {
+                  "albumBackgrounds": 0,
+                  "albumOverlays": 0,
+                  "backgrounds": 0,
+                  "frames": 2,
+                  "overlays": 0
+                },
                 "count": 2,
                 "mediaId": "00000000-0000-4000-8000-000000000010"
               }
@@ -76432,6 +76628,13 @@
             },
             "mediaUsage": [
               {
+                "breakdown": {
+                  "albumBackgrounds": 0,
+                  "albumOverlays": 0,
+                  "backgrounds": 0,
+                  "frames": 2,
+                  "overlays": 0
+                },
                 "count": 2,
                 "mediaId": "00000000-0000-4000-8000-000000000010"
               }
@@ -79688,6 +79891,13 @@
           },
           "mediaUsage": [
             {
+              "breakdown": {
+                "albumBackgrounds": 0,
+                "albumOverlays": 0,
+                "backgrounds": 0,
+                "frames": 2,
+                "overlays": 0
+              },
               "count": 2,
               "mediaId": "00000000-0000-4000-8000-000000000010"
             }
@@ -82814,6 +83024,13 @@
           },
           "mediaUsage": [
             {
+              "breakdown": {
+                "albumBackgrounds": 0,
+                "albumOverlays": 0,
+                "backgrounds": 0,
+                "frames": 2,
+                "overlays": 0
+              },
               "count": 2,
               "mediaId": "00000000-0000-4000-8000-000000000010"
             }
@@ -86003,6 +86220,13 @@
           },
           "mediaUsage": [
             {
+              "breakdown": {
+                "albumBackgrounds": 0,
+                "albumOverlays": 0,
+                "backgrounds": 0,
+                "frames": 3,
+                "overlays": 0
+              },
               "count": 3,
               "mediaId": "00000000-0000-4000-8000-000000000010"
             }
@@ -89910,6 +90134,13 @@
           },
           "mediaUsage": [
             {
+              "breakdown": {
+                "albumBackgrounds": 0,
+                "albumOverlays": 0,
+                "backgrounds": 0,
+                "frames": 4,
+                "overlays": 0
+              },
               "count": 4,
               "mediaId": "00000000-0000-4000-8000-000000000010"
             }
@@ -94318,6 +94549,13 @@
           },
           "mediaUsage": [
             {
+              "breakdown": {
+                "albumBackgrounds": 0,
+                "albumOverlays": 0,
+                "backgrounds": 0,
+                "frames": 2,
+                "overlays": 0
+              },
               "count": 2,
               "mediaId": "00000000-0000-4000-8000-000000000010"
             }
@@ -97444,6 +97682,13 @@
           },
           "mediaUsage": [
             {
+              "breakdown": {
+                "albumBackgrounds": 0,
+                "albumOverlays": 0,
+                "backgrounds": 0,
+                "frames": 2,
+                "overlays": 0
+              },
               "count": 2,
               "mediaId": "00000000-0000-4000-8000-000000000010"
             }
@@ -100570,6 +100815,13 @@
           },
           "mediaUsage": [
             {
+              "breakdown": {
+                "albumBackgrounds": 0,
+                "albumOverlays": 0,
+                "backgrounds": 0,
+                "frames": 2,
+                "overlays": 0
+              },
               "count": 2,
               "mediaId": "00000000-0000-4000-8000-000000000010"
             }
@@ -105013,6 +105265,13 @@
           },
           "mediaUsage": [
             {
+              "breakdown": {
+                "albumBackgrounds": 0,
+                "albumOverlays": 0,
+                "backgrounds": 0,
+                "frames": 16,
+                "overlays": 0
+              },
               "count": 16,
               "mediaId": "00000000-0000-4000-8000-000000000010"
             }
@@ -106142,6 +106401,13 @@
           },
           "mediaUsage": [
             {
+              "breakdown": {
+                "albumBackgrounds": 0,
+                "albumOverlays": 0,
+                "backgrounds": 0,
+                "frames": 2,
+                "overlays": 0
+              },
               "count": 2,
               "mediaId": "00000000-0000-4000-8000-000000000010"
             }
@@ -107179,6 +107445,13 @@
           },
           "mediaUsage": [
             {
+              "breakdown": {
+                "albumBackgrounds": 0,
+                "albumOverlays": 0,
+                "backgrounds": 0,
+                "frames": 2,
+                "overlays": 0
+              },
               "count": 2,
               "mediaId": "00000000-0000-4000-8000-000000000010"
             }

@@ -15,7 +15,7 @@ use crate::{
     cache_service::{ActiveCacheNamespace, CacheService},
     image_processing::{ImageProcessingBatch, prepare_changed_images},
     ipc_contract::{
-        ImportPhotoResult, SaveAsProjectCommandError, SaveAsProjectOutcome, SaveAsProjectResult,
+        ImportMediaResult, SaveAsProjectCommandError, SaveAsProjectOutcome, SaveAsProjectResult,
         SaveProjectCommandError, SaveProjectOutcome, SaveProjectResult,
     },
     logging::validate_optional_identifier,
@@ -58,6 +58,9 @@ pub(crate) async fn apply_project_intent(
     let previous_bindings = state.authorized_media_catalog()?.bindings;
     let previous = state.projection()?;
     let intent_kind = match &intent {
+        ProjectIntent::RemoveMedia { .. } => "remove_media",
+        ProjectIntent::ApplyDecorative { .. } => "apply_decorative",
+        ProjectIntent::DropDecorative { .. } => "drop_decorative",
         ProjectIntent::CopyFrames { .. } => "copy_frames",
         ProjectIntent::ApplyLayout { .. } => "apply_layout",
         ProjectIntent::ToggleLayoutFavorite { .. } => "toggle_layout_favorite",
@@ -122,36 +125,63 @@ pub(crate) async fn apply_project_intent(
 }
 
 #[tauri::command]
-pub(crate) async fn import_photo(
+pub(crate) async fn import_media(
     app: AppHandle,
+    selection: crate::ipc_contract::MediaImportSelection,
     window: WebviewWindow,
     state: State<'_, ProjectHost>,
     on_progress: tauri::ipc::Channel<crate::ipc_contract::ImageProcessingProgress>,
-) -> Result<ImportPhotoResult, String> {
+) -> Result<ImportMediaResult, String> {
     if window.label() != PROJECT_WINDOW_LABEL {
-        return Err("A importação de Foto só está disponível na Janela do Projeto.".into());
+        return Err("A importação só está disponível na Janela do Projeto.".into());
     }
     let host = state.inner().clone();
-    let (sender, receiver) = tokio::sync::oneshot::channel();
-    app.dialog()
-        .file()
-        .set_parent(&window)
-        .set_title("Importar Fotos JPEG")
-        .add_filter("Imagem JPEG", &["jpg", "jpeg"])
-        .pick_files(move |selection| {
-            let _ = sender.send(selection);
-        });
-    let selection = receiver
-        .await
-        .map_err(|_| "Não foi possível concluir o diálogo de importação de Foto.".to_string())?;
-    let Some(selection) = selection else {
-        return Ok(ImportPhotoResult::Cancelled {
+    use crate::ipc_contract::MediaImportSource;
+    let media_kind = selection.media_kind;
+    let selected = match selection.source {
+        MediaImportSource::Drop { drop_id } => Some(
+            app.state::<crate::media_file_drop::NativeMediaDrops>()
+                .take(&drop_id)?
+                .into_iter()
+                .map(FilePath::Path)
+                .collect(),
+        ),
+        source => {
+            let (sender, receiver) = tokio::sync::oneshot::channel();
+            let dialog = app
+                .dialog()
+                .file()
+                .set_parent(&window)
+                .set_title(match media_kind {
+                    myalbuns_core::MediaKind::Photo => "Importar Fotos",
+                    myalbuns_core::MediaKind::Decorative => "Importar Decorativos",
+                });
+            match source {
+                MediaImportSource::Folder => dialog.pick_folder(move |selection| {
+                    let _ = sender.send(selection.map(|path| vec![path]));
+                }),
+                _ => dialog
+                    .add_filter(
+                        "Imagens JPEG, PNG e TIFF",
+                        &["jpg", "jpeg", "png", "tif", "tiff"],
+                    )
+                    .pick_files(move |selection| {
+                        let _ = sender.send(selection);
+                    }),
+            }
+            receiver
+                .await
+                .map_err(|_| "Não foi possível concluir o diálogo de importação.".to_string())?
+        }
+    };
+    let Some(selected) = selected else {
+        return Ok(ImportMediaResult::Cancelled {
             projection: host.projection()?,
         });
     };
     let mut paths = Vec::new();
     let mut unsupported = Vec::new();
-    for selected in selection {
+    for selected in selected {
         match selected {
             FilePath::Path(path) => paths.push(path),
             FilePath::Url(_) => unsupported.push(crate::ipc_contract::ImageProcessingProblem {
@@ -160,16 +190,22 @@ pub(crate) async fn import_photo(
             }),
         }
     }
-    let result =
-        crate::photo_import::import_selected_photos(&app, paths, unsupported, |progress| {
+    let result = crate::photo_import::import_selected_media(
+        &app,
+        media_kind,
+        paths,
+        unsupported,
+        move |progress| {
             let _ = on_progress.send(progress);
-        })
-        .await?;
-    if let ImportPhotoResult::Completed {
+        },
+    )
+    .await?;
+    if let ImportMediaResult::Completed {
         projection,
         imported_count,
         media_ids,
         problems,
+        operation_problem,
     } = &result
     {
         tracing::info!(
@@ -179,6 +215,7 @@ pub(crate) async fn import_photo(
             imported_count,
             media_id = safe_log_identifier(media_ids.last().map(String::as_str).unwrap_or("")),
             rejected_count = problems.len(),
+            interrupted = operation_problem.is_some(),
             revision = projection.state.revision,
             event = "photos_imported",
         );
@@ -210,6 +247,18 @@ pub(crate) async fn preview_photo_angle(
         return Err("O Ângulo da Foto só pode ser consultada na Janela do Projeto.".into());
     }
     state.preview_photo_angle(&edit)
+}
+
+#[tauri::command]
+pub(crate) fn preview_decorative_drop(
+    request: myalbuns_core::DecorativeDropRequest,
+    window: WebviewWindow,
+    state: State<'_, ProjectHost>,
+) -> Result<Option<myalbuns_core::DecorativeDropPreview>, String> {
+    if window.label() != PROJECT_WINDOW_LABEL {
+        return Err("O Decorativo só pode ser consultado na Janela do Projeto.".into());
+    }
+    state.preview_decorative_drop(&request)
 }
 
 #[tauri::command]

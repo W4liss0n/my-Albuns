@@ -2,5 +2,6 @@
 import type { FrameSnapshot } from "./FrameSnapshot";
 import type { ProjectedActiveSides } from "./ProjectedActiveSides";
 import type { SheetRole } from "./SheetRole";
+import type { SheetVisuals } from "./SheetVisuals";
 
-export type SheetSnapshot = { id: string, layoutLocked: boolean, number: number, role: SheetRole, activeSides: ProjectedActiveSides, pageNumbers: Array<number>, widthUm: number, heightUm: number, frames: Array<FrameSnapshot>, };
+export type SheetSnapshot = { visuals?: SheetVisuals, id: string, layoutLocked: boolean, number: number, role: SheetRole, activeSides: ProjectedActiveSides, pageNumbers: Array<number>, widthUm: number, heightUm: number, frames: Array<FrameSnapshot>, };

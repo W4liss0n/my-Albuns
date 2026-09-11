@@ -739,7 +739,7 @@ validação das superfícies descritas nesta seção.
 - Arrastar um Decorativo sem modificador aplica-o como Background; manter `Shift` pressionado durante o gesto aplica-o como Overlay.
 - A posição da soltura determina o escopo: lado esquerdo, lado direito ou Ambos os lados ao usar a região central. `Ambos os lados` cobre os dois lados ativos da mesma Lâmina.
 - A região de Ambos os lados é uma faixa proporcional ao redor da junção central, visível durante o arraste e larga o suficiente para não exigir que o usuário acerte a linha divisória. A proporção exata será calibrada no protótipo.
-- Durante o arraste, a interface destaca o papel atual e a região de destino; pressionar ou soltar `Shift` troca imediatamente o preview entre Background e Overlay.
+- Durante o arraste, a interface destaca o papel atual e contorna a área real de aplicação: a Página inteira atingida ou ambos os lados. O contorno azul conserva 2 pixels no Zoom e não aplica tonalidade sobre a imagem. Duas guias verticais tracejadas e discretas delimitam a faixa central de escolha, sem preenchimento nem colchetes. Cada guia usa um único traço azul de 1 pixel, sem halo ou traço paralelo. As guias conservam a espessura e o espaçamento no Zoom e ficam mais visíveis em Ambos os lados. Foco da Lâmina, indicadores de seleção dos Frames e Barra ficam temporariamente ocultos, conservando a seleção; pressionar ou soltar `Shift` troca imediatamente o preview entre Background e Overlay.
 - O preview renderiza temporariamente o próprio Decorativo na Pilha visual e no escopo que seriam aplicados: Background abaixo dos Frames ou Overlay acima deles com transparência preservada. Ele substitui visualmente apenas o uso de destino.
 - O preview não altera estado, marco de Salvamento ou Histórico. Somente a soltura válida cria uma ação; `Esc` ou soltar fora de um alvo válido cancela e restaura a composição anterior.
 - Frames e Fotos não recebem nem interceptam um arraste originado em `Decorativos`. A posição do ponteiro continua sendo resolvida contra a zona da Lâmina subjacente, sem substituir Fotos, preencher Frames ou alterar a seleção atual.
@@ -920,6 +920,7 @@ validação das superfícies descritas nesta seção.
 - O Painel de imagens também aceita arquivos e pastas arrastados do sistema operacional. A soltura usa a aba ativa e, para cada pasta, considera somente os arquivos diretamente contidos nela.
 - JPG/JPEG, PNG e TIFF/TIF são os formatos importáveis iniciais. Outros formatos não são importados.
 - Uma importação múltipla possui sucesso parcial: arquivos válidos são importados, enquanto arquivos inválidos, corrompidos ou incompatíveis são rejeitados sem reverter os sucessos.
+- Sob pressão de memória, o processamento reduz a concorrência até uma imagem por vez. RAM física livre não bloqueia essa execução individual. Se faltar capacidade de commit e não houver trabalho ativo que possa liberar recursos, a tentativa termina com um único aviso operacional e preserva os sucessos; essa interrupção não é repetida como rejeição de cada arquivo. Problemas reais de arquivos permanecem identificados. Uma nova execução de Importar pode concluir os itens restantes sem duplicar os já vinculados.
 - Duplicatas seguem a regra normal de reimportação e não são classificadas como falha.
 - Quando houver rejeições, a Tela de Problemas é aberta ao final com `Arquivo` e `Motivo`; fechá-la não remove os itens importados.
 - Cada seleção de arquivos, escolha de pasta ou única soltura agrupa todos os novos vínculos aceitos em uma única ação de Undo/Redo e deixa o Projeto com alterações pendentes.
@@ -931,9 +932,10 @@ validação das superfícies descritas nesta seção.
 - A busca é combinada por interseção com o Filtro de uso e qualquer outro filtro ativo, sem alterar a Ordenação escolhida.
 - Cada aba mantém seu próprio texto somente enquanto a Janela do Projeto está aberta. O controle `X` limpa o texto da aba atual.
 - O texto da busca não integra o Projeto, o Histórico ou as preferências restauradas na próxima sessão.
-- Um slider único ajusta continuamente o tamanho das miniaturas da aba ativa e reorganiza a grade em tempo real.
+- Um slider único ajusta continuamente o tamanho compartilhado das miniaturas de Fotos e Decorativos e reorganiza a grade em tempo real.
 - As miniaturas preservam a proporção inteira da imagem, sem corte. Dois cliques no slider restauram o tamanho médio padrão.
-- `Fotos` e `Decorativos` mantêm tamanhos independentes, persistidos como preferências globais do usuário e reutilizados entre Projetos e sessões sem alterar o Projeto ou o Histórico.
+- Miniaturas de Fotos e Decorativos não exibem tag nem contador de usos. Uma imagem usada é indicada pelo esmaecimento da miniatura.
+- `Fotos` e `Decorativos` compartilham o mesmo tamanho de miniatura. Ajustar ou restaurar o slider em uma aba vale para ambas; trocar de aba conserva esse valor. A preferência única é persistida globalmente e reutilizada entre Projetos e sessões sem alterar o Projeto ou o Histórico.
 - Os valores exatos de mínimo, máximo e tamanho médio serão calibrados no protótipo.
 - Um clique simples substitui a seleção do Painel e estabelece sua âncora; `Ctrl` + clique adiciona ou remove uma mídia individualmente.
 - `Shift` + clique seleciona o intervalo contínuo entre a âncora e o item acionado conforme a ordem atualmente visível depois da Busca, dos filtros e da Ordenação.
