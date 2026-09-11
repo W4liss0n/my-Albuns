@@ -101,7 +101,7 @@ impl PhotoshopPlatform for WindowsPhotoshop {
         let (translations, size) = info.query(r"\VarFileInfo\Translation")?;
         let translations =
             unsafe { std::slice::from_raw_parts(translations.cast::<u16>(), size as usize / 2) };
-        for translation in translations.chunks_exact(2) {
+        for translation in translations.as_chunks::<2>().0 {
             let prefix = format!(
                 r"\StringFileInfo\{:04x}{:04x}\",
                 translation[0], translation[1]

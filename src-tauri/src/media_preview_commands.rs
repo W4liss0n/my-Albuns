@@ -287,18 +287,18 @@ pub(crate) async fn prepare_media_previews(
     } else {
         None
     };
-    if let Some(runtime_update) = runtime_update.as_ref() {
-        if let Some(change) = linked_media_change_for_update(
+    if let Some(runtime_update) = runtime_update.as_ref()
+        && let Some(change) = linked_media_change_for_update(
             runtime_update,
             &confirmed.refreshed_photo_ids,
             cache_update
                 .as_ref()
                 .is_some_and(|update| update.retry_required()),
-        ) {
-            window
-                .emit(LINKED_MEDIA_CHANGED_EVENT, change)
-                .map_err(|_| MediaPreviewCommandError::read_failed())?;
-        }
+        )
+    {
+        window
+            .emit(LINKED_MEDIA_CHANGED_EVENT, change)
+            .map_err(|_| MediaPreviewCommandError::read_failed())?;
     }
     drop(confirmed);
     if cache_update
