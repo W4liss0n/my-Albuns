@@ -413,19 +413,3 @@
   white-space: nowrap;
 }
 .media-panel[hidden] { display: none; }
-
-.media-usage-badge {
-  position: absolute;
-  z-index: 2;
-  top: 3px;
-  right: 3px;
-  min-width: 15px;
-  padding: 1px 4px;
-  border-radius: 3px;
-  background: var(--ui-surface-raised);
-  color: var(--ui-text-secondary);
-  box-shadow: 0 1px 3px #0003;
-  font-size: var(--ui-font-size-micro);
-  line-height: 1.2;
-  font-variant-numeric: tabular-nums;
-}

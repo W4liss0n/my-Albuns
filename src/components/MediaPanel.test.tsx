@@ -637,7 +637,7 @@ test("uses image orientation and opacity without visible names or usage counts",
   expect(usedCard).toHaveAttribute("data-used", "true");
   expect(usedCard).toHaveAccessibleName("Álbum 10. Já usada. 2 usos");
   expect(usedCard).not.toHaveTextContent("Álbum 10");
-  expect(usedCard?.querySelector(".media-usage-badge")).toHaveTextContent("2");
+  expect(usedCard).not.toHaveTextContent("2");
   expect(usedCard?.querySelector(".media-meta")).toBeNull();
   const landscapeThumb = usedCard?.querySelector<HTMLElement>(
     ".media-preview-thumbnail",

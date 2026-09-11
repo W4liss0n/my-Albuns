@@ -640,7 +640,6 @@ export function MediaPanel({
                   ? "Duplo clique para preencher o placeholder mais à esquerda da Lâmina centralizada"
                   : "Duplo clique aplica Fundo. Shift + duplo clique aplica Overlay."].filter(Boolean).join("\n")}
               >
-                {isUsed && <span aria-hidden="true" className="media-usage-badge" title={usageDetailsById.get(media.id)}>{usageCount}</span>}
                 {availabilityLabel && (
                   <span
                     aria-label={availabilityLabel ?? undefined}

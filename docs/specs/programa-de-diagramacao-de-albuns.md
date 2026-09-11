@@ -934,6 +934,7 @@ validação das superfícies descritas nesta seção.
 - O texto da busca não integra o Projeto, o Histórico ou as preferências restauradas na próxima sessão.
 - Um slider único ajusta continuamente o tamanho das miniaturas da aba ativa e reorganiza a grade em tempo real.
 - As miniaturas preservam a proporção inteira da imagem, sem corte. Dois cliques no slider restauram o tamanho médio padrão.
+- Miniaturas de Fotos e Decorativos não exibem tag nem contador de usos. Uma imagem usada é indicada pelo esmaecimento da miniatura.
 - `Fotos` e `Decorativos` mantêm tamanhos independentes, persistidos como preferências globais do usuário e reutilizados entre Projetos e sessões sem alterar o Projeto ou o Histórico.
 - Os valores exatos de mínimo, máximo e tamanho médio serão calibrados no protótipo.
 - Um clique simples substitui a seleção do Painel e estabelece sua âncora; `Ctrl` + clique adiciona ou remove uma mídia individualmente.

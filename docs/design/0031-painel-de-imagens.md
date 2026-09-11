@@ -22,6 +22,9 @@ de ordenação e filtro não o repetem. Ocultar o Painel conserva esse estado;
 trocar de Projeto o reinicia. Aba, chave e direção da ordenação, filtro de uso
 e tamanho das miniaturas pertencem ao armazenamento global de preferências.
 
+As miniaturas de Fotos e Decorativos não exibem tag nem contador de usos.
+A indicação visual de item usado acontece pelo esmaecimento da miniatura.
+
 O Host fornece criação, alteração e disponibilidade a partir das observações
 estabilizadas do Monitor, correlacionadas com o vínculo atual. Essa consulta
 não acessa Originais nem depende da demanda de miniaturas. Ausentes ficam
