@@ -63,6 +63,20 @@ function sample(index: number) {
   const canvas = app.renderer.extract.canvas({ target: frame, resolution: 1 });
   return Array.from(canvas.getContext("2d")!.getImageData(Math.floor(canvas.width / 2), Math.floor(canvas.height / 2), 1, 1).data);
 }
+// Opening starts before Cache URLs arrive, then waits for the texture decode.
+// The Photo area must stay free of demonstration artwork in both intervals.
+input.composition.sheets[0].frames.push({ ...base.frames[0], frameId: "photo-0",
+  photo: { ...base.frames[0].photo!, mediaId: "opening-photo" } });
+scene.update(input, 500);
+const openingSample = { beforeUrl: sample(0), beforeTexture: [] as number[], ready: [] as number[], expected: [...svg.rgb, 255] };
+input.mediaPreviewUrls = { ...input.mediaPreviewUrls, "opening-photo": svg.url };
+scene.update(input, 500);
+openingSample.beforeTexture = sample(0);
+for (let attempt = 0; attempt < 200 && sample(0)[3] !== 255; attempt += 1) await wait(10);
+openingSample.ready = sample(0);
+input.composition.sheets[0].frames = [];
+scene.update(input, 500);
+
 for (let index = 0; index < count; index += 1) {
   input.composition.sheets[0].frames.push({ ...base.frames[0], frameId: `photo-${index}`, zIndex: index,
     clipRect: { x: (index % 4) * 150_000, y: Math.floor(index / 4) * 100_000, width: 150_000, height: 100_000 },
@@ -81,5 +95,5 @@ scene.update(input, 500);
 await wait(300);
 const svgSample = { actual: sample(0), expected: [...svg.rgb, 255] };
 app.render();
-Object.assign(window, { photoPlacementTest: { samples, svgSample } });
+Object.assign(window, { photoPlacementTest: { samples, svgSample, openingSample } });
 document.body.dataset.ready = "true";

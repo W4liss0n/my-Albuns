@@ -135,9 +135,7 @@ test("keeps the photo inside a stationary frame mask throughout pan", async () =
   });
 
   const photoLayer = maskedViewport?.children.find(
-    (child) =>
-      Array.isArray((child as { children?: unknown[] }).children) &&
-      (child as { children: unknown[] }).children.length > 0,
+    (child) => (child as { label?: string }).label === "photo-pan-inside-preview",
   ) as { position: { x: number; y: number } } | undefined;
 
   expect(maskedViewport?.position).toEqual({ x: 0, y: 0 });
@@ -240,9 +238,7 @@ test("keeps every frame corner covered while panning a rotated photo", async () 
     (child) => (child as { mask?: unknown }).mask,
   ) as { children: unknown[] };
   const photoLayer = maskedViewport.children.find(
-    (child) =>
-      Array.isArray((child as { children?: unknown[] }).children) &&
-      (child as { children: unknown[] }).children.length > 0,
+    (child) => (child as { label?: string }).label === "photo-pan-inside-preview",
   ) as {
     position: { x: number; y: number };
     pivot: { x: number; y: number };
@@ -315,9 +311,7 @@ test("does not reset an active Pan preview when wheel Zoom starts", async () => 
     (child) => (child as { mask?: unknown }).mask,
   ) as { children: unknown[] };
   const photoLayer = maskedViewport.children.find(
-    (child) =>
-      Array.isArray((child as { children?: unknown[] }).children) &&
-      (child as { children: unknown[] }).children.length > 0,
+    (child) => (child as { label?: string }).label === "photo-pan-inside-preview",
   ) as {
     position: { x: number; y: number };
     scale: { x: number; y: number };
@@ -388,9 +382,7 @@ test("previews a smooth wheel zoom and commits the sequence once", async () => {
   };
   const photoLayer =
     (maskedDisplay.children.find(
-      (child) =>
-        Array.isArray((child as { children?: unknown[] }).children) &&
-        (child as { children: unknown[] }).children.length > 0,
+      (child) => (child as { label?: string }).label === "photo-pan-inside-preview",
     ) as
       | { position: { x: number }; scale: { y: number } }
       | undefined) ?? maskedDisplay;

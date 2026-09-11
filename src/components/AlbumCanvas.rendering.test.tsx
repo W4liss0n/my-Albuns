@@ -1475,6 +1475,21 @@ test("keeps the materialized Pixi scene stable across view-only updates", async 
   expect(pixiLifecycle.displays).toHaveLength(displayCount);
 });
 
+test("never draws a synthetic photo while opening the project and loading its real preview", async () => {
+  const view = renderCanvas({ compositionPlan: interactiveComposition });
+  await finishPixiInitialization();
+  const expectNoSyntheticPhoto = () => {
+    expect(displayWithLabel("photo-pan-inside-preview")?.children,
+      "a Photo waiting for its preview must not display the test stripes and circle").toHaveLength(0);
+  };
+  expectNoSyntheticPhoto();
+  view.rerenderCanvas({ mediaPreviewUrls: { "media-001": "http://myalbuns-cache.localhost/opening.jpg" } });
+  expectNoSyntheticPhoto();
+  const texture = { label: "real-opening-photo" };
+  await act(async () => pixiLifecycle.resolveAssetLoads[0](texture));
+  expect(pixiLifecycle.spriteTextures).toEqual([texture, texture]);
+});
+
 test("materializes a reduced Cache preview as the Canvas texture", async () => {
   const texture = { label: "cache-preview" };
   const logEvents: LogEvent[] = [];

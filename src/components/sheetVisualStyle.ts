@@ -57,15 +57,6 @@ export const SHEET_VISUAL_STYLE = {
     bodyStopOffset: 0.58,
     fold: "#cec2b2",
   },
-  photo: {
-    stripeCount: 12,
-    stripeOverlapPx: 1,
-    lightColor: "#fff3d0",
-    lightOpacity: 0.32,
-    lightCenterXRatio: 0.73,
-    lightCenterYRatio: 0.28,
-    lightRadiusToHeightRatio: 0.18,
-  },
   framePlaceholder: {
     fill: "#ece8e1",
     outline: "#c9c2b7",
@@ -136,13 +127,4 @@ export function inactiveSideCssGradient(
     (style.bodyStopOffset * 100).toFixed(4),
   );
   return `linear-gradient(${cssDirection}, ${style.outerEdge} 0%, ${style.body} ${bodyStopPercent}%, ${style.fold} 100%)`;
-}
-
-export function photoPaletteIndexForStripe(stripe: number) {
-  return Math.min(
-    2,
-    Math.floor(
-      (stripe / SHEET_VISUAL_STYLE.photo.stripeCount) * 3,
-    ),
-  );
 }

@@ -41,6 +41,7 @@ try {
   assert.ok(ready, 'Photo placement fixture must finish');
   evidence.samples = await execute('return window.photoPlacementTest.samples');
   evidence.svgSample = await execute('return window.photoPlacementTest.svgSample');
+  evidence.openingSample = await execute('return window.photoPlacementTest.openingSample');
   writeFileSync(path.join(output, 'rendered.png'), Buffer.from(await request('GET', `/session/${session}/screenshot`), 'base64'));
   assert.equal(evidence.samples.length, 12);
   for (const sample of evidence.samples) {
@@ -48,7 +49,11 @@ try {
     assert.deepEqual(sample.settled, sample.first, `Photo ${sample.index + 1} must not change from fallback to image`);
   }
   assert.deepEqual(evidence.svgSample.actual, evidence.svgSample.expected, 'SVG previews must retain rasterized image pixels');
+  assert.deepEqual(evidence.openingSample.beforeUrl, [0, 0, 0, 0], 'Opening must not show synthetic artwork before the preview URL arrives');
+  assert.deepEqual(evidence.openingSample.beforeTexture, [0, 0, 0, 0], 'Opening must not show synthetic artwork while the texture loads');
+  assert.deepEqual(evidence.openingSample.ready, evidence.openingSample.expected, 'Opening must display the real preview when it loads');
   console.log('PASS: 12 additions show the loaded photo on the first render, with identical settled pixels.');
+  console.log('PASS: project opening stays free of synthetic photo pixels until the real preview loads.');
 } catch (error) {
   evidence.error = error instanceof Error ? error.stack : String(error);
   console.error(evidence.error);
