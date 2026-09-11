@@ -755,6 +755,7 @@ mod tests {
     fn create_request_freezes_its_configuration_and_write_authorization() {
         let target = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("Novo.myalbuns");
         let configuration = InitialProjectCreationConfiguration {
+            frame_gap_um: 5_000,
             document: InitialDocumentConfiguration {
                 display_unit: InitialDisplayUnit::Cm,
                 sheet_width_um: 508_000,

@@ -445,6 +445,7 @@ pub struct EditorState {
     pub project_name: String,
     pub document: DocumentSnapshot,
     pub album: AlbumSnapshot,
+    pub layout_settings: crate::LayoutSettings,
     pub revision: u64,
     pub saved_revision: u64,
     pub dirty: bool,
@@ -930,6 +931,10 @@ pub enum ProjectIntent {
     },
     SetVisualDefaults {
         visual_defaults: ProjectedVisualDefaults,
+    },
+    SetAlbumDesign {
+        visual_defaults: ProjectedVisualDefaults,
+        frame_gap_um: i64,
     },
     SetDpi {
         dpi: u32,

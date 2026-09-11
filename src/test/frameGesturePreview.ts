@@ -9,6 +9,7 @@ import { interactiveComposition } from "../components/albumCanvasTestFixtures";
 import "../components/AlbumCanvas.css";
 import "../components/pixiRuntime";
 import { useEditorView } from "../state/editorView";
+import { frameGeometryPreview } from "./frameGeometryPreview";
 
 const app = new Application();
 await app.init({ width: 900, height: 600, background: "#ddd", preference: "webgl" });
@@ -44,7 +45,7 @@ const input: AlbumCanvasProps = {
   frameGeometry: {
     disabled: false,
     dragThreshold: { x: 5, y: 5 },
-    preview: async (edit) => { await wait(60); return proposed(edit); },
+    preview: async (edit) => { await wait(60); return frameGeometryPreview(proposed(edit)); },
     commit: async (edit) => {
       await wait(30);
       const committed = proposed(edit);

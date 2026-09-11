@@ -42,6 +42,7 @@ fn edit_geometry(project: &mut EditableProject, frame_id: &str, gesture: FrameGe
     project
         .apply(ProjectIntent::EditFrameGeometry {
             edit: FrameGeometryEdit {
+                snap: None,
                 frames: vec![FrameGeometryTarget {
                     frame_id: frame_id.into(),
                     expected_rect: frame.rect.clone(),

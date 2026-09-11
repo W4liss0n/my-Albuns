@@ -1,6 +1,7 @@
 ---
 status: accepted
 document: design
+updated: 2026-09-11
 ---
 
 # Criação de Projeto
@@ -120,7 +121,8 @@ A etapa `Personalização` contém uma reprodução de Lâmina com Frames de dem
 
 - o Background atual;
 - o Overlay atual;
-- a presença, a cor e a espessura da Borda padrão dos Frames.
+- a presença, a cor e a espessura da Borda padrão dos Frames;
+- o Espaço entre Frames escolhido para o Projeto.
 
 A demonstração distribui quatro Frames em duas colunas por Página, com margens e
 intervalos uniformes. Cada Frame usa um preenchimento neutro translúcido, sem o
@@ -129,9 +131,10 @@ antigo contorno tracejado, para continuar legível sobre o Background configurad
 O bloco `Frames` não usa checkbox ou campo numérico genérico. Ele apresenta a
 espessura da Borda padrão em um controle deslizante, onde zero aparece como
 `sem borda`, seguido pelas amostras branca, escura e dourada. Um segundo controle
-deslizante mantém o `Espaço entre Frames` como medida física transitória em
-micrômetros, apresenta sua conversão na Unidade escolhida em `Configurações` e
-atualiza imediatamente a reprodução.
+deslizante define o `Espaço entre Frames`, iniciado em `5 mm`, apresenta sua
+conversão na Unidade escolhida em `Configurações` e atualiza imediatamente a
+reprodução. O valor físico pertence ao draft da criação e será a referência
+única dos snaps de espaçamento padrão e do Gerador de Layouts no Projeto criado.
 
 A reprodução desenha a Borda padrão integralmente para dentro de cada Frame. A
 dimensão externa do Frame permanece inalterada e somente sua área visível interna
@@ -141,11 +144,14 @@ preenchimento que Editor e Exportação desenham sem recalcular essa regra. A
 reprodução transitória anterior à criação espelha o mesmo arranjo apenas para
 apresentar o rascunho ainda não submetido ao núcleo.
 
-`Espaço entre Frames` permanece um placeholder visual enquanto não existir no
-contrato do Padrão de Frame. Seu estado afeta somente a reprodução atual, não é
-enviado ao núcleo nem salvo em Predefinição ou Projeto, e deve permanecer marcado
-no código com `PLACEHOLDER UI` e
-`data-placeholder-feature="new-project-frame-gap"`.
+O valor de `Espaço entre Frames` é enviado ao núcleo e salvo como configuração
+do Projeto após a criação válida. Voltar de etapa ou cancelar o diálogo de
+destino conserva o draft; cancelar a criação não grava essa escolha.
+Posteriormente, `Design do Álbum` permite alterar a mesma medida sem reorganizar
+as composições existentes. O campo não pertence ao Estilo do Frame nem cria
+Frames de demonstração no Álbum. O
+[contrato de Snap de Frames](0033-snap-de-frames.md#espaçamento-padrão-compartilhado)
+detalha seu uso e substitui a antiga limitação do controle à prévia.
 
 A reprodução mostra sempre uma Lâmina dupla e mantém a proporção de largura e altura definida na etapa `Configurações`. O formato escolhido para a primeira ou a última Lâmina não desativa lados nessa demonstração, pois sua finalidade é permitir a configuração conjunta dos escopos esquerdo, direito e de Ambos os lados.
 

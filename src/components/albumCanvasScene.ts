@@ -163,7 +163,7 @@ export class AlbumCanvasScene {
     this.modeSignature = modeSignature;
     this.input = input;
     this.app.canvas.setAttribute("aria-label", input.mode.kind === "sheet-editing"
-      ? "Canvas da Lâmina em edição. Arraste um Frame para mover ou use as alças para redimensionar. Shift preserva a proporção; Alt preserva o centro; Esc cancela o gesto."
+      ? "Canvas da Lâmina em edição. Arraste um Frame para mover ou use as alças para redimensionar. Shift preserva a proporção; Alt preserva o centro; Ctrl suspende o snap; Esc cancela o gesto."
       : input.mode.isolatedSheetId ? "Canvas da Lâmina no Painel de Layouts. Passe sobre uma miniatura para visualizar o Layout."
       : "Canvas contínuo do Álbum. Arraste uma Foto sobre outro Frame para trocar o conteúdo, inclusive entre Lâminas. Esc cancela. Use a roda para navegar, Alt mais arraste para Pan e Alt mais roda para Zoom.");
     const modePolicy = albumCanvasModePolicy(input.mode);
@@ -550,6 +550,8 @@ export class AlbumCanvasScene {
       }
       applyPlaceholderLabelScale(node, scale);
       node.decorativeDropFeedback?.applyScale(scale);
+      const snap = this.frameInteractions.snapGuides;
+      node.frameSnapGuides?.update(snap?.sheetId === sheet.sheetId ? snap.guides : [], scale, this.input!.displayUnit ?? "mm");
       for (const selection of node.frameSelections.values()) {
         applyFrameSelectionScale(selection, scale);
       }

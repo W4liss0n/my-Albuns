@@ -53,11 +53,14 @@ export function editPhysicalFieldDraft(
   };
 }
 
-export function formatMicrometers(valueUm: number, unit: DisplayUnit): string {
+export function formatMicrometers(
+  valueUm: number,
+  unit: DisplayUnit,
+  decimalPlaces = PRESENTATION_DECIMALS[unit],
+): string {
   const negative = valueUm < 0;
   const magnitude = BigInt(Math.abs(valueUm));
   const denominator = MICROMETERS_PER_UNIT[unit];
-  const decimalPlaces = PRESENTATION_DECIMALS[unit];
   const scale = 10n ** BigInt(decimalPlaces);
   const rounded = (magnitude * scale + denominator / 2n) / denominator;
   const integer = rounded / scale;
@@ -77,8 +80,9 @@ export function displayUnitLabel(unit: DisplayUnit): string {
 export function formatPhysicalMeasurement(
   valueUm: number,
   unit: DisplayUnit,
+  decimalPlaces?: number,
 ): string {
-  return `${formatMicrometers(valueUm, unit)} ${displayUnitLabel(unit)}`;
+  return `${formatMicrometers(valueUm, unit, decimalPlaces)} ${displayUnitLabel(unit)}`;
 }
 
 export function parsePhysicalText(

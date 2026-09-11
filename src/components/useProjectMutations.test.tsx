@@ -279,8 +279,8 @@ test("preserves Redo when preceding History already materialized the Album Desig
   const onProjectionChange = vi.fn();
   const draft = createAlbumDesignProjectDraft(
     representativeProjection.state.revision,
-    representativeProjection.state.album.visualDefaults,
-  ).transition(target);
+    { ...representativeProjection.state.album.visualDefaults, frameGapUm: 5_000 },
+  ).transition({ ...target, frameGapUm: 5_000 });
   const view = renderHook(() => {
     const runner = useProjectMutationRunner(
       representativeProjection.state.projectId,

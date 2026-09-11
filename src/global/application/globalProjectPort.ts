@@ -93,6 +93,7 @@ export interface InitialVisualDefaults {
 export interface NewProjectCreationConfiguration
   extends NewProjectConfiguration {
   visualDefaults: InitialVisualDefaults;
+  frameGapUm: number;
 }
 
 export const PROJECT_CONFIGURATION_VALIDATION_CODES = [

@@ -291,6 +291,8 @@ export function useProjectEditorController({
   };
 
   const canvasProps: AlbumCanvasProps = {
+    frameGapUm: projection.state.layoutSettings.gapUm,
+    displayUnit: projection.state.document.displayUnit,
     revision: projection.state.revision,
     projectId: projection.state.projectId,
     mode: canvasMode.kind === "normal" && layoutPanel.visible && layoutPanel.sheetId

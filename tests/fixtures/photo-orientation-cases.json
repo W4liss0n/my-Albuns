@@ -12538,6 +12538,12 @@
           "sheetHeightUm": 300000,
           "sheetWidthUm": 600000
         },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
+        },
         "projectId": "photo-orientation-project",
         "projectName": "Orientação",
         "revision": 30,
@@ -12948,6 +12954,12 @@
           "safetyUm": 3000,
           "sheetHeightUm": 300000,
           "sheetWidthUm": 600000
+        },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
         },
         "projectId": "photo-orientation-project",
         "projectName": "Orientação",
@@ -13360,6 +13372,12 @@
           "sheetHeightUm": 300000,
           "sheetWidthUm": 600000
         },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
+        },
         "projectId": "photo-orientation-project",
         "projectName": "Orientação",
         "revision": 14,
@@ -13770,6 +13788,12 @@
           "safetyUm": 3000,
           "sheetHeightUm": 300000,
           "sheetWidthUm": 600000
+        },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
         },
         "projectId": "photo-orientation-project",
         "projectName": "Orientação",
@@ -14182,6 +14206,12 @@
           "sheetHeightUm": 300000,
           "sheetWidthUm": 600000
         },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
+        },
         "projectId": "photo-orientation-project",
         "projectName": "Orientação",
         "revision": 15,
@@ -14592,6 +14622,12 @@
           "safetyUm": 3000,
           "sheetHeightUm": 300000,
           "sheetWidthUm": 600000
+        },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
         },
         "projectId": "photo-orientation-project",
         "projectName": "Orientação",
@@ -15004,6 +15040,12 @@
           "sheetHeightUm": 300000,
           "sheetWidthUm": 600000
         },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
+        },
         "projectId": "photo-orientation-project",
         "projectName": "Orientação",
         "revision": 21,
@@ -15414,6 +15456,12 @@
           "safetyUm": 3000,
           "sheetHeightUm": 300000,
           "sheetWidthUm": 600000
+        },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
         },
         "projectId": "photo-orientation-project",
         "projectName": "Orientação",
@@ -15826,6 +15874,12 @@
           "sheetHeightUm": 300000,
           "sheetWidthUm": 600000
         },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
+        },
         "projectId": "photo-orientation-project",
         "projectName": "Orientação",
         "revision": 22,
@@ -16236,6 +16290,12 @@
           "safetyUm": 3000,
           "sheetHeightUm": 300000,
           "sheetWidthUm": 600000
+        },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
         },
         "projectId": "photo-orientation-project",
         "projectName": "Orientação",
@@ -16648,6 +16708,12 @@
           "sheetHeightUm": 300000,
           "sheetWidthUm": 600000
         },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
+        },
         "projectId": "photo-orientation-project",
         "projectName": "Orientação",
         "revision": 23,
@@ -17058,6 +17124,12 @@
           "safetyUm": 3000,
           "sheetHeightUm": 300000,
           "sheetWidthUm": 600000
+        },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
         },
         "projectId": "photo-orientation-project",
         "projectName": "Orientação",
@@ -17470,6 +17542,12 @@
           "sheetHeightUm": 300000,
           "sheetWidthUm": 600000
         },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
+        },
         "projectId": "photo-orientation-project",
         "projectName": "Orientação",
         "revision": 28,
@@ -17880,6 +17958,12 @@
           "safetyUm": 3000,
           "sheetHeightUm": 300000,
           "sheetWidthUm": 600000
+        },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
         },
         "projectId": "photo-orientation-project",
         "projectName": "Orientação",
@@ -18292,6 +18376,12 @@
           "sheetHeightUm": 300000,
           "sheetWidthUm": 600000
         },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
+        },
         "projectId": "photo-orientation-project",
         "projectName": "Orientação",
         "revision": 12,
@@ -18702,6 +18792,12 @@
           "safetyUm": 3000,
           "sheetHeightUm": 300000,
           "sheetWidthUm": 600000
+        },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
         },
         "projectId": "photo-orientation-project",
         "projectName": "Orientação",
@@ -19114,6 +19210,12 @@
           "sheetHeightUm": 300000,
           "sheetWidthUm": 600000
         },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
+        },
         "projectId": "photo-orientation-project",
         "projectName": "Orientação",
         "revision": 19,
@@ -19524,6 +19626,12 @@
           "safetyUm": 3000,
           "sheetHeightUm": 300000,
           "sheetWidthUm": 600000
+        },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
         },
         "projectId": "photo-orientation-project",
         "projectName": "Orientação",

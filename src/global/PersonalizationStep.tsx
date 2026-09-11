@@ -48,9 +48,7 @@ export function PersonalizationStep({
   const [focusedScope, setFocusedScope] = useState<
     NewProjectPersonalizationDraft["fixedScope"] | null
   >(null);
-  // PLACEHOLDER UI: o espaço entre Frames ainda não possui contrato de
-  // persistência; a medida física controla somente a reprodução desta etapa.
-  const [frameGapUm, setFrameGapUm] = useState(6_000);
+  const frameGapUm = personalization.frameGapUm;
   const backgroundRead = readBackgroundForFixedScope(personalization);
   const selectedBackground =
     backgroundRead.kind === "uniform" ? backgroundRead.value : null;
@@ -257,11 +255,10 @@ export function PersonalizationStep({
             ))}
           </div>
           <FrameRangeControl
-            dataPlaceholderFeature="new-project-frame-gap"
             label="Espaço entre Frames"
             max={24_000}
             min={0}
-            onChange={setFrameGapUm}
+            onChange={(frameGapUm) => onChange({ ...personalization, frameGapUm })}
             step={1_000}
             value={frameGapUm}
             valueText={`${formatMicrometers(

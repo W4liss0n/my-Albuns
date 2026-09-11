@@ -289,7 +289,7 @@ export interface ProjectCorePort {
   previewFrameStyle(edit: FrameStyleEdit): Promise<ComposedFrame[]>;
   queryLayouts(sheetId: string, frameRequest?: LayoutFrameRequest): Promise<LayoutQueryResult>;
   previewLayout(selection: LayoutSelection): Promise<ComposedFrame[]>;
-  previewFrameGeometry(edit: FrameGeometryEdit): Promise<ComposedFrame[]>;
+  previewFrameGeometry(edit: FrameGeometryEdit): Promise<import("../domain/project").FrameGeometryPreview>;
   load(operationId: string): Promise<EditorProjection>;
   validateAlbumInformation(
     information: AlbumInformation,

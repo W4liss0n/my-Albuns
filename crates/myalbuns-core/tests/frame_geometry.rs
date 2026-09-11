@@ -1,5 +1,8 @@
 #![cfg(windows)]
 
+#[path = "frame_geometry/snap.rs"]
+mod snap;
+
 use std::{fs, path::Path};
 
 use myalbuns_core::{
@@ -17,6 +20,429 @@ fn location(path: &Path) -> ProjectLocation {
 
 fn project_with_frame(root: &Path) -> myalbuns_core::EditableProject {
     project_with_frame_on_sheet(root, 0, false)
+}
+
+#[test]
+fn snap_aligns_to_the_page_center_and_commits_the_preview_once() {
+    let root = tempfile::tempdir().unwrap();
+    let mut project = project_with_frame(root.path());
+    let before = project.projection();
+    let frame = &before.state.album.sheets[0].frames[0];
+    // The initial Frame is 240 mm wide, at x=180 mm on a 600 mm double sheet.
+    // Its left edge approaches the page center at 150 mm from 4 screen pixels away.
+    let edit: FrameGeometryEdit = serde_json::from_value(serde_json::json!({
+        "frames": [{ "frameId": frame.id, "expectedRect": frame.rect }],
+        "gesture": { "kind": "move", "deltaXUm": -26_000, "deltaYUm": 0 },
+        "snap": { "umPerPixelX": 1000.0, "umPerPixelY": 1000.0, "retained": [] }
+    }))
+    .unwrap();
+    let preview = project.preview_frame_geometry(&edit).unwrap();
+    let preview = serde_json::to_value(preview).unwrap();
+    assert_eq!(preview["frames"][0]["clipRect"]["x"], 150_000);
+    assert!(!preview["snap"]["guides"].as_array().unwrap().is_empty());
+    assert_eq!(project.projection(), before);
+    let after = project
+        .apply(ProjectIntent::EditFrameGeometry { edit })
+        .unwrap();
+    assert_eq!(after.state.album.sheets[0].frames[0].rect.x, 150_000);
+    assert_eq!(after.state.revision, before.state.revision + 1);
+    assert_eq!(project.undo().unwrap().state.album, before.state.album);
+    assert_eq!(project.redo().unwrap(), after);
+}
+
+#[test]
+fn snap_matches_a_distant_frames_width_without_moving_its_anchor_or_reference() {
+    let root = tempfile::tempdir().unwrap();
+    let project = project_with_rectangles(
+        root.path(),
+        0,
+        false,
+        &[
+            [213_000, 79_000, 60_000, 40_000],
+            [420_000, 190_000, 100_000, 80_000],
+        ],
+    );
+    let before = project.projection();
+    let mut edit = selection(
+        &before.state.album.sheets[0].frames[..1],
+        FrameGeometryGesture::Resize {
+            handle: FrameResizeHandle::Right,
+            delta_x_um: 38_000,
+            delta_y_um: 0,
+            preserve_aspect_ratio: false,
+            from_center: false,
+        },
+    );
+    edit.snap = Some(myalbuns_core::FrameSnapRequest {
+        um_per_pixel_x: 500.0,
+        um_per_pixel_y: 500.0,
+        retained: vec![],
+    });
+    let preview = project.preview_frame_geometry(&edit).unwrap();
+    assert_eq!(
+        preview.frames[0].clip_rect,
+        RectUm {
+            x: 213_000,
+            y: 79_000,
+            width: 100_000,
+            height: 40_000
+        }
+    );
+    assert_eq!(
+        preview
+            .snap
+            .guides
+            .iter()
+            .filter(|guide| guide.kind == myalbuns_core::FrameSnapKind::Dimension)
+            .count(),
+        2
+    );
+    assert_eq!(project.projection(), before);
+}
+
+#[test]
+fn album_design_applies_spacing_and_visual_defaults_as_one_reversible_saved_edit() {
+    let root = tempfile::tempdir().unwrap();
+    let mut project = project_with_frame(root.path());
+    let before = project.projection();
+    let mut defaults = serde_json::to_value(&before.state.album.visual_defaults).unwrap();
+    defaults["background"] =
+        serde_json::json!({ "scope": "bothSides", "both": { "kind": "color", "rgb": "#123456" } });
+    let intent: ProjectIntent = serde_json::from_value(serde_json::json!({
+        "kind": "setAlbumDesign", "visualDefaults": defaults, "frameGapUm": 9_000
+    }))
+    .unwrap();
+    let after = project.apply(intent.clone()).unwrap();
+    assert_eq!(
+        serde_json::to_value(&after.state).unwrap()["layoutSettings"]["gapUm"],
+        9_000
+    );
+    assert_eq!(after.state.album.sheets, before.state.album.sheets);
+    assert_eq!(after.state.revision, before.state.revision + 1);
+    assert_eq!(
+        project.apply(intent).unwrap(),
+        after,
+        "unchanged Apply creates no History"
+    );
+    assert_eq!(project.undo().unwrap().state.album, before.state.album);
+    assert_eq!(project.redo().unwrap(), after);
+    project.save(project.revision()).unwrap();
+    drop(project);
+    let reopened = ProjectCore::new()
+        .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"))
+        .open_editable(OpenProjectRequest::new(location(
+            &root.path().join("Frame.myalbuns"),
+        )))
+        .unwrap();
+    assert_eq!(
+        serde_json::to_value(reopened.projection().state).unwrap()["layoutSettings"]["gapUm"],
+        9_000
+    );
+}
+
+#[test]
+fn spacing_snaps_use_the_project_gap_existing_gaps_and_balance_between_neighbors() {
+    for (rectangles, delta_x, expected_x, kind) in [
+        (
+            vec![
+                [213_000, 47_000, 60_000, 40_000],
+                [100_000, 40_000, 50_000, 50_000],
+            ],
+            -56_000,
+            155_000,
+            myalbuns_core::FrameSnapKind::ProjectGap,
+        ),
+        (
+            vec![
+                [210_000, 47_000, 60_000, 40_000],
+                [20_000, 40_000, 50_000, 50_000],
+                [90_000, 40_000, 50_000, 50_000],
+            ],
+            -48_000,
+            160_000,
+            myalbuns_core::FrameSnapKind::EqualGap,
+        ),
+        (
+            vec![
+                [120_000, 47_000, 40_000, 40_000],
+                [20_000, 40_000, 50_000, 50_000],
+                [210_000, 40_000, 50_000, 50_000],
+            ],
+            2_000,
+            120_000,
+            myalbuns_core::FrameSnapKind::EqualGap,
+        ),
+    ] {
+        let root = tempfile::tempdir().unwrap();
+        let project = project_with_rectangles(root.path(), 0, false, &rectangles);
+        let before = project.projection();
+        let mut edit = selection(
+            &before.state.album.sheets[0].frames[..1],
+            FrameGeometryGesture::Move {
+                delta_x_um: delta_x,
+                delta_y_um: 0,
+            },
+        );
+        edit.snap = Some(myalbuns_core::FrameSnapRequest {
+            um_per_pixel_x: 500.0,
+            um_per_pixel_y: 500.0,
+            retained: vec![],
+        });
+        let preview = project.preview_frame_geometry(&edit).unwrap();
+        assert_eq!(preview.frames[0].clip_rect.x, expected_x, "{kind:?}");
+        assert!(preview.snap.guides.iter().any(|guide| guide.kind == kind));
+        assert_eq!(project.projection(), before);
+    }
+}
+
+#[test]
+fn dimension_snap_respects_all_handles_and_dynamic_resize_modifiers() {
+    use FrameResizeHandle::*;
+    let root = tempfile::tempdir().unwrap();
+    let project = project_with_rectangles(
+        root.path(),
+        0,
+        false,
+        &[
+            [213_000, 79_000, 60_000, 40_000],
+            [420_000, 190_000, 100_000, 80_000],
+        ],
+    );
+    for (handle, dx, dy, shift, alt, [x, y, width, height]) in [
+        (
+            Right,
+            38_000,
+            0,
+            false,
+            false,
+            [213_000, 79_000, 100_000, 40_000],
+        ),
+        (
+            Left,
+            -38_000,
+            0,
+            false,
+            false,
+            [173_000, 79_000, 100_000, 40_000],
+        ),
+        (
+            Top,
+            0,
+            -38_000,
+            false,
+            false,
+            [213_000, 39_000, 60_000, 80_000],
+        ),
+        (
+            Bottom,
+            0,
+            38_000,
+            false,
+            false,
+            [213_000, 79_000, 60_000, 80_000],
+        ),
+        (
+            TopLeft,
+            -38_000,
+            -38_000,
+            false,
+            false,
+            [173_000, 39_000, 100_000, 80_000],
+        ),
+        (
+            TopRight,
+            38_000,
+            -38_000,
+            false,
+            false,
+            [213_000, 39_000, 100_000, 80_000],
+        ),
+        (
+            BottomLeft,
+            -38_000,
+            38_000,
+            false,
+            false,
+            [173_000, 79_000, 100_000, 80_000],
+        ),
+        (
+            BottomRight,
+            38_000,
+            38_000,
+            false,
+            false,
+            [213_000, 79_000, 100_000, 80_000],
+        ),
+        (
+            BottomRight,
+            38_000,
+            20_000,
+            true,
+            false,
+            [213_000, 79_000, 100_000, 66_667],
+        ),
+        (
+            BottomRight,
+            19_000,
+            19_000,
+            false,
+            true,
+            [193_000, 59_000, 100_000, 80_000],
+        ),
+        (
+            BottomRight,
+            19_000,
+            10_000,
+            true,
+            true,
+            [193_000, 65_667, 100_000, 66_667],
+        ),
+    ] {
+        let mut edit = selection(
+            &project.projection().state.album.sheets[0].frames[..1],
+            FrameGeometryGesture::Resize {
+                handle,
+                delta_x_um: dx,
+                delta_y_um: dy,
+                preserve_aspect_ratio: shift,
+                from_center: alt,
+            },
+        );
+        edit.snap = Some(myalbuns_core::FrameSnapRequest {
+            um_per_pixel_x: 500.0,
+            um_per_pixel_y: 500.0,
+            retained: vec![],
+        });
+        let preview = project.preview_frame_geometry(&edit).unwrap();
+        assert_eq!(
+            preview.frames[0].clip_rect,
+            RectUm {
+                x,
+                y,
+                width,
+                height
+            },
+            "{handle:?} Shift={shift} Alt={alt}"
+        );
+    }
+}
+
+#[test]
+fn snap_acquisition_and_release_use_screen_distance_and_the_free_pointer() {
+    let root = tempfile::tempdir().unwrap();
+    let project = project_with_frame(root.path());
+    for units in [250.0, 1_000.0, 2_000.0] {
+        let mut edit = selection(
+            &project.projection().state.album.sheets[0].frames,
+            FrameGeometryGesture::Move {
+                delta_x_um: -30_000 + (6.0 * units) as i64,
+                delta_y_um: 0,
+            },
+        );
+        edit.snap = Some(myalbuns_core::FrameSnapRequest {
+            um_per_pixel_x: units,
+            um_per_pixel_y: units,
+            retained: vec![],
+        });
+        let acquired = project.preview_frame_geometry(&edit).unwrap();
+        assert_eq!(acquired.frames[0].clip_rect.x, 150_000);
+        edit.snap.as_mut().unwrap().retained = acquired.snap.retained;
+        edit.gesture = FrameGeometryGesture::Move {
+            delta_x_um: -30_000 + (10.0 * units) as i64,
+            delta_y_um: 0,
+        };
+        let held = project.preview_frame_geometry(&edit).unwrap();
+        assert_eq!(held.frames[0].clip_rect.x, 150_000);
+        edit.gesture = FrameGeometryGesture::Move {
+            delta_x_um: -30_000 + (10.1 * units) as i64,
+            delta_y_um: 0,
+        };
+        assert_ne!(
+            project.preview_frame_geometry(&edit).unwrap().frames[0]
+                .clip_rect
+                .x,
+            150_000
+        );
+        edit.snap.as_mut().unwrap().retained.clear();
+        edit.gesture = FrameGeometryGesture::Move {
+            delta_x_um: -30_000 + (6.1 * units) as i64,
+            delta_y_um: 0,
+        };
+        assert_ne!(
+            project.preview_frame_geometry(&edit).unwrap().frames[0]
+                .clip_rect
+                .x,
+            150_000
+        );
+    }
+}
+
+#[test]
+fn a_group_snaps_only_its_outer_box_and_invalid_dimension_targets_have_no_guide() {
+    let root = tempfile::tempdir().unwrap();
+    let project = project_with_rectangles(
+        root.path(),
+        0,
+        false,
+        &[
+            [20_000, 20_000, 120_000, 80_000],
+            [200_000, 80_000, 60_000, 120_000],
+            [397_000, 40_000, 80_000, 60_000],
+        ],
+    );
+    let mut edit = selection(
+        &project.projection().state.album.sheets[0].frames[..2],
+        FrameGeometryGesture::Move {
+            delta_x_um: 195_000,
+            delta_y_um: 0,
+        },
+    );
+    edit.snap = Some(myalbuns_core::FrameSnapRequest {
+        um_per_pixel_x: 500.0,
+        um_per_pixel_y: 500.0,
+        retained: vec![],
+    });
+    let preview = project.preview_frame_geometry(&edit).unwrap();
+    assert_eq!(preview.frames[0].clip_rect.x, 215_000);
+    assert_eq!(
+        preview.frames[1].clip_rect.x, 395_000,
+        "the internal edge near 397 mm cannot attract the group"
+    );
+
+    let root = tempfile::tempdir().unwrap();
+    let project = project_with_rectangles(
+        root.path(),
+        0,
+        false,
+        &[
+            [213_000, 79_000, 60_000, 40_000],
+            [420_000, 190_000, 8_000, 80_000],
+        ],
+    );
+    let mut edit = selection(
+        &project.projection().state.album.sheets[0].frames[..1],
+        FrameGeometryGesture::Resize {
+            handle: FrameResizeHandle::Right,
+            delta_x_um: -50_000,
+            delta_y_um: 0,
+            preserve_aspect_ratio: false,
+            from_center: false,
+        },
+    );
+    edit.snap = Some(myalbuns_core::FrameSnapRequest {
+        um_per_pixel_x: 500.0,
+        um_per_pixel_y: 500.0,
+        retained: vec![],
+    });
+    let preview = project.preview_frame_geometry(&edit).unwrap();
+    assert_eq!(preview.frames[0].clip_rect.width, 12_000);
+    assert!(
+        !preview
+            .snap
+            .guides
+            .iter()
+            .any(|guide| guide.kind == myalbuns_core::FrameSnapKind::Dimension)
+    );
 }
 
 fn project_with_frame_on_sheet(
@@ -68,6 +494,7 @@ fn a_group_move_stops_together_and_commits_as_one_history_action() {
     project
         .apply(ProjectIntent::EditFrameGeometry {
             edit: FrameGeometryEdit {
+                snap: None,
                 frames: vec![myalbuns_core::FrameGeometryTarget {
                     frame_id: first.id.clone(),
                     expected_rect: first.rect.clone(),
@@ -94,7 +521,8 @@ fn a_group_move_stops_together_and_commits_as_one_history_action() {
         "gesture": { "kind": "move", "deltaXUm": 9_000_000, "deltaYUm": 0 },
     }))
     .expect("the public geometry command accepts one selection");
-    let preview = serde_json::to_value(project.preview_frame_geometry(&edit).unwrap()).unwrap();
+    let preview =
+        serde_json::to_value(project.preview_frame_geometry(&edit).unwrap().frames).unwrap();
     assert_eq!(preview[0]["clipRect"]["x"], 260_000);
     assert_eq!(preview[1]["clipRect"]["x"], 360_000);
     assert_eq!(project.projection(), before);
@@ -121,6 +549,7 @@ fn resizing_a_group_stops_before_any_member_crosses_the_minimum() {
     project
         .apply(ProjectIntent::EditFrameGeometry {
             edit: FrameGeometryEdit {
+                snap: None,
                 frames: vec![myalbuns_core::FrameGeometryTarget {
                     frame_id: frame.id.clone(),
                     expected_rect: frame.rect.clone(),
@@ -170,6 +599,7 @@ fn resizing_a_group_stops_before_any_member_crosses_the_minimum() {
         ),
     ] {
         let edit = FrameGeometryEdit {
+            snap: None,
             frames: before.state.album.sheets[0]
                 .frames
                 .iter()
@@ -186,7 +616,7 @@ fn resizing_a_group_stops_before_any_member_crosses_the_minimum() {
                 from_center,
             },
         };
-        let preview = project.preview_frame_geometry(&edit).unwrap();
+        let preview = project.preview_frame_geometry(&edit).unwrap().frames;
         for (actual, [x, y, width, height]) in preview.iter().zip(expected) {
             assert_eq!(
                 actual.clip_rect,
@@ -222,6 +652,7 @@ fn geometry_stops_at_each_single_page_surface_even_for_extreme_pointer_deltas() 
         ] {
             let preview = project
                 .preview_frame_geometry(&FrameGeometryEdit {
+                    snap: None,
                     frames: vec![myalbuns_core::FrameGeometryTarget {
                         frame_id: frame.id.clone(),
                         expected_rect: frame.rect.clone(),
@@ -232,6 +663,7 @@ fn geometry_stops_at_each_single_page_surface_even_for_extreme_pointer_deltas() 
                     },
                 })
                 .unwrap()
+                .frames
                 .remove(0);
             assert_eq!(preview.clip_rect.x, x);
             assert_eq!(preview.clip_rect.y, y);
@@ -239,6 +671,7 @@ fn geometry_stops_at_each_single_page_surface_even_for_extreme_pointer_deltas() 
         }
         let preview = project
             .preview_frame_geometry(&FrameGeometryEdit {
+                snap: None,
                 frames: vec![myalbuns_core::FrameGeometryTarget {
                     frame_id: frame.id.clone(),
                     expected_rect: frame.rect.clone(),
@@ -252,6 +685,7 @@ fn geometry_stops_at_each_single_page_surface_even_for_extreme_pointer_deltas() 
                 },
             })
             .unwrap()
+            .frames
             .remove(0);
         assert_eq!(preview.clip_rect.x + preview.clip_rect.width, active_width);
         assert_eq!(
@@ -270,6 +704,7 @@ fn a_geometry_gesture_preserves_adjacent_edits_rejects_stale_geometry_and_leaves
     let initial = project.projection();
     let frame = &initial.state.album.sheets[0].frames[0];
     let mut edit = FrameGeometryEdit {
+        snap: None,
         frames: vec![myalbuns_core::FrameGeometryTarget {
             frame_id: frame.id.clone(),
             expected_rect: frame.rect.clone(),
@@ -363,6 +798,7 @@ fn eight_resize_handles_keep_the_opposite_anchor_and_the_photo_filling_the_frame
     for (handle, [x, y, width, height]) in cases {
         let before_preview = project.projection();
         let edit = FrameGeometryEdit {
+            snap: None,
             frames: vec![myalbuns_core::FrameGeometryTarget {
                 frame_id: frame.id.clone(),
                 expected_rect: frame.rect.clone(),
@@ -375,7 +811,11 @@ fn eight_resize_handles_keep_the_opposite_anchor_and_the_photo_filling_the_frame
                 from_center: false,
             },
         };
-        let preview = project.preview_frame_geometry(&edit).unwrap().remove(0);
+        let preview = project
+            .preview_frame_geometry(&edit)
+            .unwrap()
+            .frames
+            .remove(0);
         assert_eq!(
             preview.clip_rect,
             RectUm {
@@ -417,6 +857,7 @@ fn selection(
     gesture: FrameGeometryGesture,
 ) -> FrameGeometryEdit {
     FrameGeometryEdit {
+        snap: None,
         frames: frames
             .iter()
             .map(|frame| myalbuns_core::FrameGeometryTarget {
@@ -664,7 +1105,7 @@ fn group_resizing_scales_member_positions_sizes_and_opposite_anchors_together() 
                 from_center: false,
             },
         );
-        let preview = project.preview_frame_geometry(&edit).unwrap();
+        let preview = project.preview_frame_geometry(&edit).unwrap().frames;
         for (frame, [x, y, width, height]) in preview.iter().zip(expected) {
             assert_eq!(
                 frame.clip_rect,
@@ -726,6 +1167,7 @@ fn groups_stop_at_each_active_surface_and_keep_legacy_members_from_shrinking() {
             for (frame, [x, y]) in project
                 .preview_frame_geometry(&edit)
                 .unwrap()
+                .frames
                 .iter()
                 .zip(expected)
             {
@@ -783,6 +1225,7 @@ fn a_small_persisted_placeholder_can_move_and_grow_without_being_enlarged_implic
     let before = reopened.projection();
     let frame = &before.state.album.sheets[0].frames[0];
     let mut edit = FrameGeometryEdit {
+        snap: None,
         frames: vec![myalbuns_core::FrameGeometryTarget {
             frame_id: frame.id.clone(),
             expected_rect: frame.rect.clone(),
@@ -805,7 +1248,11 @@ fn a_small_persisted_placeholder_can_move_and_grow_without_being_enlarged_implic
         delta_x_um: 10_000,
         delta_y_um: 20_000,
     };
-    let moved = reopened.preview_frame_geometry(&edit).unwrap().remove(0);
+    let moved = reopened
+        .preview_frame_geometry(&edit)
+        .unwrap()
+        .frames
+        .remove(0);
     assert_eq!(moved.clip_rect.width, 4_000);
     assert_eq!(moved.clip_rect.height, 8_000);
     assert!(moved.photo.is_none());
@@ -888,6 +1335,7 @@ fn headless_frame_geometry_corpus_matches_the_core_previews() {
         .map(|(name, gesture)| {
             let mut preview = project
                 .preview_frame_geometry(&FrameGeometryEdit {
+                    snap: None,
                     frames: vec![myalbuns_core::FrameGeometryTarget {
                         frame_id: frame.id.clone(),
                         expected_rect: frame.rect.clone(),
@@ -895,6 +1343,7 @@ fn headless_frame_geometry_corpus_matches_the_core_previews() {
                     gesture: gesture.clone(),
                 })
                 .unwrap()
+                .frames
                 .remove(0);
             preview.frame_id = "geometry-frame".into();
             preview.photo.as_mut().unwrap().media_id =
@@ -1007,6 +1456,7 @@ fn resize_modifiers_use_the_gesture_baseline_and_stop_at_surface_and_minimum_siz
     ) in cases
     {
         let edit = FrameGeometryEdit {
+            snap: None,
             frames: vec![myalbuns_core::FrameGeometryTarget {
                 frame_id: frame.id.clone(),
                 expected_rect: frame.rect.clone(),
@@ -1023,6 +1473,7 @@ fn resize_modifiers_use_the_gesture_baseline_and_stop_at_surface_and_minimum_siz
             project
                 .preview_frame_geometry(&edit)
                 .unwrap()
+                .frames
                 .remove(0)
                 .clip_rect,
             RectUm {
@@ -1103,7 +1554,8 @@ fn headless_group_geometry_corpus_matches_the_core_previews() {
                 &before.state.album.sheets[0].frames,
                 gesture.clone(),
             ))
-            .unwrap();
+            .unwrap()
+            .frames;
         for (index, frame) in frames.iter_mut().enumerate() {
             frame.frame_id = format!("group-frame-{index}");
             if let Some(photo) = &mut frame.photo {
@@ -1157,6 +1609,7 @@ fn moving_a_frame_previews_without_history_and_commits_once_through_save_and_reo
     let before = project.projection();
     let frame = &before.state.album.sheets[0].frames[0];
     let edit = FrameGeometryEdit {
+        snap: None,
         frames: vec![myalbuns_core::FrameGeometryTarget {
             frame_id: frame.id.clone(),
             expected_rect: frame.rect.clone(),
@@ -1173,7 +1626,11 @@ fn moving_a_frame_previews_without_history_and_commits_once_through_save_and_reo
         height: frame.rect.height,
     };
 
-    let preview = project.preview_frame_geometry(&edit).unwrap().remove(0);
+    let preview = project
+        .preview_frame_geometry(&edit)
+        .unwrap()
+        .frames
+        .remove(0);
     assert_eq!(preview.clip_rect, expected);
     assert_eq!(
         project.projection(),

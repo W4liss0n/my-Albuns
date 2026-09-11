@@ -75,6 +75,7 @@ pub(crate) async fn apply_project_intent(
         ProjectIntent::EditFrameGeometry { .. } => "edit_frame_geometry",
         ProjectIntent::SetAlbumInformation { .. } => "set_album_information",
         ProjectIntent::SetVisualDefaults { .. } => "set_visual_defaults",
+        ProjectIntent::SetAlbumDesign { .. } => "set_album_design",
         ProjectIntent::SetDpi { .. } => "set_dpi",
         ProjectIntent::AddSheet { .. } => "add_sheet",
         ProjectIntent::DeleteSheet { .. } => "delete_sheet",
@@ -315,7 +316,7 @@ pub(crate) async fn preview_frame_geometry(
     edit: myalbuns_core::FrameGeometryEdit,
     window: WebviewWindow,
     state: State<'_, ProjectHost>,
-) -> Result<Vec<myalbuns_core::ComposedFrame>, String> {
+) -> Result<myalbuns_core::FrameGeometryPreview, String> {
     if window.label() != PROJECT_WINDOW_LABEL {
         return Err("A geometria do Frame só pode ser consultada na Janela do Projeto.".into());
     }

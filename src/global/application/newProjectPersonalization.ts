@@ -38,6 +38,7 @@ export interface NewProjectPersonalizationDraft {
   overlay: ScopedValue<OverlayDraftContent>;
   frameBorder: FrameBorderValue;
   frameBorderPreference: SolidFrameBorder;
+  frameGapUm: number;
 }
 
 export function createDefaultPersonalizationDraft(): NewProjectPersonalizationDraft {
@@ -50,6 +51,7 @@ export function createDefaultPersonalizationDraft(): NewProjectPersonalizationDr
     overlay: { scope: "bothSides", both: null },
     frameBorder: { kind: "none" },
     frameBorderPreference: { rgb: "#FFFFFF", widthUm: 1_000 },
+    frameGapUm: 5_000,
   };
 }
 
@@ -147,6 +149,7 @@ export function toCreationConfiguration(
 ): NewProjectCreationConfiguration {
   return {
     ...dimensions,
+    frameGapUm: personalization.frameGapUm,
     visualDefaults: {
       background: mapScopedValue(personalization.background, mapBackground),
       overlay: mapScopedValue(personalization.overlay, mapOverlay),

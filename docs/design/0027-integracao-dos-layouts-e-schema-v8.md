@@ -2,6 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-09
+updated: 2026-09-11
 ticket: 28
 ---
 
@@ -53,11 +54,24 @@ do Gerador; sem sugestão, a reserva do ADR 0008 reorganiza os Frames.
 A reserva não aparece no painel e não substitui o Último Layout registrado.
 A aplicação preserva ordem, IDs, conteúdo, Borda, Opacidade e ajustes das Fotos.
 
-Os ajustes do painel pertencem ao Projeto: permissão por Página ou por Página
+Os parâmetros de Layout pertencem ao Projeto: permissão por Página ou por Página
 e Lâmina, margem, intervalo e menor lado. As medidas usam a Unidade de
 apresentação, mas chegam ao núcleo em micrômetros inteiros. Alterá-las atualiza
 as opções, sem reorganizar a composição atual. Valores padrão: ambos os
 escopos, 15 mm de margem, 5 mm de intervalo e 20 mm de menor lado.
+
+O intervalo é o mesmo `Espaço entre Frames` usado pelos snaps de espaçamento
+padrão, conforme o [contrato de Snap de Frames](0033-snap-de-frames.md).
+`Personalização` define a medida na criação e `Design do Álbum` permite
+alterá-la depois. A integração usa o `layoutSettings.gapUm` já persistido;
+não mantém uma segunda medida para os snaps. Projetos existentes conservam
+seu intervalo, e o valor inicial dos novos continua em `5 mm`.
+
+A edição em `Design do Álbum` permanece pendente até `Aplicar`, que confirma
+o espaçamento junto aos demais ajustes do formulário em uma única ação de
+Undo/Redo. A confirmação invalida consultas antigas e orienta os próximos
+snaps e consultas, sem modificar Frames atuais nem geometrias já registradas
+em Últimos Layouts, Favoritos ou no catálogo. O Salvamento continua manual.
 
 ## Formato persistido
 

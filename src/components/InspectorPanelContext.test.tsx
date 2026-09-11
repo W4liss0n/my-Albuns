@@ -44,6 +44,7 @@ function inspectorProps(
     sheets: representativeProjection.composition.sheets,
     sheetStates: representativeProjection.state.album.sheets,
     visualDefaults: representativeProjection.state.album.visualDefaults,
+    frameGapUm: 5_000,
     zoomCommitting: false,
   };
 }

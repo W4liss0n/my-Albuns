@@ -8073,6 +8073,366 @@
       },
       "readySelector": ".ui-standard-message[role=\"alert\"]",
       "actions": []
+    },
+    {
+      "id": "canvas-snap-alignment",
+      "title": "Snap de Frames — alinhamento",
+      "implementationPath": "/frame-snap-preview.html?case=alignment",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-snap-guides",
+        "reason": "Guias transitórias definidas no contrato aceito 0033. A cena Pixi de produção apresenta geometria e cotas obtidas pela prévia pública do Core; esta captura não simula o transporte IPC nativo."
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "readySelector": "[data-snap-case=\"alignment\"] canvas",
+      "actions": []
+    },
+    {
+      "id": "canvas-snap-width",
+      "title": "Snap de Frames — largura igual",
+      "implementationPath": "/frame-snap-preview.html?case=width",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-snap-guides",
+        "reason": "Guias transitórias definidas no contrato aceito 0033. A cena Pixi de produção apresenta geometria e cotas obtidas pela prévia pública do Core; esta captura não simula o transporte IPC nativo."
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "readySelector": "[data-snap-case=\"width\"] canvas",
+      "actions": []
+    },
+    {
+      "id": "canvas-snap-height",
+      "title": "Snap de Frames — altura igual",
+      "implementationPath": "/frame-snap-preview.html?case=height",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-snap-guides",
+        "reason": "Guias transitórias definidas no contrato aceito 0033. A cena Pixi de produção apresenta geometria e cotas obtidas pela prévia pública do Core; esta captura não simula o transporte IPC nativo."
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "readySelector": "[data-snap-case=\"height\"] canvas",
+      "actions": []
+    },
+    {
+      "id": "canvas-snap-corner",
+      "title": "Snap de Frames — canto independente",
+      "implementationPath": "/frame-snap-preview.html?case=corner",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-snap-guides",
+        "reason": "Guias transitórias definidas no contrato aceito 0033. A cena Pixi de produção apresenta geometria e cotas obtidas pela prévia pública do Core; esta captura não simula o transporte IPC nativo."
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "readySelector": "[data-snap-case=\"corner\"] canvas",
+      "actions": []
+    },
+    {
+      "id": "canvas-snap-shift",
+      "title": "Snap de Frames — proporção com Shift",
+      "implementationPath": "/frame-snap-preview.html?case=shift",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-snap-guides",
+        "reason": "Guias transitórias definidas no contrato aceito 0033. A cena Pixi de produção apresenta geometria e cotas obtidas pela prévia pública do Core; esta captura não simula o transporte IPC nativo."
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "readySelector": "[data-snap-case=\"shift\"] canvas",
+      "actions": []
+    },
+    {
+      "id": "canvas-snap-alt",
+      "title": "Snap de Frames — centro fixo com Alt",
+      "implementationPath": "/frame-snap-preview.html?case=alt",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-snap-guides",
+        "reason": "Guias transitórias definidas no contrato aceito 0033. A cena Pixi de produção apresenta geometria e cotas obtidas pela prévia pública do Core; esta captura não simula o transporte IPC nativo."
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "readySelector": "[data-snap-case=\"alt\"] canvas",
+      "actions": []
+    },
+    {
+      "id": "canvas-snap-shift-alt",
+      "title": "Snap de Frames — Shift e Alt",
+      "implementationPath": "/frame-snap-preview.html?case=shift-alt",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-snap-guides",
+        "reason": "Guias transitórias definidas no contrato aceito 0033. A cena Pixi de produção apresenta geometria e cotas obtidas pela prévia pública do Core; esta captura não simula o transporte IPC nativo."
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "readySelector": "[data-snap-case=\"shift-alt\"] canvas",
+      "actions": []
+    },
+    {
+      "id": "canvas-snap-project-gap",
+      "title": "Snap de Frames — espaçamento padrão",
+      "implementationPath": "/frame-snap-preview.html?case=project-gap",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-snap-guides",
+        "reason": "Guias transitórias definidas no contrato aceito 0033. A cena Pixi de produção apresenta geometria e cotas obtidas pela prévia pública do Core; esta captura não simula o transporte IPC nativo."
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "readySelector": "[data-snap-case=\"project-gap\"] canvas",
+      "actions": []
+    },
+    {
+      "id": "canvas-snap-equal-gap",
+      "title": "Snap de Frames — espaçamento igual",
+      "implementationPath": "/frame-snap-preview.html?case=equal-gap",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-snap-guides",
+        "reason": "Guias transitórias definidas no contrato aceito 0033. A cena Pixi de produção apresenta geometria e cotas obtidas pela prévia pública do Core; esta captura não simula o transporte IPC nativo."
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "readySelector": "[data-snap-case=\"equal-gap\"] canvas",
+      "actions": []
+    },
+    {
+      "id": "canvas-snap-vertical-gap",
+      "title": "Snap de Frames — espaçamento vertical",
+      "implementationPath": "/frame-snap-preview.html?case=vertical-gap",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-snap-guides",
+        "reason": "Guias transitórias definidas no contrato aceito 0033. A cena Pixi de produção apresenta geometria e cotas obtidas pela prévia pública do Core; esta captura não simula o transporte IPC nativo."
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "readySelector": "[data-snap-case=\"vertical-gap\"] canvas",
+      "actions": []
+    },
+    {
+      "id": "canvas-snap-balanced",
+      "title": "Snap de Frames — equilíbrio entre vizinhos",
+      "implementationPath": "/frame-snap-preview.html?case=balanced",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-snap-guides",
+        "reason": "Guias transitórias definidas no contrato aceito 0033. A cena Pixi de produção apresenta geometria e cotas obtidas pela prévia pública do Core; esta captura não simula o transporte IPC nativo."
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "readySelector": "[data-snap-case=\"balanced\"] canvas",
+      "actions": []
+    },
+    {
+      "id": "canvas-snap-group",
+      "title": "Snap de Frames — Caixa delimitadora do grupo",
+      "implementationPath": "/frame-snap-preview.html?case=group",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-snap-guides",
+        "reason": "Guias transitórias definidas no contrato aceito 0033. A cena Pixi de produção apresenta geometria e cotas obtidas pela prévia pública do Core; esta captura não simula o transporte IPC nativo."
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "readySelector": "[data-snap-case=\"group\"] canvas",
+      "actions": []
+    },
+    {
+      "id": "canvas-snap-single",
+      "title": "Snap de Frames — Página única",
+      "implementationPath": "/frame-snap-preview.html?case=single",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-snap-guides",
+        "reason": "Guias transitórias definidas no contrato aceito 0033. A cena Pixi de produção apresenta geometria e cotas obtidas pela prévia pública do Core; esta captura não simula o transporte IPC nativo."
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "readySelector": "[data-snap-case=\"single\"] canvas",
+      "actions": []
+    },
+    {
+      "id": "canvas-snap-corner-variant",
+      "title": "Snap de Frames — cotas em escala menor",
+      "implementationPath": "/frame-snap-preview.html?case=corner&scale=small",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-snap-guides",
+        "reason": "Guias transitórias definidas no contrato aceito 0033. A cena Pixi de produção apresenta geometria e cotas obtidas pela prévia pública do Core; esta captura não simula o transporte IPC nativo."
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "readySelector": "[data-snap-case=\"corner\"] canvas",
+      "actions": []
+    },
+    {
+      "id": "canvas-snap-equal-gap-variant",
+      "title": "Snap de Frames — cotas em centímetros",
+      "implementationPath": "/frame-snap-preview.html?case=equal-gap&unit=cm",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-snap-guides",
+        "reason": "Guias transitórias definidas no contrato aceito 0033. A cena Pixi de produção apresenta geometria e cotas obtidas pela prévia pública do Core; esta captura não simula o transporte IPC nativo."
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "readySelector": "[data-snap-case=\"equal-gap\"] canvas",
+      "actions": []
+    },
+    {
+      "id": "canvas-snap-vertical-gap-variant",
+      "title": "Snap de Frames — cotas em polegadas",
+      "implementationPath": "/frame-snap-preview.html?case=vertical-gap&unit=in",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-snap-guides",
+        "reason": "Guias transitórias definidas no contrato aceito 0033. A cena Pixi de produção apresenta geometria e cotas obtidas pela prévia pública do Core; esta captura não simula o transporte IPC nativo."
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "readySelector": "[data-snap-case=\"vertical-gap\"] canvas",
+      "actions": []
+    },
+    {
+      "id": "workspace-frame-gap-confirmed",
+      "title": "Design do Álbum — espaçamento confirmado de 5 mm",
+      "implementationPath": "/workspace-preview.html",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "album-design-frame-gap",
+        "implementationCaptureSelector": "#contextual-panel",
+        "reason": "O contrato aceito 0033 integra o Espaço entre Frames ao draft de Design do Álbum e estabelece 5 mm como valor inicial compartilhado com o Gerador."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "button[form=\"album-design-settings\"][disabled]",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Informações do Álbum\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-gap-pending",
+      "title": "Design do Álbum — espaçamento pendente no Aplicar",
+      "implementationPath": "/workspace-preview.html",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "album-design-frame-gap",
+        "implementationCaptureSelector": "#contextual-panel",
+        "reason": "O contrato aceito 0033 integra o Espaço entre Frames ao draft de Design do Álbum e estabelece 5 mm como valor inicial compartilhado com o Gerador."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "button[form=\"album-design-settings\"]:not([disabled])",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Informações do Álbum\"]"
+        },
+        {
+          "type": "focus",
+          "selector": "input[aria-label=\"Espaço entre Frames\"]"
+        },
+        {
+          "type": "key",
+          "key": "ArrowRight"
+        },
+        {
+          "type": "key",
+          "key": "ArrowRight"
+        }
+      ]
+    },
+    {
+      "id": "canvas-snap-micrometer-width",
+      "title": "Snap de Frames — larguras com diferença de 1 µm",
+      "implementationPath": "/frame-snap-preview.html?case=micrometer-width&unit=cm",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-snap-guides",
+        "reason": "Guias transitórias definidas no contrato aceito 0033. A cena Pixi de produção apresenta geometria e cotas obtidas pela prévia pública do Core; esta captura não simula o transporte IPC nativo."
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "readySelector": "[data-snap-case=\"micrometer-width\"] canvas",
+      "actions": []
+    },
+    {
+      "id": "canvas-snap-micrometer-height",
+      "title": "Snap de Frames — alturas com diferença de 1 µm",
+      "implementationPath": "/frame-snap-preview.html?case=micrometer-height&unit=cm",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-snap-guides",
+        "reason": "Guias transitórias definidas no contrato aceito 0033. A cena Pixi de produção apresenta geometria e cotas obtidas pela prévia pública do Core; esta captura não simula o transporte IPC nativo."
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "readySelector": "[data-snap-case=\"micrometer-height\"] canvas",
+      "actions": []
+    },
+    {
+      "id": "canvas-snap-micrometer-width-small",
+      "title": "Snap de Frames — cota em centímetros em escala menor",
+      "implementationPath": "/frame-snap-preview.html?case=micrometer-width&unit=cm&scale=small",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-snap-guides",
+        "reason": "Guias transitórias definidas no contrato aceito 0033. A cena Pixi de produção apresenta geometria e cotas obtidas pela prévia pública do Core; esta captura não simula o transporte IPC nativo."
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "readySelector": "[data-snap-case=\"micrometer-width\"] canvas",
+      "actions": []
     }
   ]
 }

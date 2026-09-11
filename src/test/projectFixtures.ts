@@ -7,6 +7,7 @@ import type {
 export const representativeProjection: EditorProjection = {
   canPasteFrames: false,
   state: {
+    layoutSettings: { permission: "pagesAndSheet", marginUm: 15_000, gapUm: 5_000, minimumSideUm: 20_000 },
     projectId: "project-spike-001",
     projectName: "Álbum Horizonte",
     document: {

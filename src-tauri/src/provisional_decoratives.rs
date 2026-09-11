@@ -114,6 +114,8 @@ pub(crate) struct ProvisionalProjectCreationConfiguration {
     pub(crate) document: InitialDocumentConfiguration,
     pub(crate) structure: InitialStructureConfiguration,
     pub(crate) visual_defaults: ProvisionalVisualDefaults,
+    #[serde(default = "crate::project_bootstrap::default_frame_gap_um")]
+    pub(crate) frame_gap_um: i64,
 }
 
 #[derive(Clone, Default)]
@@ -266,6 +268,7 @@ impl ProvisionalDecorativeRegistry {
         };
 
         Ok(InitialProjectCreationConfiguration {
+            frame_gap_um: configuration.frame_gap_um,
             document: configuration.document,
             structure: configuration.structure,
             visual_defaults: InitialVisualDefaults {
@@ -586,6 +589,7 @@ mod tests {
             .expect("selection is accepted")
             .expect("an image was selected");
         let configuration = ProvisionalProjectCreationConfiguration {
+            frame_gap_um: 5_000,
             document: InitialDocumentConfiguration {
                 display_unit: crate::project_bootstrap::InitialDisplayUnit::Cm,
                 sheet_width_um: 600_000,
@@ -638,6 +642,7 @@ mod tests {
     fn creation_resolution_rejects_unknown_tokens_without_mutating_the_registry() {
         let registry = ProvisionalDecorativeRegistry::default();
         let configuration = ProvisionalProjectCreationConfiguration {
+            frame_gap_um: 5_000,
             document: InitialDocumentConfiguration {
                 display_unit: crate::project_bootstrap::InitialDisplayUnit::Cm,
                 sheet_width_um: 600_000,

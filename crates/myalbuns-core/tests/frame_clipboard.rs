@@ -103,6 +103,7 @@ fn project_with_frames(root: &Path) -> EditableProject {
             project
                 .apply(ProjectIntent::EditFrameGeometry {
                     edit: FrameGeometryEdit {
+                        snap: None,
                         frames: vec![FrameGeometryTarget {
                             frame_id: id,
                             expected_rect: frame.rect.clone(),
@@ -397,6 +398,7 @@ fn clipboard_preview_corpus_matches_the_public_core() {
             project
                 .apply(ProjectIntent::EditFrameGeometry {
                     edit: FrameGeometryEdit {
+                        snap: None,
                         frames: vec![FrameGeometryTarget {
                             frame_id: frame.id,
                             expected_rect: frame.rect.clone(),

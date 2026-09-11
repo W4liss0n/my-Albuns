@@ -620,6 +620,18 @@ impl ProjectDocument {
         Ok(candidate)
     }
 
+    pub(crate) fn with_album_design(
+        &self,
+        visual_defaults: ProjectedVisualDefaults,
+        frame_gap_um: i64,
+    ) -> Result<Self, crate::CoreError> {
+        let mut settings = self.layout_settings.clone();
+        settings.parameters.gap_um = frame_gap_um;
+        self.with_layout_settings(settings)?
+            .with_visual_defaults(visual_defaults)
+            .map_err(|()| crate::CoreError::InvalidVisualDefaults)
+    }
+
     pub(crate) fn with_relinked_media(&self, media_id: Uuid, path: PathBuf) -> Result<Self, ()> {
         let mut candidate = self.clone();
         let media = candidate
@@ -1287,7 +1299,7 @@ impl ProjectDocument {
     pub(crate) fn frame_geometry_edit(
         &self,
         edit: &crate::FrameGeometryEdit,
-    ) -> Result<Vec<(Uuid, ProjectRect)>, crate::CoreError> {
+    ) -> Result<(Vec<(Uuid, ProjectRect)>, crate::FrameSnapFeedback), crate::CoreError> {
         let first = edit
             .frames
             .first()
@@ -1321,20 +1333,46 @@ impl ProjectDocument {
             ids.push(id);
             rects.push(frame.rect);
         }
-        let rects = crate::frame_geometry::edited_rects(
-            &rects,
-            active_surface_width(sheet, self.document.sheet_width_um),
-            self.document.sheet_height_um,
-            &edit.gesture,
-        );
-        Ok(ids.into_iter().zip(rects).collect())
+        let (rects, feedback) = if let Some(request) = &edit.snap {
+            let others = sheet
+                .frames
+                .iter()
+                .filter(|frame| !ids.contains(&frame.id))
+                .map(|frame| frame.rect)
+                .collect::<Vec<_>>();
+            crate::frame_snap::resolve(
+                &rects,
+                &crate::frame_snap::SnapSurface {
+                    width: active_surface_width(sheet, self.document.sheet_width_um),
+                    height: self.document.sheet_height_um,
+                    sides: sheet.active_sides,
+                    bleed: self.document.bleed_um,
+                    safety: self.document.safety_um,
+                    gap: self.layout_settings.parameters.gap_um as u64,
+                    others: &others,
+                },
+                &edit.gesture,
+                request,
+            )?
+        } else {
+            (
+                crate::frame_geometry::edited_rects(
+                    &rects,
+                    active_surface_width(sheet, self.document.sheet_width_um),
+                    self.document.sheet_height_um,
+                    &edit.gesture,
+                ),
+                crate::FrameSnapFeedback::default(),
+            )
+        };
+        Ok((ids.into_iter().zip(rects).collect(), feedback))
     }
 
     pub(crate) fn with_edited_frame_geometry(
         &self,
         edit: &crate::FrameGeometryEdit,
     ) -> Result<Self, crate::CoreError> {
-        let edits = self.frame_geometry_edit(edit)?;
+        let (edits, _) = self.frame_geometry_edit(edit)?;
         let mut candidate = self.clone();
         for frame in candidate
             .sheets
@@ -1916,6 +1954,7 @@ impl InitialProjectConfiguration {
 pub struct InitialProject {
     configuration: InitialProjectConfiguration,
     personalization: InitialProjectPersonalization,
+    frame_gap_um: i64,
 }
 
 impl InitialProject {
@@ -1938,6 +1977,7 @@ impl InitialProject {
         Self {
             configuration,
             personalization: InitialProjectPersonalization::neutral(),
+            frame_gap_um: crate::LayoutParameters::default().gap_um,
         }
     }
 
@@ -1946,8 +1986,16 @@ impl InitialProject {
         self
     }
 
+    pub fn with_frame_gap_um(mut self, gap_um: i64) -> Self {
+        self.frame_gap_um = gap_um;
+        self
+    }
+
     pub(crate) fn into_project(self) -> Result<ProjectDocument, ()> {
-        self.configuration.into_project(self.personalization)
+        let mut project = self.configuration.into_project(self.personalization)?;
+        project.layout_settings.parameters.gap_um = self.frame_gap_um;
+        validate_project_state(&project)?;
+        Ok(project)
     }
 }
 

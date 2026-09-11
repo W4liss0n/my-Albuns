@@ -1,5 +1,6 @@
 import { act, fireEvent, waitFor } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
+import { frameGeometryPreview } from "../test/frameGeometryPreview";
 
 import type { ComposedFrame, FrameGeometryEdit, FrameResizeHandle } from "../domain/project";
 import { interactiveComposition } from "./albumCanvasTestFixtures";
@@ -36,7 +37,7 @@ function latestFrame() {
 function controls() {
   return {
     disabled: false, dragThreshold: { x: 5, y: 5 },
-    preview: vi.fn(async (_edit: FrameGeometryEdit) => [interactiveComposition.sheets[0].frames[0]]),
+    preview: vi.fn(async (_edit: FrameGeometryEdit) => frameGeometryPreview([interactiveComposition.sheets[0].frames[0]])),
     commit: vi.fn(async (_edit: FrameGeometryEdit): Promise<ComposedFrame[] | null> => [interactiveComposition.sheets[0].frames[0]]), onError: vi.fn(),
   };
 }
@@ -46,6 +47,52 @@ function deferred<T>() {
   const promise = new Promise<T>((complete) => { resolve = complete; });
   return { promise, resolve };
 }
+
+test("Control removes snap guides while preview is pending and release reacquires without retention", async () => {
+  const frameGeometry = controls();
+  const snapped = { ...frameGeometryPreview([interactiveComposition.sheets[0].frames[0]]), snap: {
+    retained: ["alignment-x"], guides: [{ kind: "alignment" as const, axis: "x" as const,
+      x1: 150_000, y1: 0, x2: 150_000, y2: 300_000, measurementUm: null }],
+  } };
+  frameGeometry.preview.mockResolvedValue(snapped);
+  renderCanvas({ mode: { kind: "sheet-editing", sheetId: "sheet-001" }, compositionPlan: interactiveComposition, selectedFrameId: "frame-001", frameGeometry });
+  await finishPixiInitialization();
+  preparePointerCanvas(); startPointer();
+  fireEvent.pointerMove(window, { pointerId: 7, clientX: 140, clientY: 120 });
+  const guideLayer = () => getPixiLifecycle().displays.filter((item) => item.label === "frame-snap-guides").slice(-1)[0]!;
+  await waitFor(() => expect(guideLayer().visible).toBe(true));
+  const free = deferred<ReturnType<typeof frameGeometryPreview>>();
+  frameGeometry.preview.mockReturnValueOnce(free.promise);
+  fireEvent.keyDown(window, { key: "Control", ctrlKey: true });
+  expect(guideLayer().visible).toBe(false);
+  expect(frameGeometry.preview.mock.calls.slice(-1)[0]![0].snap).toBeUndefined();
+  fireEvent.keyUp(window, { key: "Control", ctrlKey: false });
+  await act(async () => free.resolve(frameGeometryPreview([interactiveComposition.sheets[0].frames[0]])));
+  await waitFor(() => expect(frameGeometry.preview).toHaveBeenCalledTimes(3));
+  expect(frameGeometry.preview.mock.calls.slice(-1)[0]![0].snap?.retained).toEqual([]);
+  await waitFor(() => expect(guideLayer().visible).toBe(true));
+  fireEvent.pointerUp(window, { pointerId: 7, clientX: 140, clientY: 120 });
+  expect(guideLayer().visible).toBe(false);
+});
+
+test("a snap preview resolved after Control was pressed cannot restore its geometry or guides", async () => {
+  const frameGeometry = controls();
+  const stale = deferred<ReturnType<typeof frameGeometryPreview>>();
+  const free = deferred<ReturnType<typeof frameGeometryPreview>>();
+  frameGeometry.preview.mockReturnValueOnce(stale.promise).mockReturnValueOnce(free.promise);
+  renderCanvas({ mode: { kind: "sheet-editing", sheetId: "sheet-001" }, compositionPlan: interactiveComposition, selectedFrameId: "frame-001", frameGeometry });
+  await finishPixiInitialization();
+  preparePointerCanvas(); startPointer();
+  fireEvent.pointerMove(window, { pointerId: 7, clientX: 140, clientY: 120 });
+  fireEvent.keyDown(window, { key: "Control", ctrlKey: true });
+  await act(async () => stale.resolve({
+    frames: [{ ...interactiveComposition.sheets[0].frames[0], clipRect: { x: 150_000, y: 0, width: 200_000, height: 200_000 } }],
+    snap: { retained: ["old"], guides: [{ kind: "alignment", axis: "x", x1: 150_000, y1: 0, x2: 150_000, y2: 300_000, measurementUm: null }] },
+  }));
+  expect(latestFrame().position.x).toBe(0);
+  expect(getPixiLifecycle().displays.filter((item) => item.label === "frame-snap-guides").slice(-1)[0]!.visible).toBe(false);
+  await act(async () => free.resolve(frameGeometryPreview([interactiveComposition.sheets[0].frames[0]])));
+});
 
 test("dragging a locked selection reports the lock after the threshold without requesting geometry", async () => {
   const frameGeometry = controls();
@@ -73,7 +120,7 @@ test.each(["move", "resize"])(
     };
     const commit = deferred<ComposedFrame[] | null>();
     const frameGeometry = controls();
-    frameGeometry.preview.mockResolvedValue([proposed]);
+    frameGeometry.preview.mockResolvedValue(frameGeometryPreview([proposed]));
     frameGeometry.commit.mockReturnValue(commit.promise);
     const view = renderCanvas({
       mode: { kind: "sheet-editing", sheetId: "sheet-001" },
@@ -101,7 +148,7 @@ test("presents the exact committed Frame when release differs from the last prev
   const committed = { ...original, clipRect: { ...original.clipRect, x: 55_000, y: 25_000 } };
   const reply = deferred<ComposedFrame[] | null>();
   const frameGeometry = controls();
-  frameGeometry.preview.mockResolvedValue([preview]);
+  frameGeometry.preview.mockResolvedValue(frameGeometryPreview([preview]));
   frameGeometry.commit.mockReturnValue(reply.promise);
   const view = renderCanvas({ mode: { kind: "sheet-editing", sheetId: "sheet-001" },
     compositionPlan: composition, frameGeometry });
@@ -121,7 +168,7 @@ test("presents the exact committed Frame when release differs from the last prev
 test("a no-op receipt restores the original Frame and allows the next gesture without a new projection", async () => {
   const original = interactiveComposition.sheets[0].frames[0];
   const frameGeometry = controls();
-  frameGeometry.preview.mockResolvedValue([{ ...original, clipRect: { ...original.clipRect, x: 40_000 } }]);
+  frameGeometry.preview.mockResolvedValue(frameGeometryPreview([{ ...original, clipRect: { ...original.clipRect, x: 40_000 } }]));
   frameGeometry.commit.mockResolvedValue([original]);
   renderCanvas({ mode: { kind: "sheet-editing", sheetId: "sheet-001" },
     compositionPlan: interactiveComposition, frameGeometry });
@@ -146,7 +193,7 @@ test("previews a Frame drag only beyond the platform threshold and commits the r
   const commit = deferred<ComposedFrame[] | null>();
   const frameGeometry = {
     disabled: false, dragThreshold: { x: 5, y: 5 },
-    preview: vi.fn((_edit: FrameGeometryEdit) => reply.promise),
+    preview: vi.fn((_edit: FrameGeometryEdit) => reply.promise.then(frameGeometryPreview)),
     commit: vi.fn((_edit: FrameGeometryEdit) => commit.promise), onError: vi.fn(),
   };
   const view = renderCanvas({
@@ -218,7 +265,7 @@ test.each(["Escape", "pointercancel", "blur", "lostpointercapture", "save-shortc
   "%s cancels an unfinished drag and ignores its delayed preview", async (cancellation) => {
     const reply = deferred<ComposedFrame[]>();
     const frameGeometry = controls();
-    frameGeometry.preview.mockReturnValue(reply.promise);
+    frameGeometry.preview.mockReturnValue(reply.promise.then(frameGeometryPreview));
     const view = renderCanvas({ mode: { kind: "sheet-editing", sheetId: "sheet-001" },
       compositionPlan: interactiveComposition, frameGeometry });
     await finishPixiInitialization();
@@ -253,7 +300,7 @@ test("coalesces slow previews and queues the released position before a pending 
   const first = deferred<ComposedFrame[]>();
   const last = deferred<ComposedFrame[]>();
   const frameGeometry = controls();
-  frameGeometry.preview.mockReturnValueOnce(first.promise).mockReturnValueOnce(last.promise);
+  frameGeometry.preview.mockReturnValueOnce(first.promise.then(frameGeometryPreview)).mockReturnValueOnce(last.promise.then(frameGeometryPreview));
   renderCanvas({ mode: { kind: "sheet-editing", sheetId: "sheet-001" }, compositionPlan: interactiveComposition, frameGeometry });
   await finishPixiInitialization();
   preparePointerCanvas();
@@ -293,7 +340,7 @@ test.each(["project", "mode", "blocking-operation", "confirmed-geometry"])(
   "changing %s discards an unfinished gesture and ignores the old response", async (change) => {
     const frameGeometry = controls();
     const reply = deferred<ComposedFrame[]>();
-    frameGeometry.preview.mockReturnValue(reply.promise);
+    frameGeometry.preview.mockReturnValue(reply.promise.then(frameGeometryPreview));
     const view = renderCanvas({ mode: { kind: "sheet-editing", sheetId: "sheet-001" }, compositionPlan: interactiveComposition, frameGeometry });
     await finishPixiInitialization();
     preparePointerCanvas();

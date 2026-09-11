@@ -30,6 +30,7 @@ import {
   type CanvasBounds,
 } from "./canvasSheetViewGeometry";
 import { pixiColor } from "./pixiColor";
+import { createFrameSnapGuideRenderNode } from "./frameSnapGuideRenderNode";
 import { createDecorativeDropFeedback } from "./decorativeDropFeedback";
 import { createPhotoBlackAndWhiteFilter } from "./photoBlackAndWhite";
 import {
@@ -85,6 +86,7 @@ export interface SheetRenderNode {
   inactiveSideGradient: FillGradient | null;
   frameSelections: Map<string, FrameSelectionRenderNode>;
   frameSelectionLayer: Container;
+  frameSnapGuides: ReturnType<typeof createFrameSnapGuideRenderNode> | null;
   frameGroupSelection: { signature: string; node: FrameSelectionRenderNode } | null;
   frameDropOutlines: Map<string, Graphics>;
   frameContentDropHighlights: Map<string, Graphics>;
@@ -500,6 +502,9 @@ export function createSheetRenderNode(
     }
   }
   activeContent.addChild(frameSelectionLayer);
+  const frameSnapGuides = modePolicy.editingSheetId !== null
+    ? createFrameSnapGuideRenderNode(sheet.widthUm, sheet.heightUm) : null;
+  if (frameSnapGuides) activeContent.addChild(frameSnapGuides.container);
   const decorativeDropFeedback = decorativePreview
     ? createDecorativeDropFeedback(decorativePreview, viewGeometry.activeBounds) : null;
   if (decorativeDropFeedback) sheetContainer.addChild(decorativeDropFeedback.container);
@@ -567,6 +572,7 @@ export function createSheetRenderNode(
     inactiveSideGradient: inactiveSide?.gradient ?? null,
     frameSelections,
     frameSelectionLayer,
+    frameSnapGuides,
     frameGroupSelection: null,
     frameDropOutlines,
     frameContentDropHighlights,

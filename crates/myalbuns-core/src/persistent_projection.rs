@@ -150,6 +150,7 @@ pub(crate) fn editor_state(
         project_id: session.project_id().hyphenated().to_string(),
         project_name: project_name.into(),
         document: DocumentSnapshot::from_settings(settings),
+        layout_settings: project.layout_settings().clone(),
         revision: session.revision(),
         saved_revision: session.saved_revision(),
         dirty: session.has_unsaved_changes(),

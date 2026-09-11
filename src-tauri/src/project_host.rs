@@ -572,7 +572,7 @@ impl ProjectHost {
     pub(crate) fn preview_frame_geometry(
         &self,
         edit: &myalbuns_core::FrameGeometryEdit,
-    ) -> Result<Vec<myalbuns_core::ComposedFrame>, String> {
+    ) -> Result<myalbuns_core::FrameGeometryPreview, String> {
         self.project()?
             .preview_frame_geometry(edit)
             .map_err(|error| error.to_string())
@@ -2042,6 +2042,7 @@ mod tests {
                 .clip_rect
                 .clone();
             let geometry_edit = myalbuns_core::FrameGeometryEdit {
+                snap: None,
                 frames: vec![myalbuns_core::FrameGeometryTarget {
                     frame_id: affected_frame_id,
                     expected_rect: original_rect.clone(),
@@ -2057,6 +2058,7 @@ mod tests {
             let preview = host
                 .preview_frame_geometry(&geometry_edit)
                 .unwrap()
+                .frames
                 .remove(0);
             assert_eq!(host.projection().unwrap(), transformed.projection);
             let resized = host

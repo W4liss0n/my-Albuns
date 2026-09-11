@@ -64,6 +64,7 @@ fn add_frame(project: &mut EditableProject, sheet_index: usize, rect: [i64; 4]) 
         project
             .apply(ProjectIntent::EditFrameGeometry {
                 edit: FrameGeometryEdit {
+                    snap: None,
                     frames: vec![FrameGeometryTarget {
                         frame_id: frame_id.clone(),
                         expected_rect: current,

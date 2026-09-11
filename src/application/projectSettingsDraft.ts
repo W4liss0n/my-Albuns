@@ -21,7 +21,10 @@ interface AlbumDesignDelta {
   background: ScopedDelta<ProjectedBackgroundContent>;
   overlay: ScopedDelta<ProjectedOverlayContent | null>;
   frameBorder?: ProjectedFrameBorder;
+  frameGapUm?: number;
 }
+
+export interface AlbumDesignValue extends ProjectedVisualDefaults { frameGapUm: number }
 
 /**
  * A semantic draft keeps the user transition separate from the complete
@@ -60,7 +63,7 @@ export interface MaterializedProjectSettings<Value> {
 export type AlbumInformationProjectDraft =
   ProjectSettingsDraft<AlbumInformation>;
 export type AlbumDesignProjectDraft =
-  ProjectSettingsDraft<ProjectedVisualDefaults, AlbumDesignDelta>;
+  ProjectSettingsDraft<AlbumDesignValue, AlbumDesignDelta>;
 
 export function createAlbumInformationProjectDraft(
   baselineRevision: number,
@@ -80,13 +83,13 @@ export function createAlbumInformationProjectDraft(
 
 export function createAlbumDesignProjectDraft(
   baselineRevision: number,
-  baseline: ProjectedVisualDefaults,
+  baseline: AlbumDesignValue,
 ): AlbumDesignProjectDraft {
   return createProjectSettingsDraft(
     baselineRevision,
     baseline,
-    (projection) => projection.state.album.visualDefaults,
-    (visualDefaults) => ({ kind: "setVisualDefaults", visualDefaults }),
+    albumDesignFromProjection,
+    (value) => ({ kind: "setAlbumDesign", visualDefaults: visualDefaultsFromDesign(value), frameGapUm: value.frameGapUm }),
     albumDesignDelta,
     applyAlbumDesignDelta,
     albumDesignDeltaChanged,
@@ -112,12 +115,18 @@ export function materializeProjectIntent(
       )
         .transition(intent.information)
         .materialize(latestProjection);
-    case "setVisualDefaults":
-      return createAlbumDesignProjectDraft(
+    case "setVisualDefaults": {
+      const value = createAlbumDesignProjectDraft(
         capturedProjection.state.revision,
-        capturedProjection.state.album.visualDefaults,
+        albumDesignFromProjection(capturedProjection),
       )
-        .transition(intent.visualDefaults)
+        .transition({ ...intent.visualDefaults, frameGapUm: capturedProjection.state.layoutSettings.gapUm })
+        .materializeAgainst(latestProjection).value;
+      return { kind: "setVisualDefaults", visualDefaults: visualDefaultsFromDesign(value) };
+    }
+    case "setAlbumDesign":
+      return createAlbumDesignProjectDraft(capturedProjection.state.revision, albumDesignFromProjection(capturedProjection))
+        .transition({ ...intent.visualDefaults, frameGapUm: intent.frameGapUm })
         .materialize(latestProjection);
     default:
       return intent;
@@ -235,8 +244,8 @@ function structuralEquals(left: unknown, right: unknown) {
 }
 
 function albumDesignDelta(
-  baseline: ProjectedVisualDefaults,
-  value: ProjectedVisualDefaults,
+  baseline: AlbumDesignValue,
+  value: AlbumDesignValue,
 ): AlbumDesignDelta {
   return {
     background: scopedDelta(baseline.background, value.background),
@@ -244,6 +253,7 @@ function albumDesignDelta(
     ...(structuralEquals(baseline.frameBorder, value.frameBorder)
       ? {}
       : { frameBorder: value.frameBorder }),
+    ...(baseline.frameGapUm === value.frameGapUm ? {} : { frameGapUm: value.frameGapUm }),
   };
 }
 
@@ -251,14 +261,14 @@ function albumDesignDeltaChanged(delta: AlbumDesignDelta) {
   return (
     delta.background.kind !== "none" ||
     delta.overlay.kind !== "none" ||
-    delta.frameBorder !== undefined
+    delta.frameBorder !== undefined || delta.frameGapUm !== undefined
   );
 }
 
 function transitionAlbumDesignDelta(
-  baseline: ProjectedVisualDefaults,
-  current: ProjectedVisualDefaults,
-  candidate: ProjectedVisualDefaults,
+  baseline: AlbumDesignValue,
+  current: AlbumDesignValue,
+  candidate: AlbumDesignValue,
   delta: AlbumDesignDelta,
 ): AlbumDesignDelta {
   const frameChanged = !structuralEquals(
@@ -270,6 +280,9 @@ function transitionAlbumDesignDelta(
       ? undefined
       : candidate.frameBorder
     : delta.frameBorder;
+  const frameGapUm = current.frameGapUm !== candidate.frameGapUm
+    ? baseline.frameGapUm === candidate.frameGapUm ? undefined : candidate.frameGapUm
+    : delta.frameGapUm;
   return {
     background: transitionScopedDelta(
       baseline.background,
@@ -284,18 +297,28 @@ function transitionAlbumDesignDelta(
       delta.overlay,
     ),
     ...(frameBorder === undefined ? {} : { frameBorder }),
+    ...(frameGapUm === undefined ? {} : { frameGapUm }),
   };
 }
 
 function applyAlbumDesignDelta(
-  latest: ProjectedVisualDefaults,
+  latest: AlbumDesignValue,
   delta: AlbumDesignDelta,
-): ProjectedVisualDefaults {
+): AlbumDesignValue {
   return {
     background: applyScopedDelta(latest.background, delta.background),
     overlay: applyScopedDelta(latest.overlay, delta.overlay),
     frameBorder: delta.frameBorder ?? latest.frameBorder,
+    frameGapUm: delta.frameGapUm ?? latest.frameGapUm,
   };
+}
+
+export function albumDesignFromProjection(projection: EditorProjection): AlbumDesignValue {
+  return { ...projection.state.album.visualDefaults, frameGapUm: projection.state.layoutSettings.gapUm };
+}
+
+function visualDefaultsFromDesign(value: Readonly<AlbumDesignValue>): ProjectedVisualDefaults {
+  return { background: value.background, overlay: value.overlay, frameBorder: value.frameBorder };
 }
 
 function scopedDelta<Value>(

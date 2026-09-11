@@ -6,6 +6,7 @@ import type {
   ProjectedVisualDefaults,
 } from "../domain/project";
 import {
+  type AlbumDesignValue,
   createAlbumDesignProjectDraft,
   createAlbumInformationProjectDraft,
 } from "./projectSettingsDraft";
@@ -21,7 +22,8 @@ const baselineInformation: AlbumInformation = {
   lastSheet: "double",
 };
 
-const baselineVisualDefaults: ProjectedVisualDefaults = {
+const baselineVisualDefaults: AlbumDesignValue = {
+  frameGapUm: 5_000,
   background: {
     scope: "bothSides",
     both: { kind: "color", rgb: "#FFFFFF" },
@@ -30,9 +32,28 @@ const baselineVisualDefaults: ProjectedVisualDefaults = {
   frameBorder: { kind: "none" },
 };
 
+function visualDefaults(value: AlbumDesignValue): ProjectedVisualDefaults {
+  return { background: value.background, overlay: value.overlay, frameBorder: value.frameBorder };
+}
+
+test("a spacing draft preserves visual changes already performed by an adjacent queued command", () => {
+  const draft = createAlbumDesignProjectDraft(25, baselineVisualDefaults)
+    .transition({ ...baselineVisualDefaults, frameGapUm: 9_000 });
+  const latest = structuredClone(representativeProjection);
+  latest.state.revision = 26;
+  latest.state.layoutSettings = { ...latest.state.layoutSettings, gapUm: 12_000, marginUm: 18_000 };
+  latest.state.album.visualDefaults.background = { scope: "bothSides", both: { kind: "color", rgb: "#123456" } };
+  expect(draft.materialize(latest)).toEqual({
+    kind: "setAlbumDesign", frameGapUm: 9_000, visualDefaults: latest.state.album.visualDefaults,
+  });
+  latest.state.layoutSettings.gapUm = 9_000;
+  expect(draft.materializeAgainst(latest).changed).toBe(false);
+});
+
 const representativeProjection: EditorProjection = {
   canPasteFrames: false,
   state: {
+    layoutSettings: { permission: "pagesAndSheet", marginUm: 15_000, gapUm: 5_000, minimumSideUm: 20_000 },
     projectId: "draft-contract-project",
     projectName: "Contrato de draft",
     document: {
@@ -58,7 +79,7 @@ const representativeProjection: EditorProjection = {
         },
       ],
       media: [],
-      visualDefaults: baselineVisualDefaults,
+      visualDefaults: visualDefaults(baselineVisualDefaults),
     },
     revision: 25,
     savedRevision: 25,
@@ -168,7 +189,7 @@ test("keeps the submitted delta through a temporarily matching History baseline"
 });
 
 test("composes a later side edit without dropping a temporarily satisfied both-sides intent", () => {
-  const bothTarget: ProjectedVisualDefaults = {
+  const bothTarget: AlbumDesignValue = {
     ...baselineVisualDefaults,
     background: {
       scope: "bothSides",
@@ -189,7 +210,7 @@ test("composes a later side edit without dropping a temporarily satisfied both-s
       right: { kind: "color", rgb: "#F7F5F0" },
     },
   });
-  const changedAgain: ProjectedVisualDefaults = {
+  const changedAgain: AlbumDesignValue = {
     ...baselineVisualDefaults,
     background: {
       scope: "bothSides",
@@ -205,8 +226,8 @@ test("composes a later side edit without dropping a temporarily satisfied both-s
 });
 
 test("replays only the changed Album Design side over the latest scoped values", () => {
-  const baseline = representativeProjection.state.album.visualDefaults;
-  const candidate: ProjectedVisualDefaults = {
+  const baseline = { ...representativeProjection.state.album.visualDefaults, frameGapUm: 5_000 };
+  const candidate: AlbumDesignValue = {
     ...baseline,
     background: {
       scope: "perSide",
@@ -255,7 +276,7 @@ test("replays only the changed Album Design side over the latest scoped values",
     },
   };
   expect(draft.materialize(latestProjection)).toEqual({
-    kind: "setVisualDefaults",
+    kind: "setAlbumDesign", frameGapUm: 5_000,
     visualDefaults: {
       background: {
         scope: "perSide",
@@ -269,7 +290,7 @@ test("replays only the changed Album Design side over the latest scoped values",
 });
 
 test("preserves the selected side scope without replacing the opposite side changed by History", () => {
-  const candidate: ProjectedVisualDefaults = {
+  const candidate: AlbumDesignValue = {
     ...baselineVisualDefaults,
     overlay: { scope: "perSide", left: null, right: null },
   };
@@ -285,7 +306,7 @@ test("preserves the selected side scope without replacing the opposite side chan
       album: {
         ...representativeProjection.state.album,
         visualDefaults: {
-          ...baselineVisualDefaults,
+          ...visualDefaults(baselineVisualDefaults),
           overlay: {
             scope: "perSide",
             left: null,
@@ -297,9 +318,9 @@ test("preserves the selected side scope without replacing the opposite side chan
   };
 
   expect(draft.materialize(latestProjection)).toEqual({
-    kind: "setVisualDefaults",
+    kind: "setAlbumDesign", frameGapUm: 5_000,
     visualDefaults: {
-      ...baselineVisualDefaults,
+      ...visualDefaults(baselineVisualDefaults),
       overlay: {
         scope: "perSide",
         left: null,
@@ -310,7 +331,7 @@ test("preserves the selected side scope without replacing the opposite side chan
 });
 
 test("recognizes when History has already materialized the Album Design intent", () => {
-  const target: ProjectedVisualDefaults = {
+  const target: AlbumDesignValue = {
     ...baselineVisualDefaults,
     background: {
       scope: "bothSides",
@@ -321,7 +342,7 @@ test("recognizes when History has already materialized the Album Design intent",
     representativeProjection.state.revision,
     baselineVisualDefaults,
   ).transition(target);
-  const alreadyMaterialized: ProjectedVisualDefaults = {
+  const alreadyMaterialized: AlbumDesignValue = {
     ...target,
     overlay: {
       scope: "bothSides",
@@ -336,7 +357,7 @@ test("recognizes when History has already materialized the Album Design intent",
       canRedo: true,
       album: {
         ...representativeProjection.state.album,
-        visualDefaults: alreadyMaterialized,
+        visualDefaults: visualDefaults(alreadyMaterialized),
       },
     },
   };

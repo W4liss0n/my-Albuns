@@ -306,7 +306,7 @@ export const tauriProjectCorePort: ProjectCorePort = {
   saveCustomLayout: (sheetId) => invoke("save_custom_layout", { sheetId }),
   deleteCustomLayout: (layoutId) => invoke<number>("delete_custom_layout", { layoutId }),
   previewLayout: (selection) => invoke<ComposedFrame[]>("preview_layout", { selection }),
-  previewFrameGeometry: (edit) => invoke<ComposedFrame[]>("preview_frame_geometry", { edit }),
+  previewFrameGeometry: (edit) => invoke<import("../domain/project").FrameGeometryPreview>("preview_frame_geometry", { edit }),
   load: (operationId) =>
     invoke<EditorProjection>("project_state", { operationId }),
   validateAlbumInformation: (information: AlbumInformation) =>

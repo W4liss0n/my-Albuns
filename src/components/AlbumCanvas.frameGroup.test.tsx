@@ -1,5 +1,6 @@
 import { act, fireEvent, waitFor } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
+import { frameGeometryPreview } from "../test/frameGeometryPreview";
 import type { ComposedFrame, FrameGeometryEdit } from "../domain/project";
 import { interactiveComposition } from "./albumCanvasTestFixtures";
 import {
@@ -59,7 +60,7 @@ test.each(["move", "resize"])("%s previews and commits the whole selection witho
   const pending = new Promise<ComposedFrame[]>((resolve) => { finish = resolve; });
   const frameGeometry = {
     disabled: false, dragThreshold: { x: 5, y: 5 },
-    preview: vi.fn(async (_edit: FrameGeometryEdit) => proposed),
+    preview: vi.fn(async (_edit: FrameGeometryEdit) => frameGeometryPreview(proposed)),
     commit: vi.fn((_edit: FrameGeometryEdit) => pending), onError: vi.fn(),
   };
   const view = renderCanvas({ compositionPlan: composition, mode: { kind: "sheet-editing", sheetId: "sheet-001" },
@@ -97,7 +98,7 @@ test.each(["Escape", "stale-member"])("%s cancels the entire group and ignores i
   let finish!: (frames: ComposedFrame[]) => void;
   const pending = new Promise<ComposedFrame[]>((resolve) => { finish = resolve; });
   const frameGeometry = { disabled: false, dragThreshold: { x: 5, y: 5 },
-    preview: vi.fn(async () => pending), commit: vi.fn(async () => composition.sheets[0].frames), onError: vi.fn() };
+    preview: vi.fn(async () => pending.then(frameGeometryPreview)), commit: vi.fn(async () => composition.sheets[0].frames), onError: vi.fn() };
   const view = renderCanvas({ compositionPlan: composition, mode: { kind: "sheet-editing", sheetId: "sheet-001" },
     selectedFrameIds: ["frame-001", "frame-002"], frameGeometry });
   await finishPixiInitialization();
@@ -167,7 +168,7 @@ test("multiple selected Frames retain individual outlines and share eight boundi
   renderCanvas({ compositionPlan: composition, mode: { kind: "sheet-editing", sheetId: "sheet-001" },
     selectedFrameIds: ["frame-001", "frame-002"], frameGeometry: {
       disabled: false, dragThreshold: { x: 5, y: 5 },
-      preview: vi.fn(async () => frames), commit: vi.fn(async () => frames), onError: vi.fn(),
+      preview: vi.fn(async () => frameGeometryPreview(frames)), commit: vi.fn(async () => frames), onError: vi.fn(),
     } });
   await finishPixiInitialization();
   expect(displayWithLabel("frame-selection-container-frame-001").visible).toBe(true);
