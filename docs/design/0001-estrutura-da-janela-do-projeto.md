@@ -376,6 +376,7 @@ Quando o Zoom ultrapassa `Ajustar Lâmina`, `Espaço` + arraste com o botão esq
 - `Esc` ou a soltura fora de um alvo válido encerra o arraste sem alterar o Projeto ou o Histórico; somente a soltura válida executa a operação.
 - Depois de preencher, substituir ou criar, somente o Frame afetado fica selecionado e o Painel contextual passa a mostrar sua Foto. Essa mudança de seleção não constitui uma ação adicional de Undo/Redo.
 - Dois cliques em um Decorativo aplicam-no como Background a Ambos os lados da Lâmina centralizada; manter `Shift` durante os dois cliques aplica-o como Overlay. No Modo de edição, o destino é Ambos os lados da Lâmina isolada.
+- Ao aplicar uma mídia cuja miniatura já está carregada no Painel, o Canvas reaproveita essa imagem no primeiro desenho. O novo Frame e sua seleção aparecem com a Foto, sem exibir brevemente o fundo provisório antes dela. A regra também vale para Backgrounds e Overlays já carregados.
 - O duplo clique em Decorativo não escolhe um lado individual; aplicações à esquerda ou à direita exigem arrastar até o alvo correspondente.
 - Arrastar e soltar continua escolhendo explicitamente a Lâmina ou o Frame sob o ponteiro e prevalece sobre o destino implícito.
 - Arrastar um Decorativo sem modificador aplica-o como Background; manter `Shift` pressionado durante o arraste muda o papel daquele uso para Overlay.

@@ -424,6 +424,10 @@ vi.mock("pixi.js", () => {
     },
     Sprite,
     Text,
+    Texture: { from: vi.fn((image: HTMLImageElement) => ({
+      source: { resource: image }, orig: { width: image.naturalWidth, height: image.naturalHeight },
+      destroy: vi.fn(),
+    })) },
   };
 });
 

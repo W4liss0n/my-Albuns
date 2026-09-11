@@ -1,6 +1,7 @@
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import type { MediaCatalogItem } from "../domain/project";
+import { registerMediaPreviewImage } from "../application/mediaPreviewImages";
 import "./MediaThumbnail.css";
 
 interface MediaPreviewGeometry {
@@ -36,6 +37,11 @@ export function MediaThumbnail({
   media,
   previewUrl,
 }: MediaThumbnailProps) {
+  const imageRef = useRef<HTMLImageElement>(null);
+  useEffect(() => {
+    if (!previewUrl || !imageRef.current) return;
+    return registerMediaPreviewImage(previewUrl, imageRef.current);
+  }, [previewUrl]);
   const [intrinsicSize, setIntrinsicSize] =
     useState<IntrinsicPreviewSize | null>(null);
   const geometry = mediaPreviewGeometry(
@@ -61,7 +67,10 @@ export function MediaThumbnail({
     >
       {previewUrl ? (
         <img
+          key={previewUrl}
+          ref={imageRef}
           alt=""
+          crossOrigin="anonymous"
           draggable="false"
           loading={loading}
           src={previewUrl}

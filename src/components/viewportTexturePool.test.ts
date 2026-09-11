@@ -1,6 +1,7 @@
 import { beforeEach, expect, test, vi } from "vitest";
 
 import { ViewportTexturePool } from "./viewportTexturePool";
+import { registerMediaPreviewImage } from "../application/mediaPreviewImages";
 
 const assets = vi.hoisted(() => ({
   loads: [] as string[],
@@ -13,6 +14,7 @@ const assets = vi.hoisted(() => ({
 }));
 
 vi.mock("pixi.js", () => ({
+  Texture: { from: vi.fn((image: HTMLImageElement) => ({ source: { resource: image }, destroy: vi.fn() })) },
   Assets: {
     load: vi.fn(
       (url: string) =>
@@ -31,6 +33,41 @@ beforeEach(() => {
   assets.loads.length = 0;
   assets.pending.length = 0;
   assets.unloads.length = 0;
+});
+
+test("owns a viewport texture independently from the mounted thumbnail and other Canvases", () => {
+  const url = "http://myalbuns-cache.localhost/photo.jpg";
+  const image = document.createElement("img");
+  image.crossOrigin = "anonymous";
+  image.src = url;
+  Object.defineProperties(image, {
+    complete: { value: true }, naturalWidth: { value: 1_200 },
+    naturalHeight: { value: 800 }, currentSrc: { value: url },
+  });
+  const release = registerMediaPreviewImage(url, image);
+  const first = new ViewportTexturePool(vi.fn());
+  const second = new ViewportTexturePool(vi.fn());
+  try {
+    first.sync([url]);
+    second.sync([url]);
+    const texture = first.get(url)!;
+    const other = second.get(url)!;
+    expect(texture).toBeDefined();
+    expect(other).not.toBe(texture);
+    expect(assets.loads).toEqual([]);
+    release();
+    expect(first.get(url)).toBe(texture);
+    first.sync([]);
+    expect(texture.destroy).toHaveBeenCalledExactlyOnceWith(true);
+    expect(other.destroy).not.toHaveBeenCalled();
+    expect(first.get(url)).toBeUndefined();
+    expect(image.src).toBe(url);
+    expect(assets.unloads).toEqual([]);
+  } finally {
+    release();
+    first.destroy();
+    second.destroy();
+  }
 });
 
 test("loads only desired viewport textures and unloads them when released", async () => {

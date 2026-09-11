@@ -10,6 +10,7 @@ import {
   threeSheetComposition,
 } from "./albumCanvasTestFixtures";
 import { createContinuousCanvasLayout } from "./canvasGeometry";
+import { MediaThumbnail } from "./MediaThumbnail";
 import {
   advancePixiTicker,
   AlbumCanvas,
@@ -1515,6 +1516,80 @@ test("materializes a reduced Cache preview as the Canvas texture", async () => {
       ({ event }) => event === "canvas_opaque_preview_texture_loaded",
     ),
   ).toHaveLength(1);
+});
+
+test.each([1, 6])("shows a loaded panel photo on the first Canvas update with %i existing photos", async (count) => {
+  const sheet = interactiveComposition.sheets[0];
+  const populated: CompositionPlan = { ...interactiveComposition, sheets: [{
+    ...sheet, frames: Array.from({ length: count }, (_, index) => ({
+      ...sheet.frames[0], frameId: `existing-${index}`, zIndex: index,
+    })),
+  }] };
+  const url = "http://myalbuns-cache.localhost/new-photo.jpg";
+  const thumbnail = render(<MediaThumbnail loading="eager"
+    media={{ sourceWidthPx: 1_200, sourceHeightPx: 800 }} previewUrl={url} />);
+  const image = thumbnail.container.querySelector("img")!;
+  Object.defineProperties(image, {
+    complete: { value: true }, naturalWidth: { value: 1_200 },
+    naturalHeight: { value: 800 }, currentSrc: { value: url },
+  });
+  fireEvent.load(image);
+  const mediaPreviewUrls = { "media-001": "http://myalbuns-cache.localhost/existing.jpg", "new-photo": url };
+  const view = renderCanvas({ compositionPlan: populated, mediaPreviewUrls });
+  await finishPixiInitialization();
+  await act(async () => pixiLifecycle.resolveAssetLoads[0]({ label: "existing-texture" }));
+
+  view.rerenderCanvas({ composition: { ...populated, sheets: [{ ...populated.sheets[0], frames: [
+    ...populated.sheets[0].frames, { ...sheet.frames[0], frameId: "last-added", zIndex: 6,
+      photo: { ...sheet.frames[0].photo!, mediaId: "new-photo" } },
+  ] }] }, selectedFrameIds: ["last-added"] });
+
+  type Display = { label?: string; texture?: unknown; children?: Display[] };
+  const find = (node: Display, label: string): Display | undefined =>
+    node.label === label ? node : node.children?.map((child) => find(child, label)).find(Boolean);
+  const stage = pixiLifecycle.instances[0].stage as Display;
+  for (let index = 0; index < count; index += 1) {
+    const existing = find(find(stage, `canvas-frame-existing-${index}`)!, "photo-pan-inside-preview")!;
+    expect(existing.children?.some((child) => child.texture !== undefined)).toBe(true);
+  }
+  const frame = find(stage, "canvas-frame-last-added")!;
+  expect(frame).toBeDefined();
+  const inside = find(frame, "photo-pan-inside-preview")!;
+  expect(inside.children?.some((child) => child.texture !== undefined),
+    "the newly selected Frame must show the already loaded photo, without the provisional colored background").toBe(true);
+});
+
+test("uses the loaded photo when the unused-media filter removes its thumbnail in the placement commit", async () => {
+  const url = "http://myalbuns-cache.localhost/new-photo.jpg";
+  const sheet = interactiveComposition.sheets[0];
+  const callbacks = {
+    onSelectFrame: vi.fn(), onEditSheet: vi.fn(), onFocusSheet: vi.fn(),
+    onCenteredSheetChange: vi.fn(), onViewportChange: vi.fn(),
+    onTransformPreview: vi.fn(), onTransformCommit: vi.fn(async () => true),
+  };
+  const layout = createContinuousCanvasLayout([sheet]);
+  const canvas = (placed: boolean) => <>
+    {!placed && <MediaThumbnail previewUrl={url} media={{ sourceWidthPx: 1_200, sourceHeightPx: 800 }} />}
+    <AlbumCanvas projectId="placement-filter" mode={{ kind: "normal" }}
+      composition={{ ...interactiveComposition, sheets: [{ ...sheet, frames: placed ? sheet.frames : [] }] }}
+      mediaPreviewUrls={{ "media-001": url }} sheetBarMetadata={[]} continuousCanvasLayout={layout}
+      focusedSheetId={sheet.sheetId} centeredSheetId={sheet.sheetId}
+      selectedFrameIds={placed ? ["frame-001"] : []} viewport={{ offsetX: 0 }} {...callbacks} />
+  </>;
+  const view = render(canvas(false));
+  await finishPixiInitialization();
+  const image = view.container.querySelector("img")!;
+  Object.defineProperties(image, {
+    complete: { value: true }, naturalWidth: { value: 1_200 },
+    naturalHeight: { value: 800 }, currentSrc: { value: url },
+  });
+  fireEvent.load(image);
+  view.rerender(canvas(true));
+  expect(image.isConnected).toBe(false);
+  expect(pixiLifecycle.spriteTextures).toEqual([
+    expect.objectContaining({ source: { resource: image } }),
+    expect.objectContaining({ source: { resource: image } }),
+  ]);
 });
 
 test("materializes a transparent Decorative from the shared Cache URL", async () => {
