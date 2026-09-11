@@ -327,6 +327,84 @@ fn equal_corrections_prefer_alignment_to_dimension_and_do_not_change_the_referen
 }
 
 #[test]
+fn overlapping_neighbors_cannot_be_skipped_to_invent_a_free_gap() {
+    for vertical in [false, true] {
+        let root = tempfile::tempdir().unwrap();
+        let mut rectangles = [
+            [250_000, 47_000, 40_000, 40_000],
+            [20_000, 40_000, 50_000, 50_000],
+            [50_000, 40_000, 50_000, 50_000],
+            [110_000, 40_000, 50_000, 50_000],
+        ];
+        if vertical {
+            for rect in &mut rectangles {
+                rect.swap(0, 1);
+                rect.swap(2, 3);
+            }
+        }
+        let mut project = project_with_rectangles(root.path(), 0, false, &rectangles);
+        let edit = snapped_edit(
+            &project,
+            FrameGeometryGesture::Move {
+                delta_x_um: if vertical { 0 } else { -52_000 },
+                delta_y_um: if vertical { -52_000 } else { 0 },
+            },
+        );
+        let preview = project.preview_frame_geometry(&edit).unwrap();
+        let rect = &preview.frames[0].clip_rect;
+        assert_eq!(if vertical { rect.y } else { rect.x }, 198_000);
+        assert!(
+            !preview
+                .snap
+                .guides
+                .iter()
+                .any(|guide| guide.kind == FrameSnapKind::EqualGap
+                    && guide.measurement_um == Some(40_000.0))
+        );
+        let after = project
+            .apply(ProjectIntent::EditFrameGeometry { edit })
+            .unwrap();
+        assert_eq!(
+            after.state.album.sheets[0].frames[0].rect,
+            preview.frames[0].clip_rect
+        );
+    }
+}
+
+#[test]
+fn equidistant_technical_references_follow_numeric_geometric_order() {
+    let root = tempfile::tempdir().unwrap();
+    let mut project =
+        project_with_rectangles(root.path(), 0, false, &[[80_000, 47_000, 60_000, 40_000]]);
+    project
+        .apply(ProjectIntent::SetAlbumInformation {
+            information: serde_json::from_value(serde_json::json!({
+                "displayUnit": "mm", "sheetWidthUm": 600_000, "sheetHeightUm": 300_000, "dpi": 300,
+                "bleedUm": 6_000, "safetyUm": 6_000, "firstSheet": "double", "lastSheet": "double"
+            }))
+            .unwrap(),
+        })
+        .unwrap();
+    let mut edit = snapped_edit(
+        &project,
+        FrameGeometryGesture::Move {
+            delta_x_um: -71_000,
+            delta_y_um: 0,
+        },
+    );
+    edit.snap = Some(FrameSnapRequest {
+        um_per_pixel_x: 1000.0,
+        um_per_pixel_y: 1000.0,
+        retained: vec![],
+    });
+    let preview = project.preview_frame_geometry(&edit).unwrap();
+    assert_eq!(
+        preview.frames[0].clip_rect.x, 6_000,
+        "cut at 6 mm precedes safety at 12 mm; IDs must not be sorted as text"
+    );
+}
+
+#[test]
 fn snap_visual_corpus_uses_public_core_previews() {
     let resize = |handle, dx, dy, shift, alt| FrameGeometryGesture::Resize {
         handle,

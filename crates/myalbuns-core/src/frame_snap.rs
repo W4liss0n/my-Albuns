@@ -81,6 +81,16 @@ struct Candidate {
     spacing: Option<spacing::Spacing>,
 }
 
+impl Candidate {
+    fn reference_position(&self) -> [f64; 2] {
+        let mut position = [self.reference.x() as f64, self.reference.y() as f64];
+        if self.kind == FrameSnapKind::Alignment {
+            position[self.axis] = self.value;
+        }
+        position
+    }
+}
+
 pub(crate) fn resolve(
     rects: &[ProjectRect],
     surface: &SnapSurface<'_>,
@@ -170,12 +180,14 @@ pub(crate) fn resolve(
     candidates.sort_by(|a, b| {
         let held_a = request.retained.contains(&a.id);
         let held_b = request.retained.contains(&b.id);
+        let reference_a = a.reference_position();
+        let reference_b = b.reference_position();
         held_b
             .cmp(&held_a)
             .then_with(|| a.score.total_cmp(&b.score))
             .then_with(|| a.kind.cmp(&b.kind))
-            .then_with(|| a.reference.x().cmp(&b.reference.x()))
-            .then_with(|| a.reference.y().cmp(&b.reference.y()))
+            .then_with(|| reference_a[0].total_cmp(&reference_b[0]))
+            .then_with(|| reference_a[1].total_cmp(&reference_b[1]))
             .then_with(|| a.id.cmp(&b.id))
     });
     let mut delta = motion.delta;

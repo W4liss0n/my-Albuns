@@ -26,15 +26,15 @@ pub(super) fn candidates(
     units: [f64; 2],
 ) -> Vec<Candidate> {
     let mut candidates = Vec::new();
-    let left = neighbor(free, references, axis, -1, units[axis] * 10.0);
-    let right = neighbor(free, references, axis, 1, units[axis] * 10.0);
+    let left = neighbor(free, references, axis, -1);
+    let right = neighbor(free, references, axis, 1);
     let mut gaps = vec![(surface.gap as f64, None)];
     for first in references {
-        if let Some(second) = neighbor(*first, references, axis, 1, 0.0) {
-            gaps.push((
-                coordinate(second, axis, 0.0) - coordinate(*first, axis, 1.0),
-                Some((*first, second)),
-            ));
+        if let Some(second) = neighbor(*first, references, axis, 1) {
+            let gap = coordinate(second, axis, 0.0) - coordinate(*first, axis, 1.0);
+            if gap >= 0.0 {
+                gaps.push((gap, Some((*first, second))));
+            }
         }
     }
     for (direction, adjacent) in [(-1, left), (1, right)] {
@@ -111,16 +111,25 @@ fn neighbor(
     references: &[ProjectRect],
     axis: usize,
     direction: i8,
-    slack: f64,
 ) -> Option<ProjectRect> {
     let factor = if direction < 0 { 0.0 } else { 1.0 };
     references
         .iter()
         .filter(|other| **other != rect && overlaps(rect, **other, axis))
-        .filter_map(|other| {
+        // An overlapping Frame that extends beyond this boundary blocks the
+        // corridor. Keep it as the nearest neighbor; a negative interval is
+        // ineligible, but dropping it here would jump to a farther Frame.
+        .filter(|other| {
+            if direction > 0 {
+                coordinate(**other, axis, 1.0) > coordinate(rect, axis, 1.0)
+            } else {
+                coordinate(**other, axis, 0.0) < coordinate(rect, axis, 0.0)
+            }
+        })
+        .map(|other| {
             let gap = f64::from(direction)
                 * (coordinate(*other, axis, 1.0 - factor) - coordinate(rect, axis, factor));
-            (gap >= -slack).then_some((gap, *other))
+            (gap, *other)
         })
         .min_by(|a, b| {
             a.0.total_cmp(&b.0)
@@ -148,7 +157,7 @@ pub(super) fn eligible(
                     - coordinate(rect, candidate.axis, factor));
             achieved >= 0.0
                 && (achieved - gap).abs() <= 1.0
-                && neighbor(rect, references, candidate.axis, *direction, 0.0) == Some(*target)
+                && neighbor(rect, references, candidate.axis, *direction) == Some(*target)
         }
         Some(Spacing::Balanced { left, right }) => {
             let left_gap =
@@ -158,8 +167,8 @@ pub(super) fn eligible(
             left_gap >= 0.0
                 && right_gap >= 0.0
                 && (left_gap - right_gap).abs() <= 1.0
-                && neighbor(rect, references, candidate.axis, -1, 0.0) == Some(*left)
-                && neighbor(rect, references, candidate.axis, 1, 0.0) == Some(*right)
+                && neighbor(rect, references, candidate.axis, -1) == Some(*left)
+                && neighbor(rect, references, candidate.axis, 1) == Some(*right)
         }
     }
 }
