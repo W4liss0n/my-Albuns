@@ -8329,6 +8329,62 @@
       },
       "readySelector": "[data-snap-case=\"vertical-gap\"] canvas",
       "actions": []
+    },
+    {
+      "id": "workspace-frame-gap-confirmed",
+      "title": "Design do Álbum — espaçamento confirmado de 5 mm",
+      "implementationPath": "/workspace-preview.html",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "album-design-frame-gap",
+        "implementationCaptureSelector": "#contextual-panel",
+        "reason": "O contrato aceito 0033 integra o Espaço entre Frames ao draft de Design do Álbum e estabelece 5 mm como valor inicial compartilhado com o Gerador."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "button[form=\"album-design-settings\"][disabled]",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Informações do Álbum\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-gap-pending",
+      "title": "Design do Álbum — espaçamento pendente no Aplicar",
+      "implementationPath": "/workspace-preview.html",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "album-design-frame-gap",
+        "implementationCaptureSelector": "#contextual-panel",
+        "reason": "O contrato aceito 0033 integra o Espaço entre Frames ao draft de Design do Álbum e estabelece 5 mm como valor inicial compartilhado com o Gerador."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "button[form=\"album-design-settings\"]:not([disabled])",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Informações do Álbum\"]"
+        },
+        {
+          "type": "focus",
+          "selector": "input[aria-label=\"Espaço entre Frames\"]"
+        },
+        {
+          "type": "key",
+          "key": "ArrowRight"
+        },
+        {
+          "type": "key",
+          "key": "ArrowRight"
+        }
+      ]
     }
   ]
 }
