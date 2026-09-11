@@ -10,7 +10,6 @@ import { CANVAS_MICROMETERS_PER_PIXEL } from "./canvasGeometry";
 import {
   frameOutlineStyle,
   inactiveSideCssGradient,
-  photoPaletteIndexForStripe,
   SHEET_VISUAL_STYLE,
 } from "./sheetVisualStyle";
 import "./SheetPreview.css";
@@ -298,7 +297,6 @@ function FramePreview({
           <PhotoPreview
             photo={photo}
             previewUrl={previewUrl}
-            unit={unit}
           />
         </g>
       ) : (
@@ -349,17 +347,14 @@ function FramePreview({
 interface PhotoPreviewProps {
   photo: ComposedPhoto;
   previewUrl?: string;
-  unit: number;
 }
 
 function PhotoPreview({
   photo,
   previewUrl,
-  unit,
 }: PhotoPreviewProps) {
   const effectId = `photo-black-white-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const { drawRect } = photo;
-  const photoStyle = SHEET_VISUAL_STYLE.photo;
   const centerX = drawRect.x + drawRect.width / 2;
   const centerY = drawRect.y + drawRect.height / 2;
   const transform = [
@@ -391,49 +386,7 @@ function PhotoPreview({
           x={drawRect.x}
           y={drawRect.y}
         />
-      ) : (
-        <>
-          {Array.from(
-            { length: photoStyle.stripeCount },
-            (_, stripe) => {
-              const paletteIndex =
-                photoPaletteIndexForStripe(stripe);
-              const stripeWidth =
-                drawRect.width / photoStyle.stripeCount;
-
-              return (
-                <rect
-                  fill={photo.palette[paletteIndex]}
-                  height={drawRect.height}
-                  key={stripe}
-                  width={
-                    stripeWidth +
-                    photoStyle.stripeOverlapPx * unit
-                  }
-                  x={drawRect.x + stripeWidth * stripe}
-                  y={drawRect.y}
-                />
-              );
-            },
-          )}
-          <circle
-            cx={
-              drawRect.x +
-              drawRect.width * photoStyle.lightCenterXRatio
-            }
-            cy={
-              drawRect.y +
-              drawRect.height * photoStyle.lightCenterYRatio
-            }
-            r={
-              drawRect.height *
-              photoStyle.lightRadiusToHeightRatio
-            }
-            fill={photoStyle.lightColor}
-            fillOpacity={photoStyle.lightOpacity}
-          />
-        </>
-      )}
+      ) : null}
     </g>
   );
 }

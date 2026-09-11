@@ -131,7 +131,9 @@ continua dependendo da revisão das capturas.
 miniaturas já carregadas, usando o Canvas real em navegador sem janela. O teste
 compara os pixels do primeiro desenho de cada Foto com os pixels estabilizados,
 para detectar a aparição transitória do fundo provisório, e também confere a
-rasterização das imagens SVG usadas nas fixtures. Captura e resultados
+rasterização das imagens SVG usadas nas fixtures. A abertura também é exercitada
+antes de a URL da prévia chegar e durante o carregamento da textura: nenhum
+desenho de demonstração deve ocupar a Foto nesses intervalos. Captura e resultados
 ficam em `.scratch/ui-acceptance/photo-placement/`.
 
 Os testes com janelas ficam separados. O workflow **Validation** executa a

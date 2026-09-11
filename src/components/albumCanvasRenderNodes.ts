@@ -44,7 +44,6 @@ import {
 } from "./frameSelectionRenderNode";
 import {
   frameOutlineStyle,
-  photoPaletteIndexForStripe,
   SHEET_VISUAL_STYLE,
 } from "./sheetVisualStyle";
 import {
@@ -128,7 +127,6 @@ interface PhotoPreviewLayerOptions {
   rotationDegrees: number;
   mirrorX: boolean;
   blackAndWhite: boolean;
-  palette: readonly string[];
   previewTexture?: Texture;
 }
 
@@ -283,7 +281,6 @@ export function createSheetRenderNode(
         rotationDegrees: frame.photo.rotationDegrees,
         mirrorX: frame.photo.mirrorX,
         blackAndWhite: frame.photo.blackAndWhite,
-        palette: frame.photo.palette,
         previewTexture: callbacks.previewTextureFor(frame.photo.mediaId),
       };
       const outsidePhotoLayer = createPhotoPreviewLayer({
@@ -654,7 +651,6 @@ function createPhotoPreviewLayer({
   rotationDegrees,
   mirrorX,
   blackAndWhite,
-  palette,
   previewTexture,
 }: PhotoPreviewLayerOptions) {
   const photoLayer = new Container();
@@ -677,35 +673,9 @@ function createPhotoPreviewLayer({
       height: drawHeight,
     });
     photoLayer.addChild(sprite);
-    return photoLayer;
   }
-
-  const photoStyle = SHEET_VISUAL_STYLE.photo;
-  for (let stripe = 0; stripe < photoStyle.stripeCount; stripe += 1) {
-    const paletteIndex = photoPaletteIndexForStripe(stripe);
-    photoLayer.addChild(
-      new Graphics()
-        .rect(
-          (drawWidth / photoStyle.stripeCount) * stripe,
-          0,
-          drawWidth / photoStyle.stripeCount + photoStyle.stripeOverlapPx,
-          drawHeight,
-        )
-        .fill({ color: pixiColor(palette[paletteIndex]) }),
-    );
-  }
-  photoLayer.addChild(
-    new Graphics()
-      .circle(
-        drawWidth * photoStyle.lightCenterXRatio,
-        drawHeight * photoStyle.lightCenterYRatio,
-        drawHeight * photoStyle.lightRadiusToHeightRatio,
-      )
-      .fill({
-        color: pixiColor(photoStyle.lightColor),
-        alpha: photoStyle.lightOpacity,
-      }),
-  );
+  // A missing preview carries no photo pixels. Keep its geometry and clipping
+  // ready for the real texture without substituting demonstration artwork.
   return photoLayer;
 }
 

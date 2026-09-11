@@ -142,10 +142,20 @@ const placeholderSheet: ComposedSheet = {
   ],
 };
 
+test("never draws a synthetic photo while opening the project and loading its real preview", () => {
+  const view = render(<SheetPreview sheet={photoSheet} />);
+  const photo = view.container.querySelector('[data-preview-photo-id="media-001"]')!;
+  expect(photo.querySelectorAll("rect, circle, image")).toHaveLength(0);
+  const url = "http://myalbuns-cache.localhost/opening.jpg";
+  view.rerender(<SheetPreview sheet={photoSheet} mediaPreviewUrls={{ "media-001": url }} />);
+  expect(photo.querySelectorAll("rect, circle")).toHaveLength(0);
+  expect(photo.querySelector("image")).toHaveAttribute("href", url);
+});
+
 test("renders the composed geometry and visual layers of each sheet", () => {
   render(
     <>
-      <SheetPreview sheet={photoSheet} />
+      <SheetPreview sheet={photoSheet} mediaPreviewUrls={{ "media-001": "asset://localhost/real-photo.jpg" }} />
       <SheetPreview sheet={placeholderSheet} />
     </>,
   );
@@ -170,8 +180,8 @@ test("renders the composed geometry and visual layers of each sheet", () => {
     expect.stringContaining("scale(-1 1) rotate(12)"),
   );
   expect(
-    firstPreview.querySelector('[fill="#10202b"]'),
-  ).toBeInTheDocument();
+    firstPreview.querySelector('[data-preview-photo-id="media-001"] image'),
+  ).toHaveAttribute("href", "asset://localhost/real-photo.jpg");
 
   expect(
     secondPreview.querySelector("[data-preview-photo-id]"),
