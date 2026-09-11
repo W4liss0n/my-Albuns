@@ -549,6 +549,7 @@ export class AlbumCanvasScene {
         setSheetBarActionFocused(node.sheetBar, this.focusedBarAction.action, true);
       }
       applyPlaceholderLabelScale(node, scale);
+      node.decorativeDropFeedback?.applyScale(scale);
       for (const selection of node.frameSelections.values()) {
         applyFrameSelectionScale(selection, scale);
       }
@@ -748,10 +749,13 @@ export class AlbumCanvasScene {
         ? this.frameContentDrag.highlight.frameId : "";
     } else delete this.app.canvas.dataset.frameContentDragTarget;
     const highlight = this.input.photoDropHighlight;
+    const decorativeDragging = this.input.mediaDrag?.kind === "decorative";
     for (const [sheetId, node] of this.sheetNodes) {
       node.container.visible =
         sheetId !== this.sheetReorderPlaceholderSheetId;
-      node.focusOutline.visible = sheetId === this.input.focusedSheetId;
+      node.focusOutline.visible = !decorativeDragging && sheetId === this.input.focusedSheetId;
+      node.frameSelectionLayer.visible = !decorativeDragging;
+      node.sheetBar.container.visible = !decorativeDragging && albumCanvasModePolicy(this.input.mode).showsSheetBar;
       node.sheetDropOutline.visible =
         this.input.photoDropHighlight?.kind === "sheet" &&
         this.input.photoDropHighlight.sheetId === sheetId;

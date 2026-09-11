@@ -121,6 +121,21 @@ prévia enquanto o ponteiro permanece na mesma zona e papel; a soltura sempre
 consulta o ponto final e o comando confirma o alvo novamente na sessão atual.
 Respostas atrasadas, cancelamento e soltura fora da superfície não fazem commit.
 
+O feedback visual do arraste contorna a área que efetivamente receberá a imagem:
+a Página inteira à esquerda ou à direita, ou ambas as Páginas. A zona de
+ponteiro de 40%/20%/40% serve à escolha do escopo e não define esse contorno.
+Um traço azul de 2 pixels, com apoio branco para contraste, acompanha a área
+ativa visível e conserva sua espessura no Zoom. Nenhuma tonalidade é aplicada
+sobre a composição. A região central é indicada por pequenas marcas nas bordas
+superior e inferior, sem faixa preenchida nem linhas verticais sobre a imagem;
+essas marcas não aparecem em Página única.
+
+Durante o gesto, o foco da Lâmina, os indicadores de seleção dos Frames e a
+Barra ficam visualmente ocultos para deixar claro o destino do Decorativo.
+Suas seleções permanecem intactas e voltam a ser mostradas ao encerrar o
+arraste. O rótulo junto ao ponteiro conserva o papel e o lado de aplicação,
+inclusive na troca entre Fundo e Overlay com `Shift`.
+
 Os indicadores de uso separam Frames, Fundos, Overlays, padrão de Fundo e padrão
 de Overlay. Um padrão continua contando como uso mesmo quando personalizações
 ocultam todas as suas aplicações. Remover um Decorativo restaura o padrão nos
@@ -156,3 +171,10 @@ seu driver pareado, cujas versões ficam registradas na evidência. O contrato d
 como U+E008 e conserva teclas pressionadas entre ações; a captura libera as
 fontes de entrada depois da imagem. A consulta indexada também atingiu a cota
 neste caso; a especificação oficial confirmou esse comportamento.
+
+Para a revisão do feedback, `find-docs` confirmou a API de
+[linhas de Graphics do PixiJS 8](https://pixijs.com/8.x/guides/components/scene-objects/graphics/graphics-pixel-line).
+`pixelLine` mantém um único pixel independentemente da escala; por isso o
+contorno de 2 pixels usa largura compensada pela escala do Canvas. Os tipos
+instalados de Graphics e StrokeStyle da versão 8.19.0 confirmam `clear`,
+`alignment` interno e `pixelLine` usado nas marcas centrais.

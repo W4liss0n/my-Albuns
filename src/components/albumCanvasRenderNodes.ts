@@ -30,6 +30,7 @@ import {
   type CanvasBounds,
 } from "./canvasSheetViewGeometry";
 import { pixiColor } from "./pixiColor";
+import { createDecorativeDropFeedback } from "./decorativeDropFeedback";
 import { createPhotoBlackAndWhiteFilter } from "./photoBlackAndWhite";
 import {
   createPhotoGeometry,
@@ -88,6 +89,7 @@ export interface SheetRenderNode {
   frameGroupSelection: { signature: string; node: FrameSelectionRenderNode } | null;
   frameDropOutlines: Map<string, Graphics>;
   frameContentDropHighlights: Map<string, Graphics>;
+  decorativeDropFeedback: ReturnType<typeof createDecorativeDropFeedback> | null;
   focusOutline: Graphics;
   sheetDropOutline: Graphics;
   sheetBar: SheetBarRenderNode;
@@ -501,21 +503,9 @@ export function createSheetRenderNode(
     }
   }
   activeContent.addChild(frameSelectionLayer);
-  if (decorativePreview) {
-    for (const [name, rect, alpha] of [
-      ["center", decorativePreview.centerRect, 0.10],
-      ["zone", decorativePreview.zoneRect, 0.08],
-    ] as const) {
-      if (!rect) continue;
-      const zone = new Graphics().rect(
-        rect.x * MICROMETER_TO_CANVAS_PIXEL, rect.y * MICROMETER_TO_CANVAS_PIXEL,
-        rect.width * MICROMETER_TO_CANVAS_PIXEL, rect.height * MICROMETER_TO_CANVAS_PIXEL,
-      ).fill({ color: 0x2f7fba, alpha }).stroke({ color: 0x2f7fba, width: 1, pixelLine: true });
-      zone.label = `decorative-drop-${name}-${sheet.sheetId}`;
-      zone.eventMode = "none";
-      activeContent.addChild(zone);
-    }
-  }
+  const decorativeDropFeedback = decorativePreview
+    ? createDecorativeDropFeedback(decorativePreview, viewGeometry.activeBounds) : null;
+  if (decorativeDropFeedback) sheetContainer.addChild(decorativeDropFeedback.container);
 
   const sheetBar = createSheetBarRenderNode(
     sheet,
@@ -583,6 +573,7 @@ export function createSheetRenderNode(
     frameGroupSelection: null,
     frameDropOutlines,
     frameContentDropHighlights,
+    decorativeDropFeedback,
     focusOutline,
     sheetDropOutline,
     sheetBar,

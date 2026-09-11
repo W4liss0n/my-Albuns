@@ -50,7 +50,10 @@ test("composes the Decorative preview below Frames, switches role with Shift, an
   view.rerenderCanvas({ ...callbacks, mediaDrag });
   await waitFor(() => expect(screen.getByRole("status", { name: "Aplicação do Decorativo" })).toHaveTextContent("Fundo · Ambos os lados"));
   expect(displayWithLabel("background-media-fallback-decorative-001")).toBeDefined();
-  expect(displayWithLabel("decorative-drop-center-sheet-001")).toMatchObject({ rectCommands: [{ x: 240, y: 0, width: 120, height: 300 }] });
+  expect(displayWithLabel("decorative-drop-target-sheet-001")).toMatchObject({ rectCommands: [{ x: 0, y: 0, width: 600, height: 300 }], fillStyles: [] });
+  expect(displayWithLabel("decorative-drop-center-sheet-001")).toMatchObject({ rectCommands: [], fillStyles: [] });
+  expect(displayWithLabel("sheet-focus-sheet-001")).toMatchObject({ visible: false });
+  expect(displayWithLabel("frame-selection-layer-sheet-001")).toMatchObject({ visible: false });
   expect(onDropDecorative).not.toHaveBeenCalled();
   expect(onSelectFrame).not.toHaveBeenCalled();
   view.rerenderCanvas({ ...callbacks, mediaDrag: { ...mediaDrag, shiftKey: true } });
@@ -61,6 +64,30 @@ test("composes the Decorative preview below Frames, switches role with Shift, an
   await waitFor(() => expect(onDropDecorative).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ mediaId: "decorative-001", role: "overlay" })));
   expect(onSelectFrame).not.toHaveBeenCalled();
   expect(onPhotoDragCancel).toHaveBeenCalledOnce();
+  view.rerenderCanvas({ ...callbacks, mediaDrag: null });
+  const selectionLayers = pixiLifecycle.displays.filter((node) => node.label === "frame-selection-layer-sheet-001");
+  expect(selectionLayers[selectionLayers.length - 1]).toMatchObject({ visible: true });
+});
+
+test.each(["left", "right"] as const)("outlines the entire %s Page instead of the narrower pointer zone", async (scope) => {
+  const onPreviewDecorativeDrop = vi.fn(async (): Promise<import("../domain/project").DecorativeDropPreview> => ({
+    revision: 1, role: "background", scope,
+    zoneRect: { x: scope === "left" ? 0 : 360_000, y: 0, width: 240_000, height: 300_000 },
+    centerRect: { x: 240_000, y: 0, width: 120_000, height: 300_000 },
+    sheet: composition.sheets[0],
+  }));
+  const view = renderCanvas();
+  await finishPixiInitialization();
+  vi.spyOn(pixiLifecycle.instances[0].canvas, "getBoundingClientRect").mockReturnValue({
+    left: 0, top: 0, width: 1_200, height: 500, right: 1_200, bottom: 500, x: 0, y: 0, toJSON: () => ({}),
+  });
+  view.rerenderCanvas({ revision: 1, onPreviewDecorativeDrop,
+    mediaDrag: { gestureId: 1, mediaId: "decorative-001", kind: "decorative", x: scope === "left" ? 300 : 900, y: 250, shiftKey: false, phase: "dragging" } });
+  await waitFor(() => expect(screen.getByRole("status", { name: "Aplicação do Decorativo" })).toBeInTheDocument());
+  expect(displayWithLabel("decorative-drop-target-sheet-001")).toMatchObject({
+    rectCommands: [{ x: scope === "left" ? 0 : 300, y: 0, width: 300, height: 300 }], fillStyles: [],
+  });
+  expect(displayWithLabel("decorative-drop-center-sheet-001")).toMatchObject({ rectCommands: [], fillStyles: [] });
 });
 
 test("ignores obsolete Decorative previews and cancels a pending release with Escape", async () => {

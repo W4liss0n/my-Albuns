@@ -547,7 +547,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
             O editor gráfico está indisponível.
           </span>
         )}
-        {props.mode.kind === "normal" && props.sheetReorder ? (
+        {props.mode.kind === "normal" && props.sheetReorder && props.mediaDrag?.kind !== "decorative" ? (
           <SheetBarOverlay
             bleedUm={props.technicalGuides?.bleedUm}
             disabled={props.sheetReorder.disabled || isolated}
