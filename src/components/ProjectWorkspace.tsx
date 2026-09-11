@@ -819,12 +819,11 @@ export function ProjectWorkspace({
             onActiveKindChange: (mediaKind) => workspacePreferences.update({ kind: "mediaPanelActiveKind", mediaKind }),
             onSortKeyChange: (mediaKind, sortKey) => workspacePreferences.update({ kind: "mediaPanelSortKey", mediaKind, sortKey }),
             persistent: workspacePreferences.preferences.mediaPanel,
-            thumbnailSizes:
-              workspacePreferences.preferences.mediaThumbnailSizes,
-            onThumbnailSizeChange: (mediaKind, size) =>
+            thumbnailSize:
+              workspacePreferences.preferences.mediaThumbnailSize,
+            onThumbnailSizeChange: (size) =>
               workspacePreferences.update({
                 kind: "mediaThumbnailSize",
-                mediaKind,
                 size,
               }),
             onSortDirectionChange: (mediaKind, sortDirection) =>

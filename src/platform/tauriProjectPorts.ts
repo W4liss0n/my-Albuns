@@ -374,7 +374,7 @@ async function loadWorkspacePreferences(): Promise<WorkspacePreferences> {
     inspectorSections: state.inspectorSections,
     mediaPanel: settings.mediaPanel,
     mediaPanelActiveKind: settings.mediaPanel.activeKind,
-    mediaThumbnailSizes: state.mediaThumbnailSizes,
+    mediaThumbnailSize: state.mediaThumbnailSize,
     workspacePanels: state.workspacePanels,
   });
 }

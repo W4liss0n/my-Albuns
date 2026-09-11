@@ -71,7 +71,7 @@ test("Layout queries send the requested total Frame count across the native boun
 test("composes machine-local State with roaming Settings and routes updates to the owning store", async () => {
   const state = {
     inspectorSections: { "album.design": true },
-    mediaThumbnailSizes: { decorative: 110, photo: 124 },
+    mediaThumbnailSize: 124,
     workspacePanels: {
       inspector: { size: 350, visible: true },
       media: null,

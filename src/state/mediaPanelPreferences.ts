@@ -1,5 +1,5 @@
 import {
-  MEDIA_THUMBNAIL_DEFAULT_SIZE,
+  type MediaPanelPersistentPreference,
   type MediaSortDirection,
   type MediaSortKey,
   type MediaUsageFilter,
@@ -20,11 +20,10 @@ export {
   MEDIA_THUMBNAIL_MIN_SIZE,
 } from "../application/workspacePreferences";
 
-export function createMediaPanelViewPreferences(): MediaPanelViewPreferences {
+export function createMediaPanelTabPreferences(): MediaPanelPersistentPreference {
   return {
     sortKey: "name",
     sortDirection: "ascending",
-    thumbnailSize: MEDIA_THUMBNAIL_DEFAULT_SIZE,
     usageFilter: "all",
   };
 }

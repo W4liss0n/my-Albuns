@@ -24,7 +24,7 @@ export interface WorkspacePreferences {
   inspectorSections: Readonly<Record<string, boolean>>;
   mediaPanelActiveKind: MediaKind;
   mediaPanel: Readonly<Record<MediaKind, MediaPanelPersistentPreference>>;
-  mediaThumbnailSizes: Readonly<Record<MediaKind, number>>;
+  mediaThumbnailSize: number;
   workspacePanels: Readonly<
     Record<WorkspacePanel, WorkspacePanelPreference | null>
   >;
@@ -40,7 +40,6 @@ export type WorkspacePreferenceChange =
     }
   | {
       kind: "mediaThumbnailSize";
-      mediaKind: MediaKind;
       size: number;
     }
   | {
@@ -101,12 +100,7 @@ export function createWorkspacePreferences(
       ),
       photo: normalizeMediaPanelPreference(overrides.mediaPanel?.photo),
     },
-    mediaThumbnailSizes: {
-      decorative: normalizeThumbnailSize(
-        overrides.mediaThumbnailSizes?.decorative,
-      ),
-      photo: normalizeThumbnailSize(overrides.mediaThumbnailSizes?.photo),
-    },
+    mediaThumbnailSize: normalizeThumbnailSize(overrides.mediaThumbnailSize),
     workspacePanels: {
       inspector: normalizePanelPreference(
         "inspector",
@@ -144,10 +138,7 @@ export function applyWorkspacePreferenceChange(
   if (change.kind === "mediaThumbnailSize") {
     return {
       ...preferences,
-      mediaThumbnailSizes: {
-        ...preferences.mediaThumbnailSizes,
-        [change.mediaKind]: normalizeThumbnailSize(change.size),
-      },
+      mediaThumbnailSize: normalizeThumbnailSize(change.size),
     };
   }
   if (

@@ -291,15 +291,8 @@ mod project_dialog_contract_tests {
 #[serde(rename_all = "camelCase")]
 pub struct WorkspacePreferences {
     pub(crate) inspector_sections: BTreeMap<String, bool>,
-    pub(crate) media_thumbnail_sizes: MediaThumbnailSizes,
+    pub(crate) media_thumbnail_size: u16,
     pub(crate) workspace_panels: WorkspacePanelPreferences,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-pub struct MediaThumbnailSizes {
-    pub(crate) decorative: u16,
-    pub(crate) photo: u16,
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize, TS)]
@@ -329,7 +322,6 @@ pub enum WorkspacePreferenceChange {
         open: bool,
     },
     MediaThumbnailSize {
-        media_kind: MediaPreferenceKind,
         size: u16,
     },
     WorkspacePanelSize {

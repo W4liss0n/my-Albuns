@@ -39,9 +39,10 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
         onMediaDragChange={() => undefined}
         onRelinkMedia={() => undefined}
         onRetryUnavailableMedia={async () => undefined}
-        preferences={{ kind: "local", initial: parameters.get("files") === "dates" ? {
-          photo: { sortKey: "createdAt", sortDirection: "descending", usageFilter: "all", thumbnailSize: 96 },
-        } : undefined }}
+        preferences={{ kind: "local", initialThumbnailSize: parameters.get("files") === "dates" ? 96 : undefined,
+          initial: parameters.get("files") === "dates" ? {
+            photo: { sortKey: "createdAt", sortDirection: "descending", usageFilter: "all" },
+          } : undefined }}
         previewSource={{ kind: "static", previews: mediaPreviews }}
       />
     </main>

@@ -1721,7 +1721,7 @@ test("temporarily compacts the image panel during Sheet Edit Mode and restores i
 test("hydrates and publishes machine-local Inspector and media density preferences", async () => {
   let persisted = createWorkspacePreferences({
     inspectorSections: { "album.information": false },
-    mediaThumbnailSizes: { decorative: 110, photo: 124 },
+    mediaThumbnailSize: 124,
   });
   const update = vi.fn<WorkspacePreferencesPort["update"]>(async (change) => {
     persisted = applyWorkspacePreferenceChange(persisted, change);
@@ -1770,10 +1770,14 @@ test("hydrates and publishes machine-local Inspector and media density preferenc
   await waitFor(() =>
     expect(update).toHaveBeenCalledWith({
       kind: "mediaThumbnailSize",
-      mediaKind: "photo",
       size: 126,
     }),
   );
+  fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
+  expect(screen.getByRole("group", { name: "Grade de Decorativos" })).toHaveStyle({
+    "--media-thumbnail-size": "126px",
+  });
+  expect((await workspacePreferencesPort.load()).mediaThumbnailSize).toBe(126);
 });
 
 test("saving a custom Layout works from Sheet Design and the Edit menu while a Frame owns the Inspector", async () => {

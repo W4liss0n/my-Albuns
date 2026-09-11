@@ -25,6 +25,14 @@ e tamanho das miniaturas pertencem ao armazenamento global de preferências.
 As miniaturas de Fotos e Decorativos não exibem tag nem contador de usos.
 A indicação visual de item usado acontece pelo esmaecimento da miniatura.
 
+O slider usa um único tamanho compartilhado entre Fotos e Decorativos. Ajustar
+ou restaurar o tamanho em qualquer aba vale para as duas; alterná-las conserva
+o valor. A preferência permanece global à máquina e não integra o Projeto.
+O arquivo de preferências da interface passa à versão 2 com um único campo
+de tamanho. Ao ler a versão 1, adota o tamanho salvo de Fotos e conserva as
+demais preferências; a leitura não regrava o arquivo. A próxima alteração de
+preferência publica a versão 2 sem os antigos tamanhos por aba.
+
 O Host fornece criação, alteração e disponibilidade a partir das observações
 estabilizadas do Monitor, correlacionadas com o vínculo atual. Essa consulta
 não acessa Originais nem depende da demanda de miniaturas. Ausentes ficam
@@ -184,3 +192,8 @@ Para a revisão do feedback, `find-docs` confirmou a API de
 contorno de 2 pixels usa largura compensada pela escala do Canvas. Os tipos
 instalados de Graphics e StrokeStyle da versão 8.19.0 confirmam `clear`,
 `alignment` interno e `pixelLine` usado nas guias centrais.
+
+A migração de preferências usa Serde 1.0.229 e serde_json 1.0.151. A consulta
+`find-docs` confirmou os atributos de [valor padrão](https://serde.rs/attr-default.html)
+e [omissão na serialização](https://serde.rs/attr-skip-serializing.html): os
+campos antigos são aceitos somente na leitura e não voltam ao arquivo salvo.

@@ -107,7 +107,7 @@ test("prepares only the future viewport with the panel's active ordering and fil
     ...mediaPanelInteractions, mediaUsage: [], onFillPhoto: vi.fn(),
     previewSource: { kind: "connected" as const, onDemandChange: demand, previews: {} },
     preferences: { kind: "local" as const, initial: { photo: {
-      thumbnailSize: 84, sortKey: "name" as const, sortDirection: "descending" as const, usageFilter: "all" as const,
+      sortKey: "name" as const, sortDirection: "descending" as const, usageFilter: "all" as const,
     } } },
   };
   const view = render(<MediaPanel {...props} ref={ref} mediaItems={mediaItems} />);
@@ -346,7 +346,7 @@ test("keeps independent search text for Fotos and Decorativos", async () => {
   );
 });
 
-test("resizes thumbnails independently per tab and marks unavailable date ordering in code", async () => {
+test("shares thumbnail size between tabs and resets both tabs together", async () => {
   const user = userEvent.setup();
   renderPanel();
 
@@ -370,7 +370,10 @@ test("resizes thumbnails independently per tab and marks unavailable date orderi
   const decorativeSize = screen.getByRole("slider", {
     name: "Tamanho das miniaturas",
   });
-  expect(decorativeSize).toHaveValue("84");
+  expect(decorativeSize).toHaveValue("124");
+  expect(screen.getByRole("group", { name: "Grade de Decorativos" })).toHaveStyle({
+    "--media-thumbnail-size": "124px",
+  });
   fireEvent.change(decorativeSize, { target: { value: "110" } });
 
   await user.click(screen.getByRole("button", { name: "Fotos" }));
@@ -380,12 +383,16 @@ test("resizes thumbnails independently per tab and marks unavailable date orderi
   const restoredPhotoSize = screen.getByRole("slider", {
     name: "Tamanho das miniaturas",
   });
-  expect(restoredPhotoSize).toHaveValue("124");
+  expect(restoredPhotoSize).toHaveValue("110");
   fireEvent.doubleClick(restoredPhotoSize);
   expect(restoredPhotoSize).toHaveValue("84");
+  await user.click(screen.getByRole("button", { name: "Decorativos" }));
+  expect(screen.getByRole("group", { name: "Grade de Decorativos" })).toHaveStyle({
+    "--media-thumbnail-size": "84px",
+  });
 });
 
-test("hydrates per-tab thumbnail sizes and publishes later changes", async () => {
+test("hydrates a shared thumbnail size and publishes changes without a tab", async () => {
   const user = userEvent.setup();
   const onThumbnailSizeChange = vi.fn();
   render(
@@ -401,7 +408,7 @@ test("hydrates per-tab thumbnail sizes and publishes later changes", async () =>
           decorative: { sortKey: "name", sortDirection: "ascending", usageFilter: "all" },
           photo: { sortKey: "name", sortDirection: "ascending", usageFilter: "all" },
         },
-        thumbnailSizes: { decorative: 110, photo: 124 },
+        thumbnailSize: 124,
         onSortDirectionChange: vi.fn(),
         onSortKeyChange: vi.fn(),
         onThumbnailSizeChange,
@@ -418,7 +425,7 @@ test("hydrates per-tab thumbnail sizes and publishes later changes", async () =>
   });
   expect(photoSize).toHaveValue("124");
   fireEvent.change(photoSize, { target: { value: "126" } });
-  expect(onThumbnailSizeChange).toHaveBeenCalledWith("photo", 126);
+  expect(onThumbnailSizeChange).toHaveBeenCalledWith(126);
 
   await user.click(screen.getByRole("button", { name: "Decorativos" }));
   await user.click(
@@ -426,7 +433,7 @@ test("hydrates per-tab thumbnail sizes and publishes later changes", async () =>
   );
   expect(
     screen.getByRole("slider", { name: "Tamanho das miniaturas" }),
-  ).toHaveValue("110");
+  ).toHaveValue("126");
 });
 
 test("hydrates authoritative per-tab settings and publishes only the changed field", async () => {
@@ -446,7 +453,7 @@ test("hydrates authoritative per-tab settings and publishes only the changed fie
           decorative: { sortKey: "name", sortDirection: "ascending", usageFilter: "all" },
           photo: { sortKey: "name", sortDirection: "descending", usageFilter: "unused" },
         },
-        thumbnailSizes: { decorative: 84, photo: 84 },
+        thumbnailSize: 84,
         onSortDirectionChange,
         onSortKeyChange: vi.fn(),
         onThumbnailSizeChange: vi.fn(),

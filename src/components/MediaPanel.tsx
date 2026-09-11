@@ -25,7 +25,8 @@ import type {
   MediaUsage,
 } from "../domain/project";
 import {
-  createMediaPanelViewPreferences,
+  createMediaPanelTabPreferences,
+  MEDIA_THUMBNAIL_DEFAULT_SIZE,
   type MediaPanelViewPreferences,
   type MediaUsageFilter,
 } from "../state/mediaPanelPreferences";
@@ -53,7 +54,7 @@ type MediaPanelPreferenceMode =
       onActiveKindChange(mediaKind: MediaKind): void;
       onSortKeyChange(mediaKind: MediaKind, sortKey: MediaPanelPersistentPreference["sortKey"]): void;
       persistent: Readonly<Record<MediaKind, MediaPanelPersistentPreference>>;
-      thumbnailSizes: Readonly<Record<MediaKind, number>>;
+      thumbnailSize: number;
       onSortDirectionChange(
         mediaKind: MediaKind,
         sortDirection: MediaPanelPersistentPreference["sortDirection"],
@@ -62,11 +63,12 @@ type MediaPanelPreferenceMode =
         mediaKind: MediaKind,
         usageFilter: MediaPanelPersistentPreference["usageFilter"],
       ): void;
-      onThumbnailSizeChange(mediaKind: MediaKind, size: number): void;
+      onThumbnailSizeChange(size: number): void;
     }
   | {
       kind: "local";
-      initial?: Partial<Record<MediaKind, MediaPanelViewPreferences>>;
+      initial?: Partial<Record<MediaKind, MediaPanelPersistentPreference>>;
+      initialThumbnailSize?: number;
     };
 
 type MediaPanelPreviewSource =
@@ -135,9 +137,9 @@ export function MediaPanel({
     previewSource.kind === "connected" ? previewSource.onDemandChange : null;
   const controlledPersistent =
     preferenceMode.kind === "controlled" ? preferenceMode.persistent : null;
-  const controlledThumbnailSizes =
+  const controlledThumbnailSize =
     preferenceMode.kind === "controlled"
-      ? preferenceMode.thumbnailSizes
+      ? preferenceMode.thumbnailSize
       : null;
   const [missingReview, setMissingReview] = useState<{
     activeKind: MediaKind;
@@ -174,15 +176,17 @@ export function MediaPanel({
     decorative: "",
     photo: "",
   });
+  const [thumbnailSize, setThumbnailSize] = useState(() => preferenceMode.kind === "controlled"
+    ? preferenceMode.thumbnailSize : preferenceMode.initialThumbnailSize ?? MEDIA_THUMBNAIL_DEFAULT_SIZE);
   const [preferencesByKind, setPreferencesByKind] = useState<
-    Record<MediaKind, MediaPanelViewPreferences>
+    Record<MediaKind, MediaPanelPersistentPreference>
   >(() => ({
     decorative: {
-      ...createMediaPanelViewPreferences(),
+      ...createMediaPanelTabPreferences(),
       ...initialPreferences(preferenceMode, "decorative"),
     },
     photo: {
-      ...createMediaPanelViewPreferences(),
+      ...createMediaPanelTabPreferences(),
       ...initialPreferences(preferenceMode, "photo"),
     },
   }));
@@ -204,9 +208,10 @@ export function MediaPanel({
   );
   const search = (missingReview?.searches ?? searchByKind)[activeMediaKind];
   const storedPreferences = preferencesByKind[activeMediaKind];
-  const preferences = missingReview ? { ...storedPreferences, usageFilter: missingReview.usageFilters[activeMediaKind] } : storedPreferences;
+  const preferences = { ...storedPreferences, thumbnailSize,
+    usageFilter: missingReview ? missingReview.usageFilters[activeMediaKind] : storedPreferences.usageFilter };
   const missingOnly = missingReview !== null || missingOnlyByKind[activeMediaKind];
-  const { sortKey, sortDirection, thumbnailSize, usageFilter } = preferences;
+  const { sortKey, sortDirection, usageFilter } = preferences;
   const visibleMediaItems = useMemo(() => filterMediaItems(
     activeMediaItems, mediaUsageById, search, sortKey, sortDirection, usageFilter, fileInformation, missingOnly,
   ), [activeMediaItems, mediaUsageById, search, sortKey, sortDirection, usageFilter, fileInformation, missingOnly]);
@@ -259,18 +264,8 @@ export function MediaPanel({
   }));
 
   useEffect(() => {
-    if (!controlledThumbnailSizes) return;
-    setPreferencesByKind((current) => ({
-      decorative: {
-        ...current.decorative,
-        thumbnailSize: controlledThumbnailSizes.decorative,
-      },
-      photo: {
-        ...current.photo,
-        thumbnailSize: controlledThumbnailSizes.photo,
-      },
-    }));
-  }, [controlledThumbnailSizes]);
+    if (controlledThumbnailSize !== null) setThumbnailSize(controlledThumbnailSize);
+  }, [controlledThumbnailSize]);
 
   useEffect(() => {
     if (!controlledPersistent) return;
@@ -421,14 +416,11 @@ export function MediaPanel({
     if (preferenceMode.kind === "controlled" && nextPreferences.sortKey !== undefined) {
       preferenceMode.onSortKeyChange(activeMediaKind, nextPreferences.sortKey);
     }
-    if (
-      preferenceMode.kind === "controlled" &&
-      nextPreferences.thumbnailSize !== undefined
-    ) {
-      preferenceMode.onThumbnailSizeChange(
-        activeMediaKind,
-        nextPreferences.thumbnailSize,
-      );
+    if (nextPreferences.thumbnailSize !== undefined) {
+      setThumbnailSize(nextPreferences.thumbnailSize);
+      if (preferenceMode.kind === "controlled") preferenceMode.onThumbnailSizeChange(nextPreferences.thumbnailSize);
+      const { thumbnailSize: _size, ...remaining } = nextPreferences;
+      nextPreferences = remaining;
     }
     if (
       preferenceMode.kind === "controlled" &&
@@ -704,11 +696,10 @@ function mediaAvailabilityLabel(preview: MediaPreview) {
 function initialPreferences(
   mode: MediaPanelPreferenceMode,
   mediaKind: MediaKind,
-): Partial<MediaPanelViewPreferences> {
+): Partial<MediaPanelPersistentPreference> {
   return mode.kind === "controlled"
     ? {
         ...mode.persistent[mediaKind],
-        thumbnailSize: mode.thumbnailSizes[mediaKind],
       }
     : mode.initial?.[mediaKind] ?? {};
 }

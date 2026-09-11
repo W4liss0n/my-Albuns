@@ -6,8 +6,8 @@ use myalbuns_desktop_lib::ipc_contract::{
     ExportCommandError, ExportEvent, ExportResult, FrontendLogEvent, ImageProcessingProgress,
     ImportMediaResult, LinkedMediaChanged, MediaFileCatalog, MediaPanelSettings,
     MediaPanelTabSettings, MediaPreferenceKind, MediaPreview, MediaPreviewCommandError,
-    MediaPreviewDemand, MediaPreviewState, MediaSortDirection, MediaThumbnailSizes,
-    MediaUsageFilter, OpeningExternalCopyDecision, PointerDragThreshold, ProjectCloseChoice,
+    MediaPreviewDemand, MediaPreviewState, MediaSortDirection, MediaUsageFilter,
+    OpeningExternalCopyDecision, PointerDragThreshold, ProjectCloseChoice,
     ProjectCloseRequestOutcome, ProjectCloseResolution, ProjectDialogAction,
     ProjectDialogActionEvent, ProjectDialogPresentation, ProjectDialogState,
     ProjectRecoveryDecision, SaveAsProjectCommandError, SaveAsProjectOutcome, SaveAsProjectResult,
@@ -73,8 +73,6 @@ fn main() {
         .expect("media preference kind bindings should be generated");
     MediaSortDirection::export_all(&config)
         .expect("media sort direction bindings should be generated");
-    MediaThumbnailSizes::export_all(&config)
-        .expect("media thumbnail size bindings should be generated");
     MediaUsageFilter::export_all(&config).expect("media usage filter bindings should be generated");
     ProjectDialogAction::export_all(&config)
         .expect("Project dialog action bindings should be generated");
