@@ -25,11 +25,14 @@ placeholders não iniciam a integração. O Host resolve novamente o identificad
 recebido no Projeto atual e entrega somente o Original vinculado ao lançador.
 Não exporta o Frame, não aplica o enquadramento e não usa uma representação de Cache.
 
-O Monitor existente consolida observações sucessivas antes de atualizar o
-MediaRuntime. Além da estabilidade dos metadados, verifica acesso de leitura;
+O Monitor consolida observações sucessivas e prepara a alteração antes de atualizar
+o MediaRuntime. Além da estabilidade dos metadados, verifica acesso de leitura;
 um arquivo bloqueado para leitura ou temporariamente vazio permanece indisponível,
-preservando a representação anterior. A volta do arquivo legível invalida as
-representações afetadas. Cada Host observa suas ocorrências, inclusive quando
+preservando a representação anterior. Fotos alteradas passam pela inspeção
+completa existente, com admissão por memória, antes da confirmação e da invalidação.
+Um JPEG parcial conserva a última observação e prévia válidas. A origem é conferida
+novamente ao confirmar; resultados atrasados não substituem uma geração mais nova.
+Cada Host observa suas ocorrências, inclusive quando
 mais de um Projeto utiliza o mesmo Original. A inspeção e o processamento de
 imagens continuam nos proprietários existentes, com admissão por memória.
 

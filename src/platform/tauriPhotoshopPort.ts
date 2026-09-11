@@ -10,7 +10,7 @@ const errorCodes: ReadonlySet<string> = new Set([
   "invalid_context", "launch_failed", "store_unavailable", "dialog_unavailable",
 ] as const);
 
-async function call(command: string, args?: Record<string, unknown>): Promise<unknown> {
+async function invokePhotoshop(command: string, args?: Record<string, unknown>): Promise<unknown> {
   try { return await invoke(command, args); }
   catch (error) {
     if (isIpcRecord(error) && typeof error.code === "string" && errorCodes.has(error.code) && typeof error.message === "string") {
@@ -38,23 +38,23 @@ export function parsePhotoshopStatus(value: unknown): PhotoshopStatus {
   return { revision: value.revision as number, installations, selectedInstallationId: selected as string | null } satisfies NativePhotoshopStatus;
 }
 
-const status = async () => parsePhotoshopStatus(await call("photoshop_status"));
+const status = async () => parsePhotoshopStatus(await invokePhotoshop("photoshop_status"));
 
 export const tauriPhotoshopPort: PhotoshopPort = {
   status,
   async openPhoto(target) {
     const nativeTarget: NativePhotoshopPhotoTarget = target.kind === "panel"
       ? { kind: "panel", mediaIds: [...target.mediaIds] } : { kind: "frames", frameIds: [...target.frameIds] };
-    await call("open_in_photoshop", { target: nativeTarget });
+    await invokePhotoshop("open_in_photoshop", { target: nativeTarget });
   },
-  async openSettings(section) { await call("open_application_settings", { section }); },
+  async openSettings(section) { await invokePhotoshop("open_application_settings", { section }); },
 };
 
 export const tauriPhotoshopSettingsPort: PhotoshopSettingsPort = {
   status,
-  async select(installationId) { return parsePhotoshopStatus(await call("select_photoshop", { installationId })); },
+  async select(installationId) { return parsePhotoshopStatus(await invokePhotoshop("select_photoshop", { installationId })); },
   async locate() {
-    const value = await call("choose_photoshop");
+    const value = await invokePhotoshop("choose_photoshop");
     return value === null ? null : parsePhotoshopStatus(value);
   },
 };

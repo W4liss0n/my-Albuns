@@ -1,11 +1,9 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { closeSettings, onSettingsSection } from "../platform/tauriSettingsWindow";
 import { SettingsWindow } from "../settings/SettingsWindow";
 import { tauriPhotoshopPort, tauriPhotoshopSettingsPort } from "../platform/tauriPhotoshopPort";
 import { tauriCacheSettingsPort } from "../platform/tauriCacheSettingsPort";
-import type { SettingsSection } from "../application/photoshop";
 
 import { installDesktopWebViewPolicy } from "../platform/desktopWebViewPolicy";
 import { probeGraphics } from "../platform/graphics";
@@ -23,10 +21,6 @@ installDesktopWebViewPolicy(document);
 const graphicsDiagnostic = probeGraphics();
 const parameters = new URLSearchParams(window.location.search);
 const settingsWindow = parameters.get("surface") === "settings";
-const closeSettings = () => { void invoke("close_application_settings"); };
-const onSettingsSection = (listener: (section: SettingsSection) => void) => listen<SettingsSection>("myalbuns://settings-section", (event) => {
-  if (event.payload === "performance" || event.payload === "photoshop") listener(event.payload);
-});
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

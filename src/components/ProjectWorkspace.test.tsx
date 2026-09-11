@@ -690,12 +690,14 @@ test("manual Frame creation is unavailable outside sheet editing", () => {
   expect(port.applyWithOutcome).not.toHaveBeenCalled();
 });
 
-test.each(["normal", "edit"])("opens the original of a single filled Frame in %s mode without a creative command", async (mode) => {
+test.each(["normal", "edit", "locked"])("opens the original of a single filled Frame in %s mode without a creative command", async (mode) => {
+  const current = structuredClone(projection);
+  if (mode === "locked") current.state.album.sheets[0].layoutLocked = true;
   const apply = vi.fn(async () => projection);
   const openPhoto = vi.fn(async () => undefined);
   const photoshopPort = { status: vi.fn(async () => ({ revision: 1, installations: [], selectedInstallationId: "photoshop" })), openPhoto, openSettings: vi.fn(async () => undefined) };
-  useEditorView.setState({ editingSheetId: mode === "edit" ? "sheet-001" : null, selectedFrameIds: ["frame-001"] });
-  render(<ProjectWorkspace projection={projection} projectCorePort={projectCorePortWithApply(apply)}
+  useEditorView.setState({ editingSheetId: mode !== "normal" ? "sheet-001" : null, selectedFrameIds: ["frame-001"] });
+  render(<ProjectWorkspace projection={current} projectCorePort={projectCorePortWithApply(apply)}
     photoshopPort={photoshopPort} onProjectionChange={vi.fn()} />);
   await waitFor(() => expect(photoshopPort.status).toHaveBeenCalled());
   act(() => canvasHarness.props?.onOpenFrameContextMenu?.("frame-001", { x: 320, y: 200 }));

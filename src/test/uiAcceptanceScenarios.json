@@ -8576,6 +8576,27 @@
       ]
     },
     {
+      "id": "photoshop-frame-locked-context",
+      "title": "Photoshop — Foto de Layout travado",
+      "implementationPath": "/workspace-preview.html?frame=photo&photoshop=available&mode=locked",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "photoshop-context-menu",
+        "reason": "Configurações e integração com Photoshop definidas nos contratos aceitos 0009 e 0010 e no Programa 33; a referência visual vigente não contém estes estados. Componentes de produção com portas determinísticas."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "[role=\"menu\"][aria-label=\"Ações da Foto\"]",
+      "actions": [
+        {
+          "type": "context-click",
+          "selector": ".canvas-host canvas"
+        }
+      ]
+    },
+    {
       "id": "photoshop-open-failure",
       "title": "Photoshop — instalação removida após consulta",
       "implementationPath": "/workspace-preview.html?frame=photo&photoshop=failure",

@@ -552,7 +552,10 @@ export function ProjectWorkspace({
     }
     if (!projection.state.album.sheets.find((sheet) => sheet.id === canvasMode.sheetId)?.frames.some((frame) => frame.id === frameId)) return;
     if (!controller.canvasProps.selectedFrameIds.includes(frameId)) controller.canvasProps.onSelectFrame(frameId);
-    setFrameContextMenu({ kind: "frames", position });
+    if (!controller.canAddFrame || !controller.canArrangeFrames) {
+      const frame = projection.state.album.sheets.flatMap((sheet) => sheet.frames).find((frame) => frame.id === frameId);
+      if (frame?.photo) setFrameContextMenu({ kind: "photo", position });
+    } else setFrameContextMenu({ kind: "frames", position });
   };
   const openEmptyCanvasContextMenu = (sheetId: string, position: { x: number; y: number }) => {
     if (!controller.canAddFrame || commandsBlocked || canvasMode.kind !== "sheet-editing" || canvasMode.sheetId !== sheetId) return;

@@ -4,7 +4,7 @@
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   color: var(--ui-text);
   background: var(--ui-surface);
-  font-size: 13px;
+  font-size: var(--ui-font-size-heading);
 }
 .application-settings-tabs { display: flex; gap: 4px; padding: 14px 24px 0; border-bottom: 1px solid var(--ui-border); }
 .application-settings-tabs button { padding: 10px 16px; background: transparent; color: var(--ui-text-secondary); border: 0; border-bottom: 2px solid transparent; font: inherit; cursor: pointer; }
@@ -16,9 +16,9 @@
 .application-settings-panel > p { color: var(--ui-text-secondary); line-height: 1.5; }
 .application-settings-field { display: grid; gap: 8px; font-weight: 600; }
 .application-settings-field select { width: 100%; min-width: 0; height: 36px; border: 1px solid var(--ui-border-strong); border-radius: 5px; color: var(--ui-text); background: var(--ui-surface-raised); padding-inline: 10px; font: inherit; font-weight: 400; }
-.application-settings-path { overflow-wrap: anywhere; font-size: 12px; }
+.application-settings-path { overflow-wrap: anywhere; font-size: var(--ui-font-size-action); }
 .application-settings-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.application-settings-status { font-size: 12px; }
+.application-settings-status { font-size: var(--ui-font-size-action); }
 .application-settings-metrics { display: grid; gap: 12px; margin: 0; }
 .application-settings-metrics > div { display: flex; justify-content: space-between; gap: 20px; }
 .application-settings-metrics dd { margin: 0; font-variant-numeric: tabular-nums; }

@@ -137,6 +137,28 @@ impl MediaResolutionProposal {
     pub(crate) fn observations(&self) -> &[MediaObservation] {
         &self.observations
     }
+
+    pub(crate) fn inspection_update(&self, runtime: &MediaRuntime) -> MediaRuntimeUpdate {
+        let current = runtime.snapshot();
+        MediaRuntimeUpdate {
+            observation_generation: self.generation,
+            changed_media_ids: self
+                .observations
+                .iter()
+                .filter(|observation| {
+                    observation.availability == MediaAvailability::Candidate
+                        && current.as_ref().is_none_or(|current| {
+                            !current
+                                .observations
+                                .iter()
+                                .any(|previous| previous == *observation)
+                        })
+                })
+                .map(|observation| observation.media_id.clone())
+                .collect(),
+            ..MediaRuntimeUpdate::default()
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -205,6 +227,12 @@ pub(crate) struct MediaMonitorPoll {
 }
 
 impl MediaMonitorPoll {
+    pub(crate) fn unchanged(runtime: &MediaRuntime) -> Self {
+        Self {
+            confirmed_observation: runtime.snapshot(),
+            update: None,
+        }
+    }
     pub(crate) fn confirmed_observation(&self) -> Option<&MediaResolutionProposal> {
         self.confirmed_observation.as_ref()
     }
@@ -214,12 +242,14 @@ impl MediaMonitorPoll {
     }
 }
 
+#[cfg(test)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct MediaRetryInspection {
     availability: MediaAvailability,
     update: MediaRuntimeUpdate,
 }
 
+#[cfg(test)]
 impl MediaRetryInspection {
     pub(crate) fn availability(&self) -> MediaAvailability {
         self.availability
@@ -743,6 +773,7 @@ impl MediaRuntime {
             .clone()
     }
 
+    #[cfg(test)]
     fn apply_occurrence(
         &self,
         generation: u64,
@@ -762,6 +793,7 @@ impl MediaRuntime {
     }
 }
 
+#[cfg(test)]
 fn apply_occurrence(
     current: &mut Option<MediaResolutionProposal>,
     generation: u64,
@@ -807,6 +839,131 @@ struct MediaMonitorTransition {
 }
 
 impl MediaMonitor {
+    pub(crate) fn prepare_retry_in_plan(
+        &self,
+        runtime: &MediaRuntime,
+        binding: &MediaBinding,
+        plan: &RootBindingPlan,
+    ) -> Result<MediaResolutionProposal, MediaRetryError> {
+        let mut transition = self
+            .transition
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut proposal = runtime.snapshot().ok_or(MediaRetryError::NotUnavailable)?;
+        let observation = proposal
+            .observations
+            .iter_mut()
+            .find(|observation| {
+                observation.media_id == binding.media_id
+                    && observation.availability == MediaAvailability::Unavailable
+            })
+            .ok_or(MediaRetryError::NotUnavailable)?;
+        // Explicit retry observes only its requested occurrence. Every other
+        // observation remains unchanged while image inspection is admitted.
+        *observation = self.resolver.observe_in_plan(plan, binding);
+        proposal.generation =
+            next_observation_generation(&mut transition, Some(proposal.generation));
+        Ok(proposal)
+    }
+
+    /// Stable filesystem hints are prepared first. Image inspection/admission
+    /// runs outside the transition lock; only confirmed sources can be committed.
+    pub(crate) fn prepare_in_plan(
+        &self,
+        runtime: &MediaRuntime,
+        bindings: &[MediaBinding],
+        plan: &RootBindingPlan,
+    ) -> Option<MediaResolutionProposal> {
+        let mut transition = self
+            .transition
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let current = runtime.snapshot();
+        let generation = next_observation_generation(
+            &mut transition,
+            current.as_ref().map(|current| current.generation),
+        );
+        let proposal = MediaResolutionProposal {
+            generation,
+            observations: bindings
+                .iter()
+                .map(|binding| self.resolver.observe_in_plan(plan, binding))
+                .collect(),
+        };
+        if current
+            .as_ref()
+            .is_some_and(|current| current.observations == proposal.observations)
+        {
+            transition.pending = None;
+            return None;
+        }
+        let stable = transition
+            .pending
+            .as_ref()
+            .is_some_and(|pending| pending.observations == proposal.observations);
+        transition.pending = Some(proposal.clone());
+        stable.then_some(proposal)
+    }
+
+    pub(crate) fn commit_prepared(
+        &self,
+        runtime: &MediaRuntime,
+        mut proposal: MediaResolutionProposal,
+        bindings: &[MediaBinding],
+        plan: &RootBindingPlan,
+        readable_photos: &[String],
+    ) -> MediaMonitorPoll {
+        let mut transition = self
+            .transition
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let current = runtime.snapshot();
+        if current
+            .as_ref()
+            .is_some_and(|current| current.generation >= proposal.generation)
+        {
+            return MediaMonitorPoll {
+                confirmed_observation: current,
+                update: None,
+            };
+        }
+        let previous = current
+            .as_ref()
+            .map(|current| current.observations.as_slice())
+            .unwrap_or_default();
+        for observation in &mut proposal.observations {
+            let old = previous
+                .iter()
+                .find(|old| old.media_id == observation.media_id);
+            if old == Some(observation) {
+                continue;
+            }
+            if observation.availability == MediaAvailability::Candidate {
+                let source_unchanged = bindings
+                    .iter()
+                    .find(|binding| binding.media_id == observation.media_id)
+                    .is_some_and(|binding| {
+                        observation.same_source(&self.resolver.observe_in_plan(plan, binding))
+                    });
+                let readable = observation.kind != MediaKind::Photo
+                    || readable_photos.contains(&observation.media_id);
+                if !source_unchanged || !readable {
+                    if let Some(old) = old {
+                        *observation = old.clone();
+                    } else {
+                        observation.availability = MediaAvailability::Unavailable;
+                    }
+                }
+            }
+        }
+        transition.pending = None;
+        let update = runtime.apply(proposal);
+        MediaMonitorPoll {
+            confirmed_observation: runtime.snapshot(),
+            update: Some(update),
+        }
+    }
+
     /// Image preparation or startup cache recovery already owns source evidence.
     /// Adopt only evidence whose
     /// exact binding and current source still match, without stabilizing the
@@ -872,19 +1029,7 @@ impl MediaMonitor {
         }
     }
 
-    /// Stabilization is owned here; foreground callers only supply the frozen
-    /// path plan and consume updates. Import evidence uses the explicit path above.
-    pub(crate) fn synchronize_processing(
-        &self,
-        runtime: &MediaRuntime,
-        bindings: &[MediaBinding],
-        plan: &RootBindingPlan,
-    ) -> Vec<MediaMonitorPoll> {
-        (0..2)
-            .map(|_| self.poll_in_plan(runtime, bindings, plan))
-            .collect()
-    }
-
+    #[cfg(test)]
     pub(crate) fn poll_in_plan(
         &self,
         runtime: &MediaRuntime,
@@ -900,6 +1045,7 @@ impl MediaMonitor {
         })
     }
 
+    #[cfg(test)]
     pub(crate) fn retry_unavailable(
         &self,
         runtime: &MediaRuntime,
@@ -959,6 +1105,7 @@ impl MediaMonitor {
         })
     }
 
+    #[cfg(test)]
     fn poll_with_observation(
         &self,
         runtime: &MediaRuntime,
@@ -1033,6 +1180,102 @@ fn file_time_millis(time: std::io::Result<SystemTime>) -> Option<u64> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn prepared_retry_confirms_only_its_occurrence_after_image_inspection() {
+        use myalbuns_paths::OperationPathContext;
+        let root = tempfile::tempdir().unwrap();
+        let bindings = ["selected", "other"].map(|id| MediaBinding {
+            media_id: id.into(),
+            kind: MediaKind::Photo,
+            logical_path: root.path().join(format!("{id}.jpg")),
+        });
+        for binding in &bindings {
+            RgbImage::from_pixel(20, 10, Rgb([30, 80, 120]))
+                .save_with_format(&binding.logical_path, ImageFormat::Jpeg)
+                .unwrap();
+        }
+        let runtime = MediaRuntime::default();
+        let mut prior = MediaResolver.observe(1, &bindings);
+        prior.observations[0].availability = MediaAvailability::Unavailable;
+        runtime.apply(prior.clone());
+        std::fs::write(&bindings[1].logical_path, b"another changed Original").unwrap();
+        let mut context = OperationPathContext::new();
+        context.capture(&bindings[0].logical_path).unwrap();
+        let roots = context.freeze();
+        let monitor = MediaMonitor::default();
+        let prepared = monitor
+            .prepare_retry_in_plan(&runtime, &bindings[0], &roots)
+            .unwrap();
+        assert_eq!(
+            runtime.snapshot(),
+            Some(prior.clone()),
+            "preparation cannot adopt uninspected bytes"
+        );
+        MediaResolver
+            .inspect_photo_binding_in_plan(&bindings[0], &roots)
+            .unwrap();
+        let poll = monitor.commit_prepared(
+            &runtime,
+            prepared,
+            &bindings[..1],
+            &roots,
+            &["selected".into()],
+        );
+        assert_eq!(poll.update().unwrap().changed_media_ids(), ["selected"]);
+        assert_eq!(
+            runtime.snapshot().unwrap().observations[1],
+            prior.observations[1]
+        );
+        assert_eq!(
+            monitor.prepare_retry_in_plan(&runtime, &bindings[0], &roots),
+            Err(MediaRetryError::NotUnavailable)
+        );
+    }
+
+    #[test]
+    fn prepared_confirmation_rejects_replaced_source_and_older_generation() {
+        use myalbuns_paths::OperationPathContext;
+        let root = tempfile::tempdir().unwrap();
+        let binding = MediaBinding {
+            media_id: "photo".into(),
+            kind: MediaKind::Photo,
+            logical_path: root.path().join("photo.jpg"),
+        };
+        let bindings = std::slice::from_ref(&binding);
+        let write = |width| {
+            RgbImage::from_pixel(width, 10, Rgb([30, 80, 120]))
+                .save_with_format(&binding.logical_path, ImageFormat::Jpeg)
+                .unwrap()
+        };
+        write(20);
+        let runtime = MediaRuntime::default();
+        runtime.apply(MediaResolver.observe(1, bindings));
+        let before = runtime.snapshot().unwrap().observations;
+        let monitor = MediaMonitor::default();
+        let mut context = OperationPathContext::new();
+        context.capture(&binding.logical_path).unwrap();
+        let roots = context.freeze();
+        write(60);
+        monitor.prepare_in_plan(&runtime, bindings, &roots);
+        let older = monitor.prepare_in_plan(&runtime, bindings, &roots).unwrap();
+        MediaResolver
+            .inspect_photo_binding_in_plan(&binding, &roots)
+            .unwrap();
+        write(120);
+        monitor.commit_prepared(&runtime, older.clone(), bindings, &roots, &["photo".into()]);
+        assert_eq!(runtime.snapshot().unwrap().observations, before);
+        monitor.prepare_in_plan(&runtime, bindings, &roots);
+        let newer = monitor.prepare_in_plan(&runtime, bindings, &roots).unwrap();
+        MediaResolver
+            .inspect_photo_binding_in_plan(&binding, &roots)
+            .unwrap();
+        monitor.commit_prepared(&runtime, newer, bindings, &roots, &["photo".into()]);
+        let committed = runtime.snapshot();
+        let stale = monitor.commit_prepared(&runtime, older, bindings, &roots, &["photo".into()]);
+        assert!(stale.update().is_none());
+        assert_eq!(runtime.snapshot(), committed);
+    }
+
     #[test]
     fn import_adoption_requires_current_evidence_and_leaves_other_bindings_untouched() {
         use myalbuns_paths::OperationPathContext;
