@@ -1,10 +1,12 @@
-import { Assets, type Texture } from "pixi.js";
+import { Assets, Texture } from "pixi.js";
+import { loadedMediaPreviewImage } from "../application/mediaPreviewImages";
 
 interface TextureEntry {
   desired: boolean;
   failed: boolean;
   operation: Promise<void> | null;
   texture?: Texture;
+  ownsTexture?: boolean;
 }
 
 export class ViewportTexturePool {
@@ -60,6 +62,15 @@ export class ViewportTexturePool {
       return;
     }
     if (entry.desired && !entry.texture && !entry.failed) {
+      const image = loadedMediaPreviewImage(url);
+      if (image && isRasterCacheImage(image.currentSrc)) {
+        // The panel has already loaded this Cache image. Materialize it in the
+        // same update as the Frame, without a second asynchronous Assets load.
+        entry.texture = Texture.from(image, true);
+        entry.ownsTexture = true;
+        this.onLoad(url);
+        return;
+      }
       entry.operation = Assets.load<Texture>(url)
         .then((texture) => {
           entry.texture = texture;
@@ -82,6 +93,11 @@ export class ViewportTexturePool {
       return;
     }
     if (!entry.desired && entry.texture) {
+      if (entry.ownsTexture) {
+        entry.texture.destroy(true);
+        this.entries.delete(url);
+        return;
+      }
       entry.texture = undefined;
       entry.operation = Assets.unload(url)
         .catch(() => {
@@ -93,4 +109,11 @@ export class ViewportTexturePool {
         });
     }
   }
+}
+
+function isRasterCacheImage(url: string) {
+  // Cache artifacts are PNG/JPEG. SVG DOM images can be rasterized by the
+  // browser at thumbnail size, so they must keep Pixi's dedicated SVG loader.
+  if (url.startsWith("data:")) return /^data:image\/(?:png|jpeg)[;,]/i.test(url);
+  return /\.(?:png|jpe?g)$/i.test(new URL(url).pathname);
 }

@@ -127,6 +127,13 @@ A captura `npm run ui:acceptance` também usa navegador sem janela. Selecione
 somente os estados afetados com `MYALBUNS_UI_SCENARIO_IDS`; a aprovação visual
 continua dependendo da revisão das capturas.
 
+`npm run test:photo-placement` verifica a inserção sucessiva de doze Fotos PNG/JPEG com
+miniaturas já carregadas, usando o Canvas real em navegador sem janela. O teste
+compara os pixels do primeiro desenho de cada Foto com os pixels estabilizados,
+para detectar a aparição transitória do fundo provisório, e também confere a
+rasterização das imagens SVG usadas nas fixtures. Captura e resultados
+ficam em `.scratch/ui-acceptance/photo-placement/`.
+
 Os testes com janelas ficam separados. O workflow **Validation** executa a
 validação sem janelas automaticamente nas PRs. O piloto nativo de Cópia externa
 fica disponível para execução manual, informando em `native_runner` o rótulo de

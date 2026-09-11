@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -472,7 +473,9 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
     return () => observer.disconnect();
   }, [hasSheets]);
 
-  useEffect(() => {
+  // Materialize the committed Canvas before paint and before passive thumbnail
+  // cleanup (e.g. an applied photo disappearing from the unused-media filter).
+  useLayoutEffect(() => {
     const scene = sceneRef.current;
     const host = hostRef.current;
     if (!ready || !scene || !host) return;
