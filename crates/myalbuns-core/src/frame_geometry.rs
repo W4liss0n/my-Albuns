@@ -242,11 +242,8 @@ fn edited_rect(
                 let y_scale = height / y_axis.original_size;
                 // The larger proportional pointer displacement determines the
                 // corner's scale; both axes then stop together at the first limit.
-                let scale = if (x_scale - 1.0).abs() >= (y_scale - 1.0).abs() {
-                    x_scale
-                } else {
-                    y_scale
-                };
+                let scales = [x_scale, y_scale];
+                let scale = scales[dominant_resize_axis(scales)];
                 let minimum = (x_axis.minimum / x_axis.original_size)
                     .max(y_axis.minimum / y_axis.original_size);
                 let maximum = (x_axis.maximum / x_axis.original_size)
@@ -281,13 +278,7 @@ impl ResizeAxis {
         direction: i8,
         from_center: bool,
     ) -> Self {
-        let anchor_ratio = if from_center {
-            0.5
-        } else if direction < 0 {
-            1.0
-        } else {
-            0.0
-        };
+        let anchor_ratio = resize_anchor_ratio(direction, from_center);
         let anchor = start as f64 + size as f64 * anchor_ratio;
         let maximum = if direction == 0 {
             size as f64
@@ -302,7 +293,7 @@ impl ResizeAxis {
             original_size: size as f64,
             anchor,
             anchor_ratio,
-            delta_multiplier: f64::from(direction) * if from_center { 2.0 } else { 1.0 },
+            delta_multiplier: resize_delta_multiplier(direction, from_center),
             minimum: if direction == 0 { size } else { minimum_size } as f64,
             maximum,
             limit,
@@ -324,6 +315,26 @@ impl ResizeAxis {
 
 fn moved_coordinate(start: u64, delta: i64, maximum: u64) -> u64 {
     (i128::from(start) + i128::from(delta)).clamp(0, i128::from(maximum)) as u64
+}
+
+// Geometry owns modifier interpretation for both free transforms and the snap
+// solver's analytical pointer corrections.
+pub(crate) fn resize_anchor_ratio(direction: i8, from_center: bool) -> f64 {
+    if from_center {
+        0.5
+    } else if direction < 0 {
+        1.0
+    } else {
+        0.0
+    }
+}
+
+pub(crate) fn resize_delta_multiplier(direction: i8, from_center: bool) -> f64 {
+    f64::from(direction) * if from_center { 2.0 } else { 1.0 }
+}
+
+pub(crate) fn dominant_resize_axis(scales: [f64; 2]) -> usize {
+    usize::from((scales[1] - 1.0).abs() > (scales[0] - 1.0).abs())
 }
 
 impl From<ProjectRect> for RectUm {

@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
+use crate::frame_geometry::{dominant_resize_axis, resize_anchor_ratio, resize_delta_multiplier};
 use crate::{ActiveSides, ComposedFrame, FrameGeometryGesture, ProjectRect};
 
 mod spacing;
@@ -135,8 +136,7 @@ pub(crate) fn resolve(
                 } else {
                     reference.height()
                 } as f64;
-                let delta =
-                    (value - motion.size(axis)) / (motion.directions[axis] * motion.multiplier);
+                let delta = (value - motion.size(axis)) / motion.multipliers[axis];
                 candidates.push(Candidate {
                     id: format!("d:{axis}:{value}"),
                     axis,
@@ -415,15 +415,14 @@ struct Motion {
     original: ProjectRect,
     source: FrameGeometryGesture,
     delta: [f64; 2],
-    directions: [f64; 2],
+    multipliers: [f64; 2],
     anchors: [f64; 2],
-    multiplier: f64,
     proportional: bool,
 }
 
 impl Motion {
     fn new(original: ProjectRect, source: &FrameGeometryGesture) -> Self {
-        let (delta, directions, anchors, multiplier, proportional) = match *source {
+        let (delta, multipliers, anchors, proportional) = match *source {
             FrameGeometryGesture::Move {
                 delta_x_um,
                 delta_y_um,
@@ -431,7 +430,6 @@ impl Motion {
                 [delta_x_um as f64, delta_y_um as f64],
                 [1.0; 2],
                 [0.0; 2],
-                1.0,
                 false,
             ),
             FrameGeometryGesture::Resize {
@@ -442,20 +440,16 @@ impl Motion {
                 from_center,
             } => {
                 let (x, y) = handle.axes();
-                let anchor = |direction| {
-                    if from_center {
-                        0.5
-                    } else if direction < 0 {
-                        1.0
-                    } else {
-                        0.0
-                    }
-                };
                 (
                     [delta_x_um as f64, delta_y_um as f64],
-                    [f64::from(x), f64::from(y)],
-                    [anchor(x), anchor(y)],
-                    if from_center { 2.0 } else { 1.0 },
+                    [
+                        resize_delta_multiplier(x, from_center),
+                        resize_delta_multiplier(y, from_center),
+                    ],
+                    [
+                        resize_anchor_ratio(x, from_center),
+                        resize_anchor_ratio(y, from_center),
+                    ],
                     preserve_aspect_ratio && x != 0 && y != 0,
                 )
             }
@@ -464,20 +458,19 @@ impl Motion {
             original,
             source: source.clone(),
             delta,
-            directions,
+            multipliers,
             anchors,
-            multiplier,
             proportional,
         }
     }
     fn controls(&self, axis: usize) -> bool {
-        self.directions[axis] != 0.0
+        self.multipliers[axis] != 0.0
     }
     fn coefficient(&self, axis: usize, factor: f64) -> f64 {
         if matches!(self.source, FrameGeometryGesture::Move { .. }) {
             1.0
         } else {
-            (factor - self.anchors[axis]) * self.directions[axis] * self.multiplier
+            (factor - self.anchors[axis]) * self.multipliers[axis]
         }
     }
     fn size(&self, axis: usize) -> f64 {
@@ -491,8 +484,8 @@ impl Motion {
         delta[axis] = value;
         if self.proportional {
             let other = 1 - axis;
-            let growth = value * self.directions[axis] * self.multiplier / self.size(axis);
-            delta[other] = growth * self.size(other) / (self.directions[other] * self.multiplier);
+            let growth = value * self.multipliers[axis] / self.size(axis);
+            delta[other] = growth * self.size(other) / self.multipliers[other];
         }
         delta
     }
@@ -500,10 +493,10 @@ impl Motion {
         if !self.proportional {
             return (value - self.delta[axis]).abs() / units[axis];
         }
-        let growth = [0, 1].map(|index| {
-            self.delta[index] * self.directions[index] * self.multiplier / self.size(index)
+        let scales = [0, 1].map(|index| {
+            (self.size(index) + self.delta[index] * self.multipliers[index]) / self.size(index)
         });
-        let dominant = usize::from(growth[1].abs() > growth[0].abs());
+        let dominant = dominant_resize_axis(scales);
         let free = self.corrected(self.delta, dominant, self.delta[dominant]);
         let corrected = self.corrected(self.delta, axis, value);
         ((corrected[0] - free[0]) / units[0]).hypot((corrected[1] - free[1]) / units[1])

@@ -2597,7 +2597,7 @@ test("projects the pending Unidade across the Project Window without changing Al
   ).toHaveTextContent("0.1 pol");
   expect(
     design.getByText("Espaço entre Frames").closest("label"),
-  ).toHaveTextContent("0.236 pol");
+  ).toHaveTextContent("0.197 pol");
   expect(designApply).toBeDisabled();
   expect(screen.getByText("salvo")).toBeVisible();
   expect(apply).not.toHaveBeenCalled();
@@ -2608,7 +2608,7 @@ test("projects the pending Unidade across the Project Window without changing Al
   expect(await screen.findByText("300×300 mm · 1 Lâmina")).toBeVisible();
   expect(
     design.getByText("Espaço entre Frames").closest("label"),
-  ).toHaveTextContent("6 mm");
+  ).toHaveTextContent("5 mm");
   expect(designApply).toBeDisabled();
 
   fireEvent.click(
@@ -2883,7 +2883,7 @@ test("edits and applies the complete Album design draft as one intent", async ()
 
   await waitFor(() =>
     expect(apply).toHaveBeenCalledWith({
-      kind: "setVisualDefaults",
+      kind: "setAlbumDesign", frameGapUm: 5_000,
       visualDefaults: {
         background: {
           scope: "perSide",
@@ -3513,7 +3513,7 @@ test("maps Borda zero to none and a positive value back to solid", async () => {
   fireEvent.click(applyDesign);
   await waitFor(() =>
     expect(apply).toHaveBeenLastCalledWith({
-      kind: "setVisualDefaults",
+      kind: "setAlbumDesign", frameGapUm: 5_000,
       visualDefaults: {
         ...projectionWithBorder.state.album.visualDefaults,
         frameBorder: { kind: "none" },
@@ -3537,7 +3537,7 @@ test("maps Borda zero to none and a positive value back to solid", async () => {
   fireEvent.click(applyDesign);
   await waitFor(() =>
     expect(apply).toHaveBeenLastCalledWith({
-      kind: "setVisualDefaults",
+      kind: "setAlbumDesign", frameGapUm: 5_000,
       visualDefaults: {
         ...projectionWithBorder.state.album.visualDefaults,
         frameBorder: {
@@ -3550,7 +3550,7 @@ test("maps Borda zero to none and a positive value back to solid", async () => {
   );
 });
 
-test("keeps Espaço entre Frames as a preview-only placeholder", () => {
+test("previews the pending gap and confirms it with Album Design Apply", async () => {
   const apply = vi.fn<ProjectSessionPort["apply"]>(async () => projection);
   render(
     <ProjectWorkspace
@@ -3570,18 +3570,20 @@ test("keeps Espaço entre Frames as a preview-only placeholder", () => {
   const initialSecondFrameX = Number(secondFrame.getAttribute("x"));
   const applyDesign = design.getByRole("button", { name: "Aplicar" });
 
-  expect(gap.closest("label")).toHaveAttribute(
-    "data-placeholder-feature",
-    "album-design-frame-gap",
-  );
+  expect(gap).toHaveValue("5000");
   fireEvent.change(gap, { target: { value: "18000" } });
 
   expect(design.getByText("18 mm")).toBeVisible();
   expect(Number(secondFrame.getAttribute("x"))).toBeGreaterThan(
     initialSecondFrameX,
   );
-  expect(applyDesign).toBeDisabled();
+  expect(applyDesign).toBeEnabled();
   expect(apply).not.toHaveBeenCalled();
+  fireEvent.click(applyDesign);
+  await waitFor(() => expect(apply).toHaveBeenCalledWith({
+    kind: "setAlbumDesign", frameGapUm: 18_000,
+    visualDefaults: projection.state.album.visualDefaults,
+  }, expect.any(Function)));
 });
 
 test("coordinates Decorative popups, placeholder import and focus restoration", async () => {
@@ -4517,7 +4519,7 @@ test("materializes an Album Design draft over the projection produced by a pendi
 
   await waitFor(() =>
     expect(apply).toHaveBeenCalledWith({
-      kind: "setVisualDefaults",
+      kind: "setAlbumDesign", frameGapUm: 5_000,
       visualDefaults: {
         background: {
           scope: "perSide",
@@ -4564,7 +4566,7 @@ test("applies an Album Design draft over its captured baseline when pending Undo
 
   await waitFor(() =>
     expect(apply).toHaveBeenCalledWith({
-      kind: "setVisualDefaults",
+      kind: "setAlbumDesign", frameGapUm: 5_000,
       visualDefaults: {
         background: {
           scope: "bothSides",
