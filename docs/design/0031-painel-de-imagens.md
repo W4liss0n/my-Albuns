@@ -126,9 +126,12 @@ a Página inteira à esquerda ou à direita, ou ambas as Páginas. A zona de
 ponteiro de 40%/20%/40% serve à escolha do escopo e não define esse contorno.
 Um traço azul de 2 pixels, com apoio branco para contraste, acompanha a área
 ativa visível e conserva sua espessura no Zoom. Nenhuma tonalidade é aplicada
-sobre a composição. A região central é indicada por pequenas marcas nas bordas
-superior e inferior, sem faixa preenchida nem linhas verticais sobre a imagem;
-essas marcas não aparecem em Página única.
+sobre a composição. Duas guias verticais tracejadas de 1 pixel delimitam a
+região central, com apoio branco para contraste sobre fotos claras ou escuras.
+Os traços e intervalos têm 5 pixels e começam a 8 pixels das bordas superior e
+inferior, conservando essas medidas no Zoom. As guias ficam mais visíveis ao
+atingir Ambos os lados, sem preencher a faixa nem desenhar colchetes;
+não aparecem em Página única.
 
 Durante o gesto, o foco da Lâmina, os indicadores de seleção dos Frames e a
 Barra ficam visualmente ocultos para deixar claro o destino do Decorativo.
@@ -177,4 +180,4 @@ Para a revisão do feedback, `find-docs` confirmou a API de
 `pixelLine` mantém um único pixel independentemente da escala; por isso o
 contorno de 2 pixels usa largura compensada pela escala do Canvas. Os tipos
 instalados de Graphics e StrokeStyle da versão 8.19.0 confirmam `clear`,
-`alignment` interno e `pixelLine` usado nas marcas centrais.
+`alignment` interno e `pixelLine` usado nas guias centrais.

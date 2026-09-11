@@ -10,10 +10,11 @@ export function createDecorativeDropFeedback(preview: DecorativeDropPreview, act
   container.eventMode = "none";
   const halo = new Graphics();
   const target = new Graphics();
+  const centerHalo = new Graphics();
   const center = new Graphics();
   target.label = `decorative-drop-target-${preview.sheet.sheetId}`;
   center.label = `decorative-drop-center-${preview.sheet.sheetId}`;
-  container.addChild(halo, target, center);
+  container.addChild(halo, target, centerHalo, center);
 
   const bounds = { ...activeBounds };
   if (preview.sheet.activeSides === "both" && preview.scope !== "bothSides") {
@@ -32,16 +33,22 @@ export function createDecorativeDropFeedback(preview: DecorativeDropPreview, act
         outline.clear().rect(bounds.x, bounds.y, bounds.width, bounds.height)
           .stroke({ color: strokeColor, width: width / scale, alignment: 1 });
       }
-      center.clear();
-      if (preview.centerRect) {
+      for (const guide of [centerHalo, center]) {
+        guide.clear();
+        if (!preview.centerRect) continue;
         const left = preview.centerRect.x * MICROMETER_TO_CANVAS_PIXEL;
         const right = (preview.centerRect.x + preview.centerRect.width) * MICROMETER_TO_CANVAS_PIXEL;
         const top = bounds.y + 8 / scale;
         const bottom = bounds.y + bounds.height - 8 / scale;
-        const tick = 6 / scale;
-        center.moveTo(left, top + tick).lineTo(left, top).lineTo(right, top).lineTo(right, top + tick)
-          .moveTo(left, bottom - tick).lineTo(left, bottom).lineTo(right, bottom).lineTo(right, bottom - tick)
-          .stroke({ color, alpha: preview.scope === "bothSides" ? 0.8 : 0.45, pixelLine: true });
+        const dash = 5 / scale;
+        for (const x of [left, right]) {
+          for (let y = top; y < bottom; y += dash * 2) {
+            guide.moveTo(x, y).lineTo(x, Math.min(y + dash, bottom));
+          }
+        }
+        guide.stroke(guide === centerHalo
+          ? { color: 0xffffff, alpha: 0.8, width: 3 / scale }
+          : { color, alpha: preview.scope === "bothSides" ? 0.9 : 0.6, pixelLine: true });
       }
     },
   };
