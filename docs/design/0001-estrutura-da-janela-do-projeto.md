@@ -32,6 +32,9 @@ superfícies visíveis ficaram ocultas. Ao restaurá-la, reapresenta essas mesma
 superfícies, preservando a Sessão, o Histórico e a seleção, sem recarregar a
 página. WebViews que já estavam ocultas por outro fluxo permanecem ocultas.
 Essa sincronização também se aplica à Tela de Boas-vindas e às janelas de diálogo.
+Antes de reapresentar a superfície, o host atualiza seu tamanho para a área
+interna restaurada da janela; o tamanho residual da minimização não deve aparecer
+como um quadro intermediário nem reorganizar menus e painéis durante o retorno.
 
 ## Diálogos pertencentes a uma janela
 
