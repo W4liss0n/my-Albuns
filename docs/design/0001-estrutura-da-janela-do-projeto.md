@@ -35,6 +35,8 @@ Essa sincronização também se aplica à Tela de Boas-vindas e às janelas de d
 Antes de reapresentar a superfície, o host atualiza seu tamanho para a área
 interna restaurada da janela; o tamanho residual da minimização não deve aparecer
 como um quadro intermediário nem reorganizar menus e painéis durante o retorno.
+Enquanto a janela está minimizada, a superfície conserva o último tamanho completo;
+o redimensionamento automático acompanha novamente a janela ao restaurá-la.
 
 ## Diálogos pertencentes a uma janela
 

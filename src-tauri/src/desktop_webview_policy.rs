@@ -74,9 +74,49 @@ pub(crate) fn on_window_event(window: &tauri::Window, event: &tauri::WindowEvent
 #[cfg(windows)]
 fn synchronize_webview_visibility(webview: &tauri::Webview) {
     let window = webview.window();
+    let synchronize = || -> Result<(), Box<dyn std::error::Error>> {
+        let pending_restore = || -> Result<bool, std::io::Error> {
+            let state = window.state::<WindowWebviewVisibility>();
+            let windows = state.minimized.lock().map_err(|_| {
+                std::io::Error::other("the WebView visibility state became unavailable")
+            })?;
+            Ok(windows
+                .get(window.label())
+                .is_some_and(|state| state.restore.contains_key(webview.label())))
+        };
+        let minimized = window.is_minimized()?;
+        if !minimized && pending_restore()? {
+            // Desktop surfaces fill their parent, including replacement children.
+            // Restore the current client size before enabling proportional resize.
+            webview.set_size(window.inner_size()?)?;
+            webview.set_auto_resize(true)?;
+        }
+
+        synchronize_native_visibility(webview);
+
+        if minimized && pending_restore()? {
+            // Tauri also autoresizes child WebViews to the minimized Windows
+            // client size (144x19). Keep the last complete viewport while hidden.
+            webview.set_auto_resize(false)?;
+        }
+        Ok(())
+    };
+    if let Err(error) = synchronize() {
+        tracing::warn!(
+            target: "myalbuns.desktop",
+            window_label = window.label(),
+            webview_label = webview.label(),
+            error = %error,
+            event = "webview_visibility_sync_failed",
+        );
+    }
+}
+
+#[cfg(windows)]
+fn synchronize_native_visibility(webview: &tauri::Webview) {
+    let window = webview.window();
     let app = webview.app_handle().clone();
     let label = webview.label().to_owned();
-    let restore_webview = webview.clone();
     let result = webview.with_webview(move |native| {
         let synchronize = || -> Result<(), Box<dyn std::error::Error>> {
             let is_minimized = window.is_minimized()?;
@@ -87,15 +127,8 @@ fn synchronize_webview_visibility(webview: &tauri::Webview) {
             let minimized = windows.entry(window.label().to_owned()).or_default();
             let controller = native.controller();
             let controller_id = controller.as_raw() as usize;
-            if !is_minimized && minimized.restore.get(&label) == Some(&controller_id) {
-                // Tauri's child-WebView autoresize also applies the minimized
-                // Windows client size (144x19). Its restore resize runs after
-                // this callback, so exposing the controller here would briefly
-                // present that collapsed viewport. Desktop surfaces, including
-                // replacement children, fill their window: restore that size
-                // before making the same controller visible again.
-                restore_webview.set_size(window.inner_size()?)?;
-            }
+            // with_webview holds Tauri's WebView dispatcher lock. Call only
+            // native controller methods here; Webview setters would deadlock.
             minimized.synchronize(
                 &label,
                 controller_id,

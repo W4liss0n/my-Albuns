@@ -13,6 +13,7 @@ src-tauri/binaries/*.exe
 .scratch/productive-journey-evidence/
 .scratch/focused-owned-dialog-evidence/
 .scratch/project-close-evidence/
+.scratch/webview-restore-gate/
 benchmark-data/albums/*
 !benchmark-data/albums/README.md
 *.log
