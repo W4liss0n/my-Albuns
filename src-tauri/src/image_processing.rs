@@ -316,7 +316,8 @@ impl<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> ImageProcessingBatc
                 if self.operation_problem.is_none() {
                     self.operation_problem = Some(reason);
                 }
-                None
+                self.publish_progress(None);
+                return;
             }
             Err(ProcessingFailure::File(reason)) => {
                 Some(crate::ipc_contract::ImageProcessingProblem {
@@ -781,6 +782,14 @@ mod tests {
             }
             batch.prepare_with(&binding, async { Ok(()) }).await;
             assert!(events.iter().all(|event| event.problem.is_none()));
+            assert_eq!(
+                events
+                    .iter()
+                    .map(|event| event.completed_files)
+                    .collect::<Vec<_>>(),
+                [0, 0, 0, 1],
+                "resource interruption must not complete unprocessed Originals"
+            );
             assert_eq!(
                 events.last().unwrap().operation_problem.as_deref(),
                 Some(
