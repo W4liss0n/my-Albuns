@@ -150,6 +150,12 @@ Execução local com janelas exige combinar o uso da área de trabalho e acresce
 `-AllowVisibleWindows`. A [política de validação](docs/agents/native-ui-gates.md)
 detalha os limites de cada prova e a jornada legada ainda pendente.
 
+Para verificar a restauração da WebView em uma execução local autorizada, use
+`npm run test:native-webview-restore -- -AllowVisibleWindows`. O teste abre sua
+própria janela descartável, verifica a resposta da janela e da interface após
+três ciclos de minimizar/restaurar e confere o tamanho no retorno e no
+redimensionamento seguinte. Os registros ficam em `.scratch/webview-restore-gate/`.
+
 
 Para investigar apenas o fechamento após Salvar como, use
 `npm run test:native-project-close` no ambiente reservado. O cenário altera e

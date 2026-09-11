@@ -72,6 +72,19 @@ until their hosted behavior is verified. Win32 probe fixtures are opt-in with
 `MYALBUNS_NATIVE_PROBE_TESTS=1`, only in that isolated native environment or during
 an explicitly authorized local native run.
 
+## WebView restore regression probe
+
+`npm run test:native-webview-restore -- -AllowVisibleWindows` builds a disposable
+native window using the production WebView policy and repeats minimize/restore.
+It requires the same explicit authorization for a local visible run. The probe
+uses an isolated WebView profile and never opens a user Project. It detects a
+blocked native event loop or renderer with bounded timeouts, verifies the viewport
+at each visible transition, and retains its logs under `.scratch/webview-restore-gate/`.
+The command always builds the probe from the current source before running it.
+
+This diagnostic probe exercises the Tauri/WebView2 synchronization seam. Full
+Project acceptance still requires the prepared application and its own scenarios.
+
 ## Focused saved-Project close
 
 `npm run test:native-project-close` selects only `saved-original-close`.
