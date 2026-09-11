@@ -56,7 +56,6 @@ pub(crate) async fn apply_project_intent(
     on_progress: tauri::ipc::Channel<crate::ipc_contract::ImageProcessingProgress>,
 ) -> Result<ProjectMutationOutcome, String> {
     let previous_bindings = state.authorized_media_catalog()?.bindings;
-    let previous = state.projection()?;
     let intent_kind = match &intent {
         ProjectIntent::RemoveMedia { .. } => "remove_media",
         ProjectIntent::ApplyDecorative { .. } => "apply_decorative",
@@ -110,15 +109,9 @@ pub(crate) async fn apply_project_intent(
         intent = intent_kind,
         event = "project_intent_applied",
     );
-    prepare_changed_images(
-        &app,
-        &previous_bindings,
-        &previous,
-        &outcome.projection,
-        |progress| {
-            let _ = on_progress.send(progress);
-        },
-    )
+    prepare_changed_images(&app, &previous_bindings, |progress| {
+        let _ = on_progress.send(progress);
+    })
     .await?;
     outcome.projection = state.projection()?;
     Ok(outcome)
@@ -512,17 +505,10 @@ pub(crate) async fn undo_project(
     on_progress: tauri::ipc::Channel<crate::ipc_contract::ImageProcessingProgress>,
 ) -> Result<EditorProjection, String> {
     let previous_bindings = state.authorized_media_catalog()?.bindings;
-    let previous = state.projection()?;
     let projection = state.undo()?;
-    prepare_changed_images(
-        &app,
-        &previous_bindings,
-        &previous,
-        &projection,
-        |progress| {
-            let _ = on_progress.send(progress);
-        },
-    )
+    prepare_changed_images(&app, &previous_bindings, |progress| {
+        let _ = on_progress.send(progress);
+    })
     .await?;
     tracing::info!(
         target: "myalbuns.desktop",
@@ -543,17 +529,10 @@ pub(crate) async fn redo_project(
     on_progress: tauri::ipc::Channel<crate::ipc_contract::ImageProcessingProgress>,
 ) -> Result<EditorProjection, String> {
     let previous_bindings = state.authorized_media_catalog()?.bindings;
-    let previous = state.projection()?;
     let projection = state.redo()?;
-    prepare_changed_images(
-        &app,
-        &previous_bindings,
-        &previous,
-        &projection,
-        |progress| {
-            let _ = on_progress.send(progress);
-        },
-    )
+    prepare_changed_images(&app, &previous_bindings, |progress| {
+        let _ = on_progress.send(progress);
+    })
     .await?;
     tracing::info!(
         target: "myalbuns.desktop",
