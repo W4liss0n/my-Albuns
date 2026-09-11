@@ -833,6 +833,43 @@ function renderPanel() {
   );
 }
 
+test("Photoshop opens only one contextual Photo and never a multi-selection or Decorative", () => {
+  const open = vi.fn();
+  render(<MediaPanel {...mediaPanelInteractions} mediaItems={mediaItems} mediaUsage={mediaUsage}
+    onFillPhoto={vi.fn()} previewSource={{ kind: "static" }} preferences={{ kind: "local" }}
+    photoshopAvailable onOpenInPhotoshop={open} />);
+  const photo = screen.getByRole("button", { name: /Retrato/ });
+  fireEvent.click(photo);
+  fireEvent.keyDown(photo, { key: "e", ctrlKey: true });
+  expect(open).toHaveBeenCalledExactlyOnceWith("photo-retrato");
+  fireEvent.keyDown(photo, { key: "e", ctrlKey: true, repeat: true });
+  expect(open).toHaveBeenCalledTimes(1);
+  fireEvent.click(screen.getByRole("button", { name: /Álbum 10/ }), { ctrlKey: true });
+  fireEvent.contextMenu(photo);
+  expect(screen.getByRole("menuitem", { name: /Abrir no Photoshop/ })).toBeDisabled();
+  fireEvent.keyDown(photo, { key: "e", ctrlKey: true });
+  expect(open).toHaveBeenCalledTimes(1);
+  fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
+  const decorative = screen.getByRole("button", { name: /Overlay dourado/ });
+  fireEvent.click(decorative);
+  fireEvent.keyDown(decorative, { key: "e", ctrlKey: true });
+  fireEvent.contextMenu(decorative);
+  expect(screen.queryByRole("menuitem", { name: /Abrir no Photoshop/ })).not.toBeInTheDocument();
+  expect(open).toHaveBeenCalledTimes(1);
+});
+
+test("an unavailable Photoshop disables its Photo menu without blocking other actions", () => {
+  const open = vi.fn();
+  render(<MediaPanel {...mediaPanelInteractions} mediaItems={mediaItems} mediaUsage={mediaUsage}
+    onFillPhoto={vi.fn()} previewSource={{ kind: "static" }} preferences={{ kind: "local" }}
+    photoshopAvailable={false} onOpenInPhotoshop={open} />);
+  const photo = screen.getByRole("button", { name: /Retrato/ });
+  fireEvent.contextMenu(photo);
+  expect(screen.getByRole("menuitem", { name: /Abrir no Photoshop/ })).toBeDisabled();
+  fireEvent.keyDown(photo, { key: "e", ctrlKey: true });
+  expect(open).not.toHaveBeenCalled();
+});
+
 function PersistentMediaPanel(props: Omit<ComponentProps<typeof MediaPanel>, "preferences"> & {
   preferences: Omit<Extract<ComponentProps<typeof MediaPanel>["preferences"], { kind: "controlled" }>, "activeKind" | "onActiveKindChange">;
 }) {

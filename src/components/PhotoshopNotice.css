@@ -1,0 +1,2 @@
+.photoshop-operation-notice { position: absolute; z-index: 20; top: 78px; right: 24px; width: min(420px, calc(100% - 48px)); }
+.photoshop-operation-notice button { margin-top: 8px; margin-right: 12px; }

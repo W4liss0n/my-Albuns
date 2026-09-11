@@ -46,6 +46,7 @@ import "./components/StartupSurface.css";
 import "./App.css";
 
 type AppProps = {
+  photoshopPort?: import("./application/photoshop").PhotoshopPort;
   exportPipelinePort: ExportPipelinePort;
   mediaPreviewPort: MediaPreviewPort;
   mediaDropPort?: MediaDropPort;
@@ -80,6 +81,7 @@ interface ImportPresentation {
 }
 
 function App({
+  photoshopPort,
   exportPipelinePort,
   mediaPreviewPort,
   mediaDropPort,
@@ -685,6 +687,7 @@ function App({
         probe={canvasGraphicsDiagnosticProbe}
       >
         <ProjectWorkspace
+          photoshopPort={photoshopPort}
           mediaDropPort={mediaDropPort}
           projection={projection}
           exportPipelinePort={exportPipelinePort}

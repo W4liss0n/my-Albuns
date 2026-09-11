@@ -17,6 +17,7 @@ import { tauriLogger } from "./platform/tauriLogger";
 import { tauriProjectWindowPort } from "./platform/tauriProjectWindowPort";
 import { tauriMediaDropPort } from "./platform/tauriMediaDropPort";
 import { tauriProjectDialogPort } from "./platform/tauriProjectDialogPort";
+import { tauriPhotoshopPort } from "./platform/tauriPhotoshopPort";
 import { tauriWindowControls } from "./platform/tauriWindowControls";
 import { WindowControlsProvider } from "./ui";
 
@@ -27,6 +28,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <WindowControlsProvider controls={tauriWindowControls}>
       <App
         exportPipelinePort={tauriExportPipelinePort}
+        photoshopPort={tauriPhotoshopPort}
         mediaPreviewPort={tauriMediaPreviewPort}
         mediaDropPort={tauriMediaDropPort}
         projectStartupPort={tauriProjectStartupPort}

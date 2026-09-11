@@ -37,6 +37,7 @@ import {
 } from "../ui";
 
 interface GlobalShellProps {
+  onOpenSettings?(): Promise<void>;
   failureDialogPort: ProjectFailureDialogPort;
   graphicsDiagnostic: GraphicsDiagnostic;
   newProjectPort: NewProjectPort;
@@ -47,12 +48,14 @@ const recentCoverVariants = [1, 2, 1, 3, 4, 1, 2] as const;
 const portraitCoverIndexes = new Set([1, 4, 6]);
 
 export function GlobalShell({
+  onOpenSettings,
   failureDialogPort,
   graphicsDiagnostic,
   newProjectPort,
   projectPort,
 }: GlobalShellProps) {
   const [isOpening, setIsOpening] = useState(false);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
   const [surface, setSurface] = useState<"welcome" | "newProject">(
     "welcome",
   );
@@ -222,7 +225,7 @@ export function GlobalShell({
   ]);
 
   if (!graphicsDiagnostic.supported) {
-    return <SafeApplicationShell diagnostic={graphicsDiagnostic} />;
+    return <SafeApplicationShell diagnostic={graphicsDiagnostic} onOpenSettings={onOpenSettings} />;
   }
 
   if (surface === "newProject") {
@@ -341,6 +344,11 @@ export function GlobalShell({
         </div>
         <div aria-hidden="true" className="global-action-divider" />
         <div className="global-secondary-actions">
+          <button type="button" disabled={isOpening || !onOpenSettings} onClick={() => {
+            setSettingsError(null);
+            void onOpenSettings?.().catch(() => setSettingsError("Não foi possível abrir Configurações. Tente novamente."));
+          }}>Configurações…</button>
+          {settingsError && <p role="alert">{settingsError}</p>}
           {/* PLACEHOLDER UI: ainda não existe uma porta de Exportação em lote. */}
           <button
             aria-label="Exportação em lote"

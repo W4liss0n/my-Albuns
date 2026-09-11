@@ -690,6 +690,22 @@ test("manual Frame creation is unavailable outside sheet editing", () => {
   expect(port.applyWithOutcome).not.toHaveBeenCalled();
 });
 
+test.each(["normal", "edit"])("opens the original of a single filled Frame in %s mode without a creative command", async (mode) => {
+  const apply = vi.fn(async () => projection);
+  const openPhoto = vi.fn(async () => undefined);
+  const photoshopPort = { status: vi.fn(async () => ({ revision: 1, installations: [], selectedInstallationId: "photoshop" })), openPhoto, openSettings: vi.fn(async () => undefined) };
+  useEditorView.setState({ editingSheetId: mode === "edit" ? "sheet-001" : null, selectedFrameIds: ["frame-001"] });
+  render(<ProjectWorkspace projection={projection} projectCorePort={projectCorePortWithApply(apply)}
+    photoshopPort={photoshopPort} onProjectionChange={vi.fn()} />);
+  await waitFor(() => expect(photoshopPort.status).toHaveBeenCalled());
+  act(() => canvasHarness.props?.onOpenFrameContextMenu?.("frame-001", { x: 320, y: 200 }));
+  const command = screen.getByRole("menuitem", { name: /Abrir no Photoshop/ });
+  await waitFor(() => expect(command).toBeEnabled());
+  fireEvent.click(command);
+  await waitFor(() => expect(openPhoto).toHaveBeenCalledExactlyOnceWith({ kind: "frames", frameIds: ["frame-001"] }));
+  expect(apply).not.toHaveBeenCalled();
+});
+
 test.each(["keyboard", "context"])("deletes the entire Frame selection via %s without confirmation", async (entry) => {
   const grouped = structuredClone(projection);
   grouped.state.album.sheets[0].frames.push({

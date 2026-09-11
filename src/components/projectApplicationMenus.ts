@@ -13,6 +13,7 @@ import type {
 } from "./ApplicationMenuBar";
 
 interface ProjectApplicationMenuOptions {
+  openSettings?(): void;
   saveLayout(): void;
   canSaveLayout: boolean;
   copyFrames(): void;
@@ -50,6 +51,7 @@ interface ProjectApplicationMenuOptions {
 }
 
 export function createProjectApplicationMenus({
+  openSettings,
   saveLayout,
   canSaveLayout,
   copyFrames,
@@ -181,7 +183,7 @@ export function createProjectApplicationMenus({
     {
       id: "tools",
       label: "Ferramentas",
-      items: [placeholder("settings", "project-window")],
+      items: [implemented("settings", "project-window", () => openSettings?.(), !openSettings)],
     },
     {
       id: "help",

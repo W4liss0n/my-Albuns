@@ -129,7 +129,7 @@ test("keeps stable command metadata complete and conflict-free by context", () =
   }
 });
 
-test("registers contextual Ctrl+E without pretending Photoshop is implemented", () => {
+test("registers Photoshop and its fixed shortcut in both Photo contexts", () => {
   const photoshop = PROJECT_COMMAND_CATALOG.find(
     (command) => command.id === "open-in-photoshop",
   );
@@ -138,9 +138,9 @@ test("registers contextual Ctrl+E without pretending Photoshop is implemented", 
     label: "Abrir no Photoshop",
   });
   expect(projectCommandBinding("open-in-photoshop", "frame-photo"))
-    .toMatchObject({ availability: "placeholder" });
+    .toMatchObject({ availability: "implemented" });
   expect(projectCommandBinding("open-in-photoshop", "media-photo"))
-    .toMatchObject({ availability: "placeholder" });
+    .toMatchObject({ availability: "implemented" });
   expect(projectCommandShortcutLabel("open-in-photoshop")).toBe("Ctrl+E");
   expect(
     matchProjectCommandShortcut(

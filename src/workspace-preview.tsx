@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 
 import App from "./App";
+import { photoshopProjectPreview } from "./test/photoshopPreview";
 import type {
   GraphicsDiagnostic,
   GraphicsProbe,
@@ -362,6 +363,7 @@ const workspacePreferencesPort = createPreviewWorkspacePreferencesPort(
 );
 
 const appProps = {
+  photoshopPort: previewParameters.has("photoshop") ? photoshopProjectPreview(previewParameters.get("photoshop")) : undefined,
   canvasGraphicsDiagnosticProbe,
   exportPipelinePort,
   graphicsProbe,

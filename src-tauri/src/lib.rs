@@ -38,6 +38,7 @@ mod operation_gate;
 mod operation_lease;
 mod path_io;
 mod photo_import;
+mod photoshop;
 mod processor_lifetime;
 mod product_runtime;
 mod project_bootstrap;
@@ -52,6 +53,7 @@ mod provisional_decoratives;
 mod recent_projects;
 mod runtime_role;
 mod settings_preferences;
+mod settings_window;
 mod workspace_preferences;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -79,9 +81,10 @@ pub fn run() {
 
 fn run_selected_runtime_role() -> Result<(), Box<dyn std::error::Error>> {
     match runtime_role::parse_runtime_role(std::env::args_os()) {
-        runtime_role::RuntimeRole::Global { direct_projects } => {
-            global_runtime::run(direct_projects)
-        }
+        runtime_role::RuntimeRole::Global { direct_projects } => global_runtime::run(
+            direct_projects,
+            runtime_role::settings_request(std::env::args_os()),
+        ),
         runtime_role::RuntimeRole::ProjectHost => run_project_host(),
     }
 }
@@ -298,9 +301,12 @@ mod tests {
                 "core:window:allow-start-dragging"
             ])
         );
-        assert!(
+        assert_eq!(
             allowed_commands(&project_permission)
-                .is_disjoint(&allowed_commands(&global_permission))
+                .intersection(&allowed_commands(&global_permission))
+                .copied()
+                .collect::<BTreeSet<_>>(),
+            BTreeSet::from(["open_application_settings"])
         );
         assert!(
             allowed_commands(&project_dialog_permission)
@@ -352,6 +358,34 @@ mod tests {
                 .iter()
                 .all(|window| { window["decorations"] == serde_json::Value::Bool(false) })
         );
+    }
+
+    #[test]
+    fn photoshop_preferences_belong_to_settings_and_original_opening_to_the_project() {
+        let settings: serde_json::Value =
+            serde_json::from_str(include_str!("../permissions/settings-window.json")).unwrap();
+        let project: serde_json::Value =
+            serde_json::from_str(include_str!("../permissions/project-window.json")).unwrap();
+        let global: serde_json::Value =
+            serde_json::from_str(include_str!("../permissions/global-window.json")).unwrap();
+        let capability: serde_json::Value =
+            serde_json::from_str(include_str!("../capabilities/settings.json")).unwrap();
+        assert_eq!(capability["windows"], serde_json::json!(["settings"]));
+        let settings = allowed_commands(&settings);
+        let project = allowed_commands(&project);
+        let global = allowed_commands(&global);
+        for command in [
+            "select_photoshop",
+            "choose_photoshop",
+            "close_application_settings",
+        ] {
+            assert!(settings.contains(command));
+            assert!(!project.contains(command));
+            assert!(!global.contains(command));
+        }
+        assert!(project.contains("open_in_photoshop"));
+        assert!(!settings.contains("open_in_photoshop"));
+        assert!(!global.contains("open_in_photoshop"));
     }
 
     #[test]

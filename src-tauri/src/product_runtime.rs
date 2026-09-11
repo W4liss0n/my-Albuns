@@ -160,6 +160,7 @@ pub(crate) fn run(
         .manage(ExportAttempts::default())
         .manage(crate::project_dialog_window::ProjectDialogPresentationStore::default())
         .manage(crate::settings_preferences::SettingsStore::new(&app_paths))
+        .manage(crate::photoshop::PhotoshopStateStore::new(&app_paths))
         .manage(layout_catalog)
         .manage(crate::workspace_preferences::WorkspacePreferencesStore::new(&app_paths))
         .on_window_event(|window, event| {
@@ -262,6 +263,9 @@ pub(crate) fn run(
             crate::workspace_preferences::workspace_preferences,
             crate::workspace_preferences::update_workspace_preference,
             crate::settings_preferences::application_settings,
+            crate::photoshop::commands::photoshop_status,
+            crate::photoshop::commands::open_in_photoshop,
+            crate::settings_window::open_application_settings,
             crate::settings_preferences::update_application_setting,
         ])
         .run(context);

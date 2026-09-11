@@ -28,6 +28,8 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
       data-development-preview="imported-media"
     >
       <MediaPanel
+        photoshopAvailable={parameters.get("photoshop") === "available"}
+        onOpenInPhotoshop={() => undefined}
         mediaItems={mediaItems}
         mediaUsage={mediaUsage}
         mediaFiles={mediaFiles}

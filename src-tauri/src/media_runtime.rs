@@ -1,6 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
-    io::BufReader,
+    io::{BufReader, Read},
     path::PathBuf,
     sync::{Arc, Mutex},
     time::{SystemTime, UNIX_EPOCH},
@@ -475,7 +475,7 @@ fn observe_resolved_source(
         source_created_unix_ms,
         source_modified_unix_ms,
     ) = match resolved {
-        Ok(resolved) => match resolved.file().metadata() {
+        Ok(resolved) => match readable_source_metadata(&resolved) {
             Ok(metadata) => (
                 MediaAvailability::Candidate,
                 resolved.physical_identity(),
@@ -506,6 +506,16 @@ fn observe_resolved_source(
         source_created_unix_ms,
         source_modified_unix_ms,
     }
+}
+
+fn readable_source_metadata(
+    resolved: &myalbuns_paths::ResolvedObject,
+) -> std::io::Result<std::fs::Metadata> {
+    // A metadata-only handle may succeed while Photoshop holds the original
+    // against readers. Such a sample cannot revoke the last usable preview.
+    let mut file = resolved.reopen_for_read()?;
+    file.read_exact(&mut [0u8; 1])?;
+    file.metadata()
 }
 
 /// Inspection can finish out of order; the proposal preserves the user's
@@ -1754,6 +1764,76 @@ mod tests {
             reappeared.update().unwrap().invalidated_media_ids(),
             ["photo-a"]
         );
+    }
+
+    #[test]
+    fn external_save_waits_for_read_access_and_refreshes_every_project_occurrence() {
+        use std::os::windows::fs::OpenOptionsExt;
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("shared-original.jpg");
+        std::fs::write(&source, b"previous original").unwrap();
+        let binding = |id: &str| MediaBinding {
+            media_id: id.into(),
+            kind: MediaKind::Photo,
+            logical_path: source.clone(),
+        };
+        let projects = [
+            (
+                MediaRuntime::default(),
+                MediaMonitor::default(),
+                vec![binding("a1"), binding("a2")],
+            ),
+            (
+                MediaRuntime::default(),
+                MediaMonitor::default(),
+                vec![binding("b1")],
+            ),
+        ];
+        for (runtime, monitor, bindings) in &projects {
+            monitor.poll(runtime, bindings);
+            monitor.poll(runtime, bindings);
+        }
+        // Photoshop can temporarily deny readers or truncate before writing.
+        let writer = std::fs::OpenOptions::new()
+            .write(true)
+            .share_mode(0)
+            .open(&source)
+            .unwrap();
+        for (runtime, monitor, bindings) in &projects {
+            assert!(monitor.poll(runtime, bindings).update().is_none());
+            let blocked = monitor.poll(runtime, bindings);
+            let update = blocked.update().unwrap();
+            assert!(update.invalidated_media_ids().is_empty());
+            assert!(update.revoked_preview_media_ids().is_empty());
+            assert!(
+                blocked
+                    .confirmed_observation()
+                    .unwrap()
+                    .observations()
+                    .iter()
+                    .all(|observation| observation.availability == MediaAvailability::Unavailable)
+            );
+        }
+        drop(writer);
+        std::fs::write(&source, b"").unwrap();
+        for (runtime, monitor, bindings) in &projects {
+            for _ in 0..2 {
+                assert!(monitor.poll(runtime, bindings).update().is_none());
+            }
+        }
+        std::fs::write(&source, b"new stable original after the external save").unwrap();
+        for (runtime, monitor, bindings) in &projects {
+            assert!(monitor.poll(runtime, bindings).update().is_none());
+            let restored = monitor.poll(runtime, bindings);
+            assert_eq!(
+                restored.update().unwrap().invalidated_media_ids(),
+                bindings
+                    .iter()
+                    .map(|binding| binding.media_id.clone())
+                    .collect::<Vec<_>>()
+            );
+            assert!(monitor.poll(runtime, bindings).update().is_none());
+        }
     }
 
     #[test]

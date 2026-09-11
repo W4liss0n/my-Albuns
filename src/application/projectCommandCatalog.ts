@@ -409,8 +409,7 @@ const DEFINITIONS = [
     description: "Abre as Configurações globais do aplicativo.",
     kind: "application",
     contexts: ["project-window"],
-    availability: "placeholder",
-    placeholderFeature: "open-global-settings-from-project",
+    availability: "implemented",
     shortcuts: [],
   }),
   command({
@@ -449,8 +448,7 @@ const DEFINITIONS = [
     description: "Abre a Foto contextual original no Photoshop.",
     kind: "application",
     contexts: ["frame-photo", "media-photo"],
-    availability: "placeholder",
-    placeholderFeature: "open-linked-photo-in-photoshop",
+    availability: "implemented",
     shortcuts: [shortcut("e", "Ctrl+E", { ctrlKey: true })],
   }),
 ] as const;
