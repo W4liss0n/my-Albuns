@@ -809,6 +809,12 @@
         "sheetHeightUm": 300000,
         "sheetWidthUm": 600000
       },
+      "layoutSettings": {
+        "gapUm": 5000,
+        "marginUm": 15000,
+        "minimumSideUm": 20000,
+        "permission": "pagesAndSheet"
+      },
       "projectId": "frame-clipboard-project",
       "projectName": "Clipboard",
       "revision": 25,
@@ -1767,6 +1773,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "frame-clipboard-project",
           "projectName": "Clipboard",
           "revision": 26,
@@ -2703,6 +2715,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "frame-clipboard-project",
           "projectName": "Clipboard",
@@ -3671,6 +3689,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "frame-clipboard-project",
           "projectName": "Clipboard",
@@ -4642,6 +4666,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "frame-clipboard-project",
           "projectName": "Clipboard",
           "revision": 26,
@@ -5611,6 +5641,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "frame-clipboard-project",
           "projectName": "Clipboard",
@@ -6582,6 +6618,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "frame-clipboard-project",
           "projectName": "Clipboard",
           "revision": 26,
@@ -7551,6 +7593,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "frame-clipboard-project",
           "projectName": "Clipboard",
@@ -8522,6 +8570,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "frame-clipboard-project",
           "projectName": "Clipboard",
           "revision": 27,
@@ -9338,6 +9392,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "frame-clipboard-project",
           "projectName": "Clipboard",
           "revision": 26,
@@ -10153,6 +10213,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "frame-clipboard-project",
           "projectName": "Clipboard",
@@ -10983,6 +11049,12 @@
         "safetyUm": 3000,
         "sheetHeightUm": 300000,
         "sheetWidthUm": 600000
+      },
+      "layoutSettings": {
+        "gapUm": 5000,
+        "marginUm": 15000,
+        "minimumSideUm": 20000,
+        "permission": "pagesAndSheet"
       },
       "projectId": "frame-clipboard-project",
       "projectName": "Clipboard",

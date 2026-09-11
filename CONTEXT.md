@@ -238,6 +238,18 @@ Conjunto transitório de Frames que recebe uma ação de edição em comum.
 **Caixa delimitadora**:
 Retângulo único que envolve uma Seleção de Frames e oferece as alças de redimensionamento do conjunto.
 
+**Snap de Frames**:
+Encaixe assistido da Geometria do Frame em referências geométricas da composição.
+
+**Snap de dimensão**:
+Correspondência assistida entre larguras ou entre alturas de Frames.
+
+**Snap de espaçamento**:
+Encaixe assistido que iguala a distância entre Frames a uma distância de referência.
+
+**Espaço entre Frames**:
+Distância física padrão entre Frames adotada por um Projeto.
+
 **Caixa de seleção**:
 Gesto de arrastar sobre a área vazia de uma superfície para selecionar todos os elementos contidos no retângulo resultante.
 _Evitar_: Seleção por arrasto, laço

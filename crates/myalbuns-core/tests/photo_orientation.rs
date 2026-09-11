@@ -483,6 +483,7 @@ fn fine_angles_fill_every_frame_corner_at_pan_limits_with_any_rotation_and_mirro
         project
             .apply(ProjectIntent::EditFrameGeometry {
                 edit: FrameGeometryEdit {
+                    snap: None,
                     frames: vec![FrameGeometryTarget {
                         frame_id: id.clone(),
                         expected_rect: rect.clone(),
@@ -969,6 +970,7 @@ fn public_orientation_projections_match_the_visual_corpus() {
             project
                 .apply(ProjectIntent::EditFrameGeometry {
                     edit: FrameGeometryEdit {
+                        snap: None,
                         frames: vec![FrameGeometryTarget {
                             frame_id: id.clone(),
                             expected_rect: rect,

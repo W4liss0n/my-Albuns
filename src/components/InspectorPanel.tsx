@@ -102,6 +102,7 @@ export interface InspectorPanelProps {
   sheetStates: readonly SheetSnapshot[];
   sheets: readonly ComposedSheet[];
   visualDefaults: ProjectedVisualDefaults;
+  frameGapUm: number;
   focusedSheetId: string | null;
   mediaPreviews: Readonly<Record<string, MediaPreview>>;
   revision: number;
@@ -151,6 +152,7 @@ export function InspectorPanel({
   sheetStates,
   sheets,
   visualDefaults,
+  frameGapUm,
   focusedSheetId,
   mediaPreviews,
   revision,
@@ -527,6 +529,7 @@ export function InspectorPanel({
                 mediaPreviews={mediaPreviews}
                 revision={revision}
                 value={visualDefaults}
+                frameGapUm={frameGapUm}
                 onApply={onApplyAlbumDesign}
                 onReadyChange={setDesignDirty}
               />

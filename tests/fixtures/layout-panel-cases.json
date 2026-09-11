@@ -467,6 +467,12 @@
               "sheetHeightUm": 300000,
               "sheetWidthUm": 600000
             },
+            "layoutSettings": {
+              "gapUm": 5000,
+              "marginUm": 15000,
+              "minimumSideUm": 20000,
+              "permission": "pagesAndSheet"
+            },
             "projectId": "550e8400-e29b-41d4-a716-446655440000",
             "projectName": "Layouts",
             "revision": 13,
@@ -4339,6 +4345,12 @@
               "safetyUm": 3000,
               "sheetHeightUm": 300000,
               "sheetWidthUm": 600000
+            },
+            "layoutSettings": {
+              "gapUm": 5000,
+              "marginUm": 15000,
+              "minimumSideUm": 20000,
+              "permission": "pagesAndSheet"
             },
             "projectId": "550e8400-e29b-41d4-a716-446655440000",
             "projectName": "Layouts",
@@ -8213,6 +8225,12 @@
               "sheetHeightUm": 300000,
               "sheetWidthUm": 600000
             },
+            "layoutSettings": {
+              "gapUm": 5000,
+              "marginUm": 15000,
+              "minimumSideUm": 20000,
+              "permission": "pagesAndSheet"
+            },
             "projectId": "550e8400-e29b-41d4-a716-446655440000",
             "projectName": "Layouts",
             "revision": 12,
@@ -11716,6 +11734,12 @@
               "safetyUm": 3000,
               "sheetHeightUm": 300000,
               "sheetWidthUm": 600000
+            },
+            "layoutSettings": {
+              "gapUm": 5000,
+              "marginUm": 15000,
+              "minimumSideUm": 20000,
+              "permission": "pagesAndSheet"
             },
             "projectId": "550e8400-e29b-41d4-a716-446655440000",
             "projectName": "Layouts",
@@ -15598,6 +15622,12 @@
               "sheetHeightUm": 300000,
               "sheetWidthUm": 600000
             },
+            "layoutSettings": {
+              "gapUm": 5000,
+              "marginUm": 15000,
+              "minimumSideUm": 20000,
+              "permission": "pagesAndSheet"
+            },
             "projectId": "550e8400-e29b-41d4-a716-446655440000",
             "projectName": "Layouts",
             "revision": 12,
@@ -18730,6 +18760,12 @@
               "safetyUm": 3000,
               "sheetHeightUm": 300000,
               "sheetWidthUm": 600000
+            },
+            "layoutSettings": {
+              "gapUm": 5000,
+              "marginUm": 15000,
+              "minimumSideUm": 20000,
+              "permission": "pagesAndSheet"
             },
             "projectId": "550e8400-e29b-41d4-a716-446655440000",
             "projectName": "Layouts",
@@ -22234,6 +22270,12 @@
               "safetyUm": 3000,
               "sheetHeightUm": 300000,
               "sheetWidthUm": 600000
+            },
+            "layoutSettings": {
+              "gapUm": 5000,
+              "marginUm": 15000,
+              "minimumSideUm": 20000,
+              "permission": "pagesAndSheet"
             },
             "projectId": "550e8400-e29b-41d4-a716-446655440000",
             "projectName": "Layouts",
@@ -25807,6 +25849,12 @@
               "sheetHeightUm": 300000,
               "sheetWidthUm": 600000
             },
+            "layoutSettings": {
+              "gapUm": 5000,
+              "marginUm": 15000,
+              "minimumSideUm": 20000,
+              "permission": "pagesAndSheet"
+            },
             "projectId": "550e8400-e29b-41d4-a716-446655440000",
             "projectName": "Layouts",
             "revision": 9,
@@ -26021,6 +26069,12 @@
               "safetyUm": 3000,
               "sheetHeightUm": 300000,
               "sheetWidthUm": 600000
+            },
+            "layoutSettings": {
+              "gapUm": 5000,
+              "marginUm": 15000,
+              "minimumSideUm": 20000,
+              "permission": "pagesAndSheet"
             },
             "projectId": "550e8400-e29b-41d4-a716-446655440000",
             "projectName": "Layouts",
@@ -26375,6 +26429,12 @@
               "safetyUm": 3000,
               "sheetHeightUm": 300000,
               "sheetWidthUm": 600000
+            },
+            "layoutSettings": {
+              "gapUm": 5000,
+              "marginUm": 15000,
+              "minimumSideUm": 20000,
+              "permission": "pagesAndSheet"
             },
             "projectId": "550e8400-e29b-41d4-a716-446655440000",
             "projectName": "Layouts",
@@ -26947,6 +27007,12 @@
               "sheetHeightUm": 300000,
               "sheetWidthUm": 600000
             },
+            "layoutSettings": {
+              "gapUm": 5000,
+              "marginUm": 15000,
+              "minimumSideUm": 20000,
+              "permission": "pagesAndSheet"
+            },
             "projectId": "550e8400-e29b-41d4-a716-446655440000",
             "projectName": "Layouts",
             "revision": 13,
@@ -27351,6 +27417,12 @@
               "sheetHeightUm": 300000,
               "sheetWidthUm": 600000
             },
+            "layoutSettings": {
+              "gapUm": 5000,
+              "marginUm": 15000,
+              "minimumSideUm": 20000,
+              "permission": "pagesAndSheet"
+            },
             "projectId": "550e8400-e29b-41d4-a716-446655440000",
             "projectName": "Layouts",
             "revision": 9,
@@ -27697,6 +27769,12 @@
               "sheetHeightUm": 300000,
               "sheetWidthUm": 600000
             },
+            "layoutSettings": {
+              "gapUm": 5000,
+              "marginUm": 15000,
+              "minimumSideUm": 20000,
+              "permission": "pagesAndSheet"
+            },
             "projectId": "550e8400-e29b-41d4-a716-446655440000",
             "projectName": "Layouts",
             "revision": 10,
@@ -28042,6 +28120,12 @@
               "safetyUm": 3000,
               "sheetHeightUm": 300000,
               "sheetWidthUm": 600000
+            },
+            "layoutSettings": {
+              "gapUm": 5000,
+              "marginUm": 15000,
+              "minimumSideUm": 20000,
+              "permission": "pagesAndSheet"
             },
             "projectId": "550e8400-e29b-41d4-a716-446655440000",
             "projectName": "Layouts",
@@ -28632,6 +28716,12 @@
               "safetyUm": 3000,
               "sheetHeightUm": 300000,
               "sheetWidthUm": 600000
+            },
+            "layoutSettings": {
+              "gapUm": 5000,
+              "marginUm": 15000,
+              "minimumSideUm": 20000,
+              "permission": "pagesAndSheet"
             },
             "projectId": "550e8400-e29b-41d4-a716-446655440000",
             "projectName": "Layouts",
@@ -32053,6 +32143,12 @@
               "safetyUm": 3000,
               "sheetHeightUm": 300000,
               "sheetWidthUm": 600000
+            },
+            "layoutSettings": {
+              "gapUm": 5000,
+              "marginUm": 15000,
+              "minimumSideUm": 20000,
+              "permission": "pagesAndSheet"
             },
             "projectId": "550e8400-e29b-41d4-a716-446655440000",
             "projectName": "Layouts",
@@ -37904,6 +38000,12 @@
               "safetyUm": 3000,
               "sheetHeightUm": 300000,
               "sheetWidthUm": 600000
+            },
+            "layoutSettings": {
+              "gapUm": 5000,
+              "marginUm": 15000,
+              "minimumSideUm": 20000,
+              "permission": "pagesAndSheet"
             },
             "projectId": "550e8400-e29b-41d4-a716-446655440000",
             "projectName": "Layouts",
@@ -43998,6 +44100,12 @@
               "sheetHeightUm": 300000,
               "sheetWidthUm": 600000
             },
+            "layoutSettings": {
+              "gapUm": 5000,
+              "marginUm": 15000,
+              "minimumSideUm": 20000,
+              "permission": "pagesAndSheet"
+            },
             "projectId": "550e8400-e29b-41d4-a716-446655440000",
             "projectName": "Layouts",
             "revision": 12,
@@ -47637,6 +47745,12 @@
               "sheetHeightUm": 300000,
               "sheetWidthUm": 600000
             },
+            "layoutSettings": {
+              "gapUm": 5000,
+              "marginUm": 15000,
+              "minimumSideUm": 20000,
+              "permission": "pagesAndSheet"
+            },
             "projectId": "550e8400-e29b-41d4-a716-446655440000",
             "projectName": "Layouts",
             "revision": 13,
@@ -51144,6 +51258,12 @@
               "sheetHeightUm": 300000,
               "sheetWidthUm": 600000
             },
+            "layoutSettings": {
+              "gapUm": 5000,
+              "marginUm": 15000,
+              "minimumSideUm": 20000,
+              "permission": "pagesAndSheet"
+            },
             "projectId": "550e8400-e29b-41d4-a716-446655440000",
             "projectName": "Layouts",
             "revision": 15,
@@ -52468,6 +52588,12 @@
               "safetyUm": 3000,
               "sheetHeightUm": 300000,
               "sheetWidthUm": 600000
+            },
+            "layoutSettings": {
+              "gapUm": 5000,
+              "marginUm": 15000,
+              "minimumSideUm": 20000,
+              "permission": "pagesAndSheet"
             },
             "projectId": "550e8400-e29b-41d4-a716-446655440000",
             "projectName": "Layouts",
@@ -53926,6 +54052,12 @@
               "sheetHeightUm": 300000,
               "sheetWidthUm": 600000
             },
+            "layoutSettings": {
+              "gapUm": 5000,
+              "marginUm": 15000,
+              "minimumSideUm": 20000,
+              "permission": "pagesAndSheet"
+            },
             "projectId": "550e8400-e29b-41d4-a716-446655440000",
             "projectName": "Layouts",
             "revision": 14,
@@ -55382,6 +55514,12 @@
               "safetyUm": 3000,
               "sheetHeightUm": 300000,
               "sheetWidthUm": 600000
+            },
+            "layoutSettings": {
+              "gapUm": 5000,
+              "marginUm": 15000,
+              "minimumSideUm": 20000,
+              "permission": "pagesAndSheet"
             },
             "projectId": "550e8400-e29b-41d4-a716-446655440000",
             "projectName": "Layouts",
@@ -58959,6 +59097,12 @@
               "sheetHeightUm": 300000,
               "sheetWidthUm": 600000
             },
+            "layoutSettings": {
+              "gapUm": 5000,
+              "marginUm": 15000,
+              "minimumSideUm": 20000,
+              "permission": "pagesAndSheet"
+            },
             "projectId": "550e8400-e29b-41d4-a716-446655440000",
             "projectName": "Layouts",
             "revision": 12,
@@ -62463,6 +62607,12 @@
                 "safetyUm": 3000,
                 "sheetHeightUm": 300000,
                 "sheetWidthUm": 600000
+              },
+              "layoutSettings": {
+                "gapUm": 5000,
+                "marginUm": 15000,
+                "minimumSideUm": 20000,
+                "permission": "pagesAndSheet"
               },
               "projectId": "550e8400-e29b-41d4-a716-446655440000",
               "projectName": "Layouts",
@@ -66076,6 +66226,12 @@
                 "sheetHeightUm": 300000,
                 "sheetWidthUm": 600000
               },
+              "layoutSettings": {
+                "gapUm": 5000,
+                "marginUm": 15000,
+                "minimumSideUm": 20000,
+                "permission": "pagesAndSheet"
+              },
               "projectId": "550e8400-e29b-41d4-a716-446655440000",
               "projectName": "Layouts",
               "revision": 12,
@@ -69579,6 +69735,12 @@
                 "safetyUm": 3000,
                 "sheetHeightUm": 300000,
                 "sheetWidthUm": 600000
+              },
+              "layoutSettings": {
+                "gapUm": 5000,
+                "marginUm": 15000,
+                "minimumSideUm": 20000,
+                "permission": "pagesAndSheet"
               },
               "projectId": "550e8400-e29b-41d4-a716-446655440000",
               "projectName": "Layouts",
@@ -73192,6 +73354,12 @@
                 "sheetHeightUm": 300000,
                 "sheetWidthUm": 600000
               },
+              "layoutSettings": {
+                "gapUm": 5000,
+                "marginUm": 15000,
+                "minimumSideUm": 20000,
+                "permission": "pagesAndSheet"
+              },
               "projectId": "550e8400-e29b-41d4-a716-446655440000",
               "projectName": "Layouts",
               "revision": 14,
@@ -76804,6 +76972,12 @@
                 "sheetHeightUm": 300000,
                 "sheetWidthUm": 600000
               },
+              "layoutSettings": {
+                "gapUm": 5000,
+                "marginUm": 15000,
+                "minimumSideUm": 20000,
+                "permission": "pagesAndSheet"
+              },
               "projectId": "550e8400-e29b-41d4-a716-446655440000",
               "projectName": "Layouts",
               "revision": 15,
@@ -80067,6 +80241,12 @@
               "sheetHeightUm": 300000,
               "sheetWidthUm": 600000
             },
+            "layoutSettings": {
+              "gapUm": 5000,
+              "marginUm": 15000,
+              "minimumSideUm": 20000,
+              "permission": "pagesAndSheet"
+            },
             "projectId": "550e8400-e29b-41d4-a716-446655440000",
             "projectName": "Layouts",
             "revision": 13,
@@ -83199,6 +83379,12 @@
               "safetyUm": 3000,
               "sheetHeightUm": 300000,
               "sheetWidthUm": 600000
+            },
+            "layoutSettings": {
+              "gapUm": 5000,
+              "marginUm": 15000,
+              "minimumSideUm": 20000,
+              "permission": "pagesAndSheet"
             },
             "projectId": "550e8400-e29b-41d4-a716-446655440000",
             "projectName": "Layouts",
@@ -86406,6 +86592,12 @@
               "safetyUm": 3000,
               "sheetHeightUm": 300000,
               "sheetWidthUm": 600000
+            },
+            "layoutSettings": {
+              "gapUm": 5000,
+              "marginUm": 15000,
+              "minimumSideUm": 20000,
+              "permission": "pagesAndSheet"
             },
             "projectId": "550e8400-e29b-41d4-a716-446655440000",
             "projectName": "Layouts",
@@ -90331,6 +90523,12 @@
               "safetyUm": 3000,
               "sheetHeightUm": 300000,
               "sheetWidthUm": 600000
+            },
+            "layoutSettings": {
+              "gapUm": 5000,
+              "marginUm": 15000,
+              "minimumSideUm": 20000,
+              "permission": "pagesAndSheet"
             },
             "projectId": "550e8400-e29b-41d4-a716-446655440000",
             "projectName": "Layouts",
@@ -94725,6 +94923,12 @@
               "sheetHeightUm": 300000,
               "sheetWidthUm": 600000
             },
+            "layoutSettings": {
+              "gapUm": 5000,
+              "marginUm": 15000,
+              "minimumSideUm": 20000,
+              "permission": "pagesAndSheet"
+            },
             "projectId": "550e8400-e29b-41d4-a716-446655440000",
             "projectName": "Layouts",
             "revision": 12,
@@ -97858,6 +98062,12 @@
               "sheetHeightUm": 300000,
               "sheetWidthUm": 600000
             },
+            "layoutSettings": {
+              "gapUm": 5000,
+              "marginUm": 15000,
+              "minimumSideUm": 20000,
+              "permission": "pagesAndSheet"
+            },
             "projectId": "550e8400-e29b-41d4-a716-446655440000",
             "projectName": "Layouts",
             "revision": 14,
@@ -100990,6 +101200,12 @@
               "safetyUm": 3000,
               "sheetHeightUm": 300000,
               "sheetWidthUm": 600000
+            },
+            "layoutSettings": {
+              "gapUm": 5000,
+              "marginUm": 15000,
+              "minimumSideUm": 20000,
+              "permission": "pagesAndSheet"
             },
             "projectId": "550e8400-e29b-41d4-a716-446655440000",
             "projectName": "Layouts",
@@ -106054,6 +106270,12 @@
               "sheetHeightUm": 300000,
               "sheetWidthUm": 600000
             },
+            "layoutSettings": {
+              "gapUm": 5000,
+              "marginUm": 15000,
+              "minimumSideUm": 20000,
+              "permission": "pagesAndSheet"
+            },
             "projectId": "550e8400-e29b-41d4-a716-446655440000",
             "projectName": "Layouts",
             "revision": 12,
@@ -106575,6 +106797,12 @@
               "safetyUm": 3000,
               "sheetHeightUm": 300000,
               "sheetWidthUm": 600000
+            },
+            "layoutSettings": {
+              "gapUm": 5000,
+              "marginUm": 15000,
+              "minimumSideUm": 20000,
+              "permission": "pagesAndSheet"
             },
             "projectId": "550e8400-e29b-41d4-a716-446655440000",
             "projectName": "Layouts",
@@ -107619,6 +107847,12 @@
               "safetyUm": 3000,
               "sheetHeightUm": 300000,
               "sheetWidthUm": 600000
+            },
+            "layoutSettings": {
+              "gapUm": 5000,
+              "marginUm": 15000,
+              "minimumSideUm": 20000,
+              "permission": "pagesAndSheet"
             },
             "projectId": "550e8400-e29b-41d4-a716-446655440000",
             "projectName": "Layouts",

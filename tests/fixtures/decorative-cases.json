@@ -9194,6 +9194,12 @@
           "sheetHeightUm": 300000,
           "sheetWidthUm": 600000
         },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
+        },
         "projectId": "550e8400-e29b-41d4-a716-446655440000",
         "projectName": "Decorativos",
         "revision": 9,
@@ -9593,6 +9599,12 @@
           "sheetHeightUm": 300000,
           "sheetWidthUm": 600000
         },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
+        },
         "projectId": "550e8400-e29b-41d4-a716-446655440000",
         "projectName": "Decorativos",
         "revision": 46,
@@ -9974,6 +9986,12 @@
           "safetyUm": 3000,
           "sheetHeightUm": 300000,
           "sheetWidthUm": 600000
+        },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
         },
         "projectId": "550e8400-e29b-41d4-a716-446655440000",
         "projectName": "Decorativos",
@@ -10359,6 +10377,12 @@
           "sheetHeightUm": 300000,
           "sheetWidthUm": 600000
         },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
+        },
         "projectId": "550e8400-e29b-41d4-a716-446655440000",
         "projectName": "Decorativos",
         "revision": 34,
@@ -10713,6 +10737,12 @@
           "safetyUm": 3000,
           "sheetHeightUm": 300000,
           "sheetWidthUm": 600000
+        },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
         },
         "projectId": "550e8400-e29b-41d4-a716-446655440000",
         "projectName": "Decorativos",
@@ -11079,6 +11109,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
@@ -11462,6 +11498,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
           "revision": 11,
@@ -11844,6 +11886,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
           "revision": 12,
@@ -12218,6 +12266,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
@@ -12601,6 +12655,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
           "revision": 14,
@@ -12983,6 +13043,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
           "revision": 15,
@@ -13347,6 +13413,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
@@ -13730,6 +13802,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
           "revision": 17,
@@ -14112,6 +14190,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
           "revision": 18,
@@ -14486,6 +14570,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
@@ -14869,6 +14959,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
           "revision": 20,
@@ -15251,6 +15347,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
           "revision": 21,
@@ -15615,6 +15717,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
@@ -16010,6 +16118,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
           "revision": 23,
@@ -16404,6 +16518,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
           "revision": 24,
@@ -16783,6 +16903,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
@@ -17171,6 +17297,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
           "revision": 26,
@@ -17558,6 +17690,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
           "revision": 27,
@@ -17922,6 +18060,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
@@ -18317,6 +18461,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
           "revision": 29,
@@ -18711,6 +18861,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
           "revision": 30,
@@ -19090,6 +19246,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
@@ -19478,6 +19640,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
           "revision": 32,
@@ -19865,6 +20033,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
           "revision": 33,
@@ -20229,6 +20403,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
@@ -20624,6 +20804,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
           "revision": 36,
@@ -21011,6 +21197,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
@@ -21420,6 +21612,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
@@ -21837,6 +22035,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
           "revision": 39,
@@ -22253,6 +22457,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
           "revision": 40,
@@ -22617,6 +22827,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
@@ -23012,6 +23228,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
           "revision": 34,
@@ -23399,6 +23621,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
@@ -23808,6 +24036,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
@@ -24225,6 +24459,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
           "revision": 44,
@@ -24641,6 +24881,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
           "revision": 45,
@@ -25020,6 +25266,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
@@ -25430,6 +25682,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
           "revision": 48,
@@ -25832,6 +26090,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
@@ -26241,6 +26505,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
@@ -26679,6 +26949,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
           "revision": 51,
@@ -27116,6 +27392,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
           "revision": 52,
@@ -27495,6 +27777,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
@@ -27905,6 +28193,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
           "revision": 46,
@@ -28307,6 +28601,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
@@ -28716,6 +29016,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
@@ -29153,6 +29459,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
@@ -29591,6 +29903,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
           "revision": 56,
@@ -29969,6 +30287,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
@@ -30355,6 +30679,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
@@ -30747,6 +31077,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
@@ -31147,6 +31483,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
           "revision": 61,
@@ -31525,6 +31867,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
@@ -31911,6 +32259,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
@@ -32303,6 +32657,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
@@ -32702,6 +33062,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",

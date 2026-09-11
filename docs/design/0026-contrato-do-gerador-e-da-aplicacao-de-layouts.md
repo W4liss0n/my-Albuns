@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-09
-updated: 2026-09-10
+updated: 2026-09-11
 ticket: 28
 ---
 
@@ -85,6 +85,13 @@ lado de 20 mm, como o experimento aprovado. São parâmetros explícitos da
 consulta, não constantes espalhadas por chamadores. A apresentação e a
 persistência de controles para esses parâmetros pertencem à integração do
 Painel, sem introduzir controles técnicos de pesos ou famílias no produto.
+
+O intervalo usa a medida única de `Espaço entre Frames` do Projeto, também
+consumida pelos snaps de espaçamento padrão. Seu controle fica na
+`Personalização` da criação e em `Design do Álbum`, conforme o
+[contrato de Snap de Frames](0033-snap-de-frames.md). Alterá-lo orienta novas
+consultas do Gerador, sem reescrever definições de Layouts já salvas ou
+reposicionar Frames existentes.
 
 ## Resultado e geometria
 

@@ -1,5 +1,6 @@
 mod composition;
 mod frame_geometry;
+mod frame_snap;
 mod layouts;
 mod model;
 mod persistent_project;
@@ -18,6 +19,10 @@ pub use sheet_visuals::{
 
 pub use frame_geometry::{
     FrameGeometryEdit, FrameGeometryGesture, FrameGeometryTarget, FrameResizeHandle,
+};
+pub use frame_snap::{
+    FrameGeometryPreview, FrameSnapAxis, FrameSnapFeedback, FrameSnapGuide, FrameSnapKind,
+    FrameSnapRequest,
 };
 pub use layouts::{
     CustomLayout, CustomLayoutId, FavoriteLayout, FrameOrientation, GeneratedLayout,

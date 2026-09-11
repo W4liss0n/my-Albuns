@@ -1,6 +1,7 @@
 ---
 status: accepted
 document: design
+updated: 2026-09-11
 ---
 
 # Estrutura da Janela do Projeto
@@ -267,6 +268,11 @@ Quando a Lâmina alvo possui Layout travado, a preview aplicada permanece destac
 - Movimento e redimensionamento limitam o grupo inteiro no ponto válido mais próximo quando qualquer Frame ultrapassaria a superfície ativa; nenhum elemento é limitado individualmente.
 - A superfície válida é a Lâmina inteira quando dupla e somente a Página ativa em Página única.
 - Um movimento ou redimensionamento coletivo completo gera somente uma ação de Undo/Redo, consolidada ao terminar o gesto.
+- Movimento e redimensionamento usam snaps automaticamente, sem botão de ímã. Segurar `Ctrl` durante o gesto suspende os encaixes; soltar reavalia o ponteiro atual. `Ctrl` + clique mantém sua função de alternar a presença do Frame na seleção, e `Shift`/`Alt` conservam suas funções.
+- Os encaixes abrangem alinhamento com Frames, Páginas e guias técnicas, igualdade de largura ou altura e espaçamento igual ou padrão do Projeto. Os dois tipos de espaçamento funcionam no movimento e no redimensionamento.
+- Para snaps, uma seleção múltipla é um único objeto: somente bordas, centros e dimensões totais da Caixa delimitadora participam. Os Frames internos não produzem encaixes individuais; o conjunto inteiro acompanha a transformação.
+- A aproximação inicial é de `6 px` lógicos na tela e a soltura exige mais de `10 px`, com retenção do alvo para evitar tremulação. Guias magenta de `1 px` e cotas na Unidade do Projeto indicam somente o encaixe alcançado; desaparecem nos terminais do gesto e durante a suspensão por `Ctrl`.
+- O [contrato de Snap de Frames](0033-snap-de-frames.md) define os alvos, a disputa entre candidatos, as restrições das alças, a vizinhança e os cenários para calibração e validação no Canvas real.
 - O Travamento de Layout pertence à Lâmina inteira. Como o Modo de edição isola uma única Lâmina, uma seleção não mistura Frames travados e destravados.
 - Em uma Lâmina com Layout travado, seleção simples e múltipla continuam disponíveis. Contornos e Caixa delimitadora permanecem visíveis, mas as alças de redimensionamento são omitidas.
 - Tentar arrastar uma seleção travada fornece feedback de bloqueio, não inicia movimento e não cria ação no Histórico. Substituir Fotos e editar Borda, Opacidade, Pan, Zoom, Giro, Ângulo, Espelhamento e efeitos continuam permitidos.
@@ -442,7 +448,7 @@ As configurações não visuais de `Informações do Álbum` são organizadas em
 `Design do Álbum` é reservado à aparência e contém:
 
 1. `Padrões visuais`: Background e Overlay padrão, incluindo seus escopos;
-2. `Padrão dos Frames`: presença, cor e espessura da Borda padrão.
+2. `Padrão dos Frames`: presença, cor e espessura da Borda padrão, além do controle de Espaço entre Frames do Projeto.
 
 Novas configurações globais devem ser incorporadas a `Informações do Álbum` quando alterarem estrutura, documento ou áreas técnicas, e a `Design do Álbum` quando alterarem a aparência. Ajustes exclusivos de uma Lâmina ou elemento não pertencem a essas seções.
 
@@ -478,11 +484,19 @@ A última célula da grade é `Importar Decorativo`, com contorno tracejado e se
 
 A espessura dispensa alternador. O slider começa em zero, e zero significa ausência de Borda — a mesma regra da criação de novo Projeto —, com a leitura mostrando `sem borda` nessa posição. Cada alteração permanece no mesmo draft visual até o `Aplicar`.
 
-`Espaço entre Frames` fecha o grupo e ainda não possui contrato de persistência: ele altera somente a miniatura desta seção, sem entrar no draft nem habilitar o `Aplicar`. Fica marcado como funcionalidade indisponível até o campo existir no núcleo.
+`Espaço entre Frames` fecha o grupo e representa uma única medida do Projeto,
+compartilhada pelos snaps de espaçamento padrão e pelo Gerador de Layouts.
+O controle usa a Unidade de apresentação e integra o draft de `Design do Álbum`;
+uma alteração válida habilita `Aplicar`. Até confirmar, somente a miniatura usa
+o valor pendente. A confirmação orienta os próximos encaixes e consultas de
+geração sem reposicionar Frames existentes nem alterar definições de Layouts
+já salvas. Projetos existentes conservam seu intervalo salvo; novos Projetos
+começam com `5 mm`. O valor pertence ao Projeto, sem integrar o Estilo do Frame
+ou a restauração da Borda de uma ocorrência.
 
 Opacidade não pertence ao padrão global e não aparece nesse grupo; ela permanece no contexto individual de Frame.
 
-`Informações do Álbum` e `Design do Álbum` possuem, cada um, um único botão `Aplicar` integrado ao cabeçalho da seção. Assim, a ação não cria um rodapé com espaço vazio. Sem alterações, usa a variante discreta e permanece desabilitada; um draft válido a torna destacada e acionável. O primeiro confirma conjuntamente as alterações não visuais; o segundo confirma conjuntamente Background, Overlay e padrão dos Frames. Cada ação válida entra no Projeto como uma única operação de Undo/Redo.
+`Informações do Álbum` e `Design do Álbum` possuem, cada um, um único botão `Aplicar` integrado ao cabeçalho da seção. Assim, a ação não cria um rodapé com espaço vazio. Sem alterações, usa a variante discreta e permanece desabilitada; um draft válido a torna destacada e acionável. O primeiro confirma conjuntamente as alterações não visuais; o segundo confirma conjuntamente Background, Overlay, padrão dos Frames e Espaço entre Frames. Cada ação válida entra no Projeto como uma única operação de Undo/Redo.
 
 `Aplicar` não salva o arquivo. Mudanças estruturais ou dimensionais continuam sujeitas a pré-validação e confirmação do impacto antes de entrarem atomicamente no Projeto.
 

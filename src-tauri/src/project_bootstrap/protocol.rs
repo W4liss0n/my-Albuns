@@ -479,6 +479,7 @@ mod tests {
     fn create_request_round_trip_preserves_the_closed_initial_configuration_and_authorization() {
         let base = request();
         let configuration = InitialProjectCreationConfiguration {
+            frame_gap_um: 5_000,
             document: InitialDocumentConfiguration {
                 display_unit: InitialDisplayUnit::Cm,
                 sheet_width_um: 508_000,

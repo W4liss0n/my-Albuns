@@ -7,7 +7,8 @@ pub(crate) use configuration::{
     InitialBackground, InitialBackgroundContent, InitialDocumentConfiguration, InitialFrameBorder,
     InitialOverlay, InitialOverlayContent, InitialProjectConfiguration,
     InitialProjectCreationConfiguration, InitialStructureConfiguration, InitialVisualDefaults,
-    ProjectConfigurationValidation, to_core_initial_project, validate_configuration,
+    ProjectConfigurationValidation, default_frame_gap_um, to_core_initial_project,
+    validate_configuration,
 };
 #[cfg(test)]
 pub(crate) use configuration::{InitialDisplayUnit, InitialSheetFormat};

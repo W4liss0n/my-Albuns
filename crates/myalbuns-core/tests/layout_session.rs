@@ -64,6 +64,7 @@ fn saving_and_reapplying_a_page_layout_preserves_the_frame_positions() {
         project
             .apply(ProjectIntent::EditFrameGeometry {
                 edit: myalbuns_core::FrameGeometryEdit {
+                    snap: None,
                     frames: initial
                         .frames
                         .iter()
@@ -726,6 +727,7 @@ fn locked_structure_rejects_geometry_creation_and_paste_but_keeps_selection_orde
         },
     ] {
         let edit = FrameGeometryEdit {
+            snap: None,
             frames: vec![FrameGeometryTarget {
                 frame_id: first.id.clone(),
                 expected_rect: first.rect.clone(),

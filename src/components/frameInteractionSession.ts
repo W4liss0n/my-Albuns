@@ -4,6 +4,7 @@ import type {
   ComposedFrame,
   ComposedSheet,
   FrameGeometryEdit,
+  FrameSnapFeedback,
   FrameResizeHandle,
 } from "../domain/project";
 import type { AlbumCanvasProps, CanvasFrameGeometry } from "./albumCanvasContract";
@@ -14,6 +15,7 @@ interface PointerPosition {
   clientY: number;
   shiftKey: boolean;
   altKey: boolean;
+  ctrlKey: boolean;
 }
 
 interface FrameGesture {
@@ -36,6 +38,8 @@ interface FrameGesture {
   desired: FrameGeometryEdit | null;
   inFlight: boolean;
   preview: ComposedFrame[] | null;
+  snap: FrameSnapFeedback;
+  modifierRevision: number;
 }
 
 /** Owns one pointer gesture. Only the Core may calculate its proposed geometry. */
@@ -114,6 +118,8 @@ export class FrameInteractionSession {
       desired: null,
       inFlight: false,
       preview: null,
+      snap: { retained: [], guides: [] },
+      modifierRevision: 0,
     };
     event.stopPropagation();
     this.canvas.style.setProperty("--frame-gesture-cursor", event.currentTarget.cursor ?? "move");
@@ -156,6 +162,13 @@ export class FrameInteractionSession {
     return this.suppressTap;
   }
 
+  get snapGuides() {
+    const gesture = this.gesture;
+    return gesture?.phase === "dragging"
+      ? { sheetId: gesture.sheetId, guides: gesture.snap.guides }
+      : null;
+  }
+
   reset() {
     const gesture = this.gesture;
     this.gesture = null;
@@ -179,6 +192,11 @@ export class FrameInteractionSession {
   private updatePoint(point: PointerPosition) {
     const gesture = this.gesture;
     if (!gesture || gesture.phase === "committing") return;
+    if (modifiersChanged(gesture.point, point)) {
+      gesture.snap = { retained: [], guides: [] };
+      gesture.modifierRevision++;
+      this.refresh();
+    }
     gesture.point = pointerPosition(point);
     if (gesture.phase === "pressed") {
       const threshold = gesture.controls.dragThreshold!;
@@ -210,6 +228,11 @@ export class FrameInteractionSession {
     );
     return {
       frames: gesture.frames.map((frame) => ({ frameId: frame.frameId, expectedRect: frame.clipRect })),
+      ...(!gesture.point.ctrlKey ? { snap: {
+        umPerPixelX: gesture.umPerPixelX,
+        umPerPixelY: gesture.umPerPixelY,
+        retained: gesture.snap.retained,
+      } } : {}),
       gesture: gesture.handle === null
         ? { kind: "move", deltaXUm, deltaYUm }
         : {
@@ -222,11 +245,15 @@ export class FrameInteractionSession {
 
   private requestPreview(gesture: FrameGesture) {
     if (gesture.inFlight || !gesture.desired || gesture.phase !== "dragging") return;
-    const edit = gesture.desired;
+    const desired = gesture.desired;
+    const edit = this.edit(gesture);
+    const modifierRevision = gesture.modifierRevision;
     gesture.inFlight = true;
     void gesture.controls.preview(edit).then((preview) => {
       if (this.gesture !== gesture || gesture.phase !== "dragging") return;
-      gesture.preview = preview;
+      if (modifierRevision !== gesture.modifierRevision) return;
+      gesture.preview = preview.frames;
+      gesture.snap = preview.snap;
       this.refresh();
     }).catch((error: unknown) => {
       if (this.gesture !== gesture || gesture.phase !== "dragging") return;
@@ -234,7 +261,7 @@ export class FrameInteractionSession {
       gesture.controls.onError(errorMessage(error));
     }).finally(() => {
       gesture.inFlight = false;
-      if (this.gesture === gesture && gesture.desired !== edit) this.requestPreview(gesture);
+      if (this.gesture === gesture && gesture.desired !== desired) this.requestPreview(gesture);
     });
   }
 
@@ -251,6 +278,7 @@ export class FrameInteractionSession {
       this.reset();
       return;
     }
+    if (modifiersChanged(gesture.point, event)) gesture.snap = { retained: [], guides: [] };
     gesture.point = pointerPosition(event);
     gesture.phase = "committing";
     gesture.sourceComposition = this.readContext().input!.composition;
@@ -274,6 +302,7 @@ export class FrameInteractionSession {
       this.reset();
       this.refresh();
     });
+    this.refresh();
   };
 
   private release(gesture: FrameGesture) {
@@ -311,19 +340,19 @@ export class FrameInteractionSession {
       event.preventDefault();
       event.stopImmediatePropagation();
       this.cancel();
-    } else if (event.key === "Shift" || event.key === "Alt") {
+    } else if (event.key === "Shift" || event.key === "Alt" || event.key === "Control") {
       event.preventDefault();
       this.updatePoint({
-        ...gesture.point, shiftKey: event.shiftKey, altKey: event.altKey,
+        ...gesture.point, shiftKey: event.shiftKey, altKey: event.altKey, ctrlKey: event.ctrlKey,
       });
     } else if (event.key !== "Control" && event.key !== "Meta") this.cancel();
   };
 
   private readonly keyUp = (event: KeyboardEvent) => {
     if (event.code === "Space") this.spaceHeld = false;
-    if (this.gesture && (event.key === "Shift" || event.key === "Alt")) {
+    if (this.gesture && (event.key === "Shift" || event.key === "Alt" || event.key === "Control")) {
       this.updatePoint({
-        ...this.gesture.point, shiftKey: event.shiftKey, altKey: event.altKey,
+        ...this.gesture.point, shiftKey: event.shiftKey, altKey: event.altKey, ctrlKey: event.ctrlKey,
       });
     }
   };
@@ -341,8 +370,12 @@ export class FrameInteractionSession {
 function pointerPosition(point: PointerPosition): PointerPosition {
   return {
     clientX: point.clientX, clientY: point.clientY,
-    shiftKey: point.shiftKey, altKey: point.altKey,
+    shiftKey: point.shiftKey, altKey: point.altKey, ctrlKey: point.ctrlKey,
   };
+}
+
+function modifiersChanged(before: PointerPosition, after: PointerPosition) {
+  return before.ctrlKey !== after.ctrlKey || before.shiftKey !== after.shiftKey || before.altKey !== after.altKey;
 }
 
 function sourceSignature(
@@ -353,6 +386,8 @@ function sourceSignature(
   return JSON.stringify([
     input.projectId, sheet.widthUm, sheet.heightUm, frames,
     input.composition.frameBorder,
+    sheet.frames.map((frame) => [frame.frameId, frame.clipRect]),
+    input.technicalGuides, input.frameGapUm,
     input.sheetBarMetadata.find((item) => item.sheetId === sheet.sheetId)?.layoutLocked,
   ]);
 }

@@ -32970,6 +32970,12 @@
           "sheetHeightUm": 300000,
           "sheetWidthUm": 600000
         },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
+        },
         "projectId": "550e8400-e29b-41d4-a716-446655440000",
         "projectName": "Estilo",
         "revision": 10,
@@ -33331,6 +33337,12 @@
           "safetyUm": 3000,
           "sheetHeightUm": 300000,
           "sheetWidthUm": 600000
+        },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
         },
         "projectId": "550e8400-e29b-41d4-a716-446655440000",
         "projectName": "Estilo",
@@ -33694,6 +33706,12 @@
           "sheetHeightUm": 300000,
           "sheetWidthUm": 600000
         },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
+        },
         "projectId": "550e8400-e29b-41d4-a716-446655440000",
         "projectName": "Estilo",
         "revision": 14,
@@ -34055,6 +34073,12 @@
           "safetyUm": 3000,
           "sheetHeightUm": 300000,
           "sheetWidthUm": 600000
+        },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
         },
         "projectId": "550e8400-e29b-41d4-a716-446655440000",
         "projectName": "Estilo",
@@ -34418,6 +34442,12 @@
           "sheetHeightUm": 300000,
           "sheetWidthUm": 600000
         },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
+        },
         "projectId": "550e8400-e29b-41d4-a716-446655440000",
         "projectName": "Estilo",
         "revision": 17,
@@ -34721,6 +34751,12 @@
           "safetyUm": 3000,
           "sheetHeightUm": 300000,
           "sheetWidthUm": 600000
+        },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
         },
         "projectId": "550e8400-e29b-41d4-a716-446655440000",
         "projectName": "Estilo",
@@ -35084,6 +35120,12 @@
           "sheetHeightUm": 300000,
           "sheetWidthUm": 600000
         },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
+        },
         "projectId": "550e8400-e29b-41d4-a716-446655440000",
         "projectName": "Estilo",
         "revision": 18,
@@ -35445,6 +35487,12 @@
           "safetyUm": 3000,
           "sheetHeightUm": 300000,
           "sheetWidthUm": 600000
+        },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
         },
         "projectId": "550e8400-e29b-41d4-a716-446655440000",
         "projectName": "Estilo",
@@ -35808,6 +35856,12 @@
           "sheetHeightUm": 300000,
           "sheetWidthUm": 600000
         },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
+        },
         "projectId": "550e8400-e29b-41d4-a716-446655440000",
         "projectName": "Estilo",
         "revision": 13,
@@ -36169,6 +36223,12 @@
           "safetyUm": 3000,
           "sheetHeightUm": 300000,
           "sheetWidthUm": 600000
+        },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
         },
         "projectId": "550e8400-e29b-41d4-a716-446655440000",
         "projectName": "Estilo",

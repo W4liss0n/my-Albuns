@@ -272,7 +272,7 @@ impl PersistentProjectSession {
             return Ok(outcome);
         }
         if let ProjectIntent::EditFrameGeometry { edit } = &intent {
-            let rects = self.project().frame_geometry_edit(edit)?;
+            let (rects, _) = self.project().frame_geometry_edit(edit)?;
             if rects
                 .iter()
                 .zip(&edit.frames)
@@ -280,6 +280,19 @@ impl PersistentProjectSession {
             {
                 return Ok(outcome);
             }
+        }
+        if let ProjectIntent::SetAlbumDesign {
+            visual_defaults,
+            frame_gap_um,
+        } = &intent
+        {
+            let next = self
+                .project()
+                .with_album_design(visual_defaults.clone(), *frame_gap_um)?;
+            if next != *self.project() {
+                self.commit_edit(|_| Ok(next))?;
+            }
+            return Ok(outcome);
         }
         let custom = self.layout_catalog.entries.clone();
         self.commit_edit(|project| match intent {
@@ -292,6 +305,9 @@ impl PersistentProjectSession {
             }
             ProjectIntent::SetFrameStyle { .. } => {
                 unreachable!("Frame style handles unchanged selections before committing")
+            }
+            ProjectIntent::SetAlbumDesign { .. } => {
+                unreachable!("Album Design commits its complete draft atomically")
             }
             ProjectIntent::TogglePhotoBlackAndWhite { .. } => {
                 unreachable!("Photo effects handle unchanged selections before committing")

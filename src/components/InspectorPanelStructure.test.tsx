@@ -557,6 +557,7 @@ function props(): ComponentProps<typeof InspectorPanel> {
     sheets: projection.composition.sheets,
     sheetStates: projection.state.album.sheets,
     visualDefaults: projection.state.album.visualDefaults,
+    frameGapUm: projection.state.layoutSettings.gapUm,
     zoomCommitting: false,
   };
 }

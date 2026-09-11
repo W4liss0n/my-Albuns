@@ -528,6 +528,12 @@
         "sheetHeightUm": 300000,
         "sheetWidthUm": 600000
       },
+      "layoutSettings": {
+        "gapUm": 5000,
+        "marginUm": 15000,
+        "minimumSideUm": 20000,
+        "permission": "pagesAndSheet"
+      },
       "projectId": "sheet-side-swap-project",
       "projectName": "Troca de lados",
       "revision": 24,
@@ -1064,6 +1070,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "sheet-side-swap-project",
           "projectName": "Troca de lados",
@@ -1605,6 +1617,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "sheet-side-swap-project",
           "projectName": "Troca de lados",
           "revision": 25,
@@ -1747,6 +1765,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "sheet-side-swap-project",
           "projectName": "Troca de lados",
           "revision": 0,
@@ -1883,6 +1907,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "sheet-side-swap-project",
           "projectName": "Troca de lados",
@@ -2061,6 +2091,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "sheet-side-swap-project",
           "projectName": "Troca de lados",
           "revision": 1,
@@ -2233,6 +2269,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "sheet-side-swap-project",
           "projectName": "Troca de lados",
           "revision": 1,
@@ -2374,6 +2416,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "sheet-side-swap-project",
           "projectName": "Troca de lados",
           "revision": 1,
@@ -2509,6 +2557,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "sheet-side-swap-project",
           "projectName": "Troca de lados",
@@ -2651,6 +2705,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "sheet-side-swap-project",
           "projectName": "Troca de lados",
           "revision": 1,
@@ -2786,6 +2846,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "sheet-side-swap-project",
           "projectName": "Troca de lados",

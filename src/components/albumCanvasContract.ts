@@ -2,6 +2,7 @@ import type {
   CompositionPlan,
   ComposedFrame,
   FrameGeometryEdit,
+  FrameGeometryPreview,
   PhotoDropTarget,
 } from "../domain/project";
 import type { GraphicsDiagnostic } from "../application/graphics";
@@ -75,7 +76,7 @@ export interface CanvasPhotoDropPoint {
 export interface CanvasFrameGeometry {
   disabled: boolean;
   dragThreshold: PointerDragThreshold | null;
-  preview(edit: FrameGeometryEdit): Promise<ComposedFrame[]>;
+  preview(edit: FrameGeometryEdit): Promise<FrameGeometryPreview>;
   /** The exact committed composition bridges command completion and React presentation. */
   commit(edit: FrameGeometryEdit): Promise<ComposedFrame[] | null>;
   onError(message: string): void;
@@ -95,6 +96,8 @@ export interface AlbumCanvasProps {
   sheetBarMetadata: readonly SheetBarMetadata[];
   mediaPreviewUrls?: Readonly<Record<string, string>>;
   technicalGuides?: CanvasTechnicalGuides;
+  frameGapUm?: number;
+  displayUnit?: import("../domain/project").DisplayUnit;
   continuousCanvasLayout: ContinuousCanvasLayout;
   selectedFrameIds: readonly string[];
   focusedSheetId: string | null;

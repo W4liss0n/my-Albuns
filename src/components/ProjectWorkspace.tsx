@@ -752,6 +752,7 @@ export function ProjectWorkspace({
           sheetStates={projection.state.album.sheets}
           sheets={controller.canvasProps.composition.sheets}
           visualDefaults={projection.state.album.visualDefaults}
+          frameGapUm={projection.state.layoutSettings.gapUm}
           focusedSheetId={controller.canvasProps.focusedSheetId}
           mediaPreviews={mediaPreviews}
           revision={projection.state.revision}

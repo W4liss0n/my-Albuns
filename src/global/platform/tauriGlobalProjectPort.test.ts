@@ -41,6 +41,7 @@ const configuration: NewProjectConfiguration = {
 
 const creationConfiguration: NewProjectCreationConfiguration = {
   ...configuration,
+  frameGapUm: 9_000,
   visualDefaults: {
     background: {
       scope: "perSide",

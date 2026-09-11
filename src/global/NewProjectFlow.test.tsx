@@ -302,6 +302,7 @@ test("validates and creates with the complete neutral configuration", async () =
   expect(onCreate).toHaveBeenCalledWith({
     ...expectedConfiguration,
     visualDefaults: neutralVisualDefaults,
+    frameGapUm: 5_000,
   });
 });
 
@@ -394,13 +395,13 @@ test("creates from the neutral visual defaults without copying the demonstrative
   expect(borderColors[0]).toHaveAttribute("aria-pressed", "true");
   expect(
     screen.getByRole("slider", { name: "Espaço entre Frames" }),
-  ).toHaveValue("6000");
-  expect(screen.getByText("6 mm")).toBeVisible();
+  ).toHaveValue("5000");
+  expect(screen.getByText("5 mm")).toBeVisible();
   expect(
     screen
       .getByRole("slider", { name: "Espaço entre Frames" })
       .closest("div"),
-  ).toHaveAttribute("data-placeholder-feature", "new-project-frame-gap");
+  ).not.toHaveAttribute("data-placeholder-feature");
   const secondFrame = screen.getByLabelText("Frame demonstrativo esquerdo 2");
   const initialSecondFrameX = Number(secondFrame.getAttribute("x"));
   fireEvent.change(
@@ -424,6 +425,7 @@ test("creates from the neutral visual defaults without copying the demonstrative
   expect(onCreate).toHaveBeenCalledWith(
     expect.objectContaining({
       visualDefaults: neutralVisualDefaults,
+      frameGapUm: 18_000,
     }),
   );
   expect(JSON.stringify(onCreate.mock.calls[0]?.[0])).not.toContain(
@@ -434,7 +436,7 @@ test("creates from the neutral visual defaults without copying the demonstrative
   );
 });
 
-test("formats the placeholder Frame spacing in the configured Unit", async () => {
+test("formats the Project Frame spacing in the configured Unit", async () => {
   const user = userEvent.setup();
 
   render(
@@ -450,8 +452,8 @@ test("formats the placeholder Frame spacing in the configured Unit", async () =>
 
   expect(
     screen.getByRole("slider", { name: "Espaço entre Frames" }),
-  ).toHaveValue("6000");
-  expect(screen.getByText("0.6 cm")).toBeVisible();
+  ).toHaveValue("5000");
+  expect(screen.getByText("0.5 cm")).toBeVisible();
 });
 
 test("does not hover a side that already belongs to the fixed scope", async () => {
@@ -856,9 +858,9 @@ test("shows a solid Frame border immediately and sends its canonical values", as
     .querySelectorAll("rect");
   expect(firstFrameSegments[0]).toHaveAttribute("x", "12000");
   expect(firstFrameSegments[0]).toHaveAttribute("y", "12000");
-  expect(firstFrameSegments[0]).toHaveAttribute("width", "135000");
+  expect(firstFrameSegments[0]).toHaveAttribute("width", "135500");
   expect(firstFrameSegments[0]).toHaveAttribute("height", "2500");
-  expect(firstFrameSegments[3]).toHaveAttribute("x", "144500");
+  expect(firstFrameSegments[3]).toHaveAttribute("x", "145000");
   expect(firstFrameSegments[3]).toHaveAttribute("width", "2500");
 
   fireEvent.click(screen.getByRole("button", { name: "Criar Projeto" }));
@@ -1379,6 +1381,7 @@ test("converts periodic display values without changing physical values and keep
       lastSheet: "double",
     },
     visualDefaults: neutralVisualDefaults,
+    frameGapUm: 5_000,
   } satisfies NewProjectCreationConfiguration);
 });
 

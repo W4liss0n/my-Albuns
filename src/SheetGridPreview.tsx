@@ -114,6 +114,7 @@ export function SheetGridPreview() {
   return (
     <main className="sheet-grid-preview" data-development-preview="sheet-grid">
       <InspectorPanel
+        frameGapUm={representativeProjection.state.layoutSettings.gapUm}
         context={{ kind: "album" }}
         displayedPhotoPanX={0}
         displayedPhotoZoom={1}

@@ -133,6 +133,12 @@ pub(crate) struct InitialProjectCreationConfiguration {
     pub(crate) document: InitialDocumentConfiguration,
     pub(crate) structure: InitialStructureConfiguration,
     pub(crate) visual_defaults: InitialVisualDefaults,
+    #[serde(default = "default_frame_gap_um")]
+    pub(crate) frame_gap_um: i64,
+}
+
+pub(crate) fn default_frame_gap_um() -> i64 {
+    myalbuns_core::LayoutParameters::default().gap_um
 }
 
 impl InitialProjectCreationConfiguration {
@@ -182,7 +188,8 @@ pub(crate) fn to_core_initial_project(
     let personalization = to_core_personalization(configuration.visual_defaults)?;
     Some(
         InitialProject::configured(to_core_configuration(dimensions))
-            .with_personalization(personalization),
+            .with_personalization(personalization)
+            .with_frame_gap_um(configuration.frame_gap_um),
     )
 }
 
@@ -286,6 +293,7 @@ mod tests {
     fn personalized_creation() -> InitialProjectCreationConfiguration {
         let dimensions = valid_configuration();
         InitialProjectCreationConfiguration {
+            frame_gap_um: 5_000,
             document: dimensions.document,
             structure: dimensions.structure,
             visual_defaults: InitialVisualDefaults {

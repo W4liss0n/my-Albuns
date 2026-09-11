@@ -2,6 +2,7 @@ import { emptyLayoutCatalogPort, unusedLayoutDialogPort } from "../test/layoutCa
 import { useLayoutEffect, useState } from "react";
 import { act, fireEvent, render, waitFor } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
+import { frameGeometryPreview } from "../test/frameGeometryPreview";
 
 import type { ProjectCorePort } from "../application/projectPorts";
 import type { EditorProjection } from "../domain/project";
@@ -35,7 +36,7 @@ test.each([1, 2])("releasing %i Frames and immediately undoing presents the late
   let resolveEdit!: (projection: EditorProjection) => void;
   const pendingEdit = new Promise<EditorProjection>((resolve) => { resolveEdit = resolve; });
   const unsupported = async (): Promise<never> => { throw new Error("Unsupported in this Frame/history test."); };
-  const preview = vi.fn(async () => changed.composition.sheets[0].frames);
+  const preview = vi.fn(async () => frameGeometryPreview(changed.composition.sheets[0].frames));
   const undo = vi.fn(async () => undone);
   const port: ProjectCorePort = {
     ...emptyLayoutCatalogPort,

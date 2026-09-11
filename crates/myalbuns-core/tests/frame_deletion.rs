@@ -68,6 +68,7 @@ fn project_with_frames(root: &Path) -> EditableProject {
         project
             .apply(ProjectIntent::EditFrameGeometry {
                 edit: FrameGeometryEdit {
+                    snap: None,
                     frames: vec![FrameGeometryTarget {
                         frame_id,
                         expected_rect: frame.rect.clone(),

@@ -20,16 +20,19 @@ function cloneVisualDefaults(
 function Harness({
   onApply,
   revision = representativeProjection.state.revision,
+  frameGapUm = 5_000,
   value,
 }: {
   onApply: ComponentProps<typeof AlbumDesignForm>["onApply"];
   revision?: number;
+  frameGapUm?: number;
   value: ProjectedVisualDefaults;
 }) {
   const [ready, setReady] = useState(false);
   return (
     <>
       <AlbumDesignForm
+        frameGapUm={frameGapUm}
         document={representativeProjection.state.document}
         formId="album-design-equivalent-projection"
         mediaItems={[]}
@@ -68,6 +71,25 @@ test("preserves an unapplied draft across a semantically equivalent projection",
 
   expect(screen.getByLabelText("Cor do Background")).toHaveValue("#f7f5f0");
   expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled();
+});
+
+test("edits the confirmed Project gap as part of Apply and adopts the applied baseline", async () => {
+  const value = representativeProjection.state.album.visualDefaults;
+  const onApply = vi.fn<ComponentProps<typeof AlbumDesignForm>["onApply"]>(async () => true);
+  const view = render(<Harness onApply={onApply} value={value} frameGapUm={7_000} />);
+  expect(screen.getByRole("slider", { name: "Espaço entre Frames" })).toHaveValue("7000");
+  fireEvent.change(screen.getByRole("slider", { name: "Espaço entre Frames" }), { target: { value: "9000" } });
+  expect(onApply).not.toHaveBeenCalled();
+  expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled();
+  fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
+  await waitFor(() => expect(onApply).toHaveBeenCalledOnce());
+  const submitted = onApply.mock.calls[0][0];
+  expect(submitted.materialize(representativeProjection)).toEqual({
+    kind: "setAlbumDesign", frameGapUm: 9_000, visualDefaults: value,
+  });
+  view.rerender(<Harness onApply={onApply} value={value} frameGapUm={9_000} revision={26} />);
+  await waitFor(() => expect(screen.getByRole("button", { name: "Aplicar" })).toBeDisabled());
+  expect(screen.getByRole("slider", { name: "Espaço entre Frames" })).toHaveValue("9000");
 });
 
 test("rebases an unapplied draft over an authoritative Album design change", async () => {

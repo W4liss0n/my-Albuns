@@ -578,13 +578,12 @@ impl EditableProject {
     pub fn preview_frame_geometry(
         &self,
         edit: &crate::FrameGeometryEdit,
-    ) -> Result<Vec<crate::ComposedFrame>, CoreError> {
+    ) -> Result<crate::FrameGeometryPreview, CoreError> {
         if !self.session_valid {
             return Err(CoreError::EditableSessionInvalidated);
         }
-        let edits = self
-            .project()
-            .frame_geometry_edit(edit)?
+        let (edits, snap) = self.project().frame_geometry_edit(edit)?;
+        let edits = edits
             .into_iter()
             .map(|(id, rect)| (id.hyphenated().to_string(), rect))
             .collect::<Vec<_>>();
@@ -604,13 +603,14 @@ impl EditableProject {
                 frame.rect = (*rect).into();
             }
         }
-        Ok(crate::composition::resolve_editor_projection(state)
+        let frames = crate::composition::resolve_editor_projection(state)
             .composition
             .sheets
             .into_iter()
             .flat_map(|sheet| sheet.frames)
             .filter(|frame| edits.iter().any(|(id, _)| *id == frame.frame_id))
-            .collect())
+            .collect();
+        Ok(crate::FrameGeometryPreview { frames, snap })
     }
 
     /// Resolves a Frame-style draft through the productive document and composer.

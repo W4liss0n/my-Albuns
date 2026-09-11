@@ -353,6 +353,7 @@ mod tests {
 
     fn configured_project() -> InitialProjectCreationConfiguration {
         InitialProjectCreationConfiguration {
+            frame_gap_um: 5_000,
             document: InitialDocumentConfiguration {
                 display_unit: InitialDisplayUnit::Cm,
                 sheet_width_um: 508_000,

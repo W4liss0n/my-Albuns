@@ -437,6 +437,12 @@
         "sheetHeightUm": 300000,
         "sheetWidthUm": 600000
       },
+      "layoutSettings": {
+        "gapUm": 5000,
+        "marginUm": 15000,
+        "minimumSideUm": 20000,
+        "permission": "pagesAndSheet"
+      },
       "projectId": "frame-deletion-project",
       "projectName": "Exclusão",
       "revision": 11,
@@ -850,6 +856,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "frame-deletion-project",
           "projectName": "Exclusão",
           "revision": 12,
@@ -1160,6 +1172,12 @@
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
           },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
           "projectId": "frame-deletion-project",
           "projectName": "Exclusão",
           "revision": 13,
@@ -1328,6 +1346,12 @@
             "safetyUm": 3000,
             "sheetHeightUm": 300000,
             "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
           },
           "projectId": "frame-deletion-project",
           "projectName": "Exclusão",

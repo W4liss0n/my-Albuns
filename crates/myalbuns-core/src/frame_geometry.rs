@@ -10,6 +10,9 @@ use crate::{ProjectRect, RectUm};
 pub struct FrameGeometryEdit {
     pub frames: Vec<FrameGeometryTarget>,
     pub gesture: FrameGeometryGesture,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub snap: Option<crate::FrameSnapRequest>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
@@ -55,7 +58,7 @@ pub enum FrameResizeHandle {
 }
 
 impl FrameResizeHandle {
-    fn axes(self) -> (i8, i8) {
+    pub(crate) fn axes(self) -> (i8, i8) {
         match self {
             Self::TopLeft => (-1, -1),
             Self::Top => (0, -1),
@@ -78,6 +81,29 @@ pub(crate) fn edited_rects(
     surface_width: u64,
     surface_height: u64,
     gesture: &FrameGeometryGesture,
+) -> Vec<ProjectRect> {
+    transform_rects(rects, surface_width, surface_height, gesture, None)
+}
+
+/// A snap can require a fractional pointer correction (centers and proportional
+/// corners). Quantize the resulting physical rectangles once, at the same owner
+/// as ordinary resize, instead of rounding each pointer axis before scaling.
+pub(crate) fn snapped_rects(
+    rects: &[ProjectRect],
+    surface_width: u64,
+    surface_height: u64,
+    gesture: &FrameGeometryGesture,
+    delta: [f64; 2],
+) -> Vec<ProjectRect> {
+    transform_rects(rects, surface_width, surface_height, gesture, Some(delta))
+}
+
+fn transform_rects(
+    rects: &[ProjectRect],
+    surface_width: u64,
+    surface_height: u64,
+    gesture: &FrameGeometryGesture,
+    delta: Option<[f64; 2]>,
 ) -> Vec<ProjectRect> {
     let x = rects
         .iter()
@@ -110,6 +136,7 @@ pub(crate) fn edited_rects(
         minimum_width,
         minimum_height,
         gesture,
+        delta,
     );
     rects
         .iter()
@@ -155,14 +182,31 @@ fn edited_rect(
     minimum_width: u64,
     minimum_height: u64,
     gesture: &FrameGeometryGesture,
+    delta: Option<[f64; 2]>,
 ) -> ProjectRect {
     match *gesture {
         FrameGeometryGesture::Move {
             delta_x_um,
             delta_y_um,
         } => ProjectRect::new(
-            moved_coordinate(rect.x(), delta_x_um, surface_width - rect.width()),
-            moved_coordinate(rect.y(), delta_y_um, surface_height - rect.height()),
+            delta.map_or_else(
+                || moved_coordinate(rect.x(), delta_x_um, surface_width - rect.width()),
+                |delta| {
+                    (rect.x() as f64 + delta[0])
+                        .round()
+                        .clamp(0.0, (surface_width - rect.width()) as f64)
+                        as u64
+                },
+            ),
+            delta.map_or_else(
+                || moved_coordinate(rect.y(), delta_y_um, surface_height - rect.height()),
+                |delta| {
+                    (rect.y() as f64 + delta[1])
+                        .round()
+                        .clamp(0.0, (surface_height - rect.height()) as f64)
+                        as u64
+                },
+            ),
             rect.width(),
             rect.height(),
         ),
@@ -190,8 +234,9 @@ fn edited_rect(
                 vertical,
                 from_center,
             );
-            let mut width = x_axis.requested_size(delta_x_um);
-            let mut height = y_axis.requested_size(delta_y_um);
+            let delta = delta.unwrap_or([delta_x_um as f64, delta_y_um as f64]);
+            let mut width = x_axis.requested_size(delta[0]);
+            let mut height = y_axis.requested_size(delta[1]);
             if preserve_aspect_ratio && horizontal != 0 && vertical != 0 {
                 let x_scale = width / x_axis.original_size;
                 let y_scale = height / y_axis.original_size;
@@ -264,8 +309,8 @@ impl ResizeAxis {
         }
     }
 
-    fn requested_size(&self, delta: i64) -> f64 {
-        self.original_size + delta as f64 * self.delta_multiplier
+    fn requested_size(&self, delta: f64) -> f64 {
+        self.original_size + delta * self.delta_multiplier
     }
 
     fn resolve(&self, requested: f64) -> (u64, u64) {

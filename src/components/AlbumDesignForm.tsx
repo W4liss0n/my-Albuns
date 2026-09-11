@@ -20,6 +20,7 @@ import {
 import {
   createAlbumDesignProjectDraft,
   type AlbumDesignProjectDraft,
+  type AlbumDesignValue,
 } from "../application/projectSettingsDraft";
 import type { MediaPreview } from "../application/projectPorts";
 import type {
@@ -58,6 +59,7 @@ interface AlbumDesignFormProps {
   mediaPreviews: Readonly<Record<string, MediaPreview>>;
   revision: number;
   value: ProjectedVisualDefaults;
+  frameGapUm: number;
   onApply(draft: AlbumDesignProjectDraft): Promise<boolean>;
   onReadyChange(ready: boolean): void;
 }
@@ -80,12 +82,14 @@ export function AlbumDesignForm({
   mediaPreviews,
   revision,
   value,
+  frameGapUm: confirmedFrameGapUm,
   onApply,
   onReadyChange,
 }: AlbumDesignFormProps) {
-  const baselineSignature = JSON.stringify(value);
+  const baselineValue = { ...value, frameGapUm: confirmedFrameGapUm };
+  const baselineSignature = JSON.stringify(baselineValue);
   const baseline = useSemanticBaseline(
-    { revision, value },
+    { revision, value: baselineValue },
     baselineSignature,
   );
   const [draftSession, setDraftSession] = useState<AlbumDesignDraftSession>(
@@ -114,9 +118,7 @@ export function AlbumDesignForm({
     () => renderableMediaPreviewUrls(mediaPreviews),
     [mediaPreviews],
   );
-  // PLACEHOLDER UI: o espaço entre Frames ainda não possui contrato de
-  // persistência; a medida física controla somente a prévia desta seção.
-  const [frameGapUm, setFrameGapUm] = useState(6_000);
+  const frameGapUm = draft.frameGapUm;
   /**
    * Um seletor de Decorativo por vez. O estado vive aqui, e não em cada
    * controle, para que abrir um feche o outro por construção — inclusive
@@ -217,17 +219,17 @@ export function AlbumDesignForm({
   }
 
   function transitionProjectDraft(
-    transition: (current: ProjectedVisualDefaults) => ProjectedVisualDefaults,
+    transition: (current: AlbumDesignValue) => ProjectedVisualDefaults | AlbumDesignValue,
   ) {
     setDraftSession((session) => ({
       current: session.current.transition(
-        transition(session.current.value),
+        { ...session.current.value, ...transition(session.current.value) },
       ),
       pending: session.pending
         ? {
             ...session.pending,
             subsequent: session.pending.subsequent.transition(
-              transition(session.pending.subsequent.value),
+              { ...session.pending.subsequent.value, ...transition(session.pending.subsequent.value) },
             ),
           }
         : null,
@@ -399,11 +401,7 @@ export function AlbumDesignForm({
             />
           </label>
         </div>
-        {/* PLACEHOLDER UI: frame gap awaits its persistence contract. */}
-        <label
-          className="ui-range-control"
-          data-placeholder-feature="album-design-frame-gap"
-        >
+        <label className="ui-range-control">
           <span className="ui-range-control__heading">
             <span>Espaço entre Frames</span>
             <output>
@@ -413,14 +411,15 @@ export function AlbumDesignForm({
           <input
             aria-label="Espaço entre Frames"
             className="ui-range"
-            max="24000"
+            max={Math.max(24_000, frameGapUm)}
             min="0"
             step="1000"
             type="range"
             value={frameGapUm}
-            onChange={(event) =>
-              setFrameGapUm(Number(event.currentTarget.value))
-            }
+            onChange={(event) => {
+              const frameGapUm = Number(event.currentTarget.value);
+              transitionProjectDraft((current) => ({ ...current, frameGapUm }));
+            }}
           />
         </label>
       </section>
