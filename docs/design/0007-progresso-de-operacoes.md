@@ -43,6 +43,13 @@ problema; leitura e Cache não reiniciam a barra em fases separadas. Mudanças d
 área visível não cancelam o trabalho necessário à ação. Atualizações automáticas
 da origem continuam em segundo plano e preservam a prévia anterior até a troca.
 
+Adicionar uma Foto ou aplicar um Decorativo já importado à Lâmina não inicia
+outra preparação, não abre progresso e não aguarda o Cache. O gesto atualiza
+a composição imediatamente e reutiliza a prévia disponível. Se uma prévia
+precisar ser recuperada, isso acontece sob demanda, em segundo plano. A mesma
+regra vale para desfazer e refazer essas aplicações. Novos vínculos, inclusive
+os restaurados no catálogo, continuam seguindo o processamento de imagens.
+
 Na importação, o Painel de imagens mantém o conjunto anterior durante todo o
 lote. Novos cartões e sua contagem aparecem juntos quando o processamento
 termina, inclusive quando há problemas a apresentar. Notificações do Monitor de

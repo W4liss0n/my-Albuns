@@ -66,6 +66,12 @@ Assim, mover uma miniatura dentro do programa coexiste com a recepção de
 arquivos externos. Solturas de Fotos consultam o alvo atual no Core;
 respostas de movimentos anteriores e gestos cancelados não fazem commit.
 
+Duplo clique e soltura de uma Foto ou Decorativo já importado atualizam a
+Lâmina imediatamente, sem abrir `Processando Imagens` nem aguardar uma nova
+preparação do Cache. A composição reutiliza a prévia disponível; a recuperação
+de prévias ausentes acontece em segundo plano. Desfazer e refazer a aplicação
+seguem a mesma regra.
+
 O Host captura raízes do catálogo, Cache e seleção antes de enumerar pastas.
 A enumeração e o processamento usam o mesmo plano congelado; filhos diretos
 conservam o caminho lógico da pasta selecionada.

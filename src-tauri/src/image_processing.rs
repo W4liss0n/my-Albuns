@@ -38,39 +38,31 @@ pub(crate) fn prepare_provisional_image(
 pub(crate) async fn prepare_changed_images(
     app: &AppHandle,
     previous_bindings: &[MediaBinding],
-    previous: &myalbuns_core::EditorProjection,
-    current: &myalbuns_core::EditorProjection,
     publish: impl FnMut(crate::ipc_contract::ImageProcessingProgress),
 ) -> Result<(), String> {
-    let previous_references = previous
-        .composition
-        .sheets
-        .iter()
-        .flat_map(|sheet| sheet.referenced_media_ids())
-        .collect::<std::collections::HashSet<_>>();
-    let added_references = current
-        .composition
-        .sheets
-        .iter()
-        .flat_map(|sheet| sheet.referenced_media_ids())
-        .filter(|id| !previous_references.contains(id))
-        .map(|id| id.to_string())
-        .collect::<std::collections::HashSet<_>>();
     let catalog = app.state::<ProjectHost>().authorized_media_catalog()?;
-    let bindings = catalog
-        .bindings
-        .iter()
-        .filter(|binding| {
-            !previous_bindings.contains(binding) || added_references.contains(&binding.media_id)
-        })
-        .collect::<Vec<_>>();
+    let bindings = images_requiring_preparation(previous_bindings, &catalog.bindings);
     if !bindings.is_empty() {
         let mut batch = ImageProcessingBatch::new(bindings.len() as u32, publish);
-        batch
-            .prepare_all(app, bindings.into_iter().cloned().collect())
-            .await;
+        batch.prepare_all(app, bindings).await;
     }
     Ok(())
+}
+
+fn images_requiring_preparation(
+    previous_bindings: &[MediaBinding],
+    current_bindings: &[MediaBinding],
+) -> Vec<MediaBinding> {
+    // Placement changes composition, not the imported source. Canvas demand
+    // owns any missing preview; creative mutations must not wait for Cache.
+    if previous_bindings == current_bindings {
+        return Vec::new();
+    }
+    current_bindings
+        .iter()
+        .filter(|binding| !previous_bindings.contains(binding))
+        .cloned()
+        .collect()
 }
 
 pub(crate) struct ImageProcessingBatch<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> {
@@ -651,6 +643,151 @@ mod tests {
         future::Future,
         task::{Context, Poll, Waker},
     };
+
+    #[test]
+    fn placing_imported_media_does_not_start_foreground_processing() {
+        use myalbuns_core::{
+            CreateAuthorization, CreateProjectRequest, DecorativeDropRequest, DecorativeRole,
+            DecorativeScope, ImportMedia, InitialProject, MediaKind, PhotoPlacementMode,
+            PhotoSourceMetadata, ProjectCore, ProjectIntent, ProjectLocation,
+        };
+
+        for (kind, drop) in [
+            (MediaKind::Photo, false),
+            (MediaKind::Photo, true),
+            (MediaKind::Decorative, false),
+            (MediaKind::Decorative, true),
+        ] {
+            let root = tempfile::tempdir().unwrap();
+            let location = root.path().join("Placement.myalbuns");
+            let mut roots = OperationPathContext::new();
+            roots.capture(&location).unwrap();
+            let mut project = ProjectCore::new()
+                .with_identity_storage_roots(
+                    root.path().join("leases"),
+                    root.path().join("identities"),
+                )
+                .create_editable(CreateProjectRequest::new(
+                    ProjectLocation::new(location, roots.freeze()),
+                    InitialProject::neutral(),
+                    CreateAuthorization::CreateOnly,
+                ))
+                .unwrap();
+            let path = root.path().join("Imported.png");
+            image::RgbImage::from_pixel(48, 32, image::Rgb([20, 80, 160]))
+                .save(&path)
+                .unwrap();
+            project
+                .import_media(
+                    kind,
+                    vec![ImportMedia::new(
+                        path,
+                        PhotoSourceMetadata::new(48, 32, std::array::from_fn(|_| "#FFFFFF".into()))
+                            .unwrap(),
+                    )],
+                )
+                .unwrap();
+            let host = ProjectHost::new(project);
+            let previous = host.projection().unwrap();
+            let previous_bindings = host.authorized_media_catalog().unwrap().bindings;
+            assert_eq!(
+                images_requiring_preparation(&[], &previous_bindings),
+                previous_bindings,
+                "new catalog bindings still require processing"
+            );
+            let sheet_id = previous.state.album.sheets[0].id.clone();
+            let media_id = previous.state.album.media[0].id;
+            let intent = match (kind, drop) {
+                (MediaKind::Photo, false) => ProjectIntent::AddPhoto {
+                    sheet_id,
+                    media_id,
+                    mode: PhotoPlacementMode::Normal,
+                },
+                (MediaKind::Photo, true) => ProjectIntent::DropPhoto {
+                    sheet_id,
+                    media_id,
+                    x_um: 100_000,
+                    y_um: 100_000,
+                    mode: PhotoPlacementMode::Normal,
+                },
+                (MediaKind::Decorative, false) => ProjectIntent::ApplyDecorative {
+                    sheet_id,
+                    media_id,
+                    role: DecorativeRole::Background,
+                    scope: DecorativeScope::BothSides,
+                },
+                (MediaKind::Decorative, true) => ProjectIntent::DropDecorative {
+                    request: DecorativeDropRequest {
+                        sheet_id,
+                        media_id,
+                        role: DecorativeRole::Overlay,
+                        x_um: 100_000,
+                        y_um: 100_000,
+                    },
+                },
+            };
+            let outcome = host.apply_with_outcome(intent).unwrap();
+            assert_eq!(
+                outcome.projection.state.revision,
+                previous.state.revision + 1
+            );
+            let catalog = host.authorized_media_catalog().unwrap();
+            assert_eq!(catalog.bindings, previous_bindings);
+            let pending = images_requiring_preparation(&previous_bindings, &catalog.bindings);
+            assert!(
+                pending.is_empty(),
+                "placing {kind:?} (drop={drop}) must not open processing or wait for Cache"
+            );
+            host.undo().unwrap();
+            assert!(
+                images_requiring_preparation(
+                    &catalog.bindings,
+                    &host.authorized_media_catalog().unwrap().bindings,
+                )
+                .is_empty()
+            );
+            host.redo().unwrap();
+            assert!(
+                images_requiring_preparation(
+                    &catalog.bindings,
+                    &host.authorized_media_catalog().unwrap().bindings,
+                )
+                .is_empty(),
+                "redoing placement of {kind:?} must not restart processing"
+            );
+        }
+    }
+
+    #[test]
+    fn preparation_keeps_new_and_changed_sources_but_skips_unchanged_or_removed_bindings() {
+        let binding = MediaBinding {
+            media_id: "photo-1".into(),
+            kind: myalbuns_core::MediaKind::Photo,
+            logical_path: "Original.jpg".into(),
+        };
+        let changed = MediaBinding {
+            logical_path: "Relinked.jpg".into(),
+            ..binding.clone()
+        };
+        let added = MediaBinding {
+            media_id: "decorative-1".into(),
+            kind: myalbuns_core::MediaKind::Decorative,
+            ..binding.clone()
+        };
+        assert!(images_requiring_preparation(std::slice::from_ref(&binding), &[]).is_empty());
+        assert_eq!(
+            images_requiring_preparation(
+                std::slice::from_ref(&binding),
+                &[binding.clone(), added.clone()],
+            )
+            .as_slice(),
+            std::slice::from_ref(&added),
+        );
+        assert_eq!(
+            images_requiring_preparation(&[binding], &[changed.clone(), added.clone()]),
+            [changed, added],
+        );
+    }
 
     #[test]
     fn batch_fills_two_slots_and_reports_completion_order_without_stopping_on_error() {
