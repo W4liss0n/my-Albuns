@@ -127,7 +127,7 @@ ponteiro de 40%/20%/40% serve à escolha do escopo e não define esse contorno.
 Um traço azul de 2 pixels, com apoio branco para contraste, acompanha a área
 ativa visível e conserva sua espessura no Zoom. Nenhuma tonalidade é aplicada
 sobre a composição. Duas guias verticais tracejadas de 1 pixel delimitam a
-região central, com apoio branco para contraste sobre fotos claras ou escuras.
+região central. Cada guia tem um único traço azul, sem halo ou traço paralelo.
 Os traços e intervalos têm 5 pixels e começam a 8 pixels das bordas superior e
 inferior, conservando essas medidas no Zoom. As guias ficam mais visíveis ao
 atingir Ambos os lados, sem preencher a faixa nem desenhar colchetes;

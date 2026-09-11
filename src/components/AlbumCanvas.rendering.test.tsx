@@ -49,7 +49,7 @@ test("composes the Decorative preview below Frames, switches role with Shift, an
   const callbacks = { revision: 1, onPreviewDecorativeDrop, onDropDecorative };
   view.rerenderCanvas({ ...callbacks, mediaDrag });
   await waitFor(() => expect(screen.getByRole("status", { name: "Aplicação do Decorativo" })).toHaveTextContent("Fundo · Ambos os lados"));
-  expect(displayWithLabel("background-media-fallback-decorative-001")).toBeDefined();
+  await waitFor(() => expect(displayWithLabel("background-media-fallback-decorative-001")).toBeDefined());
   expect(displayWithLabel("decorative-drop-target-sheet-001")).toMatchObject({ rectCommands: [{ x: 0, y: 0, width: 600, height: 300 }], fillStyles: [] });
   expect(displayWithLabel("decorative-drop-center-sheet-001")).toMatchObject({ rectCommands: [], fillStyles: [] });
   expect(displayWithLabel("sheet-focus-sheet-001")).toMatchObject({ visible: false });
@@ -59,7 +59,7 @@ test("composes the Decorative preview below Frames, switches role with Shift, an
   view.rerenderCanvas({ ...callbacks, mediaDrag: { ...mediaDrag, shiftKey: true } });
   await waitFor(() => expect(screen.getByRole("status", { name: "Aplicação do Decorativo" })).toHaveTextContent("Overlay · Ambos os lados"));
   expect(onPreviewDecorativeDrop).toHaveBeenLastCalledWith(expect.objectContaining({ role: "overlay" }));
-  expect(displayWithLabel("decorative-overlay-fallback-decorative-001")).toBeDefined();
+  await waitFor(() => expect(displayWithLabel("decorative-overlay-fallback-decorative-001")).toBeDefined());
   view.rerenderCanvas({ ...callbacks, mediaDrag: { ...mediaDrag, shiftKey: true, phase: "drop" } });
   await waitFor(() => expect(onDropDecorative).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ mediaId: "decorative-001", role: "overlay" })));
   expect(onSelectFrame).not.toHaveBeenCalled();

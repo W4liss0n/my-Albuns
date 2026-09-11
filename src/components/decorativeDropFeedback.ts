@@ -10,11 +10,10 @@ export function createDecorativeDropFeedback(preview: DecorativeDropPreview, act
   container.eventMode = "none";
   const halo = new Graphics();
   const target = new Graphics();
-  const centerHalo = new Graphics();
   const center = new Graphics();
   target.label = `decorative-drop-target-${preview.sheet.sheetId}`;
   center.label = `decorative-drop-center-${preview.sheet.sheetId}`;
-  container.addChild(halo, target, centerHalo, center);
+  container.addChild(halo, target, center);
 
   const bounds = { ...activeBounds };
   if (preview.sheet.activeSides === "both" && preview.scope !== "bothSides") {
@@ -33,9 +32,8 @@ export function createDecorativeDropFeedback(preview: DecorativeDropPreview, act
         outline.clear().rect(bounds.x, bounds.y, bounds.width, bounds.height)
           .stroke({ color: strokeColor, width: width / scale, alignment: 1 });
       }
-      for (const guide of [centerHalo, center]) {
-        guide.clear();
-        if (!preview.centerRect) continue;
+      center.clear();
+      if (preview.centerRect) {
         const left = preview.centerRect.x * MICROMETER_TO_CANVAS_PIXEL;
         const right = (preview.centerRect.x + preview.centerRect.width) * MICROMETER_TO_CANVAS_PIXEL;
         const top = bounds.y + 8 / scale;
@@ -43,12 +41,10 @@ export function createDecorativeDropFeedback(preview: DecorativeDropPreview, act
         const dash = 5 / scale;
         for (const x of [left, right]) {
           for (let y = top; y < bottom; y += dash * 2) {
-            guide.moveTo(x, y).lineTo(x, Math.min(y + dash, bottom));
+            center.moveTo(x, y).lineTo(x, Math.min(y + dash, bottom));
           }
         }
-        guide.stroke(guide === centerHalo
-          ? { color: 0xffffff, alpha: 0.8, width: 3 / scale }
-          : { color, alpha: preview.scope === "bothSides" ? 0.9 : 0.6, pixelLine: true });
+        center.stroke({ color, alpha: preview.scope === "bothSides" ? 1 : 0.7, pixelLine: true });
       }
     },
   };
