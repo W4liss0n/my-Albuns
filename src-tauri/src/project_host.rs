@@ -2876,7 +2876,7 @@ mod tests {
         let resolver = MediaResolver;
         runtime.apply(resolver.observe(1, std::slice::from_ref(&unavailable_sample)));
         let retried = MediaMonitor::default()
-            .retry_unavailable(&runtime, &binding, |_| {})
+            .retry_readable_fixture(&runtime, &binding)
             .expect("the Runtime repeats the authoritative inspection through the Host binding");
 
         let after = fixture
@@ -2950,8 +2950,18 @@ mod tests {
         let resolver = MediaResolver;
         let runtime = MediaRuntime::default();
         let monitor = MediaMonitor::default();
-        assert!(monitor.poll(&runtime, &before.bindings).update().is_none());
-        assert!(monitor.poll(&runtime, &before.bindings).update().is_some());
+        assert!(
+            monitor
+                .poll_readable_fixture(&runtime, &before.bindings)
+                .update()
+                .is_none()
+        );
+        assert!(
+            monitor
+                .poll_readable_fixture(&runtime, &before.bindings)
+                .update()
+                .is_some()
+        );
 
         let proposal = resolver
             .propose_relink(&selected, replacement.clone())
@@ -2986,8 +2996,13 @@ mod tests {
                 .logical_path,
             original_right
         );
-        assert!(monitor.poll(&runtime, &after.bindings).update().is_none());
-        let stable = monitor.poll(&runtime, &after.bindings);
+        assert!(
+            monitor
+                .poll_readable_fixture(&runtime, &after.bindings)
+                .update()
+                .is_none()
+        );
+        let stable = monitor.poll_readable_fixture(&runtime, &after.bindings);
         assert_eq!(
             stable.update().unwrap().changed_media_ids(),
             std::slice::from_ref(&selected.media_id)

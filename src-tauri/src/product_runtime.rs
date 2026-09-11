@@ -1209,7 +1209,6 @@ mod tests {
             .authorized_media_catalog()
             .expect("the Monitor receives the authorized catalog")
             .bindings;
-        let binding = bindings[0].clone();
         std::fs::remove_file(&photo_path).expect("the Original file is removed");
         std::fs::create_dir(&photo_path)
             .expect("an unexpected object keeps inspection deterministically unavailable");
@@ -1220,18 +1219,15 @@ mod tests {
         let (inspection_started_tx, inspection_started_rx) = mpsc::sync_channel(0);
         let (release_inspection_tx, release_inspection_rx) = mpsc::sync_channel(0);
         let blocking_monitor = monitor.clone();
-        let blocking_runtime = runtime.clone();
         let blocking_inspection = thread::spawn(move || {
-            blocking_monitor
-                .retry_unavailable(&blocking_runtime, &binding, |_| {
-                    inspection_started_tx
-                        .send(())
-                        .expect("the caller observes the blocked real inspection");
-                    release_inspection_rx
-                        .recv()
-                        .expect("the real inspection is released");
-                })
-                .expect("the unavailable occurrence completes after release");
+            blocking_monitor.hold_transition_for_test(|| {
+                inspection_started_tx
+                    .send(())
+                    .expect("the caller observes the blocked real inspection");
+                release_inspection_rx
+                    .recv()
+                    .expect("the real inspection is released");
+            });
         });
         inspection_started_rx
             .recv()
@@ -1556,8 +1552,13 @@ mod tests {
             if change_before_confirmation {
                 write_photo(31, 9);
             }
-            assert!(monitor.poll(&runtime, &catalog.bindings).update().is_none());
-            let confirmation = monitor.poll(&runtime, &catalog.bindings);
+            assert!(
+                monitor
+                    .poll_readable_fixture(&runtime, &catalog.bindings)
+                    .update()
+                    .is_none()
+            );
+            let confirmation = monitor.poll_readable_fixture(&runtime, &catalog.bindings);
             let decodes = crate::media_runtime::photo_source_decode_count();
             assert_eq!(
                 refresh_project_photos_for_media_update(
@@ -1583,8 +1584,13 @@ mod tests {
             assert_eq!(after.state.can_undo, before.state.can_undo);
 
             write_photo(43, 11);
-            assert!(monitor.poll(&runtime, &catalog.bindings).update().is_none());
-            let confirmation = monitor.poll(&runtime, &catalog.bindings);
+            assert!(
+                monitor
+                    .poll_readable_fixture(&runtime, &catalog.bindings)
+                    .update()
+                    .is_none()
+            );
+            let confirmation = monitor.poll_readable_fixture(&runtime, &catalog.bindings);
             let decodes = crate::media_runtime::photo_source_decode_count();
             refresh_project_photos_for_media_update(
                 &host,
@@ -1642,8 +1648,13 @@ mod tests {
             .expect("the demand receives the authorized catalog");
         let monitor = MediaMonitor::default();
         let runtime = MediaRuntime::default();
-        assert!(monitor.poll(&runtime, &catalog.bindings).update().is_none());
-        let confirmed = monitor.poll(&runtime, &catalog.bindings);
+        assert!(
+            monitor
+                .poll_readable_fixture(&runtime, &catalog.bindings)
+                .update()
+                .is_none()
+        );
+        let confirmed = monitor.poll_readable_fixture(&runtime, &catalog.bindings);
         let update = confirmed
             .update()
             .expect("the stable demand confirmation is adopted");
@@ -1714,15 +1725,25 @@ mod tests {
             .expect("an unexpected object makes the binding unavailable");
         let monitor = MediaMonitor::default();
         let runtime = MediaRuntime::default();
-        assert!(monitor.poll(&runtime, &catalog.bindings).update().is_none());
-        assert!(monitor.poll(&runtime, &catalog.bindings).update().is_some());
+        assert!(
+            monitor
+                .poll_readable_fixture(&runtime, &catalog.bindings)
+                .update()
+                .is_none()
+        );
+        assert!(
+            monitor
+                .poll_readable_fixture(&runtime, &catalog.bindings)
+                .update()
+                .is_some()
+        );
         std::fs::remove_dir(&photo_path).expect("the unavailable object is removed");
         RgbImage::from_pixel(23, 5, Rgb([50, 60, 70]))
             .save_with_format(&photo_path, ImageFormat::Jpeg)
             .expect("the replacement Original is a JPEG");
         let before = host.projection().expect("the fallback is projected");
         let inspection = monitor
-            .retry_unavailable(&runtime, &binding, |_| {})
+            .retry_readable_fixture(&runtime, &binding)
             .expect("the unavailable occurrence is retried");
 
         assert_eq!(

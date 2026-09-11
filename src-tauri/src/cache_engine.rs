@@ -2481,7 +2481,11 @@ mod tests {
             );
             assert!(
                 monitor
-                    .poll_in_plan(&runtime, &[binding], &fixture.work.root_bindings)
+                    .poll_readable_fixture_in_plan(
+                        &runtime,
+                        &[binding],
+                        &fixture.work.root_bindings
+                    )
                     .update()
                     .is_none(),
                 "the first poll must not invalidate the adopted cache"
