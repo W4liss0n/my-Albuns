@@ -27,6 +27,12 @@ Campos, seletores e ações comuns preservam o foco de teclado por uma mudança 
 
 No Windows, o host desabilita diretamente no WebView2 todos os aceleradores de navegador e o menu de contexto padrão; uma falha nessa configuração impede a abertura da Janela do Projeto. Zoom nativo e ferramentas de desenvolvimento também ficam desabilitados na configuração declarativa da janela. A política DOM cuida somente de navegação por link ou arquivo solto e das ações nativas dos botões auxiliares do mouse. Nenhuma dessas políticas executa comandos do produto ou substitui o registro contextual de comandos e atalhos.
 
+Ao minimizar uma janela no Windows, o host informa ao WebView2 que suas
+superfícies visíveis ficaram ocultas. Ao restaurá-la, reapresenta essas mesmas
+superfícies, preservando a Sessão, o Histórico e a seleção, sem recarregar a
+página. WebViews que já estavam ocultas por outro fluxo permanecem ocultas.
+Essa sincronização também se aplica à Tela de Boas-vindas e às janelas de diálogo.
+
 ## Diálogos pertencentes a uma janela
 
 Confirmações, avisos, seletores e progressos abrem em uma janela nativa separada com a janela solicitante como proprietária. A proprietária continua visível atrás do diálogo, mas fica desabilitada para mouse, teclado e comandos enquanto o diálogo estiver aberto. A relação nativa mantém o diálogo à frente sem recorrer a uma camada modal dentro da WebView. Fechar, cancelar ou concluir o diálogo reabilita a proprietária e devolve o foco a ela.

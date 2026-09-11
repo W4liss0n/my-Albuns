@@ -144,6 +144,7 @@ pub(crate) fn run(
         )
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
+        .manage(desktop_webview_policy::WindowWebviewVisibility::default())
         .manage(project_host)
         .manage(crate::media_file_drop::NativeMediaDrops::default())
         .manage(startup_handshake)
@@ -162,6 +163,7 @@ pub(crate) fn run(
         .manage(layout_catalog)
         .manage(crate::workspace_preferences::WorkspacePreferencesStore::new(&app_paths))
         .on_window_event(|window, event| {
+            desktop_webview_policy::on_window_event(window, event);
             if window.label() == PROJECT_WINDOW_LABEL
                 && let tauri::WindowEvent::DragDrop(event) = event
                 && let Some(payload) = window

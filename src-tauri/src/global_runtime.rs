@@ -1816,6 +1816,8 @@ pub(crate) fn run(direct_projects: Vec<PathBuf>) -> Result<(), Box<dyn std::erro
             },
         )
         .plugin(tauri_plugin_dialog::init())
+        .manage(desktop_webview_policy::WindowWebviewVisibility::default())
+        .on_window_event(desktop_webview_policy::on_window_event)
         .manage(state)
         .manage(cache_service)
         .manage(provisional_decoratives)

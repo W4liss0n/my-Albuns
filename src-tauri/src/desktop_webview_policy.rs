@@ -5,6 +5,119 @@ use std::{ffi::OsString, io, path::PathBuf};
 
 use tauri::{WebviewWindow, webview::PageLoadEvent};
 
+#[derive(Default)]
+pub(crate) struct WindowWebviewVisibility {
+    #[cfg(windows)]
+    minimized: Mutex<std::collections::HashMap<String, MinimizedWebviews>>,
+}
+
+#[cfg(windows)]
+#[derive(Default)]
+struct MinimizedWebviews {
+    restore: std::collections::HashMap<String, usize>,
+}
+
+#[cfg(windows)]
+impl MinimizedWebviews {
+    fn synchronize<E>(
+        &mut self,
+        label: &str,
+        controller_id: usize,
+        minimized: bool,
+        is_visible: impl FnOnce() -> Result<bool, E>,
+        set_visible: impl FnOnce(bool) -> Result<(), E>,
+    ) -> Result<(), E> {
+        // Save As can reuse a label after replacing its controller. A page-load
+        // notification from the same controller must retain its pending restore.
+        if self
+            .restore
+            .get(label)
+            .is_some_and(|id| *id != controller_id)
+        {
+            self.restore.remove(label);
+        }
+        if minimized {
+            if !self.restore.contains_key(label) && is_visible()? {
+                set_visible(false)?;
+                self.restore.insert(label.to_owned(), controller_id);
+            }
+        } else if self.restore.contains_key(label) {
+            set_visible(true)?;
+            self.restore.remove(label);
+        }
+        Ok(())
+    }
+}
+
+pub(crate) fn on_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
+    #[cfg(windows)]
+    match event {
+        tauri::WindowEvent::Resized(_) => {
+            // Tao reports Windows minimize/restore through Resized. WebView2
+            // does not receive those messages from its top-level parent.
+            for webview in window.webviews() {
+                synchronize_webview_visibility(&webview);
+            }
+        }
+        tauri::WindowEvent::Destroyed => {
+            let state = window.state::<WindowWebviewVisibility>();
+            if let Ok(mut minimized) = state.minimized.lock() {
+                minimized.remove(window.label());
+            }
+        }
+        _ => {}
+    }
+    #[cfg(not(windows))]
+    let _ = (window, event);
+}
+
+#[cfg(windows)]
+fn synchronize_webview_visibility(webview: &tauri::Webview) {
+    let window = webview.window();
+    let app = webview.app_handle().clone();
+    let label = webview.label().to_owned();
+    let result = webview.with_webview(move |native| {
+        let synchronize = || -> Result<(), Box<dyn std::error::Error>> {
+            let is_minimized = window.is_minimized()?;
+            let state = app.state::<WindowWebviewVisibility>();
+            let mut windows = state.minimized.lock().map_err(|_| {
+                std::io::Error::other("the WebView visibility state became unavailable")
+            })?;
+            let minimized = windows.entry(window.label().to_owned()).or_default();
+            let controller = native.controller();
+            minimized.synchronize(
+                &label,
+                controller.as_raw() as usize,
+                is_minimized,
+                || unsafe {
+                    let mut visible = windows::core::BOOL::default();
+                    controller.IsVisible(&mut visible)?;
+                    Ok::<_, windows::core::Error>(visible.as_bool())
+                },
+                |visible| unsafe { controller.SetIsVisible(visible) },
+            )?;
+            Ok(())
+        };
+        if let Err(error) = synchronize() {
+            tracing::warn!(
+                target: "myalbuns.desktop",
+                window_label = window.label(),
+                webview_label = label,
+                error = %error,
+                event = "webview_visibility_sync_failed",
+            );
+        }
+    });
+    if let Err(error) = result {
+        tracing::warn!(
+            target: "myalbuns.desktop",
+            webview_label = webview.label(),
+            error = %error,
+            event = "webview_visibility_dispatch_failed",
+        );
+    }
+}
+
 const TAURI_WEBVIEW_AUTOMATION_ENV: &str = "TAURI_WEBVIEW_AUTOMATION";
 #[cfg(debug_assertions)]
 pub(crate) const SAVE_AS_WEBVIEW_DEBUG_PORT_ENV: &str = "MYALBUNS_DEV_SAVE_AS_WEBVIEW_DEBUG_PORT";
@@ -21,7 +134,8 @@ const WRY_DEFAULT_DISABLED_FEATURES: &str =
 
 #[cfg(windows)]
 use {
-    webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Settings3, windows::core::Interface,
+    tauri::Manager, webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Settings3,
+    windows::core::Interface,
 };
 
 #[derive(Clone)]
@@ -88,6 +202,7 @@ pub(crate) fn enforce_webview(webview: &tauri::Webview) -> std::io::Result<()> {
                     "could not apply the native WebView policy: {error}"
                 ))
             })?;
+        synchronize_webview_visibility(webview);
     }
 
     #[cfg(not(windows))]
@@ -179,6 +294,123 @@ pub(crate) fn retire_inherited_debug_arguments_before_replacement() -> io::Resul
 #[cfg(all(test, debug_assertions))]
 mod tests {
     use std::{ffi::OsString, path::PathBuf};
+
+    #[cfg(windows)]
+    #[test]
+    fn minimize_restore_resumes_only_the_webviews_hidden_by_minimization() {
+        use std::cell::Cell;
+
+        let mut state = super::MinimizedWebviews::default();
+        let visible = Cell::new(true);
+        let changes = Cell::new(0);
+        let mut synchronize = |minimized| {
+            state
+                .synchronize(
+                    "project",
+                    1,
+                    minimized,
+                    || Ok::<_, ()>(visible.get()),
+                    |next| {
+                        visible.set(next);
+                        changes.set(changes.get() + 1);
+                        Ok(())
+                    },
+                )
+                .unwrap();
+        };
+        synchronize(false); // Ordinary resize/maximize must not toggle the WebView.
+        assert_eq!(changes.get(), 0);
+        for cycle in 1..=3 {
+            synchronize(true);
+            assert!(
+                !visible.get(),
+                "minimizing must notify WebView2 that it is hidden"
+            );
+            synchronize(true); // Duplicate size notifications must retain the restore decision.
+            synchronize(false);
+            assert!(
+                visible.get(),
+                "restoring must resume the same WebView2 controller"
+            );
+            synchronize(false);
+            assert_eq!(changes.get(), cycle * 2);
+        }
+
+        let mut hidden = super::MinimizedWebviews::default();
+        for minimized in [false, true, true, false] {
+            hidden
+                .synchronize(
+                    "preflight",
+                    2,
+                    minimized,
+                    || Ok::<_, ()>(false),
+                    |_| {
+                        panic!("a WebView already hidden by its owner must remain hidden");
+                    },
+                )
+                .unwrap();
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_failed_visibility_change_can_be_retried() {
+        let mut state = super::MinimizedWebviews::default();
+        assert!(
+            state
+                .synchronize("project", 1, true, || Ok(true), |_| Err("hide"))
+                .is_err()
+        );
+        assert!(!state.restore.contains_key("project"));
+        state
+            .synchronize("project", 1, true, || Ok::<_, &str>(true), |_| Ok(()))
+            .unwrap();
+        assert!(
+            state
+                .synchronize("project", 1, false, || Ok(false), |_| Err("show"))
+                .is_err()
+        );
+        assert!(state.restore.contains_key("project"));
+        state
+            .synchronize("project", 1, false, || Ok::<_, &str>(false), |_| Ok(()))
+            .unwrap();
+        assert!(state.restore.is_empty());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn page_load_preserves_pending_restore_but_a_replacement_has_its_own_visibility() {
+        let mut state = super::MinimizedWebviews::default();
+        state
+            .synchronize("project", 1, true, || Ok::<_, ()>(true), |_| Ok(()))
+            .unwrap();
+        // The same controller finishes loading while minimized.
+        state
+            .synchronize(
+                "project",
+                1,
+                true,
+                || Ok::<_, ()>(false),
+                |_| panic!("already hidden"),
+            )
+            .unwrap();
+        assert_eq!(state.restore.get("project"), Some(&1));
+        // A hidden replacement must not inherit the old controller's restore.
+        state
+            .synchronize(
+                "project",
+                2,
+                false,
+                || Ok::<_, ()>(false),
+                |_| panic!("replacement is hidden"),
+            )
+            .unwrap();
+        assert!(state.restore.is_empty());
+        state
+            .synchronize("project", 2, true, || Ok::<_, ()>(true), |_| Ok(()))
+            .unwrap();
+        assert_eq!(state.restore.get("project"), Some(&2));
+    }
 
     #[test]
     fn replacement_debug_arguments_override_the_process_port_last() {
