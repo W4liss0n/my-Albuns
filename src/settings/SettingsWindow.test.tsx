@@ -9,7 +9,7 @@ test("Cache cleanup requires confirmation and survives changing tabs while it is
   const cachePort: CacheSettingsPort = {
     status: vi.fn(async () => ({ occupiedBytes: 1000, releasableBytes: 500, clearAllScheduled: false })),
     freeClosedProjects: vi.fn(async () => ({ freedBytes: 500 })),
-    clearAll: vi.fn(() => new Promise((resolve) => { complete = () => resolve({ kind: "scheduled" }); })),
+    clearAll: vi.fn(() => new Promise<{ kind: "scheduled" }>((resolve) => { complete = () => resolve({ kind: "scheduled" }); })),
   };
   const close = vi.fn();
   render(<SettingsWindow photoshopPort={photoshopSettingsPreview(null)} cachePort={cachePort} close={close} />);
@@ -24,7 +24,7 @@ test("Cache cleanup requires confirmation and survives changing tabs while it is
   fireEvent.click(screen.getByRole("tab", { name: "Desempenho" }));
   expect(screen.getByRole("status")).toHaveTextContent("Limpeza agendada");
   expect(screen.queryByRole("button", { name: "Confirmar" })).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Fechar", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
   expect(close).toHaveBeenCalledOnce();
 });
 
