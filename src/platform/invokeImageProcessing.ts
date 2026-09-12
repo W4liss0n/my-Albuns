@@ -16,4 +16,3 @@ export async function invokeImageProcessing<T>(
     active = false;
   }
 }
-
