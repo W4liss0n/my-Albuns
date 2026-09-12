@@ -36,6 +36,8 @@ arquivo do Projeto permanece intacto até Salvar.
 ou dirty. Resolver a última pendência fecha a tabela e retoma automaticamente
 a Exportação para a mesma seleção. Fechar a tabela enquanto restam problemas
 cancela a tentativa pendente e conserva as religações já feitas na sessão.
+Uma falha na preparação da prévia continua sendo mostrada com Arquivo e Motivo,
+mesmo quando o Original já está disponível; esse diagnóstico não é uma tabela vazia.
 
 O Monitor agora exige a leitura completa também para Decorativos antes de
 confirmar conteúdo novo e invalidar o Cache. Uma gravação externa parcial

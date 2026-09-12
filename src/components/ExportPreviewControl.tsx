@@ -94,6 +94,7 @@ export const ExportPreviewControl = forwardRef<
         retryExport();
         break;
       case "dismissExport":
+      case "dismissImageProcessingProblems":
       case "openExportProject":
         dismissFeedback();
         break;
@@ -236,6 +237,11 @@ export const ExportPreviewControl = forwardRef<
         });
         if (generation !== recoveryGeneration.current) return;
         onProjectionChange?.(result.projection);
+        if (result.problems.length === 0 && result.notes.length > 0) {
+          presentDialog({ kind: "imageProcessingProblems", importedCount: null,
+            operationProblem: null, problems: result.notes });
+          return;
+        }
         problems = result.problems;
         message = result.notes.map(note => `${note.fileName}: ${note.reason}`).join(" ");
       } else {

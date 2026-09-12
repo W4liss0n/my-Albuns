@@ -203,6 +203,26 @@ test("retiring the Project during recovery prevents automatic resumption", async
   expect(exportHarness.startSheet).toHaveBeenCalledOnce();
 });
 
+test("a recovered Original with a failed preview shows the processing problem instead of silently resuming", async () => {
+  const notes = [{ fileName: "Foto.jpg", reason: "Não foi possível publicar a prévia do Cache." }];
+  const relink = vi.fn<ExportMediaPort["relink"]>(async () => ({ projection: representativeProjection, problems: [], notes }));
+  const onProjectionChange = vi.fn();
+  const { dialog, exportHarness } = renderControl({ exportMediaPort: { relink, inspect: vi.fn() }, onProjectionChange });
+  fireEvent.click(screen.getByRole("button", { name: "Exportar Lâmina" }));
+  await act(async () => exportHarness.attempts[0].reject(new MediaExportBlockedError([
+    { mediaId: "photo-1", fileName: "Foto.jpg", state: "absent" },
+  ])));
+  dialog.emit("relinkExportMedia");
+  await waitFor(() => expect(dialog.present).toHaveBeenLastCalledWith({
+    kind: "imageProcessingProblems", importedCount: null, operationProblem: null, problems: notes,
+  }));
+  expect(onProjectionChange).toHaveBeenCalledWith(representativeProjection);
+  expect(exportHarness.startSheet).toHaveBeenCalledOnce();
+  dialog.emit("dismissImageProcessingProblems");
+  expect(dialog.dismiss).toHaveBeenCalledOnce();
+  expect(screen.getByRole("button", { name: "Exportar Lâmina" })).toBeEnabled();
+});
+
 test("placeholder validation presents Project problems and returns to the Project without retrying", async () => {
   const { dialog, exportHarness } = renderControl();
   fireEvent.click(screen.getByRole("button", { name: "Exportar Lâmina" }));

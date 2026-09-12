@@ -58,6 +58,8 @@ Depois de qualquer correção, a validação é executada novamente e a tabela r
 
 Na Exportação normal, a tabela permanece aberta somente enquanto houver problemas. Ao resolver a última pendência por `Relinkar` ou `Tentar novamente`, a janela fecha e a tentativa continua automaticamente para a mesma seleção, usando o estado visível atualizado. Não existe etapa vazia de confirmação nem botão `Continuar Exportação` nesse fluxo. A janela fecha antes de qualquer seletor de destino da continuação.
 
+Se o Original foi recuperado, mas houve falha na preparação de sua prévia, o diagnóstico de processamento ainda é apresentado com `Arquivo` e `Motivo`. Fechá-lo encerra a tentativa pendente e preserva o vínculo corrigido; a retomada automática exige ausência também dessas falhas reais.
+
 Na Exportação em lote, `Continuar Exportação` permanece desabilitado enquanto houver qualquer pendência sem decisão. Ao corrigir a última linha ou ignorar explicitamente seu Projeto, o botão é habilitado e o usuário confirma a continuação.
 
 Fechar ou cancelar a Tela de Problemas encerra a tentativa de Exportação pendente. Relinks realizados na sessão de um Projeto individual permanecem como alterações não salvas. O mapa temporário produzido para um lote é descartado. Esse mapa funcional não é o contexto técnico da [política de caminhos](0011-resolucao-e-politica-de-caminhos.md), que reutiliza fatos de raízes somente dentro de cada tentativa de processamento.
