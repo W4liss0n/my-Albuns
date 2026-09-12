@@ -29,7 +29,7 @@ export function ExportConfigurationDialog({ state, onAction }: {
   const range = /^\s*(\d+)(?:\s*[-–]\s*(\d+))?\s*$/.exec(interval);
   const start = Number(range?.[1]), end = Number(range?.[2] ?? range?.[1]);
   const validRange = Number.isInteger(start) && Number.isInteger(end) && start >= 1 && start <= end && end <= state.sheets.length;
-  const rangeHelp = `Informe uma lâmina ou um intervalo de 1 a ${state.sheets.length}, como 1-${state.sheets.length}.`;
+  const rangeHelp = `Informe uma lâmina ou um intervalo de 1 a ${state.sheets.length}.`;
   const rangeError = scope === "range" && interval.trim() !== "" && !validRange ? rangeHelp : undefined;
   const rangeTooltip = useFieldValidationTooltip(`${id}-range-help`, [
     { field: "interval", messages: rangeError ? [rangeError] : undefined },
