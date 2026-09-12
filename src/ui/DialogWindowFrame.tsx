@@ -6,7 +6,7 @@ type DialogWindowFrameProps = {
   title: string;
 } & (
   | { layout: "message"; titleId: string }
-  | { layout: "progress" | "problems"; titleId?: never }
+  | { layout: "progress" | "problems" | "form"; titleId?: never }
 );
 
 export function DialogWindowFrame({

@@ -62,8 +62,12 @@ interface produtiva utiliza o comando de Exportação normal.
   JPEG, PNG por página, PDF, intervalo inválido, entrada contextual com uma
   lâmina, verificação inicial e confirmação de conflitos.
 
+O formulário segue os seletores segmentados da referência de janelas, os campos
+e o slider compartilhados do editor. Os quatro grupos têm rótulos alinhados,
+separadores discretos e um rodapé com contagem, formato e modo de saída.
+
 As evidências geradas ficam fora do Git em `.scratch/normal-export-rendering/`
-e `.scratch/ui-acceptance/normal-export-final/`. Os resultados finais dos
+e `.scratch/ui-acceptance/normal-export-styled/`. Os resultados finais dos
 ensaios e da revisão acompanham a entrega; capturas não equivalem à aprovação
 manual do usuário.
 
