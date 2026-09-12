@@ -87,11 +87,6 @@ export const ExportPreviewControl = forwardRef<
     switch (action) {
       case "relinkExportMedia": void recoverMedia(true); break;
       case "retryExportMedia": void recoverMedia(false); break;
-      case "continueMediaExport": {
-        const current = lastDialogState.current;
-        if (current?.kind === "exportMediaProblems" && !current.busy && current.problems.length === 0) startExport();
-        break;
-      }
       case "cancelExport":
         requestCancellation();
         break;
@@ -126,11 +121,15 @@ export const ExportPreviewControl = forwardRef<
   }, [dialogPort, projectId]);
 
   function startExport() {
-    if (disabled || !selection || currentAttemptId.current !== null) {
+    startSelectedExport(selection);
+  }
+
+  function startSelectedExport(selected: ExportSheetSelection | null) {
+    if (disabled || !selected || currentAttemptId.current !== null) {
       return;
     }
 
-    attemptedSelection.current = { ...selection };
+    attemptedSelection.current = { ...selected };
     const attemptId = ++nextAttemptId.current;
     currentAttemptId.current = attemptId;
     beginInteraction();
@@ -139,7 +138,7 @@ export const ExportPreviewControl = forwardRef<
 
     let attempt: ExportAttempt;
     try {
-      attempt = exportPipelinePort.startSheet(selection, (event) => {
+      attempt = exportPipelinePort.startSheet(selected, (event) => {
         if (currentAttemptId.current !== attemptId) {
           return;
         }
@@ -225,6 +224,8 @@ export const ExportPreviewControl = forwardRef<
     recoveryPending.current = true;
     presentDialog({ ...current, busy: true, message: relink ? "Procurando e processando os Arquivos da pasta escolhida…" : "Verificando os Arquivos…" });
     try {
+      let problems;
+      let message = "";
       if (relink) {
         const result = await exportMediaPort.relink(selected, progress => {
           if (generation !== recoveryGeneration.current) return;
@@ -235,15 +236,32 @@ export const ExportPreviewControl = forwardRef<
         });
         if (generation !== recoveryGeneration.current) return;
         onProjectionChange?.(result.projection);
-        presentDialog({ ...current, busy: false, problems: result.problems,
-          message: result.notes.map(note => `${note.fileName}: ${note.reason}`).join(" ") });
+        problems = result.problems;
+        message = result.notes.map(note => `${note.fileName}: ${note.reason}`).join(" ");
       } else {
-        const problems = await exportMediaPort.inspect(selected);
+        problems = await exportMediaPort.inspect(selected);
         if (generation !== recoveryGeneration.current) return;
-        presentDialog({ ...current, busy: false, problems, message: "" });
       }
+      if (problems.length > 0) {
+        presentDialog({ ...current, busy: false, problems, message });
+        return;
+      }
+      if (dialogPresentationFailed.current) return;
+
+      // Close Problems before the pipeline can open its destination picker.
+      lastDialogState.current = undefined;
+      const session = dialogSession.current;
+      dialogSession.current = null;
+      await session?.dismiss();
+      if (generation !== recoveryGeneration.current) return;
+      recoveryPending.current = false;
+      startSelectedExport(selected);
     } catch (error) {
-      if (generation === recoveryGeneration.current) presentDialog({ ...current, busy: false, message: messageFromError(error) });
+      if (generation === recoveryGeneration.current) {
+        presentDialog(lastDialogState.current
+          ? { ...current, busy: false, message: messageFromError(error) }
+          : { kind: "exportFailure", cancelled: false, retryDisabled: false, message: messageFromError(error) });
+      }
     } finally {
       if (generation === recoveryGeneration.current) {
         recoveryPending.current = false;

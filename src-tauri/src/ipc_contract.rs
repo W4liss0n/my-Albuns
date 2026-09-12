@@ -165,7 +165,6 @@ pub struct ProjectDialogPresentation {
 pub enum ProjectDialogAction {
     RelinkExportMedia,
     RetryExportMedia,
-    ContinueMediaExport,
     CancelMediaRemoval,
     RemoveAllMedia,
     RemoveMediaKeepFrames,

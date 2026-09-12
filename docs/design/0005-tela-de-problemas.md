@@ -56,7 +56,9 @@ Na Exportação, `Abrir Projeto` é a ação de um problema com Frame placeholde
 
 Depois de qualquer correção, a validação é executada novamente e a tabela remove ou atualiza os problemas resolvidos.
 
-Na visão de Exportação, `Continuar Exportação` permanece desabilitado enquanto houver qualquer pendência sem decisão. Ao corrigir a última linha ou, no lote, ignorar explicitamente seu Projeto, o botão é habilitado, mas o processamento não começa automaticamente: o usuário precisa confirmá-lo.
+Na Exportação normal, a tabela permanece aberta somente enquanto houver problemas. Ao resolver a última pendência por `Relinkar` ou `Tentar novamente`, a janela fecha e a tentativa continua automaticamente para a mesma seleção, usando o estado visível atualizado. Não existe etapa vazia de confirmação nem botão `Continuar Exportação` nesse fluxo. A janela fecha antes de qualquer seletor de destino da continuação.
+
+Na Exportação em lote, `Continuar Exportação` permanece desabilitado enquanto houver qualquer pendência sem decisão. Ao corrigir a última linha ou ignorar explicitamente seu Projeto, o botão é habilitado e o usuário confirma a continuação.
 
 Fechar ou cancelar a Tela de Problemas encerra a tentativa de Exportação pendente. Relinks realizados na sessão de um Projeto individual permanecem como alterações não salvas. O mapa temporário produzido para um lote é descartado. Esse mapa funcional não é o contexto técnico da [política de caminhos](0011-resolucao-e-politica-de-caminhos.md), que reutiliza fatos de raízes somente dentro de cada tentativa de processamento.
 
@@ -92,7 +94,7 @@ Essas associações formam um mapa temporário da execução. Elas:
 
 A tabela pertence à preparação do lote. O Modo de lote exclusivo e o progresso começam somente depois dessa etapa, permitindo que `Abrir Projeto` funcione enquanto os problemas estão sendo avaliados. Correções criativas feitas no editor, como preencher placeholders, precisam ser salvas antes de uma nova verificação, porque o lote reabre a versão persistida.
 
-Para o lote, `Continuar Exportação` é habilitado quando cada problema tiver sido corrigido ou seu Projeto tiver sido explicitamente ignorado. A Exportação normal também exige `Continuar Exportação` depois de resolver suas pendências, mas não oferece `Ignorar neste lote`.
+Para o lote, `Continuar Exportação` é habilitado quando cada problema tiver sido corrigido ou seu Projeto tiver sido explicitamente ignorado. A Exportação normal retoma automaticamente ao resolver suas pendências e não oferece `Ignorar neste lote`.
 
 ## Geração de Projetos em lote
 

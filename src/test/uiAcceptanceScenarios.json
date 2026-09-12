@@ -19,7 +19,7 @@
         "kind": "implementation-only",
         "surface": "owned-problems-dialog",
         "implementationCaptureSelector": ".ui-owned-window-shell",
-        "reason": "A especificação vigente exige recuperação dos Originais na tabela de Problemas, com Relinkar, Tentar novamente e confirmação explícita antes de continuar."
+        "reason": "A Exportação normal oferece Relinkar e Tentar novamente para os Originais pendentes e retoma automaticamente quando a validação fica sem problemas."
       },
       "viewport": {
         "width": 640,
@@ -29,20 +29,20 @@
       "actions": []
     },
     {
-      "id": "media-export-recovered",
-      "title": "Exportação — Recuperação concluída, aguardando confirmação",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportMediaProblems%22%2C%22projectName%22%3A%22Formatura%20%E2%80%94%20Turma%202026%22%2C%22problems%22%3A%5B%5D%2C%22busy%22%3Afalse%2C%22message%22%3A%22%22%7D",
+      "id": "media-export-resumed",
+      "title": "Exportação — Retomada automática após recuperação",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportProgress%22%2C%22cancelRequested%22%3Afalse%2C%22cancellable%22%3Afalse%2C%22progress%22%3A%7B%22kind%22%3A%22indeterminate%22%2C%22status%22%3A%22Iniciando%20a%20Exporta%C3%A7%C3%A3o%22%7D%7D",
       "comparison": {
         "kind": "implementation-only",
-        "surface": "owned-problems-dialog",
+        "surface": "owned-progress-dialog",
         "implementationCaptureSelector": ".ui-owned-window-shell",
-        "reason": "A especificação vigente exige recuperação dos Originais na tabela de Problemas, com Relinkar, Tentar novamente e confirmação explícita antes de continuar."
+        "reason": "A Exportação normal oferece Relinkar e Tentar novamente para os Originais pendentes e retoma automaticamente quando a validação fica sem problemas."
       },
       "viewport": {
         "width": 640,
         "height": 430
       },
-      "readySelector": ".ui-problems-table",
+      "readySelector": ".ui-progress-dialog",
       "actions": []
     },
     {
@@ -53,7 +53,7 @@
         "kind": "implementation-only",
         "surface": "owned-problems-dialog",
         "implementationCaptureSelector": ".ui-owned-window-shell",
-        "reason": "A especificação vigente exige recuperação dos Originais na tabela de Problemas, com Relinkar, Tentar novamente e confirmação explícita antes de continuar."
+        "reason": "A Exportação normal oferece Relinkar e Tentar novamente para os Originais pendentes e retoma automaticamente quando a validação fica sem problemas."
       },
       "viewport": {
         "width": 640,

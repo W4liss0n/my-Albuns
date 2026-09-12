@@ -53,7 +53,7 @@ const states: readonly ProjectDialogState[] = [
 ];
 
 const actions: readonly ProjectDialogAction[] = [
-  "relinkExportMedia", "retryExportMedia", "continueMediaExport",
+  "relinkExportMedia", "retryExportMedia",
   "cancelLayoutDeletion",
   "confirmLayoutDeletion",
   "cancelMediaRemoval",

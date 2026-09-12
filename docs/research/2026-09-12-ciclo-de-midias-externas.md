@@ -33,9 +33,9 @@ processamento de imagens. A Exportação já pode usar a sessão corrigida; o
 arquivo do Projeto permanece intacto até Salvar.
 
 `Tentar novamente` reinspeciona as origens sem alterar referências, Histórico
-ou dirty. Resolver a última pendência não inicia a Exportação: é necessário
-clicar em `Continuar Exportação`. Fechar a tabela cancela a tentativa pendente
-e conserva as religações já feitas na sessão.
+ou dirty. Resolver a última pendência fecha a tabela e retoma automaticamente
+a Exportação para a mesma seleção. Fechar a tabela enquanto restam problemas
+cancela a tentativa pendente e conserva as religações já feitas na sessão.
 
 O Monitor agora exige a leitura completa também para Decorativos antes de
 confirmar conteúdo novo e invalidar o Cache. Uma gravação externa parcial
@@ -66,9 +66,9 @@ um snapshot imutável e não executa Religação nem Salvamento.
 3. Mova também a imagem usada para uma subpasta de outra pasta. Ao exportar,
    confira a indicação de ausência e clique em `Relinkar`.
 4. Escolha a pasta que contém a nova localização. A prévia deve ser preparada,
-   o Projeto deve ficar com alterações pendentes e a tabela deve aguardar
-   `Continuar Exportação`.
-5. Feche a tabela e experimente Undo/Redo. Reabra a Exportação e confirme que
+   o Projeto deve ficar com alterações pendentes e a tabela deve fechar,
+   seguindo diretamente para a escolha do Destino.
+5. Cancele a escolha do Destino e experimente Undo/Redo. Reabra a Exportação e confirme que
    a referência corrigida funciona antes de Salvar.
 6. Repita com duas cópias de mesmo nome e extensão em subpastas diferentes:
    a busca deve manter a pendência, sem escolher uma arbitrariamente.
@@ -83,8 +83,9 @@ não salva, preservação dos bytes persistidos e Undo/Redo. Outro percurso usa
 dois Hosts para Fotos e Decorativos, comparando uma gravação truncada e sua
 sucessora válida, sem alterações de Histórico.
 
-Os testes da interface cobrem a espera pela confirmação, a exclusão entre
-ações durante a recuperação e a separação entre Religação e nova inspeção.
+Os testes da interface cobrem a retomada automática após o fechamento da
+tabela, a espera enquanto restam problemas, a exclusão entre ações durante
+a recuperação e a separação entre Religação e nova inspeção.
 As capturas declaradas estão no manifesto de aceitação visual; relatórios
 locais ficam em `.scratch/ui-acceptance/media-delivery/`.
 
@@ -115,6 +116,12 @@ viewport de navegador que aplica os pedidos de tamanho. O teste cobre a
 ausência inicial, progresso, retorno à lista, lista longa e recuperação
 completa. Antes da correção, falhava pela redução contínua; depois, cada estado
 estabiliza com um único ajuste e mantém os problemas e o rodapé visíveis.
+
+Após o teste manual seguinte, o autor retirou a confirmação adicional da
+Exportação normal. O cenário de recuperação completa agora passa ao progresso
+de Exportação, sem apresentar uma tabela vazia. A retomada aguarda o fechamento
+do diálogo anterior antes de permitir a escolha do Destino, conserva a seleção
+da tentativa e é descartada se a Sessão deixa de ser a atual durante a recuperação.
 
 As capturas anteriores usavam viewports fixos, por isso não exercitavam esse
 ciclo de retorno entre medição e redimensionamento. O novo teste cobre essa

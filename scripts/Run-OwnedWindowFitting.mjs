@@ -95,7 +95,8 @@ try {
     { id: "processing", state: { kind: "imageProcessingProgress", progress: { kind: "determinate", completed: 0, total: 1, status: "Preparando a Foto…" } }, rows: 0 },
     { id: "problems-after-progress", state: missing, rows: 1 },
     { id: "long-problem-list", state: { ...missing, problems: Array.from({ length: 15 }, (_, index) => ({ ...missing.problems[0], mediaId: `photo-${index}`, fileName: `Foto ${index}.jpg` })) }, rows: 15 },
-    { id: "recovered", state: { ...missing, problems: [] }, rows: 0 },
+    { id: "export-resumed", state: { kind: "exportProgress", cancelRequested: false, cancellable: false,
+      progress: { kind: "indeterminate", status: "Iniciando a Exportação" } }, rows: 0 },
   ];
   for (const [index, scenario] of scenarios.entries()) {
     if (index > 0) await execute(`

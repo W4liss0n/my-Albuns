@@ -21,7 +21,7 @@ type ProjectDialogProgressKind = ProjectDialogProgress["kind"];
 type IpcProjectDialogProgressKind = IpcProjectDialogProgress["kind"];
 
 const projectDialogActionMap = {
-  relinkExportMedia: "relinkExportMedia", retryExportMedia: "retryExportMedia", continueMediaExport: "continueMediaExport",
+  relinkExportMedia: "relinkExportMedia", retryExportMedia: "retryExportMedia",
   cancelMediaRemoval: "cancelMediaRemoval",
   removeAllMedia: "removeAllMedia",
   removeMediaKeepFrames: "removeMediaKeepFrames",

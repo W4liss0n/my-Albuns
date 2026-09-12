@@ -70,7 +70,7 @@ export type ProjectDialogState =
     };
 
 export type ProjectDialogAction =
-  | "relinkExportMedia" | "retryExportMedia" | "continueMediaExport"
+  | "relinkExportMedia" | "retryExportMedia"
   | "cancelMediaRemoval"
   | "removeAllMedia"
   | "removeMediaKeepFrames"

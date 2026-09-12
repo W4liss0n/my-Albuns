@@ -46,7 +46,7 @@ export function ProjectDialogView({
         confirmAction={{ label: state.busy ? "Excluindo…" : "Excluir", disabled: state.busy, onClick: () => onAction("confirmLayoutDeletion") }} />;
     case "exportMediaProblems":
       return <ProblemsDialog title="Problemas na Exportação"
-        description={state.message || (state.busy ? "Verificando os Arquivos…" : state.problems.length ? "Recupere os Arquivos necessários à Lâmina selecionada." : "Arquivos disponíveis. Clique em Continuar Exportação quando estiver pronto.")}
+        description={state.message || (state.busy ? "Verificando os Arquivos…" : "Recupere os Arquivos necessários à Lâmina selecionada.")}
         columns={["Projeto", "Problema", "Ações"]}
         rows={state.problems.map(problem => [state.projectName,
           `${problem.fileName}: Arquivo ${problem.state === "absent" ? "ausente" : "indisponível"}.`,
@@ -54,7 +54,6 @@ export function ProjectDialogView({
             {problem.state === "absent" ? "Relinkar" : "Tentar novamente"}
           </ActionButton>])}
         closeDisabled={state.busy}
-        actions={<ActionButton variant="primary" disabled={state.busy || state.problems.length > 0} onClick={() => onAction("continueMediaExport")}>Continuar Exportação</ActionButton>}
         onClose={() => onAction("dismissExport")} />;
     case "exportProblems":
       return <ProblemsDialog title="Problemas na Exportação"

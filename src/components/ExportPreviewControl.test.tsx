@@ -49,7 +49,7 @@ function createExportHarness() {
 
 function createDialogHarness() {
   let listener: ((action: ProjectDialogAction) => void) | undefined;
-  const dismiss = vi.fn(async () => undefined);
+  const dismiss = vi.fn<ProjectDialogSession["dismiss"]>(async () => undefined);
   const present = vi.fn<ProjectDialogSession["present"]>(
     async () => undefined,
   );
@@ -118,7 +118,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-test("folder recovery preserves the pending attempt, publishes the unsaved projection and waits for Continue", async () => {
+test("folder recovery publishes the unsaved projection and resumes once after closing Problems", async () => {
   const problems = [{ mediaId: "photo-1", fileName: "Foto.jpg", state: "absent" as const }];
   let resolve!: (result: Awaited<ReturnType<ExportMediaPort["relink"]>>) => void;
   const relink = vi.fn<ExportMediaPort["relink"]>(() => new Promise(done => { resolve = done; }));
@@ -127,18 +127,19 @@ test("folder recovery preserves the pending attempt, publishes the unsaved proje
   const { dialog, exportHarness } = renderControl({ exportMediaPort: { relink, inspect }, onProjectionChange });
   fireEvent.click(screen.getByRole("button", { name: "Exportar Lâmina" }));
   await act(async () => exportHarness.attempts[0].reject(new MediaExportBlockedError(problems)));
-  dialog.emit("continueMediaExport");
-  expect(exportHarness.startSheet).toHaveBeenCalledOnce();
   dialog.emit("relinkExportMedia");
   dialog.emit("relinkExportMedia");
   dialog.emit("dismissExport");
   expect(relink).toHaveBeenCalledOnce();
   expect(dialog.dismiss).not.toHaveBeenCalled();
+  let finishDismiss!: () => void;
+  dialog.dismiss.mockImplementationOnce(() => new Promise<void>(done => { finishDismiss = done; }));
   await act(async () => resolve({ projection: representativeProjection, problems: [], notes: [] }));
   expect(onProjectionChange).toHaveBeenCalledWith(representativeProjection);
-  expect(dialog.present).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "exportMediaProblems", problems: [], busy: false }));
+  expect(dialog.present).not.toHaveBeenCalledWith(expect.objectContaining({ kind: "exportMediaProblems", problems: [] }));
+  expect(dialog.dismiss).toHaveBeenCalledOnce();
   expect(exportHarness.startSheet).toHaveBeenCalledOnce();
-  dialog.emit("continueMediaExport");
+  await act(async () => finishDismiss());
   expect(exportHarness.startSheet).toHaveBeenCalledTimes(2);
   expect(inspect).not.toHaveBeenCalled();
   await act(async () => exportHarness.attempts[1].resolve({ status: "cancelled" }));
@@ -148,21 +149,58 @@ test("folder recovery preserves the pending attempt, publishes the unsaved proje
   expect(exportHarness.startSheet).toHaveBeenCalledTimes(3);
 });
 
-test("unavailable sources are reinspected without relinking, and closing cancels the pending export", async () => {
+test("unavailable sources resume only after reinspection clears the last problem", async () => {
   const relink = vi.fn();
-  const inspect = vi.fn(async () => []);
+  const problems = [{ mediaId: "photo-1", fileName: "Rede.png", state: "unavailable" as const }];
+  const inspect = vi.fn<ExportMediaPort["inspect"]>(async () => problems);
   const { dialog, exportHarness } = renderControl({ exportMediaPort: { relink, inspect } });
   fireEvent.click(screen.getByRole("button", { name: "Exportar Lâmina" }));
-  await act(async () => exportHarness.attempts[0].reject(new MediaExportBlockedError([
-    { mediaId: "photo-1", fileName: "Rede.png", state: "unavailable" },
-  ])));
+  await act(async () => exportHarness.attempts[0].reject(new MediaExportBlockedError(problems)));
   dialog.emit("retryExportMedia");
-  await waitFor(() => expect(dialog.present).toHaveBeenLastCalledWith(expect.objectContaining({ problems: [], busy: false })));
+  await waitFor(() => expect(dialog.present).toHaveBeenLastCalledWith(expect.objectContaining({ problems, busy: false })));
   expect(relink).not.toHaveBeenCalled();
+  expect(exportHarness.startSheet).toHaveBeenCalledOnce();
+  expect(dialog.dismiss).not.toHaveBeenCalled();
+  inspect.mockResolvedValueOnce([]);
+  dialog.emit("retryExportMedia");
+  await waitFor(() => expect(exportHarness.startSheet).toHaveBeenCalledTimes(2));
+  expect(dialog.dismiss).toHaveBeenCalledOnce();
+  expect(dialog.present).not.toHaveBeenCalledWith(expect.objectContaining({ kind: "exportMediaProblems", problems: [] }));
+  await act(async () => exportHarness.attempts[1].reject(new MediaExportBlockedError(problems)));
+  expect(dialog.present).toHaveBeenLastCalledWith(expect.objectContaining({ problems, busy: false }));
+  expect(exportHarness.startSheet).toHaveBeenCalledTimes(2);
+});
+
+test("partial folder recovery keeps remaining problems and closing cancels the pending export", async () => {
+  const problems = [{ mediaId: "photo-1", fileName: "Foto.jpg", state: "absent" as const }];
+  const relink = vi.fn<ExportMediaPort["relink"]>(async () => ({ projection: representativeProjection, problems,
+    notes: [{ fileName: "Foto.jpg", reason: "Mais de uma correspondência encontrada." }] }));
+  const { dialog, exportHarness } = renderControl({ exportMediaPort: { relink, inspect: vi.fn() } });
+  fireEvent.click(screen.getByRole("button", { name: "Exportar Lâmina" }));
+  await act(async () => exportHarness.attempts[0].reject(new MediaExportBlockedError(problems)));
+  dialog.emit("relinkExportMedia");
+  await waitFor(() => expect(dialog.present).toHaveBeenLastCalledWith(expect.objectContaining({ problems, busy: false,
+    message: "Foto.jpg: Mais de uma correspondência encontrada." })));
   expect(exportHarness.startSheet).toHaveBeenCalledOnce();
   dialog.emit("dismissExport");
   expect(dialog.dismiss).toHaveBeenCalledOnce();
   expect(screen.getByRole("button", { name: "Exportar Lâmina" })).toBeEnabled();
+});
+
+test("retiring the Project during recovery prevents automatic resumption", async () => {
+  let resolve!: (result: Awaited<ReturnType<ExportMediaPort["relink"]>>) => void;
+  const relink = vi.fn<ExportMediaPort["relink"]>(() => new Promise(done => { resolve = done; }));
+  const onProjectionChange = vi.fn();
+  const { dialog, exportHarness, view } = renderControl({ exportMediaPort: { relink, inspect: vi.fn() }, onProjectionChange });
+  fireEvent.click(screen.getByRole("button", { name: "Exportar Lâmina" }));
+  await act(async () => exportHarness.attempts[0].reject(new MediaExportBlockedError([
+    { mediaId: "photo-1", fileName: "Foto.jpg", state: "absent" },
+  ])));
+  dialog.emit("relinkExportMedia");
+  view.unmount();
+  await act(async () => resolve({ projection: representativeProjection, problems: [], notes: [] }));
+  expect(onProjectionChange).not.toHaveBeenCalled();
+  expect(exportHarness.startSheet).toHaveBeenCalledOnce();
 });
 
 test("placeholder validation presents Project problems and returns to the Project without retrying", async () => {
