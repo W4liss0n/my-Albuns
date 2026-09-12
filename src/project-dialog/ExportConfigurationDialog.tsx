@@ -56,9 +56,9 @@ export function ExportConfigurationDialog({ state, onAction }: {
           <fieldset className="export-configuration__section" disabled={state.busy}>
             <legend>Escopo</legend>
             <div className="export-configuration__choices">
-              <label><input ref={initialFocus} type="radio" name={`${id}-scope`} checked={scope === "album"}
+              <label><input ref={scope === "album" ? initialFocus : undefined} type="radio" name={`${id}-scope`} checked={scope === "album"}
                 onChange={() => setScope("album")} /><span>Álbum inteiro</span></label>
-              <label><input type="radio" name={`${id}-scope`} checked={scope === "range"}
+              <label><input ref={scope === "range" ? initialFocus : undefined} type="radio" name={`${id}-scope`} checked={scope === "range"}
                 onChange={() => setScope("range")} /><span>Intervalo de lâminas</span></label>
             </div>
             {scope === "range" && <div className="export-configuration__interval">
@@ -67,7 +67,7 @@ export function ExportConfigurationDialog({ state, onAction }: {
                   type="number" min={1} max={state.sheets.length} value={first} onChange={event => setFirst(event.target.value)} /></label>
                 <label>até<TextInput className="ui-field-control" aria-label="Lâmina final" aria-invalid={!validRange}
                   type="number" min={1} max={state.sheets.length} value={last} onChange={event => setLast(event.target.value)} /></label>
-                <span className="export-configuration__available">de {state.sheets.length} lâminas</span>
+                <span className="export-configuration__available">de {state.sheets.length} {state.sheets.length === 1 ? "lâmina" : "lâminas"}</span>
               </div>
               {!validRange && <p role="alert" className="export-configuration__error">
                 Escolha um intervalo entre 1 e {state.sheets.length}, com início menor ou igual ao fim.
