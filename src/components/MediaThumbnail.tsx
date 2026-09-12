@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 
 import type { MediaCatalogItem } from "../domain/project";
 import { registerMediaPreviewImage } from "../application/mediaPreviewImages";
-import missingImageSymbol from "../ui/missingImageSymbol.svg";
 import "./MediaThumbnail.css";
 
 interface MediaPreviewGeometry {
@@ -90,8 +89,7 @@ export function MediaThumbnail({
           }}
         />
       ) : missing ? (
-        <span aria-hidden="true" className="media-preview-thumbnail__missing-symbol"
-          style={{ backgroundImage: `url(${missingImageSymbol})` }} />
+        <span aria-hidden="true" className="media-preview-thumbnail__missing-symbol" />
       ) : null}
       {children}
     </span>

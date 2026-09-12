@@ -35,7 +35,7 @@
   height: 26px;
   max-width: 60%;
   max-height: 60%;
-  background: center / contain no-repeat;
+  background: url("../ui/missingImageSymbol.svg") center / contain no-repeat;
 }
 
 .media-preview-thumbnail[data-portrait="true"] {
