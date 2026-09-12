@@ -21,14 +21,11 @@ export function OwnedWindowShell({
     const shell = shellRef.current;
     if (!shell) return;
 
-    let lastHeight = 0;
+    // Measure after the native adapter has prepared the available screen bounds.
+    const measureHeight = () => Math.ceil(shell.getBoundingClientRect().height);
     const fitContent = () => {
-      // The native viewport must contain the border box, including both borders.
-      const height = Math.ceil(shell.getBoundingClientRect().height);
-      if (height <= 0 || height === lastHeight) return;
-      lastHeight = height;
       try {
-        void Promise.resolve(windowControls.fitContent(height)).catch(
+        void Promise.resolve(windowControls.fitContent(measureHeight)).catch(
           () => undefined,
         );
       } catch {

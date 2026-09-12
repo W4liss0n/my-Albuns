@@ -16,7 +16,10 @@ const missing = {
   kind: "exportMediaProblems", projectName: "Projeto de teste", busy: false, message: "",
   problems: [{ mediaId: "photo-1", fileName: "Foto movida.jpg", state: "absent" }],
 };
-const presentation = { sessionId: "owned-window-fitting", state: missing };
+const manifest = JSON.parse(readFileSync("src/test/uiAcceptanceScenarios.json", "utf8"));
+const openingScenario = manifest.scenarios.find(scenario => scenario.id === "normal-export-whole-jpeg");
+const opening = JSON.parse(new URL(openingScenario.implementationPath, "http://localhost").searchParams.get("state"));
+const presentation = { sessionId: "owned-window-fitting", state: opening };
 
 // Only the OS boundary is substituted: production React, CSS, ResizeObserver,
 // dialog events and the Tauri window adapter run inside the real browser.
@@ -36,13 +39,18 @@ function installNativeBoundary() {
         const size = JSON.parse(JSON.stringify(args.value)).Logical;
         if (!size || !Number.isFinite(size.height)) throw new Error("Invalid native size request");
         parent.fitting.fits.push(size.height);
+        if (parent.fitting.ready) parent.fitting.visibleFits.push(size.height);
         parent.fitting.lastFit = Date.now();
         parent.document.querySelector("iframe").style.height = `${size.height}px`;
-        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        // Native command completion does not wait for the browser's next layout.
         return;
       }
       if (command === "plugin:window|center") return;
-      if (command === "owned_window_content_ready") { parent.fitting.ready++; return; }
+      if (command === "owned_window_content_ready") {
+        parent.fitting.ready++;
+        parent.fitting.readyHeight = parent.document.querySelector("iframe").clientHeight;
+        return;
+      }
       if (command === "current_project_dialog_presentation") return parent.fitting.presentation;
       if (command === "plugin:event|listen") { listeners.set(args.handler, args.event); return args.handler; }
       if (command === "plugin:event|unlisten") { listeners.delete(args.eventId); return; }
@@ -62,7 +70,7 @@ const server = createServer((request, response) => {
   const url = new URL(request.url, "http://localhost");
   if (url.pathname === "/") {
     response.setHeader("Content-Type", "text/html; charset=utf-8");
-    response.end(`<html><body><script>window.fitting={fits:[],errors:[],lastFit:0,ready:0,presentation:${JSON.stringify(presentation)}};</script><iframe style="width:640px;height:438px;border:0" src="/project-dialog.html?presentation=${encodeURIComponent(JSON.stringify(presentation))}&ownedReadyToken=1"></iframe></body></html>`);
+    response.end(`<html><body><script>window.fitting={fits:[],visibleFits:[],errors:[],lastFit:0,ready:0,presentation:${JSON.stringify(presentation)}};</script><iframe style="width:800px;height:478px;border:0" src="/project-dialog.html?presentation=${encodeURIComponent(JSON.stringify(presentation))}&ownedReadyToken=1"></iframe></body></html>`);
     return;
   }
   const file = path.resolve(dist, `.${decodeURIComponent(url.pathname)}`);
@@ -91,6 +99,7 @@ try {
   const execute = (script, args = []) => request("POST", `/session/${sessionId}/execute/sync`, { script, args });
   await request("POST", `/session/${sessionId}/url`, { url: `http://127.0.0.1:${server.address().port}/` });
   const scenarios = [
+    { id: "export-opening", state: opening, rows: 0 },
     { id: "missing-original", state: missing, rows: 1 },
     { id: "processing", state: { kind: "imageProcessingProgress", progress: { kind: "determinate", completed: 0, total: 1, status: "Preparando a Foto…" } }, rows: 0 },
     { id: "problems-after-progress", state: missing, rows: 1 },
@@ -123,6 +132,11 @@ try {
     writeFileSync(path.join(output, `${scenario.id}.png`), Buffer.from(await request("GET", `/session/${sessionId}/screenshot`), "base64"));
     console.log(JSON.stringify({ id: scenario.id, height: result.height, resizeCount: result.fits.length, firstFits: result.fits.slice(0, 5), lastFits: result.fits.slice(-5), rows: result.rows, firstRowVisible: result.firstRowVisible }));
     assert.deepEqual(result.errors, [], "The real dialog must render without errors");
+    if (index === 0) {
+      assert.equal(result.ready, 1, "The export window must become ready exactly once");
+      assert.deepEqual(result.visibleFits, [], "The export window must not resize after becoming visible");
+      assert.equal(result.readyHeight, result.height, "The first visible height must match the settled height");
+    }
     assert.equal(result.rows, scenario.rows, "Problem data must reach the real dialog");
     assert.ok(result.fits.length > 0 && result.fits.length <= 4, "Automatic fitting must settle without a shrinking loop");
     assert.ok(result.height <= result.screenLimit, "The dialog must respect the available screen height");

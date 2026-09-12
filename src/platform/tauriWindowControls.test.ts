@@ -49,7 +49,7 @@ afterEach(() => {
 });
 
 test("fits the logical inner height and recenters the owned window", async () => {
-  await tauriWindowControls.fitContent(198);
+  await tauriWindowControls.fitContent(() => 198);
 
   expect(windowApi.setSize).toHaveBeenCalledWith({
     height: 198,
@@ -65,12 +65,12 @@ test("fits the logical inner height and recenters the owned window", async () =>
     coreApi.invoke.mock.invocationCallOrder[0] ?? 0,
   );
 
-  await tauriWindowControls.fitContent(198);
+  await tauriWindowControls.fitContent(() => 198);
   expect(windowApi.setSize).toHaveBeenCalledOnce();
   expect(windowApi.center).toHaveBeenCalledOnce();
   expect(coreApi.invoke).toHaveBeenCalledOnce();
 
-  await tauriWindowControls.fitContent(220);
+  await tauriWindowControls.fitContent(() => 220);
   expect(windowApi.setSize).toHaveBeenCalledTimes(2);
   expect(windowApi.center).toHaveBeenCalledTimes(2);
   expect(coreApi.invoke).toHaveBeenCalledOnce();
@@ -83,14 +83,32 @@ test("coalesces concurrent fits for the same rendered size", async () => {
   });
   windowApi.setSize.mockReturnValue(setSizeGate);
 
-  const firstFit = tauriWindowControls.fitContent(264);
-  const duplicateFit = tauriWindowControls.fitContent(264);
+  const firstFit = tauriWindowControls.fitContent(() => 264);
+  const duplicateFit = tauriWindowControls.fitContent(() => 264);
 
   releaseSetSize?.();
   await Promise.all([firstFit, duplicateFit]);
 
   expect(windowApi.setSize).toHaveBeenCalledOnce();
   expect(windowApi.center).toHaveBeenCalledOnce();
+});
+
+test("sets screen bounds before measuring the first visible content size", async () => {
+  const measuredLimits: string[] = [];
+  await tauriWindowControls.fitContent(() => {
+    const limit = document.documentElement.style.getPropertyValue(
+      "--ui-owned-window-height-limit",
+    );
+    measuredLimits.push(limit);
+    return limit === "836px" ? 500 : 478;
+  });
+
+  expect(measuredLimits).toEqual(["836px"]);
+  expect(windowApi.setSize).toHaveBeenCalledExactlyOnceWith({
+    height: 500,
+    width: 520,
+  });
+  expect(coreApi.invoke).toHaveBeenCalledOnce();
 });
 
 test("serializes changing fits instead of racing native window updates", async () => {
@@ -102,8 +120,8 @@ test("serializes changing fits instead of racing native window updates", async (
       }),
   );
 
-  const firstFit = tauriWindowControls.fitContent(320);
-  const latestFit = tauriWindowControls.fitContent(360);
+  const firstFit = tauriWindowControls.fitContent(() => 320);
+  const latestFit = tauriWindowControls.fitContent(() => 360);
 
   expect(windowApi.setSize).toHaveBeenCalledOnce();
   releaseSetSize[0]?.();
@@ -132,10 +150,10 @@ test("applies a newer fit requested during the readiness handshake", async () =>
     }),
   );
 
-  const firstFit = tauriWindowControls.fitContent(198);
+  const firstFit = tauriWindowControls.fitContent(() => 198);
   await vi.waitFor(() => expect(coreApi.invoke).toHaveBeenCalledOnce());
 
-  const newerFit = tauriWindowControls.fitContent(236);
+  const newerFit = tauriWindowControls.fitContent(() => 236);
   releaseReadiness?.();
   await Promise.all([firstFit, newerFit]);
 
@@ -153,10 +171,10 @@ test("applies a newer fit requested during the readiness handshake", async () =>
 test("retries the readiness handshake without resizing again", async () => {
   coreApi.invoke.mockRejectedValueOnce(new Error("temporary IPC failure"));
 
-  await expect(tauriWindowControls.fitContent(198)).rejects.toThrow(
+  await expect(tauriWindowControls.fitContent(() => 198)).rejects.toThrow(
     "temporary IPC failure",
   );
-  await tauriWindowControls.fitContent(198);
+  await tauriWindowControls.fitContent(() => 198);
 
   expect(windowApi.setSize).toHaveBeenCalledOnce();
   expect(windowApi.center).toHaveBeenCalledOnce();

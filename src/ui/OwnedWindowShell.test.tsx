@@ -35,7 +35,10 @@ afterEach(() => {
 });
 
 test("fits an owned window to its initial and changing content height", () => {
-  const fitContent = vi.fn();
+  const measuredHeights: number[] = [];
+  const fitContent = vi.fn((measureHeight: () => number) => {
+    measuredHeights.push(measureHeight());
+  });
   const controls = {
     close: vi.fn(),
     fitContent,
@@ -51,11 +54,11 @@ test("fits an owned window to its initial and changing content height", () => {
     </WindowControlsProvider>,
   );
 
-  expect(fitContent).toHaveBeenLastCalledWith(200);
+  expect(measuredHeights).toEqual([200]);
 
   contentHeight = 264;
   act(() => {
     resizeCallback?.([], {} as ResizeObserver);
   });
-  expect(fitContent).toHaveBeenLastCalledWith(266);
+  expect(measuredHeights).toEqual([200, 266]);
 });
