@@ -100,6 +100,10 @@ try {
   await request("POST", `/session/${sessionId}/url`, { url: `http://127.0.0.1:${server.address().port}/` });
   const scenarios = [
     { id: "export-opening", state: opening, rows: 0 },
+    { id: "export-range-empty", interval: "", stableWindow: true, rows: 0, invalid: false },
+    { id: "export-range-invalid", interval: "3-2", stableWindow: true, rows: 0, invalid: true },
+    { id: "export-range-cleared", interval: "", stableWindow: true, rows: 0, invalid: false },
+    { id: "export-range-valid", interval: "1-2", stableWindow: true, rows: 0, invalid: false },
     { id: "missing-original", state: missing, rows: 1 },
     { id: "processing", state: { kind: "imageProcessingProgress", progress: { kind: "determinate", completed: 0, total: 1, status: "Preparando a Foto…" } }, rows: 0 },
     { id: "problems-after-progress", state: missing, rows: 1 },
@@ -108,7 +112,14 @@ try {
       progress: { kind: "indeterminate", status: "Iniciando a Exportação" } }, rows: 0 },
   ];
   for (const [index, scenario] of scenarios.entries()) {
-    if (index > 0) await execute(`
+    if (scenario.stableWindow) await execute(`
+      window.fitting.fits=[]; window.fitting.lastFit=Date.now();
+      const frameWindow=document.querySelector('iframe').contentWindow,doc=frameWindow.document;
+      doc.querySelector('.export-configuration__range input[type="radio"]').click();
+      const input=doc.querySelector('[aria-label="Lâminas do intervalo"]');
+      Object.getOwnPropertyDescriptor(frameWindow.HTMLInputElement.prototype,'value').set.call(input,arguments[0]);
+      input.dispatchEvent(new frameWindow.Event('input',{bubbles:true}));`, [scenario.interval]);
+    else if (index > 0) await execute(`
       window.fitting.fits=[]; window.fitting.lastFit=Date.now();
       window.fitting.presentation.state=arguments[0];
       document.querySelector('iframe').contentWindow.presentFittingState(window.fitting.presentation);`, [scenario.state]);
@@ -121,11 +132,15 @@ try {
         const scroll=doc.querySelector('.ui-problems-scroll'),row=doc.querySelector('tbody tr');
         const box=scroll?.getBoundingClientRect(),rowBox=row?.getBoundingClientRect();
         const footer=doc.querySelector('.ui-dialog-window__footer')?.getBoundingClientRect();
+        const tooltip=doc.querySelector('[role="tooltip"]')?.getBoundingClientRect();
+        const body=doc.querySelector('.ui-dialog-window__body')?.getBoundingClientRect();
         return {...window.fitting,height:frame.clientHeight,rows:doc.querySelectorAll('tbody tr').length,
+          intervalInvalid:doc.querySelector('[aria-label="Lâminas do intervalo"]')?.getAttribute('aria-invalid')==='true',
+          tooltipVisible:Boolean(tooltip),tooltipContained:!tooltip||(tooltip.top>=body.top&&tooltip.bottom<=body.bottom&&tooltip.left>=0&&tooltip.right<=frame.clientWidth),
           firstRowVisible:rowBox?Math.max(0,Math.min(rowBox.bottom,box.bottom)-Math.max(rowBox.top,box.top)):0,
           rowHeight:rowBox?.height??0,footerBottom:footer?.bottom??0,
           scrollHeight:scroll?.clientHeight??0,screenLimit:frame.contentWindow.screen.availHeight-64};`);
-      if (result.ready && result.fits.length > 0 && Date.now() - result.lastFit > 250) break;
+      if (result.ready && (result.fits.length > 0 || scenario.stableWindow) && Date.now() - result.lastFit > 250) break;
     } while (Date.now() < deadline);
     results.push({ id: scenario.id, ...result });
     writeFileSync(path.join(output, "results.json"), JSON.stringify(results, null, 2));
@@ -138,7 +153,13 @@ try {
       assert.equal(result.readyHeight, result.height, "The first visible height must match the settled height");
     }
     assert.equal(result.rows, scenario.rows, "Problem data must reach the real dialog");
-    assert.ok(result.fits.length > 0 && result.fits.length <= 4, "Automatic fitting must settle without a shrinking loop");
+    if (scenario.stableWindow) {
+      assert.equal(result.fits.length, 0, "Range editing and tooltips must not resize the window");
+      assert.equal(result.height, results[0].height, "Range editing must preserve the opening height");
+      assert.equal(result.intervalInvalid, scenario.invalid, "An empty interval must remain neutral");
+      assert.equal(result.tooltipVisible, scenario.invalid, "Only a filled invalid interval needs an error tooltip");
+      assert.ok(result.tooltipContained, "The tooltip must remain fully visible inside the dialog");
+    } else assert.ok(result.fits.length > 0 && result.fits.length <= 4, "Automatic fitting must settle without a shrinking loop");
     assert.ok(result.height <= result.screenLimit, "The dialog must respect the available screen height");
     assert.ok(result.footerBottom <= result.height, "The footer must remain inside the native viewport");
     if (scenario.rows) assert.ok(result.firstRowVisible >= Math.min(result.rowHeight, 50), "The first problem must remain visible after automatic fitting");

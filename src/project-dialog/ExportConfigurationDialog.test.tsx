@@ -49,6 +49,33 @@ test("invalid ranges never submit and contextual export starts at the chosen she
   await user.click(screen.getByRole("button", { name: "Cancelar" })); expect(onAction).toHaveBeenCalledWith("dismissExport");
 });
 
+test("keeps an empty interval neutral and moves invalid input guidance into a tooltip", async () => {
+  const user = userEvent.setup();
+  render(<ExportConfigurationDialog state={state} onAction={vi.fn()} />);
+  await user.click(screen.getByLabelText("Intervalo personalizado"));
+  const interval = screen.getByLabelText("Lâminas do intervalo");
+
+  expect(interval).toHaveValue("");
+  expect(interval).not.toHaveAttribute("aria-invalid", "true");
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Exportar" })).toBeDisabled();
+
+  fireEvent.change(interval, { target: { value: "3-2" } });
+  expect(interval).toHaveAttribute("aria-invalid", "true");
+  expect(screen.getByRole("tooltip")).toHaveTextContent("Informe uma lâmina ou um intervalo de 1 a 3");
+  expect(screen.getByRole("alert")).toHaveClass("ui-visually-hidden");
+
+  fireEvent.change(interval, { target: { value: "" } });
+  expect(interval).not.toHaveAttribute("aria-invalid", "true");
+  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+  fireEvent.change(interval, { target: { value: "2-3" } });
+  expect(interval).not.toHaveAttribute("aria-invalid", "true");
+  expect(screen.getByRole("button", { name: "Exportar" })).toBeEnabled();
+});
+
 test("contextual export remains an interval even when the album has only one sheet, and Escape closes it", () => {
   const onAction = vi.fn();
   render(<ExportConfigurationDialog state={{ ...state,
@@ -97,7 +124,7 @@ test.each(["2-3", " 2 – 3 "])("exports a continuous interval entered as %s", a
   expect(onAction).toHaveBeenCalledWith({ configureExport: { ...state.options, scope: "range", sheetIds: ["middle", "closing"] } });
 });
 
-test.each(["", "0", "4", "3-2", "1,3", "1.5", "1-2-3"])("rejects an invalid interval %s", interval => {
+test.each(["0", "4", "3-2", "1,3", "1.5", "1-2-3"])("rejects an invalid interval %s", interval => {
   render(<ExportConfigurationDialog state={{ ...state, options: { ...state.options, scope: "range" } }} onAction={vi.fn()} />);
   fireEvent.change(screen.getByLabelText("Lâminas do intervalo"), { target: { value: interval } });
   expect(screen.getByRole("button", { name: "Exportar" })).toBeDisabled();

@@ -68,7 +68,10 @@
 .export-configuration__selection { display: grid; gap: 16px; }
 .export-configuration__selection-row { display: flex; flex-wrap: wrap; align-items: center; gap: 20px; }
 .export-configuration__range { display: flex; flex-wrap: wrap; align-items: center; gap: 20px; }
-.export-configuration__range > .ui-field-control { width: 156px; font-variant-numeric: tabular-nums; }
+.export-configuration__range-field { position: relative; width: 156px; }
+.export-configuration__range-field > .ui-field-control { width: 100%; font-variant-numeric: tabular-nums; }
+.export-configuration__range-field > .ui-anchored-tooltip { top: auto; bottom: calc(100% + var(--ui-space-2)); right: auto; width: 280px; max-width: calc(100vw - 64px); }
+.export-configuration__range-field > .ui-anchored-tooltip::before { top: auto; bottom: -5px; transform: rotate(225deg); }
 .export-configuration__choice { display: flex; width: max-content; align-items: center; gap: 12px; color: var(--ui-text); }
 .export-configuration__page-mode { margin-left: auto; }
 .export-configuration__choice input {
@@ -92,7 +95,6 @@
 .export-configuration__choice input:focus-visible { outline: 1px solid var(--ui-focus-neutral); outline-offset: 3px; }
 .export-configuration__choice:has(input:disabled) { color: var(--ui-text-disabled); }
 .export-configuration__choice input:disabled { opacity: 0.5; }
-.export-configuration__range-help { display: grid; gap: 6px; margin-top: 16px; padding-left: 32px; }
 .export-configuration__summary { margin-right: auto; color: var(--ui-text-secondary); font-size: var(--ui-font-size-form-control); }
 .export-configuration__error { margin: 0; color: var(--ui-danger-text); font-size: var(--ui-font-size-action); line-height: 1.5; }
 .export-configuration__status { margin: -12px 0 0; color: var(--ui-text-muted); font-size: var(--ui-font-size-action); }

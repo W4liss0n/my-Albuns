@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import type { ProjectDialogAction, ProjectDialogState } from "../application/projectDialogPort";
 import type { ExportFormat } from "../application/normalExport";
-import { ActionButton, AppIcon } from "../ui";
+import { ActionButton, AppIcon, FieldValidationAutoTooltip, FieldValidationTooltip, fieldValidationTooltipAttributes, useFieldValidationTooltip } from "../ui";
 import { DialogWindowFrame } from "../ui/DialogWindowFrame";
 import { DialogFocusScope } from "../ui/DialogFocusScope";
 import { TextInput } from "../ui/TextInput";
@@ -29,6 +29,11 @@ export function ExportConfigurationDialog({ state, onAction }: {
   const range = /^\s*(\d+)(?:\s*[-–]\s*(\d+))?\s*$/.exec(interval);
   const start = Number(range?.[1]), end = Number(range?.[2] ?? range?.[1]);
   const validRange = Number.isInteger(start) && Number.isInteger(end) && start >= 1 && start <= end && end <= state.sheets.length;
+  const rangeHelp = `Informe uma lâmina ou um intervalo de 1 a ${state.sheets.length}, como 1-${state.sheets.length}.`;
+  const rangeError = scope === "range" && interval.trim() !== "" && !validRange ? rangeHelp : undefined;
+  const rangeTooltip = useFieldValidationTooltip(`${id}-range-help`, [
+    { field: "interval", messages: rangeError ? [rangeError] : undefined },
+  ]);
   const selected = scope === "album" ? state.sheets : validRange
     ? state.sheets.filter(sheet => sheet.number >= start && sheet.number <= end) : [];
   const count = selected.reduce((sum, sheet) => sum + (options.mode === "sheet" ? 1 : sheet.pageCount), 0);
@@ -99,11 +104,15 @@ export function ExportConfigurationDialog({ state, onAction }: {
                     <input type="radio" name={`${id}-scope`} checked={scope === "range"} onChange={() => setScope("range")} />
                     Intervalo personalizado
                   </label>
-                  <TextInput className="ui-field-control" aria-label="Lâminas do intervalo"
-                    aria-invalid={scope === "range" && !validRange} disabled={scope !== "range"}
-                    aria-describedby={scope === "range" && !validRange ? `${id}-range-help` : undefined}
-                    placeholder="Ex.: 3-8" title="Uma lâmina (3) ou um intervalo (3-8)"
-                    value={interval} onChange={event => setInterval(event.target.value)} />
+                  <span className="export-configuration__range-field">
+                    <TextInput className="ui-field-control" aria-label="Lâminas do intervalo"
+                      {...fieldValidationTooltipAttributes("interval", rangeError, rangeTooltip)}
+                      disabled={scope !== "range"}
+                      placeholder="Ex.: 3-8" title={rangeError ? undefined : rangeHelp}
+                      onMouseEnter={() => { if (rangeError) rangeTooltip.show("interval"); }}
+                      value={interval} onChange={event => setInterval(event.target.value)} />
+                    <FieldValidationAutoTooltip field="interval" tooltip={rangeTooltip} />
+                  </span>
                 </div>
                 <label className="export-configuration__choice export-configuration__page-mode">
                   <input type="checkbox" checked={options.mode === "page"}
@@ -112,11 +121,7 @@ export function ExportConfigurationDialog({ state, onAction }: {
                 </label>
               </div>
             </div>
-            {scope === "range" && !validRange && <div id={`${id}-range-help`} className="export-configuration__range-help">
-              <p role="alert" className="export-configuration__error">
-                Informe uma lâmina ou um intervalo de 1 a {state.sheets.length}, como 1-{state.sheets.length}.
-              </p>
-            </div>}
+            <FieldValidationTooltip tooltip={rangeTooltip} />
           </fieldset>
           {state.busy && <p role="status" className="export-configuration__status">Preparando exportação…</p>}
           {state.message && <p role="alert" className="export-configuration__status export-configuration__error">{state.message}</p>}
