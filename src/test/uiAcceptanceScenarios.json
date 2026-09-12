@@ -202,7 +202,7 @@
       },
       "viewport": {
         "width": 520,
-        "height": 218
+        "height": 320
       },
       "readySelector": ".ui-standard-message",
       "actions": []
