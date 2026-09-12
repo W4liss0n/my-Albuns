@@ -44,6 +44,7 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+  document.documentElement.style.removeProperty("--ui-owned-window-height-limit");
   vi.restoreAllMocks();
 });
 

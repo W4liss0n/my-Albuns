@@ -17,6 +17,13 @@ let requestedFit: RequestedFit | null = null;
 let fitQueue: Promise<void> | null = null;
 let confirmedReadyToken: number | null = null;
 
+function availableOwnedWindowHeight() {
+  return Math.max(
+    MIN_OWNED_WINDOW_HEIGHT,
+    window.screen.availHeight - OWNED_WINDOW_SCREEN_MARGIN,
+  );
+}
+
 function currentReadyToken() {
   const token = Number(
     new URLSearchParams(window.location.search).get("ownedReadyToken"),
@@ -26,6 +33,11 @@ function currentReadyToken() {
 
 async function runFitQueue() {
   const currentWindow = getCurrentWindow();
+  // A reused dialog must be able to grow beyond its previous content size.
+  document.documentElement.style.setProperty(
+    "--ui-owned-window-height-limit",
+    `${availableOwnedWindowHeight()}px`,
+  );
   for (;;) {
     while (requestedFit) {
       const nextFit = requestedFit;
@@ -76,10 +88,7 @@ function ensureFitQueue() {
 
 async function fitContent(height: number) {
   const width = Math.ceil(document.documentElement.clientWidth);
-  const availableHeight = Math.max(
-    MIN_OWNED_WINDOW_HEIGHT,
-    window.screen.availHeight - OWNED_WINDOW_SCREEN_MARGIN,
-  );
+  const availableHeight = availableOwnedWindowHeight();
   const fittedHeight = Math.min(
     availableHeight,
     Math.max(MIN_OWNED_WINDOW_HEIGHT, Math.ceil(height)),

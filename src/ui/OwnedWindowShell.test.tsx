@@ -21,11 +21,10 @@ beforeEach(() => {
   contentHeight = 198;
   resizeCallback = null;
   vi.stubGlobal("ResizeObserver", ResizeObserverMock);
-  vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockImplementation(
-    function measuredScrollHeight(this: HTMLElement) {
-      return this.classList.contains("ui-owned-window-shell")
-        ? contentHeight
-        : 0;
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
+    function measuredBorderBox(this: HTMLElement) {
+      return new DOMRect(0, 0, 520,
+        this.classList.contains("ui-owned-window-shell") ? contentHeight + 2 : 0);
     },
   );
 });
@@ -52,11 +51,11 @@ test("fits an owned window to its initial and changing content height", () => {
     </WindowControlsProvider>,
   );
 
-  expect(fitContent).toHaveBeenLastCalledWith(198);
+  expect(fitContent).toHaveBeenLastCalledWith(200);
 
   contentHeight = 264;
   act(() => {
     resizeCallback?.([], {} as ResizeObserver);
   });
-  expect(fitContent).toHaveBeenLastCalledWith(264);
+  expect(fitContent).toHaveBeenLastCalledWith(266);
 });

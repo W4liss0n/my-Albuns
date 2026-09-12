@@ -88,6 +88,40 @@ ações durante a recuperação e a separação entre Religação e nova inspeç
 As capturas declaradas estão no manifesto de aceitação visual; relatórios
 locais ficam em `.scratch/ui-acceptance/media-delivery/`.
 
+## Correção após o teste manual: tabela vazia e janela reduzida
+
+O teste manual revelou um defeito de dimensionamento da janela de Problemas.
+O log registrou uma mudança de mídia às 23:39:37 de 11 de setembro, antes da
+tentativa, mas não uma falha de exportação que explicasse a superfície preta.
+Na reprodução com a interface compilada, o problema estava presente no DOM:
+era a área da tabela que diminuía até deixar a linha invisível.
+
+O ajuste automático media `scrollHeight`, que não incluía as duas bordas do
+contêiner. Como a altura máxima do diálogo dependia da altura corrente da
+janela, cada ajuste retirava outros dois pixels. O ensaio reproduziu duas vezes
+a sequência 278, 276, 274… até 132 pixels, com 74 redimensionamentos e uma linha
+de problema dentro de uma região de altura zero.
+
+A medição agora usa a caixa externa renderizada, incluindo as bordas. Na
+janela nativa, o limite de altura depende do espaço disponível na tela,
+permitindo crescer novamente depois de um estado curto de progresso. As
+prévias em navegador mantêm o limite do seu viewport. O comportamento das
+caixas é documentado no [CSSOM View](https://drafts.csswg.org/cssom-view/).
+
+O comando `npm run test:owned-window-fitting`, incorporado à validação padrão,
+exercita React, CSS, `ResizeObserver`, eventos de apresentação e o adaptador
+Tauri reais. Apenas a fronteira do sistema operacional é substituída por um
+viewport de navegador que aplica os pedidos de tamanho. O teste cobre a
+ausência inicial, progresso, retorno à lista, lista longa e recuperação
+completa. Antes da correção, falhava pela redução contínua; depois, cada estado
+estabiliza com um único ajuste e mantém os problemas e o rodapé visíveis.
+
+As capturas anteriores usavam viewports fixos, por isso não exercitavam esse
+ciclo de retorno entre medição e redimensionamento. O novo teste cobre essa
+lacuna sem abrir janelas na suíte automática. Os ensaios de diagnóstico ficam
+em `.scratch/ui-acceptance/media-dialog-diagnosis/`, e a regressão permanente
+gera evidências em `.scratch/ui-acceptance/owned-window-fitting/`.
+
 Os contratos externos foram consultados com `find-docs`, usando a fonte
 oficial como alternativa à indisponibilidade da cota do Context7: Rust 1.98.0,
 [enumeração de diretórios](https://doc.rust-lang.org/std/fs/fn.read_dir.html),

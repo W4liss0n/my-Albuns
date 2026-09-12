@@ -21,6 +21,7 @@
     "test:imaging-recovery": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-ImagingRecovery.ps1",
     "test:dev-lifecycle": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-DevLifecycle.ps1",
     "test:ui-acceptance": "node --test scripts/Test-UiAcceptance.mjs",
+    "test:owned-window-fitting": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-OwnedWindowFitting.ps1",
     "ui:acceptance": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Run-UiAcceptance.ps1",
     "ui:acceptance:review": "node scripts/Review-UiAcceptance.mjs",
     "test:frame-gestures": "node scripts/Run-FrameGestureRendering.mjs",

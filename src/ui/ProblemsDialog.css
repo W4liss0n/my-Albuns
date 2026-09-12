@@ -1,5 +1,5 @@
 .ui-dialog-window--problems {
-  max-height: calc(100vh - var(--ui-titlebar-height) - 2px);
+  max-height: calc(var(--ui-owned-window-height-limit, 100vh) - var(--ui-titlebar-height) - 2px);
 }
 
 .ui-dialog-window--problems .ui-dialog-window__body {

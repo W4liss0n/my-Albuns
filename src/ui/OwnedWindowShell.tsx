@@ -23,7 +23,8 @@ export function OwnedWindowShell({
 
     let lastHeight = 0;
     const fitContent = () => {
-      const height = Math.ceil(shell.scrollHeight);
+      // The native viewport must contain the border box, including both borders.
+      const height = Math.ceil(shell.getBoundingClientRect().height);
       if (height <= 0 || height === lastHeight) return;
       lastHeight = height;
       try {
