@@ -2,6 +2,16 @@
   "schemaVersion": 3,
   "scenarios": [
     {
+      "id": "welcome",
+      "title": "Tela de Boas-vindas",
+      "implementationPath": "/welcome-preview.html",
+      "referencePath": "/docs/references/ui-programa-diagramacao/Boas-vindas.dc.html",
+      "comparison": { "kind": "paired", "surface": "welcome-window" },
+      "viewport": { "width": 1280, "height": 720 },
+      "readySelector": "[aria-label=\"Ações principais\"]",
+      "actions": []
+    },
+    {
       "id": "media-preview-replacement",
       "title": "Troca de prévias — Painel e Lâmina",
       "implementationPath": "/photo-placement-preview.html",
@@ -12,16 +22,6 @@
       },
       "viewport": { "width": 1100, "height": 800 },
       "readySelector": "body[data-ready=\"true\"]",
-      "actions": []
-    },
-    {
-      "id": "welcome",
-      "title": "Tela de Boas-vindas",
-      "implementationPath": "/welcome-preview.html",
-      "referencePath": "/docs/references/ui-programa-diagramacao/Boas-vindas.dc.html",
-      "comparison": { "kind": "paired", "surface": "welcome-window" },
-      "viewport": { "width": 1280, "height": 720 },
-      "readySelector": "[aria-label=\"Ações principais\"]",
       "actions": []
     },
     {
