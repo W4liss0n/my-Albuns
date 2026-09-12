@@ -58,6 +58,9 @@ pub(crate) fn render(
             total_sources,
         )?;
     }
+    if ordered.is_empty() {
+        progress(ImagingProgressStage::LoadingSources, 1, total_sources)?;
+    }
     let total = request
         .outputs
         .iter()

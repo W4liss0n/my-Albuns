@@ -39,6 +39,54 @@ use windows_sys::Win32::{
 static NEXT_CACHE_ID: AtomicU64 = AtomicU64::new(1);
 
 #[test]
+fn normal_export_without_sources_completes_the_loading_stage() {
+    use myalbuns_core::ExportMode;
+    use myalbuns_imaging_protocol::{AlbumRenderOutput, AlbumRenderRequest, RenderFormat};
+    let root = tempfile::tempdir().unwrap();
+    let snapshot = productive_snapshot(small_initial_project(25));
+    let units = snapshot
+        .export_units(
+            &[snapshot.composition.sheets[0].sheet_id.clone()],
+            ExportMode::Page,
+        )
+        .unwrap();
+    for format in [
+        RenderFormat::Png,
+        RenderFormat::Jpeg { quality: 100 },
+        RenderFormat::Pdf,
+    ] {
+        let prepared = root.path().join(format!("blank.{}", format.extension()));
+        let mut context = OperationPathContext::new();
+        context.capture(&prepared).unwrap();
+        let selected = if format == RenderFormat::Pdf {
+            units.clone()
+        } else {
+            vec![units.last().unwrap().clone()]
+        };
+        let request = AlbumRenderRequest {
+            protocol_version: IMAGING_PROTOCOL_VERSION,
+            request_id: "blank-export".into(),
+            snapshot: snapshot.clone(),
+            format,
+            outputs: vec![AlbumRenderOutput {
+                prepared_path: prepared.clone().into(),
+                units: selected,
+            }],
+            sources: vec![],
+            root_bindings: context.freeze(),
+        };
+        let result = invoke_imaging_command(&ImagingCommand::RenderAlbum(request), None);
+        let (_, response) = decode_event_stream(&result.stdout)
+            .expect("empty sources must still complete before composition");
+        let ImagingResponse::AlbumCompleted { completion, .. } = response else {
+            panic!("unexpected response: {response:?}");
+        };
+        assert_eq!(completion.outputs[0].source_count, 0);
+        assert!(prepared.is_file());
+    }
+}
+
+#[test]
 fn normal_export_png_jpeg_and_pdf_share_physical_page_geometry_and_originals() {
     use myalbuns_core::ExportMode;
     use myalbuns_imaging_protocol::{AlbumRenderOutput, AlbumRenderRequest, RenderFormat};
