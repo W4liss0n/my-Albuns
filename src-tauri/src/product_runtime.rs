@@ -22,7 +22,10 @@ use crate::{
     imaging_processor::ImagingProcessor,
     ipc_contract::{LinkedMediaChanged, ProjectRecoveryDecision as IpcProjectRecoveryDecision},
     logging,
-    media_runtime::{MediaBinding, MediaMonitor, MediaMonitorPoll, MediaResolver, MediaRuntime},
+    media_runtime::{
+        MediaBinding, MediaMonitor, MediaMonitorPoll, MediaResolutionProposal, MediaResolver,
+        MediaRuntime,
+    },
     operation_gate::OperationGate,
     project_bootstrap::{
         BootstrapRequest, BootstrappedHostProject, FailureCode, FailureStage, HostTerminal,
@@ -160,6 +163,7 @@ pub(crate) fn run(
         .manage(ExportAttempts::default())
         .manage(crate::project_dialog_window::ProjectDialogPresentationStore::default())
         .manage(crate::settings_preferences::SettingsStore::new(&app_paths))
+        .manage(crate::photoshop::PhotoshopStateStore::new(&app_paths))
         .manage(layout_catalog)
         .manage(crate::workspace_preferences::WorkspacePreferencesStore::new(&app_paths))
         .on_window_event(|window, event| {
@@ -262,6 +266,9 @@ pub(crate) fn run(
             crate::workspace_preferences::workspace_preferences,
             crate::workspace_preferences::update_workspace_preference,
             crate::settings_preferences::application_settings,
+            crate::photoshop::commands::photoshop_status,
+            crate::photoshop::commands::open_in_photoshop,
+            crate::settings_window::open_application_settings,
             crate::settings_preferences::update_application_setting,
         ])
         .run(context);
@@ -734,6 +741,61 @@ fn changed_photos_for_update(
         .collect()
 }
 
+pub(crate) struct ConfirmedMediaUpdate {
+    pub(crate) poll: MediaMonitorPoll,
+    pub(crate) refreshed_photo_ids: Vec<String>,
+    // Consumers apply Cache invalidation before dropping this permit.
+    _permit: crate::cache_activity_gate::CacheWorkPermit,
+}
+
+pub(crate) async fn confirm_prepared_media(
+    app: &tauri::AppHandle,
+    bindings: &[MediaBinding],
+    roots: &myalbuns_paths::RootBindingPlan,
+    prepared: Option<MediaResolutionProposal>,
+) -> Result<ConfirmedMediaUpdate, String> {
+    let runtime = app.state::<MediaRuntime>();
+    let engine = app.state::<CacheEngine>();
+    let refreshed_photo_ids = if let Some(proposal) = prepared.as_ref() {
+        refresh_project_photos_with_capacity(
+            app.state::<ProjectHost>().inner(),
+            &engine,
+            app.state::<ImagingProcessor>().inner(),
+            bindings,
+            &proposal.inspection_update(&runtime),
+            roots,
+        )
+        .await
+    } else {
+        Vec::new()
+    };
+    let permit = engine
+        .begin_cancellable_work(CacheCancellation::default())
+        .await;
+    let committing_app = app.clone();
+    let bindings = bindings.to_vec();
+    let roots = roots.clone();
+    let readable = refreshed_photo_ids.clone();
+    let poll = tauri::async_runtime::spawn_blocking(move || {
+        let runtime = committing_app.state::<MediaRuntime>();
+        prepared.map_or_else(
+            || MediaMonitorPoll::unchanged(&runtime),
+            |proposal| {
+                committing_app
+                    .state::<MediaMonitor>()
+                    .commit_prepared(&runtime, proposal, &bindings, &roots, &readable)
+            },
+        )
+    })
+    .await
+    .map_err(|error| error.to_string())?;
+    Ok(ConfirmedMediaUpdate {
+        poll,
+        refreshed_photo_ids,
+        _permit: permit,
+    })
+}
+
 pub(crate) fn start_linked_media_monitor_if_active(app: tauri::AppHandle) {
     if !matches!(
         app.state::<ProjectHost>().recovery_status(),
@@ -769,7 +831,7 @@ fn start_linked_media_monitor(app: tauri::AppHandle) {
             let monitor = app.state::<MediaMonitor>().inner().clone();
             let runtime = app.state::<MediaRuntime>().inner().clone();
             let bindings = catalog.bindings.clone();
-            let (poll, roots) = match poll_linked_media_once(monitor, runtime, bindings).await {
+            let (prepared, roots) = match poll_linked_media_once(monitor, runtime, bindings).await {
                 Ok(poll) => poll,
                 Err(error) => {
                     tracing::warn!(
@@ -780,7 +842,16 @@ fn start_linked_media_monitor(app: tauri::AppHandle) {
                     continue;
                 }
             };
-            let Some(update) = poll.update() else {
+            drop(_causal_cache_permit);
+            let confirmed =
+                match confirm_prepared_media(&app, &catalog.bindings, &roots, prepared).await {
+                    Ok(confirmed) => confirmed,
+                    Err(error) => {
+                        tracing::warn!(error, event = "linked_media_confirmation_failed");
+                        continue;
+                    }
+                };
+            let Some(update) = confirmed.poll.update() else {
                 continue;
             };
             let changed = update.changed_media_ids().to_vec();
@@ -804,16 +875,7 @@ fn start_linked_media_monitor(app: tauri::AppHandle) {
                     event = "linked_media_cache_invalidated",
                 );
             }
-            drop(_causal_cache_permit);
-            refresh_project_photos_with_capacity(
-                app.state::<ProjectHost>().inner(),
-                app.state::<CacheEngine>().inner(),
-                app.state::<ImagingProcessor>().inner(),
-                &catalog.bindings,
-                update,
-                &roots,
-            )
-            .await;
+            drop(confirmed);
             if !changed.is_empty()
                 && let Some(window) = app.get_webview_window(PROJECT_WINDOW_LABEL)
                 && let Err(error) = window.emit(
@@ -835,14 +897,20 @@ async fn poll_linked_media_once(
     monitor: MediaMonitor,
     runtime: MediaRuntime,
     bindings: Vec<MediaBinding>,
-) -> Result<(MediaMonitorPoll, myalbuns_paths::RootBindingPlan), tauri::Error> {
+) -> Result<
+    (
+        Option<MediaResolutionProposal>,
+        myalbuns_paths::RootBindingPlan,
+    ),
+    tauri::Error,
+> {
     tauri::async_runtime::spawn_blocking(move || {
         let mut paths = myalbuns_paths::OperationPathContext::new();
         for binding in &bindings {
             let _ = paths.capture(&binding.logical_path);
         }
         let roots = paths.freeze();
-        (monitor.poll_in_plan(&runtime, &bindings, &roots), roots)
+        (monitor.prepare_in_plan(&runtime, &bindings, &roots), roots)
     })
     .await
 }
@@ -1141,7 +1209,6 @@ mod tests {
             .authorized_media_catalog()
             .expect("the Monitor receives the authorized catalog")
             .bindings;
-        let binding = bindings[0].clone();
         std::fs::remove_file(&photo_path).expect("the Original file is removed");
         std::fs::create_dir(&photo_path)
             .expect("an unexpected object keeps inspection deterministically unavailable");
@@ -1152,18 +1219,15 @@ mod tests {
         let (inspection_started_tx, inspection_started_rx) = mpsc::sync_channel(0);
         let (release_inspection_tx, release_inspection_rx) = mpsc::sync_channel(0);
         let blocking_monitor = monitor.clone();
-        let blocking_runtime = runtime.clone();
         let blocking_inspection = thread::spawn(move || {
-            blocking_monitor
-                .retry_unavailable(&blocking_runtime, &binding, |_| {
-                    inspection_started_tx
-                        .send(())
-                        .expect("the caller observes the blocked real inspection");
-                    release_inspection_rx
-                        .recv()
-                        .expect("the real inspection is released");
-                })
-                .expect("the unavailable occurrence completes after release");
+            blocking_monitor.hold_transition_for_test(|| {
+                inspection_started_tx
+                    .send(())
+                    .expect("the caller observes the blocked real inspection");
+                release_inspection_rx
+                    .recv()
+                    .expect("the real inspection is released");
+            });
         });
         inspection_started_rx
             .recv()
@@ -1199,7 +1263,7 @@ mod tests {
         progressed.expect(
             "another operation on the same async task must progress before inspection is released",
         );
-        assert!(poll.update().is_none());
+        assert!(poll.is_none());
     }
 
     #[test]
@@ -1280,6 +1344,104 @@ mod tests {
         let projection = host.projection().unwrap();
         assert_eq!(projection.state.album.media[0].source_width_px, Some(17));
         assert_eq!(projection.state.album.media[0].source_height_px, Some(11));
+    }
+
+    #[test]
+    fn external_photo_confirmation_updates_two_hosts_without_creative_history() {
+        tauri::async_runtime::block_on(async {
+            let root = tempfile::tempdir().unwrap();
+            let original = root.path().join("Original compartilhado.jpg");
+            let write_photo = |width| {
+                RgbImage::from_pixel(width, 20, Rgb([25, 65, 140]))
+                    .save_with_format(&original, ImageFormat::Jpeg)
+                    .unwrap()
+            };
+            write_photo(30);
+            let mut context = OperationPathContext::new();
+            context.capture(&original).unwrap();
+            let roots = context.freeze();
+            let mut projects = Vec::new();
+            for number in 0..2 {
+                let path = root.path().join(format!("Projeto {number}.myalbuns"));
+                let mut context = OperationPathContext::new();
+                context.capture(&path).unwrap();
+                let project = ProjectCore::new()
+                    .with_identity_storage_roots(
+                        root.path().join("leases"),
+                        root.path().join("identities"),
+                    )
+                    .create_editable(CreateProjectRequest::new(
+                        ProjectLocation::new(path, context.freeze()),
+                        InitialProject::neutral(),
+                        CreateAuthorization::CreateOnly,
+                    ))
+                    .unwrap();
+                let host = ProjectHost::new(project);
+                host.import_photos(vec![original.clone()], |_| {}).unwrap();
+                let catalog = host.authorized_media_catalog().unwrap();
+                let initial = host.projection().unwrap();
+                for _ in 0..2 {
+                    host.apply_with_outcome(myalbuns_core::ProjectIntent::AddPhoto {
+                        sheet_id: initial.state.album.sheets[0].id.clone(),
+                        media_id: catalog.bindings[0].media_id.parse().unwrap(),
+                        mode: myalbuns_core::PhotoPlacementMode::Normal,
+                    })
+                    .unwrap();
+                }
+                host.save(host.projection().unwrap().state.revision)
+                    .unwrap();
+                let before = host.projection().unwrap();
+                let monitor = MediaMonitor::default();
+                let runtime = MediaRuntime::default();
+                let evidence = catalog
+                    .bindings
+                    .iter()
+                    .map(|binding| MediaResolver.observe_in_plan(&roots, binding))
+                    .collect::<Vec<_>>();
+                monitor.adopt_prepared_inspections(&runtime, &catalog.bindings, &roots, &evidence);
+                // The import's successful inspection is no longer available for a different fingerprint.
+                projects.push((host, catalog.bindings, before, monitor, runtime));
+            }
+            for complete in [false, true] {
+                if complete {
+                    write_photo(80);
+                } else {
+                    std::fs::write(&original, [0xff, 0xd8, 0xff]).unwrap();
+                }
+                for (host, bindings, before, monitor, runtime) in &projects {
+                    monitor.prepare_in_plan(runtime, bindings, &roots);
+                    let prepared = monitor.prepare_in_plan(runtime, bindings, &roots).unwrap();
+                    let engine = crate::cache_engine::CacheEngine::default();
+                    let processor = crate::imaging_processor::ImagingProcessor::default();
+                    let readable = super::refresh_project_photos_with_capacity(
+                        host,
+                        &engine,
+                        &processor,
+                        bindings,
+                        &prepared.inspection_update(runtime),
+                        &roots,
+                    )
+                    .await;
+                    assert_eq!(readable.len(), usize::from(complete));
+                    let confirmed =
+                        monitor.commit_prepared(runtime, prepared, bindings, &roots, &readable);
+                    assert_eq!(
+                        confirmed.update().unwrap().invalidated_media_ids().len(),
+                        usize::from(complete)
+                    );
+                    let after = host.projection().unwrap();
+                    assert_eq!(
+                        after.state.album.media[0].source_width_px,
+                        Some(if complete { 80 } else { 30 })
+                    );
+                    assert_eq!(after.state.revision, before.state.revision);
+                    assert_eq!(after.state.can_undo, before.state.can_undo);
+                    assert_eq!(after.state.can_redo, before.state.can_redo);
+                    assert_eq!(after.state.album.sheets, before.state.album.sheets);
+                    assert!(!after.state.dirty);
+                }
+            }
+        });
     }
 
     #[test]
@@ -1390,8 +1552,13 @@ mod tests {
             if change_before_confirmation {
                 write_photo(31, 9);
             }
-            assert!(monitor.poll(&runtime, &catalog.bindings).update().is_none());
-            let confirmation = monitor.poll(&runtime, &catalog.bindings);
+            assert!(
+                monitor
+                    .poll_readable_fixture(&runtime, &catalog.bindings)
+                    .update()
+                    .is_none()
+            );
+            let confirmation = monitor.poll_readable_fixture(&runtime, &catalog.bindings);
             let decodes = crate::media_runtime::photo_source_decode_count();
             assert_eq!(
                 refresh_project_photos_for_media_update(
@@ -1417,8 +1584,13 @@ mod tests {
             assert_eq!(after.state.can_undo, before.state.can_undo);
 
             write_photo(43, 11);
-            assert!(monitor.poll(&runtime, &catalog.bindings).update().is_none());
-            let confirmation = monitor.poll(&runtime, &catalog.bindings);
+            assert!(
+                monitor
+                    .poll_readable_fixture(&runtime, &catalog.bindings)
+                    .update()
+                    .is_none()
+            );
+            let confirmation = monitor.poll_readable_fixture(&runtime, &catalog.bindings);
             let decodes = crate::media_runtime::photo_source_decode_count();
             refresh_project_photos_for_media_update(
                 &host,
@@ -1476,8 +1648,13 @@ mod tests {
             .expect("the demand receives the authorized catalog");
         let monitor = MediaMonitor::default();
         let runtime = MediaRuntime::default();
-        assert!(monitor.poll(&runtime, &catalog.bindings).update().is_none());
-        let confirmed = monitor.poll(&runtime, &catalog.bindings);
+        assert!(
+            monitor
+                .poll_readable_fixture(&runtime, &catalog.bindings)
+                .update()
+                .is_none()
+        );
+        let confirmed = monitor.poll_readable_fixture(&runtime, &catalog.bindings);
         let update = confirmed
             .update()
             .expect("the stable demand confirmation is adopted");
@@ -1548,15 +1725,25 @@ mod tests {
             .expect("an unexpected object makes the binding unavailable");
         let monitor = MediaMonitor::default();
         let runtime = MediaRuntime::default();
-        assert!(monitor.poll(&runtime, &catalog.bindings).update().is_none());
-        assert!(monitor.poll(&runtime, &catalog.bindings).update().is_some());
+        assert!(
+            monitor
+                .poll_readable_fixture(&runtime, &catalog.bindings)
+                .update()
+                .is_none()
+        );
+        assert!(
+            monitor
+                .poll_readable_fixture(&runtime, &catalog.bindings)
+                .update()
+                .is_some()
+        );
         std::fs::remove_dir(&photo_path).expect("the unavailable object is removed");
         RgbImage::from_pixel(23, 5, Rgb([50, 60, 70]))
             .save_with_format(&photo_path, ImageFormat::Jpeg)
             .expect("the replacement Original is a JPEG");
         let before = host.projection().expect("the fallback is projected");
         let inspection = monitor
-            .retry_unavailable(&runtime, &binding, |_| {})
+            .retry_readable_fixture(&runtime, &binding)
             .expect("the unavailable occurrence is retried");
 
         assert_eq!(

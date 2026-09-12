@@ -28,6 +28,8 @@ function targetOwnsEditingKeys(target: EventTarget | null) {
 }
 
 interface ProjectCommandShortcutHandlers {
+  openPhotoInPhotoshop?(): void;
+  photoCommandActive?: boolean;
   copyFrames(): void;
   pasteFrames(): void;
   frameClipboardActive: boolean;
@@ -52,6 +54,8 @@ interface ProjectCommandShortcutHandlers {
 }
 
 export function useProjectCommandShortcuts({
+  openPhotoInPhotoshop,
+  photoCommandActive = false,
   copyFrames,
   pasteFrames,
   frameClipboardActive,
@@ -77,6 +81,12 @@ export function useProjectCommandShortcuts({
   useEffect(() => {
     const handleProjectCommand = (event: KeyboardEvent) => {
       if (event.defaultPrevented) return;
+      if (photoCommandActive && targetAllowsCommandShortcut(event.target, "frame") && !targetOwnsEditingKeys(event.target) &&
+          matchProjectCommandShortcut(event, "frame-photo") === "open-in-photoshop") {
+        event.preventDefault();
+        if (!disabled && !event.repeat) openPhotoInPhotoshop?.();
+        return;
+      }
       if (frameClipboardActive && targetAllowsCommandShortcut(event.target, "frame") && !targetOwnsEditingKeys(event.target)) {
         const command = matchProjectCommandShortcut(event, "frame");
         if (command === "copy-frames" || command === "paste-frames") {
@@ -168,6 +178,8 @@ export function useProjectCommandShortcuts({
     window.addEventListener("keydown", handleProjectCommand);
     return () => window.removeEventListener("keydown", handleProjectCommand);
   }, [
+    openPhotoInPhotoshop,
+    photoCommandActive,
     copyFrames,
     pasteFrames,
     frameClipboardActive,

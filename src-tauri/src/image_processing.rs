@@ -363,7 +363,7 @@ async fn synchronize_processing_sources(
         .begin_cancellable_work(CacheCancellation::default())
         .await;
     let processing_app = app.clone();
-    let (catalog, namespace, roots, updates) = tauri::async_runtime::spawn_blocking(move || {
+    let (catalog, namespace, roots, prepared) = tauri::async_runtime::spawn_blocking(move || {
         let host = processing_app.state::<ProjectHost>();
         let catalog = host.authorized_media_catalog()?;
         let namespace = processing_app.state::<ActiveCacheNamespace>().namespace();
@@ -387,36 +387,23 @@ async fn synchronize_processing_sources(
             .retain_prepared_catalog(&catalog.project_id, &catalog.bindings);
         let monitor = processing_app.state::<crate::media_runtime::MediaMonitor>();
         let runtime = processing_app.state::<crate::media_runtime::MediaRuntime>();
-        let mut updates = Vec::new();
-        for poll in monitor.synchronize_processing(&runtime, &catalog.bindings, &roots) {
-            if let Some(update) = poll.update() {
-                processing_app
-                    .state::<CacheEngine>()
-                    .apply_monitor_media_update(
-                        &namespace,
-                        processing_app
-                            .state::<crate::cache_previews::CachePreviewRegistry>()
-                            .inner(),
-                        update,
-                    );
-                updates.push(update.clone());
-            }
-        }
-        Ok::<_, String>((catalog, namespace, roots, updates))
+        monitor.prepare_in_plan(&runtime, &catalog.bindings, &roots);
+        let prepared = monitor.prepare_in_plan(&runtime, &catalog.bindings, &roots);
+        Ok::<_, String>((catalog, namespace, roots, prepared))
     })
     .await
     .map_err(|_| "Não foi possível inspecionar as imagens do Projeto.".to_string())??;
     drop(_permit);
-    for update in updates {
-        crate::product_runtime::refresh_project_photos_with_capacity(
-            app.state::<ProjectHost>().inner(),
-            &engine,
-            app.state::<ImagingProcessor>().inner(),
-            &catalog.bindings,
-            &update,
-            &roots,
-        )
-        .await;
+    let confirmed =
+        crate::product_runtime::confirm_prepared_media(app, &catalog.bindings, &roots, prepared)
+            .await?;
+    if let Some(update) = confirmed.poll.update() {
+        engine.apply_monitor_media_update(
+            &namespace,
+            app.state::<crate::cache_previews::CachePreviewRegistry>()
+                .inner(),
+            update,
+        );
         if !update.changed_media_ids().is_empty()
             && let Some(window) =
                 app.get_webview_window(crate::product_runtime::PROJECT_WINDOW_LABEL)
@@ -431,6 +418,7 @@ async fn synchronize_processing_sources(
                 .map_err(|_| "Não foi possível atualizar as imagens do Projeto.".to_string())?;
         }
     }
+    drop(confirmed);
     let _permit = engine
         .begin_cancellable_work(CacheCancellation::default())
         .await;

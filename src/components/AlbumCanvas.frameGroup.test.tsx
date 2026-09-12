@@ -143,6 +143,21 @@ test("right-clicking a Frame opens its context actions without starting a geomet
   expect(view.onSelectFrame).not.toHaveBeenCalled();
 });
 
+test.each([true, false])("normal mode offers Photo context only for a filled Frame: %s", async (filled) => {
+  const composition = structuredClone(interactiveComposition);
+  if (!filled) composition.sheets[0].frames[0].photo = null;
+  const onOpenFrameContextMenu = vi.fn();
+  const view = renderCanvas({ compositionPlan: composition, mode: { kind: "normal" } });
+  await finishPixiInitialization();
+  view.rerenderCanvas({ onOpenFrameContextMenu });
+  act(() => displayWithLabel("canvas-frame-frame-001").emit("rightclick", {
+    button: 2, clientX: 320, clientY: 180, stopPropagation: vi.fn(),
+  }));
+  if (filled) expect(onOpenFrameContextMenu).toHaveBeenCalledWith("frame-001", { x: 320, y: 180 });
+  else expect(onOpenFrameContextMenu).not.toHaveBeenCalled();
+  expect(view.onSelectFrame).not.toHaveBeenCalled();
+});
+
 test.each(["sheet", "background"])("right-clicking empty %s offers creation without changing the selection", async (surface) => {
   const onOpenEmptyCanvasContextMenu = vi.fn();
   const view = renderCanvas({ compositionPlan: groupComposition(),

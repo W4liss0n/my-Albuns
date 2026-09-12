@@ -3,6 +3,10 @@ import type { FrameStackAction } from "../domain/project";
 import { ContextMenuSurface } from "../ui/ContextMenuSurface";
 
 interface FrameContextMenuProps {
+  editing?: boolean;
+  hasPhoto?: boolean;
+  canOpenInPhotoshop?: boolean;
+  onOpenInPhotoshop?(): void;
   position: { x: number; y: number };
   onArrange(action: FrameStackAction): void;
   onDelete(): void;
@@ -11,9 +15,17 @@ interface FrameContextMenuProps {
   onDismiss(): void;
 }
 
-export function FrameContextMenu({ position, onArrange, onDelete, onSwapContents, canSwapContents, onDismiss }: FrameContextMenuProps) {
+export function FrameContextMenu({ editing = true, hasPhoto = false, canOpenInPhotoshop = false, onOpenInPhotoshop, position, onArrange, onDelete, onSwapContents, canSwapContents, onDismiss }: FrameContextMenuProps) {
   return (
-    <ContextMenuSurface label="Organizar Frames" position={position} onDismiss={onDismiss}>
+    <ContextMenuSurface label={editing ? "Organizar Frames" : "Ações da Foto"} position={position} onDismiss={onDismiss}>
+      {hasPhoto && <>
+        <button type="button" role="menuitem" aria-label={projectCommandDescriptor("open-in-photoshop").label} disabled={!canOpenInPhotoshop} onClick={() => { onOpenInPhotoshop?.(); onDismiss(); }}>
+          <span>{projectCommandDescriptor("open-in-photoshop").label}</span>
+          <kbd aria-hidden="true">{projectCommandShortcutLabel("open-in-photoshop")}</kbd>
+        </button>
+        {editing && <div className="ui-context-menu__separator" role="separator" />}
+      </>}
+      {editing && <>
       {FRAME_STACK_COMMANDS.map(({ id, action }) => {
         const shortcut = projectCommandShortcutLabel(id);
         return (
@@ -34,6 +46,7 @@ export function FrameContextMenu({ position, onArrange, onDelete, onSwapContents
         <span>{projectCommandDescriptor("delete-frames").label}</span>
         <kbd aria-hidden="true">{projectCommandShortcutLabel("delete-frames")}</kbd>
       </button>
+      </>}
     </ContextMenuSurface>
   );
 }

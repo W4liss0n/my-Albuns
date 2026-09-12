@@ -25,6 +25,14 @@ fn main() {
     let config = Config::new()
         .with_out_dir(output_dir)
         .with_large_int("number");
+    myalbuns_desktop_lib::ipc_contract::PhotoshopStatus::export_all(&config)
+        .expect("Photoshop status bindings");
+    myalbuns_desktop_lib::ipc_contract::PhotoshopPhotoTarget::export_all(&config)
+        .expect("Photoshop target bindings");
+    myalbuns_desktop_lib::ipc_contract::PhotoshopCommandError::export_all(&config)
+        .expect("Photoshop error bindings");
+    myalbuns_desktop_lib::ipc_contract::SettingsSection::export_all(&config)
+        .expect("Settings section bindings");
 
     PointerDragThreshold::export_all(&config)
         .expect("pointer drag threshold bindings should be generated");

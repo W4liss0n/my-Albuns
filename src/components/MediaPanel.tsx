@@ -83,6 +83,8 @@ type MediaPanelPreviewSource =
     };
 
 interface MediaPanelProps {
+  photoshopAvailable?: boolean;
+  onOpenInPhotoshop?(mediaId: string): void;
   ref?: Ref<MediaPanelHandle>;
   hidden?: boolean;
   mediaItems: readonly MediaCatalogItem[];
@@ -111,6 +113,8 @@ const naturalNameCollator = new Intl.Collator("pt-BR", {
 const EMPTY_MEDIA_FILES: Readonly<Record<string, MediaFileInfo>> = {};
 
 export function MediaPanel({
+  photoshopAvailable = false,
+  onOpenInPhotoshop,
   ref,
   hidden = false,
   mediaItems,
@@ -484,6 +488,14 @@ export function MediaPanel({
 
   function selectAllVisibleMedia(event: KeyboardEvent<HTMLElement>) {
     if (isTextEntryTarget(event.target)) return;
+    if (matchProjectCommandShortcut(event, "media-photo") === "open-in-photoshop") {
+      event.preventDefault(); event.stopPropagation();
+      const selected = selectedMediaIds.size === 1 ? [...selectedMediaIds][0] : null;
+      if (!event.repeat && !relinkDisabled && !importPending && photoshopAvailable && selected &&
+          mediaItems.some((media) => media.id === selected && media.kind === "photo")) onOpenInPhotoshop?.(selected);
+      setContextMenu(null);
+      return;
+    }
     if (matchProjectCommandShortcut(event, "media-panel") === "remove-media") {
       event.preventDefault();
       event.stopPropagation();
@@ -670,6 +682,11 @@ export function MediaPanel({
       </div>
       {contextMenu && <ContextMenuSurface label="Ações das imagens" position={contextMenu}
         onDismiss={() => { setContextMenu(null); panelHostRef.current?.focus({ preventScroll: true }); }}>
+        {mediaItems.some((media) => selectedMediaIds.has(media.id) && media.kind === "photo") && <button type="button" role="menuitem"
+          disabled={!photoshopAvailable || relinkDisabled || importPending || selectedMediaIds.size !== 1}
+          onClick={() => { const id = [...selectedMediaIds][0]; if (id) onOpenInPhotoshop?.(id); setContextMenu(null); panelHostRef.current?.focus({ preventScroll: true }); }}>
+          <span>{projectCommandDescriptor("open-in-photoshop").label}</span><kbd aria-hidden="true">{projectCommandShortcutLabel("open-in-photoshop")}</kbd>
+        </button>}
         <button type="button" role="menuitem" disabled={relinkDisabled || importPending || selectedMediaIds.size === 0}
           onClick={() => { setContextMenu(null); onRemoveMedia([...selectedMediaIds]); panelHostRef.current?.focus({ preventScroll: true }); }}>
           <span>{projectCommandDescriptor("remove-media").label}</span><kbd aria-hidden="true">{projectCommandShortcutLabel("remove-media")}</kbd>

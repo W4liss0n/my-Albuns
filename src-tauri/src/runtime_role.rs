@@ -5,6 +5,23 @@ use std::{
 
 pub(crate) const PROJECT_HOST_ROLE_ARGUMENT: &str = "--myalbuns-project-host";
 
+pub(crate) fn settings_request(
+    arguments: impl IntoIterator<Item = OsString>,
+) -> Option<crate::ipc_contract::SettingsSection> {
+    arguments
+        .into_iter()
+        .skip(1)
+        .find_map(|argument| match argument.to_str() {
+            Some("--myalbuns-settings=photoshop") => {
+                Some(crate::ipc_contract::SettingsSection::Photoshop)
+            }
+            Some("--myalbuns-settings=performance") => {
+                Some(crate::ipc_contract::SettingsSection::Performance)
+            }
+            _ => None,
+        })
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum RuntimeRole {
     Global { direct_projects: Vec<PathBuf> },
@@ -96,6 +113,36 @@ mod tests {
             ]),
             RuntimeRole::ProjectHost
         );
+    }
+
+    #[test]
+    fn recognizes_only_fixed_settings_sections_without_consuming_project_paths() {
+        use super::settings_request;
+        use crate::ipc_contract::SettingsSection;
+        for (flag, expected) in [
+            (
+                "--myalbuns-settings=photoshop",
+                Some(SettingsSection::Photoshop),
+            ),
+            (
+                "--myalbuns-settings=performance",
+                Some(SettingsSection::Performance),
+            ),
+            ("--myalbuns-settings=other", None),
+        ] {
+            let args = [
+                OsString::from("MyAlbuns.exe"),
+                OsString::from(flag),
+                OsString::from(r"C:\Album.myalbuns"),
+            ];
+            assert_eq!(settings_request(args.clone()), expected);
+            assert_eq!(
+                parse(args),
+                RuntimeRole::Global {
+                    direct_projects: vec![PathBuf::from(r"C:\Album.myalbuns")]
+                }
+            );
+        }
     }
 
     #[test]

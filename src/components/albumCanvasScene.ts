@@ -711,7 +711,7 @@ export class AlbumCanvasScene {
         },
         onPhotoContentDragStart: (frameId, event) => { if (!this.input?.mediaDrag) this.frameContentDrag.start(frameId, event); },
         onFrameContextMenu: (frameId, position) => {
-          if (!this.input || this.input.frameGeometry?.disabled || this.frameInteractions.ignoresTap) return;
+          if (!this.input || (this.input.mode.kind === "sheet-editing" && this.input.frameGeometry?.disabled) || this.frameInteractions.ignoresTap) return;
           this.input.onOpenFrameContextMenu?.(frameId, position);
         },
         onEmptyCanvasContextMenu: (sheetId, position) => this.openEmptyCanvasContextMenu(sheetId, position),

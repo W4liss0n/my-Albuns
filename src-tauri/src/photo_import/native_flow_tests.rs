@@ -456,7 +456,7 @@ fn run_real_import_flow_with_memory(
         let catalog = host.authorized_media_catalog().unwrap();
         assert!(
             monitor
-                .poll_in_plan(&runtime, &catalog.bindings, &roots)
+                .poll_readable_fixture_in_plan(&runtime, &catalog.bindings, &roots)
                 .update()
                 .is_none()
         );

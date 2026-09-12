@@ -24,7 +24,7 @@ use crate::{
     media_runtime::{MediaAvailability, MediaMonitor, MediaRuntime},
     product_runtime::{
         CACHE_PROCESSOR_WARNING_EVENT, LINKED_MEDIA_CHANGED_EVENT, PROJECT_WINDOW_LABEL,
-        refresh_project_photos_with_capacity,
+        confirm_prepared_media,
     },
     project_host::ProjectHost,
 };
@@ -106,57 +106,57 @@ pub(crate) async fn retry_unavailable_media(
     if catalog.project_id != retry_namespace.project_id() {
         return Err(MediaPreviewCommandError::read_failed());
     }
-    let binding = catalog
+    let retry_binding = catalog
         .bindings
-        .into_iter()
+        .iter()
         .find(|binding| binding.media_id == media_id)
+        .cloned()
         .ok_or_else(MediaPreviewCommandError::read_failed)?;
-    let source_path = binding.logical_path.clone();
-    let retry_binding = binding.clone();
+    let source_path = retry_binding.logical_path.clone();
     let monitor = media_monitor.inner().clone();
     let runtime = media_runtime.inner().clone();
-    let retry_app = app.clone();
-    let retry_registry = registry.inner().clone();
-    let (inspection, roots) = tauri::async_runtime::spawn_blocking(move || {
-        let inspection = monitor.retry_unavailable(&runtime, &binding, |update| {
-            retry_app.state::<CacheEngine>().apply_monitor_media_update(
-                &retry_namespace,
-                &retry_registry,
-                update,
-            );
-        })?;
+    let binding = retry_binding.clone();
+    let (prepared, roots) = tauri::async_runtime::spawn_blocking(move || {
         let mut paths = myalbuns_paths::OperationPathContext::new();
         let _ = paths.capture(&binding.logical_path);
-        Ok::<_, crate::media_runtime::MediaRetryError>((inspection, paths.freeze()))
+        let roots = paths.freeze();
+        let prepared = monitor.prepare_retry_in_plan(&runtime, &binding, &roots)?;
+        Ok::<_, crate::media_runtime::MediaRetryError>((prepared, roots))
     })
     .await
     .map_err(MediaPreviewCommandError::retry_failed)?
     .map_err(MediaPreviewCommandError::retry_failed)?;
     drop(_causal_cache_permit);
-    let refreshed_photo_ids = refresh_project_photos_with_capacity(
-        &project_host,
-        &engine,
-        app.state::<ImagingProcessor>().inner(),
+    let confirmed = confirm_prepared_media(
+        &app,
         std::slice::from_ref(&retry_binding),
-        inspection.update(),
         &roots,
+        Some(prepared),
     )
-    .await;
-    tracing::info!(
-        target: "myalbuns.desktop",
-        media_id,
-        changed = !inspection.update().changed_media_ids().is_empty(),
-        invalidated = !inspection.update().invalidated_media_ids().is_empty(),
-        event = "linked_media_retry_adopted",
-    );
+    .await
+    .map_err(MediaPreviewCommandError::retry_failed)?;
+    let update = confirmed.poll.update().cloned().unwrap_or_default();
+    engine.apply_monitor_media_update(&retry_namespace, &registry, &update);
     if let Some(change) =
-        linked_media_change_for_update(inspection.update(), &refreshed_photo_ids, true)
+        linked_media_change_for_update(&update, &confirmed.refreshed_photo_ids, true)
     {
         window
             .emit(LINKED_MEDIA_CHANGED_EVENT, change)
             .map_err(|_| MediaPreviewCommandError::read_failed())?;
     }
-    let state = preview_state(inspection.availability());
+    let availability = confirmed
+        .poll
+        .confirmed_observation()
+        .and_then(|snapshot| {
+            snapshot
+                .observations()
+                .iter()
+                .find(|observation| observation.media_id == media_id)
+        })
+        .map(|observation| observation.availability)
+        .unwrap_or(MediaAvailability::Unavailable);
+    let state = preview_state(availability);
+    drop(confirmed);
     if state == MediaPreviewState::Ready {
         processing.prepare(&app, &retry_binding).await;
     } else {
@@ -243,7 +243,7 @@ pub(crate) async fn prepare_media_previews(
     let runtime = media_runtime.inner().clone();
     let bindings = catalog.bindings.clone();
     let cache_root = namespace.paths().root().to_path_buf();
-    let (poll, roots) = tauri::async_runtime::spawn_blocking(move || {
+    let (prepared, roots) = tauri::async_runtime::spawn_blocking(move || {
         let mut paths = myalbuns_paths::OperationPathContext::new();
         for path in std::iter::once(cache_root.as_path()).chain(
             bindings
@@ -253,11 +253,16 @@ pub(crate) async fn prepare_media_previews(
             let _ = paths.capture(path);
         }
         let roots = paths.freeze();
-        let poll = monitor.poll_in_plan(&runtime, &bindings, &roots);
+        let poll = monitor.prepare_in_plan(&runtime, &bindings, &roots);
         (poll, roots)
     })
     .await
     .map_err(|_| MediaPreviewCommandError::read_failed())?;
+    drop(causal_cache_permit);
+    let confirmed = confirm_prepared_media(&app, &catalog.bindings, &roots, prepared)
+        .await
+        .map_err(MediaPreviewCommandError::retry_failed)?;
+    let poll = &confirmed.poll;
     let runtime_update = poll.update().cloned();
     let observations = poll
         .confirmed_observation()
@@ -265,7 +270,7 @@ pub(crate) async fn prepare_media_previews(
             proposal
                 .observations()
                 .iter()
-                .map(|observation| (observation.media_id.as_str(), observation.availability))
+                .map(|observation| (observation.media_id.clone(), observation.availability))
                 .collect::<HashMap<_, _>>()
         })
         .unwrap_or_default();
@@ -282,29 +287,20 @@ pub(crate) async fn prepare_media_previews(
     } else {
         None
     };
-    drop(causal_cache_permit);
-    if let Some(runtime_update) = runtime_update.as_ref() {
-        let refreshed_photo_ids = refresh_project_photos_with_capacity(
-            &project_host,
-            &engine,
-            &processor,
-            &catalog.bindings,
+    if let Some(runtime_update) = runtime_update.as_ref()
+        && let Some(change) = linked_media_change_for_update(
             runtime_update,
-            &roots,
-        )
-        .await;
-        if let Some(change) = linked_media_change_for_update(
-            runtime_update,
-            &refreshed_photo_ids,
+            &confirmed.refreshed_photo_ids,
             cache_update
                 .as_ref()
                 .is_some_and(|update| update.retry_required()),
-        ) {
-            window
-                .emit(LINKED_MEDIA_CHANGED_EVENT, change)
-                .map_err(|_| MediaPreviewCommandError::read_failed())?;
-        }
+        )
+    {
+        window
+            .emit(LINKED_MEDIA_CHANGED_EVENT, change)
+            .map_err(|_| MediaPreviewCommandError::read_failed())?;
     }
+    drop(confirmed);
     if cache_update
         .as_ref()
         .is_some_and(|update| !update.demand_can_resume())

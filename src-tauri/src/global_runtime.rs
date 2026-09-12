@@ -18,7 +18,10 @@ use tauri_plugin_dialog::{DialogExt, FilePath};
 use crate::{
     cache_service::{CacheScheduledCleanupOutcome, CacheService},
     desktop_webview_policy,
-    global_activation::{GlobalActivationEntry, PrimaryGlobalActivation, enter_global_activation},
+    global_activation::{
+        GlobalActivationEntry, PrimaryGlobalActivation, enter_global_activation,
+        enter_global_activation_with_settings,
+    },
     graphics_launch_gate::{
         GRAPHICS_GATE_TIMEOUT, GraphicsGateCompletion, GraphicsGateReport, GraphicsLaunchGate,
     },
@@ -352,7 +355,14 @@ async fn complete_graphics_gate(
             Some(outcome)
         }
         GraphicsGateCompletion::Rejected => {
-            show_existing_global_window(&app);
+            if state
+                .global_activation
+                .as_ref()
+                .and_then(|activation| activation.initial_settings())
+                .is_none()
+            {
+                show_existing_global_window(&app);
+            }
             None
         }
         GraphicsGateCompletion::Ready(_) | GraphicsGateCompletion::AlreadyFinal => None,
@@ -1522,6 +1532,16 @@ async fn listen_for_forwarded_activations(app: AppHandle, state: GlobalRuntimeSt
         }
 
         let launch_permit = state.project_launches.enter_activation().await;
+        if let Some(section) = batch.settings {
+            state.cancel_requested_exit();
+            if let Err(error) = crate::settings_window::show(&app, section).await {
+                tracing::warn!(error = %error, event = "settings_window_open_failed");
+            }
+            if batch.projects.is_empty() {
+                primary.complete_activation();
+                continue;
+            }
+        }
         let outcome = if batch.projects.is_empty() {
             None
         } else if let Some(error) = state.scheduled_cleanup_failure().await {
@@ -1587,6 +1607,17 @@ async fn initialize_global_window(
         return;
     }
     if !activation_pending {
+        if let Some(section) = state
+            .global_activation
+            .as_ref()
+            .and_then(|activation| activation.initial_settings())
+        {
+            if let Err(error) = crate::settings_window::show(&app, section).await {
+                tracing::error!(error = %error, event = "settings_window_open_failed");
+                app.exit(1);
+            }
+            return;
+        }
         if let Err(error) = window.show() {
             tracing::error!(
                 target: "myalbuns.desktop",
@@ -1661,6 +1692,15 @@ async fn initialize_global_runtime(
 }
 
 fn exit_global_after_handoff(app: &AppHandle) {
+    if app
+        .get_webview_window(crate::settings_window::SETTINGS_WINDOW_LABEL)
+        .is_some()
+    {
+        if let Some(window) = app.get_webview_window(GLOBAL_WINDOW_LABEL) {
+            let _ = window.hide();
+        }
+        return;
+    }
     let state = app.state::<GlobalRuntimeState>().inner();
     state.exit_requested.store(true, Ordering::Release);
     let can_exit = state
@@ -1669,6 +1709,26 @@ fn exit_global_after_handoff(app: &AppHandle) {
         .is_none_or(|activation| activation.stop_accepting());
     if can_exit {
         commit_global_exit(app, state);
+    }
+}
+
+fn on_global_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
+    desktop_webview_policy::on_window_event(window, event);
+    if window.label() == crate::settings_window::SETTINGS_WINDOW_LABEL
+        && matches!(event, tauri::WindowEvent::Destroyed)
+    {
+        let app = window.app_handle().clone();
+        // Serialize closure with forwarded activations, including Alt+F4.
+        tauri::async_runtime::spawn(async move {
+            let state = app.state::<GlobalRuntimeState>();
+            let _permit = state.project_launches.enter_activation().await;
+            if app
+                .get_webview_window(GLOBAL_WINDOW_LABEL)
+                .is_none_or(|global| !global.is_visible().unwrap_or(false))
+            {
+                exit_global_after_handoff(&app);
+            }
+        });
     }
 }
 
@@ -1790,9 +1850,17 @@ pub(crate) fn webdriver_automation_project() -> Option<PathBuf> {
     )
 }
 
-pub(crate) fn run(direct_projects: Vec<PathBuf>) -> Result<(), Box<dyn std::error::Error>> {
+pub(crate) fn run(
+    direct_projects: Vec<PathBuf>,
+    settings: Option<crate::ipc_contract::SettingsSection>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let app_paths = AppPaths::discover()?;
-    let primary_activation = match enter_global_activation(&app_paths, direct_projects)? {
+    let activation = if settings.is_some() {
+        enter_global_activation_with_settings(&app_paths, direct_projects, settings)
+    } else {
+        enter_global_activation(&app_paths, direct_projects)
+    };
+    let primary_activation = match activation? {
         GlobalActivationEntry::Forwarded => return Ok(()),
         GlobalActivationEntry::Primary(primary) => Arc::new(primary),
     };
@@ -1817,8 +1885,12 @@ pub(crate) fn run(direct_projects: Vec<PathBuf>) -> Result<(), Box<dyn std::erro
         )
         .plugin(tauri_plugin_dialog::init())
         .manage(desktop_webview_policy::WindowWebviewVisibility::default())
-        .on_window_event(desktop_webview_policy::on_window_event)
+        .on_window_event(on_global_window_event)
         .manage(state)
+        .manage(crate::settings_window::SettingsWindowState::new(
+            app_paths.clone(),
+        ))
+        .manage(crate::photoshop::PhotoshopStateStore::new(&app_paths))
         .manage(cache_service)
         .manage(provisional_decoratives)
         .setup(move |app| {
@@ -1847,6 +1919,11 @@ pub(crate) fn run(direct_projects: Vec<PathBuf>) -> Result<(), Box<dyn std::erro
         })
         .invoke_handler(tauri::generate_handler![
             complete_graphics_gate,
+            crate::settings_window::open_application_settings,
+            crate::settings_window::close_application_settings,
+            crate::photoshop::commands::photoshop_status,
+            crate::photoshop::commands::select_photoshop,
+            crate::photoshop::commands::choose_photoshop,
             crate::native_dialog_window::dismiss_owned_dialog,
             crate::native_dialog_window::owned_window_content_ready,
             crate::native_dialog_window::resolve_opening_external_copy,

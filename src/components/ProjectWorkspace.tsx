@@ -60,12 +60,17 @@ import {
 } from "./sheetReorderSession";
 import type { ProjectMutationRunner } from "./useProjectMutationRunner";
 import { useWorkspacePreferences } from "../state/useWorkspacePreferences";
+import { usePhotoshop } from "../state/usePhotoshop";
+import "./PhotoshopNotice.css";
+import { InlineNotice } from "../ui/InlineNotice";
+import { ActionButton } from "../ui/ActionButton";
 import {
   useWorkspacePanelLayout,
   WorkspacePanelSplitter,
 } from "./workspacePanelLayout";
 
 interface ProjectWorkspaceProps {
+  photoshopPort?: import("../application/photoshop").PhotoshopPort;
   mediaDropPort?: import("../application/projectPorts").MediaDropPort;
   projection: EditorProjection;
   projectDialogPort: ProjectDialogPort;
@@ -90,6 +95,7 @@ interface ProjectWorkspaceProps {
 const SHEET_EDITING_MEDIA_PANEL_HEIGHT = 120;
 
 export function ProjectWorkspace({
+  photoshopPort,
   mediaDropPort,
   projection,
   projectDialogPort,
@@ -144,9 +150,10 @@ export function ProjectWorkspace({
   } | null>(null);
   const [closeMessage, setCloseMessage] = useState<string | null>(null);
   const [frameContextMenu, setFrameContextMenu] = useState<{
-    kind: "frames" | "empty";
+    kind: "frames" | "empty" | "photo";
     position: { x: number; y: number };
   } | null>(null);
+  const photoshop = usePhotoshop(photoshopPort);
   const [presentationUnitOverride, setPresentationUnitOverride] = useState<{
     projectId: string;
     unit: DisplayUnit;
@@ -359,6 +366,12 @@ export function ProjectWorkspace({
     albumInformationApply.active ||
     saveAsBarrierActive ||
     graphicsFailure !== null;
+  const selectedPhotoFrame = controller.selectedFrames.length === 1 && controller.selectedFrames[0].photo
+    ? controller.selectedFrames[0] : null;
+  const canOpenFrameInPhotoshop = selectedPhotoFrame !== null && photoshop.available && !photoshop.opening && !commandsBlocked;
+  const openFrameInPhotoshop = () => {
+    if (canOpenFrameInPhotoshop && selectedPhotoFrame) void photoshop.open({ kind: "frames", frameIds: [selectedPhotoFrame.id] });
+  };
   const workspaceInteractionBlocked =
     mediaRemoval.active || saveAsBarrierActive || graphicsFailure !== null;
   const sheetOrderSignature = projection.state.album.sheets
@@ -525,20 +538,32 @@ export function ProjectWorkspace({
     [structuralCommandsBlocked],
   );
   useEffect(() => {
-    if (!controller.canAddFrame || commandsBlocked ||
+    if (commandsBlocked || (frameContextMenu?.kind !== "photo" && !controller.canAddFrame) ||
         (frameContextMenu?.kind === "frames" && !controller.canArrangeFrames)) setFrameContextMenu(null);
   }, [controller.canAddFrame, controller.canArrangeFrames, frameContextMenu?.kind, commandsBlocked, projectId]);
   const openFrameContextMenu = (frameId: string, position: { x: number; y: number }) => {
-    if (commandsBlocked || canvasMode.kind !== "sheet-editing" ||
-        !projection.state.album.sheets.find((sheet) => sheet.id === canvasMode.sheetId)?.frames.some((frame) => frame.id === frameId)) return;
+    if (commandsBlocked) return;
+    if (canvasMode.kind === "normal") {
+      const frame = projection.state.album.sheets.flatMap((sheet) => sheet.frames).find((frame) => frame.id === frameId);
+      if (!frame?.photo) return;
+      controller.canvasProps.onSelectFrame(frameId);
+      setFrameContextMenu({ kind: "photo", position });
+      return;
+    }
+    if (!projection.state.album.sheets.find((sheet) => sheet.id === canvasMode.sheetId)?.frames.some((frame) => frame.id === frameId)) return;
     if (!controller.canvasProps.selectedFrameIds.includes(frameId)) controller.canvasProps.onSelectFrame(frameId);
-    setFrameContextMenu({ kind: "frames", position });
+    if (!controller.canAddFrame || !controller.canArrangeFrames) {
+      const frame = projection.state.album.sheets.flatMap((sheet) => sheet.frames).find((frame) => frame.id === frameId);
+      if (frame?.photo) setFrameContextMenu({ kind: "photo", position });
+    } else setFrameContextMenu({ kind: "frames", position });
   };
   const openEmptyCanvasContextMenu = (sheetId: string, position: { x: number; y: number }) => {
     if (!controller.canAddFrame || commandsBlocked || canvasMode.kind !== "sheet-editing" || canvasMode.sheetId !== sheetId) return;
     setFrameContextMenu({ kind: "empty", position });
   };
   useProjectCommandShortcuts({
+    openPhotoInPhotoshop: openFrameInPhotoshop,
+    photoCommandActive: selectedPhotoFrame !== null && mediaDrag === null && sheetContextMenu === null && frameContextMenu === null,
     copyFrames: () => { void controller.copyFrames(); },
     pasteFrames: () => { void controller.pasteFrames(); },
     frameClipboardActive: canvasMode.kind === "sheet-editing" && mediaDrag === null && sheetContextMenu === null && frameContextMenu === null,
@@ -565,6 +590,7 @@ export function ProjectWorkspace({
     undo: controller.undo,
   });
   const applicationMenus = createProjectApplicationMenus({
+    openSettings: photoshopPort ? () => void photoshop.openSettings("performance") : undefined,
     saveLayout: controller.saveLayout,
     canSaveLayout: controller.canSaveLayout,
     copyFrames: () => { void controller.copyFrames(); },
@@ -790,6 +816,8 @@ export function ProjectWorkspace({
         />}
 
         <MediaPanel
+          photoshopAvailable={photoshop.available && !photoshop.opening && !commandsBlocked}
+          onOpenInPhotoshop={(mediaId) => { if (!commandsBlocked) void photoshop.open({ kind: "panel", mediaIds: [mediaId] }); }}
           dropPort={mediaDropPort}
           key={`media-${projectId}`}
           mediaFiles={mediaFiles}
@@ -848,7 +876,16 @@ export function ProjectWorkspace({
         />
       </div>
 
-      {frameContextMenu?.kind === "frames" ? <FrameContextMenu position={frameContextMenu.position}
+      {photoshop.error && <div className="photoshop-operation-notice"><InlineNotice role="alert" tone="error">
+        <p>{photoshop.error.message}</p>
+        {photoshop.error.configure && <ActionButton onClick={() => void photoshop.openSettings()}>Configurar Photoshop…</ActionButton>}
+        <ActionButton onClick={photoshop.dismissError}>Fechar aviso</ActionButton>
+      </InlineNotice></div>}
+      {frameContextMenu?.kind === "frames" || frameContextMenu?.kind === "photo" ? <FrameContextMenu position={frameContextMenu.position}
+        editing={frameContextMenu.kind === "frames"}
+        hasPhoto={controller.selectedFrames.some((frame) => frame.photo !== null)}
+        canOpenInPhotoshop={canOpenFrameInPhotoshop}
+        onOpenInPhotoshop={openFrameInPhotoshop}
         onSwapContents={() => { void controller.swapFrameContents(); }}
         canSwapContents={controller.canSwapFrameContents}
         onDelete={() => { void controller.deleteFrames(); }}

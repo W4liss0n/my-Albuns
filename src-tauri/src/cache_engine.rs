@@ -2481,7 +2481,11 @@ mod tests {
             );
             assert!(
                 monitor
-                    .poll_in_plan(&runtime, &[binding], &fixture.work.root_bindings)
+                    .poll_readable_fixture_in_plan(
+                        &runtime,
+                        &[binding],
+                        &fixture.work.root_bindings
+                    )
                     .update()
                     .is_none(),
                 "the first poll must not invalidate the adopted cache"
@@ -4213,6 +4217,120 @@ mod tests {
                     )
                     .is_none(),
                 "a malformed on-disk generation cannot be rehydrated after restart"
+            );
+        });
+    }
+
+    #[test]
+    fn partial_external_jpeg_keeps_the_published_preview_until_full_image_confirmation() {
+        use crate::media_runtime::{MediaMonitor, MediaResolver, MediaRuntime};
+        tauri::async_runtime::block_on(async {
+            let fixture = fixture();
+            let source = fixture.work.source.source_path();
+            let write_jpeg = |width| {
+                image::RgbImage::from_pixel(width, 12, image::Rgb([20, 70, 150]))
+                    .save_with_format(source, image::ImageFormat::Jpeg)
+                    .unwrap()
+            };
+            write_jpeg(16);
+            let binding = super::cache_source_binding(&fixture.work.source);
+            let bindings = [binding.clone()];
+            let roots = &fixture.work.root_bindings;
+            let monitor = MediaMonitor::default();
+            let runtime = MediaRuntime::default();
+            MediaResolver
+                .inspect_photo_binding_in_plan(&binding, roots)
+                .unwrap();
+            monitor.adopt_prepared_inspections(
+                &runtime,
+                &bindings,
+                roots,
+                &[MediaResolver.observe_in_plan(roots, &binding)],
+            );
+            let before = runtime.snapshot().unwrap().observations().to_vec();
+            let engine = CacheEngine::default();
+            let registry = CachePreviewRegistry::new("project");
+            engine.reconcile_preview_demand(
+                &registry,
+                fixture.work.namespace.project_id(),
+                1,
+                [binding.media_id.as_str()],
+            );
+            let artifact = verified_preview_artifact(&fixture, &engine).await;
+            let ready = registry
+                .publish(
+                    &fixture.app_paths,
+                    &fixture.work.namespace,
+                    &artifact,
+                    source,
+                )
+                .unwrap();
+            let token = ready.url.unwrap().rsplit('/').next().unwrap().to_owned();
+            assert_eq!(preview_status(&registry, &token), StatusCode::OK);
+
+            std::fs::write(source, [0xff, 0xd8, 0xff]).unwrap();
+            assert!(
+                monitor
+                    .prepare_in_plan(&runtime, &bindings, roots)
+                    .is_none()
+            );
+            let prepared = monitor.prepare_in_plan(&runtime, &bindings, roots).unwrap();
+            assert!(
+                MediaResolver
+                    .inspect_photo_binding_in_plan(&binding, roots)
+                    .is_err()
+            );
+            let rejected = monitor.commit_prepared(&runtime, prepared, &bindings, roots, &[]);
+            assert!(
+                rejected
+                    .update()
+                    .unwrap()
+                    .invalidated_media_ids()
+                    .is_empty()
+            );
+            assert_eq!(runtime.snapshot().unwrap().observations(), before);
+            engine.apply_monitor_media_update(
+                &fixture.work.namespace,
+                &registry,
+                rejected.update().unwrap(),
+            );
+            assert_eq!(preview_status(&registry, &token), StatusCode::OK);
+
+            write_jpeg(48);
+            assert!(
+                monitor
+                    .prepare_in_plan(&runtime, &bindings, roots)
+                    .is_none()
+            );
+            let prepared = monitor.prepare_in_plan(&runtime, &bindings, roots).unwrap();
+            MediaResolver
+                .inspect_photo_binding_in_plan(&binding, roots)
+                .unwrap();
+            let confirmed =
+                monitor.commit_prepared(&runtime, prepared, &bindings, roots, &[binding.media_id]);
+            assert_eq!(
+                confirmed.update().unwrap().invalidated_media_ids(),
+                ["photo-a"]
+            );
+            engine.apply_monitor_media_update(
+                &fixture.work.namespace,
+                &registry,
+                confirmed.update().unwrap(),
+            );
+            assert_eq!(
+                preview_status(&registry, &token),
+                StatusCode::OK,
+                "display retains the last publication until its verified successor is ready"
+            );
+            let fresh = verified_preview_artifact(&fixture, &engine).await;
+            assert_ne!(fresh.generation_id, artifact.generation_id);
+            let ready = registry
+                .publish(&fixture.app_paths, &fixture.work.namespace, &fresh, source)
+                .unwrap();
+            assert_ne!(preview_status(&registry, &token), StatusCode::OK);
+            assert_eq!(
+                preview_status(&registry, ready.url.unwrap().rsplit('/').next().unwrap()),
+                StatusCode::OK
             );
         });
     }

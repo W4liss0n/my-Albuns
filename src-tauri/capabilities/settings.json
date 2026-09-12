@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "settings",
+  "description": "Minimum permissions for the global Settings window",
+  "local": true,
+  "windows": ["settings"],
+  "permissions": ["settings-window-commands", "core:window:allow-start-dragging", "core:event:allow-listen", "core:event:allow-unlisten"]
+}

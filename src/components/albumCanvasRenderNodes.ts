@@ -419,7 +419,7 @@ export function createSheetRenderNode(
       }
     });
     frameContainer.on("rightclick", (event: FederatedPointerEvent) => {
-      if (!modePolicy.showsFrameResizeHandles) return;
+      if (!modePolicy.showsFrameResizeHandles && !photoNode) return;
       event.stopPropagation();
       callbacks.onFrameContextMenu(frame.frameId, { x: event.clientX, y: event.clientY });
     });

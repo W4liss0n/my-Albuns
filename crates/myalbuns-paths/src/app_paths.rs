@@ -190,6 +190,10 @@ impl AppPaths {
         self.state_dir().join("workspace-preferences.json")
     }
 
+    pub fn photoshop_file(&self) -> PathBuf {
+        self.state_dir().join("photoshop.json")
+    }
+
     pub fn project_identity_leases_dir(&self) -> PathBuf {
         self.state_dir().join("ProjectIdentityLeases")
     }

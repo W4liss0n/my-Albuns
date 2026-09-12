@@ -8433,6 +8433,193 @@
       },
       "readySelector": "[data-snap-case=\"micrometer-width\"] canvas",
       "actions": []
+    },
+    {
+      "id": "photoshop-settings-detected",
+      "title": "Photoshop — instalações detectadas",
+      "implementationPath": "/settings-preview.html",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "application-settings",
+        "reason": "Configurações e integração com Photoshop definidas nos contratos aceitos 0009 e 0010 e no Programa 33; a referência visual vigente não contém estes estados. Componentes de produção com portas determinísticas."
+      },
+      "viewport": {
+        "width": 640,
+        "height": 520
+      },
+      "readySelector": ".application-settings-status",
+      "actions": []
+    },
+    {
+      "id": "photoshop-settings-absent",
+      "title": "Photoshop — nenhuma instalação",
+      "implementationPath": "/settings-preview.html?state=absent",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "application-settings",
+        "reason": "Configurações e integração com Photoshop definidas nos contratos aceitos 0009 e 0010 e no Programa 33; a referência visual vigente não contém estes estados. Componentes de produção com portas determinísticas."
+      },
+      "viewport": {
+        "width": 640,
+        "height": 520
+      },
+      "readySelector": ".application-settings-status",
+      "actions": []
+    },
+    {
+      "id": "photoshop-settings-invalid",
+      "title": "Photoshop — executável inválido",
+      "implementationPath": "/settings-preview.html",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "application-settings",
+        "reason": "Configurações e integração com Photoshop definidas nos contratos aceitos 0009 e 0010 e no Programa 33; a referência visual vigente não contém estes estados. Componentes de produção com portas determinísticas."
+      },
+      "viewport": {
+        "width": 640,
+        "height": 520
+      },
+      "readySelector": ".application-settings [role=\"alert\"]",
+      "actions": [
+        {
+          "type": "click-text",
+          "text": "Localizar Photoshop…"
+        }
+      ]
+    },
+    {
+      "id": "photoshop-settings-small",
+      "title": "Photoshop — janela menor e caminho longo",
+      "implementationPath": "/settings-preview.html",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "application-settings",
+        "reason": "Configurações e integração com Photoshop definidas nos contratos aceitos 0009 e 0010 e no Programa 33; a referência visual vigente não contém estes estados. Componentes de produção com portas determinísticas."
+      },
+      "viewport": {
+        "width": 480,
+        "height": 440
+      },
+      "readySelector": ".application-settings-path",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": "select"
+        },
+        {
+          "type": "key",
+          "key": "ArrowDown"
+        }
+      ]
+    },
+    {
+      "id": "settings-cache-confirmation",
+      "title": "Configurações — confirmação de limpeza",
+      "implementationPath": "/settings-preview.html?section=performance",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "application-settings",
+        "reason": "Configurações e integração com Photoshop definidas nos contratos aceitos 0009 e 0010 e no Programa 33; a referência visual vigente não contém estes estados. Componentes de produção com portas determinísticas."
+      },
+      "viewport": {
+        "width": 640,
+        "height": 520
+      },
+      "readySelector": ".application-settings [role=\"tabpanel\"]:not([hidden]) .ui-inline-notice",
+      "actions": [
+        {
+          "type": "click-text",
+          "text": "Limpar todo o Cache"
+        }
+      ]
+    },
+    {
+      "id": "photoshop-panel-context",
+      "title": "Photoshop — Foto no Painel",
+      "implementationPath": "/media-panel-preview.html?photoshop=available",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "photoshop-context-menu",
+        "reason": "Configurações e integração com Photoshop definidas nos contratos aceitos 0009 e 0010 e no Programa 33; a referência visual vigente não contém estes estados. Componentes de produção com portas determinísticas."
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "readySelector": "[role=\"menuitem\"]",
+      "actions": [
+        {
+          "type": "context-click",
+          "selector": "[data-media-id]:first-child"
+        }
+      ]
+    },
+    {
+      "id": "photoshop-frame-context",
+      "title": "Photoshop — Foto no Frame em modo normal",
+      "implementationPath": "/workspace-preview.html?frame=photo&photoshop=available",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "photoshop-context-menu",
+        "reason": "Configurações e integração com Photoshop definidas nos contratos aceitos 0009 e 0010 e no Programa 33; a referência visual vigente não contém estes estados. Componentes de produção com portas determinísticas."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "[role=\"menu\"][aria-label=\"Ações da Foto\"]",
+      "actions": [
+        {
+          "type": "context-click",
+          "selector": ".canvas-host canvas"
+        }
+      ]
+    },
+    {
+      "id": "photoshop-frame-locked-context",
+      "title": "Photoshop — Foto de Layout travado",
+      "implementationPath": "/workspace-preview.html?frame=photo&photoshop=available&mode=locked",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "photoshop-context-menu",
+        "reason": "Configurações e integração com Photoshop definidas nos contratos aceitos 0009 e 0010 e no Programa 33; a referência visual vigente não contém estes estados. Componentes de produção com portas determinísticas."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "[role=\"menu\"][aria-label=\"Ações da Foto\"]",
+      "actions": [
+        {
+          "type": "context-click",
+          "selector": ".canvas-host canvas"
+        }
+      ]
+    },
+    {
+      "id": "photoshop-open-failure",
+      "title": "Photoshop — instalação removida após consulta",
+      "implementationPath": "/workspace-preview.html?frame=photo&photoshop=failure",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "photoshop-failure",
+        "reason": "Configurações e integração com Photoshop definidas nos contratos aceitos 0009 e 0010 e no Programa 33; a referência visual vigente não contém estes estados. Componentes de produção com portas determinísticas."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".photoshop-operation-notice [role=\"alert\"]",
+      "actions": [
+        {
+          "type": "context-click",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Abrir no Photoshop\"]"
+        }
+      ]
     }
   ]
 }

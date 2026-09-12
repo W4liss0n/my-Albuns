@@ -1,5 +1,9 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { closeSettings, onSettingsSection } from "../platform/tauriSettingsWindow";
+import { SettingsWindow } from "../settings/SettingsWindow";
+import { tauriPhotoshopPort, tauriPhotoshopSettingsPort } from "../platform/tauriPhotoshopPort";
+import { tauriCacheSettingsPort } from "../platform/tauriCacheSettingsPort";
 
 import { installDesktopWebViewPolicy } from "../platform/desktopWebViewPolicy";
 import { probeGraphics } from "../platform/graphics";
@@ -15,16 +19,21 @@ import { tauriProjectFailureDialogPort } from "./platform/tauriProjectFailureDia
 
 installDesktopWebViewPolicy(document);
 const graphicsDiagnostic = probeGraphics();
+const parameters = new URLSearchParams(window.location.search);
+const settingsWindow = parameters.get("surface") === "settings";
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <WindowControlsProvider controls={tauriWindowControls}>
-      <GlobalShell
+    <WindowControlsProvider controls={settingsWindow ? { ...tauriWindowControls, close: closeSettings } : tauriWindowControls}>
+      {settingsWindow ? <SettingsWindow photoshopPort={tauriPhotoshopSettingsPort} cachePort={tauriCacheSettingsPort}
+        close={closeSettings} initialSection={parameters.get("section") === "photoshop" ? "photoshop" : "performance"}
+        onSectionRequest={onSettingsSection} /> : <GlobalShell
+        onOpenSettings={() => tauriPhotoshopPort.openSettings("performance")}
         failureDialogPort={tauriProjectFailureDialogPort}
         graphicsDiagnostic={graphicsDiagnostic}
         newProjectPort={tauriNewProjectPort}
         projectPort={tauriGlobalProjectPort}
-      />
+      />}
     </WindowControlsProvider>
   </React.StrictMode>,
 );

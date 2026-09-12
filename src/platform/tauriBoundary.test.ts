@@ -9,6 +9,8 @@ import messageDialogWindowPermission from "../../src-tauri/permissions/message-d
 import ownedDialogWindowPermission from "../../src-tauri/permissions/owned-dialog-window.json?raw";
 import projectWindowPermission from "../../src-tauri/permissions/project-window.json?raw";
 import projectDialogWindowPermission from "../../src-tauri/permissions/project-dialog-window.json?raw";
+import settingsWindowCapability from "../../src-tauri/capabilities/settings.json?raw";
+import settingsWindowPermission from "../../src-tauri/permissions/settings-window.json?raw";
 import productRuntimeSource from "../../src-tauri/src/product_runtime.rs?raw";
 import projectCommandsSource from "../../src-tauri/src/project_commands.rs?raw";
 
@@ -20,6 +22,8 @@ const sourceFiles = import.meta.glob("../**/*.{ts,tsx}", {
 
 const tauriCommandSources = {
   shared: ["./tauriLogger.ts"],
+  photoshop: ["./tauriPhotoshopPort.ts"],
+  settings: ["./tauriCacheSettingsPort.ts", "./tauriSettingsWindow.ts"],
   ownedDialog: ["./tauriWindowControls.ts"],
   messageDialog: ["./tauriOwnedDialogControls.ts"],
   openingDialog: ["./tauriOpeningDialogControls.ts"],
@@ -54,6 +58,8 @@ const issue16GlobalCacheCommands = new Set([
   "free_closed_project_cache",
   "clear_all_cache",
 ]);
+const photoshopProjectCommands = ["photoshop_status", "open_in_photoshop", "open_application_settings"];
+const photoshopSettingsCommands = ["photoshop_status", "select_photoshop", "choose_photoshop"];
 
 function findOffenders(
   isOffender: (path: string, source: string) => boolean,
@@ -69,7 +75,7 @@ function extractInvokedCommands(sourcePaths: readonly string[]) {
     sourcePaths.flatMap((path) =>
       Array.from(
         sourceFiles[path].matchAll(
-          /\binvoke(?:ImageProcessing)?(?:<[^>]+>)?\(\s*["']([^"']+)["']/g,
+          /\binvoke(?:ImageProcessing|Photoshop)?(?:<[^>]+>)?\(\s*["']([^"']+)["']/g,
         ),
         (match) => match[1],
       ),
@@ -138,6 +144,8 @@ test("assigns every Tauri command adapter to an explicit surface", () => {
     .sort();
   const assignedSources = [
     ...tauriCommandSources.shared,
+    ...tauriCommandSources.photoshop,
+    ...tauriCommandSources.settings,
     ...tauriCommandSources.ownedDialog,
     ...tauriCommandSources.messageDialog,
     ...tauriCommandSources.openingDialog,
@@ -154,6 +162,7 @@ test("keeps the project-window capability aligned with the invoked commands", ()
   const invokedCommands = extractInvokedCommands(
     [...tauriCommandSources.shared, ...tauriCommandSources.project],
   );
+  photoshopProjectCommands.forEach((command) => invokedCommands.add(command));
   const { capability, allowedCommands } = parseSurfaceContract(
     projectWindowCapability,
     projectWindowPermission,
@@ -178,11 +187,13 @@ test("keeps the global-window capability isolated from project commands", () => 
   const explicitGlobalSurface = new Set([
     ...globalCommands,
     ...issue16GlobalCacheCommands,
+    "open_application_settings",
   ]);
   const projectCommands = extractInvokedCommands([
     ...tauriCommandSources.shared,
     ...tauriCommandSources.project,
   ]);
+  photoshopProjectCommands.forEach((command) => projectCommands.add(command));
   const { capability, allowedCommands } = parseSurfaceContract(
     globalWindowCapability,
     globalWindowPermission,
@@ -204,7 +215,19 @@ test("keeps the global-window capability isolated from project commands", () => 
   );
   expect(
     [...allowedCommands].filter((command) => projectCommands.has(command)),
-  ).toEqual([]);
+  ).toEqual(["open_application_settings"]);
+});
+
+test("routes Photoshop commands to their explicit surfaces and isolates Settings mutations", () => {
+  const integrationCommands = extractInvokedCommands(tauriCommandSources.photoshop);
+  expect([...integrationCommands].sort()).toEqual([...new Set([...photoshopProjectCommands, ...photoshopSettingsCommands])].sort());
+  const settingsCommands = extractInvokedCommands(tauriCommandSources.settings);
+  photoshopSettingsCommands.forEach((command) => settingsCommands.add(command));
+  const { capability, allowedCommands } = parseSurfaceContract(settingsWindowCapability, settingsWindowPermission);
+  expect(capability.windows).toEqual(["settings"]);
+  expect([...allowedCommands].sort()).toEqual([...settingsCommands].sort());
+  expect(allowedCommands.has("open_in_photoshop")).toBe(false);
+  expect(allowedCommands.has("apply_project_intent")).toBe(false);
 });
 
 test("limits the Project dialog to state hydration and semantic actions", () => {

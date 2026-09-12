@@ -6,6 +6,7 @@
       "commands": {
         "allow": [
           "complete_graphics_gate",
+          "open_application_settings",
           "validate_project_configuration",
           "create_project",
           "choose_provisional_decorative",

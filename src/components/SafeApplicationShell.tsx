@@ -10,12 +10,20 @@ type SafeSettingsSection = "performance" | "photoshop";
 
 interface SafeApplicationShellProps {
   diagnostic: GraphicsDiagnostic;
+  onOpenSettings?(): Promise<void>;
 }
 
 export function SafeApplicationShell({
   diagnostic,
+  onOpenSettings,
 }: SafeApplicationShellProps) {
   const [surface, setSurface] = useState<SafeSurface>("welcome");
+  const [settingsError, setSettingsError] = useState(false);
+  const openSettings = () => {
+    if (!onOpenSettings) { setSurface("settings"); return; }
+    setSettingsError(false);
+    void onOpenSettings().catch(() => setSettingsError(true));
+  };
 
   return (
     <main className="safe-application-shell ui-chrome-selection-scope">
@@ -34,7 +42,7 @@ export function SafeApplicationShell({
             </SurfaceButton>
             <SurfaceButton
               active={surface === "settings"}
-              onPress={() => setSurface("settings")}
+              onPress={openSettings}
             >
               Configurações
             </SurfaceButton>
@@ -49,7 +57,7 @@ export function SafeApplicationShell({
             <WelcomeSurface
               diagnostic={diagnostic}
               onOpenDiagnostic={() => setSurface("diagnostic")}
-              onOpenSettings={() => setSurface("settings")}
+              onOpenSettings={openSettings}
             />
           )}
           {surface === "settings" && (
@@ -60,6 +68,7 @@ export function SafeApplicationShell({
           {surface === "diagnostic" && (
             <DiagnosticSurface diagnostic={diagnostic} />
           )}
+          {settingsError && <InlineNotice role="alert" tone="error">Não foi possível abrir Configurações. Tente novamente.</InlineNotice>}
         </section>
       </div>
     </main>

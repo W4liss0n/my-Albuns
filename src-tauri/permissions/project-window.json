@@ -40,6 +40,9 @@
           "workspace_preferences",
           "update_workspace_preference",
           "application_settings",
+          "photoshop_status",
+          "open_in_photoshop",
+          "open_application_settings",
           "update_application_setting"
         ],
         "deny": []

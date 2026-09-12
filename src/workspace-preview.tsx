@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 
 import App from "./App";
+import { photoshopProjectPreview } from "./test/photoshopPreview";
 import type {
   GraphicsDiagnostic,
   GraphicsProbe,
@@ -86,6 +87,12 @@ if (frameContext === "layouts" && previewParameters.get("mode") === "edit") {
   useEditorView.setState({ projectId: projection.state.projectId, editingSheetId: sheet.id,
     focusedSheetId: sheet.id, centeredSheetId: sheet.id,
     selectedFrameIds: previewParameters.get("selection") === "none" ? [] : sheet.frames.map((frame) => frame.id) });
+}
+if (frameContext === "photo" && previewParameters.get("mode") === "locked") {
+  const sheet = projection.state.album.sheets[0];
+  sheet.layoutLocked = true;
+  useEditorView.setState({ projectId: projection.state.projectId, editingSheetId: sheet.id,
+    focusedSheetId: sheet.id, centeredSheetId: sheet.id, selectedFrameIds: [sheet.frames[0].id] });
 }
 if (frameContext === "stack") {
   const exposeSelection = () => { document.body.dataset.stackSelection = useEditorView.getState().selectedFrameIds.join(","); };
@@ -362,6 +369,7 @@ const workspacePreferencesPort = createPreviewWorkspacePreferencesPort(
 );
 
 const appProps = {
+  photoshopPort: previewParameters.has("photoshop") ? photoshopProjectPreview(previewParameters.get("photoshop")) : undefined,
   canvasGraphicsDiagnosticProbe,
   exportPipelinePort,
   graphicsProbe,

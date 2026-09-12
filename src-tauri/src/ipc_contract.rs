@@ -4,6 +4,61 @@ use myalbuns_core::EditorProjection;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum SettingsSection {
+    Performance,
+    Photoshop,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct PhotoshopInstallation {
+    pub id: String,
+    pub name: String,
+    pub version: String,
+    pub path: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct PhotoshopStatus {
+    #[ts(type = "number")]
+    pub revision: u64,
+    pub installations: Vec<PhotoshopInstallation>,
+    pub selected_installation_id: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub enum PhotoshopPhotoTarget {
+    Panel { media_ids: Vec<String> },
+    Frames { frame_ids: Vec<String> },
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+pub enum PhotoshopErrorCode {
+    InstallationUnavailable,
+    InvalidInstallation,
+    OriginalAbsent,
+    OriginalUnavailable,
+    InvalidContext,
+    LaunchFailed,
+    StoreUnavailable,
+    DialogUnavailable,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+pub struct PhotoshopCommandError {
+    pub code: PhotoshopErrorCode,
+    pub message: String,
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize, TS)]
 pub struct PointerDragThreshold {
     pub x: f64,

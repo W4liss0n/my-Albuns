@@ -852,6 +852,49 @@ impl ProjectHost {
         })
     }
 
+    pub(crate) fn photoshop_photo(
+        &self,
+        target: &crate::ipc_contract::PhotoshopPhotoTarget,
+    ) -> Result<MediaBinding, crate::ipc_contract::PhotoshopCommandError> {
+        use crate::ipc_contract::{
+            PhotoshopCommandError, PhotoshopErrorCode, PhotoshopPhotoTarget,
+        };
+        let invalid = || PhotoshopCommandError::new(PhotoshopErrorCode::InvalidContext);
+        let project = self.project().map_err(|_| invalid())?;
+        let media_id = match target {
+            PhotoshopPhotoTarget::Panel { media_ids } if media_ids.len() == 1 => {
+                media_ids[0].clone()
+            }
+            PhotoshopPhotoTarget::Frames { frame_ids } if frame_ids.len() == 1 => project
+                .projection()
+                .state
+                .album
+                .sheets
+                .iter()
+                .flat_map(|sheet| &sheet.frames)
+                .find(|frame| frame.id == frame_ids[0])
+                .and_then(|frame| frame.photo.as_ref())
+                .ok_or_else(invalid)?
+                .media_id
+                .to_string(),
+            _ => return Err(invalid()),
+        };
+        let media = project
+            .project()
+            .media()
+            .iter()
+            .find(|media| {
+                media.id().to_string() == media_id
+                    && media.kind() == myalbuns_core::MediaKind::Photo
+            })
+            .ok_or_else(invalid)?;
+        Ok(MediaBinding {
+            media_id,
+            kind: media.kind(),
+            logical_path: media.path().to_path_buf(),
+        })
+    }
+
     pub(crate) fn is_current_project(&self, project_id: &str) -> bool {
         self.project()
             .is_ok_and(|project| project.project_id().to_string() == project_id)
@@ -1343,6 +1386,84 @@ mod tests {
             assert!(media_ids.is_empty());
             assert_eq!(problems.len(), expected_problems);
         }
+    }
+
+    #[test]
+    fn photoshop_resolves_one_current_photo_without_changing_creative_state() {
+        use crate::ipc_contract::{PhotoshopErrorCode, PhotoshopPhotoTarget as Target};
+        let fixture = fixture();
+        let original = fixture._root.path().join("Foto original.jpg");
+        RgbImage::from_pixel(48, 32, Rgb([20, 120, 220]))
+            .save_with_format(&original, ImageFormat::Jpeg)
+            .unwrap();
+        let crate::ipc_contract::ImportMediaResult::Completed {
+            media_ids,
+            projection,
+            ..
+        } = fixture
+            .host
+            .import_photos(vec![original.clone()], |_| {})
+            .unwrap()
+        else {
+            panic!("import completes")
+        };
+        let media_id = media_ids[0].clone();
+        let sheet_id = projection.state.album.sheets[0].id.clone();
+        fixture
+            .host
+            .apply_with_outcome(ProjectIntent::AddPhoto {
+                sheet_id,
+                media_id: media_id.parse().unwrap(),
+                mode: myalbuns_core::PhotoPlacementMode::Normal,
+            })
+            .unwrap();
+        let before = fixture.host.projection().unwrap();
+        let frame_id = before
+            .state
+            .album
+            .sheets
+            .iter()
+            .flat_map(|sheet| &sheet.frames)
+            .find(|frame| frame.photo.is_some())
+            .unwrap()
+            .id
+            .clone();
+        fixture.host.save(before.state.revision).unwrap();
+        let before = fixture.host.projection().unwrap();
+        for target in [
+            Target::Panel {
+                media_ids: vec![media_id.clone()],
+            },
+            Target::Frames {
+                frame_ids: vec![frame_id.clone()],
+            },
+        ] {
+            let binding = fixture.host.photoshop_photo(&target).unwrap();
+            assert_eq!(binding.media_id, media_id);
+            assert_eq!(binding.logical_path, original);
+        }
+        for target in [
+            Target::Panel { media_ids: vec![] },
+            Target::Panel {
+                media_ids: vec!["foreign".into()],
+            },
+            Target::Panel {
+                media_ids: vec![media_id.clone(), media_id],
+            },
+            Target::Frames {
+                frame_ids: vec![frame_id.clone(), frame_id],
+            },
+            Target::Frames {
+                frame_ids: vec!["foreign".into()],
+            },
+        ] {
+            assert_eq!(
+                fixture.host.photoshop_photo(&target).unwrap_err().code,
+                PhotoshopErrorCode::InvalidContext
+            );
+        }
+        assert_eq!(fixture.host.projection().unwrap(), before);
+        assert!(!before.state.dirty);
     }
 
     #[test]
@@ -2755,7 +2876,7 @@ mod tests {
         let resolver = MediaResolver;
         runtime.apply(resolver.observe(1, std::slice::from_ref(&unavailable_sample)));
         let retried = MediaMonitor::default()
-            .retry_unavailable(&runtime, &binding, |_| {})
+            .retry_readable_fixture(&runtime, &binding)
             .expect("the Runtime repeats the authoritative inspection through the Host binding");
 
         let after = fixture
@@ -2829,8 +2950,18 @@ mod tests {
         let resolver = MediaResolver;
         let runtime = MediaRuntime::default();
         let monitor = MediaMonitor::default();
-        assert!(monitor.poll(&runtime, &before.bindings).update().is_none());
-        assert!(monitor.poll(&runtime, &before.bindings).update().is_some());
+        assert!(
+            monitor
+                .poll_readable_fixture(&runtime, &before.bindings)
+                .update()
+                .is_none()
+        );
+        assert!(
+            monitor
+                .poll_readable_fixture(&runtime, &before.bindings)
+                .update()
+                .is_some()
+        );
 
         let proposal = resolver
             .propose_relink(&selected, replacement.clone())
@@ -2865,8 +2996,13 @@ mod tests {
                 .logical_path,
             original_right
         );
-        assert!(monitor.poll(&runtime, &after.bindings).update().is_none());
-        let stable = monitor.poll(&runtime, &after.bindings);
+        assert!(
+            monitor
+                .poll_readable_fixture(&runtime, &after.bindings)
+                .update()
+                .is_none()
+        );
+        let stable = monitor.poll_readable_fixture(&runtime, &after.bindings);
         assert_eq!(
             stable.update().unwrap().changed_media_ids(),
             std::slice::from_ref(&selected.media_id)

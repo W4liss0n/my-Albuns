@@ -1,0 +1,7 @@
+{
+  "permission": [{
+    "identifier": "settings-window-commands",
+    "description": "Allows the global Settings window to manage machine preferences and Cache without Project access.",
+    "commands": { "allow": ["photoshop_status", "select_photoshop", "choose_photoshop", "close_application_settings", "cache_service_status", "free_closed_project_cache", "clear_all_cache"], "deny": [] }
+  }]
+}
