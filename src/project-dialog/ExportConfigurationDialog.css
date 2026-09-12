@@ -62,7 +62,7 @@
 .export-configuration__quality .ui-range::-moz-range-track { background: var(--ui-border-strong); }
 .export-configuration__quality .ui-range::-webkit-slider-thumb { width: 18px; height: 18px; margin-top: -7px; border-color: var(--ui-accent-fill); background: var(--ui-accent-fill); box-shadow: none; }
 .export-configuration__quality .ui-range::-moz-range-thumb { width: 18px; height: 18px; border-color: var(--ui-accent-fill); background: var(--ui-accent-fill); box-shadow: none; }
-.export-configuration__quality .ui-range:focus-visible::-webkit-slider-thumb,
+.export-configuration__quality .ui-range:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 2px var(--ui-surface-raised), 0 0 0 3px var(--ui-focus-neutral); }
 .export-configuration__quality .ui-range:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 2px var(--ui-surface-raised), 0 0 0 3px var(--ui-focus-neutral); }
 .export-configuration__quality input:disabled { opacity: 0.5; }
 .export-configuration__selection { display: grid; gap: 16px; }
