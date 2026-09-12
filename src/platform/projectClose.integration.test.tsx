@@ -104,7 +104,7 @@ test.each(["pending", "completed"] as const)(
       const runProjectMutation = useProjectMutationRunner(current.state.projectId, corePort);
       return (
         <ProjectWorkspace
-          exportPipelinePort={{ startSheet: () => { throw new Error("No export in this scenario"); } }}
+          exportPipelinePort={{ defaultDestination: async () => "C:/Exportados/Album", chooseDestination: async () => null, startSheet: () => { throw new Error("No export in this scenario"); } }}
           runProjectMutation={runProjectMutation}
           mediaPreviews={{}}
           onMediaDemandChange={() => undefined}

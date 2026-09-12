@@ -342,7 +342,9 @@ fn run(command: &ImagingCommand, log_root: &Path) -> myalbuns_imaging_protocol::
         decode_event_stream(&output.stdout).expect("the Processador response is valid");
     let request_id = match command {
         ImagingCommand::BuildCache(request) => &request.request_id,
-        ImagingCommand::Render(_) | ImagingCommand::PreparePhotoImport(_) => {
+        ImagingCommand::Render(_)
+        | ImagingCommand::RenderAlbum(_)
+        | ImagingCommand::PreparePhotoImport(_) => {
             panic!("the fixture requires a Cache command")
         }
     };

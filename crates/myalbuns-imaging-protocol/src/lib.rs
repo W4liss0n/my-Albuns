@@ -1,4 +1,8 @@
+mod album_render;
 mod cache;
+pub use album_render::{
+    AlbumRenderCompletion, AlbumRenderOutput, AlbumRenderRequest, RenderFormat,
+};
 mod command;
 mod event_stream;
 mod photo_import;
@@ -36,7 +40,7 @@ pub use render::{
 };
 pub use response::ImagingResponse;
 
-pub const IMAGING_PROTOCOL_VERSION: u32 = 22;
+pub const IMAGING_PROTOCOL_VERSION: u32 = 23;
 
 pub(crate) fn is_safe_identifier(value: &str) -> bool {
     !value.is_empty()

@@ -36,7 +36,7 @@ vi.mock("./AlbumDesignForm", () => ({
 }));
 
 const exportPipelinePort: ExportPipelinePort = {
-  startSheet: () => ({
+  defaultDestination: async () => "C:/Exportados/Album", chooseDestination: async () => null, startSheet: () => ({
     cancel: async () => "not_found",
     completion: Promise.resolve({
       status: "completed",

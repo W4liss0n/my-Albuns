@@ -158,8 +158,7 @@ const DEFINITIONS = [
     description: "Abre o fluxo normal de Exportação do Projeto.",
     kind: "application",
     contexts: ["project-window"],
-    availability: "placeholder",
-    placeholderFeature: "normal-project-export",
+    availability: "implemented",
     shortcuts: [],
   }),
   command({

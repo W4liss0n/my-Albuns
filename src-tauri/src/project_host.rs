@@ -939,6 +939,52 @@ impl ProjectHost {
         })
     }
 
+    pub(crate) fn export_destination(&self) -> Result<String, String> {
+        let project = self.project()?;
+        let path = project.project_path();
+        let parent = path
+            .parent()
+            .ok_or("O Projeto não tem uma pasta de destino.")?;
+        Ok(parent
+            .join(crate::export_commands::export_name(
+                &project.projection().state.project_name,
+            ))
+            .to_string_lossy()
+            .into_owned())
+    }
+
+    pub(crate) fn freeze_export(
+        &self,
+        sheet_ids: &[String],
+    ) -> Result<(RenderSnapshot, Vec<RenderSource>), String> {
+        let (snapshot, media) = self
+            .project()?
+            .freeze_rendering()
+            .into_export(sheet_ids)
+            .map_err(|error| error.to_string())?;
+        let sources = media
+            .into_iter()
+            .map(|media| {
+                RenderSource::new(
+                    MediaId::try_from(media.id())
+                        .expect("persisted media identities are canonical"),
+                    media.path().to_path_buf(),
+                )
+            })
+            .collect::<Result<_, _>>()?;
+        Ok((snapshot, sources))
+    }
+
+    pub(crate) fn validate_export(
+        &self,
+        sheet_ids: &[String],
+    ) -> Result<Vec<myalbuns_core::LayoutExportProblem>, String> {
+        self.project()?
+            .freeze_rendering()
+            .validate_export_sheets(sheet_ids)
+            .map_err(|error| error.to_string())
+    }
+
     pub(crate) fn validate_sheet_export(
         &self,
         sheet_id: &str,

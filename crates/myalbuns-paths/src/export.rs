@@ -34,6 +34,7 @@ pub struct PreparedExportStorage {
     destination: DirectoryGuard,
     preparation: DirectoryGuard,
     plan: ExportPathPlan,
+    shared_preparation: bool,
 }
 
 impl ExportPathPlan {
@@ -98,11 +99,54 @@ impl ExportPathPlan {
             destination,
             preparation,
             plan: self.clone(),
+            shared_preparation: false,
         })
     }
 }
 
 impl PreparedExportStorage {
+    /// Removes only explicitly named regular children of a guarded destination.
+    pub fn remove_obsolete_outputs(
+        destination: &Path,
+        paths: &[PathBuf],
+    ) -> Result<(), AppPathsError> {
+        let guard = open_directory(destination).map_err(export_storage_error)?;
+        for path in paths {
+            if path.parent() != Some(destination) {
+                return Err(AppPathsError::ExportStorageOutsideDestination);
+            }
+            if open_export_file(&guard, path, true)?.is_some() {
+                fs::remove_file(path).map_err(|_| AppPathsError::ExportStorageUnavailable)?;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn into_shared_preparation(mut self) -> Self {
+        self.shared_preparation = true;
+        self
+    }
+    /// Adds a planned output to this already-owned preparation directory.
+    pub fn prepare_sibling(&self, plan: ExportPathPlan) -> Result<Self, AppPathsError> {
+        if plan.preparation_directory != self.plan.preparation_directory
+            || plan.output_path.parent() != self.plan.output_path.parent()
+        {
+            return Err(AppPathsError::InvalidExportPath);
+        }
+        Ok(Self {
+            destination: open_directory(
+                plan.output_path
+                    .parent()
+                    .ok_or(AppPathsError::InvalidExportPath)?,
+            )
+            .map_err(export_storage_error)?,
+            preparation: open_directory(&plan.preparation_directory)
+                .map_err(export_storage_error)?,
+            plan,
+            shared_preparation: true,
+        })
+    }
+
     pub fn publish(self) -> Result<(), AppPathsError> {
         let validation = (|| {
             let prepared =
@@ -148,6 +192,25 @@ impl PreparedExportStorage {
     }
 
     pub fn discard(self) -> Result<bool, AppPathsError> {
+        if self.shared_preparation {
+            let exists =
+                open_export_file(&self.preparation, &self.plan.prepared_output_path, true)?
+                    .is_some();
+            if exists {
+                fs::remove_file(&self.plan.prepared_output_path)
+                    .map_err(|_| AppPathsError::ExportStorageUnavailable)?;
+            }
+            let directory = self.plan.preparation_directory.clone();
+            drop(self);
+            match fs::remove_dir(directory) {
+                Ok(()) => {}
+                Err(error)
+                    if error.kind() == std::io::ErrorKind::DirectoryNotEmpty
+                        || error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(_) => return Err(AppPathsError::ExportStorageUnavailable),
+            }
+            return Ok(exists);
+        }
         let mut removed = false;
         for entry in fs::read_dir(&self.preparation.logical_path)
             .map_err(|_| AppPathsError::ExportStorageUnavailable)?

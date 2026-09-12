@@ -192,6 +192,34 @@ impl ResolvedObject {
         reopen_file_for_read(&self.file)
     }
 
+    /// Retains the resolved Original against writes and deletion for one render attempt.
+    pub fn capture_for_read(&self) -> std::io::Result<File> {
+        #[cfg(windows)]
+        {
+            use std::os::windows::io::{AsRawHandle, FromRawHandle};
+            use windows_sys::Win32::{
+                Foundation::{GENERIC_READ, HANDLE, INVALID_HANDLE_VALUE},
+                Storage::FileSystem::{FILE_SHARE_READ, ReOpenFile},
+            };
+            let handle = unsafe {
+                ReOpenFile(
+                    self.file.as_raw_handle() as HANDLE,
+                    GENERIC_READ,
+                    FILE_SHARE_READ,
+                    0,
+                )
+            };
+            if handle == INVALID_HANDLE_VALUE {
+                return Err(std::io::Error::last_os_error());
+            }
+            Ok(unsafe { File::from_raw_handle(handle.cast()) })
+        }
+        #[cfg(not(windows))]
+        {
+            self.reopen_for_read()
+        }
+    }
+
     pub fn compare_physical(&self, other: &Self) -> PhysicalIdentityEvidence {
         compare_file_identity(&self.file, &other.file)
     }

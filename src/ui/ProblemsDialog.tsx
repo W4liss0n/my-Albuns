@@ -12,6 +12,7 @@ interface ProblemsDialogProps {
   rows: readonly (readonly ReactNode[])[];
   onClose(): void;
   closeDisabled?: boolean;
+  closeLabel?: string;
   actions?: ReactNode;
 }
 
@@ -22,6 +23,7 @@ export function ProblemsDialog({
   rows,
   onClose,
   closeDisabled = false,
+  closeLabel = "Fechar",
   actions,
 }: ProblemsDialogProps) {
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -34,7 +36,7 @@ export function ProblemsDialog({
       <DialogWindowFrame
         title={title}
         layout="problems"
-        actions={<>{actions}<ActionButton ref={closeRef} disabled={closeDisabled} onClick={onClose}>Fechar</ActionButton></>}
+        actions={<>{actions}<ActionButton ref={closeRef} disabled={closeDisabled} onClick={onClose}>{closeLabel}</ActionButton></>}
       >
         <p className="ui-problems-description">{description}</p>
         <div

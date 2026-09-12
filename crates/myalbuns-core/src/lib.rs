@@ -1,4 +1,6 @@
 mod composition;
+mod export_selection;
+pub use export_selection::{ExportFormat, ExportMode, SelectedExportUnit};
 mod frame_geometry;
 mod frame_snap;
 mod layouts;

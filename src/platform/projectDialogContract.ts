@@ -1,4 +1,5 @@
 import { parseExportMediaProblems } from "./exportMediaContract";
+import { parseNormalExportOptions } from "../application/normalExport";
 import type {
   ProjectDialogAction,
   ProjectDialogActionEvent,
@@ -21,6 +22,7 @@ type ProjectDialogProgressKind = ProjectDialogProgress["kind"];
 type IpcProjectDialogProgressKind = IpcProjectDialogProgress["kind"];
 
 const projectDialogActionMap = {
+  confirmExportOverwrite: "confirmExportOverwrite",
   relinkExportMedia: "relinkExportMedia", retryExportMedia: "retryExportMedia",
   cancelMediaRemoval: "cancelMediaRemoval",
   removeAllMedia: "removeAllMedia",
@@ -40,8 +42,8 @@ const projectDialogActionMap = {
   dismissImageProcessingProblems: "dismissImageProcessingProblems",
   retryExport: "retryExport",
   saveAndClose: "saveAndClose",
-} as const satisfies Record<IpcProjectDialogAction, ProjectDialogAction> &
-  Record<ProjectDialogAction, IpcProjectDialogAction>;
+} as const satisfies Record<Extract<IpcProjectDialogAction, string>, ProjectDialogAction> &
+  Record<Extract<ProjectDialogAction, string>, IpcProjectDialogAction>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -130,6 +132,17 @@ const stateDecoders: Record<
   StateDecoder
 > &
   Record<ProjectDialogStateKind, StateDecoder> = {
+  exportConfiguration: value => {
+    const options = parseNormalExportOptions(value.options);
+    if (!options || !Array.isArray(value.sheets) || !value.sheets.length || typeof value.busy !== "boolean" || typeof value.message !== "string") return null;
+    const sheets = [];
+    for (const sheet of value.sheets) {
+      if (!isRecord(sheet) || typeof sheet.sheetId !== "string" || typeof sheet.number !== "number" || !Number.isSafeInteger(sheet.number) || sheet.number < 1 || (sheet.pageCount !== 1 && sheet.pageCount !== 2)) return null;
+      sheets.push({ sheetId: sheet.sheetId, number: sheet.number, pageCount: sheet.pageCount });
+    }
+    return { kind: "exportConfiguration", sheets, options, busy: value.busy, message: value.message };
+  },
+  exportConflicts: value => Array.isArray(value.files) && value.files.every(file => typeof file === "string") ? { kind: "exportConflicts", files: value.files } : null,
   mediaRemovalConfirmation: (value) => typeof value.busy === "boolean" &&
     (value.mediaKind === "photo" || value.mediaKind === "decorative") &&
     isWireU64(value.count) && isWireU64(value.usedCount) && isWireU64(value.usageCount)
@@ -220,6 +233,10 @@ const stateDecoders: Record<
 export function parseProjectDialogAction(
   value: unknown,
 ): ProjectDialogAction | null {
+  if (isRecord(value)) {
+    if (hasOwn(value, "configureExport")) { const options = parseNormalExportOptions(value.configureExport); return options ? { configureExport: options } : null; }
+    if (hasOwn(value, "chooseExportDestination")) { const options = parseNormalExportOptions(value.chooseExportDestination); return options ? { chooseExportDestination: options } : null; }
+  }
   return typeof value === "string" &&
     hasOwn(projectDialogActionMap, value)
     ? projectDialogActionMap[value]
@@ -241,7 +258,7 @@ export function parseProjectDialogActionEvent(
     action: toIpcProjectDialogAction(action),
     sessionId: value.sessionId,
   } satisfies IpcProjectDialogActionEvent;
-  return { action: projectDialogActionMap[event.action], sessionId: event.sessionId };
+  return { action, sessionId: event.sessionId };
 }
 
 export function parseProjectDialogPresentation(
@@ -265,6 +282,7 @@ export function parseProjectDialogPresentation(
 export function toIpcProjectDialogAction(
   action: ProjectDialogAction,
 ): IpcProjectDialogAction {
+  if (typeof action !== "string") return action;
   return projectDialogActionMap[action];
 }
 
@@ -286,6 +304,8 @@ export function toIpcProjectDialogState(
   state: ProjectDialogState,
 ): IpcProjectDialogState {
   switch (state.kind) {
+    case "exportConfiguration": return { ...state };
+    case "exportConflicts": return { ...state };
     case "mediaRemovalConfirmation": return { ...state };
     case "exportMediaProblems": return { ...state, problems: state.problems.map(problem => ({ ...problem })) };
     case "exportProblems":
@@ -331,6 +351,8 @@ function fromIpcProjectDialogState(
   state: IpcProjectDialogState,
 ): ProjectDialogState {
   switch (state.kind) {
+    case "exportConfiguration": return { ...state };
+    case "exportConflicts": return { ...state };
     case "mediaRemovalConfirmation": return { ...state };
     case "exportMediaProblems": return { ...state, problems: state.problems.map(problem => ({ ...problem })) };
     case "exportProblems":

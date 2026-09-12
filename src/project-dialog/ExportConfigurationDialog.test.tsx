@@ -1,0 +1,62 @@
+import { fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { expect, test, vi } from "vitest";
+import { ExportConfigurationDialog } from "./ExportConfigurationDialog";
+import type { ProjectDialogState } from "../application/projectDialogPort";
+
+const state: Extract<ProjectDialogState, { kind: "exportConfiguration" }> = {
+  kind: "exportConfiguration", busy: false, message: "",
+  sheets: [{ sheetId: "opening", number: 1, pageCount: 1 }, { sheetId: "middle", number: 2, pageCount: 2 }, { sheetId: "closing", number: 3, pageCount: 1 }],
+  options: { scope: "album", sheetIds: ["opening", "middle", "closing"], mode: "sheet", format: { kind: "jpeg", quality: 100 }, destination: "C:/Álbuns/Teste", overwrite: false },
+};
+
+test("exports only the selected continuous sheets and counts active pages for PDF", async () => {
+  const user = userEvent.setup(); const onAction = vi.fn();
+  render(<ExportConfigurationDialog state={state} onAction={onAction} />);
+  expect(screen.getByText("3 arquivos")).toBeInTheDocument();
+  await user.click(screen.getByLabelText("Por página"));
+  expect(screen.getByText("4 arquivos")).toBeInTheDocument();
+  await user.click(screen.getByLabelText("Intervalo de lâminas"));
+  fireEvent.change(screen.getByLabelText("Lâmina inicial"), { target: { value: "2" } });
+  fireEvent.change(screen.getByLabelText("Lâmina final"), { target: { value: "2" } });
+  await user.click(screen.getByLabelText("PDF"));
+  expect(screen.getByText("1 PDF · 2 páginas")).toBeInTheDocument();
+  expect(screen.queryByRole("slider")).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Exportar" }));
+  expect(onAction).toHaveBeenCalledWith({ configureExport: { ...state.options, scope: "range", sheetIds: ["middle"], mode: "page", format: { kind: "pdf" } } });
+});
+
+test("JPEG quality is local to an opening, restores on double click and is omitted for PNG", async () => {
+  const user = userEvent.setup(); const onAction = vi.fn();
+  const view = render(<ExportConfigurationDialog state={state} onAction={onAction} />);
+  fireEvent.change(screen.getByRole("slider"), { target: { value: "64" } });
+  await user.click(screen.getByRole("button", { name: "Exportar" }));
+  expect(onAction).toHaveBeenLastCalledWith({ configureExport: { ...state.options, format: { kind: "jpeg", quality: 64 } } });
+  fireEvent.doubleClick(screen.getByRole("slider"));
+  expect(screen.getByRole("slider")).toHaveValue("100");
+  fireEvent.change(screen.getByRole("slider"), { target: { value: "72" } });
+  await user.click(screen.getByLabelText("PNG")); await user.click(screen.getByRole("button", { name: "Exportar" }));
+  expect(onAction).toHaveBeenLastCalledWith({ configureExport: { ...state.options, format: { kind: "png" } } });
+  view.unmount(); render(<ExportConfigurationDialog state={state} onAction={onAction} />);
+  expect(screen.getByRole("slider")).toHaveValue("100");
+});
+
+test("invalid ranges never submit and contextual export starts at the chosen sheet", async () => {
+  const user = userEvent.setup(); const onAction = vi.fn();
+  render(<ExportConfigurationDialog state={{ ...state, options: { ...state.options, scope: "range", sheetIds: ["middle"] } }} onAction={onAction} />);
+  expect(screen.getByLabelText("Lâmina inicial")).toHaveValue(2); expect(screen.getByLabelText("Lâmina final")).toHaveValue(2);
+  fireEvent.change(screen.getByLabelText("Lâmina inicial"), { target: { value: "3" } });
+  expect(screen.getByRole("alert")).toBeInTheDocument(); expect(screen.getByRole("button", { name: "Exportar" })).toBeDisabled();
+  await user.click(screen.getByRole("button", { name: "Cancelar" })); expect(onAction).toHaveBeenCalledWith("dismissExport");
+});
+
+test("contextual export remains an interval even when the album has only one sheet, and Escape closes it", () => {
+  const onAction = vi.fn();
+  render(<ExportConfigurationDialog state={{ ...state,
+    sheets: [{ sheetId: "middle", number: 1, pageCount: 2 }],
+    options: { ...state.options, scope: "range", sheetIds: ["middle"] },
+  }} onAction={onAction} />);
+  expect(screen.getByLabelText("Intervalo de lâminas")).toBeChecked();
+  fireEvent.keyDown(screen.getByLabelText("Lâmina inicial"), { key: "Escape" });
+  expect(onAction).toHaveBeenCalledWith("dismissExport");
+});

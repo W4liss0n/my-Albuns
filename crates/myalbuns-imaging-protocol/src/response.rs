@@ -12,6 +12,10 @@ use crate::render::RenderCompletion;
     rename_all_fields = "camelCase"
 )]
 pub enum ImagingResponse {
+    AlbumCompleted {
+        request_id: String,
+        completion: crate::AlbumRenderCompletion,
+    },
     Completed {
         request_id: String,
         completion: RenderCompletion,
@@ -98,7 +102,8 @@ impl ImagingResponse {
 
     pub fn request_id(&self) -> &str {
         match self {
-            Self::Completed { request_id, .. }
+            Self::AlbumCompleted { request_id, .. }
+            | Self::Completed { request_id, .. }
             | Self::CacheCompleted { request_id, .. }
             | Self::PhotoImportCompleted { request_id, .. }
             | Self::Failed { request_id, .. } => request_id,

@@ -1,6 +1,7 @@
 import { invokeImageProcessing } from "./invokeImageProcessing";
 import { MediaExportBlockedError } from "../application/exportMedia";
 import { parseExportMediaProblems } from "./exportMediaContract";
+import { ExportConflictsError } from "../application/normalExport";
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
@@ -430,8 +431,10 @@ export const tauriMediaPreviewPort: MediaPreviewPort = {
 };
 
 export const tauriExportPipelinePort: ExportPipelinePort = {
+  defaultDestination: () => invoke<string>("default_export_destination"),
+  chooseDestination: () => invoke<string | null>("choose_export_folder"),
   startSheet: (
-    { projectName, sheetId, sheetNumber },
+    { projectName, sheetId, sheetNumber, options },
     emitEvent: (event: ExportProgressEvent) => void,
   ) => {
     const onEvent = new Channel<IpcExportEvent>();
@@ -468,7 +471,7 @@ export const tauriExportPipelinePort: ExportPipelinePort = {
         cancellable: event.data.cancellable,
       });
     };
-    const completion = invoke<IpcExportResult>("export_sheet", {
+    const completion = invoke<IpcExportResult>(options ? "export_project" : "export_sheet", options ? { options, onEvent } : {
       projectName,
       sheetId,
       sheetNumber,
@@ -479,6 +482,7 @@ export const tauriExportPipelinePort: ExportPipelinePort = {
         result,
       }))
       .catch((error: unknown) => {
+        if (typeof error === "object" && error !== null && "code" in error && error.code === "export_conflict" && "conflicts" in error && Array.isArray(error.conflicts) && error.conflicts.every(file => typeof file === "string") && error.conflicts.length) throw new ExportConflictsError(error.conflicts);
         if (isCancelledExportError(error)) {
           return {
             status: "cancelled" as const,

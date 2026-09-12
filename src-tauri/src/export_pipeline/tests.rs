@@ -36,6 +36,169 @@ struct ScriptedTransport {
     invocations: usize,
 }
 
+struct AlbumTransport {
+    fail: bool,
+    prior_output: PathBuf,
+    prior_bytes: Vec<u8>,
+}
+impl ImagingTransport for AlbumTransport {
+    fn invoke<'a>(
+        &'a mut self,
+        command: &'a ImagingCommand,
+        _context: &'a InvocationContext,
+        _operation: ImagingOperation,
+        _attempt: u8,
+        _control: InvocationControl<'a>,
+    ) -> InvocationFuture<'a> {
+        let ImagingCommand::RenderAlbum(request) = command else {
+            panic!("normal export uses the album request");
+        };
+        assert_eq!(
+            std::fs::read(&self.prior_output).unwrap(),
+            self.prior_bytes,
+            "all final files remain untouched while preparing"
+        );
+        let mut completions = vec![];
+        for (index, output) in request.outputs.iter().enumerate() {
+            let path = request
+                .root_bindings
+                .resolve(output.prepared_path.as_path())
+                .unwrap();
+            let bytes = format!("prepared-{index}").into_bytes();
+            std::fs::write(path, &bytes).unwrap();
+            completions.push(RenderCompletion {
+                width_px: 1,
+                height_px: 1,
+                dpi: request.snapshot.dpi,
+                source_count: 1,
+                source_bytes: 1,
+                output_bytes: bytes.len() as u64,
+                output_sha256: format!("{:x}", Sha256::digest(&bytes)),
+            });
+        }
+        let response = if self.fail {
+            ImagingResponse::failed(
+                request.request_id.clone(),
+                ImagingFailureCode::EncodeFailed,
+                None::<String>,
+                None,
+            )
+        } else {
+            ImagingResponse::AlbumCompleted {
+                request_id: request.request_id.clone(),
+                completion: myalbuns_imaging_protocol::AlbumRenderCompletion {
+                    outputs: completions,
+                },
+            }
+        };
+        Box::pin(async move { Ok(response) })
+    }
+}
+
+#[test]
+fn normal_export_prepares_the_entire_set_before_publish_and_cleans_a_failed_set() {
+    for (fail, whole_album) in [(false, false), (true, false), (false, true), (true, true)] {
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("original.jpg");
+        RgbImage::from_pixel(4, 4, Rgb([20, 50, 90]))
+            .save(&source)
+            .unwrap();
+        let mut snapshot = productive_snapshot(source.clone());
+        snapshot.project_name = "Album".into();
+        snapshot.composition.sheets.truncate(2);
+        let orphan = root.path().join("Album_003.png");
+        std::fs::write(&orphan, b"old-orphan").unwrap();
+        for name in ["Album_004.jpg", "Album_005_notes.png", "Album_0006.png"] {
+            std::fs::write(root.path().join(name), b"keep").unwrap();
+        }
+        let sheet_ids: Vec<_> = snapshot
+            .composition
+            .sheets
+            .iter()
+            .take(2)
+            .map(|sheet| sheet.sheet_id.clone())
+            .collect();
+        assert_eq!(sheet_ids.len(), 2);
+        let media_id = snapshot.composition.sheets[0]
+            .referenced_media_ids()
+            .next()
+            .unwrap();
+        let plan = super::plan_album(
+            snapshot,
+            super::AlbumExportOptions {
+                sheet_ids,
+                whole_album,
+                mode: myalbuns_core::ExportMode::Sheet,
+                format: myalbuns_core::ExportFormat::Png,
+                destination: root.path().to_path_buf(),
+                authorization: ExportWriteAuthorization::ReplaceConfirmed,
+                sources: vec![RenderSource::new(media_id, source).unwrap()],
+                request_id: "normal-export-set".into(),
+            },
+        )
+        .unwrap();
+        let first = root.path().join("Album_001.png");
+        let second = root.path().join("Album_002.png");
+        std::fs::write(&first, b"old-first").unwrap();
+        std::fs::write(&second, b"old-second").unwrap();
+        assert_eq!(
+            plan.conflicts().unwrap(),
+            if whole_album {
+                vec!["Album_001.png", "Album_002.png", "Album_003.png"]
+            } else {
+                vec!["Album_001.png", "Album_002.png"]
+            }
+        );
+        let mut roots = OperationPathContext::new();
+        for path in plan.required_paths() {
+            roots.capture(&path).unwrap();
+        }
+        let mut transport = AlbumTransport {
+            fail,
+            prior_output: first.clone(),
+            prior_bytes: b"old-first".to_vec(),
+        };
+        let result = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(super::execute_album(
+                &mut transport,
+                plan,
+                &roots.freeze(),
+                &ExportExecutionControl::default(),
+                &|_| {},
+                &InvocationContext::new("normal-export-set", None::<String>),
+            ));
+        assert_eq!(result.is_err(), fail);
+        assert_eq!(
+            std::fs::read(&first).unwrap(),
+            if fail {
+                b"old-first".to_vec()
+            } else {
+                b"prepared-0".to_vec()
+            }
+        );
+        assert_eq!(
+            std::fs::read(&second).unwrap(),
+            if fail {
+                b"old-second".to_vec()
+            } else {
+                b"prepared-1".to_vec()
+            }
+        );
+        assert_eq!(orphan.exists(), fail || !whole_album);
+        for name in ["Album_004.jpg", "Album_005_notes.png", "Album_0006.png"] {
+            assert_eq!(std::fs::read(root.path().join(name)).unwrap(), b"keep");
+        }
+        assert!(
+            !root
+                .path()
+                .join(".myalbuns-export-normal-export-set.tmp")
+                .exists(),
+            "all preparations are cleaned after either terminal"
+        );
+    }
+}
+
 struct CancellationAwareTransport {
     prepared_path: PathBuf,
     invocation_started: Arc<Barrier>,

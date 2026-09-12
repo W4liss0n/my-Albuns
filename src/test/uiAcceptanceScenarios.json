@@ -12,6 +12,131 @@
       "actions": []
     },
     {
+      "id": "normal-export-whole-jpeg",
+      "title": "Exportação — álbum inteiro em JPEG",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportConfiguration%22%2C%22busy%22%3Afalse%2C%22message%22%3A%22%22%2C%22sheets%22%3A%5B%7B%22sheetId%22%3A%22opening%22%2C%22number%22%3A1%2C%22pageCount%22%3A1%7D%2C%7B%22sheetId%22%3A%22middle%22%2C%22number%22%3A2%2C%22pageCount%22%3A2%7D%2C%7B%22sheetId%22%3A%22closing%22%2C%22number%22%3A3%2C%22pageCount%22%3A1%7D%5D%2C%22options%22%3A%7B%22scope%22%3A%22album%22%2C%22sheetIds%22%3A%5B%22opening%22%2C%22middle%22%2C%22closing%22%5D%2C%22mode%22%3A%22sheet%22%2C%22format%22%3A%7B%22kind%22%3A%22jpeg%22%2C%22quality%22%3A100%7D%2C%22destination%22%3A%22D%3A%5C%5C%C3%81lbuns%5C%5CFormatura%202026%22%2C%22overwrite%22%3Afalse%7D%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-export-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "Design aceito 0004: formulário único com escopo, modo, formato e destino; utiliza os componentes compartilhados da referência vigente de diálogos."
+      },
+      "viewport": {
+        "width": 640,
+        "height": 590
+      },
+      "readySelector": ".export-configuration",
+      "actions": []
+    },
+    {
+      "id": "normal-export-range-png",
+      "title": "Exportação — intervalo por página em PNG",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportConfiguration%22%2C%22busy%22%3Afalse%2C%22message%22%3A%22%22%2C%22sheets%22%3A%5B%7B%22sheetId%22%3A%22opening%22%2C%22number%22%3A1%2C%22pageCount%22%3A1%7D%2C%7B%22sheetId%22%3A%22middle%22%2C%22number%22%3A2%2C%22pageCount%22%3A2%7D%2C%7B%22sheetId%22%3A%22closing%22%2C%22number%22%3A3%2C%22pageCount%22%3A1%7D%5D%2C%22options%22%3A%7B%22scope%22%3A%22range%22%2C%22sheetIds%22%3A%5B%22middle%22%5D%2C%22mode%22%3A%22page%22%2C%22format%22%3A%7B%22kind%22%3A%22png%22%7D%2C%22destination%22%3A%22D%3A%5C%5C%C3%81lbuns%5C%5CFormatura%202026%22%2C%22overwrite%22%3Afalse%7D%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-export-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "Design aceito 0004: formulário único com escopo, modo, formato e destino; utiliza os componentes compartilhados da referência vigente de diálogos."
+      },
+      "viewport": {
+        "width": 640,
+        "height": 590
+      },
+      "readySelector": ".export-configuration",
+      "actions": []
+    },
+    {
+      "id": "normal-export-pdf",
+      "title": "Exportação — PDF com quatro páginas",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportConfiguration%22%2C%22busy%22%3Afalse%2C%22message%22%3A%22%22%2C%22sheets%22%3A%5B%7B%22sheetId%22%3A%22opening%22%2C%22number%22%3A1%2C%22pageCount%22%3A1%7D%2C%7B%22sheetId%22%3A%22middle%22%2C%22number%22%3A2%2C%22pageCount%22%3A2%7D%2C%7B%22sheetId%22%3A%22closing%22%2C%22number%22%3A3%2C%22pageCount%22%3A1%7D%5D%2C%22options%22%3A%7B%22scope%22%3A%22album%22%2C%22sheetIds%22%3A%5B%22opening%22%2C%22middle%22%2C%22closing%22%5D%2C%22mode%22%3A%22page%22%2C%22format%22%3A%7B%22kind%22%3A%22pdf%22%7D%2C%22destination%22%3A%22D%3A%5C%5C%C3%81lbuns%5C%5CFormatura%202026%22%2C%22overwrite%22%3Afalse%7D%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-export-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "Design aceito 0004: formulário único com escopo, modo, formato e destino; utiliza os componentes compartilhados da referência vigente de diálogos."
+      },
+      "viewport": {
+        "width": 640,
+        "height": 590
+      },
+      "readySelector": ".export-configuration",
+      "actions": []
+    },
+    {
+      "id": "normal-export-invalid-range",
+      "title": "Exportação — intervalo inválido",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportConfiguration%22%2C%22busy%22%3Afalse%2C%22message%22%3A%22%22%2C%22sheets%22%3A%5B%7B%22sheetId%22%3A%22opening%22%2C%22number%22%3A1%2C%22pageCount%22%3A1%7D%2C%7B%22sheetId%22%3A%22middle%22%2C%22number%22%3A2%2C%22pageCount%22%3A2%7D%2C%7B%22sheetId%22%3A%22closing%22%2C%22number%22%3A3%2C%22pageCount%22%3A1%7D%5D%2C%22options%22%3A%7B%22scope%22%3A%22range%22%2C%22sheetIds%22%3A%5B%22middle%22%5D%2C%22mode%22%3A%22page%22%2C%22format%22%3A%7B%22kind%22%3A%22png%22%7D%2C%22destination%22%3A%22D%3A%5C%5C%C3%81lbuns%5C%5CFormatura%202026%22%2C%22overwrite%22%3Afalse%7D%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-export-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "Design aceito 0004: formulário único com escopo, modo, formato e destino; utiliza os componentes compartilhados da referência vigente de diálogos."
+      },
+      "viewport": {
+        "width": 640,
+        "height": 590
+      },
+      "readySelector": ".export-configuration",
+      "actions": [
+        {
+          "type": "input",
+          "selector": "[aria-label=\"Lâmina inicial\"]",
+          "value": "3"
+        }
+      ]
+    },
+    {
+      "id": "normal-export-contextual-single",
+      "title": "Exportação contextual — projeto de uma lâmina",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportConfiguration%22%2C%22busy%22%3Afalse%2C%22message%22%3A%22%22%2C%22sheets%22%3A%5B%7B%22sheetId%22%3A%22middle%22%2C%22number%22%3A1%2C%22pageCount%22%3A2%7D%5D%2C%22options%22%3A%7B%22scope%22%3A%22range%22%2C%22sheetIds%22%3A%5B%22middle%22%5D%2C%22mode%22%3A%22sheet%22%2C%22format%22%3A%7B%22kind%22%3A%22jpeg%22%2C%22quality%22%3A100%7D%2C%22destination%22%3A%22D%3A%5C%5C%C3%81lbuns%5C%5CFormatura%202026%22%2C%22overwrite%22%3Afalse%7D%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-export-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "Design aceito 0004: formulário único com escopo, modo, formato e destino; utiliza os componentes compartilhados da referência vigente de diálogos."
+      },
+      "viewport": {
+        "width": 640,
+        "height": 590
+      },
+      "readySelector": ".export-configuration",
+      "actions": []
+    },
+    {
+      "id": "normal-export-conflicts",
+      "title": "Exportação — confirmação do conjunto existente",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportConflicts%22%2C%22files%22%3A%5B%22Formatura%202026_001.png%22%2C%22Formatura%202026_002.png%22%2C%22Formatura%202026_003.png%22%2C%22Formatura%202026_004.png%22%5D%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-export-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "Design aceito 0004: formulário único com escopo, modo, formato e destino; utiliza os componentes compartilhados da referência vigente de diálogos."
+      },
+      "viewport": {
+        "width": 640,
+        "height": 590
+      },
+      "readySelector": ".ui-problems-table",
+      "actions": []
+    },
+    {
+      "id": "normal-export-checking",
+      "title": "Exportação — verificação inicial em andamento",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportConfiguration%22%2C%22busy%22%3Atrue%2C%22message%22%3A%22%22%2C%22sheets%22%3A%5B%7B%22sheetId%22%3A%22opening%22%2C%22number%22%3A1%2C%22pageCount%22%3A1%7D%2C%7B%22sheetId%22%3A%22middle%22%2C%22number%22%3A2%2C%22pageCount%22%3A2%7D%2C%7B%22sheetId%22%3A%22closing%22%2C%22number%22%3A3%2C%22pageCount%22%3A1%7D%5D%2C%22options%22%3A%7B%22scope%22%3A%22album%22%2C%22sheetIds%22%3A%5B%22opening%22%2C%22middle%22%2C%22closing%22%5D%2C%22mode%22%3A%22sheet%22%2C%22format%22%3A%7B%22kind%22%3A%22jpeg%22%2C%22quality%22%3A100%7D%2C%22destination%22%3A%22D%3A%5C%5C%C3%81lbuns%5C%5CFormatura%202026%22%2C%22overwrite%22%3Afalse%7D%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-export-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "Design aceito 0004: formulário único com escopo, modo, formato e destino; utiliza os componentes compartilhados da referência vigente de diálogos."
+      },
+      "viewport": {
+        "width": 640,
+        "height": 590
+      },
+      "readySelector": ".export-configuration",
+      "actions": []
+    },
+    {
       "id": "media-preview-replacement",
       "title": "Troca de prévias — Painel e Lâmina",
       "implementationPath": "/photo-placement-preview.html",

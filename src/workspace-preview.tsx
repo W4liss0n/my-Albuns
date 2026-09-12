@@ -314,7 +314,7 @@ const mediaPreviewPort: MediaPreviewPort = {
 };
 
 const exportPipelinePort: ExportPipelinePort = {
-  startSheet: () => ({
+  defaultDestination: async () => "C:/Exportados/Album", chooseDestination: async () => null, startSheet: () => ({
     completion: Promise.resolve({
       status: "completed",
       result: { heightPx: 3_543, widthPx: 7_087 },

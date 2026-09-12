@@ -11,15 +11,17 @@ use crate::{
     project_host::ProjectHost,
 };
 
-fn required_bindings(host: &ProjectHost, sheet_id: &str) -> Result<Vec<MediaBinding>, String> {
-    let frozen = host.freeze_sheet_export(sheet_id)?;
+fn required_bindings_for(
+    host: &ProjectHost,
+    sheet_ids: &[String],
+) -> Result<Vec<MediaBinding>, String> {
+    let (_, sources) = host.freeze_export(sheet_ids)?;
     let catalog = host.authorized_media_catalog()?;
     Ok(catalog
         .bindings
         .into_iter()
         .filter(|binding| {
-            frozen
-                .sources
+            sources
                 .iter()
                 .any(|source| source.media_id().to_string() == binding.media_id)
         })
@@ -30,7 +32,14 @@ pub(crate) fn inspect(
     host: &ProjectHost,
     sheet_id: &str,
 ) -> Result<Vec<ExportMediaProblem>, String> {
-    let bindings = required_bindings(host, sheet_id)?;
+    inspect_selection(host, &[sheet_id.into()])
+}
+
+pub(crate) fn inspect_selection(
+    host: &ProjectHost,
+    sheet_ids: &[String],
+) -> Result<Vec<ExportMediaProblem>, String> {
+    let bindings = required_bindings_for(host, sheet_ids)?;
     Ok(MediaResolver
         .observe(0, &bindings)
         .observations()
@@ -58,6 +67,7 @@ pub(crate) fn inspect(
 #[tauri::command]
 pub(crate) async fn inspect_export_media(
     sheet_id: String,
+    sheet_ids: Option<Vec<String>>,
     window: WebviewWindow,
     state: State<'_, ProjectHost>,
 ) -> Result<Vec<ExportMediaProblem>, String> {
@@ -65,14 +75,17 @@ pub(crate) async fn inspect_export_media(
         return Err("A Exportação pertence à Janela do Projeto.".into());
     }
     let host = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || inspect(&host, &sheet_id))
-        .await
-        .map_err(|error| error.to_string())?
+    tauri::async_runtime::spawn_blocking(move || {
+        inspect_selection(&host, &sheet_ids.unwrap_or_else(|| vec![sheet_id]))
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
 pub(crate) async fn relink_export_media(
     sheet_id: String,
+    sheet_ids: Option<Vec<String>>,
     app: AppHandle,
     window: WebviewWindow,
     on_progress: tauri::ipc::Channel<crate::ipc_contract::ImageProcessingProgress>,
@@ -82,11 +95,12 @@ pub(crate) async fn relink_export_media(
     }
     let host = app.state::<ProjectHost>().inner().clone();
     let inspecting_host = host.clone();
-    let inspecting_sheet = sheet_id.clone();
+    let sheet_ids = sheet_ids.unwrap_or_else(|| vec![sheet_id]);
+    let inspecting_sheets = sheet_ids.clone();
     let missing = tauri::async_runtime::spawn_blocking(move || {
-        let problems = inspect(&inspecting_host, &inspecting_sheet)?;
+        let problems = inspect_selection(&inspecting_host, &inspecting_sheets)?;
         Ok::<_, String>(
-            required_bindings(&inspecting_host, &inspecting_sheet)?
+            required_bindings_for(&inspecting_host, &inspecting_sheets)?
                 .into_iter()
                 .filter(|binding| {
                     problems.iter().any(|problem| {
@@ -198,10 +212,11 @@ pub(crate) async fn relink_export_media(
         }
     }
     let inspecting_host = host.clone();
-    let problems =
-        tauri::async_runtime::spawn_blocking(move || inspect(&inspecting_host, &sheet_id))
-            .await
-            .map_err(|error| error.to_string())??;
+    let problems = tauri::async_runtime::spawn_blocking(move || {
+        inspect_selection(&inspecting_host, &sheet_ids)
+    })
+    .await
+    .map_err(|error| error.to_string())??;
     Ok(ExportRelinkResult {
         projection: host.projection()?,
         problems,

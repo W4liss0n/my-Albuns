@@ -149,7 +149,7 @@ test("projects export progress and cancellation through the standard progress di
         progress: {
           completed: 2,
           kind: "determinate",
-          status: "Compondo a prova",
+          status: "Compondo a Exportação",
           total: 5,
         },
       }}
@@ -266,7 +266,7 @@ test("projects export success through the standard message dialog", async () => 
       onAction={onAction}
       state={{
         kind: "exportSuccess",
-        message: "A prova foi exportada com sucesso.",
+        message: "A Exportação foi concluída com sucesso.",
       }}
     />,
   );
@@ -275,7 +275,7 @@ test("projects export success through the standard message dialog", async () => 
     name: "Exportação concluída",
   });
   expect(within(dialog).getByRole("status")).toHaveTextContent(
-    "A prova foi exportada com sucesso.",
+    "A Exportação foi concluída com sucesso.",
   );
   await user.click(within(dialog).getByRole("button", { name: "Fechar" }));
   expect(onAction).toHaveBeenCalledWith("dismissExport");

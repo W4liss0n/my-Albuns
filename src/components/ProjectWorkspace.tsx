@@ -633,6 +633,7 @@ export function ProjectWorkspace({
       void controller.deleteSheet();
     },
     exportSheet: () => exportControlRef.current?.start(),
+    exportAlbum: () => exportControlRef.current?.start("album"),
     mediaPanelVisible: workspacePanels.panels.media.visible,
     redo: () => void controller.redo(),
     save: () => void controller.save(),
@@ -695,6 +696,7 @@ export function ProjectWorkspace({
           onActiveChange={setExportActive}
           projectId={projection.state.projectId}
           selection={exportSelection}
+          sheets={projection.composition.sheets.map(sheet => ({ sheetId: sheet.sheetId, number: sheet.number, pageCount: sheet.activeSides === "both" ? 2 : 1 }))}
         />
       </div>
 

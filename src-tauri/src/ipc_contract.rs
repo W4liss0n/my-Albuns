@@ -94,6 +94,15 @@ pub struct ProjectDialogDetail {
 )]
 #[ts(tag = "kind")]
 pub enum ProjectDialogState {
+    ExportConfiguration {
+        sheets: Vec<ExportSheetInfo>,
+        options: NormalExportOptions,
+        busy: bool,
+        message: String,
+    },
+    ExportConflicts {
+        files: Vec<String>,
+    },
     ExportMediaProblems {
         project_name: String,
         problems: Vec<ExportMediaProblem>,
@@ -160,9 +169,12 @@ pub struct ProjectDialogPresentation {
     pub(crate) state: ProjectDialogState,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub enum ProjectDialogAction {
+    ConfigureExport(NormalExportOptions),
+    ChooseExportDestination(NormalExportOptions),
+    ConfirmExportOverwrite,
     RelinkExportMedia,
     RetryExportMedia,
     CancelMediaRemoval,
@@ -183,6 +195,32 @@ pub enum ProjectDialogAction {
     DismissImageProcessingProblems,
     RetryExport,
     SaveAndClose,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct NormalExportOptions {
+    pub scope: ExportScope,
+    pub sheet_ids: Vec<String>,
+    pub mode: myalbuns_core::ExportMode,
+    pub format: myalbuns_core::ExportFormat,
+    pub destination: String,
+    pub overwrite: bool,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum ExportScope {
+    Album,
+    Range,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportSheetInfo {
+    pub sheet_id: String,
+    pub number: u32,
+    pub page_count: u32,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, TS)]
@@ -236,7 +274,7 @@ mod project_dialog_contract_tests {
         ];
 
         for (action, expected) in cases {
-            let encoded = serde_json::to_value(action).expect("dialog action serializes");
+            let encoded = serde_json::to_value(&action).expect("dialog action serializes");
             assert_eq!(encoded, json!(expected));
             assert_eq!(
                 serde_json::from_value::<ProjectDialogAction>(encoded)

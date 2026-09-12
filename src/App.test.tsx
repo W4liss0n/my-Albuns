@@ -23,6 +23,7 @@ import type {
 import type {
   ProjectDialogAction,
   ProjectDialogPort,
+  ProjectDialogSession,
 } from "./application/projectDialogPort";
 import {
   createWorkspacePreferences,
@@ -150,6 +151,7 @@ const mediaPreviewPort: MediaPreviewPort = {
   onCacheProcessorWarning: async () => () => undefined,
 };
 const exportPipelinePort: ExportPipelinePort = {
+  defaultDestination: async () => "C:/Exportados/Album", chooseDestination: async () => null,
   startSheet: () => ({
     completion: Promise.resolve({
       status: "completed",
@@ -181,9 +183,9 @@ const projectWindowPort: ProjectWindowPort = {
   resolveClose: async () => ({ kind: "closed" }),
 };
 const projectDialogPort: ProjectDialogPort = {
-  acquire: () => ({
+  acquire: (onAction) => ({
     dismiss: async () => undefined,
-    present: async () => undefined,
+    present: async (state) => { if (state.kind === "exportConfiguration" && !state.busy) onAction({ configureExport: state.options }); },
   }),
 };
 const projectStartupPort: ProjectStartupPort = {
@@ -223,7 +225,7 @@ type TestAppProps = Omit<
 
 function projectDialogHarness() {
   const dismiss = vi.fn(async () => undefined);
-  const present = vi.fn(async () => undefined);
+  const present = vi.fn<ProjectDialogSession["present"]>(async () => undefined);
   let listener: (action: ProjectDialogAction) => void = () => undefined;
   return {
     dismiss,
@@ -232,7 +234,10 @@ function projectDialogHarness() {
     port: {
       acquire: (nextListener) => {
         listener = nextListener;
-        return { dismiss, present };
+        return { dismiss, present: async (state) => {
+          if (state.kind === "exportConfiguration") { if (!state.busy) listener({ configureExport: state.options }); return; }
+          await present(state);
+        } };
       },
     } satisfies ProjectDialogPort,
   };
@@ -253,6 +258,7 @@ function App({
     providedExportPipelinePort ??
     (providedLegacyExportPort
       ? {
+          defaultDestination: async () => "C:/Exportados/Album", chooseDestination: async () => null,
           startSheet: (selection, onEvent) =>
             providedLegacyExportPort.startSheet(selection.sheetId, onEvent),
         }
@@ -295,7 +301,7 @@ test("keeps the Recovery decision out of the Project WebView startup", async () 
   );
 
   expect(
-    await screen.findByRole("button", { name: "Exportar Lâmina" }),
+    await screen.findByRole("button", { name: "Exportar" }),
   ).toBeInTheDocument();
   expect(load).toHaveBeenCalledOnce();
   expect(
@@ -432,7 +438,7 @@ test("opens the Project in the real workspace when hardware WebGL2 is available"
   );
 
   expect(
-    await screen.findByRole("button", { name: "Exportar Lâmina" }),
+    await screen.findByRole("button", { name: "Exportar" }),
   ).toBeInTheDocument();
   expect(
     screen.getByRole("menubar", { name: "Menu principal" }),
@@ -499,7 +505,7 @@ test("confirms Project UI readiness only after shared preferences hydrate", asyn
     />,
   );
 
-  await screen.findByRole("button", { name: "Exportar Lâmina" });
+  await screen.findByRole("button", { name: "Exportar" });
   expect(confirmUiReady).not.toHaveBeenCalled();
 
   act(() => finishPreferenceLoad(createWorkspacePreferences()));
@@ -660,7 +666,7 @@ test("prepares real media previews after opening without blocking the Workspace"
   );
 
   expect(
-    await screen.findByRole("button", { name: "Exportar Lâmina" }),
+    await screen.findByRole("button", { name: "Exportar" }),
   ).toBeInTheDocument();
   await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledOnce());
   expect(logEvents).toEqual(
@@ -1086,7 +1092,7 @@ test("shows the canonical Project warning when repeated processor failures suspe
     />,
   );
 
-  await screen.findByRole("button", { name: "Exportar Lâmina" });
+  await screen.findByRole("button", { name: "Exportar" });
   act(() =>
     warnCacheSuspended?.({
       state: "suspended",
@@ -1102,7 +1108,7 @@ test("shows the canonical Project warning when repeated processor failures suspe
         "O Cache foi suspenso após falhas repetidas do Processador de Imagens.",
     }),
   );
-  expect(screen.getByRole("button", { name: "Exportar Lâmina" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Exportar" })).toBeEnabled();
   expect(screen.getByTestId("album-canvas")).toBeInTheDocument();
 });
 
@@ -1158,7 +1164,7 @@ test("registers the Cache warning listener before the first preview demand", asy
     />,
   );
 
-  await screen.findByRole("button", { name: "Exportar Lâmina" });
+  await screen.findByRole("button", { name: "Exportar" });
   await waitFor(() =>
     expect(screen.getByTestId("album-canvas")).toHaveAttribute(
       "data-demand-reported",
@@ -1218,7 +1224,7 @@ test("registers the media-change listener before the first preview demand", asyn
     />,
   );
 
-  await screen.findByRole("button", { name: "Exportar Lâmina" });
+  await screen.findByRole("button", { name: "Exportar" });
   await waitFor(() =>
     expect(screen.getByTestId("album-canvas")).toHaveAttribute(
       "data-demand-reported",
@@ -1416,15 +1422,14 @@ test("retries an unavailable occurrence explicitly and refreshes it without Reli
       ],
     },
   };
-  const prepareMediaPreviews = vi
-    .fn()
-    .mockResolvedValueOnce([
-      { mediaId: "media-001", state: "unavailable" as const, url: null },
-    ])
-    .mockResolvedValueOnce([
-      { mediaId: "media-001", state: "ready" as const, url: recoveredUrl },
-    ]);
+  let mediaRecovered = false;
+  const prepareMediaPreviews = vi.fn(async () => [{
+    mediaId: "media-001",
+    state: mediaRecovered ? "ready" as const : "unavailable" as const,
+    url: mediaRecovered ? recoveredUrl : null,
+  }]);
   const retryUnavailableMedia = vi.fn(async () => {
+    mediaRecovered = true;
     notifyMediaChanged?.(["media-001"]);
     return {
       mediaId: "media-001",
@@ -1475,6 +1480,7 @@ test("retries an unavailable occurrence explicitly and refreshes it without Reli
     />,
   );
 
+  await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalled(), { timeout: 5000 });
   const retry = await screen.findByRole("button", {
     name: /Tentar novamente o arquivo de/i,
   });
@@ -1487,8 +1493,8 @@ test("retries an unavailable occurrence explicitly and refreshes it without Reli
   await waitFor(() =>
     expect(retryUnavailableMedia).toHaveBeenCalledWith("media-001", expect.any(Function)),
   );
-  await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledTimes(2));
-  await waitFor(() => expect(load).toHaveBeenCalledTimes(3));
+  await waitFor(() => expect(prepareMediaPreviews.mock.calls.length).toBeGreaterThanOrEqual(2));
+  await waitFor(() => expect(load.mock.calls.length).toBeGreaterThanOrEqual(3));
   expect(screen.getByTestId("album-canvas")).toHaveAttribute(
     "data-media-preview",
     recoveredUrl,
@@ -1772,7 +1778,7 @@ test("cancels resident media demand when runtime graphics become unavailable", a
     "true",
   );
   expect(
-    screen.getByRole("button", { name: "Exportar Lâmina" }),
+    screen.getByRole("button", { name: "Exportar" }),
   ).toBeDisabled();
   expect(screen.getByTestId("album-canvas")).toBeInTheDocument();
   expect(

@@ -1,4 +1,5 @@
 import type { ExportMediaProblem } from "./exportMedia";
+import type { NormalExportOptions, ExportSheetInfo } from "./normalExport";
 import type { ImageProcessingProblem } from "./projectPorts";
 import type { LayoutExportProblem } from "../domain/project";
 
@@ -20,6 +21,8 @@ export interface ProjectDialogDetail {
 }
 
 export type ProjectDialogState =
+  | { kind: "exportConfiguration"; sheets: ExportSheetInfo[]; options: NormalExportOptions; busy: boolean; message: string }
+  | { kind: "exportConflicts"; files: string[] }
   | { kind: "exportMediaProblems"; projectName: string; problems: readonly ExportMediaProblem[]; busy: boolean; message: string }
   | { kind: "mediaRemovalConfirmation"; mediaKind: "photo" | "decorative"; count: number; usedCount: number; usageCount: number; busy: boolean }
   | { kind: "layoutDeletionConfirmation"; busy: boolean }
@@ -70,6 +73,9 @@ export type ProjectDialogState =
     };
 
 export type ProjectDialogAction =
+  | { configureExport: NormalExportOptions }
+  | { chooseExportDestination: NormalExportOptions }
+  | "confirmExportOverwrite"
   | "relinkExportMedia" | "retryExportMedia"
   | "cancelMediaRemoval"
   | "removeAllMedia"

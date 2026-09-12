@@ -232,6 +232,7 @@ function deferredValue<Value>() {
 }
 
 const exportPipelinePort: ExportPipelinePort = {
+  defaultDestination: async () => "C:/Exportados/Album", chooseDestination: async () => null,
   startSheet: () => ({
     completion: Promise.resolve({
       status: "completed",
@@ -266,9 +267,9 @@ const inertProjectWindowPort: ProjectWindowPort = {
 };
 
 const inertProjectDialogPort: ProjectDialogPort = {
-  acquire: () => ({
+  acquire: (onAction) => ({
     dismiss: async () => undefined,
-    present: async () => undefined,
+    present: async (state) => { if (state.kind === "exportConfiguration" && !state.busy) onAction({ configureExport: state.options }); },
   }),
 };
 
@@ -307,6 +308,10 @@ function projectDialogHarness() {
         }
       },
       present: async (state) => {
+        if (state.kind === "exportConfiguration") {
+          if (!state.busy) nextListener({ configureExport: state.options });
+          return;
+        }
         await present(state);
         if (session.closed || sessions.includes(session)) return;
         sessions.push(session);
@@ -450,6 +455,7 @@ function ProjectWorkspace({
     providedExportPipelinePort ??
     (providedLegacyExportPort
       ? {
+          defaultDestination: async () => "C:/Exportados/Album", chooseDestination: async () => null,
           startSheet: (selection, onEvent) =>
             providedLegacyExportPort.startSheet(selection.sheetId, onEvent),
         }
@@ -2005,7 +2011,7 @@ test("consumes the first Escape in the image-panel options before leaving Sheet 
   expect(canvasHarness.props?.mode).toEqual({ kind: "normal" });
 });
 
-test("starts the implemented Lâmina export from the Arquivo menu", () => {
+test("starts the implemented Lâmina export from the Arquivo menu", async () => {
   const startSheet = vi.fn<ExportPort["startSheet"]>(() => ({
     completion: Promise.resolve({
       status: "completed",
@@ -2022,7 +2028,8 @@ test("starts the implemented Lâmina export from the Arquivo menu", () => {
     />,
   );
 
-  fireEvent.click(getApplicationCommand("Arquivo", "Exportar Lâmina…"));
+  const exportAction = getApplicationCommand("Arquivo", "Exportar Lâmina…");
+  await act(async () => { fireEvent.click(exportAction); });
 
   expect(startSheet).toHaveBeenCalledWith("sheet-001", expect.any(Function));
 });
@@ -2223,7 +2230,7 @@ test("uses the same close decision for the application command and blocks it whi
     kind: "projectCloseConfirmation",
   });
   expect(
-    screen.getByRole("button", { name: "Exportar Lâmina", hidden: true }),
+    screen.getByRole("button", { name: "Exportar", hidden: true }),
   ).toBeDisabled();
 
   await act(async () => finish());
@@ -2329,7 +2336,7 @@ test("never resumes or reports success after an indeterminate close save", async
     screen.getByRole("menuitem", { name: "Editar" }),
   ).toBeDisabled();
   expect(
-    screen.getByRole("button", { name: "Exportar Lâmina" }),
+    screen.getByRole("button", { name: "Exportar" }),
   ).toBeDisabled();
 });
 
@@ -2340,6 +2347,7 @@ test("blocks only Project commands while its Export attempt is active", async ()
     finish = resolve;
   });
   const controlledExportPipelinePort: ExportPipelinePort = {
+    defaultDestination: async () => "C:/Exportados/Album", chooseDestination: async () => null,
     startSheet: (_sheetId, onEvent) => {
       emit = onEvent;
       return {
@@ -2366,10 +2374,11 @@ test("blocks only Project commands while its Export attempt is active", async ()
   );
 
   fireEvent.click(
-    screen.getByRole("button", { name: "Exportar Lâmina" }),
+    screen.getByRole("button", { name: "Exportar" }),
   );
   expect(screen.getByRole("menuitem", { name: "Editar" })).toBeDisabled();
 
+  await waitFor(() => expect(emit).toBeTypeOf("function"));
   act(() => {
     emit({ event: "started", cancellable: true });
   });
@@ -3941,7 +3950,7 @@ test("saves with Ctrl+S without transient feedback or flashing unrelated control
   );
 
   const exportButton = screen.getByRole("button", {
-    name: "Exportar Lâmina",
+    name: "Exportar",
   });
   await act(async () => {
     fireEvent.keyDown(window, { ctrlKey: true, key: "s" });
@@ -3983,7 +3992,7 @@ test("keeps unrelated controls stable while a History command is pending", async
   );
 
   const exportButton = screen.getByRole("button", {
-    name: "Exportar Lâmina",
+    name: "Exportar",
   });
   await act(async () => {
     fireEvent.keyDown(window, { ctrlKey: true, key: "z" });
@@ -4415,7 +4424,8 @@ test("queues native Close behind Export and routes every action to its owning se
     />,
   );
 
-  fireEvent.click(screen.getByRole("button", { name: "Exportar Lâmina" }));
+  fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  await waitFor(() => expect(emitExport).toBeTypeOf("function"));
   act(() => emitExport({ event: "started", cancellable: true }));
   await waitFor(() =>
     expect(close.dialog.present).toHaveBeenCalledWith(
@@ -6198,7 +6208,7 @@ test("commits a slider zoom once without flashing a global busy state", async ()
 
   const slider = screen.getByRole("slider", { name: "Zoom da Foto" });
   const exportButton = screen.getByRole("button", {
-    name: "Exportar Lâmina",
+    name: "Exportar",
   });
 
   fireEvent.pointerDown(slider);
@@ -6750,7 +6760,7 @@ test("starts a pointer drag for the directly pressed Photo and cancels it with E
   fireEvent.keyDown(window, { key: "Escape" });
   expect(canvasHarness.props?.draggedPhotoId).toBeNull();
 });
-test("starts Exportação for the Canvas-centered Lâmina even while focus remains on another Lâmina", () => {
+test("starts Exportação for the Canvas-centered Lâmina even while focus remains on another Lâmina", async () => {
   const startSheet = vi.fn<ExportPipelinePort["startSheet"]>(() => ({
     completion: Promise.resolve({
       status: "completed",
@@ -6761,7 +6771,7 @@ test("starts Exportação for the Canvas-centered Lâmina even while focus remai
 
   render(
     <ProjectWorkspace
-      exportPipelinePort={{ startSheet }}
+      exportPipelinePort={{ defaultDestination: async () => "C:/Exportados/Album", chooseDestination: async () => null, startSheet }}
       projection={twoSheetProjection}
       projectCorePort={projectCorePortWithApply(async () =>
         twoSheetProjection
@@ -6774,16 +6784,15 @@ test("starts Exportação for the Canvas-centered Lâmina even while focus remai
     canvasHarness.props?.onCenteredSheetChange?.("sheet-002");
   });
   expect(useEditorView.getState().focusedSheetId).toBe("sheet-001");
-  fireEvent.click(
-    screen.getByRole("button", { name: "Exportar Lâmina" }),
-  );
+  const exportAction = getApplicationCommand("Arquivo", "Exportar Lâmina…");
+  await act(async () => { fireEvent.click(exportAction); });
 
   expect(startSheet).toHaveBeenCalledWith(
-    {
+    expect.objectContaining({
       projectName: "Álbum Horizonte",
       sheetId: "sheet-002",
       sheetNumber: 2,
-    },
+    }),
     expect.any(Function),
   );
 });

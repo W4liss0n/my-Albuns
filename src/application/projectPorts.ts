@@ -331,12 +331,15 @@ export interface MediaPreviewPort {
 }
 
 export interface ExportSheetSelection {
+  options?: import("./normalExport").NormalExportOptions;
   projectName: string;
   sheetId: string;
   sheetNumber: number;
 }
 
 export interface ExportPipelinePort {
+  defaultDestination(): Promise<string>;
+  chooseDestination(): Promise<string | null>;
   startSheet(
     selection: ExportSheetSelection,
     onEvent: (event: ExportProgressEvent) => void,
