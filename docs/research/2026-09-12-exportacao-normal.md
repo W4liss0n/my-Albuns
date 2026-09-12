@@ -63,8 +63,10 @@ interface produtiva utiliza o comando de Exportação normal.
   lâmina, verificação inicial e confirmação de conflitos.
 
 O formulário segue os seletores segmentados da referência de janelas, os campos
-e o slider compartilhados do editor. Os quatro grupos têm rótulos alinhados,
-separadores discretos e um rodapé com contagem, formato e modo de saída.
+e o slider compartilhados do editor. Modo, Formato e Destino têm rótulos
+alinhados. A opção de intervalo fica abaixo, com um único campo ao lado;
+desmarcada, inclui o álbum inteiro. Não há linha interna de título. O rodapé
+reúne contagem, formato e modo de saída.
 
 A navegação circular por Tab considera a opção marcada de cada grupo de rádio,
 inclusive quando a exportação abre diretamente em um intervalo. O comportamento
@@ -72,7 +74,7 @@ foi reproduzido no Edge e coberto por teste de teclado, conforme o
 [padrão de navegação do W3C](https://www.w3.org/WAI/ARIA/apg/patterns/radio/).
 
 As evidências geradas ficam fora do Git em `.scratch/normal-export-rendering/`
-e `.scratch/ui-acceptance/normal-export-styled/`. Os resultados finais dos
+e `.scratch/ui-acceptance/normal-export-compact/`. Os resultados finais dos
 ensaios e da revisão acompanham a entrega; capturas não equivalem à aprovação
 manual do usuário.
 

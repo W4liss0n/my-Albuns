@@ -80,8 +80,8 @@
       "actions": [
         {
           "type": "input",
-          "selector": "[aria-label=\"Lâmina inicial\"]",
-          "value": "3"
+          "selector": "[aria-label=\"Lâminas do intervalo\"]",
+          "value": "3-2"
         }
       ]
     },

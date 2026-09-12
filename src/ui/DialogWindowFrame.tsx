@@ -26,7 +26,9 @@ export function DialogWindowFrame({
       className={`ui-dialog-window ui-dialog-window--${layout}`}
       role="dialog"
     >
-      {layout !== "message" ? (
+      {layout === "form" ? (
+        <h2 className="ui-visually-hidden" id={accessibleTitleId}>{title}</h2>
+      ) : layout !== "message" ? (
         <header className="ui-dialog-window__header">
           <h2 id={accessibleTitleId}>{title}</h2>
         </header>

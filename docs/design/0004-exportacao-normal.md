@@ -1,7 +1,7 @@
 ---
 status: accepted
 document: design
-updated: 2026-09-01
+updated: 2026-09-12
 ---
 
 # Exportação normal
@@ -12,24 +12,27 @@ A tela de Exportação reúne somente as decisões necessárias para gerar a sa�
 
 ## Estrutura do diálogo
 
-A Exportação normal usa um único diálogo modal com quatro grupos:
+A Exportação normal usa um único diálogo modal, sem uma linha interna de título
+`Exportar`, com três grupos principais:
 
-1. `Escopo`: `Álbum inteiro` ou `Intervalo de Lâminas`;
-2. `Modo`: `Por lâmina` ou `Por página`;
-3. `Formato`: `JPEG`, `PNG` ou `PDF`;
-4. `Destino`: pasta padrão calculada ou outra pasta local, UNC, mapeada ou longa escolhida pelo usuário.
+1. `Modo`: `Por lâmina` ou `Por página`;
+2. `Formato`: `JPEG`, `PNG` ou `PDF`;
+3. `Destino`: pasta padrão calculada ou outra pasta local, UNC, mapeada ou longa escolhida pelo usuário.
+
+Abaixo de Destino, `Intervalo de lâminas` é uma opção marcável com um único
+campo ao lado. Desmarcada, exporta o álbum inteiro e desabilita o campo;
+não existe botão `Álbum inteiro`. Marcada, aceita uma lâmina (`3`) ou uma
+faixa contínua (`3-8`). O campo preserva o texto ao desmarcar a opção.
 
 O rodapé fixo apresenta a quantidade calculada de arquivos para JPEG/PNG ou de páginas para PDF, além de `Cancelar` e `Exportar`.
 
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
-│  Exportar                                                        │
-├──────────────────────────────────────────────────────────────────┤
-│  Escopo       Álbum inteiro  |  Intervalo [ início ] [ fim ]     │
 │  Modo         Por lâmina | Por página                            │
 │  Formato      JPEG | PNG | PDF                                   │
 │  Qualidade    ─────────●──────        somente para JPEG          │
 │  Destino      [ caminho calculado ou escolhido ] [ Escolher... ] │
+│  □ Intervalo de lâminas  [ 1-28 ]                                │
 ├──────────────────────────────────────────────────────────────────┤
 │  28 arquivos                              Cancelar   Exportar     │
 └──────────────────────────────────────────────────────────────────┘
@@ -47,7 +50,9 @@ Quando o formato do lote é JPEG, a codificação usa obrigatoriamente qualidade
 
 ## Entrada contextual
 
-`Exportar Lâmina`, acionado pelo menu de contexto, abre o mesmo diálogo com `Intervalo de Lâminas` selecionado e a Lâmina de origem preenchida como início e fim. Todas as demais opções continuam editáveis antes de iniciar.
+`Exportar Lâmina`, acionado pelo menu de contexto, abre o mesmo diálogo com
+`Intervalo de lâminas` marcado e o número da Lâmina de origem preenchido no
+campo. Todas as demais opções continuam editáveis antes de iniciar.
 
 Quando `Intervalo de Lâminas` está selecionado, o diálogo informa que a operação não remove arquivos fora do intervalo e não consegue inferir o modo das saídas já existentes pelo nome. Uma Exportação integral é a única operação que restabelece um conjunto completo autoritativo no destino.
 

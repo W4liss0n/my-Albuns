@@ -603,11 +603,7 @@ kbd {
 
 .ui-dialog-window--form {
   max-height: calc(var(--ui-owned-window-height-limit, 100vh) - var(--ui-titlebar-height) - 2px);
-}
-
-.ui-dialog-window--form .ui-dialog-window__header {
-  padding: 16px 18px 14px;
-  border-bottom: 1px solid var(--ui-border);
+  grid-template-rows: minmax(0, 1fr) auto;
 }
 
 .ui-dialog-window--form .ui-dialog-window__body {

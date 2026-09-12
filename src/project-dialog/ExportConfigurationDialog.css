@@ -7,22 +7,20 @@
   position: relative;
   min-width: 0;
   margin: 0;
-  padding: 16px 0 16px 96px;
+  padding: 14px 0 14px 96px;
   border: 0;
   border-bottom: 1px solid var(--ui-border);
 }
 
 .export-configuration__section legend {
   position: absolute;
-  top: 22px;
+  top: 20px;
   left: 0;
   padding: 0;
   color: var(--ui-text-secondary);
   font-size: var(--ui-font-size-label);
   font-weight: 600;
 }
-
-.export-configuration__section:last-of-type { border-bottom: 0; }
 
 /* Same inset selector treatment as project creation and the window reference. */
 .export-configuration__choices {
@@ -69,11 +67,37 @@
 .export-configuration__choices input:disabled + span { color: var(--ui-text-disabled); }
 .export-configuration__formats span { min-width: 64px; }
 
-.export-configuration__interval { display: grid; gap: 10px; margin-top: 12px; }
+.export-configuration__interval { display: grid; min-width: 0; gap: 10px; margin: 0; padding: 14px 0; border: 0; }
 .export-configuration__range { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-.export-configuration__range label { display: flex; align-items: center; gap: 7px; font-size: var(--ui-font-size-label); }
-.export-configuration__range input { width: 58px; height: var(--ui-control-height); font-variant-numeric: tabular-nums; }
-.export-configuration__available { color: var(--ui-text-muted); font-size: var(--ui-font-size-support); }
+.export-configuration__range > .ui-field-control { width: 100px; height: var(--ui-control-height); font-variant-numeric: tabular-nums; }
+.export-configuration__range > .ui-field-control:disabled { color: var(--ui-text-disabled); background: var(--ui-surface-muted); }
+.export-configuration__scope-toggle { display: flex; align-items: center; gap: 8px; color: var(--ui-text); font-size: var(--ui-font-size-control); }
+.export-configuration__scope-toggle input {
+  display: grid;
+  place-content: center;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  appearance: none;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 3px;
+  background: var(--ui-surface-raised);
+}
+.export-configuration__scope-toggle input::after {
+  width: 7px;
+  height: 4px;
+  margin-top: -2px;
+  border-bottom: 2px solid var(--ui-on-accent);
+  border-left: 2px solid var(--ui-on-accent);
+  content: "";
+  opacity: 0;
+  transform: rotate(-45deg);
+}
+.export-configuration__scope-toggle input:checked { border-color: var(--ui-accent-fill); background: var(--ui-accent-fill); }
+.export-configuration__scope-toggle input:checked::after { opacity: 1; }
+.export-configuration__scope-toggle input:focus-visible { outline: 1px solid var(--ui-focus-neutral); outline-offset: 2px; }
+.export-configuration__scope-toggle:has(input:disabled) { color: var(--ui-text-disabled); }
+.export-configuration__range-help { display: grid; gap: 6px; padding-left: 22px; }
 .export-configuration__hint { margin: 0; color: var(--ui-text-muted); font-size: var(--ui-font-size-support); line-height: 1.5; }
 .export-configuration__quality { max-width: 264px; margin-top: 16px; gap: 7px; }
 .export-configuration__quality output { font-size: var(--ui-font-size-support); font-variant-numeric: tabular-nums; }

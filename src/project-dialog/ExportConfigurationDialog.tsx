@@ -16,13 +16,17 @@ export function ExportConfigurationDialog({ state, onAction }: {
   const [options, setOptions] = useState(state.options);
   const [scope, setScope] = useState(state.options.scope);
   const initialFocus = useRef<HTMLInputElement>(null);
-  const [first, setFirst] = useState(String(state.sheets.find(sheet => sheet.sheetId === state.options.sheetIds[0])?.number ?? 1));
-  const [last, setLast] = useState(String(state.sheets.find(sheet => sheet.sheetId === state.options.sheetIds[state.options.sheetIds.length - 1])?.number ?? state.sheets.length));
+  const [interval, setInterval] = useState(() => {
+    const first = state.sheets.find(sheet => sheet.sheetId === state.options.sheetIds[0])?.number ?? 1;
+    const last = state.sheets.find(sheet => sheet.sheetId === state.options.sheetIds[state.options.sheetIds.length - 1])?.number ?? state.sheets.length;
+    return first === last ? String(first) : `${first}-${last}`;
+  });
   const [quality, setQuality] = useState(100);
   const id = useId();
   useEffect(() => { setOptions(state.options); }, [state.options]);
 
-  const start = Number(first), end = Number(last);
+  const range = /^\s*(\d+)(?:\s*[-–]\s*(\d+))?\s*$/.exec(interval);
+  const start = Number(range?.[1]), end = Number(range?.[2] ?? range?.[1]);
   const validRange = Number.isInteger(start) && Number.isInteger(end) && start >= 1 && start <= end && end <= state.sheets.length;
   const selected = scope === "album" ? state.sheets : validRange
     ? state.sheets.filter(sheet => sheet.number >= start && sheet.number <= end) : [];
@@ -54,34 +58,11 @@ export function ExportConfigurationDialog({ state, onAction }: {
       }>
         <form className="export-configuration" onSubmit={event => event.preventDefault()}>
           <fieldset className="export-configuration__section" disabled={state.busy}>
-            <legend>Escopo</legend>
-            <div className="export-configuration__choices">
-              <label><input ref={scope === "album" ? initialFocus : undefined} type="radio" name={`${id}-scope`} checked={scope === "album"}
-                onChange={() => setScope("album")} /><span>Álbum inteiro</span></label>
-              <label><input ref={scope === "range" ? initialFocus : undefined} type="radio" name={`${id}-scope`} checked={scope === "range"}
-                onChange={() => setScope("range")} /><span>Intervalo de lâminas</span></label>
-            </div>
-            {scope === "range" && <div className="export-configuration__interval">
-              <div className="export-configuration__range">
-                <label>De<TextInput className="ui-field-control" aria-label="Lâmina inicial" aria-invalid={!validRange}
-                  type="number" min={1} max={state.sheets.length} value={first} onChange={event => setFirst(event.target.value)} /></label>
-                <label>até<TextInput className="ui-field-control" aria-label="Lâmina final" aria-invalid={!validRange}
-                  type="number" min={1} max={state.sheets.length} value={last} onChange={event => setLast(event.target.value)} /></label>
-                <span className="export-configuration__available">de {state.sheets.length} {state.sheets.length === 1 ? "lâmina" : "lâminas"}</span>
-              </div>
-              {!validRange && <p role="alert" className="export-configuration__error">
-                Escolha um intervalo entre 1 e {state.sheets.length}, com início menor ou igual ao fim.
-              </p>}
-              <p className="export-configuration__hint">Arquivos fora do intervalo serão mantidos. Os nomes existentes não indicam se foram exportados por lâmina ou por página.</p>
-            </div>}
-          </fieldset>
-
-          <fieldset className="export-configuration__section" disabled={state.busy}>
             <legend>Modo</legend>
             <div className="export-configuration__choices">
-              <label><input type="radio" name={`${id}-mode`} checked={options.mode === "sheet"}
+              <label><input ref={options.mode === "sheet" ? initialFocus : undefined} type="radio" name={`${id}-mode`} checked={options.mode === "sheet"}
                 onChange={() => setOptions(current => ({ ...current, mode: "sheet" }))} /><span>Por lâmina</span></label>
-              <label><input type="radio" name={`${id}-mode`} checked={options.mode === "page"}
+              <label><input ref={options.mode === "page" ? initialFocus : undefined} type="radio" name={`${id}-mode`} checked={options.mode === "page"}
                 onChange={() => setOptions(current => ({ ...current, mode: "page" }))} /><span>Por página</span></label>
             </div>
           </fieldset>
@@ -111,6 +92,26 @@ export function ExportConfigurationDialog({ state, onAction }: {
                 title={options.destination} onChange={event => setOptions(current => ({ ...current, destination: event.target.value }))} />
               <ActionButton onClick={() => onAction({ chooseExportDestination: { ...request, sheetIds: options.sheetIds } })}>Escolher…</ActionButton>
             </div>
+          </fieldset>
+          <fieldset className="export-configuration__interval" disabled={state.busy}>
+            <div className="export-configuration__range">
+              <label className="export-configuration__scope-toggle">
+                <input type="checkbox" checked={scope === "range"}
+                  onChange={event => setScope(event.target.checked ? "range" : "album")} />
+                Intervalo de lâminas
+              </label>
+              <TextInput className="ui-field-control" aria-label="Lâminas do intervalo"
+                aria-invalid={scope === "range" && !validRange} disabled={scope !== "range"}
+                aria-describedby={scope === "range" ? `${id}-range-help` : undefined}
+                placeholder="Ex.: 3-8" title="Uma lâmina (3) ou um intervalo (3-8)"
+                value={interval} onChange={event => setInterval(event.target.value)} />
+            </div>
+            {scope === "range" && <div id={`${id}-range-help`} className="export-configuration__range-help">
+              {!validRange && <p role="alert" className="export-configuration__error">
+                Informe uma lâmina ou um intervalo de 1 a {state.sheets.length}, como 1-{state.sheets.length}.
+              </p>}
+              <p className="export-configuration__hint">Arquivos fora do intervalo serão mantidos. Os nomes existentes não indicam se foram exportados por lâmina ou por página.</p>
+            </div>}
           </fieldset>
           {state.busy && <p role="status" className="export-configuration__status">Preparando exportação…</p>}
           {state.message && <p role="alert" className="export-configuration__status export-configuration__error">{state.message}</p>}
