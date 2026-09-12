@@ -100,8 +100,10 @@ async function fitContent(measureHeight: () => number, preferredWidth?: number) 
   const readyToken = currentReadyToken();
   const readinessPending =
     readyToken !== null && confirmedReadyToken !== readyToken;
-  if (width <= 0 || (sizeKey === lastFittedSize && !readinessPending)) return;
-  if (sizeKey !== lastFittedSize && requestedFit?.sizeKey !== sizeKey) {
+  // A pending resize can still replace the last fitted size. Keep the latest
+  // request even when the content returns to that previously fitted size.
+  if (sizeKey === lastFittedSize && !requestedFit && !readinessPending) return;
+  if (requestedFit?.sizeKey !== sizeKey) {
     requestedFit = { height: fittedHeight, sizeKey, width };
   }
   await ensureFitQueue();

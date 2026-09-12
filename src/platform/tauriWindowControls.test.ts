@@ -121,6 +121,20 @@ test("sets screen bounds before measuring the first visible content size", async
   expect(coreApi.invoke).toHaveBeenCalledOnce();
 });
 
+test("restores the current size when a superseded expansion is still in flight", async () => {
+  await tauriWindowControls.fitContent(() => 208, 440);
+  let finishExpansion!: () => void;
+  windowApi.setSize.mockImplementationOnce(
+    () => new Promise<void>((resolve) => { finishExpansion = resolve; }),
+  );
+  const expansion = tauriWindowControls.fitContent(() => 501, 800);
+  const currentContent = tauriWindowControls.fitContent(() => 208, 440);
+  finishExpansion();
+  await Promise.all([expansion, currentContent]);
+
+  expect(windowApi.setSize).toHaveBeenLastCalledWith({ width: 440, height: 208 });
+});
+
 test("serializes changing fits instead of racing native window updates", async () => {
   const releaseSetSize: Array<() => void> = [];
   windowApi.setSize.mockImplementation(
