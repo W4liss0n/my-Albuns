@@ -8,6 +8,7 @@ import {
   SaveProjectError,
 } from "../application/projectPorts";
 import { representativeProjection } from "../test/projectFixtures";
+import { MediaExportBlockedError } from "../application/exportMedia";
 import {
   tauriExportPipelinePort,
   tauriMediaPreviewPort,
@@ -161,6 +162,15 @@ test("completes an Export attempt with the backend result", async () => {
     sheetNumber: 3,
     onEvent: tauriBoundary.channels[0],
   });
+});
+
+test("native media preflight failures reach the recovery screen before any started event", async () => {
+  const problems = [{ mediaId: "photo-1", fileName: "Foto.jpg", state: "absent" as const }];
+  vi.mocked(invoke).mockRejectedValueOnce({ code: "media_problems", mediaProblems: problems });
+  const event = vi.fn();
+  const attempt = tauriExportPipelinePort.startSheet(exportSelection, event);
+  await expect(attempt.completion).rejects.toEqual(new MediaExportBlockedError(problems));
+  expect(event).not.toHaveBeenCalled();
 });
 
 test("forwards Export events without exposing the backend operation id", () => {

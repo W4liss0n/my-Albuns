@@ -28,6 +28,8 @@ const tauriCommandSources = {
   messageDialog: ["./tauriOwnedDialogControls.ts"],
   openingDialog: ["./tauriOpeningDialogControls.ts"],
   project: [
+    "./tauriExportMediaPort.ts",
+    "./invokeImageProcessing.ts",
     "./tauriProjectDialogPort.ts",
     "./tauriProjectPorts.ts",
     "./tauriProjectWindowPort.ts",

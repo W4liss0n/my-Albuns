@@ -11,6 +11,8 @@ interface ProblemsDialogProps {
   columns: readonly string[];
   rows: readonly (readonly ReactNode[])[];
   onClose(): void;
+  closeDisabled?: boolean;
+  actions?: ReactNode;
 }
 
 export function ProblemsDialog({
@@ -19,18 +21,20 @@ export function ProblemsDialog({
   columns,
   rows,
   onClose,
+  closeDisabled = false,
+  actions,
 }: ProblemsDialogProps) {
   const closeRef = useRef<HTMLButtonElement>(null);
   return (
     <DialogFocusScope
       focusKey={title}
       initialFocusRef={closeRef}
-      onEscape={onClose}
+      onEscape={() => { if (!closeDisabled) onClose(); }}
     >
       <DialogWindowFrame
         title={title}
         layout="problems"
-        actions={<ActionButton ref={closeRef} onClick={onClose}>Fechar</ActionButton>}
+        actions={<>{actions}<ActionButton ref={closeRef} disabled={closeDisabled} onClick={onClose}>Fechar</ActionButton></>}
       >
         <p className="ui-problems-description">{description}</p>
         <div

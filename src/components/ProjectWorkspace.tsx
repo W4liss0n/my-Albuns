@@ -70,6 +70,7 @@ import {
 } from "./workspacePanelLayout";
 
 interface ProjectWorkspaceProps {
+  exportMediaPort?: import("../application/exportMedia").ExportMediaPort;
   photoshopPort?: import("../application/photoshop").PhotoshopPort;
   mediaDropPort?: import("../application/projectPorts").MediaDropPort;
   projection: EditorProjection;
@@ -95,6 +96,7 @@ interface ProjectWorkspaceProps {
 const SHEET_EDITING_MEDIA_PANEL_HEIGHT = 120;
 
 export function ProjectWorkspace({
+  exportMediaPort,
   photoshopPort,
   mediaDropPort,
   projection,
@@ -681,6 +683,8 @@ export function ProjectWorkspace({
             saveAsBarrierActive ||
             graphicsFailure !== null
           }
+          exportMediaPort={exportMediaPort}
+          onProjectionChange={onProjectionChange}
           exportPipelinePort={exportPipelinePort}
           onActiveChange={setExportActive}
           projectId={projection.state.projectId}

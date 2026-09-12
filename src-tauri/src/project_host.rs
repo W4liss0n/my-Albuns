@@ -2963,6 +2963,7 @@ mod tests {
                 .is_some()
         );
 
+        std::fs::remove_file(&original_left).expect("only the selected Original is absent");
         let proposal = resolver
             .propose_relink(&selected, replacement.clone())
             .expect("MediaResolver authoritatively validates the selected candidate");

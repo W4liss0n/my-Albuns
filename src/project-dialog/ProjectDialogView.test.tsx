@@ -4,6 +4,28 @@ import { expect, test, vi } from "vitest";
 
 import { ProjectDialogView } from "./ProjectDialogView";
 
+test("export media recovery offers distinct actions and never continues while blocked or busy", async () => {
+  const user = userEvent.setup();
+  const onAction = vi.fn();
+  const state = { kind: "exportMediaProblems" as const, projectName: "Álbum", busy: false, message: "", problems: [
+    { mediaId: "photo-1", fileName: "Foto.jpg", state: "absent" as const },
+    { mediaId: "photo-2", fileName: "Rede.png", state: "unavailable" as const },
+  ] };
+  const view = render(<ProjectDialogView state={state} onAction={onAction} />);
+  expect(screen.getByRole("button", { name: "Continuar Exportação" })).toBeDisabled();
+  await user.click(screen.getByRole("button", { name: "Relinkar" }));
+  await user.click(screen.getByRole("button", { name: "Tentar novamente" }));
+  expect(onAction.mock.calls).toEqual([["relinkExportMedia"], ["retryExportMedia"]]);
+  view.rerender(<ProjectDialogView state={{ ...state, busy: true }} onAction={onAction} />);
+  await user.keyboard("{Escape}");
+  expect(screen.getByRole("button", { name: "Fechar" })).toBeDisabled();
+  expect(onAction).toHaveBeenCalledTimes(2);
+  view.rerender(<ProjectDialogView state={{ ...state, problems: [] }} onAction={onAction} />);
+  expect(onAction).toHaveBeenCalledTimes(2);
+  await user.click(screen.getByRole("button", { name: "Continuar Exportação" }));
+  expect(onAction).toHaveBeenLastCalledWith("continueMediaExport");
+});
+
 test("custom Layout deletion explains its global scope and offers Cancel and Delete", async () => {
   const user = userEvent.setup();
   const onAction = vi.fn();

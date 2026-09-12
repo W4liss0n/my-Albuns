@@ -413,48 +413,21 @@ pub(crate) async fn relink_media(
     let mut processing = ImageProcessingBatch::new(1, |progress| {
         let _ = on_progress.send(progress);
     });
-    let cache_pause = app.state::<CacheEngine>().pause().await;
-    let relink_app = app.clone();
-    let relinked = tauri::async_runtime::spawn_blocking(move || {
-        let mut inspection_paths = myalbuns_paths::OperationPathContext::new();
-        let _ = inspection_paths.capture(&path);
-        let estimate = crate::imaging_processor::ImageMemoryEstimate::in_plan(
-            &inspection_paths.freeze(), [path.as_path()],
-        );
-        // Religação already owns the exclusive Cache pause. Reserve the same
-        // CPU/RAM budget without trying to acquire nested Cache activity.
-        let cancellation = crate::cache_activity_gate::CacheCancellation::default();
-        let _inspection_reservation = tauri::async_runtime::block_on(
-            relink_app.state::<crate::imaging_processor::ImagingProcessor>()
-                .reserve_inspection(estimate, cancellation.flag()),
-        ).map_err(|error| error.to_string())?;
-        if !occurrence_is_authoritatively_absent(&binding) {
-            return Err(
-                "O Arquivo original reapareceu durante a Religação; nenhuma referência foi alterada."
-                    .to_string(),
-            );
-        }
-        let proposal = MediaResolver.propose_relink(&binding, path)?;
-        let engine = relink_app.state::<CacheEngine>();
-        let namespace = relink_app.state::<ActiveCacheNamespace>().namespace();
-        engine
-            .invalidate_relinked_media(
-                &cache_pause,
-                relink_app.state::<AppPaths>().inner(),
-                &namespace,
-                relink_app.state::<CachePreviewRegistry>().inner(),
-                &binding.media_id,
-            )
-            .map_err(|error| {
-                format!(
-                    "Não foi possível invalidar o Cache antes da Religação: {}",
-                    error.message
-                )
-            })?;
-        host.relink_media(proposal)
+    let mut paths = myalbuns_paths::OperationPathContext::new();
+    let original_path = binding.logical_path.clone();
+    let candidate_path = path.clone();
+    let roots = tauri::async_runtime::spawn_blocking(move || {
+        paths
+            .capture(&original_path)
+            .map_err(|error| error.to_string())?;
+        paths
+            .capture(&candidate_path)
+            .map_err(|error| error.to_string())?;
+        Ok::<_, String>(paths.freeze())
     })
-    .await;
-    let relinked = relinked.map_err(|_| "Não foi possível concluir a Religação.".to_string())??;
+    .await
+    .map_err(|error| error.to_string())??;
+    let relinked = relink_binding(&app, binding, path, roots).await?;
     let relinked_binding = state
         .authorized_media_catalog()?
         .bindings
@@ -471,6 +444,41 @@ pub(crate) async fn relink_media(
         event = "linked_media_relinked",
     );
     state.projection()
+}
+
+pub(crate) async fn relink_binding(
+    app: &AppHandle,
+    binding: MediaBinding,
+    path: std::path::PathBuf,
+    roots: myalbuns_paths::RootBindingPlan,
+) -> Result<EditorProjection, String> {
+    let cache_pause = app.state::<CacheEngine>().pause().await;
+    let relink_app = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let estimate =
+            crate::imaging_processor::ImageMemoryEstimate::in_plan(&roots, [path.as_path()]);
+        let cancellation = crate::cache_activity_gate::CacheCancellation::default();
+        let _reservation = tauri::async_runtime::block_on(
+            relink_app
+                .state::<crate::imaging_processor::ImagingProcessor>()
+                .reserve_inspection(estimate, cancellation.flag()),
+        )
+        .map_err(|error| error.to_string())?;
+        let proposal = MediaResolver.propose_relink_in_plan(&binding, path, &roots)?;
+        let engine = relink_app.state::<CacheEngine>();
+        engine
+            .invalidate_relinked_media(
+                &cache_pause,
+                relink_app.state::<AppPaths>().inner(),
+                &relink_app.state::<ActiveCacheNamespace>().namespace(),
+                relink_app.state::<CachePreviewRegistry>().inner(),
+                &binding.media_id,
+            )
+            .map_err(|error| error.message)?;
+        relink_app.state::<ProjectHost>().relink_media(proposal)
+    })
+    .await
+    .map_err(|_| "Não foi possível concluir a Religação.".to_string())?
 }
 
 fn occurrence_is_authoritatively_absent(binding: &MediaBinding) -> bool {

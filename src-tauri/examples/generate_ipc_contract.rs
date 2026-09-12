@@ -34,6 +34,8 @@ fn main() {
     myalbuns_desktop_lib::ipc_contract::SettingsSection::export_all(&config)
         .expect("Settings section bindings");
 
+    myalbuns_desktop_lib::ipc_contract::ExportRelinkResult::export_all(&config)
+        .expect("export recovery bindings");
     PointerDragThreshold::export_all(&config)
         .expect("pointer drag threshold bindings should be generated");
     CancelDisposition::export_all(&config)

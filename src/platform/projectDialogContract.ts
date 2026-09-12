@@ -1,3 +1,4 @@
+import { parseExportMediaProblems } from "./exportMediaContract";
 import type {
   ProjectDialogAction,
   ProjectDialogActionEvent,
@@ -20,6 +21,7 @@ type ProjectDialogProgressKind = ProjectDialogProgress["kind"];
 type IpcProjectDialogProgressKind = IpcProjectDialogProgress["kind"];
 
 const projectDialogActionMap = {
+  relinkExportMedia: "relinkExportMedia", retryExportMedia: "retryExportMedia", continueMediaExport: "continueMediaExport",
   cancelMediaRemoval: "cancelMediaRemoval",
   removeAllMedia: "removeAllMedia",
   removeMediaKeepFrames: "removeMediaKeepFrames",
@@ -148,6 +150,11 @@ const stateDecoders: Record<
       problems.push({ fileName: problem.fileName, reason: problem.reason });
     }
     return { kind: "imageProcessingProblems", importedCount: value.importedCount, problems, operationProblem: value.operationProblem ?? null };
+  },
+  exportMediaProblems: (value) => {
+    const problems = parseExportMediaProblems(value.problems);
+    return typeof value.projectName === "string" && typeof value.busy === "boolean" && typeof value.message === "string" && problems
+      ? { kind: "exportMediaProblems", projectName: value.projectName, busy: value.busy, message: value.message, problems } : null;
   },
   exportProblems: (value) => {
     const problems = parseLayoutExportProblems(value.problems);
@@ -280,6 +287,7 @@ export function toIpcProjectDialogState(
 ): IpcProjectDialogState {
   switch (state.kind) {
     case "mediaRemovalConfirmation": return { ...state };
+    case "exportMediaProblems": return { ...state, problems: state.problems.map(problem => ({ ...problem })) };
     case "exportProblems":
       return { kind: state.kind, projectName: state.projectName, problems: state.problems.map((problem) => ({ ...problem })) };
     case "imageProcessingProgress":
@@ -324,6 +332,7 @@ function fromIpcProjectDialogState(
 ): ProjectDialogState {
   switch (state.kind) {
     case "mediaRemovalConfirmation": return { ...state };
+    case "exportMediaProblems": return { ...state, problems: state.problems.map(problem => ({ ...problem })) };
     case "exportProblems":
       return { kind: state.kind, projectName: state.projectName, problems: state.problems.map((problem) => ({ ...problem })) };
     case "imageProcessingProgress":

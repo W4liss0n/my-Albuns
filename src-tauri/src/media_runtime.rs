@@ -1,3 +1,5 @@
+mod relink;
+
 use std::{
     collections::{HashMap, HashSet},
     io::{BufReader, Read},
@@ -425,23 +427,48 @@ impl MediaResolver {
         inspect_media_source(&binding.logical_path, false)
     }
 
-    pub(crate) fn inspect_photo_binding_in_plan(
+    pub(crate) fn inspect_media_binding_in_plan(
         &self,
         binding: &MediaBinding,
         plan: &RootBindingPlan,
     ) -> Result<PhotoSourceMetadata, String> {
-        if binding.kind != MediaKind::Photo {
-            return Err("A ocorrência escolhida não é uma Foto.".into());
-        }
         inspect_media_source_in_plan(plan, &binding.logical_path, false)
     }
 
+    #[cfg(test)]
     pub(crate) fn propose_relink(
         &self,
         binding: &MediaBinding,
         replacement_path: PathBuf,
     ) -> Result<MediaRelinkProposal, String> {
-        let inspected = inspect_media_source(&replacement_path, false)?;
+        let mut context = OperationPathContext::new();
+        context
+            .capture(&binding.logical_path)
+            .map_err(|error| error.to_string())?;
+        context
+            .capture(&replacement_path)
+            .map_err(|error| error.to_string())?;
+        self.propose_relink_in_plan(binding, replacement_path, &context.freeze())
+    }
+
+    pub(crate) fn propose_relink_in_plan(
+        &self,
+        binding: &MediaBinding,
+        replacement_path: PathBuf,
+        roots: &RootBindingPlan,
+    ) -> Result<MediaRelinkProposal, String> {
+        if self.observe_in_plan(roots, binding).availability != MediaAvailability::Absent {
+            return Err("Somente um Arquivo comprovadamente ausente pode ser religado.".into());
+        }
+        let candidate = MediaBinding {
+            logical_path: replacement_path.clone(),
+            ..binding.clone()
+        };
+        let before = self.observe_in_plan(roots, &candidate);
+        let inspected = inspect_media_source_in_plan(roots, &replacement_path, false)?;
+        if !before.same_source(&self.observe_in_plan(roots, &candidate)) {
+            return Err("O Original mudou durante a inspeção. Tente novamente.".into());
+        }
 
         Ok(MediaRelinkProposal {
             media_id: binding.media_id.clone(),
@@ -599,6 +626,7 @@ fn inspect_photo_candidates<T: Send, R: Send>(
     })
 }
 
+#[cfg(test)]
 fn inspect_media_source(
     path: &std::path::Path,
     require_jpeg: bool,
@@ -859,7 +887,7 @@ impl MediaMonitor {
         mut proposal: MediaResolutionProposal,
         bindings: &[MediaBinding],
         plan: &RootBindingPlan,
-        readable_photos: &[String],
+        readable_media: &[String],
     ) -> MediaMonitorPoll {
         let mut transition = self
             .transition
@@ -893,8 +921,7 @@ impl MediaMonitor {
                     .is_some_and(|binding| {
                         observation.same_source(&self.resolver.observe_in_plan(plan, binding))
                     });
-                let readable = observation.kind != MediaKind::Photo
-                    || readable_photos.contains(&observation.media_id);
+                let readable = readable_media.contains(&observation.media_id);
                 if !source_unchanged || !readable {
                     if let Some(old) = old {
                         *observation = old.clone();
@@ -1113,7 +1140,7 @@ mod tests {
             "preparation cannot adopt uninspected bytes"
         );
         MediaResolver
-            .inspect_photo_binding_in_plan(&bindings[0], &roots)
+            .inspect_media_binding_in_plan(&bindings[0], &roots)
             .unwrap();
         let poll = monitor.commit_prepared(
             &runtime,
@@ -1160,7 +1187,7 @@ mod tests {
         monitor.prepare_in_plan(&runtime, bindings, &roots);
         let older = monitor.prepare_in_plan(&runtime, bindings, &roots).unwrap();
         MediaResolver
-            .inspect_photo_binding_in_plan(&binding, &roots)
+            .inspect_media_binding_in_plan(&binding, &roots)
             .unwrap();
         write(120);
         monitor.commit_prepared(&runtime, older.clone(), bindings, &roots, &["photo".into()]);
@@ -1168,7 +1195,7 @@ mod tests {
         monitor.prepare_in_plan(&runtime, bindings, &roots);
         let newer = monitor.prepare_in_plan(&runtime, bindings, &roots).unwrap();
         MediaResolver
-            .inspect_photo_binding_in_plan(&binding, &roots)
+            .inspect_media_binding_in_plan(&binding, &roots)
             .unwrap();
         monitor.commit_prepared(&runtime, newer, bindings, &roots, &["photo".into()]);
         let committed = runtime.snapshot();

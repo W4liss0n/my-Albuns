@@ -23,6 +23,17 @@ impl ProjectDialogState {
     fn sanitized(self) -> Self {
         match self {
             Self::MediaRemovalConfirmation { .. } => self,
+            Self::ExportMediaProblems {
+                project_name,
+                problems,
+                busy,
+                message,
+            } => Self::ExportMediaProblems {
+                project_name: bound_text(project_name),
+                problems,
+                busy,
+                message: bound_text(message),
+            },
             Self::LayoutDeletionConfirmation { busy } => Self::LayoutDeletionConfirmation { busy },
             Self::ExportProblems {
                 project_name,
@@ -110,7 +121,9 @@ impl ProjectDialogState {
                 520.0,
                 240.0 + native_dialog_window::OWNED_WINDOW_TITLEBAR_HEIGHT,
             ),
-            Self::ImageProcessingProblems { .. } | Self::ExportProblems { .. } => (
+            Self::ImageProcessingProblems { .. }
+            | Self::ExportProblems { .. }
+            | Self::ExportMediaProblems { .. } => (
                 640.0,
                 400.0 + native_dialog_window::OWNED_WINDOW_TITLEBAR_HEIGHT,
             ),

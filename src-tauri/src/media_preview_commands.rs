@@ -138,7 +138,7 @@ pub(crate) async fn retry_unavailable_media(
     let update = confirmed.poll.update().cloned().unwrap_or_default();
     engine.apply_monitor_media_update(&retry_namespace, &registry, &update);
     if let Some(change) =
-        linked_media_change_for_update(&update, &confirmed.refreshed_photo_ids, true)
+        linked_media_change_for_update(&update, &confirmed.refreshed_media_ids, true)
     {
         window
             .emit(LINKED_MEDIA_CHANGED_EVENT, change)
@@ -290,7 +290,7 @@ pub(crate) async fn prepare_media_previews(
     if let Some(runtime_update) = runtime_update.as_ref()
         && let Some(change) = linked_media_change_for_update(
             runtime_update,
-            &confirmed.refreshed_photo_ids,
+            &confirmed.refreshed_media_ids,
             cache_update
                 .as_ref()
                 .is_some_and(|update| update.retry_required()),
@@ -605,13 +605,13 @@ fn preview_state(availability: MediaAvailability) -> MediaPreviewState {
 
 fn linked_media_change_for_update(
     update: &crate::media_runtime::MediaRuntimeUpdate,
-    refreshed_photo_ids: &[String],
+    refreshed_media_ids: &[String],
     refresh_all_changed_media_ids: bool,
 ) -> Option<LinkedMediaChanged> {
     let media_ids = if refresh_all_changed_media_ids {
         update.changed_media_ids().to_vec()
     } else {
-        refreshed_photo_ids.to_vec()
+        refreshed_media_ids.to_vec()
     };
     (!media_ids.is_empty()).then_some(LinkedMediaChanged { media_ids })
 }

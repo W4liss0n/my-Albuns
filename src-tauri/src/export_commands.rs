@@ -107,6 +107,7 @@ impl ExportCommandError {
             message: "A Exportação foi cancelada.".into(),
             media_id: None,
             path_code: None,
+            media_problems: None,
             layout_problems: None,
         }
     }
@@ -117,6 +118,7 @@ impl ExportCommandError {
             message: message.into(),
             media_id: None,
             path_code: None,
+            media_problems: None,
             layout_problems: None,
         }
     }
@@ -128,6 +130,7 @@ impl ExportCommandError {
                 message: "Outra operação exclusiva já está em andamento. Aguarde sua conclusão e tente novamente.".into(),
                 media_id: None,
                 path_code: None,
+                media_problems: None,
                 layout_problems: None,
             },
             OperationGateError::Unavailable { reason } => Self {
@@ -135,6 +138,7 @@ impl ExportCommandError {
                 message: format!("Não foi possível reservar a Exportação: {reason}"),
                 media_id: None,
                 path_code: None,
+                media_problems: None,
                 layout_problems: None,
             },
         }
@@ -147,6 +151,7 @@ impl ExportCommandError {
                 message: failure.message,
                 media_id: processor.media_id,
                 path_code: processor.path_code.map(Into::into),
+                media_problems: None,
                 layout_problems: None,
             };
         }
@@ -157,6 +162,7 @@ impl ExportCommandError {
                 message: failure.message,
                 media_id: None,
                 path_code: None,
+                media_problems: None,
                 layout_problems: None,
             },
             export_pipeline::ExportFailureStage::Publish { .. } => Self {
@@ -164,6 +170,7 @@ impl ExportCommandError {
                 message: failure.message,
                 media_id: None,
                 path_code: None,
+                media_problems: None,
                 layout_problems: None,
             },
             _ => Self::failed(failure.message),
@@ -340,7 +347,26 @@ pub(crate) async fn export_sheet(
             message: "Preencha os Frames vazios antes de exportar a seleção.".into(),
             media_id: None,
             path_code: None,
+            media_problems: None,
             layout_problems: Some(problems),
+        });
+    }
+    let checking_host = state.inner().clone();
+    let checking_sheet = sheet_id.clone();
+    let media_problems = tauri::async_runtime::spawn_blocking(move || {
+        crate::export_media::inspect(&checking_host, &checking_sheet)
+    })
+    .await
+    .map_err(|error| ExportCommandError::failed(error.to_string()))?
+    .map_err(ExportCommandError::failed)?;
+    if !media_problems.is_empty() {
+        return Err(ExportCommandError {
+            code: ExportCommandErrorCode::MediaProblems,
+            message: "Confira os Arquivos necessários à Exportação.".into(),
+            media_id: None,
+            path_code: None,
+            media_problems: Some(media_problems),
+            layout_problems: None,
         });
     }
     let suggested_filename = suggested_export_filename(&project_name, sheet_number);

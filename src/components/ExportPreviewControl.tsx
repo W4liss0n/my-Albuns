@@ -22,8 +22,12 @@ import type {
 import { ActionButton } from "../ui";
 import { LayoutExportBlockedError } from "../application/projectPorts";
 import "./ExportPreviewControl.css";
+import { MediaExportBlockedError, type ExportMediaPort } from "../application/exportMedia";
+import type { EditorProjection } from "../domain/project";
 
 interface ExportPreviewControlProps {
+  exportMediaPort?: ExportMediaPort;
+  onProjectionChange?(projection: EditorProjection): void;
   dialogPort: ProjectDialogPort;
   disabled?: boolean;
   exportPipelinePort: ExportPipelinePort;
@@ -41,6 +45,8 @@ export const ExportPreviewControl = forwardRef<
   ExportPreviewControlProps
 >(function ExportPreviewControl(
   {
+    exportMediaPort,
+    onProjectionChange,
     dialogPort,
     disabled = false,
     exportPipelinePort,
@@ -54,6 +60,9 @@ export const ExportPreviewControl = forwardRef<
     "idle" | "starting" | "running" | "cancelled" | "completed" | "failed"
   >("idle");
   const nextAttemptId = useRef(0);
+  const recoveryGeneration = useRef(0);
+  const recoveryPending = useRef(false);
+  const attemptedSelection = useRef<ExportSheetSelection | null>(null);
   const currentAttemptId = useRef<number | null>(null);
   const startedAttemptId = useRef<number | null>(null);
   const activeAttempt = useRef<{
@@ -76,6 +85,13 @@ export const ExportPreviewControl = forwardRef<
 
   dialogActionListener.current = (action) => {
     switch (action) {
+      case "relinkExportMedia": void recoverMedia(true); break;
+      case "retryExportMedia": void recoverMedia(false); break;
+      case "continueMediaExport": {
+        const current = lastDialogState.current;
+        if (current?.kind === "exportMediaProblems" && !current.busy && current.problems.length === 0) startExport();
+        break;
+      }
       case "cancelExport":
         requestCancellation();
         break;
@@ -92,6 +108,7 @@ export const ExportPreviewControl = forwardRef<
   };
 
   useLayoutEffect(() => {
+    recoveryGeneration.current++;
     setPhase("idle");
     lastDialogState.current = undefined;
     dialogPresentationFailed.current = false;
@@ -113,6 +130,7 @@ export const ExportPreviewControl = forwardRef<
       return;
     }
 
+    attemptedSelection.current = { ...selection };
     const attemptId = ++nextAttemptId.current;
     currentAttemptId.current = attemptId;
     beginInteraction();
@@ -195,6 +213,45 @@ export const ExportPreviewControl = forwardRef<
     );
   }
 
+  async function recoverMedia(relink: boolean) {
+    const current = lastDialogState.current;
+    const selected = attemptedSelection.current;
+    if (!exportMediaPort || !selected || current?.kind !== "exportMediaProblems" || current.busy) return;
+    const generation = ++recoveryGeneration.current;
+    recoveryPending.current = true;
+    presentDialog({ ...current, busy: true, message: relink ? "Procurando e processando os Arquivos da pasta escolhida…" : "Verificando os Arquivos…" });
+    try {
+      if (relink) {
+        const result = await exportMediaPort.relink(selected, progress => {
+          if (generation !== recoveryGeneration.current) return;
+          presentDialog({ kind: "imageProcessingProgress", progress: {
+            kind: "determinate", completed: progress.completedFiles, total: progress.totalFiles,
+            status: `${progress.completedFiles} de ${progress.totalFiles}`,
+          } });
+        });
+        if (generation !== recoveryGeneration.current) return;
+        onProjectionChange?.(result.projection);
+        presentDialog({ ...current, busy: false, problems: result.problems,
+          message: result.notes.map(note => `${note.fileName}: ${note.reason}`).join(" ") });
+      } else {
+        const problems = await exportMediaPort.inspect(selected);
+        if (generation !== recoveryGeneration.current) return;
+        presentDialog({ ...current, busy: false, problems, message: "" });
+      }
+    } catch (error) {
+      if (generation === recoveryGeneration.current) presentDialog({ ...current, busy: false, message: messageFromError(error) });
+    } finally {
+      if (generation === recoveryGeneration.current) {
+        recoveryPending.current = false;
+        if (dialogPresentationFailed.current) {
+          setPhase("idle");
+          lastDialogState.current = undefined;
+          endInteraction();
+        }
+      }
+    }
+  }
+
   function retryExport() {
     if (phase !== "cancelled" && phase !== "failed") return;
     const current = lastDialogState.current;
@@ -217,6 +274,8 @@ export const ExportPreviewControl = forwardRef<
   }
 
   function dismissFeedback() {
+    if (recoveryPending.current) return;
+    if (lastDialogState.current?.kind === "exportMediaProblems" && lastDialogState.current.busy) return;
     if (
       phase !== "cancelled" &&
       phase !== "completed" &&
@@ -225,6 +284,7 @@ export const ExportPreviewControl = forwardRef<
       return;
     }
     setPhase("idle");
+    recoveryGeneration.current++;
     lastDialogState.current = undefined;
     const session = dialogSession.current;
     dialogSession.current = null;
@@ -233,6 +293,7 @@ export const ExportPreviewControl = forwardRef<
   }
 
   function presentDialog(state: ProjectDialogState) {
+    if (recoveryPending.current && dialogPresentationFailed.current) return;
     lastDialogState.current = state;
     const session =
       dialogSession.current ??
@@ -250,7 +311,7 @@ export const ExportPreviewControl = forwardRef<
       if (current && !current.cancelRequested) {
         current.cancelRequested = true;
         void current.attempt.cancel().catch(() => undefined);
-      } else if (!current) {
+      } else if (!current && !recoveryPending.current) {
         setPhase("idle");
         lastDialogState.current = undefined;
         endInteraction();
@@ -273,6 +334,11 @@ export const ExportPreviewControl = forwardRef<
     if (!finished) return;
 
     const message = messageFromError(error);
+    if (error instanceof MediaExportBlockedError && attemptedSelection.current && exportMediaPort) {
+      setPhase("failed");
+      presentDialog({ kind: "exportMediaProblems", projectName: attemptedSelection.current.projectName, problems: error.problems, busy: false, message: "" });
+      return;
+    }
     if (error instanceof LayoutExportBlockedError && selection) {
       setPhase("failed");
       presentDialog({ kind: "exportProblems", projectName: selection.projectName, problems: error.problems });
@@ -305,6 +371,8 @@ export const ExportPreviewControl = forwardRef<
   }
 
   function retireActiveAttempt() {
+    recoveryGeneration.current++;
+    recoveryPending.current = false;
     const attemptId = currentAttemptId.current;
     if (attemptId !== null) {
       const current = activeAttempt.current;

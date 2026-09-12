@@ -94,6 +94,12 @@ pub struct ProjectDialogDetail {
 )]
 #[ts(tag = "kind")]
 pub enum ProjectDialogState {
+    ExportMediaProblems {
+        project_name: String,
+        problems: Vec<ExportMediaProblem>,
+        busy: bool,
+        message: String,
+    },
     MediaRemovalConfirmation {
         media_kind: myalbuns_core::MediaKind,
         count: u32,
@@ -157,6 +163,9 @@ pub struct ProjectDialogPresentation {
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub enum ProjectDialogAction {
+    RelinkExportMedia,
+    RetryExportMedia,
+    ContinueMediaExport,
     CancelMediaRemoval,
     RemoveAllMedia,
     RemoveMediaKeepFrames,
@@ -489,6 +498,7 @@ pub enum CancelDisposition {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]
 #[serde(rename_all = "snake_case")]
 pub enum ExportCommandErrorCode {
+    MediaProblems,
     UnfilledLayoutPositions,
     Cancelled,
     Conflict,
@@ -530,6 +540,8 @@ pub struct ExportCommandError {
     pub(crate) media_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) path_code: Option<ExportPathCode>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) media_problems: Option<Vec<ExportMediaProblem>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) layout_problems: Option<Vec<myalbuns_core::LayoutExportProblem>>,
 }
@@ -1174,4 +1186,28 @@ pub struct FrontendLogEvent {
 pub struct ImageProcessingProblem {
     pub(crate) file_name: String,
     pub(crate) reason: String,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum ExportMediaState {
+    Absent,
+    Unavailable,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportMediaProblem {
+    pub(crate) media_id: String,
+    pub(crate) file_name: String,
+    pub(crate) state: ExportMediaState,
+}
+
+#[derive(Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportRelinkResult {
+    #[ts(type = "import(\"../../domain/project\").EditorProjection")]
+    pub(crate) projection: myalbuns_core::EditorProjection,
+    pub(crate) problems: Vec<ExportMediaProblem>,
+    pub(crate) notes: Vec<ImageProcessingProblem>,
 }

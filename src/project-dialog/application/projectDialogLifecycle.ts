@@ -28,6 +28,7 @@ export function defaultProjectDialogCloseAction(
       return state.cancellable && !state.cancelRequested
         ? "cancelExport"
         : null;
+    case "exportMediaProblems": return state.busy ? null : "dismissExport";
     case "exportFailure":
     case "exportProblems":
     case "exportSuccess":

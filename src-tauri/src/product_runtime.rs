@@ -262,6 +262,8 @@ pub(crate) fn run(
             crate::media_preview_commands::prepare_media_previews,
             crate::media_preview_commands::read_media_files,
             crate::export_commands::export_sheet,
+            crate::export_media::inspect_export_media,
+            crate::export_media::relink_export_media,
             crate::export_commands::cancel_export,
             crate::workspace_preferences::workspace_preferences,
             crate::workspace_preferences::update_workspace_preference,
@@ -599,7 +601,7 @@ fn refresh_changed_photo_sources_in_plan(
             refreshed.push(binding.media_id);
             continue;
         }
-        match MediaResolver.inspect_photo_binding_in_plan(&binding, roots) {
+        match MediaResolver.inspect_media_binding_in_plan(&binding, roots) {
             Ok(metadata) => match host.observe_photo_source(&binding, metadata) {
                 Ok(()) => refreshed.push(binding.media_id.clone()),
                 Err(error) => tracing::warn!(
@@ -626,10 +628,10 @@ pub(crate) fn refresh_project_photos_for_media_update(
     bindings: &[MediaBinding],
     update: &crate::media_runtime::MediaRuntimeUpdate,
 ) -> Vec<String> {
-    refresh_changed_photo_sources(host, changed_photos_for_update(bindings, update))
+    refresh_changed_photo_sources(host, changed_media_for_update(bindings, update))
 }
 
-pub(crate) async fn refresh_project_photos_with_capacity(
+pub(crate) async fn refresh_project_media_with_capacity(
     host: &ProjectHost,
     engine: &CacheEngine,
     processor: &ImagingProcessor,
@@ -643,7 +645,7 @@ pub(crate) async fn refresh_project_photos_with_capacity(
     };
 
     let mut refreshed = Vec::new();
-    for binding in changed_photos_for_update(bindings, update) {
+    for binding in changed_media_for_update(bindings, update) {
         let cancellation = CacheCancellation::default();
         let result = loop {
             if cancellation.reason() == Some(CacheCancellationReason::Paused) {
@@ -696,12 +698,22 @@ pub(crate) async fn refresh_project_photos_with_capacity(
             // pause a resource wait without holding a nested activity alive.
             let inspected = tauri::async_runtime::spawn_blocking(move || {
                 let metadata = MediaResolver
-                    .inspect_photo_binding_in_plan(&inspecting_binding, &inspecting_roots)?;
+                    .inspect_media_binding_in_plan(&inspecting_binding, &inspecting_roots)?;
                 let current = MediaResolver.observe_in_plan(&inspecting_roots, &inspecting_binding);
                 if !observation.same_source(&current) {
                     return Err("A origem mudou durante a inspeção da imagem.".to_owned());
                 }
-                inspecting_host.observe_photo_source(&inspecting_binding, metadata)
+                if inspecting_binding.kind == MediaKind::Photo {
+                    inspecting_host.observe_photo_source(&inspecting_binding, metadata)
+                } else if inspecting_host
+                    .authorized_media_catalog()?
+                    .bindings
+                    .contains(&inspecting_binding)
+                {
+                    Ok(())
+                } else {
+                    Err("A referência do Decorativo mudou durante a inspeção.".into())
+                }
             })
             .await;
             drop(reservation);
@@ -723,7 +735,7 @@ pub(crate) async fn refresh_project_photos_with_capacity(
     refreshed
 }
 
-fn changed_photos_for_update(
+fn changed_media_for_update(
     bindings: &[MediaBinding],
     update: &crate::media_runtime::MediaRuntimeUpdate,
 ) -> Vec<MediaBinding> {
@@ -734,16 +746,14 @@ fn changed_photos_for_update(
         .collect::<std::collections::HashSet<_>>();
     bindings
         .iter()
-        .filter(|binding| {
-            binding.kind == MediaKind::Photo && changed.contains(binding.media_id.as_str())
-        })
+        .filter(|binding| changed.contains(binding.media_id.as_str()))
         .cloned()
         .collect()
 }
 
 pub(crate) struct ConfirmedMediaUpdate {
     pub(crate) poll: MediaMonitorPoll,
-    pub(crate) refreshed_photo_ids: Vec<String>,
+    pub(crate) refreshed_media_ids: Vec<String>,
     // Consumers apply Cache invalidation before dropping this permit.
     _permit: crate::cache_activity_gate::CacheWorkPermit,
 }
@@ -756,8 +766,8 @@ pub(crate) async fn confirm_prepared_media(
 ) -> Result<ConfirmedMediaUpdate, String> {
     let runtime = app.state::<MediaRuntime>();
     let engine = app.state::<CacheEngine>();
-    let refreshed_photo_ids = if let Some(proposal) = prepared.as_ref() {
-        refresh_project_photos_with_capacity(
+    let refreshed_media_ids = if let Some(proposal) = prepared.as_ref() {
+        refresh_project_media_with_capacity(
             app.state::<ProjectHost>().inner(),
             &engine,
             app.state::<ImagingProcessor>().inner(),
@@ -775,7 +785,7 @@ pub(crate) async fn confirm_prepared_media(
     let committing_app = app.clone();
     let bindings = bindings.to_vec();
     let roots = roots.clone();
-    let readable = refreshed_photo_ids.clone();
+    let readable = refreshed_media_ids.clone();
     let poll = tauri::async_runtime::spawn_blocking(move || {
         let runtime = committing_app.state::<MediaRuntime>();
         prepared.map_or_else(
@@ -791,7 +801,7 @@ pub(crate) async fn confirm_prepared_media(
     .map_err(|error| error.to_string())?;
     Ok(ConfirmedMediaUpdate {
         poll,
-        refreshed_photo_ids,
+        refreshed_media_ids,
         _permit: permit,
     })
 }
@@ -1062,9 +1072,9 @@ mod tests {
 
     use image::{ImageFormat, Rgb, RgbImage};
     use myalbuns_core::{
-        CreateAuthorization, CreateProjectRequest, ImportPhoto, InitialProject, OpenProjectRequest,
-        PhotoPlacementMode, PhotoSourceMetadata, ProjectCore, ProjectIntent, ProjectLocation,
-        SaveProjectOutcome,
+        CreateAuthorization, CreateProjectRequest, ImportPhoto, InitialProject, MediaKind,
+        OpenProjectRequest, PhotoPlacementMode, PhotoSourceMetadata, ProjectCore, ProjectIntent,
+        ProjectLocation, SaveProjectOutcome,
     };
     use myalbuns_imaging_protocol::{
         CacheArtifact, CacheArtifactFormat, CacheBasicColorProfile, CacheFingerprint,
@@ -1305,7 +1315,7 @@ mod tests {
         let processor = crate::imaging_processor::ImagingProcessor::default();
         tauri::async_runtime::block_on(async {
             let occupied = processor.reserve().await.unwrap();
-            let refresh = super::refresh_project_photos_with_capacity(
+            let refresh = super::refresh_project_media_with_capacity(
                 &host, &engine, &processor, &bindings, &update, &roots,
             );
             tokio::pin!(refresh);
@@ -1347,101 +1357,120 @@ mod tests {
     }
 
     #[test]
-    fn external_photo_confirmation_updates_two_hosts_without_creative_history() {
-        tauri::async_runtime::block_on(async {
-            let root = tempfile::tempdir().unwrap();
-            let original = root.path().join("Original compartilhado.jpg");
-            let write_photo = |width| {
-                RgbImage::from_pixel(width, 20, Rgb([25, 65, 140]))
-                    .save_with_format(&original, ImageFormat::Jpeg)
-                    .unwrap()
-            };
-            write_photo(30);
-            let mut context = OperationPathContext::new();
-            context.capture(&original).unwrap();
-            let roots = context.freeze();
-            let mut projects = Vec::new();
-            for number in 0..2 {
-                let path = root.path().join(format!("Projeto {number}.myalbuns"));
+    fn external_media_confirmation_updates_two_hosts_without_creative_history() {
+        for kind in [MediaKind::Photo, MediaKind::Decorative] {
+            tauri::async_runtime::block_on(async {
+                let root = tempfile::tempdir().unwrap();
+                let original = root.path().join("Original compartilhado.jpg");
+                let write_photo = |width| {
+                    RgbImage::from_pixel(width, 20, Rgb([25, 65, 140]))
+                        .save_with_format(&original, ImageFormat::Jpeg)
+                        .unwrap()
+                };
+                write_photo(30);
                 let mut context = OperationPathContext::new();
-                context.capture(&path).unwrap();
-                let project = ProjectCore::new()
-                    .with_identity_storage_roots(
-                        root.path().join("leases"),
-                        root.path().join("identities"),
-                    )
-                    .create_editable(CreateProjectRequest::new(
-                        ProjectLocation::new(path, context.freeze()),
-                        InitialProject::neutral(),
-                        CreateAuthorization::CreateOnly,
-                    ))
-                    .unwrap();
-                let host = ProjectHost::new(project);
-                host.import_photos(vec![original.clone()], |_| {}).unwrap();
-                let catalog = host.authorized_media_catalog().unwrap();
-                let initial = host.projection().unwrap();
-                for _ in 0..2 {
-                    host.apply_with_outcome(myalbuns_core::ProjectIntent::AddPhoto {
-                        sheet_id: initial.state.album.sheets[0].id.clone(),
-                        media_id: catalog.bindings[0].media_id.parse().unwrap(),
-                        mode: myalbuns_core::PhotoPlacementMode::Normal,
-                    })
-                    .unwrap();
-                }
-                host.save(host.projection().unwrap().state.revision)
-                    .unwrap();
-                let before = host.projection().unwrap();
-                let monitor = MediaMonitor::default();
-                let runtime = MediaRuntime::default();
-                let evidence = catalog
-                    .bindings
-                    .iter()
-                    .map(|binding| MediaResolver.observe_in_plan(&roots, binding))
-                    .collect::<Vec<_>>();
-                monitor.adopt_prepared_inspections(&runtime, &catalog.bindings, &roots, &evidence);
-                // The import's successful inspection is no longer available for a different fingerprint.
-                projects.push((host, catalog.bindings, before, monitor, runtime));
-            }
-            for complete in [false, true] {
-                if complete {
-                    write_photo(80);
-                } else {
-                    std::fs::write(&original, [0xff, 0xd8, 0xff]).unwrap();
-                }
-                for (host, bindings, before, monitor, runtime) in &projects {
-                    monitor.prepare_in_plan(runtime, bindings, &roots);
-                    let prepared = monitor.prepare_in_plan(runtime, bindings, &roots).unwrap();
-                    let engine = crate::cache_engine::CacheEngine::default();
-                    let processor = crate::imaging_processor::ImagingProcessor::default();
-                    let readable = super::refresh_project_photos_with_capacity(
-                        host,
-                        &engine,
-                        &processor,
-                        bindings,
-                        &prepared.inspection_update(runtime),
+                context.capture(&original).unwrap();
+                let roots = context.freeze();
+                let mut projects = Vec::new();
+                for number in 0..2 {
+                    let path = root.path().join(format!("Projeto {number}.myalbuns"));
+                    let mut context = OperationPathContext::new();
+                    context.capture(&path).unwrap();
+                    let project = ProjectCore::new()
+                        .with_identity_storage_roots(
+                            root.path().join("leases"),
+                            root.path().join("identities"),
+                        )
+                        .create_editable(CreateProjectRequest::new(
+                            ProjectLocation::new(path, context.freeze()),
+                            InitialProject::neutral(),
+                            CreateAuthorization::CreateOnly,
+                        ))
+                        .unwrap();
+                    let host = ProjectHost::new(project);
+                    let id = host.authorized_media_catalog().unwrap().project_id;
+                    let proposal = MediaResolver.propose_media_imports_in_plan(
+                        kind,
+                        vec![original.clone()],
+                        &[],
                         &roots,
-                    )
-                    .await;
-                    assert_eq!(readable.len(), usize::from(complete));
-                    let confirmed =
-                        monitor.commit_prepared(runtime, prepared, bindings, &roots, &readable);
-                    assert_eq!(
-                        confirmed.update().unwrap().invalidated_media_ids().len(),
-                        usize::from(complete)
+                        |_| {},
                     );
-                    let after = host.projection().unwrap();
-                    assert_eq!(
-                        after.state.album.media[0].source_width_px,
-                        Some(if complete { 80 } else { 30 })
+                    host.commit_photo_import_proposal(&id, proposal).unwrap();
+                    let catalog = host.authorized_media_catalog().unwrap();
+                    let initial = host.projection().unwrap();
+                    for _ in 0..if kind == MediaKind::Photo { 2 } else { 0 } {
+                        host.apply_with_outcome(myalbuns_core::ProjectIntent::AddPhoto {
+                            sheet_id: initial.state.album.sheets[0].id.clone(),
+                            media_id: catalog.bindings[0].media_id.parse().unwrap(),
+                            mode: myalbuns_core::PhotoPlacementMode::Normal,
+                        })
+                        .unwrap();
+                    }
+                    host.save(host.projection().unwrap().state.revision)
+                        .unwrap();
+                    let before = host.projection().unwrap();
+                    let monitor = MediaMonitor::default();
+                    let runtime = MediaRuntime::default();
+                    let evidence = catalog
+                        .bindings
+                        .iter()
+                        .map(|binding| MediaResolver.observe_in_plan(&roots, binding))
+                        .collect::<Vec<_>>();
+                    monitor.adopt_prepared_inspections(
+                        &runtime,
+                        &catalog.bindings,
+                        &roots,
+                        &evidence,
                     );
-                    assert_eq!(after.state.revision, before.state.revision);
-                    assert_eq!(after.state.can_undo, before.state.can_undo);
-                    assert_eq!(after.state.can_redo, before.state.can_redo);
-                    assert_eq!(after.state.album.sheets, before.state.album.sheets);
-                    assert!(!after.state.dirty);
+                    // The import's successful inspection is no longer available for a different fingerprint.
+                    projects.push((host, catalog.bindings, before, monitor, runtime));
                 }
-            }
-        });
+                for complete in [false, true] {
+                    if complete {
+                        write_photo(80);
+                    } else {
+                        std::fs::write(&original, [0xff, 0xd8, 0xff]).unwrap();
+                    }
+                    for (host, bindings, before, monitor, runtime) in &projects {
+                        monitor.prepare_in_plan(runtime, bindings, &roots);
+                        let prepared = monitor.prepare_in_plan(runtime, bindings, &roots).unwrap();
+                        let engine = crate::cache_engine::CacheEngine::default();
+                        let processor = crate::imaging_processor::ImagingProcessor::default();
+                        let readable = super::refresh_project_media_with_capacity(
+                            host,
+                            &engine,
+                            &processor,
+                            bindings,
+                            &prepared.inspection_update(runtime),
+                            &roots,
+                        )
+                        .await;
+                        assert_eq!(readable.len(), usize::from(complete));
+                        let confirmed =
+                            monitor.commit_prepared(runtime, prepared, bindings, &roots, &readable);
+                        assert_eq!(
+                            confirmed.update().unwrap().invalidated_media_ids().len(),
+                            usize::from(complete)
+                        );
+                        let after = host.projection().unwrap();
+                        assert_eq!(
+                            after.state.album.media[0].source_width_px,
+                            if kind == MediaKind::Photo {
+                                Some(if complete { 80 } else { 30 })
+                            } else {
+                                before.state.album.media[0].source_width_px
+                            }
+                        );
+                        assert_eq!(after.state.revision, before.state.revision);
+                        assert_eq!(after.state.can_undo, before.state.can_undo);
+                        assert_eq!(after.state.can_redo, before.state.can_redo);
+                        assert_eq!(after.state.album.sheets, before.state.album.sheets);
+                        assert!(!after.state.dirty);
+                    }
+                }
+            });
+        }
     }
 
     #[test]

@@ -36,6 +36,8 @@
           "prepare_media_previews",
           "read_media_files",
           "export_sheet",
+          "inspect_export_media",
+          "relink_export_media",
           "cancel_export",
           "workspace_preferences",
           "update_workspace_preference",

@@ -13,6 +13,7 @@ mod dev_job;
 mod dev_supervisor_protocol;
 mod export_attempts;
 mod export_commands;
+mod export_media;
 mod export_pipeline;
 mod global_activation;
 mod global_runtime;

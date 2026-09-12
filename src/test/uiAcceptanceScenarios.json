@@ -2,6 +2,57 @@
   "schemaVersion": 3,
   "scenarios": [
     {
+      "id": "media-export-problems",
+      "title": "Exportação — Arquivos ausentes e indisponíveis",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportMediaProblems%22%2C%22projectName%22%3A%22Formatura%20%E2%80%94%20Turma%202026%22%2C%22problems%22%3A%5B%7B%22mediaId%22%3A%22photo-1%22%2C%22fileName%22%3A%22Retrato%20001.JPG%22%2C%22state%22%3A%22absent%22%7D%2C%7B%22mediaId%22%3A%22photo-2%22%2C%22fileName%22%3A%22Retrato%20002.JPG%22%2C%22state%22%3A%22unavailable%22%7D%5D%2C%22busy%22%3Afalse%2C%22message%22%3A%22%22%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-problems-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "A especificação vigente exige recuperação dos Originais na tabela de Problemas, com Relinkar, Tentar novamente e confirmação explícita antes de continuar."
+      },
+      "viewport": {
+        "width": 640,
+        "height": 430
+      },
+      "readySelector": ".ui-problems-table",
+      "actions": []
+    },
+    {
+      "id": "media-export-recovered",
+      "title": "Exportação — Recuperação concluída, aguardando confirmação",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportMediaProblems%22%2C%22projectName%22%3A%22Formatura%20%E2%80%94%20Turma%202026%22%2C%22problems%22%3A%5B%5D%2C%22busy%22%3Afalse%2C%22message%22%3A%22%22%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-problems-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "A especificação vigente exige recuperação dos Originais na tabela de Problemas, com Relinkar, Tentar novamente e confirmação explícita antes de continuar."
+      },
+      "viewport": {
+        "width": 640,
+        "height": 430
+      },
+      "readySelector": ".ui-problems-table",
+      "actions": []
+    },
+    {
+      "id": "media-export-searching",
+      "title": "Exportação — Busca de Arquivos em andamento",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportMediaProblems%22%2C%22projectName%22%3A%22Formatura%20%E2%80%94%20Turma%202026%22%2C%22problems%22%3A%5B%7B%22mediaId%22%3A%22photo-1%22%2C%22fileName%22%3A%22Retrato%20001.JPG%22%2C%22state%22%3A%22absent%22%7D%2C%7B%22mediaId%22%3A%22photo-2%22%2C%22fileName%22%3A%22Retrato%20002.JPG%22%2C%22state%22%3A%22unavailable%22%7D%5D%2C%22busy%22%3Atrue%2C%22message%22%3A%22Procurando%20e%20processando%20os%20Arquivos%20da%20pasta%20escolhida%E2%80%A6%22%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-problems-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "A especificação vigente exige recuperação dos Originais na tabela de Problemas, com Relinkar, Tentar novamente e confirmação explícita antes de continuar."
+      },
+      "viewport": {
+        "width": 640,
+        "height": 430
+      },
+      "readySelector": ".ui-problems-table",
+      "actions": []
+    },
+    {
       "id": "welcome",
       "title": "Tela de Boas-vindas",
       "implementationPath": "/welcome-preview.html",
