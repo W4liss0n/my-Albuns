@@ -242,8 +242,6 @@ mod tests {
             dialog_capability["permissions"],
             serde_json::json!([
                 "message-dialog-window-commands",
-                "core:window:allow-center",
-                "core:window:allow-set-size",
                 "core:window:allow-start-dragging"
             ])
         );
@@ -255,8 +253,6 @@ mod tests {
             progress_dialog_capability["permissions"],
             serde_json::json!([
                 "owned-dialog-window-commands",
-                "core:window:allow-center",
-                "core:window:allow-set-size",
                 "core:window:allow-start-dragging"
             ])
         );
@@ -297,8 +293,6 @@ mod tests {
                 "core:event:allow-listen",
                 "core:event:allow-unlisten",
                 "core:window:allow-close",
-                "core:window:allow-center",
-                "core:window:allow-set-size",
                 "core:window:allow-start-dragging"
             ])
         );
@@ -317,6 +311,7 @@ mod tests {
             allowed_commands(&project_dialog_permission),
             BTreeSet::from([
                 "current_project_dialog_presentation",
+                "fit_owned_window",
                 "owned_window_content_ready",
                 "submit_project_dialog_action"
             ])
@@ -324,6 +319,7 @@ mod tests {
         assert_eq!(
             allowed_commands(&owned_dialog_permission),
             BTreeSet::from([
+                "fit_owned_window",
                 "owned_window_content_ready",
                 "resolve_opening_external_copy",
                 "resolve_opening_recovery",
@@ -331,7 +327,11 @@ mod tests {
         );
         assert_eq!(
             allowed_commands(&message_dialog_permission),
-            BTreeSet::from(["dismiss_owned_dialog", "owned_window_content_ready"])
+            BTreeSet::from([
+                "dismiss_owned_dialog",
+                "fit_owned_window",
+                "owned_window_content_ready"
+            ])
         );
         let global_commands = allowed_commands(&global_permission);
         let project_commands = allowed_commands(&project_permission);

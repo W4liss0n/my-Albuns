@@ -1926,6 +1926,7 @@ pub(crate) fn run(
             crate::photoshop::commands::choose_photoshop,
             crate::native_dialog_window::dismiss_owned_dialog,
             crate::native_dialog_window::owned_window_content_ready,
+            crate::native_dialog_window::fit_owned_window,
             crate::native_dialog_window::resolve_opening_external_copy,
             crate::native_dialog_window::resolve_opening_recovery,
             create_project,

@@ -35,8 +35,8 @@ function installNativeBoundary() {
     transformCallback: (callback) => { callbacks.set(++callbackId, callback); return callbackId; },
     unregisterCallback: (id) => callbacks.delete(id),
     invoke: async (command, args) => {
-      if (command === "plugin:window|set_size") {
-        const size = JSON.parse(JSON.stringify(args.value)).Logical;
+      if (command === "fit_owned_window") {
+        const size = args;
         if (!size || !Number.isFinite(size.height)) throw new Error("Invalid native size request");
         parent.fitting.fits.push(size.height);
         if (parent.fitting.ready) parent.fitting.visibleFits.push(size.height);
@@ -46,7 +46,6 @@ function installNativeBoundary() {
         // Native command completion does not wait for the browser's next layout.
         return;
       }
-      if (command === "plugin:window|center") return;
       if (command === "owned_window_content_ready") {
         parent.fitting.ready++;
         parent.fitting.readyHeight = parent.document.querySelector("iframe").clientHeight;

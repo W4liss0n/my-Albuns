@@ -175,6 +175,84 @@ pub(crate) fn owned_window_content_ready(window: WebviewWindow, token: u64) -> R
 }
 
 #[tauri::command]
+pub(crate) async fn fit_owned_window(
+    window: WebviewWindow,
+    width: f64,
+    height: f64,
+) -> Result<(), String> {
+    if !matches!(
+        window.label(),
+        "project-dialog" | OPENING_PROGRESS_LABEL | PROJECT_FAILURE_LABEL
+    ) {
+        return Err("content fitting belongs only to owned dialog windows".into());
+    }
+    if ![width, height]
+        .iter()
+        .all(|value| value.is_finite() && *value > 0.0 && *value <= 65535.0)
+    {
+        return Err("the owned window dimensions are invalid".into());
+    }
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    let target = window.clone();
+    window
+        .run_on_main_thread(move || {
+            let _ = sender.send(fit_owned_window_frame(&target, width, height));
+        })
+        .map_err(|error| error.to_string())?;
+    receiver
+        .await
+        .map_err(|_| "the owned window fitting became unavailable".to_owned())?
+        .map_err(|error| error.to_string())
+}
+
+fn fit_owned_window_frame(window: &WebviewWindow, width: f64, height: f64) -> io::Result<()> {
+    #[cfg(windows)]
+    {
+        use windows::Win32::UI::WindowsAndMessaging::{
+            SWP_NOACTIVATE, SWP_NOOWNERZORDER, SWP_NOZORDER, SetWindowPos,
+        };
+
+        let scale = window.scale_factor().map_err(io::Error::other)?;
+        let requested = tauri::LogicalSize::new(width, height).to_physical::<i32>(scale);
+        let inner = window.inner_size().map_err(io::Error::other)?;
+        let outer = window.outer_size().map_err(io::Error::other)?;
+        // Include the native frame/shadow offsets when converting client dimensions.
+        let outer_width = requested.width + outer.width as i32 - inner.width as i32;
+        let outer_height = requested.height + outer.height as i32 - inner.height as i32;
+        let monitor = window
+            .current_monitor()
+            .map_err(io::Error::other)?
+            .or(window.primary_monitor().map_err(io::Error::other)?)
+            .ok_or_else(|| io::Error::other("the dialog monitor is unavailable"))?;
+        let area = monitor.work_area();
+        let left = area.position.x + (area.size.width as i32 - outer_width) / 2;
+        let top = area.position.y + (area.size.height as i32 - outer_height) / 2;
+
+        // Resize and reposition in one native operation; separate calls expose an
+        // off-center frame between the content fit and the subsequent centering.
+        unsafe {
+            SetWindowPos(
+                window.hwnd().map_err(io::Error::other)?,
+                None,
+                left,
+                top,
+                outer_width,
+                outer_height,
+                SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_NOZORDER,
+            )
+        }
+        .map_err(io::Error::other)
+    }
+    #[cfg(not(windows))]
+    {
+        window
+            .set_size(tauri::LogicalSize::new(width, height))
+            .map_err(io::Error::other)?;
+        window.center().map_err(io::Error::other)
+    }
+}
+
+#[tauri::command]
 pub(crate) fn resolve_opening_recovery(
     window: WebviewWindow,
     attempt_id: String,
@@ -409,10 +487,7 @@ fn resize_owned_window_width(window: &WebviewWindow, width: f64) -> io::Result<(
         .inner_size()
         .map_err(io::Error::other)?
         .to_logical::<f64>(scale_factor);
-    window
-        .set_size(tauri::LogicalSize::new(width, current_size.height))
-        .map_err(io::Error::other)?;
-    window.center().map_err(io::Error::other)
+    fit_owned_window_frame(window, width, current_size.height)
 }
 
 impl Drop for NativeProgressDialog {

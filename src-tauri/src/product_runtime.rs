@@ -230,6 +230,7 @@ pub(crate) fn run(
         .invoke_handler(tauri::generate_handler![
             crate::logging::frontend_log,
             crate::native_dialog_window::owned_window_content_ready,
+            crate::native_dialog_window::fit_owned_window,
             project_ui_ready,
             crate::project_commands::project_state,
             crate::project_commands::validate_album_information,

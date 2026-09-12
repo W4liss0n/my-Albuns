@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import type { WindowControls } from "../ui/WindowControlsContext";
 
@@ -32,7 +32,6 @@ function currentReadyToken() {
 }
 
 async function runFitQueue() {
-  const currentWindow = getCurrentWindow();
   for (;;) {
     while (requestedFit) {
       const nextFit = requestedFit;
@@ -41,10 +40,10 @@ async function runFitQueue() {
         continue;
       }
 
-      await currentWindow.setSize(
-        new LogicalSize(nextFit.width, nextFit.height),
-      );
-      await currentWindow.center();
+      await invoke<void>("fit_owned_window", {
+        width: nextFit.width,
+        height: nextFit.height,
+      });
       lastFittedSize = nextFit.sizeKey;
       if (requestedFit === nextFit) requestedFit = null;
     }
