@@ -340,7 +340,7 @@
         "reason": "A Exportação normal oferece Relinkar e Tentar novamente para os Originais pendentes e retoma automaticamente quando a validação fica sem problemas."
       },
       "viewport": {
-        "width": 640,
+        "width": 440,
         "height": 430
       },
       "readySelector": ".ui-progress-dialog",
@@ -551,7 +551,7 @@
         "implementationCaptureSelector": ".ui-owned-window-shell",
         "reason": "A Exportação usa progresso pertencente à Janela conforme as decisões aceitas posteriores."
       },
-      "viewport": { "width": 520, "height": 320 },
+      "viewport": { "width": 440, "height": 320 },
       "readySelector": ".ui-progress-dialog__track[role=\"progressbar\"]",
       "actions": []
     },
@@ -565,7 +565,7 @@
         "implementationCaptureSelector": ".ui-owned-window-shell",
         "reason": "O cancelamento em andamento não possui equivalente na referência visual vigente."
       },
-      "viewport": { "width": 520, "height": 320 },
+      "viewport": { "width": 440, "height": 320 },
       "readySelector": ".ui-progress-dialog__track[role=\"progressbar\"]",
       "actions": []
     },
@@ -579,7 +579,7 @@
         "implementationCaptureSelector": ".ui-owned-window-shell",
         "reason": "A fase de publicação pode retirar a ação Cancelar quando o adaptador produtivo informa que a tentativa deixou de ser cancelável."
       },
-      "viewport": { "width": 520, "height": 320 },
+      "viewport": { "width": 440, "height": 320 },
       "readySelector": ".ui-progress-dialog__track[role=\"progressbar\"]",
       "actions": []
     },

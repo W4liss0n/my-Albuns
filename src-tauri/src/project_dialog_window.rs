@@ -255,6 +255,10 @@ pub(crate) async fn present_project_dialog(
     let owner = window;
     let display_result = async {
         if let Some(dialog) = app.get_webview_window(PROJECT_DIALOG_LABEL) {
+            // Reusing the native window must not retain the previous dialog's width.
+            // Its rendered content continues to determine the fitted height.
+            native_dialog_window::resize_owned_window_width(&dialog, state.initial_dimensions().0)
+                .map_err(|error| error.to_string())?;
             dialog
                 .emit(PROJECT_DIALOG_PRESENTATION_EVENT, &presentation)
                 .map_err(|error| error.to_string())?;
