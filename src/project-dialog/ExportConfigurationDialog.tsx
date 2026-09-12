@@ -101,7 +101,7 @@ export function ExportConfigurationDialog({ state, onAction }: {
                   </label>
                   <TextInput className="ui-field-control" aria-label="Lâminas do intervalo"
                     aria-invalid={scope === "range" && !validRange} disabled={scope !== "range"}
-                    aria-describedby={scope === "range" ? `${id}-range-help` : undefined}
+                    aria-describedby={scope === "range" && !validRange ? `${id}-range-help` : undefined}
                     placeholder="Ex.: 3-8" title="Uma lâmina (3) ou um intervalo (3-8)"
                     value={interval} onChange={event => setInterval(event.target.value)} />
                 </div>
@@ -112,11 +112,10 @@ export function ExportConfigurationDialog({ state, onAction }: {
                 </label>
               </div>
             </div>
-            {scope === "range" && <div id={`${id}-range-help`} className="export-configuration__range-help">
-              {!validRange && <p role="alert" className="export-configuration__error">
+            {scope === "range" && !validRange && <div id={`${id}-range-help`} className="export-configuration__range-help">
+              <p role="alert" className="export-configuration__error">
                 Informe uma lâmina ou um intervalo de 1 a {state.sheets.length}, como 1-{state.sheets.length}.
-              </p>}
-              <p className="export-configuration__hint">Arquivos fora do intervalo serão mantidos. Os nomes existentes não indicam se foram exportados por lâmina ou por página.</p>
+              </p>
             </div>}
           </fieldset>
           {state.busy && <p role="status" className="export-configuration__status">Preparando exportação…</p>}

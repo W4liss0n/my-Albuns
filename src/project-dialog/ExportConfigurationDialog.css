@@ -93,7 +93,6 @@
 .export-configuration__choice:has(input:disabled) { color: var(--ui-text-disabled); }
 .export-configuration__choice input:disabled { opacity: 0.5; }
 .export-configuration__range-help { display: grid; gap: 6px; margin-top: 16px; padding-left: 32px; }
-.export-configuration__hint { margin: 0; color: var(--ui-text-muted); font-size: var(--ui-font-size-support); line-height: 1.5; }
 .export-configuration__summary { margin-right: auto; color: var(--ui-text-secondary); font-size: var(--ui-font-size-form-control); }
 .export-configuration__error { margin: 0; color: var(--ui-danger-text); font-size: var(--ui-font-size-action); line-height: 1.5; }
 .export-configuration__status { margin: -12px 0 0; color: var(--ui-text-muted); font-size: var(--ui-font-size-action); }

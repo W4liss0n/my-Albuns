@@ -69,7 +69,7 @@ Quando o formato do lote é JPEG, a codificação usa obrigatoriamente qualidade
 `Intervalo personalizado` selecionado e o número da Lâmina de origem preenchido no
 campo. Todas as demais opções continuam editáveis antes de iniciar.
 
-Quando `Intervalo personalizado` está selecionado, o diálogo informa que a operação não remove arquivos fora do intervalo e não consegue inferir o modo das saídas já existentes pelo nome. Uma Exportação integral é a única operação que restabelece um conjunto completo autoritativo no destino.
+Quando `Intervalo personalizado` está selecionado, o diálogo apresenta uma mensagem abaixo do campo apenas se o intervalo for inválido. A operação mantém os arquivos fora do intervalo. Uma Exportação integral é a única operação que restabelece um conjunto completo autoritativo no destino.
 
 ## Pré-validação
 
