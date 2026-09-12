@@ -12,6 +12,58 @@
       "actions": []
     },
     {
+      "id": "workspace-missing-image-horizontal",
+      "title": "Imagem ausente — Frame horizontal sem Cache",
+      "implementationPath": "/workspace-preview.html?frame=photo&files=missing-placeholder",
+      "comparison": {
+        "kind": "implementation-only", "surface": "missing-image-placeholder",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Modelo aprovado pelo usuário e descrito no design 0031: fundo neutro e símbolo central; texto apenas no Frame e indicador de canto apenas no Painel."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "body:has(.canvas-host canvas):not(:has(.canvas-loading)):has(.media-preview-thumbnail[data-missing=\"true\"])",
+      "actions": []
+    },
+    {
+      "id": "workspace-missing-image-portrait",
+      "title": "Imagem ausente — Frame vertical sem Cache",
+      "implementationPath": "/workspace-preview.html?frame=photo&files=missing-placeholder&shape=portrait",
+      "comparison": {
+        "kind": "implementation-only", "surface": "missing-image-placeholder",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "O modelo aprovado se adapta à proporção do Frame, mantendo símbolo e texto centralizados, sem indicador no canto."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "body:has(.canvas-host canvas):not(:has(.canvas-loading)):has(.media-preview-thumbnail[data-missing=\"true\"])",
+      "actions": []
+    },
+    {
+      "id": "workspace-missing-image-small",
+      "title": "Imagem ausente — Frame pequeno sem Cache",
+      "implementationPath": "/workspace-preview.html?frame=photo&files=missing-placeholder&shape=small",
+      "comparison": {
+        "kind": "implementation-only", "surface": "missing-image-placeholder",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Símbolo e texto do modelo aprovado reduzem juntos para caber em Frames pequenos."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "body:has(.canvas-host canvas):not(:has(.canvas-loading)):has(.media-preview-thumbnail[data-missing=\"true\"])",
+      "actions": []
+    },
+    {
+      "id": "workspace-missing-image-retained-cache",
+      "title": "Imagem ausente — Cache preservado no Frame e no Painel",
+      "implementationPath": "/workspace-preview.html?frame=photo&files=missing-placeholder&cache=retained",
+      "comparison": {
+        "kind": "implementation-only", "surface": "missing-image-placeholder",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "O modelo aprovado substitui apenas a representação sem Cache; a prévia disponível continua sendo exibida."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "body:has(.canvas-host canvas):not(:has(.canvas-loading)):has(.media-preview-thumbnail[data-has-preview=\"true\"] .media-missing-indicator)",
+      "actions": []
+    },
+    {
       "id": "media-export-problems",
       "title": "Exportação — Arquivos ausentes e indisponíveis",
       "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportMediaProblems%22%2C%22projectName%22%3A%22Formatura%20%E2%80%94%20Turma%202026%22%2C%22problems%22%3A%5B%7B%22mediaId%22%3A%22photo-1%22%2C%22fileName%22%3A%22Retrato%20001.JPG%22%2C%22state%22%3A%22absent%22%7D%2C%7B%22mediaId%22%3A%22photo-2%22%2C%22fileName%22%3A%22Retrato%20002.JPG%22%2C%22state%22%3A%22unavailable%22%7D%5D%2C%22busy%22%3Afalse%2C%22message%22%3A%22%22%7D",

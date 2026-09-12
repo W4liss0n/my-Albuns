@@ -5,6 +5,21 @@ import type { MediaCatalogItem } from "../domain/project";
 import { MediaThumbnail } from "./MediaThumbnail";
 import { loadedMediaPreviewImage } from "../application/mediaPreviewImages";
 
+test("distinguishes an absent thumbnail from loading and restores the photo when Cache arrives", () => {
+  const media = { sourceWidthPx: 800, sourceHeightPx: 1200 };
+  const view = render(<MediaThumbnail media={media} />);
+  const thumbnail = view.container.firstChild;
+  expect(thumbnail).toHaveAttribute("data-missing", "false");
+  view.rerender(<MediaThumbnail media={media} missing />);
+  expect(thumbnail).toHaveAttribute("data-missing", "true");
+  expect(thumbnail).toHaveAttribute("data-portrait", "true");
+  expect(thumbnail).toHaveStyle({ "--media-aspect-ratio": "800 / 1200" });
+  view.rerender(<MediaThumbnail media={media} missing previewUrl="/cached.jpg" />);
+  expect(thumbnail).toHaveAttribute("data-missing", "false");
+  expect(view.container.querySelector("img")).toHaveAttribute("src", "/cached.jpg");
+  expect(view.container.querySelector(".media-preview-thumbnail__missing-symbol")).toBeNull();
+});
+
 test("uses the loaded preview ratio when catalog dimensions are unavailable", () => {
   const media = {
     id: "decorative-without-metadata",

@@ -77,6 +77,7 @@ const canvasHarness = vi.hoisted(() => ({
     centeredSheetId: string | null;
     viewport: { offsetX: number };
     mediaPreviewUrls?: Readonly<Record<string, string>>;
+    missingMediaIds?: ReadonlySet<string>;
     technicalGuides?: CanvasTechnicalGuides;
     sheetReorder?: CanvasSheetReorder;
     onMediaDemandChange?(demand: MediaPreviewDemand): void;
@@ -5550,6 +5551,21 @@ test("uses reduced Cache previews in the media panel and Canvas", () => {
   expect(canvasHarness.props?.mediaPreviewUrls).toEqual(
     mediaPreviewUrls,
   );
+});
+
+test.each([
+  ["absent", null, undefined, true],
+  ["absent", "asset://localhost/cache/retained.jpg", undefined, false],
+  ["unavailable", null, undefined, false],
+  ["cache_unavailable", null, undefined, false],
+  ["ready", null, "absent", true],
+  ["absent", null, "available", false],
+] as const)("projects missing-image presentation from preview %s, Cache %s and file %s", (state, url, fileState, missing) => {
+  render(<ProjectWorkspace exportPipelinePort={exportPipelinePort} projection={projection}
+    projectCorePort={projectCorePortWithApply(async () => projection)} onProjectionChange={() => undefined}
+    mediaPreviews={{ "media-001": { mediaId: "media-001", state, url } }}
+    mediaFiles={fileState ? { "media-001": { mediaId: "media-001", state: fileState, createdAtMs: null, modifiedAtMs: null } } : undefined} />);
+  expect(canvasHarness.props?.missingMediaIds?.has("media-001")).toBe(missing);
 });
 
 test("offers retry only for an unavailable occurrence and keeps Relink exclusive to absent", async () => {

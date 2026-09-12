@@ -176,6 +176,12 @@ export function ProjectWorkspace({
     () => renderableMediaPreviewUrls(mediaPreviews),
     [mediaPreviews],
   );
+  const missingMediaIds = useMemo(() => new Set(
+    projection.state.album.media.filter((media) =>
+      (mediaFiles?.[media.id]?.state ?? mediaPreviews[media.id]?.state) === "absent"
+      && !mediaPreviewUrls[media.id],
+    ).map((media) => media.id),
+  ), [projection.state.album.media, mediaFiles, mediaPreviews, mediaPreviewUrls]);
   const albumDesignPreloadMediaIds = useMemo(
     () =>
       projection.state.album.media.flatMap((media) =>
@@ -728,6 +734,7 @@ export function ProjectWorkspace({
               onSelect: controller.canvasProps.onFocusSheet,
             }}
             mediaPreviewUrls={mediaPreviewUrls}
+            missingMediaIds={missingMediaIds}
             technicalGuides={{
               bleedUm: projection.state.document.bleedUm,
               safetyUm: projection.state.document.safetyUm,

@@ -607,6 +607,7 @@ export function MediaPanel({
                 kind="media"
                 media={media}
                 previewUrl={preview?.url ?? undefined}
+                missing={(file?.state ?? preview?.state) === "absent"}
                 selected={isSelected}
                 onClick={(event) => { if (!mediaDrag.suppressClick()) selectMedia(media.id, event); }}
                 onContextMenu={(event) => {

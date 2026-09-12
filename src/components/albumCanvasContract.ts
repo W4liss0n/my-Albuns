@@ -95,6 +95,8 @@ export interface AlbumCanvasProps {
   composition: CompositionPlan;
   sheetBarMetadata: readonly SheetBarMetadata[];
   mediaPreviewUrls?: Readonly<Record<string, string>>;
+  /** Originals known to be absent, with no retained Cache preview. */
+  missingMediaIds?: ReadonlySet<string>;
   technicalGuides?: CanvasTechnicalGuides;
   frameGapUm?: number;
   displayUnit?: import("../domain/project").DisplayUnit;

@@ -26,6 +26,18 @@
   background: #fff;
 }
 
+.media-preview-thumbnail[data-missing="true"] {
+  background: #efede8;
+}
+
+.media-preview-thumbnail__missing-symbol {
+  width: 26px;
+  height: 26px;
+  max-width: 60%;
+  max-height: 60%;
+  background: center / contain no-repeat;
+}
+
 .media-preview-thumbnail[data-portrait="true"] {
   width: auto;
   height: 100%;

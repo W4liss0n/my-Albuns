@@ -479,7 +479,8 @@ export class AlbumCanvasScene {
         if (!frame.photo) return null;
         const url = this.input?.mediaPreviewUrls?.[frame.photo.mediaId] ?? null;
         if (url) desiredPreviewUrls.add(url);
-        return url ? [url, this.previewTextures.get(url) !== undefined] : null;
+        return [url, url ? this.previewTextures.get(url) !== undefined : false,
+          this.input?.missingMediaIds?.has(frame.photo.mediaId) ?? false];
       });
       const backgroundPreviewStates = sheet.backgrounds.flatMap(
         (background) => {
@@ -687,6 +688,7 @@ export class AlbumCanvasScene {
       signature,
       {
         previewTextureFor: (mediaId) => this.previewTextureFor(mediaId),
+        isMediaMissing: (mediaId) => this.input?.missingMediaIds?.has(mediaId) ?? false,
         onSheetTap: (sheetId) => {
           if (this.input?.mediaDrag) return;
           if (!this.input || this.frameInteractions.ignoresTap || this.frameContentDrag.ignoresTap) return;

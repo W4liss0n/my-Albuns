@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 
 import type { MediaCatalogItem } from "../domain/project";
 import { registerMediaPreviewImage } from "../application/mediaPreviewImages";
+import missingImageSymbol from "../ui/missingImageSymbol.svg";
 import "./MediaThumbnail.css";
 
 interface MediaPreviewGeometry {
@@ -22,6 +23,7 @@ interface MediaThumbnailProps {
   loading?: "eager" | "lazy";
   media: Pick<MediaCatalogItem, "sourceHeightPx" | "sourceWidthPx">;
   previewUrl?: string;
+  missing?: boolean;
 }
 
 /**
@@ -36,6 +38,7 @@ export function MediaThumbnail({
   loading = "lazy",
   media,
   previewUrl,
+  missing = false,
 }: MediaThumbnailProps) {
   const imageRef = useRef<HTMLImageElement>(null);
   useEffect(() => {
@@ -58,6 +61,7 @@ export function MediaThumbnail({
         .filter(Boolean)
         .join(" ")}
       data-has-preview={String(Boolean(previewUrl))}
+      data-missing={String(missing && !previewUrl)}
       data-portrait={String(geometry.isPortrait)}
       style={
         {
@@ -85,6 +89,9 @@ export function MediaThumbnail({
             });
           }}
         />
+      ) : missing ? (
+        <span aria-hidden="true" className="media-preview-thumbnail__missing-symbol"
+          style={{ backgroundImage: `url(${missingImageSymbol})` }} />
       ) : null}
       {children}
     </span>

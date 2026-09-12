@@ -54,6 +54,16 @@ imagem ausente e atua no item clicado, preservando uma seleção múltipla
 existente. A ação respeita os bloqueios de operação e deixa de aparecer quando
 o Original retorna. A nova tentativa para Arquivo indisponível mantém seu fluxo.
 
+Para Arquivo ausente sem Cache, o placeholder usa fundo cinza quente uniforme
+(`#efede8`) e símbolo de imagem central (`#aaa397`). Na miniatura, conserva a
+proporção da mídia e a moldura branca, sem texto; o indicador quadrado de ausência
+permanece no canto superior direito. No Frame da Lâmina, o mesmo símbolo acompanha
+o texto `Imagem ausente` (`#7d766a`), sem indicador no canto. Símbolo e texto cabem
+no Frame, reduzindo juntos nos tamanhos pequenos, sem acompanhar Pan, Zoom ou
+rotação da Foto. A representação é exclusiva da interação e não muda a geometria
+ou o conteúdo persistido. Cache disponível continua mostrando a Foto; Frame
+vazio, carregamento e Arquivo indisponível mantêm suas apresentações próprias.
+
 ## Importação e gestos
 
 Fotos e Decorativos usam a mesma tentativa nativa. A aba é capturada ao iniciar

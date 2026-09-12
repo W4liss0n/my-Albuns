@@ -897,6 +897,9 @@ test.each([
   expect(status.textContent).toBe("");
   expect(status).toHaveAttribute("title", expect.stringContaining("Arquivo ausente"));
   expect(card.querySelector("img")?.getAttribute("src") ?? null).toBe(url);
+  expect(card.querySelector(".media-preview-thumbnail"))
+    .toHaveAttribute("data-missing", String(!url));
+  expect(card.querySelector(".media-preview-thumbnail__missing-symbol") !== null).toBe(!url);
   expect(screen.queryByRole("button", { name: /Religar/ })).not.toBeInTheDocument();
   fireEvent.doubleClick(card);
   if (kind === "photo") expect(onFillPhoto).toHaveBeenCalledWith("missing");

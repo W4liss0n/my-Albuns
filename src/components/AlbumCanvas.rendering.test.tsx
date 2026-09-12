@@ -1490,6 +1490,28 @@ test("never draws a synthetic photo while opening the project and loading its re
   expect(pixiLifecycle.spriteTextures).toEqual([texture, texture]);
 });
 
+test("shows the missing-image UI only after confirmed absence and retires it when Cache arrives", async () => {
+  const before = structuredClone(interactiveComposition);
+  const view = renderCanvas({ compositionPlan: interactiveComposition });
+  await finishPixiInitialization();
+  expect(pixiLifecycle.displays.some((node) => node.label.startsWith("frame-missing-image"))).toBe(false);
+  view.rerenderCanvas({ missingMediaIds: new Set(["media-001"]) });
+  const missing = displayWithLabel("frame-missing-image-frame-001");
+  expect(missing.children).toHaveLength(2);
+  expect(displayWithLabel("frame-missing-image-label-frame-001")).toMatchObject({ text: "Imagem ausente" });
+  expect(displayWithLabel("frame-missing-image-fill-frame-001")).toMatchObject({
+    fillStyles: [{ color: 0xefede8 }],
+  });
+  const frame = interactiveComposition.sheets[0].frames[0];
+  expect(missing.position).toEqual(expect.objectContaining({ x: frame.clipRect.width / 2000, y: frame.clipRect.height / 2000 }));
+  expect(interactiveComposition).toEqual(before);
+  view.rerenderCanvas({ mediaPreviewUrls: { "media-001": "http://myalbuns-cache.localhost/recovered.jpg" } });
+  expect(missing.children).toHaveLength(0);
+  const texture = { label: "recovered-cache" };
+  await act(async () => pixiLifecycle.resolveAssetLoads[0](texture));
+  expect(pixiLifecycle.spriteTextures).toEqual([texture, texture]);
+});
+
 test("materializes a reduced Cache preview as the Canvas texture", async () => {
   const texture = { label: "cache-preview" };
   const logEvents: LogEvent[] = [];
