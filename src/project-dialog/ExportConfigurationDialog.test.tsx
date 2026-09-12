@@ -60,3 +60,17 @@ test("contextual export remains an interval even when the album has only one she
   fireEvent.keyDown(screen.getByLabelText("Lâmina inicial"), { key: "Escape" });
   expect(onAction).toHaveBeenCalledWith("dismissExport");
 });
+
+test("wraps keyboard navigation through the selected scope without leaving the dialog", async () => {
+  const user = userEvent.setup();
+  render(<><button>Fora do diálogo</button><ExportConfigurationDialog state={{ ...state,
+    options: { ...state.options, scope: "range", sheetIds: ["middle"] },
+  }} onAction={vi.fn()} /></>);
+  const interval = screen.getByLabelText("Intervalo de lâminas");
+  expect(interval).toHaveFocus();
+  await user.tab({ shift: true });
+  expect(screen.getByRole("button", { name: "Exportar" })).toHaveFocus();
+  await user.tab();
+  expect(interval).toHaveFocus();
+  expect(interval).toBeChecked();
+});

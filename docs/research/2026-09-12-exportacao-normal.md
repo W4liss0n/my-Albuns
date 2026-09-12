@@ -66,6 +66,11 @@ O formulário segue os seletores segmentados da referência de janelas, os campo
 e o slider compartilhados do editor. Os quatro grupos têm rótulos alinhados,
 separadores discretos e um rodapé com contagem, formato e modo de saída.
 
+A navegação circular por Tab considera a opção marcada de cada grupo de rádio,
+inclusive quando a exportação abre diretamente em um intervalo. O comportamento
+foi reproduzido no Edge e coberto por teste de teclado, conforme o
+[padrão de navegação do W3C](https://www.w3.org/WAI/ARIA/apg/patterns/radio/).
+
 As evidências geradas ficam fora do Git em `.scratch/normal-export-rendering/`
 e `.scratch/ui-acceptance/normal-export-styled/`. Os resultados finais dos
 ensaios e da revisão acompanham a entrega; capturas não equivalem à aprovação
