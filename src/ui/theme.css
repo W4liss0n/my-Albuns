@@ -78,6 +78,8 @@
   --ui-font-size-action: 12px;
   --ui-font-size-control: 12.5px;
   --ui-font-size-heading: 13px;
+  --ui-font-size-form-control: 14px;
+  --ui-font-size-form-heading: 16px;
   --ui-font-mono: ui-monospace, "SFMono-Regular", Consolas, monospace;
   --ui-panel-surface: #f7f6f2;
 }

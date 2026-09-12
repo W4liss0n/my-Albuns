@@ -14,11 +14,11 @@ test("exports only the selected continuous sheets and counts active pages for PD
   const user = userEvent.setup(); const onAction = vi.fn();
   render(<ExportConfigurationDialog state={state} onAction={onAction} />);
   expect(screen.getByText("3 arquivos")).toBeInTheDocument();
-  await user.click(screen.getByLabelText("Por página"));
+  await user.click(screen.getByLabelText("Exportar como páginas simples"));
   expect(screen.getByText("4 arquivos")).toBeInTheDocument();
-  await user.click(screen.getByLabelText("Intervalo de lâminas"));
+  await user.click(screen.getByLabelText("Intervalo personalizado"));
   fireEvent.change(screen.getByLabelText("Lâminas do intervalo"), { target: { value: "2" } });
-  await user.click(screen.getByLabelText("PDF"));
+  await user.selectOptions(screen.getByLabelText("Formato de exportação"), "pdf");
   expect(screen.getByText("1 PDF · 2 páginas")).toBeInTheDocument();
   expect(screen.queryByRole("slider")).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Exportar" }));
@@ -34,7 +34,7 @@ test("JPEG quality is local to an opening, restores on double click and is omitt
   fireEvent.doubleClick(screen.getByRole("slider"));
   expect(screen.getByRole("slider")).toHaveValue("100");
   fireEvent.change(screen.getByRole("slider"), { target: { value: "72" } });
-  await user.click(screen.getByLabelText("PNG")); await user.click(screen.getByRole("button", { name: "Exportar" }));
+  await user.selectOptions(screen.getByLabelText("Formato de exportação"), "png"); await user.click(screen.getByRole("button", { name: "Exportar" }));
   expect(onAction).toHaveBeenLastCalledWith({ configureExport: { ...state.options, format: { kind: "png" } } });
   view.unmount(); render(<ExportConfigurationDialog state={state} onAction={onAction} />);
   expect(screen.getByRole("slider")).toHaveValue("100");
@@ -55,36 +55,36 @@ test("contextual export remains an interval even when the album has only one she
     sheets: [{ sheetId: "middle", number: 1, pageCount: 2 }],
     options: { ...state.options, scope: "range", sheetIds: ["middle"] },
   }} onAction={onAction} />);
-  expect(screen.getByLabelText("Intervalo de lâminas")).toBeChecked();
+  expect(screen.getByLabelText("Intervalo personalizado")).toBeChecked();
   fireEvent.keyDown(screen.getByLabelText("Lâminas do intervalo"), { key: "Escape" });
   expect(onAction).toHaveBeenCalledWith("dismissExport");
 });
 
-test("wraps keyboard navigation through the selected mode without leaving the dialog", async () => {
+test("wraps keyboard navigation from the destination without leaving the dialog", async () => {
   const user = userEvent.setup();
   render(<><button>Fora do diálogo</button><ExportConfigurationDialog state={{ ...state,
     options: { ...state.options, scope: "range", sheetIds: ["middle"], mode: "page" },
   }} onAction={vi.fn()} /></>);
-  const mode = screen.getByLabelText("Por página");
-  expect(mode).toHaveFocus();
+  const destination = screen.getByLabelText("Pasta de destino");
+  expect(destination).toHaveFocus();
   await user.tab({ shift: true });
   expect(screen.getByRole("button", { name: "Exportar" })).toHaveFocus();
   await user.tab();
-  expect(mode).toHaveFocus();
-  expect(mode).toBeChecked();
+  expect(destination).toHaveFocus();
+  expect(screen.getByLabelText("Exportar como páginas simples")).toBeChecked();
 });
 
-test("exports the whole album by default and restores it when the interval is unchecked", async () => {
+test("exports all sheets by default and restores them after selecting a custom interval", async () => {
   const user = userEvent.setup(); const onAction = vi.fn();
   render(<ExportConfigurationDialog state={state} onAction={onAction} />);
-  const intervalToggle = screen.getByRole("checkbox", { name: "Intervalo de lâminas" });
+  const intervalToggle = screen.getByRole("radio", { name: "Intervalo personalizado" });
   expect(intervalToggle).not.toBeChecked();
-  expect(screen.queryByText("Álbum inteiro")).not.toBeInTheDocument();
+  expect(screen.getByRole("radio", { name: "Todas as lâminas" })).toBeChecked();
   expect(screen.getByLabelText("Lâminas do intervalo")).toBeDisabled();
   await user.click(intervalToggle);
   fireEvent.change(screen.getByLabelText("Lâminas do intervalo"), { target: { value: "3-2" } });
   expect(screen.getByRole("button", { name: "Exportar" })).toBeDisabled();
-  await user.click(intervalToggle);
+  await user.click(screen.getByRole("radio", { name: "Todas as lâminas" }));
   await user.click(screen.getByRole("button", { name: "Exportar" }));
   expect(onAction).toHaveBeenLastCalledWith({ configureExport: state.options });
 });

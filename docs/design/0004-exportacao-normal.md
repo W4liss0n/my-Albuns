@@ -12,27 +12,42 @@ A tela de Exportação reúne somente as decisões necessárias para gerar a sa�
 
 ## Estrutura do diálogo
 
-A Exportação normal usa um único diálogo modal, sem uma linha interna de título
-`Exportar`, com três grupos principais:
+A Exportação normal usa um único diálogo modal com largura inicial de 800 px,
+sem uma linha interna de título `Exportar`. A proposta abaixo foi aprovada
+pelo usuário como refinamento da referência visual do projeto:
 
-1. `Modo`: `Por lâmina` ou `Por página`;
-2. `Formato`: `JPEG`, `PNG` ou `PDF`;
-3. `Destino`: pasta padrão calculada ou outra pasta local, UNC, mapeada ou longa escolhida pelo usuário.
+![Proposta aprovada para a Exportação normal](assets/0004-exportacao-aprovada.png)
 
-Abaixo de Destino, `Intervalo de lâminas` é uma opção marcável com um único
-campo ao lado. Desmarcada, exporta o álbum inteiro e desabilita o campo;
-não existe botão `Álbum inteiro`. Marcada, aceita uma lâmina (`3`) ou uma
-faixa contínua (`3-8`). O campo preserva o texto ao desmarcar a opção.
+Os blocos têm títulos acima dos controles, margens laterais amplas e espaço
+entre eles, na seguinte ordem:
+
+1. `Destino da exportação`: campo de pasta e botão `Escolher…` na mesma linha;
+2. `Formato de exportação`: seletor `JPEG`, `PNG` ou `PDF`, acompanhado do
+   slider e percentual de qualidade quando o formato é JPEG;
+3. `Seleção de lâminas`: opções exclusivas `Todas as lâminas` e
+   `Intervalo personalizado`, uma abaixo da outra. O intervalo tem um único
+   campo ao lado. Na mesma linha, à direita, fica a opção independente
+   `Exportar como páginas simples`.
+
+`Todas as lâminas` é o padrão. O campo de intervalo permanece desabilitado
+nessa seleção e preserva o texto ao alternar. O intervalo aceita uma lâmina
+(`3`) ou uma faixa contínua (`3-8`). Páginas simples desmarcado corresponde
+à saída por lâmina; marcado corresponde à saída por página. Em janelas mais
+estreitas, a opção de páginas simples passa para a linha seguinte.
 
 O rodapé fixo apresenta a quantidade calculada de arquivos para JPEG/PNG ou de páginas para PDF, além de `Cancelar` e `Exportar`.
 
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
-│  Modo         Por lâmina | Por página                            │
-│  Formato      JPEG | PNG | PDF                                   │
-│  Qualidade    ─────────●──────        somente para JPEG          │
-│  Destino      [ caminho calculado ou escolhido ] [ Escolher... ] │
-│  □ Intervalo de lâminas  [ 1-28 ]                                │
+│  Destino da exportação                                          │
+│  [ caminho calculado ou escolhido ]                [ Escolher ] │
+│                                                                 │
+│  Formato de exportação                                          │
+│  [ JPEG ▾ ]    Qualidade: ─────────● 100%                         │
+│                                                                 │
+│  Seleção de lâminas                                             │
+│  ● Todas as lâminas                                             │
+│  ○ Intervalo personalizado [ 3-8 ]    □ Páginas simples          │
 ├──────────────────────────────────────────────────────────────────┤
 │  28 arquivos                              Cancelar   Exportar     │
 └──────────────────────────────────────────────────────────────────┘
@@ -51,10 +66,10 @@ Quando o formato do lote é JPEG, a codificação usa obrigatoriamente qualidade
 ## Entrada contextual
 
 `Exportar Lâmina`, acionado pelo menu de contexto, abre o mesmo diálogo com
-`Intervalo de lâminas` marcado e o número da Lâmina de origem preenchido no
+`Intervalo personalizado` selecionado e o número da Lâmina de origem preenchido no
 campo. Todas as demais opções continuam editáveis antes de iniciar.
 
-Quando `Intervalo de Lâminas` está selecionado, o diálogo informa que a operação não remove arquivos fora do intervalo e não consegue inferir o modo das saídas já existentes pelo nome. Uma Exportação integral é a única operação que restabelece um conjunto completo autoritativo no destino.
+Quando `Intervalo personalizado` está selecionado, o diálogo informa que a operação não remove arquivos fora do intervalo e não consegue inferir o modo das saídas já existentes pelo nome. Uma Exportação integral é a única operação que restabelece um conjunto completo autoritativo no destino.
 
 ## Pré-validação
 

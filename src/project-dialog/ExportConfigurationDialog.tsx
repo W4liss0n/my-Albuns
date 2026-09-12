@@ -1,7 +1,8 @@
 import { useEffect, useId, useRef, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import type { ProjectDialogAction, ProjectDialogState } from "../application/projectDialogPort";
 import type { ExportFormat } from "../application/normalExport";
-import { ActionButton } from "../ui";
+import { ActionButton, AppIcon } from "../ui";
 import { DialogWindowFrame } from "../ui/DialogWindowFrame";
 import { DialogFocusScope } from "../ui/DialogFocusScope";
 import { TextInput } from "../ui/TextInput";
@@ -19,7 +20,7 @@ export function ExportConfigurationDialog({ state, onAction }: {
   const [interval, setInterval] = useState(() => {
     const first = state.sheets.find(sheet => sheet.sheetId === state.options.sheetIds[0])?.number ?? 1;
     const last = state.sheets.find(sheet => sheet.sheetId === state.options.sheetIds[state.options.sheetIds.length - 1])?.number ?? state.sheets.length;
-    return first === last ? String(first) : `${first}-${last}`;
+    return state.options.scope === "album" ? "" : first === last ? String(first) : `${first}-${last}`;
   });
   const [quality, setQuality] = useState(100);
   const id = useId();
@@ -48,8 +49,7 @@ export function ExportConfigurationDialog({ state, onAction }: {
       <DialogWindowFrame layout="form" title="Exportar" actions={
         <>
           <div className="export-configuration__summary" aria-live="polite">
-            <strong>{summary}</strong>
-            <span>{options.format.kind.toUpperCase()} · {options.mode === "sheet" ? "Por lâmina" : "Por página"}</span>
+            <span>{summary}</span>{options.format.kind !== "pdf" && <> · {options.format.kind.toUpperCase()}</>}
           </div>
           <ActionButton disabled={state.busy} onClick={() => onAction("dismissExport")}>Cancelar</ActionButton>
           <ActionButton variant="primary" disabled={state.busy || count === 0 || !options.destination.trim()}
@@ -57,54 +57,60 @@ export function ExportConfigurationDialog({ state, onAction }: {
         </>
       }>
         <form className="export-configuration" onSubmit={event => event.preventDefault()}>
-          <fieldset className="export-configuration__section" disabled={state.busy}>
-            <legend>Modo</legend>
-            <div className="export-configuration__choices">
-              <label><input ref={options.mode === "sheet" ? initialFocus : undefined} type="radio" name={`${id}-mode`} checked={options.mode === "sheet"}
-                onChange={() => setOptions(current => ({ ...current, mode: "sheet" }))} /><span>Por lâmina</span></label>
-              <label><input ref={options.mode === "page" ? initialFocus : undefined} type="radio" name={`${id}-mode`} checked={options.mode === "page"}
-                onChange={() => setOptions(current => ({ ...current, mode: "page" }))} /><span>Por página</span></label>
-            </div>
-          </fieldset>
-
-          <fieldset className="export-configuration__section" disabled={state.busy}>
-            <legend>Formato</legend>
-            <div className="export-configuration__choices export-configuration__formats">
-              {(["jpeg", "png", "pdf"] as const).map(kind => <label key={kind}>
-                <input type="radio" name={`${id}-format`} checked={options.format.kind === kind} onChange={() => setFormat(kind)} />
-                <span>{kind.toUpperCase()}</span>
-              </label>)}
-            </div>
-            {options.format.kind === "jpeg" && <div className="export-configuration__quality ui-range-control">
-              <div className="ui-range-control__heading">
-                <label htmlFor={`${id}-quality`}>Qualidade JPEG</label><output htmlFor={`${id}-quality`}>{quality}%</output>
-              </div>
-              <input id={`${id}-quality`} className="ui-range" aria-label="Qualidade JPEG" type="range"
-                min={1} max={100} step={1} value={quality} onChange={event => setQuality(Number(event.target.value))}
-                onDoubleClick={() => setQuality(100)} title="Dois cliques para restaurar 100%" />
-            </div>}
-          </fieldset>
-
           <fieldset className="export-configuration__section export-configuration__section--destination" disabled={state.busy}>
-            <legend>Destino</legend>
+            <legend>Destino da exportação</legend>
             <div className="export-configuration__destination">
-              <TextInput className="ui-field-control" aria-label="Pasta de destino" value={options.destination}
+              <TextInput ref={initialFocus} className="ui-field-control" aria-label="Pasta de destino" value={options.destination}
                 title={options.destination} onChange={event => setOptions(current => ({ ...current, destination: event.target.value }))} />
-              <ActionButton onClick={() => onAction({ chooseExportDestination: { ...request, sheetIds: options.sheetIds } })}>Escolher…</ActionButton>
+              <ActionButton variant="primary" onClick={() => onAction({ chooseExportDestination: { ...request, sheetIds: options.sheetIds } })}>Escolher…</ActionButton>
             </div>
           </fieldset>
-          <fieldset className="export-configuration__interval" disabled={state.busy}>
-            <div className="export-configuration__range">
-              <label className="export-configuration__scope-toggle">
-                <input type="checkbox" checked={scope === "range"}
-                  onChange={event => setScope(event.target.checked ? "range" : "album")} />
-                Intervalo de lâminas
+
+          <fieldset className="export-configuration__section" disabled={state.busy}>
+            <legend>Formato de exportação</legend>
+            <div className="export-configuration__format-row">
+              <div className="export-configuration__format-select">
+                <select className="ui-field-control" aria-label="Formato de exportação" value={options.format.kind}
+                  onChange={event => setFormat(event.target.value as ExportFormat["kind"])}>
+                  <option value="jpeg">JPEG</option><option value="png">PNG</option><option value="pdf">PDF</option>
+                </select>
+                <AppIcon icon={ChevronDown} size={16} />
+              </div>
+              {options.format.kind === "jpeg" && <div className="export-configuration__quality">
+                <label htmlFor={`${id}-quality`}>Qualidade:</label>
+                <input id={`${id}-quality`} className="ui-range" aria-label="Qualidade JPEG" type="range"
+                  min={1} max={100} step={1} value={quality} onChange={event => setQuality(Number(event.target.value))}
+                  onDoubleClick={() => setQuality(100)} title="Dois cliques para restaurar 100%" />
+                <output htmlFor={`${id}-quality`}>{quality}%</output>
+              </div>}
+            </div>
+          </fieldset>
+
+          <fieldset className="export-configuration__section" disabled={state.busy}>
+            <legend>Seleção de lâminas</legend>
+            <div className="export-configuration__selection">
+              <label className="export-configuration__choice">
+                <input type="radio" name={`${id}-scope`} checked={scope === "album"} onChange={() => setScope("album")} />
+                Todas as lâminas
               </label>
-              <TextInput className="ui-field-control" aria-label="Lâminas do intervalo"
-                aria-invalid={scope === "range" && !validRange} disabled={scope !== "range"}
-                aria-describedby={scope === "range" ? `${id}-range-help` : undefined}
-                placeholder="Ex.: 3-8" title="Uma lâmina (3) ou um intervalo (3-8)"
-                value={interval} onChange={event => setInterval(event.target.value)} />
+              <div className="export-configuration__selection-row">
+                <div className="export-configuration__range">
+                  <label className="export-configuration__choice">
+                    <input type="radio" name={`${id}-scope`} checked={scope === "range"} onChange={() => setScope("range")} />
+                    Intervalo personalizado
+                  </label>
+                  <TextInput className="ui-field-control" aria-label="Lâminas do intervalo"
+                    aria-invalid={scope === "range" && !validRange} disabled={scope !== "range"}
+                    aria-describedby={scope === "range" ? `${id}-range-help` : undefined}
+                    placeholder="Ex.: 3-8" title="Uma lâmina (3) ou um intervalo (3-8)"
+                    value={interval} onChange={event => setInterval(event.target.value)} />
+                </div>
+                <label className="export-configuration__choice export-configuration__page-mode">
+                  <input type="checkbox" checked={options.mode === "page"}
+                    onChange={event => setOptions(current => ({ ...current, mode: event.target.checked ? "page" : "sheet" }))} />
+                  Exportar como páginas simples
+                </label>
+              </div>
             </div>
             {scope === "range" && <div id={`${id}-range-help`} className="export-configuration__range-help">
               {!validRange && <p role="alert" className="export-configuration__error">

@@ -111,7 +111,7 @@ impl ProjectDialogState {
     fn initial_dimensions(&self) -> (f64, f64) {
         match self {
             Self::ExportConfiguration { .. } => (
-                600.0,
+                800.0,
                 440.0 + native_dialog_window::OWNED_WINDOW_TITLEBAR_HEIGHT,
             ),
             Self::ExportConflicts { .. } => (
