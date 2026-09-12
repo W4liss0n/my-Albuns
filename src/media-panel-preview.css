@@ -12,3 +12,7 @@
   width: calc(100% - 313px);
   height: 200px;
 }
+
+.media-panel-preview[data-acceptance-surface="editor"]:has(.ui-context-menu) {
+  height: 240px;
+}

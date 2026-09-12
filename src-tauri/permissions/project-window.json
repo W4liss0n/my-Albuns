@@ -24,6 +24,7 @@
           "slider_double_click_time",
           "frame_drag_threshold",
           "relink_media",
+          "replace_media",
           "retry_unavailable_media",
           "undo_project",
           "redo_project",
