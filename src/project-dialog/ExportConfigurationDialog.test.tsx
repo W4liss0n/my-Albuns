@@ -7,7 +7,7 @@ import type { ProjectDialogState } from "../application/projectDialogPort";
 const state: Extract<ProjectDialogState, { kind: "exportConfiguration" }> = {
   kind: "exportConfiguration", busy: false, message: "",
   sheets: [{ sheetId: "opening", number: 1, pageCount: 1 }, { sheetId: "middle", number: 2, pageCount: 2 }, { sheetId: "closing", number: 3, pageCount: 1 }],
-  options: { scope: "album", sheetIds: ["opening", "middle", "closing"], mode: "sheet", format: { kind: "jpeg", quality: 100 }, destination: "C:/Álbuns/Teste", overwrite: false },
+  options: { scope: "album", sheetIds: ["opening", "middle", "closing"], mode: "sheet", format: { kind: "jpeg", quality: 100 }, destination: "C:/Álbuns/Teste", conflictPolicy: "ask" as const },
 };
 
 test("exports only the selected continuous sheets and counts active pages for PDF", async () => {

@@ -76,6 +76,7 @@ export type ProjectDialogAction =
   | { configureExport: NormalExportOptions }
   | { chooseExportDestination: NormalExportOptions }
   | "confirmExportOverwrite"
+  | "skipExportConflicts"
   | "relinkExportMedia" | "retryExportMedia"
   | "cancelMediaRemoval"
   | "removeAllMedia"

@@ -125,7 +125,7 @@ export type ExportOutcome =
       result: ExportResult;
     }
   | {
-      status: "cancelled";
+      status: "cancelled" | "skipped";
     };
 
 export type ExportCancelStatus =

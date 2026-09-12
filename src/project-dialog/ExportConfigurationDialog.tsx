@@ -38,7 +38,7 @@ export function ExportConfigurationDialog({ state, onAction }: {
     ? state.sheets.filter(sheet => sheet.number >= start && sheet.number <= end) : [];
   const count = selected.reduce((sum, sheet) => sum + (options.mode === "sheet" ? 1 : sheet.pageCount), 0);
   const request = {
-    ...options, scope, sheetIds: selected.map(sheet => sheet.sheetId), overwrite: false,
+    ...options, scope, sheetIds: selected.map(sheet => sheet.sheetId), conflictPolicy: "ask" as const,
     format: options.format.kind === "jpeg" ? { kind: "jpeg" as const, quality } : options.format,
   };
   const setFormat = (kind: ExportFormat["kind"]) => setOptions(current => ({

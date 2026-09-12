@@ -176,7 +176,7 @@ test("native media preflight failures reach the recovery screen before any start
 
 test("normal export sends the complete selection and maps overwrite conflicts without starting progress", async () => {
   const options = { scope: "range" as const, sheetIds: ["sheet-002", "sheet-003"], mode: "page" as const,
-    format: { kind: "jpeg" as const, quality: 64 }, destination: "C:/Álbuns/Exportados", overwrite: false };
+    format: { kind: "jpeg" as const, quality: 64 }, destination: "C:/Álbuns/Exportados", conflictPolicy: "ask" as const };
   const conflicts = ["Álbum_003.jpg", "Álbum_004.jpg"];
   vi.mocked(invoke).mockRejectedValueOnce({ code: "export_conflict", conflicts });
   const event = vi.fn();
@@ -184,6 +184,17 @@ test("normal export sends the complete selection and maps overwrite conflicts wi
   await expect(attempt.completion).rejects.toEqual(new ExportConflictsError(conflicts));
   expect(invoke).toHaveBeenCalledWith("export_project", { options, onEvent: tauriBoundary.channels[0] });
   expect(event).not.toHaveBeenCalled();
+});
+
+test("an entirely skipped export completes without progress or fabricated output dimensions", async () => {
+  const options = { scope: "album" as const, sheetIds: [exportSelection.sheetId], mode: "sheet" as const,
+    format: { kind: "pdf" as const }, destination: "C:/Exportados", conflictPolicy: "skip" as const };
+  vi.mocked(invoke).mockResolvedValueOnce(null);
+  const event = vi.fn();
+  const attempt = tauriExportPipelinePort.startSheet({ ...exportSelection, options }, event);
+  await expect(attempt.completion).resolves.toEqual({ status: "skipped" });
+  expect(event).not.toHaveBeenCalled();
+  await expect(attempt.cancel()).resolves.toBe("not_found");
 });
 
 test("forwards Export events without exposing the backend operation id", () => {

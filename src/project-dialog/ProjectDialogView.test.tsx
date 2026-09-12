@@ -22,6 +22,18 @@ test("export media recovery offers distinct actions without a Continue step", as
   expect(onAction).toHaveBeenCalledTimes(2);
 });
 
+test("export conflicts use a generic confirmation with skip, replace and cancel", async () => {
+  const user = userEvent.setup();
+  const onAction = vi.fn();
+  render(<ProjectDialogView onAction={onAction} state={{ kind: "exportConflicts", files: ["Album_001.png", "Album_002.png"] }} />);
+  expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  expect(screen.queryByText("Album_001.png")).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Ignorar" }));
+  await user.click(screen.getByRole("button", { name: "Substituir" }));
+  await user.click(screen.getByRole("button", { name: "Cancelar" }));
+  expect(onAction.mock.calls).toEqual([["skipExportConflicts"], ["confirmExportOverwrite"], ["dismissExport"]]);
+});
+
 test("custom Layout deletion explains its global scope and offers Cancel and Delete", async () => {
   const user = userEvent.setup();
   const onAction = vi.fn();

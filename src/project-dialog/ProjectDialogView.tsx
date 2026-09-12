@@ -33,11 +33,11 @@ export function ProjectDialogView({
 
   switch (state.kind) {
     case "exportConfiguration": return <ExportConfigurationDialog state={state} onAction={onAction} />;
-    case "exportConflicts": return <ProblemsDialog title="Arquivos já existentes" description="Confirme a atualização destes arquivos. No álbum inteiro, saídas antigas que excedem a nova seleção serão removidas após a publicação."
-      closeLabel="Cancelar"
-      columns={["Arquivo"]} rows={state.files.map(file => [file])} onClose={() => onAction("dismissExport")}
-      actions={<ActionButton variant="primary" onClick={() => onAction("confirmExportOverwrite")}>Sobrescrever todos</ActionButton>}
-      />;
+    case "exportConflicts": return <ConfirmationDialog title="Já existe uma exportação"
+      description="Há arquivos exportados na pasta de destino. Deseja ignorar os existentes ou substituí-los?"
+      leadingAction={{ label: "Ignorar", onClick: () => onAction("skipExportConflicts") }}
+      cancelAction={{ label: "Cancelar", onClick: () => onAction("dismissExport") }}
+      confirmAction={{ label: "Substituir", onClick: () => onAction("confirmExportOverwrite") }} />;
     case "mediaRemovalConfirmation":
       return <ConfirmationDialog title={`Remover ${state.count} ${state.mediaKind === "photo" ? (state.count === 1 ? "Foto" : "Fotos") : (state.count === 1 ? "Decorativo" : "Decorativos")}?`} tone="danger"
         description={state.mediaKind === "photo"

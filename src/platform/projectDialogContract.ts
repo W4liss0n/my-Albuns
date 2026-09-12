@@ -23,6 +23,7 @@ type IpcProjectDialogProgressKind = IpcProjectDialogProgress["kind"];
 
 const projectDialogActionMap = {
   confirmExportOverwrite: "confirmExportOverwrite",
+  skipExportConflicts: "skipExportConflicts",
   relinkExportMedia: "relinkExportMedia", retryExportMedia: "retryExportMedia",
   cancelMediaRemoval: "cancelMediaRemoval",
   removeAllMedia: "removeAllMedia",

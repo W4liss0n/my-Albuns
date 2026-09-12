@@ -115,8 +115,8 @@ impl ProjectDialogState {
                 440.0 + native_dialog_window::OWNED_WINDOW_TITLEBAR_HEIGHT,
             ),
             Self::ExportConflicts { .. } => (
-                600.0,
-                340.0 + native_dialog_window::OWNED_WINDOW_TITLEBAR_HEIGHT,
+                520.0,
+                180.0 + native_dialog_window::OWNED_WINDOW_TITLEBAR_HEIGHT,
             ),
             Self::MediaRemovalConfirmation { .. } => (
                 660.0,

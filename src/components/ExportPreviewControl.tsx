@@ -96,9 +96,14 @@ export const ExportPreviewControl = forwardRef<
       return;
     }
     switch (action) {
-      case "confirmExportOverwrite": {
+      case "confirmExportOverwrite":
+      case "skipExportConflicts": {
         const selected = attemptedSelection.current;
-        if (lastDialogState.current?.kind === "exportConflicts" && selected?.options) startSelectedExport({ ...selected, options: { ...selected.options, overwrite: true } });
+        if (lastDialogState.current?.kind === "exportConflicts" && selected?.options) {
+          startSelectedExport({ ...selected, options: { ...selected.options,
+            conflictPolicy: action === "skipExportConflicts" ? "skip" : "replace",
+          } });
+        }
         break;
       }
       case "relinkExportMedia": void recoverMedia(true); break;
@@ -143,7 +148,7 @@ export const ExportPreviewControl = forwardRef<
     beginInteraction();
     setPhase("configuring");
     const generation = ++recoveryGeneration.current;
-    const options: NormalExportOptions = { scope: scope === "album" ? "album" : "range", sheetIds: scope === "album" ? sheets.map(sheet => sheet.sheetId) : [selection.sheetId], mode: "sheet", format: { kind: "jpeg", quality: 100 }, destination: "", overwrite: false };
+    const options: NormalExportOptions = { scope: scope === "album" ? "album" : "range", sheetIds: scope === "album" ? sheets.map(sheet => sheet.sheetId) : [selection.sheetId], mode: "sheet", format: { kind: "jpeg", quality: 100 }, destination: "", conflictPolicy: "ask" as const };
     // Present once the initial fields are ready so opening never shrinks a busy form.
     void exportPipelinePort.defaultDestination().then(destination => {
       if (generation === recoveryGeneration.current) presentDialog({ kind: "exportConfiguration", sheets, options: { ...options, destination }, busy: false, message: "" });
@@ -228,8 +233,8 @@ export const ExportPreviewControl = forwardRef<
         const finished = finishActiveAttempt(attemptId);
         if (!finished) return;
 
-        if (outcome.status === "cancelled") {
-          if (finished.started) {
+        if (outcome.status === "cancelled" || outcome.status === "skipped") {
+          if (outcome.status === "cancelled" && finished.started) {
             if (dialogPresentationFailed.current) {
               setPhase("idle");
               lastDialogState.current = undefined;

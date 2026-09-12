@@ -72,7 +72,11 @@ test("does not open configuration if the control unmounts while resolving its de
   expect(onActiveChange.mock.calls).toEqual([[true], [false]]);
 });
 
-test("normal export waits for configuration and retries the same options after overwrite confirmation", async () => {
+test.each([
+  ["confirmExportOverwrite", "replace"],
+  ["skipExportConflicts", "skip"],
+  ["dismissExport", null],
+] as const)("normal export retries the same selection after %s", async (action, conflictPolicy) => {
   const dialog = createDialogHarness(); const harness = createExportHarness();
   render(<ExportPreviewControl dialogPort={dialog.port} exportPipelinePort={harness.port} projectId="project-a"
     selection={{ projectName: "Album", sheetId: "second", sheetNumber: 2 }}
@@ -80,15 +84,27 @@ test("normal export waits for configuration and retries the same options after o
   fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
   await waitFor(() => expect(dialog.present).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "exportConfiguration", busy: false })));
   expect(harness.startSheet).not.toHaveBeenCalled();
-  const options = { scope: "range" as const, sheetIds: ["second"], mode: "page" as const, format: { kind: "png" as const }, destination: "C:/Exportados", overwrite: false };
+  const options = { scope: "range" as const, sheetIds: ["second"], mode: "page" as const, format: { kind: "png" as const }, destination: "C:/Exportados", conflictPolicy: "ask" as const };
   dialog.emit({ configureExport: options });
   expect(dialog.present).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "exportConfiguration", busy: true, options }));
   expect(harness.startSheet).toHaveBeenLastCalledWith({ projectName: "Album", sheetId: "second", sheetNumber: 2, options }, expect.any(Function));
   await act(async () => { harness.attempts[0].reject(new ExportConflictsError(["Album_002.png", "Album_003.png"])); });
   expect(dialog.present).toHaveBeenLastCalledWith({ kind: "exportConflicts", files: ["Album_002.png", "Album_003.png"] });
-  dialog.emit("confirmExportOverwrite");
-  expect(harness.startSheet).toHaveBeenLastCalledWith(expect.objectContaining({ options: { ...options, overwrite: true } }), expect.any(Function));
-  dialog.emit("confirmExportOverwrite"); expect(harness.startSheet).toHaveBeenCalledTimes(2);
+  dialog.emit(action);
+  if (conflictPolicy === null) {
+    expect(dialog.dismiss).toHaveBeenCalledTimes(1);
+    expect(harness.startSheet).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "Exportar" })).toBeEnabled();
+    return;
+  }
+  expect(harness.startSheet).toHaveBeenLastCalledWith(expect.objectContaining({ options: { ...options, conflictPolicy } }), expect.any(Function));
+  dialog.emit(action); expect(harness.startSheet).toHaveBeenCalledTimes(2);
+  if (conflictPolicy === "skip") {
+    await act(async () => { harness.attempts[1].resolve({ status: "skipped" }); });
+    expect(dialog.dismiss).toHaveBeenCalledTimes(1);
+    expect(dialog.present.mock.calls.some(([state]) => state.kind === "exportProgress" || state.kind === "exportSuccess")).toBe(false);
+    expect(screen.getByRole("button", { name: "Exportar" })).toBeEnabled();
+  }
 });
 
 interface AttemptHarness {

@@ -472,10 +472,10 @@ export const tauriExportPipelinePort: ExportPipelinePort = {
       });
     };
     const request = options
-      ? invoke<IpcExportResult>("export_project", { options, onEvent })
+      ? invoke<IpcExportResult | null>("export_project", { options, onEvent })
       : invoke<IpcExportResult>("export_sheet", { projectName, sheetId, sheetNumber, onEvent });
     const completion = request
-      .then((result) => ({
+      .then((result) => result === null ? { status: "skipped" as const } : ({
         status: "completed" as const,
         result,
       }))

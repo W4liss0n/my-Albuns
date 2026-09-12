@@ -92,6 +92,17 @@ impl AlbumRenderRequest {
                 sheets.push(unit.sheet_id.clone());
             }
         }
+        // Ignoring existing image files can leave gaps or one side of a spread.
+        // Their identity and order still come from the complete composition.
+        if self.format != RenderFormat::Pdf {
+            sheets = self
+                .snapshot
+                .composition
+                .sheets
+                .iter()
+                .map(|sheet| sheet.sheet_id.clone())
+                .collect();
+        }
         let canonical = [
             myalbuns_core::ExportMode::Sheet,
             myalbuns_core::ExportMode::Page,
@@ -100,7 +111,14 @@ impl AlbumRenderRequest {
         .any(|mode| {
             self.snapshot
                 .export_units(&sheets, mode)
-                .is_ok_and(|expected| expected.iter().eq(units.iter().copied()))
+                .is_ok_and(|expected| {
+                    expected
+                        .iter()
+                        .filter(|unit| {
+                            self.format == RenderFormat::Pdf || indexes.contains(&unit.index)
+                        })
+                        .eq(units.iter().copied())
+                })
         });
         if !canonical {
             return Err(

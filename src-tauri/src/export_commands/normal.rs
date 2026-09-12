@@ -1,5 +1,8 @@
 use super::*;
-use crate::{ipc_contract::NormalExportOptions, product_runtime::PROJECT_WINDOW_LABEL};
+use crate::{
+    ipc_contract::{ExportConflictPolicy, NormalExportOptions},
+    product_runtime::PROJECT_WINDOW_LABEL,
+};
 use tauri::Manager;
 use tauri_plugin_dialog::{DialogExt, FilePath};
 
@@ -68,7 +71,7 @@ pub(crate) async fn export_project(
     cache: State<'_, CacheEngine>,
     processor: State<'_, ImagingProcessor>,
     attempts: State<'_, ExportAttempts>,
-) -> Result<ExportResult, NormalExportError> {
+) -> Result<Option<ExportResult>, NormalExportError> {
     require_owner(&window).map_err(ExportCommandError::failed)?;
     options
         .format
@@ -125,9 +128,9 @@ pub(crate) async fn export_project(
     if !destination.is_absolute() {
         return Err(ExportCommandError::failed("Escolha uma pasta de destino absoluta.").into());
     }
-    let overwrite = options.overwrite;
+    let conflict_policy = options.conflict_policy;
     let plan = tauri::async_runtime::spawn_blocking(move || {
-        let plan = export_pipeline::plan_album(
+        let mut plan = export_pipeline::plan_album(
             snapshot,
             export_pipeline::AlbumExportOptions {
                 protected_originals,
@@ -136,7 +139,7 @@ pub(crate) async fn export_project(
                 mode: options.mode,
                 format: options.format,
                 destination: destination.clone(),
-                authorization: if overwrite {
+                authorization: if conflict_policy == ExportConflictPolicy::Replace {
                     ExportWriteAuthorization::ReplaceConfirmed
                 } else {
                     ExportWriteAuthorization::CreateOnly
@@ -146,7 +149,7 @@ pub(crate) async fn export_project(
             },
         )?;
         let conflicts = plan.conflicts()?;
-        if conflicts.is_empty() || overwrite {
+        if conflicts.is_empty() || conflict_policy != ExportConflictPolicy::Ask {
             std::fs::create_dir_all(&destination).map_err(|error| {
                 export_pipeline::ExportFailure::new(
                     export_pipeline::ExportFailureStage::Prepare,
@@ -154,19 +157,24 @@ pub(crate) async fn export_project(
                 )
             })?;
         }
-        Ok::<_, export_pipeline::ExportFailure>((plan, conflicts))
+        let has_outputs =
+            conflict_policy != ExportConflictPolicy::Skip || plan.skip_existing_outputs()?;
+        Ok::<_, export_pipeline::ExportFailure>((plan, conflicts, has_outputs))
     })
     .await
     .map_err(|error| ExportCommandError::failed(error.to_string()))?
     .map_err(ExportCommandError::from_pipeline)?;
-    let (plan, conflicts) = plan;
-    if !conflicts.is_empty() && !overwrite {
+    let (plan, conflicts, has_outputs) = plan;
+    if !conflicts.is_empty() && conflict_policy == ExportConflictPolicy::Ask {
         let mut error = ExportCommandError::failed("Já existem arquivos no Destino da Exportação.");
         error.code = ExportCommandErrorCode::ExportConflict;
         return Err(NormalExportError {
             error: Box::new(error),
             conflicts,
         });
+    }
+    if !has_outputs {
+        return Ok(None);
     }
     let request_id = plan.request_id().to_owned();
     let attempt = attempts
@@ -182,5 +190,6 @@ pub(crate) async fn export_project(
     };
     run_export(app, window, on_event, logging, cache, processor, prepared)
         .await
+        .map(Some)
         .map_err(Into::into)
 }

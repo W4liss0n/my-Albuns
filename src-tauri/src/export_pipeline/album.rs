@@ -109,6 +109,35 @@ pub(crate) fn plan_album(
 }
 
 impl AlbumExportPlan {
+    /// Keeps original numbering and create-only publication for the remaining files.
+    /// A file appearing after this check must never be silently overwritten.
+    pub(crate) fn skip_existing_outputs(&mut self) -> Result<bool, ExportFailure> {
+        let existing = self.conflicts()?;
+        self.outputs.retain(|(path, _)| {
+            !existing
+                .iter()
+                .any(|name| path.output_path().file_name() == Some(std::ffi::OsStr::new(name)))
+        });
+        self.obsolete_outputs.clear();
+        self.cleanup_confirmed = false;
+        let sheets: std::collections::HashSet<_> = self
+            .outputs
+            .iter()
+            .flat_map(|(_, units)| units.iter().map(|unit| &unit.sheet_id))
+            .collect();
+        let required: std::collections::HashSet<_> = self
+            .snapshot
+            .composition
+            .sheets
+            .iter()
+            .filter(|sheet| sheets.contains(&sheet.sheet_id))
+            .flat_map(|sheet| sheet.referenced_media_ids())
+            .collect();
+        self.sources
+            .retain(|source| required.contains(&source.media_id()));
+        Ok(!self.outputs.is_empty())
+    }
+
     pub(crate) fn request_id(&self) -> &str {
         &self.request_id
     }

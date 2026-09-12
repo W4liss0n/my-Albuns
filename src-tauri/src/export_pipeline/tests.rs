@@ -201,6 +201,150 @@ fn normal_export_prepares_the_entire_set_before_publish_and_cleans_a_failed_set(
 }
 
 #[test]
+fn normal_export_skip_preserves_existing_files_and_numbering_without_orphan_cleanup() {
+    use myalbuns_core::{ExportFormat, ExportMode};
+    for (mode, format) in [
+        (ExportMode::Sheet, ExportFormat::Png),
+        (ExportMode::Page, ExportFormat::Png),
+        (ExportMode::Sheet, ExportFormat::Jpeg { quality: 100 }),
+    ] {
+        for late_conflict in [false, true] {
+            let root = tempfile::tempdir().unwrap();
+            let mut plan = skip_export_plan(root.path(), mode, format.clone());
+            let outputs: Vec<_> = plan
+                .required_paths()
+                .into_iter()
+                .filter(|path| {
+                    path.file_stem()
+                        .unwrap()
+                        .to_string_lossy()
+                        .starts_with("Album_")
+                })
+                .collect();
+            assert!(outputs.len() >= 2);
+            let orphan = root
+                .path()
+                .join(format!("Album_999.{}", format.extension()));
+            std::fs::write(&outputs[0], b"keep-first").unwrap();
+            std::fs::write(&orphan, b"keep-orphan").unwrap();
+            // Replan to include the existing orphan, as the command does on retry.
+            plan = skip_export_plan(root.path(), mode, format.clone());
+            assert!(plan.skip_existing_outputs().unwrap());
+            assert!(!plan.required_paths().contains(&outputs[0]));
+            if late_conflict {
+                std::fs::write(&outputs[1], b"arrived-later").unwrap();
+            }
+            let mut roots = OperationPathContext::new();
+            for path in plan.required_paths() {
+                roots.capture(&path).unwrap();
+            }
+            let mut transport = AlbumTransport {
+                fail: false,
+                prior_output: outputs[0].clone(),
+                prior_bytes: b"keep-first".to_vec(),
+            };
+            let result = tokio::runtime::Runtime::new()
+                .unwrap()
+                .block_on(super::execute_album(
+                    &mut transport,
+                    plan,
+                    &roots.freeze(),
+                    &ExportExecutionControl::default(),
+                    &|_| {},
+                    &InvocationContext::new("skip-existing", None::<String>),
+                ));
+            assert_eq!(std::fs::read(&outputs[0]).unwrap(), b"keep-first");
+            assert_eq!(std::fs::read(&orphan).unwrap(), b"keep-orphan");
+            if late_conflict {
+                assert!(matches!(
+                    result.unwrap_err().stage,
+                    ExportFailureStage::Publish { .. }
+                ));
+                assert_eq!(std::fs::read(&outputs[1]).unwrap(), b"arrived-later");
+            } else {
+                result.unwrap();
+                for (index, output) in outputs.iter().skip(1).enumerate() {
+                    assert_eq!(
+                        std::fs::read(output).unwrap(),
+                        format!("prepared-{index}").as_bytes()
+                    );
+                }
+                let mut retry = skip_export_plan(root.path(), mode, format.clone());
+                assert!(
+                    !retry.skip_existing_outputs().unwrap(),
+                    "all existing outputs finish without rendering"
+                );
+            }
+            assert!(
+                !root
+                    .path()
+                    .join(".myalbuns-export-skip-existing.tmp")
+                    .exists()
+            );
+        }
+    }
+}
+
+#[test]
+fn normal_export_skip_treats_pdf_as_one_file_and_rejects_directory_conflicts() {
+    use myalbuns_core::{ExportFormat, ExportMode};
+    let root = tempfile::tempdir().unwrap();
+    let output = root.path().join("Album.pdf");
+    std::fs::write(&output, b"existing-pdf").unwrap();
+    let mut plan = skip_export_plan(root.path(), ExportMode::Page, ExportFormat::Pdf);
+    assert!(!plan.skip_existing_outputs().unwrap());
+    assert_eq!(std::fs::read(&output).unwrap(), b"existing-pdf");
+    std::fs::remove_file(&output).unwrap();
+    std::fs::create_dir(&output).unwrap();
+    let mut plan = skip_export_plan(root.path(), ExportMode::Page, ExportFormat::Pdf);
+    assert_eq!(
+        plan.skip_existing_outputs().unwrap_err().stage,
+        ExportFailureStage::Plan
+    );
+}
+
+fn skip_export_plan(
+    destination: &std::path::Path,
+    mode: myalbuns_core::ExportMode,
+    format: myalbuns_core::ExportFormat,
+) -> super::AlbumExportPlan {
+    let source = destination.join("original.jpg");
+    if !source.exists() {
+        RgbImage::from_pixel(4, 4, Rgb([20, 50, 90]))
+            .save(&source)
+            .unwrap();
+    }
+    let mut snapshot = productive_snapshot(source.clone());
+    snapshot.project_name = "Album".into();
+    snapshot.composition.sheets.truncate(2);
+    let sheet_ids = snapshot
+        .composition
+        .sheets
+        .iter()
+        .map(|sheet| sheet.sheet_id.clone())
+        .collect();
+    let media_id = snapshot.composition.sheets[0]
+        .referenced_media_ids()
+        .next()
+        .unwrap();
+    super::plan_album(
+        snapshot,
+        super::AlbumExportOptions {
+            protected_originals: vec![source.clone()],
+            sheet_ids,
+            whole_album: true,
+            mode,
+            format,
+            destination: destination.to_path_buf(),
+            authorization: ExportWriteAuthorization::CreateOnly,
+            sources: vec![RenderSource::new(media_id, source).unwrap()],
+            request_id: "skip-existing".into(),
+        },
+    )
+    .unwrap()
+}
+
+#[test]
 fn normal_export_never_replaces_or_cleans_an_original_outside_the_render_selection() {
     for orphan in [false, true] {
         let root = tempfile::tempdir().unwrap();

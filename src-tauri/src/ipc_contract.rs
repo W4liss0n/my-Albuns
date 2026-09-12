@@ -176,6 +176,7 @@ pub enum ProjectDialogAction {
     ConfigureExport(NormalExportOptions),
     ChooseExportDestination(NormalExportOptions),
     ConfirmExportOverwrite,
+    SkipExportConflicts,
     RelinkExportMedia,
     RetryExportMedia,
     CancelMediaRemoval,
@@ -206,7 +207,15 @@ pub struct NormalExportOptions {
     pub mode: myalbuns_core::ExportMode,
     pub format: myalbuns_core::ExportFormat,
     pub destination: String,
-    pub overwrite: bool,
+    pub conflict_policy: ExportConflictPolicy,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum ExportConflictPolicy {
+    Ask,
+    Skip,
+    Replace,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]

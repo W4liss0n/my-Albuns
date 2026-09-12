@@ -74,23 +74,34 @@ fn normal_export_png_jpeg_and_pdf_share_physical_page_geometry_and_originals() {
         .export_units(&[sheet_id], ExportMode::Page)
         .unwrap();
     assert_eq!(units.len(), 2);
-    for format in [
-        RenderFormat::Png,
-        RenderFormat::Jpeg { quality: 100 },
-        RenderFormat::Pdf,
+    for (format, skip_first) in [
+        (RenderFormat::Png, false),
+        (RenderFormat::Jpeg { quality: 100 }, false),
+        (RenderFormat::Pdf, false),
+        (RenderFormat::Png, true),
+        (RenderFormat::Jpeg { quality: 100 }, true),
     ] {
         let groups = if format == RenderFormat::Pdf {
             vec![units.clone()]
         } else {
-            units.iter().cloned().map(|unit| vec![unit]).collect()
+            units
+                .iter()
+                .skip(usize::from(skip_first))
+                .cloned()
+                .map(|unit| vec![unit])
+                .collect()
         };
         let outputs: Vec<_> = groups
             .into_iter()
-            .enumerate()
-            .map(|(index, units)| AlbumRenderOutput {
+            .map(|units| AlbumRenderOutput {
                 prepared_path: root
                     .path()
-                    .join(format!("page-{}.{}", index + 1, format.extension()))
+                    .join(format!(
+                        "{}page-{}.{}",
+                        if skip_first { "retained-" } else { "" },
+                        units[0].index,
+                        format.extension()
+                    ))
                     .into(),
                 units,
             })
@@ -109,6 +120,22 @@ fn normal_export_png_jpeg_and_pdf_share_physical_page_geometry_and_originals() {
             sources: vec![RenderSource::new(media_id, source.clone()).unwrap()],
             root_bindings: context.freeze(),
         };
+        request.validate().unwrap();
+        if skip_first {
+            let mut invalid = request.clone();
+            invalid.outputs[0].units[0].index = 1;
+            assert!(
+                invalid.validate().is_err(),
+                "a retained right page cannot be renumbered as the left page"
+            );
+        } else if format != RenderFormat::Pdf {
+            let mut invalid = request.clone();
+            invalid.outputs.reverse();
+            assert!(
+                invalid.validate().is_err(),
+                "canonical output order remains mandatory"
+            );
+        }
         let result = invoke_imaging_command(&ImagingCommand::RenderAlbum(request), None);
         let (_, response) = decode_event_stream(&result.stdout).unwrap();
         let ImagingResponse::AlbumCompleted { completion, .. } = response else {
@@ -125,7 +152,7 @@ fn normal_export_png_jpeg_and_pdf_share_physical_page_geometry_and_originals() {
             if format != RenderFormat::Pdf {
                 let image = image::open(path).unwrap().to_rgb8();
                 assert_eq!(image.dimensions(), (13, 13));
-                let expected = if index == 0 {
+                let expected = if output.units[0].index == 1 {
                     [210_u8, 30, 20]
                 } else {
                     [20_u8, 60, 210]

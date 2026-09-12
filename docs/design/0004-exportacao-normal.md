@@ -82,6 +82,8 @@ Ao acionar `Exportar`, placeholders e originais necessários ausentes ou indispo
 
 ## Preparação e Publicação
 
+Quando já existem arquivos da Exportação no Destino, um aviso compacto e genérico oferece `Ignorar`, `Substituir` e `Cancelar`, sem listar cada arquivo. `Ignorar` mantém os arquivos existentes e exporta apenas as saídas que faltam, conservando seus nomes e índices. Se todas já existem, a tentativa termina sem abrir Progresso. `Substituir` autoriza atualizar os arquivos existentes; `Cancelar` encerra a tentativa. A decisão vale para aquela tentativa. `Ignorar` nunca remove Saídas órfãs; se surgir outro conflito durante a preparação, a Publicação falha sem sobrescrevê-lo.
+
 JPEG e PNG compartilham o namespace `{nome-do-projeto}_{índice decimal com largura mínima de três dígitos}` nos modos `Por lâmina` e `Por página`; `001` a `999` conservam três dígitos e índices maiores crescem normalmente. O nome isolado não identifica o modo usado. O mapeamento de qualidade, os formatos e o comportamento acima de `999` pertencem ao [Contrato do Renderizador final](0019-contrato-do-renderizador-final.md).
 
 Ao iniciar, a operação adquire o `OperationLease` exclusivo; não existe fila de espera. O lease reserva em conjunto a concessão global, a pausa do Cache e o Processador de Imagens, e garante a devolução dos três recursos em sucesso, falha, cancelamento ou queda — a Exportação não os orquestra individualmente. O contrato do lease está em [Propriedade de estado e módulos do núcleo](0012-propriedade-de-estado-e-modulos-do-nucleo.md). Cancelamento e progresso continuam pertencendo somente à tentativa.
