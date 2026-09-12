@@ -6558,23 +6558,20 @@ test("restores the active media tab in a new window without restoring its search
   expect(props.onProjectionChange).not.toHaveBeenCalled();
 });
 
-test("the album absence notice opens a temporary view and restores the previous tab and filters", async () => {
+test("absent Originals stay in the media panel without an album inspector notice", () => {
   render(<ProjectWorkspace exportPipelinePort={exportPipelinePort} projection={projection}
     projectCorePort={projectCorePortWithApply(async () => projection)} onProjectionChange={vi.fn()}
     mediaFiles={{ "media-002": { mediaId: "media-002", state: "absent", createdAtMs: null, modifiedAtMs: null } }} />);
-  fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
-  fireEvent.change(screen.getByRole("searchbox", { name: "Buscar Decorativos" }), { target: { value: "dourado" } });
-  fireEvent.click(screen.getByRole("button", { name: "Filtro, ordem e tamanho" }));
-  fireEvent.change(screen.getByRole("combobox", { name: "Filtro de uso" }), { target: { value: "used" } });
-  fireEvent.click(screen.getByRole("button", { name: "Ver arquivos ausentes" }));
+  expect(screen.queryByText(/arquivo original ausente/i)).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Ver arquivos ausentes" })).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Fotos" })).toHaveAttribute("aria-pressed", "true");
   expect(screen.getByRole("button", { name: "Campo.jpg. Arquivo ausente" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Serra ao amanhecer.jpg. Já usada. 1 uso" })).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: /Ausentes/ }));
   expect(screen.queryByRole("button", { name: "Serra ao amanhecer.jpg. Já usada. 1 uso" })).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Encerrar visualização de ausentes" }));
-  expect(screen.getByRole("button", { name: "Decorativos" })).toHaveAttribute("aria-pressed", "true");
-  expect(screen.getByRole("searchbox", { name: "Buscar Decorativos" })).toHaveValue("dourado");
-  fireEvent.click(screen.getByRole("button", { name: "Filtro, ordem e tamanho" }));
-  expect(screen.getByRole("combobox", { name: "Filtro de uso" })).toHaveValue("used");
+  expect(screen.getByRole("button", { name: "Campo.jpg. Arquivo ausente" })).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: /Todas/ }));
+  expect(screen.getByRole("button", { name: "Serra ao amanhecer.jpg. Já usada. 1 uso" })).toBeVisible();
 });
 
 test("reimporting a JPEG selects its existing card without a creative mutation", async () => {

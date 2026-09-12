@@ -307,7 +307,7 @@ A saída final será uma Exportação JPEG, PNG ou PDF, `Por lâmina` ou `Por p�
 1. Como pessoa diagramadora, quero ordenar por Nome, Data de criação ou Data de alteração, para encontrar imagens por critérios diferentes.
 1. Como pessoa diagramadora, quero escolher direção crescente ou decrescente, para adaptar a visualização ao meu fluxo.
 1. Como pessoa diagramadora, quero que Nome use ordenação natural como `1`, `2`, `10`, para acompanhar sequências intuitivamente.
-1. Como pessoa diagramadora, quero que datas venham dos arquivos originais, ausentes fiquem no fim e empates usem Nome, para obter ordem determinística.
+1. Como pessoa diagramadora, quero que datas venham dos arquivos originais, a disponibilidade não altere a ordenação e empates usem Nome, para obter ordem determinística.
 1. Como pessoa diagramadora, quero filtrar por `Todas`, `Usadas` ou `Não usadas`, para localizar mídias posicionadas ou disponíveis.
 1. Como pessoa diagramadora, quero considerar uma Foto usada quando aparecer em algum Frame, para que o filtro reflita a composição.
 1. Como pessoa diagramadora, quero considerar um Decorativo usado quando aplicado ou definido como padrão, para reconhecer todas as referências relevantes.
@@ -320,7 +320,7 @@ A saída final será uma Exportação JPEG, PNG ou PDF, `Por lâmina` ou `Por p�
 1. Como pessoa diagramadora, quero que operações com muitos arquivos na mesma origem de rede reutilizem a resolução dessa raiz durante a execução, para evitar trabalho repetitivo sem criar estado permanente.
 1. Como pessoa diagramadora, quero observar a nova versão quando o conteúdo do mesmo caminho for substituído, para trabalhar com o original atual.
 1. Como pessoa diagramadora, quero relocalizar uma referência ausente somente no Projeto atual, para preservar o isolamento entre trabalhos.
-1. Como pessoa diagramadora, quero receber aviso sobre arquivo ausente que esteja apenas no Painel, para corrigi-lo sem bloquear saída que não o utiliza.
+1. Como pessoa diagramadora, quero identificar o arquivo ausente no próprio item do Painel de imagens, sem aviso no Painel contextual e sem bloquear saída que não o utiliza.
 1. Como pessoa diagramadora, quero bloquear a Exportação se um original necessário à seleção estiver ausente, para não gerar resultado incompleto pelo Cache.
 1. Como pessoa diagramadora, quero remover Foto em uso escolhendo remover tudo, manter Frames como placeholders ou cancelar, para controlar o impacto.
 1. Como pessoa diagramadora, quero aplicar uma única decisão ao remover várias Fotos, para não responder ao mesmo diálogo repetidamente.
@@ -967,7 +967,7 @@ validação das superfícies descritas nesta seção.
 - Durante esse arraste, Frames e Fotos são transparentes ao roteamento do gesto: o alvo é sempre a zona da Lâmina sob o ponteiro.
 - Dois cliques em um Decorativo aplicam-no a Ambos os lados da Lâmina usada como alvo implícito: Background sem modificador e Overlay com `Shift`.
 - A Ordenação do Painel oferece Nome, Data de criação e Data de alteração, em direção crescente ou decrescente.
-- A ordenação padrão é Nome crescente com comparação natural. Datas vêm do Arquivo vinculado; Arquivos ausentes ficam no fim e empates usam Nome natural.
+- A ordenação padrão é Nome crescente com comparação natural. A disponibilidade não participa da ordenação: Arquivos ausentes seguem o mesmo critério de Nome ou data dos demais itens, em ambas as direções. Datas vêm do Arquivo vinculado; datas conhecidas precedem desconhecidas e empates usam Nome natural.
 - O Filtro de uso oferece `Todas`, `Usadas` e `Não usadas`.
 - Uma Foto está usada quando aparece em algum Frame. Um Decorativo está usado quando está aplicado ou configurado no Padrão visual do Projeto.
 - Ordenação e filtro são preferências do aplicativo por aba, reutilizadas entre Projetos e sessões. Não alteram o Projeto e não participam de Undo/Redo.
@@ -1000,7 +1000,7 @@ validação das superfícies descritas nesta seção.
 - Pan, Zoom, Frames, Layouts e demais decisões de composição não invalidam a representação reduzida; as mesmas regras determinísticas calculam o plano que a prévia e a saída final adaptam aos seus respectivos renderizadores.
 - Um Arquivo ausente ou indisponível pode conservar sua última representação e metadados conhecidos com indicação própria, mas continua inválido como fonte de Exportação.
 - Se uma origem acessível confirmar que um arquivo foi movido ou removido, cada Projeto o considera ausente e pode religá-lo independentemente. Arquivo indisponível preserva o vínculo e oferece nova tentativa, não Religação. Uma Religação aceita altera somente a referência daquele Projeto, participa de Undo/Redo, exige Salvamento e nunca move o arquivo original.
-- Arquivo ausente usado na seleção bloqueia a Exportação. Arquivo ausente apenas no Painel gera aviso, mas não bloqueia.
+- Arquivo ausente usado na seleção bloqueia a Exportação. Arquivo ausente apenas no Painel de imagens mantém indicação no próprio item, mas não bloqueia. O Painel contextual não apresenta aviso nem atalho de revisão de ausentes.
 - O Cache de mídia serve exclusivamente à interação. Nunca substitui um original ausente e nunca é usado como fonte de Exportação.
 - `Liberar espaço` reserva atomicamente namespaces sem proprietário ativo e remove somente Cache de Projetos fechados. `Limpar todo o Cache` executa apenas sem Projeto ou Processador ativo; caso contrário, é agendado para a próxima inicialização segura, sem pausar editores nem remover Cache ativo ao vivo.
 
@@ -1157,7 +1157,7 @@ validação das superfícies descritas nesta seção.
 - Persistência e identidade devem cobrir Salvar, `Salvar como`, Cópia externa gravável e somente leitura, movimentação, Bloqueio de abertura, bloqueio órfão, isolamento, Undo/Redo em sessão e Recuperação consolidada que reinicia com Histórico vazio.
 - Cenários com arquivos temporários reais devem verificar vínculos externos, substituição no mesmo caminho, Arquivo ausente, Arquivo indisponível, religação independente, duplicação entre abas e remoção de itens usados.
 - Caminhos devem ser exercitados como local absoluto, UNC, unidade mapeada, verbatim local, verbatim UNC, caminho longo, relativo inválido, namespace de dispositivo, curinga, fluxo alternativo e componente reservado. Os testes também cobrem arquivo no lugar de diretório e o inverso, criação sob pai validado, aliases do mesmo Projeto, `Same`/`Different`/`Indeterminate` com política no chamador, rede indisponível e recuperada, transporte do mesmo plano imutável de bindings por IPC, bindings fixos até o estado terminal, nova captura em `Tentar novamente` ou retomada após reinício e abertura individual de cada original.
-- O Painel deve ser testado por ordenação natural, datas do original, arquivos ausentes no fim, busca sem distinção de caixa ou acento, interseção entre busca e filtros, textos temporários independentes por aba, redimensionamento contínuo das miniaturas sem corte, seleção individual, por intervalo e de todos os resultados visíveis, descarte de selecionados ocultados, preservação diante de reordenação, clique direito e remoção contextual por foco, além da persistência somente das preferências previstas sem alterar o Projeto.
+- O Painel deve ser testado por ordenação natural, datas do original, arquivos ausentes na ordenação normal, busca sem distinção de caixa ou acento, interseção entre busca e filtros, textos temporários independentes por aba, redimensionamento contínuo das miniaturas sem corte, seleção individual, por intervalo e de todos os resultados visíveis, descarte de selecionados ocultados, preservação diante de reordenação, clique direito e remoção contextual por foco, além da persistência somente das preferências previstas sem alterar o Projeto.
 - Testes de Exportação devem usar composições canônicas para verificar dimensões físicas, DPI, quantidade e ordem, namespace compartilhado entre modos, recorte central, transparência, Pilha visual, PDF multipágina e leitura dos originais.
 - Conflitos de Exportação e geração devem ser pré-calculados, apresentados em conjunto e nunca resultar em substituição ou renomeação silenciosa.
 - Nenhum teste de Exportação pode obter sucesso apenas por existir Cache quando o original estiver ausente.

@@ -35,13 +35,15 @@ preferência publica a versão 2 sem os antigos tamanhos por aba.
 
 O Host fornece criação, alteração e disponibilidade a partir das observações
 estabilizadas do Monitor, correlacionadas com o vínculo atual. Essa consulta
-não acessa Originais nem depende da demanda de miniaturas. Ausentes ficam
-depois dos demais arquivos em qualquer direção de ordenação; datas conhecidas
-precedem desconhecidas e o Nome natural desempata.
+não acessa Originais nem depende da demanda de miniaturas. A disponibilidade
+não participa da ordenação: arquivos ausentes seguem o mesmo critério de Nome
+ou data dos demais itens, em ambas as direções. Datas conhecidas precedem
+desconhecidas e o Nome natural desempata.
 
-O aviso de ausentes abre uma revisão temporária. Durante essa revisão, busca,
-filtros de uso e aba ficam sobrepostos às escolhas anteriores. Encerrá-la
-retoma as escolhas preservadas, sem gravar a revisão como preferência.
+O Painel contextual não exibe aviso de arquivos ausentes nem atalho para
+uma revisão temporária. A ausência continua indicada no próprio item do
+Painel de imagens. O filtro `Ausentes` permanece disponível por escolha do
+usuário, dentro da aba atual e em conjunto com a busca e o filtro de uso.
 
 ## Importação e gestos
 

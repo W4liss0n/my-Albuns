@@ -286,24 +286,44 @@ test("combines accent-insensitive search with the usage filter and natural name 
   );
 });
 
-test("orders by the Original dates and keeps absent files last in both directions", async () => {
+test("orders absent and available Originals together by name and known dates", async () => {
   const user = userEvent.setup();
   render(<MediaPanel {...mediaPanelInteractions} mediaItems={mediaItems} mediaUsage={mediaUsage}
     onFillPhoto={vi.fn()} previewSource={{ kind: "static" }} preferences={{ kind: "local" }}
     mediaFiles={{
       "photo-album-10": { mediaId: "photo-album-10", state: "available", createdAtMs: 100, modifiedAtMs: 300 },
-      "photo-album-2": { mediaId: "photo-album-2", state: "available", createdAtMs: 200, modifiedAtMs: 100 },
-      "photo-retrato": { mediaId: "photo-retrato", state: "absent", createdAtMs: null, modifiedAtMs: null },
+      "photo-album-2": { mediaId: "photo-album-2", state: "absent", createdAtMs: 200, modifiedAtMs: 100 },
+      "photo-retrato": { mediaId: "photo-retrato", state: "available", createdAtMs: 150, modifiedAtMs: 200 },
     }} />);
+  expect(visibleMediaIds()).toEqual(["photo-album-2", "photo-album-10", "photo-retrato"]);
   await user.click(screen.getByRole("button", { name: "Filtro, ordem e tamanho" }));
   await user.selectOptions(screen.getByRole("combobox", { name: "Ordenar por" }), "createdAt-ascending");
-  expect(visibleMediaIds()).toEqual(["photo-album-10", "photo-album-2", "photo-retrato"]);
+  expect(visibleMediaIds()).toEqual(["photo-album-10", "photo-retrato", "photo-album-2"]);
   await user.selectOptions(screen.getByRole("combobox", { name: "Ordenar por" }), "createdAt-descending");
-  expect(visibleMediaIds()).toEqual(["photo-album-2", "photo-album-10", "photo-retrato"]);
+  expect(visibleMediaIds()).toEqual(["photo-album-2", "photo-retrato", "photo-album-10"]);
   await user.selectOptions(screen.getByRole("combobox", { name: "Ordenar por" }), "modifiedAt-ascending");
-  expect(visibleMediaIds()).toEqual(["photo-album-2", "photo-album-10", "photo-retrato"]);
+  expect(visibleMediaIds()).toEqual(["photo-album-2", "photo-retrato", "photo-album-10"]);
   await user.selectOptions(screen.getByRole("combobox", { name: "Ordenar por" }), "name-descending");
-  expect(visibleMediaIds()).toEqual(["photo-album-10", "photo-album-2", "photo-retrato"]);
+  expect(visibleMediaIds()).toEqual(["photo-retrato", "photo-album-10", "photo-album-2"]);
+});
+
+test.each(["photo", "decorative"] as const)("an absent %s keeps its natural position and selection without file dates", (kind) => {
+  const items = [media("first", kind, "Foto 1"), media("middle", kind, "Foto 2"), media("last", kind, "Foto 10")];
+  const props = { ...mediaPanelInteractions, mediaItems: items, mediaUsage: [], onFillPhoto: vi.fn(),
+    preferences: { kind: "local" as const }, previewSource: { kind: "static" as const } };
+  const view = render(<MediaPanel {...props} />);
+  if (kind === "decorative") fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
+  fireEvent.click(screen.getByRole("button", { name: "Foto 2" }));
+  view.rerender(<MediaPanel {...props} previewSource={{ kind: "static", previews: {
+    middle: { mediaId: "middle", state: "absent", url: null },
+  } }} />);
+  const grid = screen.getByRole("group", { name: kind === "photo" ? "Grade de Fotos" : "Grade de Decorativos" });
+  const order = () => Array.from(grid.querySelectorAll("[data-media-id]")).map(item => item.getAttribute("data-media-id"));
+  expect(order()).toEqual(["first", "middle", "last"]);
+  expect(screen.getByRole("button", { name: "Foto 2. Arquivo ausente" })).toHaveAttribute("aria-pressed", "true");
+  view.rerender(<MediaPanel {...props} />);
+  expect(order()).toEqual(["first", "middle", "last"]);
+  expect(screen.getByRole("button", { name: "Foto 2" })).toHaveAttribute("aria-pressed", "true");
 });
 
 test("treats compact options as a disclosure and restores its trigger on Escape", async () => {

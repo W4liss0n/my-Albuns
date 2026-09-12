@@ -8001,26 +8001,21 @@
       ]
     },
     {
-      "id": "media-panel-missing-review",
-      "title": "Painel de imagens — revisão de ausentes aberta pelo aviso do Álbum",
+      "id": "media-panel-missing-normal-order",
+      "title": "Arquivos ausentes — ordem normal e Painel contextual sem aviso",
       "implementationPath": "/workspace-preview.html?files=absent",
       "comparison": {
         "kind": "implementation-only",
         "surface": "media-panel-complete",
         "implementationCaptureSelector": ".app-shell",
-        "reason": "A revisão temporária de ausentes segue a especificação e o design 0031, posteriores à referência vigente."
+        "reason": "A decisão do usuário remove o aviso do Painel contextual e mantém arquivos ausentes na ordenação normal do Painel de imagens."
       },
       "viewport": {
         "width": 1440,
         "height": 900
       },
-      "readySelector": "[aria-label=\"Encerrar visualização de ausentes\"]",
-      "actions": [
-        {
-          "type": "click-text",
-          "text": "Ver arquivos ausentes"
-        }
-      ]
+      "readySelector": "body:has(#contextual-panel):has(.media-grid [aria-label$=\"Arquivo ausente\"])",
+      "actions": []
     },
     {
       "id": "workspace-decorative-grid",

@@ -758,12 +758,6 @@ export function ProjectWorkspace({
         )}
 
         {workspacePanels.panels.inspector.visible && <InspectorPanel
-          missingMedia={{ count: projection.state.album.media.filter((media) => mediaFiles?.[media.id]?.state === "absent").length,
-            onShow: () => {
-              if (controller.layoutPanel.visible) controller.layoutPanel.close();
-              workspacePreferences.update({ kind: "workspacePanelVisibility", panel: "media", visible: true });
-              mediaPanelRef.current?.showAbsent();
-            } }}
           saveLayout={{ enabled: controller.canSaveLayout, onSave: controller.saveLayout,
             feedback: noticeInInspector ? layoutNotice : null }}
           key={projectId}

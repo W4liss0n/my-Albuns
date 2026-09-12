@@ -2133,7 +2133,7 @@ test.each([
   await waitFor(() => expect(load).toHaveBeenCalledTimes(alreadyReading ? 3 : 2));
 });
 
-test("reports absent Originals without a thumbnail and refreshes the warning when the Original returns", async () => {
+test("updates absent Original cards without showing an inspector notice when the Original returns", async () => {
   let notify: Parameters<MediaPreviewPort["onMediaChanged"]>[0] = () => undefined;
   const readMediaFiles = vi.fn<MediaPreviewPort["readMediaFiles"]>()
     .mockResolvedValueOnce({ projectId: representativeProjection.state.projectId, files: [
@@ -2148,11 +2148,12 @@ test("reports absent Originals without a thumbnail and refreshes the warning whe
       onMediaChanged: async (listener) => { notify = listener; return () => undefined; } }}
     graphicsProbe={canvasGraphicsDiagnosticProbe} canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
     logger={silentLogger} />);
-  expect(await screen.findByRole("button", { name: "Ver arquivos ausentes" })).toBeVisible();
-  expect(screen.getByRole("button", { name: "Campo.jpg. Arquivo ausente" })).toBeVisible();
+  expect(await screen.findByRole("button", { name: "Campo.jpg. Arquivo ausente" })).toBeVisible();
+  expect(screen.queryByRole("button", { name: "Ver arquivos ausentes" })).not.toBeInTheDocument();
   act(() => notify(["media-002"]));
-  await waitFor(() => expect(screen.queryByRole("button", { name: "Ver arquivos ausentes" })).not.toBeInTheDocument());
-  expect(screen.getByRole("button", { name: "Campo.jpg" })).toBeVisible();
+  expect(await screen.findByRole("button", { name: "Campo.jpg" })).toBeVisible();
+  expect(screen.queryByRole("button", { name: "Campo.jpg. Arquivo ausente" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Ver arquivos ausentes" })).not.toBeInTheDocument();
 });
 
 test("keeps a completed Save authoritative when a monitor read finishes during saving", async () => {

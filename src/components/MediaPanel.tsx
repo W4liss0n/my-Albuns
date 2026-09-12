@@ -40,7 +40,6 @@ import "./MediaPanel.css";
 import { MEDIA_PANEL_PRELOAD_MARGIN, mediaPanelViewportDemand } from "./mediaPanelViewport";
 
 export interface MediaPanelHandle {
-  showAbsent(): void;
   planCatalog(mediaItems: readonly MediaCatalogItem[], mediaUsage: readonly MediaUsage[]): {
     demand: MediaPreviewDemand;
     commit(): void;
@@ -145,20 +144,13 @@ export function MediaPanel({
     preferenceMode.kind === "controlled"
       ? preferenceMode.thumbnailSize
       : null;
-  const [missingReview, setMissingReview] = useState<{
-    activeKind: MediaKind;
-    searches: Record<MediaKind, string>;
-    usageFilters: Record<MediaKind, MediaUsageFilter>;
-  } | null>(null);
   const [missingOnlyByKind, setMissingOnlyByKind] = useState<Record<MediaKind, boolean>>({ photo: false, decorative: false });
   const [localActiveMediaKind, setLocalActiveMediaKind] =
     useState<MediaKind>("photo");
-  const preferredActiveMediaKind = preferenceMode.kind === "controlled" ? preferenceMode.activeKind : localActiveMediaKind;
-  const activeMediaKind = missingReview?.activeKind ?? preferredActiveMediaKind;
+  const activeMediaKind = preferenceMode.kind === "controlled" ? preferenceMode.activeKind : localActiveMediaKind;
   useEffect(() => { setContextMenu(null); }, [activeMediaKind, hidden]);
   function setActiveMediaKind(activeKind: MediaKind) {
-    if (missingReview) setMissingReview({ ...missingReview, activeKind });
-    else if (preferenceMode.kind === "controlled") preferenceMode.onActiveKindChange(activeKind);
+    if (preferenceMode.kind === "controlled") preferenceMode.onActiveKindChange(activeKind);
     else setLocalActiveMediaKind(activeKind);
   }
   const fileInformation = useMemo(() => {
@@ -210,11 +202,10 @@ export function MediaPanel({
     () => mediaItems.filter((media) => media.kind === activeMediaKind),
     [activeMediaKind, mediaItems],
   );
-  const search = (missingReview?.searches ?? searchByKind)[activeMediaKind];
+  const search = searchByKind[activeMediaKind];
   const storedPreferences = preferencesByKind[activeMediaKind];
-  const preferences = { ...storedPreferences, thumbnailSize,
-    usageFilter: missingReview ? missingReview.usageFilters[activeMediaKind] : storedPreferences.usageFilter };
-  const missingOnly = missingReview !== null || missingOnlyByKind[activeMediaKind];
+  const preferences = { ...storedPreferences, thumbnailSize };
+  const missingOnly = missingOnlyByKind[activeMediaKind];
   const { sortKey, sortDirection, usageFilter } = preferences;
   const visibleMediaItems = useMemo(() => filterMediaItems(
     activeMediaItems, mediaUsageById, search, sortKey, sortDirection, usageFilter, fileInformation, missingOnly,
@@ -245,11 +236,6 @@ export function MediaPanel({
   });
 
   useImperativeHandle(ref, () => ({
-    showAbsent() {
-      if (!missingCounts.photo && !missingCounts.decorative) return;
-      setMissingReview({ activeKind: missingCounts[activeMediaKind] ? activeMediaKind : activeMediaKind === "photo" ? "decorative" : "photo",
-        searches: { photo: "", decorative: "" }, usageFilters: { photo: "all", decorative: "all" } });
-    },
     planCatalog(nextItems, nextUsage) {
       const ordered = filterMediaItems(
         nextItems.filter((media) => media.kind === activeMediaKind),
@@ -412,11 +398,6 @@ export function MediaPanel({
   function updatePreferences(
     nextPreferences: Partial<MediaPanelViewPreferences>,
   ) {
-    if (missingReview && nextPreferences.usageFilter !== undefined) {
-      setMissingReview({ ...missingReview, usageFilters: { ...missingReview.usageFilters, [activeMediaKind]: nextPreferences.usageFilter } });
-      const { usageFilter: _filter, ...remaining } = nextPreferences;
-      nextPreferences = remaining;
-    }
     if (preferenceMode.kind === "controlled" && nextPreferences.sortKey !== undefined) {
       preferenceMode.onSortKeyChange(activeMediaKind, nextPreferences.sortKey);
     }
@@ -550,10 +531,8 @@ export function MediaPanel({
         activeMediaKind={activeMediaKind}
         missingCounts={missingCounts}
         missingOnly={missingOnly}
-        reviewingMissing={missingReview !== null}
         onMissingOnlyChange={(value) => {
-          if (missingReview && !value) setMissingReview(null);
-          else setMissingOnlyByKind((current) => ({ ...current, [activeMediaKind]: value }));
+          setMissingOnlyByKind((current) => ({ ...current, [activeMediaKind]: value }));
         }}
         itemCount={activeMediaItems.length}
         preferences={preferences}
@@ -564,8 +543,7 @@ export function MediaPanel({
         onActiveMediaKindChange={setActiveMediaKind}
         onPreferencesChange={updatePreferences}
         onSearchChange={(nextSearch) => {
-          if (missingReview) setMissingReview({ ...missingReview, searches: { ...missingReview.searches, [activeMediaKind]: nextSearch } });
-          else setSearchByKind((current) => ({
+          setSearchByKind((current) => ({
             ...current,
             [activeMediaKind]: nextSearch,
           }));
@@ -747,8 +725,6 @@ function filterMediaItems(
   ).sort((left, right) => {
     const leftFile = files[left.id];
     const rightFile = files[right.id];
-    const absent = Number(leftFile?.state === "absent") - Number(rightFile?.state === "absent");
-    if (absent) return absent;
     if (sortKey !== "name") {
       const leftDate = sortKey === "createdAt" ? leftFile?.createdAtMs : leftFile?.modifiedAtMs;
       const rightDate = sortKey === "createdAt" ? rightFile?.createdAtMs : rightFile?.modifiedAtMs;
