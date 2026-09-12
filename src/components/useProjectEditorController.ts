@@ -485,6 +485,7 @@ export function useProjectEditorController({
     applyAlbumDesign: mutations.applyAlbumDesign,
     applyDpi: mutations.applyDpi,
     relinkMedia: mutations.relinkMedia,
+    replaceMedia: mutations.replaceMedia,
     importMedia: mutations.importMedia,
     addSheetBefore,
     addSheetAfter,

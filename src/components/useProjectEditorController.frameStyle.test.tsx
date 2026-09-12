@@ -43,7 +43,7 @@ function harness() {
     previewLayout: async () => { throw new Error("Layouts are not configured in this fixture."); },
     previewDecorativeDrop: async () => { throw new Error("Decorative preview is not configured in this fixture."); },
     previewFrameStyle: preview, previewPhotoAngle: unsupported, previewFrameGeometry: unsupported, saveAs: unsupported,
-    validateAlbumInformation: unsupported, importMedia: unsupported, resolvePhotoDropTarget: unsupported, relink: unsupported,
+    validateAlbumInformation: unsupported, importMedia: unsupported, resolvePhotoDropTarget: unsupported, replaceImage: unsupported, relink: unsupported,
   };
   const sheetId = initial.state.album.sheets[0].id;
   useEditorView.setState({ projectId: initial.state.projectId, editingSheetId: sheetId,

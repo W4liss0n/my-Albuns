@@ -71,7 +71,7 @@ const projectCorePort: ProjectCorePort = {
     previewPhotoAngle: async () => { throw new Error("Photo angle preview is not configured in this fixture."); },
     previewFrameGeometry: async () => { throw new Error("Frame geometry preview is not configured in this fixture."); },
   resolvePhotoDropTarget: async () => ({ kind: "invalid" }),
-  relink: async () => representativeProjection,
+  replaceImage: async () => representativeProjection, relink: async () => representativeProjection,
   undo: async () => representativeProjection,
   redo: async () => representativeProjection,
   save: async () => ({

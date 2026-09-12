@@ -248,6 +248,7 @@ pub(crate) fn run(
             crate::project_commands::slider_double_click_time,
             crate::project_commands::frame_drag_threshold,
             crate::project_commands::relink_media,
+            crate::project_commands::replace_media,
             crate::media_preview_commands::retry_unavailable_media,
             crate::project_commands::undo_project,
             crate::project_commands::redo_project,

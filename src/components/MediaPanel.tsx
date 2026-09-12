@@ -101,6 +101,7 @@ interface MediaPanelProps {
   onMediaDragChange(drag: MediaDrag | null): void;
   dragThreshold?: import("../application/projectPorts").PointerDragThreshold | null;
   onRelinkMedia(mediaId: string): void;
+  onReplaceMedia(mediaId: string): void;
   onRetryUnavailableMedia(mediaId: string): Promise<void>;
   relinkDisabled?: boolean;
   preferences: MediaPanelPreferenceMode;
@@ -131,6 +132,7 @@ export function MediaPanel({
   onMediaDragChange,
   dragThreshold = { x: 5, y: 5 },
   onRelinkMedia,
+  onReplaceMedia,
   onRetryUnavailableMedia,
   relinkDisabled = false,
   preferences: preferenceMode,
@@ -664,6 +666,15 @@ export function MediaPanel({
             Religar
           </button>
         )}
+        <button type="button" role="menuitem" disabled={relinkDisabled || importPending}
+          onClick={() => {
+            const mediaId = contextMenu.mediaId;
+            setContextMenu(null);
+            panelHostRef.current?.focus({ preventScroll: true });
+            onReplaceMedia(mediaId);
+          }}>
+          Substituir Imagem
+        </button>
         {mediaItems.some((media) => selectedMediaIds.has(media.id) && media.kind === "photo") && <button type="button" role="menuitem"
           disabled={!photoshopAvailable || relinkDisabled || importPending || selectedMediaIds.size !== 1}
           onClick={() => { const id = [...selectedMediaIds][0]; if (id) onOpenInPhotoshop?.(id); setContextMenu(null); panelHostRef.current?.focus({ preventScroll: true }); }}>

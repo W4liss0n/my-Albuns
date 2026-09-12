@@ -43,6 +43,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
         importPending={new URLSearchParams(window.location.search).get("import") === "pending"}
         onMediaDragChange={() => undefined}
         onRelinkMedia={() => undefined}
+        onReplaceMedia={() => undefined}
         onRetryUnavailableMedia={async () => undefined}
         preferences={{ kind: "local", initialThumbnailSize: parameters.get("files") === "dates" ? 96 : undefined,
           initial: parameters.get("files") === "dates" ? {

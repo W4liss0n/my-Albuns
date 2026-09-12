@@ -469,7 +469,7 @@ impl ProjectHost {
             .find(|media| media.id() == media_id.into_uuid())
             .ok_or_else(|| format!("A ocorrência de mídia não existe: {media_id}"))?;
         if current.kind() != proposal.kind() || current.path() != proposal.expected_logical_path() {
-            return Err("A referência de mídia mudou durante a Religação; tente novamente.".into());
+            return Err("A imagem foi alterada durante a operação; tente novamente.".into());
         }
         let source_metadata = proposal.source_metadata().cloned();
         project
@@ -2901,6 +2901,85 @@ mod tests {
                 .expect("the authorized catalog is unchanged")
                 .bindings[0],
             binding
+        );
+    }
+
+    #[test]
+    fn replacement_preserves_frames_and_all_usages_with_history_and_manual_save() {
+        let root = tempfile::tempdir().unwrap();
+        let original = root.path().join("original.png");
+        let replacement = root.path().join("substituta.png");
+        RgbImage::new(30, 20).save(&original).unwrap();
+        RgbImage::new(20, 30).save(&replacement).unwrap();
+        let fixture = fixture();
+        fixture
+            .host
+            .import_photos(vec![original.clone()], |_| {})
+            .unwrap();
+        let binding = fixture.host.authorized_media_catalog().unwrap().bindings[0].clone();
+        for sheet in fixture.host.projection().unwrap().state.album.sheets {
+            fixture
+                .host
+                .apply_with_outcome(ProjectIntent::AddPhoto {
+                    sheet_id: sheet.id,
+                    media_id: binding.media_id.parse().unwrap(),
+                    mode: PhotoPlacementMode::Normal,
+                })
+                .unwrap();
+        }
+        fixture
+            .host
+            .save(fixture.host.projection().unwrap().state.revision)
+            .unwrap();
+        let persisted = std::fs::read(&fixture.project_path).unwrap();
+        let before = fixture.host.projection().unwrap();
+        let mut context = OperationPathContext::new();
+        context.capture(&replacement).unwrap();
+        let proposal = MediaResolver
+            .propose_replacement_in_plan(&binding, replacement.clone(), &context.freeze())
+            .unwrap();
+        let replaced = fixture.host.relink_media(proposal).unwrap();
+        assert_eq!(
+            replaced.state.album.sheets, before.state.album.sheets,
+            "Frames and Photo transforms must be retained"
+        );
+        assert_eq!(
+            replaced.media_usage, before.media_usage,
+            "all occurrences keep the same catalog identity"
+        );
+        assert!(replaced.state.dirty && replaced.state.can_undo);
+        assert_eq!(replaced.state.revision, before.state.revision + 1);
+        assert_eq!(replaced.state.album.media[0].name, "substituta.png");
+        assert_eq!(
+            std::fs::read(&fixture.project_path).unwrap(),
+            persisted,
+            "replacement never auto-saves"
+        );
+        fixture.host.undo().unwrap();
+        assert_eq!(
+            fixture.host.authorized_media_catalog().unwrap().bindings[0].logical_path,
+            original
+        );
+        fixture.host.redo().unwrap();
+        assert_eq!(
+            fixture.host.authorized_media_catalog().unwrap().bindings[0].logical_path,
+            replacement
+        );
+        fixture
+            .host
+            .save(fixture.host.projection().unwrap().state.revision)
+            .unwrap();
+        let project_path = fixture.project_path.clone();
+        let lease_root = fixture.identity_lease_root.clone();
+        drop(fixture.host);
+        let reopened = open_project(&project_path, &lease_root);
+        assert_eq!(
+            reopened.authorized_media_catalog().unwrap().bindings[0].logical_path,
+            replacement
+        );
+        assert_eq!(
+            reopened.projection().unwrap().state.album.sheets,
+            before.state.album.sheets
         );
     }
 

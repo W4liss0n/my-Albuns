@@ -1,5 +1,5 @@
 //! Candidate discovery never changes a Project. The selected folder bounds the
-//! search; incomplete enumeration cannot prove that a match is unique.
+//! search to its immediate files; incomplete enumeration cannot prove uniqueness.
 use std::{
     collections::HashMap,
     ffi::OsString,
@@ -22,30 +22,23 @@ impl MediaResolver {
             .filter_map(|binding| binding.logical_path.file_name())
             .map(|name| (name.to_owned(), Vec::new()))
             .collect();
-        let mut pending = vec![folder.to_path_buf()];
-        while let Some(path) = pending.pop() {
-            let directory = roots
-                .resolve_existing(&path, ExpectedObject::Directory)
-                .map_err(|error| format!("Não foi possível verificar toda a pasta: {error}"))?;
-            let entries = std::fs::read_dir(directory.operational_path())
-                .map_err(|error| format!("Não foi possível verificar toda a pasta: {error}"))?;
-            for entry in entries {
-                let entry = entry.map_err(|error| error.to_string())?;
-                let metadata =
-                    std::fs::symlink_metadata(entry.path()).map_err(|error| error.to_string())?;
-                // Do not follow junctions/symlinks outside the selected tree or
-                // silently call a partly searched tree unique.
-                if is_link(&metadata) {
-                    return Err("A pasta contém um atalho ou junção. Escolha uma pasta de Fotos sem esses redirecionamentos.".into());
-                }
-                let child = path.join(entry.file_name());
-                if metadata.is_dir() {
-                    pending.push(child);
-                } else if metadata.is_file()
-                    && let Some(found) = matches.get_mut(&entry.file_name())
-                {
-                    found.push(child);
-                }
+        let directory = roots
+            .resolve_existing(folder, ExpectedObject::Directory)
+            .map_err(|error| format!("Não foi possível verificar a pasta: {error}"))?;
+        let entries = std::fs::read_dir(directory.operational_path())
+            .map_err(|error| format!("Não foi possível verificar a pasta: {error}"))?;
+        for entry in entries {
+            let entry = entry.map_err(|error| error.to_string())?;
+            let Some(found) = matches.get_mut(&entry.file_name()) else {
+                continue;
+            };
+            let metadata =
+                std::fs::symlink_metadata(entry.path()).map_err(|error| error.to_string())?;
+            if is_link(&metadata) {
+                return Err("A imagem encontrada é um atalho ou redirecionamento. Escolha a pasta que contém o arquivo original.".into());
+            }
+            if metadata.is_file() {
+                found.push(folder.join(entry.file_name()));
             }
         }
         Ok(bindings
@@ -119,12 +112,13 @@ mod tests {
     }
 
     #[test]
-    fn recursive_search_requires_one_exact_filename_and_retains_logical_paths() {
+    fn selected_folder_search_ignores_subfolders_and_requires_exact_filename() {
         let root = tempfile::tempdir().unwrap();
         for folder in ["Fotos/a", "Fotos/b"] {
             std::fs::create_dir_all(root.path().join(folder)).unwrap();
         }
         for name in [
+            "Fotos/única.JPG",
             "Fotos/a/única.JPG",
             "Fotos/a/dupla.png",
             "Fotos/b/dupla.png",
@@ -151,8 +145,49 @@ mod tests {
         let found = MediaResolver
             .find_relink_candidates(&folder, &bindings, &context.freeze())
             .unwrap();
-        assert_eq!(found.len(), 2);
-        assert_eq!(found["única.JPG"], folder.join("a").join("única.JPG"));
-        assert_eq!(found["mesmo.jpg"], folder.join("a").join("mesmo.jpg"));
+        assert_eq!(found.len(), 1, "subfolders must not contribute candidates");
+        assert_eq!(found["única.JPG"], folder.join("única.JPG"));
+    }
+
+    #[test]
+    fn replacement_accepts_present_or_absent_images_but_relink_still_requires_absence() {
+        let root = tempfile::tempdir().unwrap();
+        let original = root.path().join("original.png");
+        let replacement = root.path().join("renamed.png");
+        let corrupt = root.path().join("corrupt.png");
+        image::RgbImage::new(24, 16).save(&original).unwrap();
+        image::RgbImage::new(16, 24).save(&replacement).unwrap();
+        std::fs::write(&corrupt, b"not an image").unwrap();
+        let mut context = OperationPathContext::new();
+        context.capture(&original).unwrap();
+        let roots = context.freeze();
+        for kind in [MediaKind::Photo, MediaKind::Decorative] {
+            for name in ["original.png", "absent.png"] {
+                let binding = MediaBinding {
+                    media_id: "selected".into(),
+                    kind,
+                    logical_path: root.path().join(name),
+                };
+                let proposal = MediaResolver
+                    .propose_replacement_in_plan(&binding, replacement.clone(), &roots)
+                    .unwrap();
+                assert_eq!(proposal.media_id(), "selected");
+                assert_eq!(proposal.kind(), kind);
+                assert_eq!(proposal.expected_logical_path(), binding.logical_path);
+                assert_eq!(proposal.replacement_path(), replacement);
+                assert!(
+                    MediaResolver
+                        .propose_replacement_in_plan(&binding, corrupt.clone(), &roots)
+                        .is_err()
+                );
+                if name == "original.png" {
+                    assert!(
+                        MediaResolver
+                            .propose_relink_in_plan(&binding, replacement.clone(), &roots)
+                            .is_err()
+                    );
+                }
+            }
+        }
     }
 }

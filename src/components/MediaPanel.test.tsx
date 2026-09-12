@@ -26,6 +26,7 @@ const mediaPanelInteractions = {
   onRemoveMedia: () => undefined,
   onMediaDragChange: () => undefined,
   onRelinkMedia: () => undefined,
+  onReplaceMedia: () => undefined,
   onRetryUnavailableMedia: async () => undefined,
 };
 
@@ -910,6 +911,25 @@ test.each([
   expect(screen.queryByRole("menu", { name: "Ações das imagens" })).not.toBeInTheDocument();
 });
 
+test.each(["photo", "decorative"] as const)("Substituir Imagem is available for every %s state and targets the clicked item", (kind) => {
+  const onReplaceMedia = vi.fn();
+  const states = ["ready", "absent", "unavailable", "cache_unavailable"] as const;
+  render(<MediaPanel {...mediaPanelInteractions} onReplaceMedia={onReplaceMedia}
+    mediaItems={states.map((state) => media(state, kind, state))} mediaUsage={[]}
+    onFillPhoto={vi.fn()} preferences={{ kind: "local" }} previewSource={{ kind: "static", previews:
+      Object.fromEntries(states.map((state) => [state, { mediaId: state, state, url: null }])) }} />);
+  if (kind === "decorative") fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
+  fireEvent.click(screen.getByRole("button", { name: /^ready/ }));
+  fireEvent.click(screen.getByRole("button", { name: /^absent/ }), { ctrlKey: true });
+  for (const state of states) {
+    fireEvent.contextMenu(screen.getByRole("button", { name: new RegExp(`^${state}`) }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Substituir Imagem" }));
+    expect(onReplaceMedia).toHaveBeenLastCalledWith(state);
+    expect(screen.queryByRole("menu", { name: "Ações das imagens" })).not.toBeInTheDocument();
+  }
+  expect(onReplaceMedia).toHaveBeenCalledTimes(4);
+});
+
 test("Religar targets the right-clicked absent item while preserving a selected group", () => {
   const onRelinkMedia = vi.fn();
   const props = { ...mediaPanelInteractions, onRelinkMedia, onFillPhoto: vi.fn(), mediaUsage: [],
@@ -946,6 +966,7 @@ test.each(["relinkDisabled", "importPending"] as const)("Religar remains disable
   fireEvent.contextMenu(screen.getByRole("button", { name: /^Imagem 1/ }));
   const relink = screen.getByRole("menuitem", { name: "Religar" });
   expect(relink).toBeDisabled();
+  expect(screen.getByRole("menuitem", { name: "Substituir Imagem" })).toBeDisabled();
   fireEvent.click(relink);
   expect(onRelinkMedia).not.toHaveBeenCalled();
 });

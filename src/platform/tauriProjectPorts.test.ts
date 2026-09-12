@@ -304,6 +304,12 @@ test("resolves a queued cancellation as not_found when completion fails before s
   expect(invoke).toHaveBeenCalledTimes(1);
 });
 
+test("sends image replacement through the native picker command with processing progress", async () => {
+  vi.mocked(invoke).mockResolvedValue(representativeProjection);
+  await expect(tauriProjectCorePort.replaceImage("media-001", vi.fn())).resolves.toBe(representativeProjection);
+  expect(invoke).toHaveBeenCalledWith("replace_media", { mediaId: "media-001", onProgress: tauriBoundary.channels[0] });
+});
+
 test("maps the Project and media ports to the desktop commands", async () => {
   const information = {
     displayUnit: "mm" as const,

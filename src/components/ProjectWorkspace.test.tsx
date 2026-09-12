@@ -372,7 +372,7 @@ function projectCorePortWithApply(
     previewPhotoAngle: async () => { throw new Error("Photo angle preview is not configured in this fixture."); },
     previewFrameGeometry: async () => { throw new Error("Frame geometry preview is not configured in this fixture."); },
     resolvePhotoDropTarget: async () => ({ kind: "invalid" }),
-    relink: async () => projection,
+    replaceImage: async () => projection, relink: async () => projection,
     undo: async () => projection,
     redo: async () => projection,
     save: async () => {
@@ -5520,6 +5520,24 @@ test("shows Page numbers instead of cover and final aliases", () => {
   ).toBe(
     "linear-gradient(to left, #faf9f6 0%, #ebe3d8 58%, #cec2b2 100%)",
   );
+});
+
+test("Substituir Imagem in the Panel updates the workspace through the Project mutation flow", async () => {
+  const replacement = structuredClone(projection);
+  replacement.state.revision += 1;
+  replacement.state.dirty = true;
+  const selected = projection.state.album.media[0];
+  replacement.state.album.media[0].name = "Nova imagem.jpg";
+  const port = projectCorePortWithApply(async () => projection);
+  port.replaceImage = vi.fn(async () => replacement);
+  const onProjectionChange = vi.fn();
+  render(<ProjectWorkspace projection={projection} projectCorePort={port}
+    exportPipelinePort={exportPipelinePort} onProjectionChange={onProjectionChange} />);
+  fireEvent.contextMenu(screen.getByRole("button", { name: (name) => name.startsWith(selected.name) }));
+  expect(screen.queryByRole("menuitem", { name: "Religar" })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("menuitem", { name: "Substituir Imagem" }));
+  await waitFor(() => expect(port.replaceImage).toHaveBeenCalledWith(selected.id, expect.any(Function)));
+  await waitFor(() => expect(onProjectionChange).toHaveBeenCalledWith(replacement));
 });
 
 test("uses reduced Cache previews in the media panel and Canvas", () => {

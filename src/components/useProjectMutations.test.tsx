@@ -55,7 +55,7 @@ function projectSessionPort(
     previewPhotoAngle: async () => { throw new Error("Photo angle preview is not configured in this fixture."); },
     previewFrameGeometry: async () => { throw new Error("Frame geometry preview is not configured in this fixture."); },
     resolvePhotoDropTarget: async () => ({ kind: "invalid" }),
-    relink: async () => representativeProjection,
+    replaceImage: async () => representativeProjection, relink: async () => representativeProjection,
     undo,
     redo: async () => representativeProjection,
     save: async () => ({
@@ -124,6 +124,36 @@ test("applies a structural intent with outcome, returns its status, and forwards
   expect(applyWithOutcome).toHaveBeenCalledWith(intent, expect.any(Function));
   expect(onProjectionChange).toHaveBeenCalledWith(updatedProjection);
   expect(onAffectedSheet).toHaveBeenCalledWith("sheet-001");
+});
+
+test.each(["success", "failure"] as const)("Save waits for replacement and respects its %s outcome", async (outcome) => {
+  const pending = deferredProjection();
+  const replaced = structuredClone(representativeProjection);
+  replaced.state.revision += 1;
+  replaced.state.dirty = true;
+  const port = projectSessionPort(async () => representativeProjection, async () => representativeProjection);
+  port.replaceImage = vi.fn(() => pending.promise);
+  port.save = vi.fn(async (revision) => ({ outcome: { kind: "alreadyCurrent" as const, revision }, projection: replaced }));
+  const onProjectionChange = vi.fn();
+  const view = renderHook(() => useProjectMutations({
+    projection: representativeProjection,
+    runProjectMutation: useProjectMutationRunner(representativeProjection.state.projectId, port),
+    onProjectionChange, onAffectedFrame: () => undefined, onAffectedSheet: () => undefined,
+  }));
+  act(() => view.result.current.replaceMedia("media-001"));
+  await waitFor(() => expect(port.replaceImage).toHaveBeenCalledWith("media-001", expect.any(Function)));
+  act(() => view.result.current.save());
+  expect(port.save).not.toHaveBeenCalled();
+  await act(async () => {
+    if (outcome === "success") pending.resolve(replaced);
+    else pending.reject(new Error("Imagem inválida"));
+  });
+  if (outcome === "success") {
+    await waitFor(() => expect(port.save).toHaveBeenCalledWith(replaced.state.revision));
+  } else {
+    expect(port.save).not.toHaveBeenCalled();
+    expect(onProjectionChange).not.toHaveBeenCalled();
+  }
 });
 
 test("materializes a queued reorder beside its intended Sheet after History restores an earlier Sheet", async () => {

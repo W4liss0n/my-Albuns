@@ -843,6 +843,7 @@ export function ProjectWorkspace({
           onMediaDragChange={setMediaDrag}
           dragThreshold={controller.frameStyle.dragThreshold}
           onRelinkMedia={controller.relinkMedia}
+          onReplaceMedia={controller.replaceMedia}
           onRetryUnavailableMedia={(mediaId) => controller.retryUnavailableMedia(
             (publish) => onRetryUnavailableMedia(mediaId, publish),
           )}

@@ -251,7 +251,7 @@ const projectCorePort: ProjectCorePort = {
     ? frameContentSwapCorpus.dropProbes.find((probe) => probe.sheetId === sheetId &&
       Math.abs(probe.xUm - xUm) < 6_000 && Math.abs(probe.yUm - yUm) < 6_000)?.target ?? { kind: "invalid" }
     : { kind: "invalid" },
-  relink: async () => projection,
+  replaceImage: async () => projection, relink: async () => projection,
   undo: async () => restorePreviewHistory(undoStack, redoStack),
   redo: async () => restorePreviewHistory(redoStack, undoStack),
   save: async () => {

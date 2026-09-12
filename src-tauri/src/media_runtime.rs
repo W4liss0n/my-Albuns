@@ -460,6 +460,15 @@ impl MediaResolver {
         if self.observe_in_plan(roots, binding).availability != MediaAvailability::Absent {
             return Err("Somente um Arquivo comprovadamente ausente pode ser religado.".into());
         }
+        self.propose_replacement_in_plan(binding, replacement_path, roots)
+    }
+
+    pub(crate) fn propose_replacement_in_plan(
+        &self,
+        binding: &MediaBinding,
+        replacement_path: PathBuf,
+        roots: &RootBindingPlan,
+    ) -> Result<MediaRelinkProposal, String> {
         let candidate = MediaBinding {
             logical_path: replacement_path.clone(),
             ..binding.clone()

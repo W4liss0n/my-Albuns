@@ -54,6 +54,23 @@ imagem ausente e atua no item clicado, preservando uma seleção múltipla
 existente. A ação respeita os bloqueios de operação e deixa de aparecer quando
 o Original retorna. A nova tentativa para Arquivo indisponível mantém seu fluxo.
 
+`Religar` solicita a pasta que contém o Original e procura somente entre os
+arquivos diretamente nessa pasta, pelo mesmo nome e extensão, sem pesquisar
+subpastas. A ausência de correspondência é informada e preserva o vínculo.
+O menu atua somente na imagem clicada, mesmo quando há várias selecionadas.
+A Religação da Exportação normal usa a mesma busca restrita à pasta escolhida.
+
+`Substituir Imagem` aparece no menu do botão direito de todas as Fotos e
+Decorativos, presentes, ausentes ou indisponíveis, com ou sem Cache. Abre o
+seletor de arquivo JPEG, PNG ou TIFF e permite escolher outro nome. A operação
+troca a referência da imagem clicada e atualiza todos os seus usos no Projeto,
+preservando sua identidade no catálogo, posição e tamanho dos Frames, seus
+ajustes e os usos como Fundo ou Overlay. Inspeciona o novo Original e renova
+o Cache. Cancelar ou escolher o mesmo caminho não altera a sessão; um arquivo
+inválido não substitui a imagem. As duas ações respeitam os bloqueios de
+operação, participam de Undo/Redo e exigem Salvamento manual. Nenhuma delas
+move ou sobrescreve o arquivo original.
+
 Para Arquivo ausente sem Cache, o placeholder usa fundo cinza quente uniforme
 (`#efede8`) e símbolo de imagem central (`#aaa397`). Na miniatura, conserva a
 proporção da mídia e a moldura branca, sem texto; o indicador quadrado de ausência

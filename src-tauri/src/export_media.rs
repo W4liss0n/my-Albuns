@@ -166,11 +166,12 @@ pub(crate) async fn relink_export_media(
                     .to_string_lossy()
                     .into_owned();
                 let result = match candidates.get(&binding.media_id) {
-                    Some(path) => crate::project_commands::relink_binding(
+                    Some(path) => crate::project_commands::change_media_binding(
                         &app,
                         binding.clone(),
                         path.clone(),
                         roots.clone(),
+                        crate::project_commands::MediaChangeKind::Relink,
                     )
                     .await
                     .map(|_| ()),
@@ -283,6 +284,15 @@ mod tests {
         let candidates = MediaResolver
             .find_relink_candidates(&folder, std::slice::from_ref(&binding), &roots)
             .unwrap();
+        assert!(
+            candidates.is_empty(),
+            "Export recovery must not search subfolders"
+        );
+        let direct_replacement = folder.join("Usada.png");
+        std::fs::copy(&replacement, &direct_replacement).unwrap();
+        let candidates = MediaResolver
+            .find_relink_candidates(&folder, std::slice::from_ref(&binding), &roots)
+            .unwrap();
         let proposal = MediaResolver
             .propose_relink_in_plan(&binding, candidates[&binding.media_id].clone(), &roots)
             .unwrap();
@@ -296,7 +306,7 @@ mod tests {
         assert!(inspect(&host, &sheet_id).unwrap().is_empty());
         let exported = host.freeze_sheet_export(&sheet_id).unwrap();
         assert_eq!(exported.sources.len(), 1);
-        assert_eq!(exported.sources[0].source_path(), replacement);
+        assert_eq!(exported.sources[0].source_path(), direct_replacement);
         host.undo().unwrap();
         assert_eq!(
             inspect(&host, &sheet_id).unwrap()[0].state,

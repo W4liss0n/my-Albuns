@@ -64,6 +64,29 @@
       "actions": []
     },
     {
+      "id": "media-panel-replace-available-photo",
+      "title": "Substituir Imagem — Foto disponível",
+      "implementationPath": "/media-panel-preview.html?acceptance=editor",
+      "comparison": { "kind": "implementation-only", "surface": "media-panel-complete",
+        "implementationCaptureSelector": ".media-panel-preview",
+        "reason": "Design 0031: Substituir Imagem fica disponível para todas as imagens; Religar somente para ausentes." },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "[role=\"menu\"]:has([role=\"menuitem\"])",
+      "actions": [{ "type": "context-click", "selector": ".media-grid [data-media-id=\"test-media-001\"]" }]
+    },
+    {
+      "id": "media-panel-replace-available-decorative",
+      "title": "Substituir Imagem — Decorativo disponível",
+      "implementationPath": "/media-panel-preview.html?acceptance=editor",
+      "comparison": { "kind": "implementation-only", "surface": "media-panel-complete",
+        "implementationCaptureSelector": ".media-panel-preview",
+        "reason": "Design 0031: Decorativos também oferecem Substituir Imagem, preservando seus usos no Projeto." },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "[role=\"menu\"]:has([role=\"menuitem\"])",
+      "actions": [{ "type": "click", "selector": "[aria-label=\"Decorativos\"]" },
+        { "type": "context-click", "selector": ".media-grid [data-media-id=\"test-decorative-001\"]" }]
+    },
+    {
       "id": "media-export-problems",
       "title": "Exportação — Arquivos ausentes e indisponíveis",
       "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportMediaProblems%22%2C%22projectName%22%3A%22Formatura%20%E2%80%94%20Turma%202026%22%2C%22problems%22%3A%5B%7B%22mediaId%22%3A%22photo-1%22%2C%22fileName%22%3A%22Retrato%20001.JPG%22%2C%22state%22%3A%22absent%22%7D%2C%7B%22mediaId%22%3A%22photo-2%22%2C%22fileName%22%3A%22Retrato%20002.JPG%22%2C%22state%22%3A%22unavailable%22%7D%5D%2C%22busy%22%3Afalse%2C%22message%22%3A%22%22%7D",
