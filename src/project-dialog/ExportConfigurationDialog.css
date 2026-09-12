@@ -1,19 +1,19 @@
 .export-configuration { display: grid; gap: 18px; margin: 0; }
 .export-configuration fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
-.export-configuration legend { padding: 0; margin-bottom: 9px; font-size: 12px; font-weight: 600; }
+.export-configuration legend { padding: 0; margin-bottom: 9px; font-size: var(--ui-font-size-action); font-weight: 600; }
 .export-configuration__row { display: flex; flex-wrap: wrap; gap: 12px 24px; }
 .export-configuration__row label { display: inline-flex; align-items: center; gap: 7px; }
-.export-configuration input[type="radio"], .export-configuration input[type="range"] { accent-color: var(--accent, #28638a); }
+.export-configuration input[type="radio"], .export-configuration input[type="range"] { accent-color: var(--ui-accent-fill); }
 .export-configuration input[type="radio"] { margin: 0; }
 .export-configuration__range { display: flex; gap: 16px; margin-top: 12px; }
 .export-configuration__range label { display: flex; align-items: center; gap: 8px; }
 .export-configuration__range input { width: 68px; }
-.export-configuration input:not([type="radio"]):not([type="range"]) { min-width: 0; border: 1px solid var(--border, #d8d1c5); border-radius: 4px; background: white; color: inherit; font: inherit; padding: 7px 9px; }
-.export-configuration__hint { margin: 9px 0 0; color: var(--text-muted, #7d766a); font-size: 11px; line-height: 1.5; }
+.export-configuration input:not([type="radio"]):not([type="range"]) { min-width: 0; border: 1px solid var(--ui-border-strong); border-radius: 4px; background: var(--ui-surface-raised); color: inherit; font: inherit; padding: 7px 9px; }
+.export-configuration__hint { margin: 9px 0 0; color: var(--ui-text-muted); font-size: var(--ui-font-size-support); line-height: 1.5; }
 .export-configuration__quality { display: flex; align-items: center; gap: 14px; margin-top: 14px; }
 .export-configuration__quality input { flex: 1; min-width: 60px; }
 .export-configuration__quality output { width: 38px; text-align: right; font-variant-numeric: tabular-nums; }
 .export-configuration__destination { display: flex; gap: 8px; }
 .export-configuration__destination input { flex: 1; }
-.export-configuration__summary { margin-right: auto; align-self: center; color: var(--text-muted, #7d766a); }
-.export-configuration__error { color: #a13125; margin: 8px 0 0; line-height: 1.5; }
+.export-configuration__summary { margin-right: auto; align-self: center; color: var(--ui-text-muted); }
+.export-configuration__error { color: var(--ui-danger-text); margin: 8px 0 0; line-height: 1.5; }

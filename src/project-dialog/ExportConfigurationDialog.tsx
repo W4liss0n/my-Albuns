@@ -52,6 +52,7 @@ export function ExportConfigurationDialog({ state, onAction }: { state: State; o
         <input aria-label="Pasta de destino" value={options.destination} onChange={event => setOptions(current => ({ ...current, destination: event.target.value }))} />
         <ActionButton onClick={() => onAction({ chooseExportDestination: { ...request, sheetIds: options.sheetIds } })}>Escolher…</ActionButton>
       </div></fieldset>
+      {state.busy && <p role="status" className="export-configuration__hint">Preparando exportação…</p>}
       {state.message && <p role="alert" className="export-configuration__error">{state.message}</p>}
     </form>
   </DialogWindowFrame></DialogFocusScope>;

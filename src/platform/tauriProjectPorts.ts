@@ -471,12 +471,10 @@ export const tauriExportPipelinePort: ExportPipelinePort = {
         cancellable: event.data.cancellable,
       });
     };
-    const completion = invoke<IpcExportResult>(options ? "export_project" : "export_sheet", options ? { options, onEvent } : {
-      projectName,
-      sheetId,
-      sheetNumber,
-      onEvent,
-    })
+    const request = options
+      ? invoke<IpcExportResult>("export_project", { options, onEvent })
+      : invoke<IpcExportResult>("export_sheet", { projectName, sheetId, sheetNumber, onEvent });
+    const completion = request
       .then((result) => ({
         status: "completed" as const,
         result,

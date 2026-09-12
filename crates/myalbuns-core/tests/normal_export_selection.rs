@@ -24,7 +24,7 @@ fn snapshot() -> RenderSnapshot {
             width_um: width,
             height_um: 300_000,
             base: ComposedColor {
-                rgb: "#ffffff".into(),
+                rgb: "#FFFFFF".into(),
                 draw_rect: RectUm {
                     x: 0,
                     y: 0,

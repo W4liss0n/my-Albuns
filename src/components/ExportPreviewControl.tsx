@@ -177,7 +177,7 @@ export const ExportPreviewControl = forwardRef<
     }
 
     attemptedSelection.current = { ...selected };
-    if (lastDialogState.current?.kind === "exportConfiguration") presentDialog({ ...lastDialogState.current, busy: true, message: "" });
+    if (lastDialogState.current?.kind === "exportConfiguration") presentDialog({ ...lastDialogState.current, options: selected.options ?? lastDialogState.current.options, busy: true, message: "" });
     const attemptId = ++nextAttemptId.current;
     currentAttemptId.current = attemptId;
     beginInteraction();

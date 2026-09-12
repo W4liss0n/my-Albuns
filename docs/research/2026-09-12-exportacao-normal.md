@@ -34,6 +34,12 @@ com o nome numerado canônico e a extensão atual, depois de publicar todas as
 novas saídas. Intervalos preservam arquivos externos à seleção. Arquivos de
 outro formato e nomes parecidos não são removidos.
 
+A proteção de Originais usa o catálogo inteiro, incluindo fotos de outras
+lâminas e mídias ainda não colocadas. Antes de substituir ou limpar um alvo
+existente, compara sua identidade física com esses Originais. Uma comparação
+inconclusiva bloqueia a alteração e orienta usar uma pasta nova ou restabelecer
+o acesso; exportar para nomes novos não exige essa varredura adicional.
+
 As ações de religar arquivos continuam na pasta diretamente escolhida pelo
 usuário. Ao resolver o último bloqueio de mídia, a mesma seleção, formato e
 destino são retomados automaticamente. O fluxo antigo de exportação de uma

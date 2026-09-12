@@ -131,7 +131,7 @@ pub(crate) fn render_unit(
     let composition_units = frame_count.max(1);
     progress(ImagingProgressStage::Composing, 0, composition_units)?;
     for (index, frame) in sheet.frames.iter().enumerate() {
-        draw_frame(&mut image, frame, pixels_per_micrometer, raster, &sources)?;
+        draw_frame(&mut image, frame, pixels_per_micrometer, raster, sources)?;
         progress(
             ImagingProgressStage::Composing,
             u32::try_from(index + 1).map_err(|_| "a Lâmina contém Frames demais".to_string())?,

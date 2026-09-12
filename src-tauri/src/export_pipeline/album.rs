@@ -4,6 +4,7 @@ use myalbuns_imaging_protocol::{AlbumRenderOutput, AlbumRenderRequest, ImagingRe
 
 #[derive(Debug)]
 pub(crate) struct AlbumExportPlan {
+    protected_originals: Vec<PathBuf>,
     obsolete_outputs: Vec<PathBuf>,
     cleanup_confirmed: bool,
     snapshot: RenderSnapshot,
@@ -14,6 +15,7 @@ pub(crate) struct AlbumExportPlan {
 }
 
 pub(crate) struct AlbumExportOptions {
+    pub protected_originals: Vec<PathBuf>,
     pub sheet_ids: Vec<String>,
     pub whole_album: bool,
     pub mode: ExportMode,
@@ -29,6 +31,7 @@ pub(crate) fn plan_album(
     options: AlbumExportOptions,
 ) -> Result<AlbumExportPlan, ExportFailure> {
     let AlbumExportOptions {
+        protected_originals,
         sheet_ids,
         whole_album,
         mode,
@@ -93,6 +96,7 @@ pub(crate) fn plan_album(
         obsolete_outputs.sort();
     }
     Ok(AlbumExportPlan {
+        protected_originals,
         obsolete_outputs,
         cleanup_confirmed: whole_album
             && authorization == ExportWriteAuthorization::ReplaceConfirmed,
@@ -109,6 +113,11 @@ impl AlbumExportPlan {
         &self.request_id
     }
     pub(crate) fn required_paths(&self) -> Vec<PathBuf> {
+        let protects_existing = self
+            .outputs
+            .iter()
+            .any(|(path, _)| path.output_path().exists())
+            || !self.obsolete_outputs.is_empty();
         self.outputs
             .iter()
             .map(|(path, _)| path.output_path().to_path_buf())
@@ -116,6 +125,12 @@ impl AlbumExportPlan {
                 self.sources
                     .iter()
                     .map(|source| source.source_path().to_path_buf()),
+            )
+            .chain(
+                self.protected_originals
+                    .iter()
+                    .filter(|_| protects_existing)
+                    .cloned(),
             )
             .collect()
     }
@@ -184,15 +199,21 @@ pub(crate) async fn execute_album<T: ImagingTransport>(
             .resolve_existing()
             .map_err(|error| ExportFailure::new(ExportFailureStage::Prepare, error.to_string()))?
         {
-            for source in &plan.sources {
-                let original = roots
-                    .resolve_existing(
-                        source.source_path(),
-                        myalbuns_paths::ExpectedObject::RegularFile,
-                    )
-                    .map_err(|error| {
-                        ExportFailure::new(ExportFailureStage::Prepare, error.to_string())
-                    })?;
+            for source in &plan.protected_originals {
+                let original = match roots
+                    .resolve_existing(source, myalbuns_paths::ExpectedObject::RegularFile)
+                {
+                    Ok(original) => original,
+                    Err(myalbuns_paths::ResolveError::NotFound) => continue,
+                    Err(error) => {
+                        return Err(ExportFailure::new(
+                            ExportFailureStage::Prepare,
+                            format!(
+                                "Não foi possível distinguir o Destino de um Original do Projeto: {error}. Escolha uma pasta nova ou restabeleça o acesso aos Originais."
+                            ),
+                        ));
+                    }
+                };
                 if target.compare_physical(&original)
                     != myalbuns_paths::PhysicalIdentityEvidence::Different
                 {

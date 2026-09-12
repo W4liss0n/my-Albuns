@@ -6,13 +6,13 @@ use tauri_plugin_dialog::{DialogExt, FilePath};
 #[derive(serde::Serialize)]
 pub(crate) struct NormalExportError {
     #[serde(flatten)]
-    error: ExportCommandError,
+    error: Box<ExportCommandError>,
     conflicts: Vec<String>,
 }
 impl From<ExportCommandError> for NormalExportError {
     fn from(error: ExportCommandError) -> Self {
         Self {
-            error,
+            error: Box::new(error),
             conflicts: vec![],
         }
     }
@@ -87,6 +87,13 @@ pub(crate) async fn export_project(
     let (snapshot, sources) = state
         .freeze_export(&options.sheet_ids)
         .map_err(ExportCommandError::failed)?;
+    let protected_originals = state
+        .authorized_media_catalog()
+        .map_err(ExportCommandError::failed)?
+        .bindings
+        .into_iter()
+        .map(|binding| binding.logical_path)
+        .collect();
     let checking_host = state.inner().clone();
     let sheet_ids = options.sheet_ids.clone();
     let media = tauri::async_runtime::spawn_blocking(move || {
@@ -123,6 +130,7 @@ pub(crate) async fn export_project(
         let plan = export_pipeline::plan_album(
             snapshot,
             export_pipeline::AlbumExportOptions {
+                protected_originals,
                 sheet_ids: options.sheet_ids,
                 whole_album: options.scope == crate::ipc_contract::ExportScope::Album,
                 mode: options.mode,
@@ -155,7 +163,10 @@ pub(crate) async fn export_project(
     if !conflicts.is_empty() && !overwrite {
         let mut error = ExportCommandError::failed("Já existem arquivos no Destino da Exportação.");
         error.code = ExportCommandErrorCode::ExportConflict;
-        return Err(NormalExportError { error, conflicts });
+        return Err(NormalExportError {
+            error: Box::new(error),
+            conflicts,
+        });
     }
     let request_id = plan.request_id().to_owned();
     let attempt = attempts

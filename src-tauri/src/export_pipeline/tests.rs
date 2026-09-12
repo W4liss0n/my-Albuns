@@ -126,6 +126,7 @@ fn normal_export_prepares_the_entire_set_before_publish_and_cleans_a_failed_set(
         let plan = super::plan_album(
             snapshot,
             super::AlbumExportOptions {
+                protected_originals: vec![source.clone()],
                 sheet_ids,
                 whole_album,
                 mode: myalbuns_core::ExportMode::Sheet,
@@ -195,6 +196,84 @@ fn normal_export_prepares_the_entire_set_before_publish_and_cleans_a_failed_set(
                 .join(".myalbuns-export-normal-export-set.tmp")
                 .exists(),
             "all preparations are cleaned after either terminal"
+        );
+    }
+}
+
+#[test]
+fn normal_export_never_replaces_or_cleans_an_original_outside_the_render_selection() {
+    for orphan in [false, true] {
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("selected.jpg");
+        RgbImage::from_pixel(4, 4, Rgb([20, 50, 90]))
+            .save(&source)
+            .unwrap();
+        let protected = root.path().join(if orphan {
+            "Album_003.png"
+        } else {
+            "Album_001.png"
+        });
+        RgbImage::from_pixel(4, 4, Rgb([80, 60, 20]))
+            .save(&protected)
+            .unwrap();
+        let original_bytes = std::fs::read(&protected).unwrap();
+        let mut snapshot = productive_snapshot(source.clone());
+        snapshot.project_name = "Album".into();
+        snapshot.composition.sheets.truncate(2);
+        let sheet_ids = snapshot
+            .composition
+            .sheets
+            .iter()
+            .take(if orphan { 2 } else { 1 })
+            .map(|sheet| sheet.sheet_id.clone())
+            .collect();
+        let media_id = snapshot.composition.sheets[0]
+            .referenced_media_ids()
+            .next()
+            .unwrap();
+        let plan = super::plan_album(
+            snapshot,
+            super::AlbumExportOptions {
+                sheet_ids,
+                whole_album: orphan,
+                mode: myalbuns_core::ExportMode::Sheet,
+                format: myalbuns_core::ExportFormat::Png,
+                destination: root.path().to_path_buf(),
+                authorization: ExportWriteAuthorization::ReplaceConfirmed,
+                // The productive command supplies the entire catalog, including unused media.
+                protected_originals: vec![source.clone(), protected.clone()],
+                sources: vec![RenderSource::new(media_id, source).unwrap()],
+                request_id: "protected-original".into(),
+            },
+        )
+        .unwrap();
+        let mut roots = OperationPathContext::new();
+        for path in plan.required_paths() {
+            roots.capture(&path).unwrap();
+        }
+        let mut transport = AlbumTransport {
+            fail: false,
+            prior_output: protected.clone(),
+            prior_bytes: original_bytes.clone(),
+        };
+        let failure = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(super::execute_album(
+                &mut transport,
+                plan,
+                &roots.freeze(),
+                &ExportExecutionControl::default(),
+                &|_| {},
+                &InvocationContext::new("protected-original", None::<String>),
+            ))
+            .unwrap_err();
+        assert_eq!(failure.stage, ExportFailureStage::Prepare);
+        assert_eq!(std::fs::read(&protected).unwrap(), original_bytes);
+        assert!(
+            !root
+                .path()
+                .join(".myalbuns-export-protected-original.tmp")
+                .exists()
         );
     }
 }

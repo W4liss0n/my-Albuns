@@ -29,6 +29,7 @@ test("normal export waits for configuration and retries the same options after o
   expect(harness.startSheet).not.toHaveBeenCalled();
   const options = { scope: "range" as const, sheetIds: ["second"], mode: "page" as const, format: { kind: "png" as const }, destination: "C:/Exportados", overwrite: false };
   dialog.emit({ configureExport: options });
+  expect(dialog.present).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "exportConfiguration", busy: true, options }));
   expect(harness.startSheet).toHaveBeenLastCalledWith({ projectName: "Album", sheetId: "second", sheetNumber: 2, options }, expect.any(Function));
   await act(async () => { harness.attempts[0].reject(new ExportConflictsError(["Album_002.png", "Album_003.png"])); });
   expect(dialog.present).toHaveBeenLastCalledWith({ kind: "exportConflicts", files: ["Album_002.png", "Album_003.png"] });

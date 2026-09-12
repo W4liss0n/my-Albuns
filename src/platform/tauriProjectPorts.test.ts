@@ -9,6 +9,7 @@ import {
 } from "../application/projectPorts";
 import { representativeProjection } from "../test/projectFixtures";
 import { MediaExportBlockedError } from "../application/exportMedia";
+import { ExportConflictsError } from "../application/normalExport";
 import {
   tauriExportPipelinePort,
   tauriMediaPreviewPort,
@@ -170,6 +171,18 @@ test("native media preflight failures reach the recovery screen before any start
   const event = vi.fn();
   const attempt = tauriExportPipelinePort.startSheet(exportSelection, event);
   await expect(attempt.completion).rejects.toEqual(new MediaExportBlockedError(problems));
+  expect(event).not.toHaveBeenCalled();
+});
+
+test("normal export sends the complete selection and maps overwrite conflicts without starting progress", async () => {
+  const options = { scope: "range" as const, sheetIds: ["sheet-002", "sheet-003"], mode: "page" as const,
+    format: { kind: "jpeg" as const, quality: 64 }, destination: "C:/Álbuns/Exportados", overwrite: false };
+  const conflicts = ["Álbum_003.jpg", "Álbum_004.jpg"];
+  vi.mocked(invoke).mockRejectedValueOnce({ code: "export_conflict", conflicts });
+  const event = vi.fn();
+  const attempt = tauriExportPipelinePort.startSheet({ ...exportSelection, options }, event);
+  await expect(attempt.completion).rejects.toEqual(new ExportConflictsError(conflicts));
+  expect(invoke).toHaveBeenCalledWith("export_project", { options, onEvent: tauriBoundary.channels[0] });
   expect(event).not.toHaveBeenCalled();
 });
 

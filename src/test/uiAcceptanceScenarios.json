@@ -386,7 +386,7 @@
     {
       "id": "export-success",
       "title": "Diálogo de Exportação — concluída",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportSuccess%22%2C%22message%22%3A%22A%20prova%20foi%20exportada%20com%20sucesso.%22%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportSuccess%22%2C%22message%22%3A%22A%20Exporta%C3%A7%C3%A3o%20foi%20conclu%C3%ADda%20com%20sucesso.%22%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-message-dialog",
