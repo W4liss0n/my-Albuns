@@ -2,6 +2,19 @@
   "schemaVersion": 3,
   "scenarios": [
     {
+      "id": "media-preview-replacement",
+      "title": "Troca de prévias — Painel e Lâmina",
+      "implementationPath": "/photo-placement-preview.html",
+      "comparison": {
+        "kind": "implementation-only", "surface": "media-preview-replacement",
+        "implementationCaptureSelector": "body",
+        "reason": "Decisão do usuário: manter a imagem anterior até a nova prévia estar pronta. O ensaio test:photo-placement verifica também os pixels durante a transição, que não pode ser comprovada apenas por uma captura final."
+      },
+      "viewport": { "width": 1100, "height": 800 },
+      "readySelector": "body[data-ready=\"true\"]",
+      "actions": []
+    },
+    {
       "id": "welcome",
       "title": "Tela de Boas-vindas",
       "implementationPath": "/welcome-preview.html",

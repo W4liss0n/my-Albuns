@@ -52,3 +52,9 @@
   object-fit: contain;
   transition: opacity 120ms ease;
 }
+
+.media-preview-thumbnail img[data-pending="true"] {
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
+}

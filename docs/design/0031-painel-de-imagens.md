@@ -71,6 +71,14 @@ inválido não substitui a imagem. As duas ações respeitam os bloqueios de
 operação, participam de Undo/Redo e exigem Salvamento manual. Nenhuma delas
 move ou sobrescreve o arquivo original.
 
+Ao atualizar ou substituir uma imagem, a prévia anterior continua visível no
+Painel e na Lâmina até a nova representação estar carregada. A troca ocorre
+diretamente, sem um intervalo vazio ou placeholder entre as duas versões.
+Essa retenção é temporária e visual: não modifica o Cache persistido nem a
+fonte usada na Exportação. Uma mídia sem prévia continua seguindo os estados
+de carregamento, ausência e indisponibilidade já definidos; a prévia antiga
+não reaparece depois de removida nem é transferida para outro Projeto.
+
 Para Arquivo ausente sem Cache, o placeholder usa fundo cinza quente uniforme
 (`#efede8`) e símbolo de imagem central (`#aaa397`). Na miniatura, conserva a
 proporção da mídia e a moldura branca, sem texto; o indicador quadrado de ausência

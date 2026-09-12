@@ -75,6 +75,7 @@ export class AlbumCanvasScene {
     SheetPositionAnimation
   >();
   private readonly previewTextures: ViewportTexturePool;
+  private presentedPreviewUrls = new Map<string, string>();
   private readonly photoInteractions: PhotoInteractionSession;
   private readonly frameInteractions: FrameInteractionSession;
   private readonly frameContentDrag: FrameContentDragSession;
@@ -184,6 +185,7 @@ export class AlbumCanvasScene {
     const firstSheet = sheets[0];
     if (!firstSheet) {
       this.clearMaterializedSheets();
+      this.presentedPreviewUrls.clear();
       this.previewTextures.sync([]);
       return;
     }
@@ -372,6 +374,7 @@ export class AlbumCanvasScene {
   private resetProjectScene() {
     this.resetTransientInteractions();
     this.clearMaterializedSheets();
+    this.presentedPreviewUrls.clear();
     this.previewTextures.sync([]);
     this.lastCanvasMetrics = null;
     this.lastMediaDemandSignature = null;
@@ -465,7 +468,7 @@ export class AlbumCanvasScene {
       desiredSheets,
     );
     const desiredIds = new Set(desiredSheets.map((sheet) => sheet.sheetId));
-    const desiredPreviewUrls = new Set<string>();
+    const desiredPreviewUrls = this.preparePreviewTextures(desiredSheets);
     const signatures = new Map<string, string>();
     const sheetBarMetadata = new Map(
       this.input.sheetBarMetadata.map((metadata) => [
@@ -477,8 +480,7 @@ export class AlbumCanvasScene {
     for (const sheet of desiredSheets) {
       const previewStates = sheet.frames.map((frame) => {
         if (!frame.photo) return null;
-        const url = this.input?.mediaPreviewUrls?.[frame.photo.mediaId] ?? null;
-        if (url) desiredPreviewUrls.add(url);
+        const url = this.presentedPreviewUrls.get(frame.photo.mediaId) ?? null;
         return [url, url ? this.previewTextures.get(url) !== undefined : false,
           this.input?.missingMediaIds?.has(frame.photo.mediaId) ?? false];
       });
@@ -486,8 +488,7 @@ export class AlbumCanvasScene {
         (background) => {
           if (background.kind !== "media") return [];
           const url =
-            this.input?.mediaPreviewUrls?.[background.mediaId] ?? null;
-          if (url) desiredPreviewUrls.add(url);
+            this.presentedPreviewUrls.get(background.mediaId) ?? null;
           return [
             url
               ? [url, this.previewTextures.get(url) !== undefined]
@@ -497,8 +498,7 @@ export class AlbumCanvasScene {
       );
       const overlayPreviewStates = sheet.overlays.map((overlay) => {
         const url =
-          this.input?.mediaPreviewUrls?.[overlay.mediaId] ?? null;
-        if (url) desiredPreviewUrls.add(url);
+          this.presentedPreviewUrls.get(overlay.mediaId) ?? null;
         return url
           ? [url, this.previewTextures.get(url) !== undefined]
           : null;
@@ -734,8 +734,27 @@ export class AlbumCanvasScene {
   }
 
   private previewTextureFor(mediaId: string) {
-    const url = this.input?.mediaPreviewUrls?.[mediaId];
+    const url = this.presentedPreviewUrls.get(mediaId);
     return url ? this.previewTextures.get(url) : undefined;
+  }
+
+  private preparePreviewTextures(sheets: readonly ComposedSheet[]) {
+    const requested = new Map(mediaIdsForSheets(sheets).flatMap((mediaId) => {
+      const url = this.input?.mediaPreviewUrls?.[mediaId];
+      return url ? [[mediaId, url] as const] : [];
+    }));
+    // Keep the currently displayed generations alive until the scene has
+    // switched to loaded replacements. The second sync releases retired URLs
+    // only after their old render nodes have been removed.
+    this.previewTextures.sync([...requested.values(), ...this.presentedPreviewUrls.values()]);
+    const presented = new Map<string, string>();
+    for (const [mediaId, url] of requested) {
+      const previous = this.presentedPreviewUrls.get(mediaId);
+      if (this.previewTextures.get(url)) presented.set(mediaId, url);
+      else if (previous && this.previewTextures.get(previous)) presented.set(mediaId, previous);
+    }
+    this.presentedPreviewUrls = presented;
+    return new Set([...requested.values(), ...presented.values()]);
   }
 
   private readonly refreshAfterPreviewTextureChange = () => {

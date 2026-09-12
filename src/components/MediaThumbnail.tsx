@@ -9,12 +9,6 @@ interface MediaPreviewGeometry {
   isPortrait: boolean;
 }
 
-interface IntrinsicPreviewSize {
-  height: number;
-  previewUrl: string;
-  width: number;
-}
-
 interface MediaThumbnailProps {
   "aria-label"?: string;
   children?: ReactNode;
@@ -39,18 +33,19 @@ export function MediaThumbnail({
   previewUrl,
   missing = false,
 }: MediaThumbnailProps) {
-  const imageRef = useRef<HTMLImageElement>(null);
+  const [loaded, setLoaded] = useState<{
+    url: string;
+    width: number;
+    height: number;
+    geometry: MediaPreviewGeometry;
+  } | null>(null);
   useEffect(() => {
-    if (!previewUrl || !imageRef.current) return;
-    return registerMediaPreviewImage(previewUrl, imageRef.current);
+    if (!previewUrl) setLoaded(null);
   }, [previewUrl]);
-  const [intrinsicSize, setIntrinsicSize] =
-    useState<IntrinsicPreviewSize | null>(null);
-  const geometry = mediaPreviewGeometry(
+  const retained = previewUrl && loaded && loaded.url !== previewUrl ? loaded : null;
+  const geometry = retained?.geometry ?? mediaPreviewGeometry(
     media,
-    intrinsicSize && intrinsicSize.previewUrl === previewUrl
-      ? intrinsicSize
-      : undefined,
+    loaded && loaded.url === previewUrl ? loaded : undefined,
   );
 
   return (
@@ -68,27 +63,14 @@ export function MediaThumbnail({
         } as CSSProperties
       }
     >
-      {previewUrl ? (
-        <img
-          key={previewUrl}
-          ref={imageRef}
-          alt=""
-          crossOrigin="anonymous"
-          draggable="false"
-          loading={loading}
-          src={previewUrl}
-          onLoad={(event) => {
-            if (hasSourceDimensions(media)) return;
-            const { naturalHeight, naturalWidth } = event.currentTarget;
-            if (naturalWidth <= 0 || naturalHeight <= 0) return;
-            setIntrinsicSize({
-              height: naturalHeight,
-              previewUrl,
-              width: naturalWidth,
-            });
-          }}
-        />
-      ) : missing ? (
+      {previewUrl ? [retained?.url, previewUrl].filter((url): url is string => Boolean(url)).map((url) => (
+        <ThumbnailImage key={url} url={url} loading={retained ? "eager" : loading}
+          pending={Boolean(retained && url === previewUrl)}
+          onLoad={url === previewUrl ? (image) => {
+            const size = { width: image.naturalWidth, height: image.naturalHeight };
+            setLoaded({ url, ...size, geometry: mediaPreviewGeometry(media, size) });
+          } : undefined} />
+      )) : missing ? (
         <span aria-hidden="true" className="media-preview-thumbnail__missing-symbol" />
       ) : null}
       {children}
@@ -96,9 +78,24 @@ export function MediaThumbnail({
   );
 }
 
+function ThumbnailImage({ url, loading, pending, onLoad }: {
+  url: string;
+  loading: "eager" | "lazy";
+  pending: boolean;
+  onLoad?: (image: HTMLImageElement) => void;
+}) {
+  const imageRef = useRef<HTMLImageElement>(null);
+  useEffect(() => {
+    if (imageRef.current) return registerMediaPreviewImage(url, imageRef.current);
+  }, [url]);
+  return <img ref={imageRef} alt="" crossOrigin="anonymous" draggable="false"
+    loading={loading} src={url} data-pending={pending || undefined}
+    onLoad={(event) => onLoad?.(event.currentTarget)} />;
+}
+
 function mediaPreviewGeometry(
   media: Pick<MediaCatalogItem, "sourceHeightPx" | "sourceWidthPx">,
-  intrinsicSize?: IntrinsicPreviewSize,
+  intrinsicSize?: { width: number; height: number },
 ): MediaPreviewGeometry {
   const width = hasSourceDimensions(media)
     ? media.sourceWidthPx
