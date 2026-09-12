@@ -19,7 +19,7 @@ const missing = {
 const manifest = JSON.parse(readFileSync("src/test/uiAcceptanceScenarios.json", "utf8"));
 const openingScenario = manifest.scenarios.find(scenario => scenario.id === "normal-export-whole-jpeg");
 const opening = JSON.parse(new URL(openingScenario.implementationPath, "http://localhost").searchParams.get("state"));
-const presentation = { sessionId: "owned-window-fitting", state: opening };
+const presentation = { sessionId: "owned-window-fitting", state: opening, windowWidth: 800 };
 
 // Only the OS boundary is substituted: production React, CSS, ResizeObserver,
 // dialog events and the Tauri window adapter run inside the real browser.
@@ -42,6 +42,7 @@ function installNativeBoundary() {
         if (parent.fitting.ready) parent.fitting.visibleFits.push(size.height);
         parent.fitting.lastFit = Date.now();
         parent.document.querySelector("iframe").style.height = `${size.height}px`;
+        parent.document.querySelector("iframe").style.width = `${size.width}px`;
         // Native command completion does not wait for the browser's next layout.
         return;
       }
@@ -104,12 +105,13 @@ try {
     { id: "export-range-invalid", interval: "3-2", stableWindow: true, rows: 0, invalid: true },
     { id: "export-range-cleared", interval: "", stableWindow: true, rows: 0, invalid: false },
     { id: "export-range-valid", interval: "1-2", stableWindow: true, rows: 0, invalid: false },
-    { id: "missing-original", state: missing, rows: 1 },
-    { id: "processing", state: { kind: "imageProcessingProgress", progress: { kind: "determinate", completed: 0, total: 1, status: "Preparando a Foto…" } }, rows: 0 },
-    { id: "problems-after-progress", state: missing, rows: 1 },
-    { id: "long-problem-list", state: { ...missing, problems: Array.from({ length: 15 }, (_, index) => ({ ...missing.problems[0], mediaId: `photo-${index}`, fileName: `Foto ${index}.jpg` })) }, rows: 15 },
+    { id: "missing-original", state: missing, rows: 1, width: 640 },
+    { id: "processing", state: { kind: "imageProcessingProgress", progress: { kind: "determinate", completed: 0, total: 1, status: "Preparando a Foto…" } }, rows: 0, width: 440 },
+    { id: "problems-after-progress", state: missing, rows: 1, width: 640 },
+    { id: "long-problem-list", state: { ...missing, problems: Array.from({ length: 15 }, (_, index) => ({ ...missing.problems[0], mediaId: `photo-${index}`, fileName: `Foto ${index}.jpg` })) }, rows: 15, width: 640 },
     { id: "export-resumed", state: { kind: "exportProgress", cancelRequested: false, cancellable: false,
-      progress: { kind: "indeterminate", status: "Iniciando a Exportação" } }, rows: 0 },
+      progress: { kind: "indeterminate", status: "Iniciando a Exportação" } }, rows: 0, width: 440 },
+    { id: "configuration-returned", state: opening, rows: 0, width: 800 },
   ];
   for (const [index, scenario] of scenarios.entries()) {
     if (scenario.stableWindow) await execute(`
@@ -122,7 +124,8 @@ try {
     else if (index > 0) await execute(`
       window.fitting.fits=[]; window.fitting.lastFit=Date.now();
       window.fitting.presentation.state=arguments[0];
-      document.querySelector('iframe').contentWindow.presentFittingState(window.fitting.presentation);`, [scenario.state]);
+      window.fitting.presentation.windowWidth=arguments[1];
+      document.querySelector('iframe').contentWindow.presentFittingState(window.fitting.presentation);`, [scenario.state, scenario.width ?? 800]);
     let result;
     const deadline = Date.now() + 4_500;
     do {
@@ -134,7 +137,7 @@ try {
         const footer=doc.querySelector('.ui-dialog-window__footer')?.getBoundingClientRect();
         const tooltip=doc.querySelector('[role="tooltip"]')?.getBoundingClientRect();
         const body=doc.querySelector('.ui-dialog-window__body')?.getBoundingClientRect();
-        return {...window.fitting,height:frame.clientHeight,rows:doc.querySelectorAll('tbody tr').length,
+        return {...window.fitting,width:frame.clientWidth,height:frame.clientHeight,rows:doc.querySelectorAll('tbody tr').length,
           intervalInvalid:doc.querySelector('[aria-label="Lâminas do intervalo"]')?.getAttribute('aria-invalid')==='true',
           tooltipVisible:Boolean(tooltip),tooltipContained:!tooltip||(tooltip.top>=body.top&&tooltip.bottom<=body.bottom&&tooltip.left>=0&&tooltip.right<=frame.clientWidth),
           firstRowVisible:rowBox?Math.max(0,Math.min(rowBox.bottom,box.bottom)-Math.max(rowBox.top,box.top)):0,
@@ -153,6 +156,7 @@ try {
       assert.equal(result.readyHeight, result.height, "The first visible height must match the settled height");
     }
     assert.equal(result.rows, scenario.rows, "Problem data must reach the real dialog");
+    assert.equal(result.width, scenario.width ?? 800, "The window must use the width delivered with the current dialog");
     if (scenario.stableWindow) {
       assert.equal(result.fits.length, 0, "Range editing and tooltips must not resize the window");
       assert.equal(result.height, results[0].height, "Range editing must preserve the opening height");

@@ -104,6 +104,7 @@ export interface ProjectDialogActionEvent {
 export interface ProjectDialogPresentation {
   sessionId: string;
   state: ProjectDialogState;
+  windowWidth: number;
 }
 
 /**

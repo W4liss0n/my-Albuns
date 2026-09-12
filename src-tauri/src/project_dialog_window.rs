@@ -192,11 +192,13 @@ impl ProjectDialogPresentationStore {
             if current.session_id != session_id {
                 return Err("another Project dialog session owns the window".into());
             }
+            current.window_width = state.initial_dimensions().0 as u16;
             current.state = state;
             return Ok(());
         }
         *current = Some(ProjectDialogPresentation {
             session_id: session_id.into(),
+            window_width: state.initial_dimensions().0 as u16,
             state,
         });
         Ok(())
@@ -250,6 +252,7 @@ pub(crate) async fn present_project_dialog(
     state_store.present(&session_id, state.clone())?;
     let presentation = ProjectDialogPresentation {
         session_id: session_id.clone(),
+        window_width: state.initial_dimensions().0 as u16,
         state: state.clone(),
     };
     let owner = window;
@@ -257,10 +260,6 @@ pub(crate) async fn present_project_dialog(
         if let Some(dialog) = app.get_webview_window(PROJECT_DIALOG_LABEL) {
             dialog
                 .emit(PROJECT_DIALOG_PRESENTATION_EVENT, &presentation)
-                .map_err(|error| error.to_string())?;
-            // Present the new content before fitting its width so the previous
-            // form cannot grow taller while being squeezed into a compact dialog.
-            native_dialog_window::resize_owned_window_width(&dialog, state.initial_dimensions().0)
                 .map_err(|error| error.to_string())?;
             return native_dialog_window::display_owned_dialog(&owner, &dialog)
                 .map_err(|error| error.to_string());
@@ -460,6 +459,36 @@ mod tests {
                 ..
             })
                 if message == "Falha mais recente"
+        ));
+    }
+
+    #[test]
+    fn a_reused_dialog_projects_its_new_width_with_its_content() {
+        let store = ProjectDialogPresentationStore::default();
+        store
+            .present(
+                "export",
+                ProjectDialogState::ProjectCloseConfirmation { busy: false },
+            )
+            .unwrap();
+        assert_eq!(store.current().unwrap().unwrap().window_width, 520);
+        store
+            .present(
+                "export",
+                ProjectDialogState::ExportProgress {
+                    cancel_requested: false,
+                    cancellable: true,
+                    progress: ProjectDialogProgress::Indeterminate {
+                        status: "Exportando".into(),
+                    },
+                },
+            )
+            .unwrap();
+        let presentation = store.current().unwrap().unwrap();
+        assert_eq!(presentation.window_width, 440);
+        assert!(matches!(
+            presentation.state,
+            ProjectDialogState::ExportProgress { .. }
         ));
     }
 

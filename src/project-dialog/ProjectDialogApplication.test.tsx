@@ -43,6 +43,7 @@ test("reused dialog actions and window Close follow the latest owner atomically"
       client={client}
       initialPresentation={{
         sessionId: "export-1",
+        windowWidth: 440,
         state: {
           kind: "exportSuccess",
           message: "Primeiro owner",
@@ -53,13 +54,17 @@ test("reused dialog actions and window Close follow the latest owner atomically"
     />,
   );
   await waitFor(() => expect(client.onPresentation).toHaveBeenCalledOnce());
+  expect(windowControls.fitContent).toHaveBeenLastCalledWith(expect.any(Function), 440);
 
   act(() => {
     emit({
       sessionId: "project-close-2",
+      windowWidth: 520,
       state: { busy: false, kind: "projectCloseConfirmation" },
     });
   });
+  expect(windowControls.fitContent).toHaveBeenLastCalledWith(expect.any(Function), 520);
+  expect(document.querySelector(".ui-owned-window-shell")).toHaveStyle({ width: "520px" });
   await user.click(screen.getByRole("button", { name: "Cancelar" }));
   await user.click(screen.getByRole("button", { name: "Fechar janela" }));
 

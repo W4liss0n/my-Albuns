@@ -264,7 +264,13 @@ export function parseProjectDialogActionEvent(
 export function parseProjectDialogPresentation(
   value: unknown,
 ): ProjectDialogPresentation | null {
-  if (!isRecord(value) || !isProjectDialogSessionId(value.sessionId)) {
+  if (
+    !isRecord(value) ||
+    !isProjectDialogSessionId(value.sessionId) ||
+    !isWireU64(value.windowWidth) ||
+    value.windowWidth === 0 ||
+    value.windowWidth > 65535
+  ) {
     return null;
   }
   const state = parseProjectDialogState(value.state);
@@ -272,10 +278,12 @@ export function parseProjectDialogPresentation(
   const presentation = {
     sessionId: value.sessionId,
     state: toIpcProjectDialogState(state),
+    windowWidth: value.windowWidth,
   } satisfies IpcProjectDialogPresentation;
   return {
     sessionId: presentation.sessionId,
     state: fromIpcProjectDialogState(presentation.state),
+    windowWidth: presentation.windowWidth,
   };
 }
 

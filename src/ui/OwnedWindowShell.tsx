@@ -7,12 +7,14 @@ interface OwnedWindowShellProps {
   children: ReactNode;
   controls?: "all" | "close" | "none";
   status?: string;
+  width?: number;
 }
 
 export function OwnedWindowShell({
   children,
   controls = "none",
   status,
+  width,
 }: OwnedWindowShellProps) {
   const shellRef = useRef<HTMLDivElement>(null);
   const windowControls = useWindowControls();
@@ -25,7 +27,7 @@ export function OwnedWindowShell({
     const measureHeight = () => Math.ceil(shell.getBoundingClientRect().height);
     const fitContent = () => {
       try {
-        void Promise.resolve(windowControls.fitContent(measureHeight)).catch(
+        void Promise.resolve(windowControls.fitContent(measureHeight, width)).catch(
           () => undefined,
         );
       } catch {
@@ -37,12 +39,13 @@ export function OwnedWindowShell({
     fitContent();
 
     return () => observer.disconnect();
-  }, [windowControls]);
+  }, [windowControls, width]);
 
   return (
     <div
       className="ui-owned-window-shell ui-chrome-selection-scope"
       ref={shellRef}
+      style={width === undefined ? undefined : { width }}
     >
       <ApplicationHeader controls={controls} status={status} />
       {children}

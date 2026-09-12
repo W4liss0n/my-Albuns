@@ -141,9 +141,13 @@ test("keeps the dialog action and initial window bound to their session", () => 
   ).toBeNull();
   const presentation = {
     sessionId: "album-information-7",
+    windowWidth: 520,
     state: states[0],
   };
   expect(parseProjectDialogPresentation(presentation)).toEqual(presentation);
+  for (const windowWidth of [undefined, 0, -1, 1.5, NaN, Infinity, 65536]) {
+    expect(parseProjectDialogPresentation({ ...presentation, windowWidth })).toBeNull();
+  }
   expect(
     parseInitialProjectDialogPresentation(
       `?presentation=${encodeURIComponent(JSON.stringify(presentation))}`,

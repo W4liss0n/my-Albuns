@@ -167,6 +167,7 @@ pub enum ProjectDialogState {
 pub struct ProjectDialogPresentation {
     pub(crate) session_id: String,
     pub(crate) state: ProjectDialogState,
+    pub(crate) window_width: u16,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
@@ -372,6 +373,7 @@ mod project_dialog_contract_tests {
         assert_eq!(
             serde_json::to_value(ProjectDialogPresentation {
                 session_id: "export-8".into(),
+                window_width: 440,
                 state: ProjectDialogState::ExportSuccess {
                     message: "Exportação concluída".into(),
                 },
@@ -379,6 +381,7 @@ mod project_dialog_contract_tests {
             .expect("the owned presentation serializes"),
             json!({
                 "sessionId": "export-8",
+                "windowWidth": 440,
                 "state": {
                     "kind": "exportSuccess",
                     "message": "Exportação concluída"

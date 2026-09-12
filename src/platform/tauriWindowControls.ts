@@ -81,14 +81,15 @@ function ensureFitQueue() {
   return runningQueue;
 }
 
-async function fitContent(measureHeight: () => number) {
+async function fitContent(measureHeight: () => number, preferredWidth?: number) {
   const availableHeight = availableOwnedWindowHeight();
   // Measure against the screen, not the provisional or previously fitted viewport.
   document.documentElement.style.setProperty(
     "--ui-owned-window-height-limit",
     `${availableHeight}px`,
   );
-  const width = Math.ceil(document.documentElement.clientWidth);
+  const width = Math.ceil(preferredWidth ?? document.documentElement.clientWidth);
+  if (!Number.isFinite(width) || width <= 0) return;
   const height = measureHeight();
   if (!Number.isFinite(height) || height <= 0) return;
   const fittedHeight = Math.min(

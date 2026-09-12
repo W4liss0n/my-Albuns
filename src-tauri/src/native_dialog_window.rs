@@ -403,15 +403,12 @@ impl NativeProgressDialog {
     }
 }
 
-pub(crate) fn resize_owned_window_width(window: &WebviewWindow, width: f64) -> io::Result<()> {
+fn resize_owned_window_width(window: &WebviewWindow, width: f64) -> io::Result<()> {
     let scale_factor = window.scale_factor().map_err(io::Error::other)?;
     let current_size = window
         .inner_size()
         .map_err(io::Error::other)?
         .to_logical::<f64>(scale_factor);
-    if (current_size.width - width).abs() < 0.5 {
-        return Ok(());
-    }
     window
         .set_size(tauri::LogicalSize::new(width, current_size.height))
         .map_err(io::Error::other)?;

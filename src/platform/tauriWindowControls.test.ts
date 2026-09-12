@@ -93,6 +93,16 @@ test("coalesces concurrent fits for the same rendered size", async () => {
   expect(windowApi.center).toHaveBeenCalledOnce();
 });
 
+test("fits the current dialog width even while the native viewport retains the previous width", async () => {
+  vi.spyOn(document.documentElement, "clientWidth", "get").mockReturnValue(800);
+  await tauriWindowControls.fitContent(() => 501, 800);
+  await tauriWindowControls.fitContent(() => 208, 440);
+
+  expect(windowApi.setSize).toHaveBeenLastCalledWith({ width: 440, height: 208 });
+  await tauriWindowControls.fitContent(() => 208, 440);
+  expect(windowApi.setSize).toHaveBeenCalledTimes(2);
+});
+
 test("sets screen bounds before measuring the first visible content size", async () => {
   const measuredLimits: string[] = [];
   await tauriWindowControls.fitContent(() => {
