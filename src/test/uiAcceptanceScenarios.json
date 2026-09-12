@@ -2,6 +2,16 @@
   "schemaVersion": 3,
   "scenarios": [
     {
+      "id": "welcome",
+      "title": "Tela de Boas-vindas",
+      "implementationPath": "/welcome-preview.html",
+      "referencePath": "/docs/references/ui-programa-diagramacao/Boas-vindas.dc.html",
+      "comparison": { "kind": "paired", "surface": "welcome-window" },
+      "viewport": { "width": 1280, "height": 720 },
+      "readySelector": "[aria-label=\"Ações principais\"]",
+      "actions": []
+    },
+    {
       "id": "media-export-problems",
       "title": "Exportação — Arquivos ausentes e indisponíveis",
       "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportMediaProblems%22%2C%22projectName%22%3A%22Formatura%20%E2%80%94%20Turma%202026%22%2C%22problems%22%3A%5B%7B%22mediaId%22%3A%22photo-1%22%2C%22fileName%22%3A%22Retrato%20001.JPG%22%2C%22state%22%3A%22absent%22%7D%2C%7B%22mediaId%22%3A%22photo-2%22%2C%22fileName%22%3A%22Retrato%20002.JPG%22%2C%22state%22%3A%22unavailable%22%7D%5D%2C%22busy%22%3Afalse%2C%22message%22%3A%22%22%7D",
@@ -50,16 +60,6 @@
         "height": 430
       },
       "readySelector": ".ui-problems-table",
-      "actions": []
-    },
-    {
-      "id": "welcome",
-      "title": "Tela de Boas-vindas",
-      "implementationPath": "/welcome-preview.html",
-      "referencePath": "/docs/references/ui-programa-diagramacao/Boas-vindas.dc.html",
-      "comparison": { "kind": "paired", "surface": "welcome-window" },
-      "viewport": { "width": 1280, "height": 720 },
-      "readySelector": "[aria-label=\"Ações principais\"]",
       "actions": []
     },
     {
