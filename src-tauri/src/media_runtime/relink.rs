@@ -77,6 +77,48 @@ mod tests {
     use myalbuns_paths::OperationPathContext;
 
     #[test]
+    fn candidate_inspection_keeps_the_search_binding_after_a_new_mapping_is_captured() {
+        let first = tempfile::tempdir().unwrap();
+        let second = tempfile::tempdir().unwrap();
+        let folder = PathBuf::from(r"Z:\Fotos");
+        let binding = MediaBinding {
+            media_id: "photo-1".into(),
+            kind: MediaKind::Photo,
+            logical_path: PathBuf::from(r"Z:\antiga\Foto.png"),
+        };
+        for (root, width) in [(first.path(), 17), (second.path(), 41)] {
+            std::fs::create_dir(root.join("Fotos")).unwrap();
+            image::RgbImage::from_pixel(width, 11, image::Rgb([30, 80, 140]))
+                .save_with_format(root.join("Fotos/Foto.png"), image::ImageFormat::Png)
+                .unwrap();
+        }
+        let mut first_context = OperationPathContext::new();
+        first_context
+            .capture_with_binding(&folder, first.path())
+            .unwrap();
+        let first_plan = first_context.freeze();
+        let candidates = MediaResolver
+            .find_relink_candidates(&folder, std::slice::from_ref(&binding), &first_plan)
+            .unwrap();
+        let mut remapped_context = OperationPathContext::new();
+        remapped_context
+            .capture_with_binding(&folder, second.path())
+            .unwrap();
+        let replacement = candidates[&binding.media_id].clone();
+        let inspected = MediaResolver
+            .propose_relink_in_plan(&binding, replacement.clone(), &first_plan)
+            .unwrap();
+        let remapped = MediaResolver
+            .propose_relink_in_plan(&binding, replacement, &remapped_context.freeze())
+            .unwrap();
+        assert_ne!(
+            inspected.source_metadata(),
+            remapped.source_metadata(),
+            "the next attempt sees the remap; this attempt retains the source that it searched"
+        );
+    }
+
+    #[test]
     fn recursive_search_requires_one_exact_filename_and_retains_logical_paths() {
         let root = tempfile::tempdir().unwrap();
         for folder in ["Fotos/a", "Fotos/b"] {

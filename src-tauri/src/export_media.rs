@@ -114,8 +114,19 @@ pub(crate) async fn relink_export_media(
             });
         let selection = receiver.await.map_err(|error| error.to_string())?;
         if let Some(FilePath::Path(folder)) = selection {
+            let catalog = host.authorized_media_catalog()?;
+            let cache_root = app
+                .state::<crate::cache_service::ActiveCacheNamespace>()
+                .namespace()
+                .paths()
+                .root()
+                .to_path_buf();
             let (candidates, roots, missing) = tauri::async_runtime::spawn_blocking(move || {
                 let mut context = OperationPathContext::new();
+                let _ = context.capture(&cache_root);
+                for media in &catalog.bindings {
+                    let _ = context.capture(&media.logical_path);
+                }
                 context
                     .capture(&folder)
                     .map_err(|error| error.to_string())?;
@@ -135,6 +146,14 @@ pub(crate) async fn relink_export_media(
                 |progress| {
                     if let Some(problem) = progress.problem.as_ref() {
                         notes.push(problem.clone());
+                    }
+                    if let Some(reason) = progress.operation_problem.as_ref()
+                        && !notes.iter().any(|note| note.reason == *reason)
+                    {
+                        notes.push(ImageProcessingProblem {
+                            file_name: "Processamento".into(),
+                            reason: reason.clone(),
+                        });
                     }
                     let _ = on_progress.send(progress);
                 },
@@ -166,7 +185,9 @@ pub(crate) async fn relink_export_media(
                             logical_path: candidates[&binding.media_id].clone(),
                             ..binding
                         };
-                        processing.prepare(&app, &replacement).await;
+                        processing
+                            .prepare_all_in_plan(&app, vec![replacement], roots.clone())
+                            .await;
                     }
                     Err(reason) => {
                         processing.complete(Some(ImageProcessingProblem { file_name, reason }))

@@ -141,6 +141,11 @@ test("folder recovery preserves the pending attempt, publishes the unsaved proje
   dialog.emit("continueMediaExport");
   expect(exportHarness.startSheet).toHaveBeenCalledTimes(2);
   expect(inspect).not.toHaveBeenCalled();
+  await act(async () => exportHarness.attempts[1].resolve({ status: "cancelled" }));
+  expect(dialog.dismiss).toHaveBeenCalledOnce();
+  expect(screen.getByRole("button", { name: "Exportar Lâmina" })).toBeEnabled();
+  fireEvent.click(screen.getByRole("button", { name: "Exportar Lâmina" }));
+  expect(exportHarness.startSheet).toHaveBeenCalledTimes(3);
 });
 
 test("unavailable sources are reinspected without relinking, and closing cancels the pending export", async () => {

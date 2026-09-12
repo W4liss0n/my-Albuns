@@ -198,6 +198,10 @@ export const ExportPreviewControl = forwardRef<
             });
           } else {
             setPhase("idle");
+            lastDialogState.current = undefined;
+            const session = dialogSession.current;
+            dialogSession.current = null;
+            void session?.dismiss().catch(() => undefined);
             endInteraction();
           }
           return;

@@ -416,7 +416,18 @@ pub(crate) async fn relink_media(
     let mut paths = myalbuns_paths::OperationPathContext::new();
     let original_path = binding.logical_path.clone();
     let candidate_path = path.clone();
+    let catalog = host.authorized_media_catalog()?;
+    let cache_root = app
+        .state::<ActiveCacheNamespace>()
+        .namespace()
+        .paths()
+        .root()
+        .to_path_buf();
     let roots = tauri::async_runtime::spawn_blocking(move || {
+        let _ = paths.capture(&cache_root);
+        for media in &catalog.bindings {
+            let _ = paths.capture(&media.logical_path);
+        }
         paths
             .capture(&original_path)
             .map_err(|error| error.to_string())?;
@@ -427,14 +438,16 @@ pub(crate) async fn relink_media(
     })
     .await
     .map_err(|error| error.to_string())??;
-    let relinked = relink_binding(&app, binding, path, roots).await?;
+    let relinked = relink_binding(&app, binding, path, roots.clone()).await?;
     let relinked_binding = state
         .authorized_media_catalog()?
         .bindings
         .into_iter()
         .find(|binding| binding.media_id == selected_media_id)
         .ok_or_else(|| "A imagem religada não pertence mais ao Projeto.".to_string())?;
-    processing.prepare(&app, &relinked_binding).await;
+    processing
+        .prepare_all_in_plan(&app, vec![relinked_binding], roots)
+        .await;
     tracing::info!(
         target: "myalbuns.desktop",
         process_role = ProcessRole::DesktopHost.as_str(),
