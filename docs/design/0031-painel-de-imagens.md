@@ -45,6 +45,15 @@ uma revisão temporária. A ausência continua indicada no próprio item do
 Painel de imagens. O filtro `Ausentes` permanece disponível por escolha do
 usuário, dentro da aba atual e em conjunto com a busca e o filtro de uso.
 
+Na miniatura, a ausência aparece somente como um ícone quadrado no canto
+superior direito, com descrição acessível e ao passar o mouse. Não há texto
+`Ausente` nem botão de Religação sobre a imagem. Com Cache, a miniatura real
+continua disponível; sem Cache, o mesmo ícone aparece sobre o placeholder
+genérico. A ação `Religar` fica exclusivamente no menu do botão direito da
+imagem ausente e atua no item clicado, preservando uma seleção múltipla
+existente. A ação respeita os bloqueios de operação e deixa de aparecer quando
+o Original retorna. A nova tentativa para Arquivo indisponível mantém seu fluxo.
+
 ## Importação e gestos
 
 Fotos e Decorativos usam a mesma tentativa nativa. A aba é capturada ao iniciar

@@ -7591,6 +7591,51 @@
       ]
     },
     {
+      "id": "media-panel-absent-without-cache",
+      "title": "Foto ausente sem Cache — ícone sobre o placeholder",
+      "implementationPath": "/media-panel-preview.html?acceptance=editor&files=absent&cache=missing",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-complete",
+        "implementationCaptureSelector": ".media-panel",
+        "reason": "A decisão do usuário substitui o aviso textual por um ícone quadrado e move Religar para o menu do botão direito."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": ".media-grid [data-media-id=\"test-media-003\"] .media-missing-indicator",
+      "actions": [{ "type": "click", "selector": ".media-folder-chip:not([aria-label])" }]
+    },
+    {
+      "id": "media-panel-absent-context-menu",
+      "title": "Foto ausente com Cache — Religar no menu do botão direito",
+      "implementationPath": "/media-panel-preview.html?acceptance=editor&files=absent",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-complete",
+        "implementationCaptureSelector": ".media-panel-preview",
+        "reason": "O design 0031 mantém a miniatura em Cache e oferece Religação somente no menu do item ausente."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "[role=\"menu\"]:has([role=\"menuitem\"])",
+      "actions": [{ "type": "context-click", "selector": ".media-grid [data-media-id=\"test-media-003\"]" }]
+    },
+    {
+      "id": "media-panel-absent-decorative-context-menu",
+      "title": "Decorativo ausente sem Cache — ícone e Religação no menu",
+      "implementationPath": "/media-panel-preview.html?acceptance=editor&files=absent&cache=missing",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-complete",
+        "implementationCaptureSelector": ".media-panel-preview",
+        "reason": "A indicação e a Religação de ausentes seguem o mesmo contrato de Fotos na aba Decorativos."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "[role=\"menu\"]:has([role=\"menuitem\"])",
+      "actions": [
+        { "type": "click", "selector": "[aria-label=\"Decorativos\"]" },
+        { "type": "context-click", "selector": ".media-grid [data-media-id=\"test-decorative-001\"]" }
+      ]
+    },
+    {
       "id": "media-panel-removal-menu",
       "title": "Painel de imagens — seleção e menu Remover",
       "implementationPath": "/media-panel-preview.html?acceptance=editor",

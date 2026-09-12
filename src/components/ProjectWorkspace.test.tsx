@@ -5626,8 +5626,8 @@ test("offers retry only for an unavailable occurrence and keeps Relink exclusive
   );
 
   expect(
-    screen.getAllByRole("button", { name: /Religar arquivo de/i }),
-  ).toHaveLength(1);
+    screen.queryByRole("button", { name: /Religar arquivo de/i }),
+  ).not.toBeInTheDocument();
   expect(
     screen.getAllByRole("button", { name: /Tentar novamente o arquivo de/i }),
   ).toHaveLength(1);
@@ -5637,12 +5637,11 @@ test("offers retry only for an unavailable occurrence and keeps Relink exclusive
     name: /^(Arquivo ausente|Indisponível|Prévia indisponível)/,
   });
   expect(availabilityStatuses).toHaveLength(3);
-  expect(screen.getByRole("status", { name: /^Arquivo ausente/ })).toHaveTextContent(/^Ausente$/);
+  expect(screen.getByRole("status", { name: /^Arquivo ausente/ }).textContent).toBe("");
   expect(screen.getByRole("status", { name: "Indisponível" })).toHaveTextContent(/^Indisponível$/);
   expect(screen.getByRole("status", { name: /^Prévia indisponível/ })).toHaveTextContent(/^Prévia indisponível/);
-  fireEvent.click(
-    screen.getByRole("button", { name: /Religar arquivo de/i }),
-  );
+  fireEvent.contextMenu(screen.getByRole("button", { name: /Arquivo ausente/ }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Religar" }));
   fireEvent.click(
     screen.getByRole("button", { name: /Tentar novamente o arquivo de/i }),
   );

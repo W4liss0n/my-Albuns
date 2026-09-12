@@ -878,6 +878,75 @@ test("Photoshop opens only one contextual Photo and never a multi-selection or D
   expect(open).toHaveBeenCalledTimes(1);
 });
 
+test.each([
+  ["photo", null], ["photo", "asset://localhost/cache/retained.jpg"],
+  ["decorative", null], ["decorative", "asset://localhost/cache/retained.jpg"],
+] as const)("an absent %s with preview %s relinks only through its context menu", (kind, url) => {
+  const onRelinkMedia = vi.fn();
+  const onFillPhoto = vi.fn();
+  const onApplyDecorative = vi.fn();
+  render(<MediaPanel {...mediaPanelInteractions} onRelinkMedia={onRelinkMedia}
+    onFillPhoto={onFillPhoto} onApplyDecorative={onApplyDecorative}
+    mediaItems={[media("missing", kind, "Imagem 1")]} mediaUsage={[]}
+    preferences={{ kind: "local" }} previewSource={{ kind: "static", previews: {
+      missing: { mediaId: "missing", state: "absent", url },
+    } }} />);
+  if (kind === "decorative") fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
+  const card = screen.getByRole("button", { name: /^Imagem 1\. Arquivo ausente/ });
+  const status = within(card).getByRole("status", { name: /^Arquivo ausente/ });
+  expect(status.textContent).toBe("");
+  expect(status).toHaveAttribute("title", expect.stringContaining("Arquivo ausente"));
+  expect(card.querySelector("img")?.getAttribute("src") ?? null).toBe(url);
+  expect(screen.queryByRole("button", { name: /Religar/ })).not.toBeInTheDocument();
+  fireEvent.doubleClick(card);
+  if (kind === "photo") expect(onFillPhoto).toHaveBeenCalledWith("missing");
+  else expect(onApplyDecorative).toHaveBeenCalledWith("missing", "background");
+  fireEvent.contextMenu(card);
+  fireEvent.click(screen.getByRole("menuitem", { name: "Religar" }));
+  expect(onRelinkMedia).toHaveBeenCalledExactlyOnceWith("missing");
+  expect(screen.queryByRole("menu", { name: "Ações das imagens" })).not.toBeInTheDocument();
+});
+
+test("Religar targets the right-clicked absent item while preserving a selected group", () => {
+  const onRelinkMedia = vi.fn();
+  const props = { ...mediaPanelInteractions, onRelinkMedia, onFillPhoto: vi.fn(), mediaUsage: [],
+    mediaItems: [media("first", "photo", "Imagem 1"), media("second", "photo", "Imagem 2")],
+    preferences: { kind: "local" as const }, previewSource: { kind: "static" as const },
+    mediaFiles: {
+      first: { mediaId: "first", state: "absent" as const, createdAtMs: null, modifiedAtMs: null },
+      second: { mediaId: "second", state: "absent" as const, createdAtMs: null, modifiedAtMs: null },
+    } };
+  const view = render(<MediaPanel {...props} />);
+  const first = screen.getByRole("button", { name: /^Imagem 1/ });
+  const second = screen.getByRole("button", { name: /^Imagem 2/ });
+  fireEvent.click(first);
+  fireEvent.click(second, { ctrlKey: true });
+  fireEvent.contextMenu(second);
+  expect(first).toHaveAttribute("aria-pressed", "true");
+  expect(second).toHaveAttribute("aria-pressed", "true");
+  fireEvent.click(screen.getByRole("menuitem", { name: "Religar" }));
+  expect(onRelinkMedia).toHaveBeenCalledExactlyOnceWith("second");
+  fireEvent.contextMenu(first);
+  view.rerender(<MediaPanel {...props} mediaFiles={{ ...props.mediaFiles,
+    first: { ...props.mediaFiles.first, state: "available" },
+  }} />);
+  expect(screen.queryByRole("menuitem", { name: "Religar" })).not.toBeInTheDocument();
+});
+
+test.each(["relinkDisabled", "importPending"] as const)("Religar remains disabled during %s", (busyProp) => {
+  const onRelinkMedia = vi.fn();
+  render(<MediaPanel {...mediaPanelInteractions} {...{ [busyProp]: true }} onRelinkMedia={onRelinkMedia}
+    onFillPhoto={vi.fn()} mediaItems={[media("missing", "photo", "Imagem 1")]} mediaUsage={[]}
+    preferences={{ kind: "local" }} previewSource={{ kind: "static", previews: {
+      missing: { mediaId: "missing", state: "absent", url: null },
+    } }} />);
+  fireEvent.contextMenu(screen.getByRole("button", { name: /^Imagem 1/ }));
+  const relink = screen.getByRole("menuitem", { name: "Religar" });
+  expect(relink).toBeDisabled();
+  fireEvent.click(relink);
+  expect(onRelinkMedia).not.toHaveBeenCalled();
+});
+
 test("an unavailable Photoshop disables its Photo menu without blocking other actions", () => {
   const open = vi.fn();
   render(<MediaPanel {...mediaPanelInteractions} mediaItems={mediaItems} mediaUsage={mediaUsage}

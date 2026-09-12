@@ -9,6 +9,7 @@ import {
   type MouseEvent,
   type Ref,
 } from "react";
+import { ImageOff } from "lucide-react";
 import type {
   MediaPreview,
   MediaImportSelection,
@@ -17,6 +18,7 @@ import type {
 } from "../application/projectPorts";
 import { matchProjectCommandShortcut, projectCommandDescriptor, projectCommandShortcutLabel } from "../application/projectCommandCatalog";
 import { ContextMenuSurface } from "../ui/ContextMenuSurface";
+import { AppIcon } from "../ui/AppIcon";
 import type { MediaPanelPersistentPreference } from "../application/workspacePreferences";
 
 import type {
@@ -135,7 +137,7 @@ export function MediaPanel({
   previewSource,
 }: MediaPanelProps) {
   const mediaPreviews = previewSource.previews ?? {};
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; mediaId: string } | null>(null);
   const onMediaDemandChange =
     previewSource.kind === "connected" ? previewSource.onDemandChange : null;
   const controlledPersistent =
@@ -610,7 +612,7 @@ export function MediaPanel({
                 onContextMenu={(event) => {
                   event.preventDefault();
                   selectMediaForContextMenu(media.id);
-                  setContextMenu({ x: event.clientX, y: event.clientY });
+                  setContextMenu({ x: event.clientX, y: event.clientY, mediaId: media.id });
                 }}
                 onPointerDown={(event) => mediaDrag.start(media.id, media.kind, event)}
                 onDoubleClick={(event) => {
@@ -625,24 +627,14 @@ export function MediaPanel({
                 {availabilityLabel && (
                   <span
                     aria-label={availabilityLabel ?? undefined}
-                    className="media-availability"
+                    className={preview?.state === "absent" ? "media-missing-indicator" : "media-availability"}
                     role="status"
+                    title={availabilityLabel}
                   >
-                    {preview?.state === "absent" ? "Ausente" : availabilityLabel}
+                    {preview?.state === "absent" ? <AppIcon icon={ImageOff} size={16} /> : availabilityLabel}
                   </span>
                 )}
                 </MediaPreviewCard>
-                {preview?.state === "absent" && (
-                  <button
-                    aria-label={`Religar arquivo de ${media.name}`}
-                    className="media-recovery-action"
-                    disabled={relinkDisabled}
-                    type="button"
-                    onClick={() => onRelinkMedia(media.id)}
-                  >
-                    Religar
-                  </button>
-                )}
                 {preview?.state === "unavailable" && (
                   <button
                     aria-label={`Tentar novamente o arquivo de ${media.name}`}
@@ -660,6 +652,17 @@ export function MediaPanel({
       </div>
       {contextMenu && <ContextMenuSurface label="Ações das imagens" position={contextMenu}
         onDismiss={() => { setContextMenu(null); panelHostRef.current?.focus({ preventScroll: true }); }}>
+        {fileInformation[contextMenu.mediaId]?.state === "absent" && (
+          <button type="button" role="menuitem" disabled={relinkDisabled || importPending}
+            onClick={() => {
+              const mediaId = contextMenu.mediaId;
+              setContextMenu(null);
+              panelHostRef.current?.focus({ preventScroll: true });
+              onRelinkMedia(mediaId);
+            }}>
+            Religar
+          </button>
+        )}
         {mediaItems.some((media) => selectedMediaIds.has(media.id) && media.kind === "photo") && <button type="button" role="menuitem"
           disabled={!photoshopAvailable || relinkDisabled || importPending || selectedMediaIds.size !== 1}
           onClick={() => { const id = [...selectedMediaIds][0]; if (id) onOpenInPhotoshop?.(id); setContextMenu(null); panelHostRef.current?.focus({ preventScroll: true }); }}>
