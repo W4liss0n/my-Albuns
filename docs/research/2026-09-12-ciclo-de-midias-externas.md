@@ -20,12 +20,19 @@ Lâmina verifica somente seus Originais necessários. Ausência ou
 indisponibilidade abre a tabela de Problemas. Arquivos sem uso naquela seleção
 não bloqueiam a operação.
 
-`Relinkar` solicita a pasta das Fotos e procura nas subpastas pelo nome e pela
-extensão exatos. Somente uma correspondência única é proposta para cada
-referência ausente; zero ou várias correspondências permanecem pendentes. A
-inspeção completa confirma o candidato antes da alteração. Falhas de leitura
-da árvore impedem afirmar unicidade; atalhos simbólicos e junções interrompem
-a busca com um motivo explícito, evitando percursos incompletos ou cíclicos.
+`Relinkar` solicita a pasta das Fotos e procura somente nos arquivos diretamente
+nessa pasta pelo nome e pela extensão exatos, sem pesquisar subpastas. Somente
+uma correspondência única é proposta para cada referência ausente; zero ou
+várias correspondências permanecem pendentes. A inspeção completa confirma o
+candidato antes da alteração. Falhas de enumeração impedem afirmar unicidade;
+um candidato com o nome procurado que seja atalho simbólico ou redirecionamento
+interrompe a busca com um motivo explícito. Subpastas e entradas com outros
+nomes não são percorridas.
+
+Essa regra reflete a decisão posterior do autor, registrada no design 0031.
+No Painel, `Religar` usa a mesma busca para a imagem clicada. `Substituir Imagem`
+oferece a todas as Fotos e Decorativos um seletor de arquivo, inclusive para
+Originais renomeados, preservando os usos, Frames e ajustes no Projeto.
 
 Cada referência corrigida usa o comando normal da Sessão, participa de
 Undo/Redo e fica pendente de Salvamento manual. As prévias passam pelo mesmo
@@ -65,22 +72,24 @@ um snapshot imutável e não executa Religação nem Salvamento.
 1. Em um Projeto de teste, importe duas imagens e coloque apenas uma na Lâmina.
 2. Salve o Projeto. Mova a imagem que ficou somente no Painel: a Lâmina ainda
    deve exportar.
-3. Mova também a imagem usada para uma subpasta de outra pasta. Ao exportar,
+3. Mova também a imagem usada para outra pasta. Ao exportar,
    confira a indicação de ausência e clique em `Relinkar`.
-4. Escolha a pasta que contém a nova localização. A prévia deve ser preparada,
+4. Escolha a pasta que contém diretamente a imagem. A prévia deve ser preparada,
    o Projeto deve ficar com alterações pendentes e a tabela deve fechar,
    seguindo diretamente para a escolha do Destino.
 5. Cancele a escolha do Destino e experimente Undo/Redo. Reabra a Exportação e confirme que
    a referência corrigida funciona antes de Salvar.
-6. Repita com duas cópias de mesmo nome e extensão em subpastas diferentes:
-   a busca deve manter a pendência, sem escolher uma arbitrariamente.
+6. Repita deixando a imagem somente em uma subpasta: escolher a pasta acima
+   deve manter a pendência. Escolher diretamente a subpasta deve religar.
 7. Para indisponibilidade, use uma origem temporariamente inacessível. A ação
    deve ser `Tentar novamente`, preservando o vínculo.
+8. No Painel, abra o menu de uma imagem presente e use `Substituir Imagem` com
+   outro nome. Confira seus usos e ajustes nas Lâminas, Undo/Redo e Salvamento.
 
 ## Evidências
 
 O teste com arquivos temporários reais cobre a seleção de dependências,
-ausência, objeto de tipo incorreto, busca recursiva, snapshot com referência
+ausência, objeto de tipo incorreto, busca direta que ignora subpastas, snapshot com referência
 não salva, preservação dos bytes persistidos e Undo/Redo. Outro percurso usa
 dois Hosts para Fotos e Decorativos, comparando uma gravação truncada e sua
 sucessora válida, sem alterações de Histórico.
@@ -90,6 +99,10 @@ tabela, a espera enquanto restam problemas, a exclusão entre ações durante
 a recuperação e a separação entre Religação e nova inspeção.
 As capturas declaradas estão no manifesto de aceitação visual; relatórios
 locais ficam em `.scratch/ui-acceptance/media-delivery/`.
+Os cenários de Religar pela pasta e Substituir Imagem acrescentam cobertura de
+fila com Salvamento adjacente, preservação dos Frames e usos, Undo/Redo e
+reabertura após Salvamento. As capturas dos menus ficam em
+`.scratch/ui-acceptance/media-actions-final/`.
 
 ## Correção após o teste manual: tabela vazia e janela reduzida
 

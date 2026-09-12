@@ -66,7 +66,7 @@ Fechar ou cancelar a Tela de Problemas encerra a tentativa de Exportação pende
 
 ## Exportação individual
 
-Na Exportação normal, `Relinkar` abre um seletor de pasta para o usuário informar onde estão as Fotos daquele Projeto. A busca percorre essa pasta recursivamente e exige o nome e a extensão exatos do Arquivo ausente.
+Na Exportação normal, `Relinkar` abre um seletor de pasta para o usuário informar onde estão as Fotos daquele Projeto. A busca considera somente os arquivos diretamente nessa pasta, sem pesquisar subpastas, e exige o nome e a extensão exatos do Arquivo ausente.
 
 Somente uma correspondência única é aceita. Nenhuma ou várias mantêm a pendência; uma correspondência aceita atualiza a referência na sessão aberta. A mudança:
 
@@ -77,7 +77,7 @@ Somente uma correspondência única é aceita. Nenhuma ou várias mantêm a pend
 
 ## Exportação em lote
 
-No lote, `Relinkar` em uma linha solicita a pasta das Fotos daquele Projeto e faz a mesma busca recursiva, exata e não ambígua. A correspondência integra somente o mapa temporário do lote e não atualiza o arquivo persistido.
+No lote, `Relinkar` em uma linha solicita a pasta das Fotos daquele Projeto e mantém a busca recursiva, exata e não ambígua. A correspondência integra somente o mapa temporário do lote e não atualiza o arquivo persistido.
 
 O contexto do lote também acrescenta a ação global `Relinkar todos`. Ela solicita uma pasta raiz onde se encontram as pastas de Fotos dos Projetos.
 
