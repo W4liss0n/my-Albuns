@@ -37,6 +37,11 @@ estreitas, a opção de páginas simples passa para a linha seguinte.
 
 O rodapé fixo apresenta a quantidade calculada de arquivos para JPEG/PNG ou de páginas para PDF, além de `Cancelar` e `Exportar`.
 
+Na abertura, a pasta de destino padrão é obtida antes de apresentar o diálogo.
+A janela aparece diretamente com os campos prontos para edição, sem um estado
+transitório de preparação que altere sua altura. Se a consulta falhar, o diálogo
+já abre editável com a mensagem de erro e permite escolher outra pasta.
+
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
 │  Destino da exportação                                          │

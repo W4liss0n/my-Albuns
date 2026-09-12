@@ -19,6 +19,59 @@ import { MediaExportBlockedError, type ExportMediaPort } from "../application/ex
 import { representativeProjection } from "../test/projectFixtures";
 import { ExportConflictsError } from "../application/normalExport";
 
+test("opens normal export only after the destination is available, without a transient preparation state", async () => {
+  const dialog = createDialogHarness();
+  const harness = createExportHarness();
+  let resolveDestination!: (destination: string) => void;
+  harness.port.defaultDestination = () => new Promise(resolve => { resolveDestination = resolve; });
+  render(<ExportPreviewControl dialogPort={dialog.port} exportPipelinePort={harness.port} projectId="project-a"
+    selection={{ projectName: "Album", sheetId: "first", sheetNumber: 1 }}
+    sheets={[{ sheetId: "first", number: 1, pageCount: 2 }]} />);
+
+  fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  expect(screen.getByRole("button", { name: "Exportar" })).toBeDisabled();
+  expect(dialog.present).not.toHaveBeenCalled();
+
+  await act(async () => { resolveDestination("C:/Exportados/Album"); });
+  expect(dialog.present).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+    kind: "exportConfiguration", busy: false, message: "",
+    options: expect.objectContaining({ destination: "C:/Exportados/Album" }),
+  }));
+  expect(harness.startSheet).not.toHaveBeenCalled();
+});
+
+test("opens an editable configuration with the destination error instead of a temporary preparation state", async () => {
+  const dialog = createDialogHarness();
+  const harness = createExportHarness();
+  harness.port.defaultDestination = async () => { throw new Error("Destino indisponível"); };
+  render(<ExportPreviewControl dialogPort={dialog.port} exportPipelinePort={harness.port} projectId="project-a"
+    selection={{ projectName: "Album", sheetId: "first", sheetNumber: 1 }}
+    sheets={[{ sheetId: "first", number: 1, pageCount: 2 }]} />);
+
+  fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  await waitFor(() => expect(dialog.present).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+    kind: "exportConfiguration", busy: false, message: "Destino indisponível",
+    options: expect.objectContaining({ destination: "" }),
+  })));
+});
+
+test("does not open configuration if the control unmounts while resolving its destination", async () => {
+  const dialog = createDialogHarness();
+  const harness = createExportHarness();
+  const onActiveChange = vi.fn();
+  let resolveDestination!: (destination: string) => void;
+  harness.port.defaultDestination = () => new Promise(resolve => { resolveDestination = resolve; });
+  const view = render(<ExportPreviewControl dialogPort={dialog.port} exportPipelinePort={harness.port} projectId="project-a"
+    onActiveChange={onActiveChange} selection={{ projectName: "Album", sheetId: "first", sheetNumber: 1 }}
+    sheets={[{ sheetId: "first", number: 1, pageCount: 2 }]} />);
+
+  fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  view.unmount();
+  await act(async () => { resolveDestination("C:/Exportados/Album"); });
+  expect(dialog.present).not.toHaveBeenCalled();
+  expect(onActiveChange.mock.calls).toEqual([[true], [false]]);
+});
+
 test("normal export waits for configuration and retries the same options after overwrite confirmation", async () => {
   const dialog = createDialogHarness(); const harness = createExportHarness();
   render(<ExportPreviewControl dialogPort={dialog.port} exportPipelinePort={harness.port} projectId="project-a"

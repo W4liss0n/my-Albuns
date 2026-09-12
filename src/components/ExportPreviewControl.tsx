@@ -144,7 +144,7 @@ export const ExportPreviewControl = forwardRef<
     setPhase("configuring");
     const generation = ++recoveryGeneration.current;
     const options: NormalExportOptions = { scope: scope === "album" ? "album" : "range", sheetIds: scope === "album" ? sheets.map(sheet => sheet.sheetId) : [selection.sheetId], mode: "sheet", format: { kind: "jpeg", quality: 100 }, destination: "", overwrite: false };
-    presentDialog({ kind: "exportConfiguration", sheets, options, busy: true, message: "" });
+    // Present once the initial fields are ready so opening never shrinks a busy form.
     void exportPipelinePort.defaultDestination().then(destination => {
       if (generation === recoveryGeneration.current) presentDialog({ kind: "exportConfiguration", sheets, options: { ...options, destination }, busy: false, message: "" });
     }, error => {
