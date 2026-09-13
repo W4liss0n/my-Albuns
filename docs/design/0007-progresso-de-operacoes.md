@@ -43,6 +43,12 @@ problema; leitura e Cache não reiniciam a barra em fases separadas. Mudanças d
 área visível não cancelam o trabalho necessário à ação. Atualizações automáticas
 da origem continuam em segundo plano e preservam a prévia anterior até a troca.
 
+A contagem avança assim que a prévia reduzida está preparada e validada. A
+publicação conjunta do índice do Cache permanece dentro da operação aguardada,
+sem contar novamente as imagens; uma falha nessa publicação continua sendo
+apresentada no resultado. Isso permite atualizar a barra durante a preparação,
+em vez de concentrar todos os avanços no fim do lote.
+
 Adicionar uma Foto ou aplicar um Decorativo já importado à Lâmina não inicia
 outra preparação, não abre progresso e não aguarda o Cache. O gesto atualiza
 a composição imediatamente e reutiliza a prévia disponível. Se uma prévia

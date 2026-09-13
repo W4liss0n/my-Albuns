@@ -11,7 +11,7 @@ export async function subscribeOpeningImageProgress(
   const unlisten = await listen<StartupImageProgress>(OPENING_IMAGE_PROGRESS_EVENT, ({ payload }) => {
     receivedLiveProgress = true;
     receive(payload);
-  });
+  }, { target: "dialog-opening-progress" });
   try {
     const current = await invoke<StartupImageProgress | null>("opening_image_progress");
     if (current && !receivedLiveProgress) receive(current);

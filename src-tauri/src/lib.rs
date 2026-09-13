@@ -254,6 +254,8 @@ mod tests {
             progress_dialog_capability["permissions"],
             serde_json::json!([
                 "owned-dialog-window-commands",
+                "core:event:allow-listen",
+                "core:event:allow-unlisten",
                 "core:window:allow-start-dragging"
             ])
         );

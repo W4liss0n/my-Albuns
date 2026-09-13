@@ -16,6 +16,9 @@ test("recovers the current progress after installing the live subscription", asy
   const receive = vi.fn();
   const stop = await subscribeOpeningImageProgress(receive);
   expect(api.listen.mock.invocationCallOrder[0]).toBeLessThan(api.invoke.mock.invocationCallOrder[0]);
+  expect(api.listen).toHaveBeenCalledWith("myalbuns://opening-image-progress", expect.any(Function), {
+    target: "dialog-opening-progress",
+  });
   expect(receive).toHaveBeenCalledWith({ completedFiles: 3, totalFiles: 12 });
   stop();
   expect(api.unlisten).toHaveBeenCalledOnce();
