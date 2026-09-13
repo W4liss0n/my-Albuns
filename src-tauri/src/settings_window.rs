@@ -68,17 +68,22 @@ pub(crate) async fn show(app: &AppHandle, section: SettingsSection) -> Result<()
         SettingsSection::Photoshop => "photoshop",
         SettingsSection::Performance => "performance",
     };
+    let reservation = app
+        .state::<crate::settings_modality::SettingsModality>()
+        .reserve()
+        .await?;
     let (signal, readiness) = desktop_webview_policy::page_load_handshake();
     let window = WebviewWindowBuilder::new(
         app,
         SETTINGS_WINDOW_LABEL,
         WebviewUrl::App(format!("global.html?surface=settings&section={section}").into()),
     )
-    .title("Configurações — MyAlbuns")
+    .title("Configurações")
     .inner_size(720.0, 440.0)
     .min_inner_size(480.0, 440.0)
     .resizable(true)
     .maximizable(false)
+    .minimizable(false)
     .visible(false)
     .decorations(false)
     .data_directory(
@@ -92,12 +97,24 @@ pub(crate) async fn show(app: &AppHandle, section: SettingsSection) -> Result<()
     .on_page_load(move |window, payload| signal.observe(&window, payload.event()))
     .build()
     .map_err(|error| error.to_string())?;
+    let reservation = std::sync::Mutex::new(Some(reservation));
+    window.on_window_event(move |event| {
+        if matches!(event, tauri::WindowEvent::Destroyed) {
+            reservation
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .take();
+        }
+    });
     if let Err(error) = readiness.wait().await {
         let _ = window.destroy();
         return Err(error.to_string());
     }
-    window.show().map_err(|error| error.to_string())?;
-    window.set_focus().map_err(|error| error.to_string())
+    if let Err(error) = window.show().and_then(|()| window.set_focus()) {
+        let _ = window.destroy();
+        return Err(error.to_string());
+    }
+    Ok(())
 }
 
 #[tauri::command]

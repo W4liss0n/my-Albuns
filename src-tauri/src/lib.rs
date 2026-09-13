@@ -54,6 +54,7 @@ mod provisional_decoratives;
 mod recent_projects;
 mod runtime_role;
 mod settings_preferences;
+mod settings_modality;
 mod settings_window;
 mod workspace_preferences;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

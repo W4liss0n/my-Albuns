@@ -11,6 +11,8 @@ document: design
 
 Existe somente uma janela de Configurações por instância do aplicativo. Ela pode ser aberta pela Tela de Boas-vindas ou por `Ferramentas > Configurações` em qualquer Janela de Projeto; uma nova solicitação apenas focaliza a janela existente.
 
+O título mostra somente `Configurações`, sem a marca MyAlbuns, com o controle de fechar à direita. Enquanto ela estiver aberta, as demais janelas do programa ficam bloqueadas, inclusive para fechar o Projeto. Ao fechar Configurações, o programa volta a responder; uma falha no processo que hospeda essa janela também libera o bloqueio.
+
 Na primeira versão, a janela contém:
 
 - `Desempenho`;

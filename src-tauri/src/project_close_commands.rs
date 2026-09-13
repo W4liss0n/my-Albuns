@@ -19,6 +19,9 @@ pub(crate) fn request_project_close(
     window: Window,
     state: State<'_, ProjectHost>,
 ) -> Result<ProjectCloseRequestOutcome, SaveProjectCommandError> {
+    if crate::settings_modality::blocks(&window) {
+        return Err(SaveProjectCommandError::SessionUnavailable);
+    }
     tracing::info!(
         target: "myalbuns.desktop",
         process_role = ProcessRole::DesktopHost.as_str(),
@@ -59,6 +62,9 @@ pub(crate) async fn resolve_project_close(
     window: Window,
     state: State<'_, ProjectHost>,
 ) -> Result<ProjectCloseResolution, SaveProjectCommandError> {
+    if crate::settings_modality::blocks(&window) {
+        return Err(SaveProjectCommandError::SessionUnavailable);
+    }
     match choice {
         ProjectCloseChoice::Cancel => cancel_close(&window, &state),
         ProjectCloseChoice::DiscardAndClose => discard_and_close(&window, &state),

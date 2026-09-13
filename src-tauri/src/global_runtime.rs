@@ -1713,6 +1713,9 @@ fn exit_global_after_handoff(app: &AppHandle) {
 }
 
 fn on_global_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
+    if crate::settings_modality::on_window_event(window, event) {
+        return;
+    }
     desktop_webview_policy::on_window_event(window, event);
     if window.label() == crate::settings_window::SETTINGS_WINDOW_LABEL
         && matches!(event, tauri::WindowEvent::Destroyed)
@@ -1895,6 +1898,7 @@ pub(crate) fn run(
         .manage(provisional_decoratives)
         .setup(move |app| {
             logging::initialize(app, &app_paths, ProcessRole::Global);
+            crate::settings_modality::install(app.handle(), &app_paths);
             let app_handle = app.handle().clone();
             // Both configured windows use `create: false`. Install the first
             // owned WebView before setup returns; the page-load terminal then

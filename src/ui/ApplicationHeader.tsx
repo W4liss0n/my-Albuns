@@ -5,6 +5,7 @@ import { BrandWordmark } from "./BrandWordmark";
 import { useWindowControls } from "./WindowControlsContext";
 
 interface ApplicationHeaderProps {
+  showBrand?: boolean;
   controls?: "all" | "close" | "none";
   context?: string;
   metadata?: string;
@@ -20,6 +21,7 @@ function runWindowAction(action: () => Promise<void> | void) {
 }
 
 export function ApplicationHeader({
+  showBrand = true,
   controls = "all",
   context,
   metadata,
@@ -39,12 +41,14 @@ export function ApplicationHeader({
         data-tauri-drag-region
       />
       <span className="ui-application-header__identity">
-        <BrandWordmark compact />
+        {showBrand ? <BrandWordmark compact /> : null}
         {context ? (
           <>
-            <span aria-hidden="true" className="ui-header-separator">
-              ·
-            </span>
+            {showBrand ? (
+              <span aria-hidden="true" className="ui-header-separator">
+                ·
+              </span>
+            ) : null}
             <strong>{context}</strong>
           </>
         ) : null}

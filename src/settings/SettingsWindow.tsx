@@ -24,7 +24,7 @@ export function SettingsWindow({ initialSection = "performance", photoshopPort, 
     return () => { disposed = true; release?.(); };
   }, [onSectionRequest]);
   return <div className="application-settings ui-chrome-selection-scope">
-    <ApplicationHeader context="Configurações" controls="close" />
+      <ApplicationHeader context="Configurações" controls="close" showBrand={false} />
     <div role="tablist" aria-label="Configurações" className="application-settings-tabs">
       {(["performance", "photoshop"] as const).map((value, index, sections) => <button key={value} type="button" role="tab"
         id={`settings-tab-${value}`} aria-controls={`settings-panel-${value}`} aria-selected={section === value} tabIndex={section === value ? 0 : -1}

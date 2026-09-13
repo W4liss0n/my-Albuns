@@ -167,6 +167,9 @@ pub(crate) fn run(
         .manage(layout_catalog)
         .manage(crate::workspace_preferences::WorkspacePreferencesStore::new(&app_paths))
         .on_window_event(|window, event| {
+            if crate::settings_modality::on_window_event(window, event) {
+                return;
+            }
             desktop_webview_policy::on_window_event(window, event);
             if window.label() == PROJECT_WINDOW_LABEL
                 && let tauri::WindowEvent::DragDrop(event) = event
@@ -395,6 +398,7 @@ fn setup_host(
         .startup_projection()
         .map_err(io::Error::other)?;
     logging::initialize(app, &app_paths, ProcessRole::DesktopHost);
+    crate::settings_modality::install(app.handle(), &app_paths);
     app.manage(OperationGate::new(&app_paths));
     app.manage(ImagingProcessor::default());
 
