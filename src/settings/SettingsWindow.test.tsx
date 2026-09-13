@@ -13,19 +13,37 @@ test("Cache cleanup requires confirmation and survives changing tabs while it is
   };
   const close = vi.fn();
   render(<SettingsWindow photoshopPort={photoshopSettingsPreview(null)} cachePort={cachePort} close={close} />);
-  const clear = screen.getByRole("button", { name: "Limpar todo o Cache" });
+  const clear = screen.getByRole("button", { name: "Limpar todo o cache" });
   await waitFor(() => expect(clear).toBeEnabled());
   fireEvent.click(clear);
   expect(cachePort.clearAll).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "Confirmar" }));
   expect(cachePort.clearAll).toHaveBeenCalledOnce();
-  fireEvent.click(screen.getByRole("tab", { name: "Photoshop" }));
+  fireEvent.click(screen.getByRole("tab", { name: "Outros" }));
   await act(async () => complete());
   fireEvent.click(screen.getByRole("tab", { name: "Desempenho" }));
   expect(screen.getByRole("status")).toHaveTextContent("Limpeza agendada");
   expect(screen.queryByRole("button", { name: "Confirmar" })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
   expect(close).toHaveBeenCalledOnce();
+});
+
+test("canceling cleanup returns to the cache actions without deleting anything", async () => {
+  const cachePort: CacheSettingsPort = {
+    status: async () => ({ occupiedBytes: 1000, releasableBytes: 500, clearAllScheduled: false }),
+    freeClosedProjects: vi.fn(async () => ({ freedBytes: 500 })),
+    clearAll: vi.fn(async () => ({ kind: "scheduled" as const })),
+  };
+  render(<SettingsWindow photoshopPort={photoshopSettingsPreview(null)} cachePort={cachePort} close={vi.fn()} />);
+  await waitFor(() => expect(screen.getByRole("button", { name: "Liberar espaço" })).toBeEnabled());
+  for (const name of ["Liberar espaço", "Limpar todo o cache"]) {
+    fireEvent.click(screen.getByRole("button", { name }));
+    expect(screen.getByRole("button", { name: "Cancelar" })).toHaveFocus();
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(screen.getByRole("button", { name })).toHaveFocus();
+  }
+  expect(cachePort.freeClosedProjects).not.toHaveBeenCalled();
+  expect(cachePort.clearAll).not.toHaveBeenCalled();
 });
 
 test("a forwarded settings request changes section and unregisters its listener on close", async () => {
@@ -38,7 +56,7 @@ test("a forwarded settings request changes section and unregisters its listener 
   const view = render(<SettingsWindow photoshopPort={photoshopSettingsPreview(null)} cachePort={cachePort} close={vi.fn()}
     onSectionRequest={async (listener) => { request = listener; return release; }} />);
   await act(async () => request("photoshop"));
-  expect(screen.getByRole("tab", { name: "Photoshop" })).toHaveAttribute("aria-selected", "true");
+  expect(screen.getByRole("tab", { name: "Outros" })).toHaveAttribute("aria-selected", "true");
   view.unmount();
   expect(release).toHaveBeenCalledOnce();
 });

@@ -33,7 +33,7 @@ export function SettingsWindow({ initialSection = "performance", photoshopPort, 
           event.preventDefault();
           const target = sections[event.key === "Home" ? 0 : event.key === "End" ? sections.length - 1 : (index + (event.key === "ArrowRight" ? 1 : -1) + sections.length) % sections.length];
           setSection(target); document.getElementById(`settings-tab-${target}`)?.focus();
-        }}>{value === "performance" ? "Desempenho" : "Photoshop"}</button>)}
+        }}>{value === "performance" ? "Desempenho" : "Outros"}</button>)}
     </div>
     <main>
       <div role="tabpanel" id="settings-panel-performance" aria-labelledby="settings-tab-performance" hidden={section !== "performance"}>

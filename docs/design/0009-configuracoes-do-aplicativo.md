@@ -14,7 +14,7 @@ Existe somente uma janela de Configurações por instância do aplicativo. Ela p
 Na primeira versão, a janela contém:
 
 - `Desempenho`;
-- `Photoshop`.
+- `Outros`, que reúne as integrações, começando pelo Photoshop.
 
 As preferências pertencem ao usuário, não participam de Undo/Redo e não exigem `Salvar` no Projeto. Escolhas simples são persistidas imediatamente; ações destrutivas ou demoradas mantêm confirmação e progresso próprios.
 
@@ -22,7 +22,7 @@ As preferências pertencem ao usuário, não participam de Undo/Redo e não exig
 ┌──────────────────────────────────────────────────────────────────┐
 │  Configurações                                                   │
 ├──────────────────────────────────────────────────────────────────┤
-│  Desempenho  │  Photoshop                                       │
+│  Desempenho  │  Outros                                          │
 ├──────────────────────────────────────────────────────────────────┤
 │                                                                  │
 │                 conteúdo da aba selecionada                      │
@@ -34,32 +34,34 @@ As preferências pertencem ao usuário, não participam de Undo/Redo e não exig
 
 ## Desempenho
 
-A primeira versão não expõe calibração, número de processos, threads, memória ou paralelismo. A aba apresenta somente o uso do Cache e as ações seguras para liberar espaço.
+A primeira versão não expõe calibração, número de processos, threads, memória ou paralelismo. A aba apresenta somente o uso do Cache e as ações seguras para liberar espaço. Os indicadores e suas ações ficam em duas colunas, com `Atualizar` no cabeçalho da seção.
 
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
-│  Cache                                                           │
+│  Cache de imagens                                  Atualizar     │
 ├──────────────────────────────────────────────────────────────────┤
-│  Espaço ocupado                        {espaço calculado}          │
-│  Liberável de Projetos fechados         {espaço calculado}         │
+│  Espaço ocupado               │  Disponível para liberar          │
+│  {espaço calculado}           │  {espaço calculado}               │
 │                                                                  │
-│  [ Liberar espaço ]       [ Limpar todo o Cache ]                 │
+│  [ Limpar todo o cache ]       │  [ Liberar espaço ]               │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
 `Liberar espaço` informa quanto pode remover e, depois da confirmação, exclui somente o Cache de Projetos fechados e sem proprietário ativo. Projetos, itens do Painel, vínculos e Arquivos originais permanecem intactos.
 
-`Limpar todo o Cache` nunca remove Cache pertencente a um Projeto aberto durante a execução normal. Se não houver Projeto ou Processador ativo, pode executar imediatamente; caso contrário, oferece agendar a limpeza para a próxima inicialização do aplicativo, antes da abertura de Projetos. Não existe limpeza ao vivo de Cache ativo no MVP.
+`Limpar todo o cache` nunca remove Cache pertencente a um Projeto aberto durante a execução normal. Se não houver Projeto ou Processador ativo, pode executar imediatamente; caso contrário, oferece agendar a limpeza para a próxima inicialização do aplicativo, antes da abertura de Projetos. Não existe limpeza ao vivo de Cache ativo no MVP.
+
+A confirmação ocupa a área dos indicadores, sem aumentar a janela. Ela informa o efeito da ação e a preservação dos Projetos e originais; `Cancelar` retorna aos indicadores.
 
 O programa não impõe limite rígido, não expira Cache por idade e não mostra uma progressão de alertas por patamares arbitrários. Ele exibe o total ocupado em Configurações e avisa quando o espaço livre do volume estiver baixo, oferecendo `Liberar espaço`.
 
 A organização física, a invalidação e as garantias do Cache estão em [Armazenamento local e Cache](0010-armazenamento-local-e-cache.md).
 
-## Photoshop
+## Outros
 
-A aba apresenta as instalações detectadas do Adobe Photoshop e a disponibilidade da integração.
+A seção `Photoshop` apresenta as instalações detectadas do Adobe Photoshop e a disponibilidade da integração. O estado fica ao lado do título; `Atualizar` permanece à direita. O seletor `Versão utilizada` e o botão `Localizar…` ficam na mesma linha. O caminho da instalação aparece abaixo, abreviado visualmente se necessário, com o texto completo disponível para cópia e no tooltip.
 
-Sem preferência válida, a versão compatível mais recente começa selecionada. O usuário pode escolher outra instalação detectada ou usar `Localizar Photoshop...` para indicar o executável.
+Sem preferência válida, a versão compatível mais recente começa selecionada. O usuário pode escolher outra instalação detectada ou usar `Localizar…` para indicar o executável. A mudança do nome da aba não altera o destino dos comandos existentes que abrem diretamente as preferências do Photoshop.
 
 `Abrir no Photoshop` aparece no menu de contexto de uma Foto do Painel e de um Frame preenchido. O atalho fixo da primeira versão é `Ctrl + E`, e a ação exige exatamente uma Foto contextual.
 
@@ -69,17 +71,15 @@ Um Monitor de Arquivos consolida eventos rápidos e os trata como indícios. Dep
 
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
-│  Photoshop                                                       │
+│  Photoshop  Disponível                             Atualizar     │
 ├──────────────────────────────────────────────────────────────────┤
-│  Instalação usada                                                │
-│  [ Adobe Photoshop 2026                              ▾ ]          │
+│  Versão utilizada                                                │
+│  [ Adobe Photoshop 2026                 ▾ ]   [ Localizar… ]      │
 │  C:\...\Adobe Photoshop 2026\Photoshop.exe                       │
-│                                                                  │
-│  [ Localizar Photoshop... ]                                      │
-│                                                                  │
-│  Status: integração disponível                                   │
 └──────────────────────────────────────────────────────────────────┘
 ```
+
+A janela abre com 720 × 440 pixels lógicos, usa o cabeçalho, as cores e os controles compartilhados do projeto e mantém as abas e o rodapé fixos. Conteúdo excedente rola somente na área central. Textos introdutórios redundantes são omitidos; erros e confirmações necessários continuam visíveis. Em larguras reduzidas, os espaçamentos se ajustam e as colunas podem se empilhar, sem cortar controles.
 
 ## Comandos e associações
 

@@ -75,7 +75,7 @@ pub(crate) async fn show(app: &AppHandle, section: SettingsSection) -> Result<()
         WebviewUrl::App(format!("global.html?surface=settings&section={section}").into()),
     )
     .title("Configurações — MyAlbuns")
-    .inner_size(640.0, 520.0)
+    .inner_size(720.0, 440.0)
     .min_inner_size(480.0, 440.0)
     .resizable(true)
     .maximizable(false)

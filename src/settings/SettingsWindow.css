@@ -4,22 +4,85 @@
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   color: var(--ui-text);
   background: var(--ui-surface);
-  font-size: var(--ui-font-size-heading);
+  font-size: var(--ui-font-size-form-control);
 }
-.application-settings-tabs { display: flex; gap: 4px; padding: 14px 24px 0; border-bottom: 1px solid var(--ui-border); }
-.application-settings-tabs button { padding: 10px 16px; background: transparent; color: var(--ui-text-secondary); border: 0; border-bottom: 2px solid transparent; font: inherit; cursor: pointer; }
-.application-settings-tabs button[aria-selected="true"] { color: var(--ui-accent-text); border-bottom-color: var(--ui-accent); font-weight: 600; }
-.application-settings main { overflow: auto; }
-.application-settings-panel { display: grid; gap: 16px; padding: 24px; }
+
+.application-settings-tabs {
+  display: flex;
+  gap: 24px;
+  padding: 12px 28px 0;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.application-settings-tabs button {
+  padding: 12px 4px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--ui-text-secondary);
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.application-settings-tabs button[aria-selected="true"] {
+  border-bottom-color: var(--ui-accent);
+  color: var(--ui-accent-text);
+  font-weight: 600;
+}
+
+.application-settings-tabs button:focus-visible {
+  outline: 1px solid var(--ui-focus-neutral);
+  outline-offset: -4px;
+}
+
+.application-settings main { min-width: 0; overflow: auto; }
+.application-settings-panel { display: grid; gap: 24px; padding: 24px 28px 28px; }
 .application-settings-panel h2, .application-settings-panel p { margin: 0; }
-.application-settings-panel h2 { font-size: 16px; }
-.application-settings-panel > p { color: var(--ui-text-secondary); line-height: 1.5; }
-.application-settings-field { display: grid; gap: 8px; font-weight: 600; }
-.application-settings-field select { width: 100%; min-width: 0; height: 36px; border: 1px solid var(--ui-border-strong); border-radius: 5px; color: var(--ui-text); background: var(--ui-surface-raised); padding-inline: 10px; font: inherit; font-weight: 400; }
-.application-settings-path { overflow-wrap: anywhere; font-size: var(--ui-font-size-action); }
+.application-settings-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.application-settings-section-heading h2 { font-size: var(--ui-font-size-form-heading); font-weight: 650; }
+.application-settings-section-heading > .ui-action-button { margin-right: -12px; }
+.application-settings-integration-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.application-settings .ui-action-button { height: 36px; font-size: var(--ui-font-size-form-control); }
+
+.application-settings-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface-raised);
+}
+
+.application-settings-cache-column { display: grid; justify-items: start; gap: 24px; min-width: 0; padding: 24px; }
+.application-settings-cache-column + .application-settings-cache-column { border-left: 1px solid var(--ui-border); }
+.application-settings-metrics { display: grid; gap: 8px; margin: 0; }
+.application-settings-metrics dt { color: var(--ui-text-secondary); font-size: var(--ui-font-size-control); }
+.application-settings-metrics dd { margin: 0; font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.application-settings-integration { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 10px 12px; }
+.application-settings-field { display: grid; min-width: 0; gap: 12px; color: var(--ui-text-secondary); font-size: var(--ui-font-size-control); }
+.application-settings-field select { width: 100%; min-width: 0; height: 36px; padding-inline: 12px; font-size: var(--ui-font-size-form-control); }
+.application-settings-field select:disabled { color: var(--ui-text-muted); background: var(--ui-surface-muted); }
+.application-settings-path { grid-column: 1 / -1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ui-text-muted); font-size: var(--ui-font-size-action); }
+.application-settings-status { color: var(--ui-text-secondary); font-size: var(--ui-font-size-action); }
+.application-settings-status[data-available="true"] { color: var(--ui-success-text); }
 .application-settings-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.application-settings-status { font-size: var(--ui-font-size-action); }
-.application-settings-metrics { display: grid; gap: 12px; margin: 0; }
-.application-settings-metrics > div { display: flex; justify-content: space-between; gap: 20px; }
-.application-settings-metrics dd { margin: 0; font-variant-numeric: tabular-nums; }
-.application-settings footer { display: flex; justify-content: flex-end; padding: 12px 24px; border-top: 1px solid var(--ui-border); }
+.application-settings-panel .ui-inline-notice { font-size: var(--ui-font-size-control); }
+.application-settings-panel .ui-inline-notice .application-settings-actions { justify-content: flex-end; margin-top: 12px; }
+.application-settings-panel > [role="status"] { color: var(--ui-text-secondary); font-size: var(--ui-font-size-control); }
+.application-settings footer { display: flex; justify-content: flex-end; padding: 14px 28px; border-top: 1px solid var(--ui-border); }
+.application-settings footer .ui-action-button { min-width: 100px; }
+
+@media (max-width: 560px) {
+  .application-settings-tabs { padding-inline: 20px; }
+  .application-settings-panel { padding-inline: 20px; }
+  .application-settings-cache-column { gap: 20px; padding: 18px 14px; }
+  .application-settings-cache-column .ui-action-button { padding-inline: 10px; font-size: var(--ui-font-size-control); }
+  .application-settings footer { padding-inline: 20px; }
+}
+
+@media (max-width: 400px) {
+  .application-settings-columns { grid-template-columns: minmax(0, 1fr); }
+  .application-settings-cache-column + .application-settings-cache-column { border-top: 1px solid var(--ui-border); border-left: 0; }
+  .application-settings-integration { grid-template-columns: minmax(0, 1fr); }
+  .application-settings-locate { justify-self: start; }
+}

@@ -8836,8 +8836,8 @@
         "reason": "Configurações e integração com Photoshop definidas nos contratos aceitos 0009 e 0010 e no Programa 33; a referência visual vigente não contém estes estados. Componentes de produção com portas determinísticas."
       },
       "viewport": {
-        "width": 640,
-        "height": 520
+        "width": 720,
+        "height": 440
       },
       "readySelector": ".application-settings-status",
       "actions": []
@@ -8852,8 +8852,8 @@
         "reason": "Configurações e integração com Photoshop definidas nos contratos aceitos 0009 e 0010 e no Programa 33; a referência visual vigente não contém estes estados. Componentes de produção com portas determinísticas."
       },
       "viewport": {
-        "width": 640,
-        "height": 520
+        "width": 720,
+        "height": 440
       },
       "readySelector": ".application-settings-status",
       "actions": []
@@ -8868,14 +8868,14 @@
         "reason": "Configurações e integração com Photoshop definidas nos contratos aceitos 0009 e 0010 e no Programa 33; a referência visual vigente não contém estes estados. Componentes de produção com portas determinísticas."
       },
       "viewport": {
-        "width": 640,
-        "height": 520
+        "width": 720,
+        "height": 440
       },
       "readySelector": ".application-settings [role=\"alert\"]",
       "actions": [
         {
           "type": "click-text",
-          "text": "Localizar Photoshop…"
+          "text": "Localizar…"
         }
       ]
     },
@@ -8905,6 +8905,59 @@
       ]
     },
     {
+      "id": "settings-cache-overview",
+      "title": "Configurações — cache em duas colunas",
+      "implementationPath": "/settings-preview.html?section=performance",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "application-settings",
+        "reason": "Configurações e integração com Photoshop definidas nos contratos aceitos 0009 e 0010 e no Programa 33; a referência visual vigente não contém estes estados. Componentes de produção com portas determinísticas."
+      },
+      "viewport": {
+        "width": 720,
+        "height": 440
+      },
+      "readySelector": ".application-settings-columns",
+      "actions": []
+    },
+    {
+      "id": "settings-cache-small",
+      "title": "Configurações — cache na janela mínima",
+      "implementationPath": "/settings-preview.html?section=performance",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "application-settings",
+        "reason": "Configurações e integração com Photoshop definidas nos contratos aceitos 0009 e 0010 e no Programa 33; a referência visual vigente não contém estes estados. Componentes de produção com portas determinísticas."
+      },
+      "viewport": {
+        "width": 480,
+        "height": 440
+      },
+      "readySelector": ".application-settings-columns",
+      "actions": []
+    },
+    {
+      "id": "settings-cache-free-confirmation",
+      "title": "Configurações — liberar cache de projetos fechados",
+      "implementationPath": "/settings-preview.html?section=performance",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "application-settings",
+        "reason": "Configurações e integração com Photoshop definidas nos contratos aceitos 0009 e 0010 e no Programa 33; a referência visual vigente não contém estes estados. Componentes de produção com portas determinísticas."
+      },
+      "viewport": {
+        "width": 720,
+        "height": 440
+      },
+      "readySelector": ".application-settings [role=\"tabpanel\"]:not([hidden]) .ui-inline-notice",
+      "actions": [
+        {
+          "type": "click-text",
+          "text": "Liberar espaço"
+        }
+      ]
+    },
+    {
       "id": "settings-cache-confirmation",
       "title": "Configurações — confirmação de limpeza",
       "implementationPath": "/settings-preview.html?section=performance",
@@ -8914,14 +8967,14 @@
         "reason": "Configurações e integração com Photoshop definidas nos contratos aceitos 0009 e 0010 e no Programa 33; a referência visual vigente não contém estes estados. Componentes de produção com portas determinísticas."
       },
       "viewport": {
-        "width": 640,
-        "height": 520
+        "width": 720,
+        "height": 440
       },
       "readySelector": ".application-settings [role=\"tabpanel\"]:not([hidden]) .ui-inline-notice",
       "actions": [
         {
           "type": "click-text",
-          "text": "Limpar todo o Cache"
+          "text": "Limpar todo o cache"
         }
       ]
     },

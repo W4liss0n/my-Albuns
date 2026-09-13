@@ -15,6 +15,18 @@ export function CacheSettings({ port }: { port: CacheSettingsPort }) {
   const [error, setError] = useState<string | null>(null);
   const sequence = useRef(0);
   const running = useRef(false);
+  const clearButton = useRef<HTMLButtonElement>(null);
+  const freeButton = useRef<HTMLButtonElement>(null);
+  const cancelButton = useRef<HTMLButtonElement>(null);
+  const previousConfirmation = useRef(confirmation);
+  useEffect(() => {
+    if (confirmation) cancelButton.current?.focus();
+    else if (previousConfirmation.current) {
+      const trigger = previousConfirmation.current === "closed" ? freeButton.current : clearButton.current;
+      trigger?.focus();
+    }
+    previousConfirmation.current = confirmation;
+  }, [confirmation]);
   const refresh = useCallback(async () => {
     if (running.current) return;
     const request = ++sequence.current;
@@ -41,22 +53,28 @@ export function CacheSettings({ port }: { port: CacheSettingsPort }) {
     finally { running.current = false; if (request === sequence.current) setPending(false); }
   };
   return <section aria-label="Cache" className="application-settings-panel" aria-busy={pending}>
-    <h2>Cache</h2>
-    <p>Gerencie o espaço ocupado pelas prévias dos Projetos.</p>
-    <dl className="application-settings-metrics">
-      <div><dt>Espaço ocupado</dt><dd>{status ? formatCacheBytes(status.occupiedBytes) : "Calculando…"}</dd></div>
-      <div><dt>Liberável de Projetos fechados</dt><dd>{status ? formatCacheBytes(status.releasableBytes) : "Calculando…"}</dd></div>
-    </dl>
-    <div className="application-settings-actions">
-      <ActionButton disabled={pending || !status || status.releasableBytes === 0} onClick={() => setConfirmation("closed")}>Liberar espaço</ActionButton>
-      <ActionButton disabled={pending || !status || status.clearAllScheduled} onClick={() => setConfirmation("all")}>Limpar todo o Cache</ActionButton>
-      <ActionButton disabled={pending} onClick={() => void refresh()}>Atualizar</ActionButton>
+    <div className="application-settings-section-heading">
+      <h2>Cache de imagens</h2>
+      <ActionButton variant="quiet" disabled={pending} onClick={() => void refresh()}>Atualizar</ActionButton>
     </div>
-    {confirmation && <InlineNotice title={confirmation === "closed" ? "Liberar espaço?" : "Limpar todo o Cache?"}>
-      <p>{confirmation === "closed" ? `Até ${formatCacheBytes(status?.releasableBytes ?? 0)} de prévias de Projetos fechados podem ser removidos.` : "Se houver um Projeto ou Processador ativo, a limpeza será agendada para a próxima inicialização segura."}</p>
-      <p>Projetos e arquivos originais serão preservados.</p>
+    {!confirmation && <div className="application-settings-columns">
+      <div className="application-settings-cache-column">
+        <dl className="application-settings-metrics">
+          <dt>Espaço ocupado</dt><dd>{status ? formatCacheBytes(status.occupiedBytes) : "Calculando…"}</dd>
+        </dl>
+        <ActionButton ref={clearButton} disabled={pending || !status || status.clearAllScheduled} onClick={() => setConfirmation("all")}>Limpar todo o cache</ActionButton>
+      </div>
+      <div className="application-settings-cache-column">
+        <dl className="application-settings-metrics">
+          <dt>Disponível para liberar</dt><dd title="Prévias de projetos fechados">{status ? formatCacheBytes(status.releasableBytes) : "Calculando…"}</dd>
+        </dl>
+        <ActionButton ref={freeButton} disabled={pending || !status || status.releasableBytes === 0} onClick={() => setConfirmation("closed")}>Liberar espaço</ActionButton>
+      </div>
+    </div>}
+    {confirmation && <InlineNotice title={confirmation === "closed" ? "Liberar espaço?" : "Limpar todo o cache?"}>
+      <p>{confirmation === "closed" ? `Remove até ${formatCacheBytes(status?.releasableBytes ?? 0)} de prévias de projetos fechados.` : "Se o cache estiver em uso, a limpeza ficará para a próxima inicialização."} Os projetos e as fotos originais serão mantidos.</p>
       <div className="application-settings-actions">
-        <ActionButton disabled={pending} onClick={() => setConfirmation(null)}>Cancelar</ActionButton>
+        <ActionButton ref={cancelButton} disabled={pending} onClick={() => setConfirmation(null)}>Cancelar</ActionButton>
         <ActionButton disabled={pending} variant="primary" onClick={() => void confirm()}>{pending ? "Limpando…" : "Confirmar"}</ActionButton>
       </div>
     </InlineNotice>}
