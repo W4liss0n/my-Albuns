@@ -46,7 +46,8 @@ use crate::{
 pub(crate) const GLOBAL_WINDOW_LABEL: &str = "global";
 const GLOBAL_ACTIVATION_TERMINAL_EVENT: &str = "myalbuns://global-activation-terminal";
 pub(crate) const GLOBAL_WEBVIEW_NAMESPACE: &str = "global";
-const HOST_TERMINAL_TIMEOUT: Duration = Duration::from_secs(30);
+// Reopening after cleanup can rebuild the entire Cache before exposing the editor.
+const HOST_TERMINAL_TIMEOUT: Duration = Duration::from_secs(300);
 // Creating also decodes initial originals and prepares their canonical Cache.
 const HOST_CREATION_TIMEOUT: Duration = Duration::from_secs(300);
 

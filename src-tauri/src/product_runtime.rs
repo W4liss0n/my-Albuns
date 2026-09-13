@@ -59,13 +59,6 @@ pub(crate) fn run(
     app_paths: AppPaths,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let (request, mut project) = opened.into_parts();
-    let initial_image_processing = InitialImageProcessing {
-        required: matches!(
-            request.intent,
-            crate::project_bootstrap::BootstrapIntent::CreateNew { .. }
-        ),
-        problems: tokio::sync::OnceCell::new(),
-    };
     #[cfg(debug_assertions)]
     crate::dev_host_registration::register_from_environment(&request.launch_nonce)?;
 
@@ -97,6 +90,17 @@ pub(crate) fn run(
         &catalog.bindings,
         &roots,
     );
+    let initial_image_processing = InitialImageProcessing {
+        bindings: if matches!(
+            request.intent,
+            crate::project_bootstrap::BootstrapIntent::CreateNew { .. }
+        ) {
+            catalog.bindings.clone()
+        } else {
+            images_requiring_startup_preparation(&catalog.bindings, &recovered_sources, &roots)
+        },
+        problems: tokio::sync::OnceCell::new(),
+    };
     // Cache recovery validated the derived bytes; adopt the same source evidence
     // before the first poll so it is not mistaken for a new source change.
     media_monitor.adopt_prepared_inspections(
@@ -492,8 +496,31 @@ fn projection_identity(project_host: &ProjectHost) -> Result<(String, u64), io::
 }
 
 struct InitialImageProcessing {
-    required: bool,
+    bindings: Vec<MediaBinding>,
     problems: tokio::sync::OnceCell<Mutex<Vec<crate::ipc_contract::ImageProcessingProblem>>>,
+}
+
+fn images_requiring_startup_preparation(
+    bindings: &[MediaBinding],
+    recovered_sources: &[crate::media_runtime::MediaObservation],
+    roots: &myalbuns_paths::RootBindingPlan,
+) -> Vec<MediaBinding> {
+    // Cache recovery already validated the adopted generations. Missing
+    // originals cannot be rebuilt; retain their established cached/placeholder
+    // presentation instead of holding opening for work that cannot succeed.
+    let recovered = recovered_sources
+        .iter()
+        .map(|source| source.media_id.as_str())
+        .collect::<std::collections::HashSet<_>>();
+    bindings
+        .iter()
+        .filter(|binding| {
+            !recovered.contains(binding.media_id.as_str())
+                && MediaResolver.observe_in_plan(roots, binding).availability
+                    == crate::media_runtime::MediaAvailability::Candidate
+        })
+        .cloned()
+        .collect()
 }
 
 impl InitialImageProcessing {
@@ -503,19 +530,23 @@ impl InitialImageProcessing {
     ) -> Result<Vec<crate::ipc_contract::ImageProcessingProblem>, String> {
         self.prepare_with(async {
             let mut problems = Vec::new();
-            if self.required {
-                let catalog = app.state::<ProjectHost>().authorized_media_catalog()?;
-                if !catalog.bindings.is_empty() {
-                    let mut batch = crate::image_processing::ImageProcessingBatch::new(
-                        catalog.bindings.len() as u32,
-                        |progress| {
-                            if let Some(problem) = progress.problem {
-                                problems.push(problem);
-                            }
-                        },
-                    );
-                    batch.prepare_all(app, catalog.bindings).await;
-                }
+            let mut operation_problem = None;
+            if !self.bindings.is_empty() {
+                let mut batch = crate::image_processing::ImageProcessingBatch::new(
+                    self.bindings.len() as u32,
+                    |progress| {
+                        if let Some(reason) = progress.operation_problem {
+                            operation_problem = Some(reason);
+                        }
+                        if let Some(problem) = progress.problem {
+                            problems.push(problem);
+                        }
+                    },
+                );
+                batch.prepare_all(app, self.bindings.clone()).await;
+            }
+            if let Some(reason) = operation_problem {
+                return Err(reason);
             }
             Ok::<_, String>(problems)
         })
@@ -551,7 +582,13 @@ async fn project_ui_ready(
         return Err("UI confirmation belongs only to the Project window".into());
     }
 
-    let problems = image_processing.prepare(window.app_handle()).await?;
+    let problems = image_processing
+        .prepare(window.app_handle())
+        .await
+        .map_err(|error| {
+            startup.emit_failed(FailureStage::Initialize, FailureCode::IoFailure);
+            error
+        })?;
     match startup.confirm_ui_ready() {
         Ok(transition) => {
             if transition.newly_observed {
@@ -1107,6 +1144,55 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "prepares the isolated native cache reconstruction fixture"]
+    fn prepare_cache_reconstruction_fixture() {
+        let root = std::path::PathBuf::from(
+            std::env::var_os("MYALBUNS_CACHE_RECONSTRUCTION_FIXTURE").unwrap(),
+        );
+        std::fs::create_dir_all(&root).unwrap();
+        let project_path = root.join("Reconstrucao.myalbuns");
+        assert!(
+            !project_path.exists(),
+            "the fixture must never replace a Project"
+        );
+        let mut paths = OperationPathContext::new();
+        paths.capture(&project_path).unwrap();
+        let core = ProjectCore::new()
+            .with_identity_storage_roots(root.join("leases"), root.join("identities"));
+        let mut project = core
+            .create_editable(CreateProjectRequest::new(
+                ProjectLocation::new(project_path.clone(), paths.freeze()),
+                InitialProject::neutral(),
+                CreateAuthorization::CreateOnly,
+            ))
+            .unwrap();
+        for index in 0..60 {
+            let path = root.join(format!("Foto-{index:03}.jpg"));
+            RgbImage::from_fn(1280, 960, |x, y| {
+                Rgb([(x % 255) as u8, (y % 255) as u8, index * 4])
+            })
+            .save_with_format(&path, ImageFormat::Jpeg)
+            .unwrap();
+            project
+                .import_photo(ImportPhoto::new(
+                    path,
+                    PhotoSourceMetadata::new(
+                        1280,
+                        960,
+                        ["#102030".into(), "#405060".into(), "#708090".into()],
+                    )
+                    .unwrap(),
+                ))
+                .unwrap();
+        }
+        assert!(matches!(
+            project.save(project.revision()).unwrap(),
+            SaveProjectOutcome::Saved { .. }
+        ));
+        println!("{}", project_path.display());
+    }
+
+    #[test]
     fn initial_image_warnings_wait_for_preparation_and_are_not_replayed_to_replacement_webviews() {
         use std::{
             future::Future,
@@ -1115,7 +1201,7 @@ mod tests {
 
         tauri::async_runtime::block_on(async {
             let processing = InitialImageProcessing {
-                required: true,
+                bindings: Vec::new(),
                 problems: tokio::sync::OnceCell::new(),
             };
             let (ready, preparation) = tokio::sync::oneshot::channel();
@@ -1152,6 +1238,58 @@ mod tests {
                     .is_empty()
             );
         });
+    }
+
+    #[test]
+    fn reopening_prepares_all_available_uncached_images_but_reuses_recovered_generations() {
+        use crate::media_runtime::{MediaBinding, MediaResolver};
+        let root = tempfile::tempdir().unwrap();
+        let mut paths = OperationPathContext::new();
+        let bindings = [
+            ("ready", MediaKind::Photo),
+            ("offscreen", MediaKind::Photo),
+            ("decorative", MediaKind::Decorative),
+            ("missing", MediaKind::Photo),
+        ]
+        .into_iter()
+        .map(|(id, kind)| {
+            let path = root.path().join(format!("{id}.jpg"));
+            if id != "missing" {
+                RgbImage::from_pixel(5, 7, Rgb([20, 30, 40]))
+                    .save_with_format(&path, ImageFormat::Jpeg)
+                    .unwrap();
+            }
+            paths.capture(&path).unwrap();
+            MediaBinding {
+                media_id: id.into(),
+                kind,
+                logical_path: path,
+            }
+        })
+        .collect::<Vec<_>>();
+        let roots = paths.freeze();
+        let recovered = vec![MediaResolver.observe_in_plan(&roots, &bindings[0])];
+        let pending = super::images_requiring_startup_preparation(&bindings, &recovered, &roots);
+        assert_eq!(
+            pending
+                .iter()
+                .map(|binding| binding.media_id.as_str())
+                .collect::<Vec<_>>(),
+            ["offscreen", "decorative"]
+        );
+        let cold = super::images_requiring_startup_preparation(&bindings, &[], &roots);
+        assert_eq!(
+            cold.len(),
+            3,
+            "cleanup makes every available original part of startup preparation"
+        );
+        let recovered = cold
+            .iter()
+            .map(|binding| MediaResolver.observe_in_plan(&roots, binding))
+            .collect::<Vec<_>>();
+        assert!(
+            super::images_requiring_startup_preparation(&bindings, &recovered, &roots).is_empty()
+        );
     }
 
     #[test]
