@@ -98,7 +98,7 @@ try {
   const expected = await owner.evaluate("window.__TAURI_INTERNALS__.invoke('project_state', {operationId:'dialog-dirty'})");
   assert.equal(expected.state.dirty, true);
   assert.equal(expected.state.canUndo, true);
-  if (mode === "close") await click(owner, "Fechar");
+  if (mode === "close") await click(owner, "Fechar janela");
   else await click(owner, "Exportar");
   const dialog = await connect(dialogPort, "/project-dialog.html");
   const current = () => dialog.evaluate("window.__TAURI_INTERNALS__.invoke('current_project_dialog_presentation')");
