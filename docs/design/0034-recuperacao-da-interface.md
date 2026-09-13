@@ -14,9 +14,10 @@ arquivo do Projeto nem reinicia o processamento de imagens.
 
 Esta decisão implementa a recuperação aprovada após a
 [pesquisa sobre o diálogo preto](../research/2026-09-13-webview2-dialogo-preto.md).
-A causa interna de `BrowserProcessExited / Unexpected / C0000005` permanece
-em investigação. Recuperar o controle trata a consequência visível da falha;
-não demonstra uma correção do defeito interno do Runtime.
+O diagnóstico posterior identificou interferência do RivaTuner nos dumps locais,
+detalhada ao final deste documento. Recuperar o controle trata a consequência
+visível da falha e complementa a correção do ambiente; não demonstra uma correção
+interna do Runtime.
 
 ## Comportamento
 
@@ -26,6 +27,12 @@ não demonstra uma correção do defeito interno do Runtime.
   cor de fundo do programa, sem adicionar linha temporária de estado.
 - O editor reconstitui sua apresentação a partir do Host existente. Avisos da
   preparação inicial não são repetidos como se fosse uma nova abertura.
+- Se o editor falhar com um diálogo do Projeto aberto, esse diálogo é encerrado
+  antes da reconstrução: seus controladores pertenciam à interface perdida.
+  Configurações de Exportação e confirmações não são repetidas automaticamente.
+  Exportações em andamento recebem cancelamento cooperativo, respeitando uma
+  publicação que já não permita cancelamento. Comandos já aceitos terminam antes
+  da nova leitura da Sessão; as alterações concluídas e o histórico permanecem.
 - Tela de Boas-vindas e Configurações usam a mesma recuperação do controle.
 - A política permite até duas tentativas automáticas em 60 segundos por janela.
   Falha da reconstrução ou esgotamento desse limite apresenta uma mensagem
@@ -47,9 +54,21 @@ Identificadores monotônicos distinguem controles antigos e novos: endereços de
 objetos COM podem ser reutilizados depois de fechar um controle.
 
 A recuperação do editor reserva a mesma transição usada pelo `Salvar como`.
+Antes dessa reserva, bloqueia novas operações da interface e aguarda os comandos
+já admitidos, incluindo importação, Religação, Salvamento, criação do diálogo e
+preparação de Exportação. Isso permite que um `Salvar como` já aceito termine sua
+própria troca de autoridade. A espera tem o mesmo limite de 15 segundos da
+recuperação; se excedido, a mensagem nativa permite tentar novamente. Trabalhos
+de Cache e Monitor não pertencem a esse controle de comandos da interface.
 Se a troca de autoridade já estiver em andamento, aguarda sua conclusão e
 reconfere se o controle que falhou ainda é o atual. O Monitor de Arquivos
 permanece ativo durante a ausência temporária do WebView.
+
+Depois da drenagem e da reconferência do controlador, uma confirmação de fechar
+ainda sem resposta é cancelada. Fechamento ou Salvamento já aprovados não são
+revertidos. A apresentação antiga é retirada do Host e seu diálogo libera a
+janela do Projeto. Sessões de diálogo usam IDs únicos entre reconstruções, para
+que ações antigas não alcancem um novo controlador.
 
 O controle novo recebe a URL atual, o diretório de perfil e os argumentos do
 ambiente anterior. Um token de prontidão já consumido é removido da URL;
@@ -89,6 +108,13 @@ raiz local isolada. Exemplo, a partir da raiz do repositório:
 ```powershell
 node scripts/Run-WebviewRecoveryGate.mjs <executavel> <projeto-de-teste> <nova-pasta-de-evidencias> --procdump <procdump64.exe>
 ```
+
+`scripts/Run-ProjectDialogRecoveryGate.mjs` cobre os modos `configuration`,
+`close` e `progress`, cada um em uma instância isolada. Depois da queda, exige
+ausência de diálogo abandonado, mesmo HWND habilitado, projeção completa
+preservada e uma nova Exportação cujo botão Cancelar funciona. O modo `progress`
+inicia uma Exportação real em uma pasta descartável; a projeção é alterada sem
+Salvar para verificar também dirty e Undo.
 
 O parâmetro opcional usa o ProcDump da Microsoft, valida sua assinatura e a
 identidade exata do navegador antes de anexar o diagnóstico. Não instala um

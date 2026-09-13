@@ -165,6 +165,7 @@ pub(crate) fn run(
         .manage(media_runtime)
         .manage(media_monitor)
         .manage(ExportAttempts::default())
+        .manage(crate::project_ui_operations::ProjectUiOperations::default())
         .manage(crate::project_dialog_window::ProjectDialogPresentationStore::default())
         .manage(crate::settings_preferences::SettingsStore::new(&app_paths))
         .manage(crate::photoshop::PhotoshopStateStore::new(&app_paths))

@@ -114,13 +114,23 @@ impl ExportAttempts {
     }
 
     pub(crate) fn begin_window_close(&self, window_label: &str) -> usize {
+        self.cancel_window(window_label, true)
+    }
+
+    pub(crate) fn cancel_window_for_recovery(&self, window_label: &str) -> usize {
+        self.cancel_window(window_label, false)
+    }
+
+    fn cancel_window(&self, window_label: &str, closing: bool) -> usize {
         let controls = {
             let mut registry = self
                 .inner
                 .registry
                 .lock()
                 .expect("the Export attempt registry remains available");
-            registry.closing_windows.insert(window_label.to_owned());
+            if closing {
+                registry.closing_windows.insert(window_label.to_owned());
+            }
             registry
                 .registrations
                 .values()
@@ -238,6 +248,18 @@ mod tests {
 
     use super::ExportAttempts;
     use crate::ipc_contract::CancelDisposition;
+
+    #[test]
+    fn recovery_cancels_only_its_window_without_permanently_closing_export_admission() {
+        let attempts = ExportAttempts::default();
+        let old = attempts.begin("old", "project").unwrap();
+        let other = attempts.begin("other", "another-project").unwrap();
+        assert_eq!(attempts.cancel_window_for_recovery("project"), 1);
+        assert!(old.is_cancelled());
+        assert!(!other.is_cancelled());
+        drop(old);
+        assert!(attempts.begin("new", "project").is_ok());
+    }
 
     #[test]
     fn only_the_owning_window_can_cancel_its_active_export_attempt() {

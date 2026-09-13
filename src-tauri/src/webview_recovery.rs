@@ -290,6 +290,28 @@ fn recover(
     if window.hwnd().map_err(io::Error::other)?.0 as usize != native_window {
         return Ok(());
     }
+    // Drain before reserving Save As authority: an already accepted Save As
+    // may still need that reservation after its native file picker returns.
+    let _ui_recovery = if label == crate::product_runtime::PROJECT_WINDOW_LABEL {
+        let retirement = app
+            .state::<crate::project_ui_operations::ProjectUiOperations>()
+            .recover()
+            .map_err(io::Error::other)?;
+        let deadline = Instant::now() + RECOVERY_TIMEOUT;
+        while !retirement.is_drained() {
+            app.state::<crate::export_attempts::ExportAttempts>()
+                .cancel_window_for_recovery(label);
+            if Instant::now() >= deadline {
+                return Err(io::Error::other(
+                    "A operação anterior ainda não terminou. Aguarde e tente novamente.",
+                ));
+            }
+            std::thread::sleep(Duration::from_millis(25));
+        }
+        Some(retirement)
+    } else {
+        None
+    };
     let _authority_reservation = if label == crate::product_runtime::PROJECT_WINDOW_LABEL {
         if let Some(authority) =
             app.try_state::<crate::project_webview_authority::ProjectWebviewAuthority>()
@@ -356,6 +378,14 @@ fn recover(
     });
     if !still_current {
         return Ok(());
+    }
+    if label == crate::product_runtime::PROJECT_WINDOW_LABEL {
+        // Only an unanswered close confirmation is cancelled. A close/save
+        // already approved has finished during the drain above.
+        let _ = app
+            .state::<crate::project_host::ProjectHost>()
+            .cancel_close();
+        crate::project_dialog_window::retire_editor_dialog(app).map_err(io::Error::other)?;
     }
     if label == crate::project_dialog_window::PROJECT_DIALOG_LABEL {
         // Reused export dialogs keep their original URL while the Host advances

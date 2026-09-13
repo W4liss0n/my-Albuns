@@ -90,6 +90,8 @@ pub(crate) async fn retry_unavailable_media(
     media_monitor: State<'_, MediaMonitor>,
     namespace_owner: State<'_, ActiveCacheNamespace>,
 ) -> Result<MediaPreview, MediaPreviewCommandError> {
+    let _operation = crate::project_ui_operations::begin(&app)
+        .map_err(|_| MediaPreviewCommandError::read_failed())?;
     if window.label() != PROJECT_WINDOW_LABEL {
         return Err(MediaPreviewCommandError::read_failed());
     }

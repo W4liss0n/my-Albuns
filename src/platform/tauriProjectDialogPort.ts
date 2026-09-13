@@ -39,7 +39,6 @@ interface OwnedDialogSession {
 }
 
 export function createTauriProjectDialogPort(): ProjectDialogPort {
-  let nextSessionId = 0;
   let activeSession: OwnedDialogSession | null = null;
   const waitingSessions: OwnedDialogSession[] = [];
   let dialogMutationQueue: Promise<void> = Promise.resolve();
@@ -175,7 +174,7 @@ export function createTauriProjectDialogPort(): ProjectDialogPort {
     listener: (action: ProjectDialogAction) => void,
   ): ProjectDialogSession {
     const owned: OwnedDialogSession = {
-      id: `project-dialog-session-${++nextSessionId}`,
+      id: `project-dialog-session-${crypto.randomUUID()}`,
       listener,
       presentedVersion: 0,
       state: null,

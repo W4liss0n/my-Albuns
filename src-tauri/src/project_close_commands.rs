@@ -1,6 +1,6 @@
 use myalbuns_core::{SaveProjectError, SaveProjectOutcome};
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
-use tauri::{State, Window};
+use tauri::{Manager, State, Window};
 
 use crate::{
     ipc_contract::{
@@ -19,6 +19,8 @@ pub(crate) fn request_project_close(
     window: Window,
     state: State<'_, ProjectHost>,
 ) -> Result<ProjectCloseRequestOutcome, SaveProjectCommandError> {
+    let _operation = crate::project_ui_operations::begin(window.app_handle())
+        .map_err(|_| SaveProjectCommandError::SessionUnavailable)?;
     if crate::settings_modality::blocks(&window) {
         return Err(SaveProjectCommandError::SessionUnavailable);
     }
@@ -62,6 +64,8 @@ pub(crate) async fn resolve_project_close(
     window: Window,
     state: State<'_, ProjectHost>,
 ) -> Result<ProjectCloseResolution, SaveProjectCommandError> {
+    let _operation = crate::project_ui_operations::begin(window.app_handle())
+        .map_err(|_| SaveProjectCommandError::SessionUnavailable)?;
     if crate::settings_modality::blocks(&window) {
         return Err(SaveProjectCommandError::SessionUnavailable);
     }

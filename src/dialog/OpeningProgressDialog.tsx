@@ -1,12 +1,16 @@
-import type { StartupImageProgress } from "../platform/generated/StartupImageProgress";
 import { ProgressDialog } from "../ui";
+
+interface OpeningImageProgress {
+  completedFiles: number;
+  totalFiles: number;
+}
 
 export function OpeningProgressDialog({
   creating = false,
   images = null,
 }: {
   creating?: boolean;
-  images?: StartupImageProgress | null;
+  images?: OpeningImageProgress | null;
 }) {
   return <ProgressDialog
     title={creating ? "Criando Projeto" : "Abrindo Projeto"}

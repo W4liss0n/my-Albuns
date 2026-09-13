@@ -43,6 +43,22 @@ function invokedSessionId(callIndex: number) {
   return args.sessionId;
 }
 
+test("a replacement editor cannot consume actions addressed to the previous renderer", async () => {
+  vi.mocked(invoke).mockResolvedValue(undefined);
+  const native = nativeActionHarness();
+  const state = { busy: false, kind: "projectCloseConfirmation" } as const;
+  await createTauriProjectDialogPort().acquire(vi.fn()).present(state);
+  const oldSessionId = invokedSessionId(0);
+  const listener = vi.fn();
+  await createTauriProjectDialogPort().acquire(listener).present(state);
+  const newSessionId = invokedSessionId(1);
+  expect(newSessionId).not.toBe(oldSessionId);
+  native.emit({ action: "discardAndClose", sessionId: oldSessionId });
+  expect(listener).not.toHaveBeenCalled();
+  native.emit({ action: "cancelProjectClose", sessionId: newSessionId });
+  expect(listener).toHaveBeenCalledWith("cancelProjectClose");
+});
+
 test("scopes native presentation, updates and actions to one dialog session", async () => {
   vi.mocked(invoke).mockResolvedValue(undefined);
   const native = nativeActionHarness();

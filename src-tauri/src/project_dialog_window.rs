@@ -264,6 +264,7 @@ pub(crate) async fn present_project_dialog(
     state_store: State<'_, ProjectDialogPresentationStore>,
 ) -> Result<(), String> {
     require_project_owner(&window)?;
+    let _operation = crate::project_ui_operations::begin(&app)?;
     require_dialog_session_id(&session_id)?;
     let state = state.sanitized();
     state_store.present(&session_id, state.clone())?;
@@ -400,6 +401,23 @@ fn require_project_owner(window: &WebviewWindow) -> Result<(), String> {
     } else {
         Err("Project dialogs belong only to the Project window".into())
     }
+}
+
+/// A replaced editor cannot receive actions for its old frontend sessions.
+pub(crate) fn retire_editor_dialog(app: &AppHandle) -> Result<(), String> {
+    let store = app.state::<ProjectDialogPresentationStore>();
+    let Some(presentation) = store.current()? else {
+        return Ok(());
+    };
+    if let Some(dialog) = app.get_window(PROJECT_DIALOG_LABEL) {
+        dialog.destroy().map_err(|error| error.to_string())?;
+    }
+    store.clear(&presentation.session_id)?;
+    if let Some(owner) = app.get_webview_window(PROJECT_WINDOW_LABEL) {
+        native_dialog_window::release_blocked_owner_if_disabled(&owner, false);
+    }
+    tracing::info!(target: "myalbuns.desktop", event = "project_dialog_retired_after_editor_failure");
+    Ok(())
 }
 
 fn require_dialog_session_id(session_id: &str) -> Result<(), String> {

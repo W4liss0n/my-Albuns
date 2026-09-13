@@ -345,6 +345,8 @@ pub(crate) async fn export_sheet(
     processor: State<'_, ImagingProcessor>,
     attempts: State<'_, ExportAttempts>,
 ) -> Result<ExportResult, ExportCommandError> {
+    let _operation =
+        crate::project_ui_operations::begin(&app).map_err(ExportCommandError::failed)?;
     let problems = state
         .validate_sheet_export(&sheet_id)
         .map_err(ExportCommandError::failed)?;

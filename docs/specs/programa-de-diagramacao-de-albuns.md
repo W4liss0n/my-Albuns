@@ -478,21 +478,20 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 
 ### Configurações do aplicativo
 
-- `Configurações` abre uma janela global organizada nas abas iniciais `Desempenho` e `Photoshop`.
-- Nesta entrega, a janela pode ser aberta por `Ferramentas > Configurações` em qualquer Janela de Projeto; a entrada equivalente na Tela de Boas-vindas fica adiada até sua ligação com a nova UI.
+- `Configurações` abre uma janela global organizada nas abas iniciais `Desempenho` e `Outros`, pela Tela de Boas-vindas ou por `Ferramentas > Configurações`.
+- O título mostra somente `Configurações`, com o controle de fechar à direita. As demais janelas do programa ficam bloqueadas enquanto ela estiver aberta, inclusive para fechar o Projeto; fechar Configurações ou encerrar seu processo libera o bloqueio.
 - Existe somente uma janela de Configurações por instância do MyAlbuns; solicitações posteriores focalizam a existente.
 - As preferências dessa janela pertencem ao usuário e não integram arquivos de Projeto, Salvamento ou Undo/Redo.
-- Escolhas simples são aplicadas e persistidas imediatamente, sem botão geral `Aplicar` ou `Salvar`. `Liberar espaço` e `Limpar todo o Cache` mantêm seus próprios feedbacks e confirmações.
+- Escolhas simples são aplicadas e persistidas imediatamente, sem botão geral `Aplicar` ou `Salvar`. `Limpar cache` mantém confirmação e feedback próprios.
 - Preferências globais, catálogo global de Layouts e estado local reconstruível são persistidos independentemente, cada qual com schema e política de falha próprios. Podem compartilhar primitivas de substituição de um arquivo, mas não um armazenamento genérico que iguale suas garantias. Cada Janela consulta a revisão aplicável ao abrir ou receber foco; falha de escrita preserva a revisão confirmada anterior.
-- `Desempenho` apresenta somente o uso do Cache, o volume liberável de Projetos fechados, `Liberar espaço` e `Limpar todo o Cache`; não expõe calibração, processos, threads, memória ou paralelismo.
+- `Desempenho` apresenta somente `Cache dos álbuns`, com espaço ocupado e uma única ação `Limpar cache` na mesma linha, usando toda a largura útil. A seção é compacta, sem cartões, diagnóstico do Canvas ou botão `Atualizar`; consulta os dados ao abrir e recuperar foco.
 - Apagar o Cache não remove itens do Painel, vínculos, conteúdo de Projeto ou Arquivos originais. As representações interativas são reconstruídas quando necessárias e continuam proibidas como fonte de Exportação.
-- A seção mostra o espaço atualmente ocupado e quanto `Liberar espaço` pode remover.
-- `Liberar espaço` exige confirmação e remove integralmente somente o Cache de Projetos fechados; qualquer Projeto aberto ou com processo ativo é preservado.
+- A confirmação usa um balão ancorado ao botão, sem deslocar o conteúdo: `Ao limpar o cache, as próximas aberturas dos álbuns podem demorar mais.`, com `Cancelar` e `Confirmar`. Escape ou clique fora apenas fecha o balão.
 - O aplicativo não possui limite rígido nem apaga Cache automaticamente por tamanho na primeira versão.
 - O aplicativo não possui alertas progressivos por patamares arbitrários. Pouco espaço livre no volume pode gerar um aviso com o total ocupado, `Agora não` e `Liberar espaço`; se não houver espaço seguro para outro artefato, a geração daquele Cache é interrompida sem modificar o Projeto ou o original.
-- `Limpar todo o Cache` exige confirmação e só executa imediatamente quando não houver Projeto ou Processador ativo. Caso contrário, oferece agendar a limpeza para a próxima inicialização, antes da abertura de Projetos; o MVP não pausa editores nem remove Cache ativo ao vivo.
-- `Photoshop` lista as instalações compatíveis detectadas e mostra a disponibilidade da integração.
-- Sem preferência válida, a versão mais recente é selecionada automaticamente. O usuário pode escolher outra versão detectada ou usar `Localizar Photoshop...` para indicar manualmente o executável.
+- `Limpar cache` só executa imediatamente quando não houver Projeto ou Processador ativo. Caso contrário, agenda automaticamente para a próxima inicialização, antes da abertura de Projetos, informa uma única vez e desabilita novas solicitações; o MVP não pausa editores nem remove Cache ativo ao vivo.
+- A seção `Photoshop`, na aba `Outros`, aproxima o título das opções e reúne `Versão utilizada` e `Localizar…` na mesma linha, com o caminho abaixo. Não mostra `Disponível` nem `Atualizar`; consulta instalações ao abrir e recuperar foco.
+- Sem preferência válida, a versão mais recente é selecionada automaticamente. O usuário pode escolher outra versão detectada ou usar `Localizar…` para indicar manualmente o executável.
 - A instalação escolhida é uma preferência global reutilizada entre Projetos e sessões.
 - `Abrir no Photoshop` aparece no menu de contexto de uma Foto no Painel e de um Frame preenchido. `Ctrl + E` é seu atalho fixo na primeira versão.
 - O comando exige exatamente uma Foto contextual. Com Seleção de Frames múltipla, ele fica indisponível e não abre arquivos em massa.
@@ -1006,7 +1005,7 @@ validação das superfícies descritas nesta seção.
 - `Substituir Imagem` fica no menu do botão direito de todas as Fotos e Decorativos, independentemente de disponibilidade ou Cache. Seleciona diretamente um arquivo JPEG, PNG ou TIFF, inclusive com nome diferente, valida-o e troca a referência da imagem clicada em todos os seus usos no Projeto. Preserva identidade no catálogo, geometria e ajustes dos Frames e usos como Fundo ou Overlay, renovando a prévia. Cancelamento, mesmo caminho ou arquivo inválido não alteram a sessão. Participa de Undo/Redo e exige Salvamento manual, sem modificar o arquivo original.
 - O Cache de mídia serve exclusivamente à interação. Nunca substitui um original ausente e nunca é usado como fonte de Exportação.
 - O placeholder de Arquivo ausente sem Cache tem fundo neutro uniforme e símbolo de imagem central. Na miniatura do Painel de imagens, mantém a proporção da mídia, sem texto, e conserva o indicador quadrado no canto superior direito. No Frame da Lâmina, mostra também `Imagem ausente`, sem indicador no canto; símbolo e texto se ajustam ao espaço do Frame e não acompanham as transformações da Foto. Essa apresentação não altera o conteúdo persistido nem a Exportação e não substitui a Foto quando há Cache, o Frame vazio ou os estados de carregamento e indisponibilidade.
-- `Liberar espaço` reserva atomicamente namespaces sem proprietário ativo e remove somente Cache de Projetos fechados. `Limpar todo o Cache` executa apenas sem Projeto ou Processador ativo; caso contrário, é agendado para a próxima inicialização segura, sem pausar editores nem remover Cache ativo ao vivo.
+- A limpeza reserva atomicamente namespaces sem proprietário ativo. A única ação de Configurações, `Limpar cache`, executa apenas sem Projeto ou Processador ativo; caso contrário, é agendada automaticamente para a próxima inicialização segura, sem pausar editores nem remover Cache ativo ao vivo.
 
 ### Identidade, sessão e persistência
 

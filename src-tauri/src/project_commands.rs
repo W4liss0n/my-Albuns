@@ -55,6 +55,7 @@ pub(crate) async fn apply_project_intent(
     state: State<'_, ProjectHost>,
     on_progress: tauri::ipc::Channel<crate::ipc_contract::ImageProcessingProgress>,
 ) -> Result<ProjectMutationOutcome, String> {
+    let _operation = crate::project_ui_operations::begin(&app)?;
     let previous_bindings = state.authorized_media_catalog()?.bindings;
     let intent_kind = match &intent {
         ProjectIntent::RemoveMedia { .. } => "remove_media",
@@ -126,6 +127,7 @@ pub(crate) async fn import_media(
     state: State<'_, ProjectHost>,
     on_progress: tauri::ipc::Channel<crate::ipc_contract::ImageProcessingProgress>,
 ) -> Result<ImportMediaResult, String> {
+    let _operation = crate::project_ui_operations::begin(&app)?;
     if window.label() != PROJECT_WINDOW_LABEL {
         return Err("A importação só está disponível na Janela do Projeto.".into());
     }
@@ -410,6 +412,7 @@ async fn change_media_reference(
     on_progress: tauri::ipc::Channel<crate::ipc_contract::ImageProcessingProgress>,
     kind: MediaChangeKind,
 ) -> Result<EditorProjection, String> {
+    let _operation = crate::project_ui_operations::begin(&app)?;
     if window.label() != PROJECT_WINDOW_LABEL {
         return Err("A alteração de imagem só está disponível na Janela do Projeto.".into());
     }
@@ -618,6 +621,7 @@ pub(crate) async fn undo_project(
     state: State<'_, ProjectHost>,
     on_progress: tauri::ipc::Channel<crate::ipc_contract::ImageProcessingProgress>,
 ) -> Result<EditorProjection, String> {
+    let _operation = crate::project_ui_operations::begin(&app)?;
     let previous_bindings = state.authorized_media_catalog()?.bindings;
     let projection = state.undo()?;
     prepare_changed_images(&app, &previous_bindings, |progress| {
@@ -642,6 +646,7 @@ pub(crate) async fn redo_project(
     state: State<'_, ProjectHost>,
     on_progress: tauri::ipc::Channel<crate::ipc_contract::ImageProcessingProgress>,
 ) -> Result<EditorProjection, String> {
+    let _operation = crate::project_ui_operations::begin(&app)?;
     let previous_bindings = state.authorized_media_catalog()?.bindings;
     let projection = state.redo()?;
     prepare_changed_images(&app, &previous_bindings, |progress| {
@@ -665,6 +670,8 @@ pub(crate) async fn save_project(
     window: WebviewWindow,
     state: State<'_, ProjectHost>,
 ) -> Result<SaveProjectResult, SaveProjectCommandError> {
+    let _operation = crate::project_ui_operations::begin(window.app_handle())
+        .map_err(|_| SaveProjectCommandError::SessionUnavailable)?;
     let host = state.inner().clone();
     let window_label = window.label().to_owned();
     let save = tauri::async_runtime::spawn_blocking(move || host.save(expected_revision))
@@ -731,6 +738,8 @@ pub(crate) async fn save_project_as(
     window: WebviewWindow,
     state: State<'_, ProjectHost>,
 ) -> Result<SaveAsProjectResult, SaveAsProjectCommandError> {
+    let _operation = crate::project_ui_operations::begin(window.app_handle())
+        .map_err(|_| SaveAsProjectCommandError::SessionUnavailable)?;
     if window.label() != PROJECT_WINDOW_LABEL {
         return Err(SaveAsProjectCommandError::SessionUnavailable);
     }

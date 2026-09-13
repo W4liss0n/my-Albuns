@@ -42,6 +42,7 @@ pub(crate) async fn choose_export_folder(
     app: AppHandle,
     window: WebviewWindow,
 ) -> Result<Option<String>, String> {
+    let _operation = crate::project_ui_operations::begin(&app)?;
     require_owner(&window)?;
     let parent = app.get_webview_window("project-dialog").unwrap_or(window);
     let (sender, receiver) = tokio::sync::oneshot::channel();
@@ -72,6 +73,8 @@ pub(crate) async fn export_project(
     processor: State<'_, ImagingProcessor>,
     attempts: State<'_, ExportAttempts>,
 ) -> Result<Option<ExportResult>, NormalExportError> {
+    let _operation =
+        crate::project_ui_operations::begin(&app).map_err(ExportCommandError::failed)?;
     require_owner(&window).map_err(ExportCommandError::failed)?;
     options
         .format

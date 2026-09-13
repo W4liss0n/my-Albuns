@@ -90,6 +90,7 @@ pub(crate) async fn relink_export_media(
     window: WebviewWindow,
     on_progress: tauri::ipc::Channel<crate::ipc_contract::ImageProcessingProgress>,
 ) -> Result<ExportRelinkResult, String> {
+    let _operation = crate::project_ui_operations::begin(&app)?;
     if window.label() != PROJECT_WINDOW_LABEL {
         return Err("A Religação pertence à Janela do Projeto.".into());
     }

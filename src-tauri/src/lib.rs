@@ -48,6 +48,7 @@ mod project_commands;
 mod project_dialog_window;
 mod project_host;
 mod project_recovery;
+mod project_ui_operations;
 mod project_webview_authority;
 mod project_window_lifecycle;
 mod provisional_decoratives;
