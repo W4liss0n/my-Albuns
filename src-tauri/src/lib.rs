@@ -323,6 +323,7 @@ mod tests {
             allowed_commands(&owned_dialog_permission),
             BTreeSet::from([
                 "fit_owned_window",
+                "opening_image_progress",
                 "owned_window_content_ready",
                 "resolve_opening_external_copy",
                 "resolve_opening_recovery",
