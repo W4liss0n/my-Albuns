@@ -39,7 +39,7 @@
 .application-settings-panel { display: grid; gap: 12px; padding: 24px; }
 .application-settings-panel h2, .application-settings-panel p { margin: 0; }
 .application-settings-panel > h2 { font-size: var(--ui-font-size-heading); font-weight: 600; }
-.application-settings-panel--cache { max-width: 528px; }
+.application-settings-panel--cache > .ui-inline-notice { max-width: 480px; }
 
 .application-settings-cache { margin: 0; }
 .application-settings-cache-row {
