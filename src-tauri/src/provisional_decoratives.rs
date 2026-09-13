@@ -420,7 +420,7 @@ pub(crate) async fn choose_provisional_decorative(
     };
     let profile = app
         .state::<myalbuns_paths::AppPaths>()
-        .webview_data_directory(crate::global_runtime::GLOBAL_WEBVIEW_NAMESPACE)
+        .webview_data_directory(crate::native_dialog_window::PROGRESS_WEBVIEW_NAMESPACE)
         .map_err(|_| ProvisionalDecorativeFailure::dialog_unavailable())?;
     let progress = crate::native_dialog_window::show_native_progress(
         &app,

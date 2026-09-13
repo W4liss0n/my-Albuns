@@ -171,6 +171,9 @@ pub(crate) const PROJECT_DIALOG_WEBVIEW_DEBUG_PORT_ENV: &str =
 #[cfg(debug_assertions)]
 pub(crate) const PROJECT_DIALOG_WEBVIEW_DATA_DIRECTORY_ENV: &str =
     "MYALBUNS_DEV_PROJECT_DIALOG_WEBVIEW_DATA_DIRECTORY";
+#[cfg(debug_assertions)]
+pub(crate) const OPENING_DIALOG_WEBVIEW_DEBUG_PORT_ENV: &str =
+    "MYALBUNS_DEV_OPENING_DIALOG_WEBVIEW_DEBUG_PORT";
 
 #[cfg(debug_assertions)]
 const WRY_DEFAULT_DISABLED_FEATURES: &str =
@@ -229,9 +232,11 @@ pub(crate) fn enforce_webview(webview: &tauri::Webview) -> std::io::Result<()> {
     #[cfg(windows)]
     {
         let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+        let label = webview.label().to_owned();
         webview
             .with_webview(move |webview| {
-                let result = enforce_windows_policy(&webview).map_err(|error| error.to_string());
+                let result =
+                    enforce_windows_policy(&webview, &label).map_err(|error| error.to_string());
                 let _ = sender.send(result);
             })
             .map_err(std::io::Error::other)?;
@@ -289,6 +294,11 @@ pub(crate) fn replacement_webview_debug_arguments(
 }
 
 #[cfg(debug_assertions)]
+pub(crate) fn global_webview_debug_arguments() -> io::Result<Option<String>> {
+    replacement_webview_debug_arguments(std::env::var_os("MYALBUNS_DEV_GLOBAL_WEBVIEW_DEBUG_PORT"))
+}
+
+#[cfg(debug_assertions)]
 pub(crate) fn project_dialog_debug_data_directory(
     directory: Option<OsString>,
 ) -> io::Result<Option<PathBuf>> {
@@ -309,6 +319,7 @@ pub(crate) fn project_dialog_debug_data_directory(
 pub(crate) fn retire_inherited_debug_arguments_before_replacement() -> io::Result<()> {
     if std::env::var_os(SAVE_AS_WEBVIEW_DEBUG_PORT_ENV).is_none()
         && std::env::var_os(PROJECT_DIALOG_WEBVIEW_DEBUG_PORT_ENV).is_none()
+        && std::env::var_os(OPENING_DIALOG_WEBVIEW_DEBUG_PORT_ENV).is_none()
     {
         return Ok(());
     }
@@ -483,9 +494,47 @@ mod tests {
 }
 
 #[cfg(windows)]
-fn enforce_windows_policy(webview: &tauri::webview::PlatformWebview) -> windows::core::Result<()> {
+fn enforce_windows_policy(
+    webview: &tauri::webview::PlatformWebview,
+    label: &str,
+) -> windows::core::Result<()> {
     unsafe {
         let core_webview = webview.controller().CoreWebView2()?;
+        use webview2_com::{
+            Microsoft::Web::WebView2::Win32::{
+                COREWEBVIEW2_PROCESS_FAILED_KIND, COREWEBVIEW2_PROCESS_FAILED_REASON,
+                ICoreWebView2ProcessFailedEventArgs2,
+            },
+            ProcessFailedEventHandler,
+        };
+        let mut browser_pid = 0;
+        core_webview.BrowserProcessId(&mut browser_pid)?;
+        let label = label.to_owned();
+        let mut token = 0;
+        core_webview.add_ProcessFailed(
+            &ProcessFailedEventHandler::create(Box::new(move |_, args| {
+                if let Some(args) = args {
+                    let mut kind = COREWEBVIEW2_PROCESS_FAILED_KIND::default();
+                    args.ProcessFailedKind(&mut kind)?;
+                    let args = args.cast::<ICoreWebView2ProcessFailedEventArgs2>()?;
+                    let mut reason = COREWEBVIEW2_PROCESS_FAILED_REASON::default();
+                    let mut code = 0;
+                    args.Reason(&mut reason)?;
+                    args.ExitCode(&mut code)?;
+                    tracing::error!(
+                        target: "myalbuns.desktop",
+                        event = "webview_process_failed",
+                        webview_label = label,
+                        browser_process_id = browser_pid,
+                        failure_kind = kind.0,
+                        failure_reason = reason.0,
+                        exit_code = code,
+                    );
+                }
+                Ok(())
+            })),
+            &mut token,
+        )?;
         let settings = core_webview.Settings()?;
         settings.SetAreDefaultContextMenusEnabled(false)?;
         settings

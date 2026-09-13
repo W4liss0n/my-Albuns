@@ -123,6 +123,7 @@ const TAURI_WEBVIEW_AUTOMATION_ENV: &str = "TAURI_WEBVIEW_AUTOMATION";
 struct GlobalRuntimeState {
     bootstrap: ProjectHostBootstrap,
     global_webview_data_directory: PathBuf,
+    progress_webview_data_directory: PathBuf,
     graphics_gate: GraphicsLaunchGate,
     recent_projects: RecentProjectsStore,
     startup_failure: Arc<Mutex<Option<ProjectLaunchFailure>>>,
@@ -145,6 +146,9 @@ impl GlobalRuntimeState {
                 .with_creation_timeout(HOST_CREATION_TIMEOUT),
             global_webview_data_directory: app_paths
                 .webview_data_directory(GLOBAL_WEBVIEW_NAMESPACE)
+                .map_err(|error| std::io::Error::other(error.to_string()))?,
+            progress_webview_data_directory: app_paths
+                .webview_data_directory(native_dialog_window::PROGRESS_WEBVIEW_NAMESPACE)
                 .map_err(|error| std::io::Error::other(error.to_string()))?,
             graphics_gate: GraphicsLaunchGate::new(activation_projects),
             recent_projects: RecentProjectsStore::new(app_paths),
@@ -804,7 +808,7 @@ async fn launch_confirmed_project_with_bindings_and_progress(
         app,
         presentation.owner_label,
         presentation.kind,
-        &state.global_webview_data_directory,
+        &state.progress_webview_data_directory,
     )
     .await
     {
@@ -1458,9 +1462,15 @@ fn build_global_window(
         .find(|window| window.label == GLOBAL_WINDOW_LABEL)
         .ok_or_else(|| std::io::Error::other("the Global window configuration does not exist"))?;
     let (policy_signal, policy_readiness) = desktop_webview_policy::page_load_handshake();
-    let window = WebviewWindowBuilder::from_config(app, config)
+    let builder = WebviewWindowBuilder::from_config(app, config)
         .map_err(std::io::Error::other)?
-        .data_directory(webview_data_directory)
+        .data_directory(webview_data_directory);
+    #[cfg(debug_assertions)]
+    let builder = match desktop_webview_policy::global_webview_debug_arguments()? {
+        Some(arguments) => builder.additional_browser_args(&arguments),
+        None => builder,
+    };
+    let window = builder
         .on_page_load(move |window, payload| {
             policy_signal.observe(&window, payload.event());
         })
@@ -1914,6 +1924,8 @@ pub(crate) fn run(
                 &app_handle,
                 setup_state.global_webview_data_directory.clone(),
             )?;
+            #[cfg(debug_assertions)]
+            desktop_webview_policy::retire_inherited_debug_arguments_before_replacement()?;
             let managed_cache_service = app.state::<CacheService>().inner().clone();
             tauri::async_runtime::spawn(initialize_global_runtime(
                 app_handle.clone(),

@@ -73,7 +73,7 @@ pub(crate) async fn show(app: &AppHandle, section: SettingsSection) -> Result<()
         .reserve()
         .await?;
     let (signal, readiness) = desktop_webview_policy::page_load_handshake();
-    let window = WebviewWindowBuilder::new(
+    let builder = WebviewWindowBuilder::new(
         app,
         SETTINGS_WINDOW_LABEL,
         WebviewUrl::App(format!("global.html?surface=settings&section={section}").into()),
@@ -93,10 +93,18 @@ pub(crate) async fn show(app: &AppHandle, section: SettingsSection) -> Result<()
             .map_err(|error| error.to_string())?,
     )
     .center()
-    .prevent_overflow()
-    .on_page_load(move |window, payload| signal.observe(&window, payload.event()))
-    .build()
-    .map_err(|error| error.to_string())?;
+    .prevent_overflow();
+    #[cfg(debug_assertions)]
+    let builder = match desktop_webview_policy::global_webview_debug_arguments()
+        .map_err(|error| error.to_string())?
+    {
+        Some(arguments) => builder.additional_browser_args(&arguments),
+        None => builder,
+    };
+    let window = builder
+        .on_page_load(move |window, payload| signal.observe(&window, payload.event()))
+        .build()
+        .map_err(|error| error.to_string())?;
     let reservation = std::sync::Mutex::new(Some(reservation));
     window.on_window_event(move |event| {
         if matches!(event, tauri::WindowEvent::Destroyed) {

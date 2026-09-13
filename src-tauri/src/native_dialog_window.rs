@@ -31,6 +31,7 @@ const PROJECT_RECOVERY_DIALOG_WIDTH: f64 = 492.0;
 const OWNED_WINDOW_READY_PARAMETER: &str = "ownedReadyToken";
 pub(crate) const OWNED_WINDOW_TITLEBAR_HEIGHT: f64 = 38.0;
 const OPENING_PROGRESS_LABEL: &str = "dialog-opening-progress";
+pub(crate) const PROGRESS_WEBVIEW_NAMESPACE: &str = "global-progress";
 const OPENING_IMAGE_PROGRESS_EVENT: &str = "myalbuns://opening-image-progress";
 const PROJECT_FAILURE_LABEL: &str = "dialog-project-failure";
 static NEXT_OWNED_WINDOW_READY_TOKEN: AtomicU64 = AtomicU64::new(1);
@@ -547,7 +548,7 @@ pub(crate) async fn show_native_progress(
     app: &AppHandle,
     owner_label: &str,
     kind: NativeProgressKind,
-    owner_webview_data_directory: &Path,
+    progress_webview_data_directory: &Path,
 ) -> io::Result<NativeProgressDialog> {
     if let Some(state) = app.try_state::<OpeningImageProgressState>() {
         *state
@@ -556,6 +557,12 @@ pub(crate) async fn show_native_progress(
             .map_err(|_| io::Error::other("the opening progress state is unavailable"))? = None;
     }
     let owner = owned_window(app, owner_label)?;
+    #[cfg(debug_assertions)]
+    let browser_arguments = desktop_webview_policy::replacement_webview_debug_arguments(
+        std::env::var_os(desktop_webview_policy::OPENING_DIALOG_WEBVIEW_DEBUG_PORT_ENV),
+    )?;
+    #[cfg(not(debug_assertions))]
+    let browser_arguments: Option<String> = None;
     let window = build_hidden_owned_window(
         app,
         &owner,
@@ -564,8 +571,10 @@ pub(crate) async fn show_native_progress(
             url: kind.url(),
             width: DIALOG_WIDTH,
             height: 126.0 + OWNED_WINDOW_TITLEBAR_HEIGHT,
-            browser_arguments: None,
-            browser_data_directory: Some(owner_webview_data_directory),
+            browser_arguments: browser_arguments.as_deref(),
+            // A failure in the hidden Global browser must not blank the progress
+            // dialog while the independent Project Host is still preparing images.
+            browser_data_directory: Some(progress_webview_data_directory),
         },
     )
     .await?;

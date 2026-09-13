@@ -63,6 +63,13 @@ ser preparadas. O espaço da porcentagem fica reservado desde o início para
 evitar alteração do tamanho da janela nessa transição. A conclusão da contagem
 não libera o editor antes da entrega das miniaturas visíveis.
 
+Os diálogos de progresso do Global usam um grupo de processos WebView2 próprio,
+com perfil em `State/WebView2/global-progress`. Assim, uma falha no navegador
+da Tela de Boas-vindas ou de Configurações não apaga o acompanhamento enquanto
+o Host prepara as imagens. A propriedade da janela, seu tamanho e a transição
+para o editor continuam seguindo o fluxo descrito acima. Falhas de processos
+WebView2 são registradas nos logs com a superfície e o código de saída.
+
 Na importação, o Painel de imagens mantém o conjunto anterior durante todo o
 lote. Novos cartões e sua contagem aparecem juntos quando o processamento
 termina, inclusive quando há problemas a apresentar. Notificações do Monitor de
