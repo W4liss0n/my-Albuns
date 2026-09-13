@@ -444,6 +444,34 @@
       "actions": []
     },
     {
+      "id": "opening-images-progress",
+      "title": "Diálogo de abertura — preparando imagens",
+      "implementationPath": "/dialog.html?kind=opening-project&imageCompleted=5&imageTotal=12",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-progress-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "A abertura usa o progresso determinado canônico na preparação das imagens, conforme docs/design/0007-progresso-de-operacoes.md."
+      },
+      "viewport": { "width": 520, "height": 320 },
+      "readySelector": "[role=\"progressbar\"][aria-valuenow=\"5\"][aria-valuemax=\"12\"]",
+      "actions": []
+    },
+    {
+      "id": "opening-images-completed",
+      "title": "Diálogo de abertura — imagens preparadas",
+      "implementationPath": "/dialog.html?kind=opening-project&imageCompleted=12&imageTotal=12",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-progress-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "A contagem completa permanece visível até a entrega das miniaturas, sem alterar o tamanho da janela."
+      },
+      "viewport": { "width": 520, "height": 320 },
+      "readySelector": "[role=\"progressbar\"][aria-valuenow=\"12\"][aria-valuemax=\"12\"]",
+      "actions": []
+    },
+    {
       "id": "new-project-operational-failure-dialog",
       "title": "Novo Projeto — falha operacional em diálogo pertencente",
       "implementationPath": "/dialog.html?kind=project-failure&title=N%C3%A3o%20foi%20poss%C3%ADvel%20escolher%20a%20Imagem%20decorativa&message=O%20arquivo%20escolhido%20n%C3%A3o%20cont%C3%A9m%20uma%20imagem%20JPEG%20ou%20PNG.&action=Escolha%20outro%20arquivo%20JPEG%20ou%20PNG.",

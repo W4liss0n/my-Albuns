@@ -72,6 +72,8 @@ fn main() {
         .expect("Original file information bindings should be generated");
     ImageProcessingProgress::export_all(&config)
         .expect("Photo import progress bindings should be generated");
+    myalbuns_desktop_lib::ipc_contract::StartupImageProgress::export_all(&config)
+        .expect("Startup image progress bindings should be generated");
     MediaPreview::export_all(&config).expect("media preview bindings should be generated");
     MediaPreviewDemand::export_all(&config)
         .expect("media preview demand bindings should be generated");

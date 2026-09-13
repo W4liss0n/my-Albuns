@@ -6,6 +6,8 @@
   "windows": ["dialog-opening-progress"],
   "permissions": [
     "owned-dialog-window-commands",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
     "core:window:allow-start-dragging"
   ]
 }

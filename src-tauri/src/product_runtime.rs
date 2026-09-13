@@ -536,6 +536,11 @@ impl InitialImageProcessing {
                 let mut batch = crate::image_processing::ImageProcessingBatch::new(
                     self.bindings.len() as u32,
                     |progress| {
+                        app.state::<ProjectStartupHandshake>()
+                            .report_image_progress(crate::ipc_contract::StartupImageProgress {
+                                completed_files: progress.completed_files,
+                                total_files: progress.total_files,
+                            });
                         if let Some(reason) = progress.operation_problem {
                             operation_problem = Some(reason);
                         }
@@ -1085,6 +1090,20 @@ enum StartupSignal {
 }
 
 impl ProjectStartupHandshake {
+    fn report_image_progress(&self, progress: crate::ipc_contract::StartupImageProgress) {
+        if let Ok(state) = self.state.lock() {
+            if !state.terminal.emitted {
+                let _ = crate::project_bootstrap::write_host_progress(
+                    io::stdout().lock(),
+                    &crate::project_bootstrap::HostProgress::preparing_images(
+                        &state.terminal.request,
+                        progress,
+                    ),
+                );
+            }
+        }
+    }
+
     fn new(terminal: PendingHostTerminal, identity: (String, u64)) -> Self {
         Self {
             state: Arc::new(Mutex::new(ProjectStartupState {

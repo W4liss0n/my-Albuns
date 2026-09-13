@@ -716,6 +716,13 @@ pub struct ImageProcessingProgress {
     pub(crate) operation_problem: Option<String>,
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct StartupImageProgress {
+    pub completed_files: u32,
+    pub total_files: u32,
+}
+
 #[derive(Serialize, TS)]
 #[serde(
     tag = "kind",

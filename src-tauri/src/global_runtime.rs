@@ -793,7 +793,7 @@ async fn launch_confirmed_project_with_progress(
 
 async fn launch_confirmed_project_with_bindings_and_progress(
     app: &AppHandle,
-    state: GlobalRuntimeState,
+    mut state: GlobalRuntimeState,
     project_path: PathBuf,
     launch: ConfirmedLaunch,
     root_bindings: RootBindingPlan,
@@ -819,6 +819,11 @@ async fn launch_confirmed_project_with_bindings_and_progress(
             None
         }
     };
+    if let Some(dialog) = progress.as_ref() {
+        state.bootstrap = state
+            .bootstrap
+            .with_progress(dialog.image_progress_reporter());
+    }
     let launch =
         launch_confirmed_project_with_bindings(state.clone(), project_path, launch, root_bindings)
             .await;
@@ -1889,6 +1894,7 @@ pub(crate) fn run(
         )
         .plugin(tauri_plugin_dialog::init())
         .manage(desktop_webview_policy::WindowWebviewVisibility::default())
+        .manage(native_dialog_window::OpeningImageProgressState::default())
         .on_window_event(on_global_window_event)
         .manage(state)
         .manage(crate::settings_window::SettingsWindowState::new(
@@ -1934,6 +1940,7 @@ pub(crate) fn run(
             crate::native_dialog_window::fit_owned_window,
             crate::native_dialog_window::resolve_opening_external_copy,
             crate::native_dialog_window::resolve_opening_recovery,
+            crate::native_dialog_window::opening_image_progress,
             create_project,
             open_project,
             recent_projects,

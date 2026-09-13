@@ -35,12 +35,14 @@ interface ProgressDialogProps {
   cancelAction?: DialogAction;
   progress: ProgressDialogState;
   title: string;
+  reserveProgressMeta?: boolean;
 }
 
 export function ProgressDialog({
   cancelAction,
   progress,
   title,
+  reserveProgressMeta = false,
 }: ProgressDialogProps) {
   const measured = progress.kind !== "indeterminate";
   const total = measured ? Math.max(1, progress.total) : undefined;
@@ -113,11 +115,11 @@ export function ProgressDialog({
               title={title}
               total={total}
             />
-            {progress.kind === "determinate" ? (
-              <div className="ui-progress-dialog__meta">
-                <span>{percentage}%</span>
+            {progress.kind === "determinate" || reserveProgressMeta ? (
+              <div className="ui-progress-dialog__meta" aria-hidden={!measured || undefined}>
+                <span>{measured ? `${percentage}%` : "\u00a0"}</span>
                 <span className="ui-progress-dialog__meta-spacer" />
-                {progress.remaining ? <span>{progress.remaining}</span> : null}
+                {progress.kind === "determinate" && progress.remaining ? <span>{progress.remaining}</span> : null}
               </div>
             ) : null}
           </>

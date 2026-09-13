@@ -4,14 +4,16 @@ use std::{
     io,
     path::Path,
     sync::{
-        Mutex, OnceLock,
+        Arc, Mutex, OnceLock,
         atomic::{AtomicU64, Ordering},
     },
     time::Duration,
 };
 
 use serde::Deserialize;
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent};
+use tauri::{
+    AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
+};
 
 #[cfg(windows)]
 use windows::Win32::UI::Input::KeyboardAndMouse::IsWindowEnabled;
@@ -29,6 +31,7 @@ const PROJECT_RECOVERY_DIALOG_WIDTH: f64 = 492.0;
 const OWNED_WINDOW_READY_PARAMETER: &str = "ownedReadyToken";
 pub(crate) const OWNED_WINDOW_TITLEBAR_HEIGHT: f64 = 38.0;
 const OPENING_PROGRESS_LABEL: &str = "dialog-opening-progress";
+const OPENING_IMAGE_PROGRESS_EVENT: &str = "myalbuns://opening-image-progress";
 const PROJECT_FAILURE_LABEL: &str = "dialog-project-failure";
 static NEXT_OWNED_WINDOW_READY_TOKEN: AtomicU64 = AtomicU64::new(1);
 static OWNED_WINDOW_READINESS: OnceLock<Mutex<OwnedWindowReadinessRegistry>> = OnceLock::new();
@@ -336,6 +339,26 @@ impl ProjectFailureDialogContext {
     }
 }
 
+#[derive(Clone, Default)]
+pub(crate) struct OpeningImageProgressState(
+    Arc<Mutex<Option<crate::ipc_contract::StartupImageProgress>>>,
+);
+
+#[tauri::command]
+pub(crate) fn opening_image_progress(
+    window: WebviewWindow,
+    state: tauri::State<'_, OpeningImageProgressState>,
+) -> Result<Option<crate::ipc_contract::StartupImageProgress>, String> {
+    if window.label() != OPENING_PROGRESS_LABEL {
+        return Err("Opening progress belongs only to its owned dialog".into());
+    }
+    state
+        .0
+        .lock()
+        .map(|progress| *progress)
+        .map_err(|_| "the opening progress state is unavailable".into())
+}
+
 pub(crate) struct NativeProgressDialog {
     closed: bool,
     decision_attempt: Option<OpeningDecisionAttempt>,
@@ -345,6 +368,19 @@ pub(crate) struct NativeProgressDialog {
 }
 
 impl NativeProgressDialog {
+    pub(crate) fn image_progress_reporter(
+        &self,
+    ) -> crate::project_bootstrap::StartupProgressReporter {
+        let window = self.window.clone();
+        let state = window.state::<OpeningImageProgressState>().inner().clone();
+        crate::project_bootstrap::StartupProgressReporter::new(move |progress| {
+            if let Ok(mut current) = state.0.lock() {
+                *current = Some(progress);
+                let _ = window.emit_to(window.label(), OPENING_IMAGE_PROGRESS_EVENT, progress);
+            }
+        })
+    }
+
     pub(crate) async fn request_external_copy_decision(
         &mut self,
         attempt_id: &str,
@@ -513,6 +549,12 @@ pub(crate) async fn show_native_progress(
     kind: NativeProgressKind,
     owner_webview_data_directory: &Path,
 ) -> io::Result<NativeProgressDialog> {
+    if let Some(state) = app.try_state::<OpeningImageProgressState>() {
+        *state
+            .0
+            .lock()
+            .map_err(|_| io::Error::other("the opening progress state is unavailable"))? = None;
+    }
     let owner = owned_window(app, owner_label)?;
     let window = build_hidden_owned_window(
         app,

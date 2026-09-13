@@ -50,6 +50,13 @@ precisar ser recuperada, isso acontece sob demanda, em segundo plano. A mesma
 regra vale para desfazer e refazer essas aplicações. Novos vínculos, inclusive
 os restaurados no catálogo, continuam seguindo o processamento de imagens.
 
+Na abertura, o diálogo começa com `Preparando a Janela do Projeto…`. Quando
+existe Cache a reconstruir, a mesma janela passa para `Preparando imagens`,
+com barra determinada, porcentagem e contagem `X de Y` das imagens que precisam
+ser preparadas. O espaço da porcentagem fica reservado desde o início para
+evitar alteração do tamanho da janela nessa transição. A conclusão da contagem
+não libera o editor antes da entrega das miniaturas visíveis.
+
 Na importação, o Painel de imagens mantém o conjunto anterior durante todo o
 lote. Novos cartões e sua contagem aparecem juntos quando o processamento
 termina, inclusive quando há problemas a apresentar. Notificações do Monitor de

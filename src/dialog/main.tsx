@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useState } from "react";
+import React, { useEffect, useLayoutEffect, useState } from "react";
 import ReactDOM from "react-dom/client";
 
 import type { ProjectRecoveryDecision } from "../application/projectPorts";
@@ -12,6 +12,9 @@ import {
 } from "../platform/tauriOpeningDialogControls";
 import { dismissOwnedWindow } from "../platform/tauriOwnedDialogControls";
 import { tauriWindowControls } from "../platform/tauriWindowControls";
+import { subscribeOpeningImageProgress } from "../platform/tauriOpeningImageProgress";
+import type { StartupImageProgress } from "../platform/generated/StartupImageProgress";
+import { OpeningProgressDialog } from "./OpeningProgressDialog";
 import {
   MessageDialog,
   OwnedWindowShell,
@@ -33,6 +36,32 @@ function parameter(name: string, fallback: string) {
 function DialogContent() {
   const windowControls = useWindowControls();
   const kind = parameters.get("kind");
+  const [imageProgress, setImageProgress] = useState<StartupImageProgress | null>(() => {
+    const completedFiles = Number(parameters.get("imageCompleted"));
+    const totalFiles = Number(parameters.get("imageTotal"));
+    return Number.isSafeInteger(completedFiles) && Number.isSafeInteger(totalFiles) &&
+      totalFiles > 0 && completedFiles >= 0 && completedFiles <= totalFiles
+      ? { completedFiles, totalFiles } : null;
+  });
+  useEffect(() => {
+    if (!["opening-project", "creating-project", "project-recovery", "external-copy"].includes(kind ?? "")) return;
+    let active = true;
+    const subscription = subscribeOpeningImageProgress((progress) => {
+      if (active) setImageProgress(progress);
+    });
+    void subscription.catch(() => undefined);
+    return () => {
+      active = false;
+      void subscription.then((unlisten) => unlisten()).catch(() => undefined);
+    };
+  }, [kind]);
+  useLayoutEffect(() => {
+    if (kind === "opening-project") window.sessionStorage.setItem(OPENING_OWNER_MARKER, "loading");
+  }, [kind]);
+
+  if (imageProgress) {
+    return <OpeningProgressDialog creating={kind === "creating-project"} images={imageProgress} />;
+  }
 
   const closeDialog = () => {
     void Promise.resolve(windowControls.close()).catch(() => undefined);
@@ -45,15 +74,7 @@ function DialogContent() {
   }
 
   if (kind === "creating-project") {
-    return (
-      <ProgressDialog
-        progress={{
-          kind: "indeterminate",
-          status: "Preparando a Janela do Projeto…",
-        }}
-        title="Criando Projeto"
-      />
-    );
+    return <OpeningProgressDialog creating />;
   }
 
   if (kind === "project-failure") {
@@ -126,22 +147,6 @@ function OpeningExternalCopyDialog() {
         resolving={resolving}
       />
     </div>
-  );
-}
-
-function OpeningProgressDialog() {
-  useLayoutEffect(() => {
-    window.sessionStorage.setItem(OPENING_OWNER_MARKER, "loading");
-  }, []);
-
-  return (
-    <ProgressDialog
-      progress={{
-        kind: "indeterminate",
-        status: "Preparando a Janela do Projeto…",
-      }}
-      title="Abrindo Projeto"
-    />
   );
 }
 
