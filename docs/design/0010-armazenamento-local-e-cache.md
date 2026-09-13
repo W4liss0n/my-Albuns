@@ -1,7 +1,7 @@
 ---
 status: accepted
 document: design
-updated: 2026-09-06
+updated: 2026-09-13
 ---
 
 # Armazenamento local e Cache
@@ -329,6 +329,8 @@ Não existe limite rígido, expiração automática por idade ou sequência de a
 Configurações apresenta somente `Limpar cache`, para solicitar a limpeza completa. Ela executa imediatamente apenas quando não houver Projeto ou Processador ativo e depois de adquirir a concessão exclusiva única do `OperationGate`. Caso contrário, agenda automaticamente para a próxima inicialização, antes da abertura de Projetos. O usuário não escolhe o alcance nem o momento da limpeza. A concessão impede abertura, Processador ou Exportação concorrente e é liberada em sucesso, falha ou cancelamento. O MVP não pausa editores nem remove Cache ativo ao vivo. A manutenção de namespaces fechados acima permanece uma capacidade interna, não uma segunda opção na aba Desempenho.
 
 Nenhuma ação de Cache remove Projetos, itens do Painel, vínculos, Recuperação, Layouts, preferências, Exportações ou originais.
+
+Depois da confirmação, a limpeza acontece em segundo plano, sem diálogo de progresso nem cancelamento durante a execução. A pessoa não precisa acompanhar a remoção. As reservas e a espera pela conclusão antes de abrir Projetos continuam sendo responsabilidades internas do aplicativo. A preparação das imagens durante a abertura do Álbum mantém seu progresso determinado.
 
 ## Cenários de validação
 
