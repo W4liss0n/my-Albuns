@@ -26,8 +26,11 @@ Keep the Windows desktop available while running. The observer places only its
 temporary progress dialog above other windows once, without taking focus. It
 samples actual composed desktop pixels; a DOM screenshot does not prove that
 the native window painted. It rejects sustained black content, requires the
-completed progress bar to paint, and verifies Cache completion and Project UI
-readiness. Inspect `completed.png` for the status, percentage and image count.
+measured progress bar to paint, and verifies Cache completion and Project UI
+readiness. Inspect `progress.png` for the status, percentage and image count.
+`completed.png` additionally records the final bar when it remains exposed long
+enough for the desktop sampler. Completing the work and releasing the Project
+must not require an artificial minimum dwell time at 100%.
 
 On 2026-09-13, the original shared-browser implementation reproduced an actual
 WebView2 browser exit with `0xC0000005` during Cache cleanup/reopening. Injecting

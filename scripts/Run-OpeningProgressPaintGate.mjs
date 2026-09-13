@@ -93,7 +93,7 @@ try {
     exposedSamples: exposed.length, projectReady: Boolean(ready),
   }, null, 2));
   assert.ok(longestBlackMilliseconds < 500, `The native dialog stayed black for ${longestBlackMilliseconds} ms`);
-  assert.ok(existsSync(path.join(output, "completed.png")), "The complete progress bar must actually paint");
+  assert.ok(existsSync(path.join(output, "progress.png")), "Measured progress must actually paint beyond the initial indeterminate indicator");
   assert.equal(cacheEntries, expectedImages, "All fixture images must be prepared before release");
   assert.ok(ready, "The Project must complete its UI readiness handshake");
   assert.ok(!records.some((record) => record.event === "imaging_process_spawned" &&

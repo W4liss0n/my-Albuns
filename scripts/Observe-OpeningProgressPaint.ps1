@@ -67,8 +67,8 @@ public static class OpeningProgressPaint {
                             total++;
                             if (color.R < 20 && color.G < 20 && color.B < 20) black++;
                         }
-                    // A long continuous blue run distinguishes completion from the
-                    // short indeterminate indicator, title text and a blank window.
+                    // A run longer than the indeterminate indicator proves that
+                    // measured progress painted, rather than just the initial shell.
                     for (int y = bitmap.Height / 2; y < bitmap.Height - 15; y += 2) {
                         int run = 0;
                         for (int x = 0; x < bitmap.Width; x++) {
@@ -87,6 +87,8 @@ public static class OpeningProgressPaint {
                             bitmap.Save(Path.Combine(output, "painted.png"), ImageFormat.Png);
                             savedPaint = true;
                         }
+                        if (longestBlueRun >= (width - 40) * 0.32)
+                            bitmap.Save(Path.Combine(output, "progress.png"), ImageFormat.Png);
                         if (longestBlueRun >= (width - 40) * 0.99)
                             bitmap.Save(Path.Combine(output, "completed.png"), ImageFormat.Png);
                     }
