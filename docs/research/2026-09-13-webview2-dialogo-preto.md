@@ -6,6 +6,15 @@ date: 2026-09-13
 
 # Diálogo preto: pesquisa de falhas do WebView2
 
+## Evidência posterior: origem identificada em dump real
+
+A investigação posterior à implementação da recuperação encontrou uma falha
+em `RTSSHooks64.dll`, do RivaTuner, acessando uma biblioteca DXGI já descarregada.
+O mesmo padrão foi reproduzido abrindo Configurações sem limpar Cache.
+Consulte [o diagnóstico com dump e reprodução](2026-09-13-rivatuner-webview2-configuracoes.md).
+O levantamento abaixo preserva o estado anterior, quando ainda faltava essa
+captura; suas hipóteses não substituem a evidência posterior.
+
 ## Recomendação para o MyAlbuns
 
 A prioridade é tratar a perda do navegador que desenha a interface e obter um
