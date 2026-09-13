@@ -32,6 +32,8 @@ readiness. Inspect `completed.png` for the status, percentage and image count.
 On 2026-09-13, the original shared-browser implementation reproduced an actual
 WebView2 browser exit with `0xC0000005` during Cache cleanup/reopening. Injecting
 the same browser-loss pattern left its progress surface black for 7.8 seconds.
-The isolated progress implementation remained painted through `60 de 60`.
+Isolation alone also encountered an independent progress-browser access
+violation. With GPU composition disabled only for the dedicated progress
+environment, repeated fault-injection runs remained painted through `60 de 60`.
 This proves failure containment; it does not identify the internal WebView2
 instruction that caused the access violation.

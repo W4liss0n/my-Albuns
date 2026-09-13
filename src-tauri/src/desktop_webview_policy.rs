@@ -175,8 +175,7 @@ pub(crate) const PROJECT_DIALOG_WEBVIEW_DATA_DIRECTORY_ENV: &str =
 pub(crate) const OPENING_DIALOG_WEBVIEW_DEBUG_PORT_ENV: &str =
     "MYALBUNS_DEV_OPENING_DIALOG_WEBVIEW_DEBUG_PORT";
 
-#[cfg(debug_assertions)]
-const WRY_DEFAULT_DISABLED_FEATURES: &str =
+pub(crate) const WRY_DEFAULT_DISABLED_FEATURES: &str =
     "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection";
 
 #[cfg(windows)]

@@ -64,7 +64,9 @@ evitar alteração do tamanho da janela nessa transição. A conclusão da conta
 não libera o editor antes da entrega das miniaturas visíveis.
 
 Os diálogos de progresso do Global usam um grupo de processos WebView2 próprio,
-com perfil em `State/WebView2/global-progress`. Assim, uma falha no navegador
+com perfil em `State/WebView2/global-progress` e renderização sem aceleração de
+GPU para essa superfície simples de texto e barra. O Canvas do Projeto mantém
+sua renderização acelerada em outro grupo. Assim, uma falha no navegador
 da Tela de Boas-vindas ou de Configurações não apaga o acompanhamento enquanto
 o Host prepara as imagens. A propriedade da janela, seu tamanho e a transição
 para o editor continuam seguindo o fluxo descrito acima. Falhas de processos

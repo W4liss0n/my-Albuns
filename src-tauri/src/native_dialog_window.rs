@@ -563,6 +563,12 @@ pub(crate) async fn show_native_progress(
     )?;
     #[cfg(not(debug_assertions))]
     let browser_arguments: Option<String> = None;
+    // This small text/progress surface does not need the GPU compositor that
+    // failed during opening. Its separate environment leaves the Canvas GPU intact.
+    let browser_arguments = format!(
+        "{} --disable-gpu",
+        browser_arguments.unwrap_or_else(|| desktop_webview_policy::WRY_DEFAULT_DISABLED_FEATURES.to_owned())
+    );
     let window = build_hidden_owned_window(
         app,
         &owner,
@@ -571,7 +577,7 @@ pub(crate) async fn show_native_progress(
             url: kind.url(),
             width: DIALOG_WIDTH,
             height: 126.0 + OWNED_WINDOW_TITLEBAR_HEIGHT,
-            browser_arguments: browser_arguments.as_deref(),
+            browser_arguments: Some(&browser_arguments),
             // A failure in the hidden Global browser must not blank the progress
             // dialog while the independent Project Host is still preparing images.
             browser_data_directory: Some(progress_webview_data_directory),
