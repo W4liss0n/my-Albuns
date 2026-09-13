@@ -74,7 +74,7 @@ Um Monitor de Arquivos consolida eventos rápidos e os trata como indícios. Dep
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-A janela abre com 720 × 440 pixels lógicos, usa o cabeçalho, as cores e os controles compartilhados do projeto e mantém as abas e o rodapé fixos. Segue a densidade das janelas auxiliares: títulos de seção de 13 pixels, controles de 31 pixels e texto de controle de 12,5 pixels, com 12 pixels entre título e conteúdo. Conteúdo excedente rola somente na área central. Textos introdutórios redundantes são omitidos; erros e confirmações necessários continuam visíveis. Em larguras reduzidas, os espaçamentos se ajustam e as colunas podem se empilhar, sem cortar controles.
+A janela abre com 720 × 440 pixels lógicos, usa o cabeçalho, as cores e os controles compartilhados do projeto e mantém as abas e o rodapé fixos. O botão X permanece no canto superior direito, inclusive em larguras reduzidas e quando o status do cabeçalho está oculto. Segue a densidade das janelas auxiliares: títulos de seção de 13 pixels, controles de 31 pixels e texto de controle de 12,5 pixels, com 12 pixels entre título e conteúdo. Conteúdo excedente rola somente na área central. Textos introdutórios redundantes são omitidos; erros e confirmações necessários continuam visíveis. Em larguras reduzidas, os espaçamentos se ajustam e as colunas podem se empilhar, sem cortar controles.
 
 ## Comandos e associações
 

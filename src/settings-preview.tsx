@@ -5,6 +5,7 @@ import { photoshopSettingsPreview } from "./test/photoshopPreview";
 import type { CacheSettingsPort } from "./application/cacheSettings";
 import "./ui/theme.css";
 import "./ui/ui.css";
+import "./global/GlobalShell.css";
 
 const parameters = new URLSearchParams(window.location.search);
 let cache = { occupiedBytes: 104857600, releasableBytes: 41943040, clearAllScheduled: false };
