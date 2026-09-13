@@ -323,6 +323,39 @@ pub struct FrozenSheetRendering {
 }
 
 impl FrozenProjectRendering {
+    pub fn into_export(
+        self,
+        sheet_ids: &[String],
+    ) -> Result<(RenderSnapshot, Vec<MediaRef>), CoreError> {
+        let problems = self.validate_export_sheets(sheet_ids)?;
+        if !problems.is_empty() {
+            return Err(CoreError::UnfilledLayoutPositions { problems });
+        }
+        let snapshot = RenderSnapshot::from_resolved(
+            RenderSnapshotMetadata::from(&self.projection.state),
+            self.projection.composition,
+        );
+        snapshot.export_units(sheet_ids, crate::ExportMode::Sheet)?;
+        let referenced: HashSet<_> = snapshot
+            .composition
+            .sheets
+            .iter()
+            .filter(|sheet| sheet_ids.contains(&sheet.sheet_id))
+            .flat_map(|sheet| sheet.referenced_media_ids())
+            .collect();
+        let sources: Vec<_> = self
+            .sources
+            .into_iter()
+            .filter(|media| referenced.contains(&MediaId::from_uuid(media.id())))
+            .collect();
+        if sources.len() != referenced.len() {
+            return Err(CoreError::InvalidSnapshot(
+                "a composição congelada referencia uma fonte ausente".into(),
+            ));
+        }
+        Ok((snapshot, sources))
+    }
+
     pub fn validate_export_sheets(
         &self,
         sheet_ids: &[String],

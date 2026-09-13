@@ -1921,11 +1921,13 @@ name = "myalbuns-imaging"
 version = "0.1.0"
 dependencies = [
  "embed-resource",
+ "flate2",
  "image",
  "myalbuns-core",
  "myalbuns-imaging-protocol",
  "myalbuns-logging",
  "myalbuns-paths",
+ "png 0.18.1",
  "serde_json",
  "sha2",
  "tempfile",

@@ -74,12 +74,14 @@ pub(crate) struct OpenRenderSource {
     source_bytes: u64,
 }
 
+#[derive(Clone)]
 enum SourcePreflight {
     Jpeg(JpegPreflight),
     Png(PngPreflight),
     Tiff(TiffPreflight),
 }
 
+#[derive(Clone)]
 struct JpegPreflight {
     width: u32,
     height: u32,
@@ -104,12 +106,14 @@ enum JpegComponentLayout {
     OtherThreeComponents,
 }
 
+#[derive(Clone)]
 struct PngPreflight {
     width: u32,
     height: u32,
     has_icc_profile: bool,
 }
 
+#[derive(Clone)]
 struct TiffPreflight {
     width: u32,
     height: u32,
@@ -118,6 +122,20 @@ struct TiffPreflight {
 }
 
 impl OpenRenderSource {
+    pub(crate) fn decode_captured(&self) -> Result<RgbaImage, SourceFailure> {
+        let mut file = self.reader.get_ref().try_clone().map_err(|error| {
+            SourceFailure::path(ImagingPathCode::from_io_error(&error), error.to_string())
+        })?;
+        file.seek(SeekFrom::Start(0)).map_err(|error| {
+            SourceFailure::path(ImagingPathCode::from_io_error(&error), error.to_string())
+        })?;
+        Self {
+            reader: BufReader::new(file),
+            preflight: self.preflight.clone(),
+            source_bytes: self.source_bytes,
+        }
+        .decode()
+    }
     pub(crate) fn byte_count(&self) -> u64 {
         self.source_bytes
     }
@@ -202,6 +220,25 @@ fn open_source(
             format!("não foi possível abrir a fonte original para leitura: {error}"),
         )
     })?;
+    inspect_open_source(file, allow_single_page_tiff)
+}
+
+pub(crate) fn capture_render_source(
+    resolved: &ResolvedObject,
+) -> Result<OpenRenderSource, SourceFailure> {
+    let file = resolved.capture_for_read().map_err(|error| {
+        SourceFailure::path(
+            ImagingPathCode::from_io_error(&error),
+            format!("não foi possível manter o Original estável: {error}"),
+        )
+    })?;
+    inspect_open_source(file, true)
+}
+
+fn inspect_open_source(
+    file: File,
+    allow_single_page_tiff: bool,
+) -> Result<OpenRenderSource, SourceFailure> {
     let metadata = file.metadata().map_err(|error| {
         SourceFailure::path(
             ImagingPathCode::from_io_error(&error),

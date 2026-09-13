@@ -5,6 +5,7 @@ New-Item -ItemType Directory -Force -Path $reportRoot | Out-Null
 $steps = @(
     @{ name = 'processor-build'; arguments = @('run', 'sidecar:prepare') },
     @{ name = 'frontend-build'; arguments = @('run', 'build') },
+    @{ name = 'owned-window-fitting'; arguments = @('run', 'test:owned-window-fitting') },
     @{ name = 'frontend-tests'; arguments = @('test') },
     @{ name = 'automation-tests'; arguments = @('run', 'test:automation') },
     @{ name = 'rust-quality'; arguments = @('run', 'quality:rust') },

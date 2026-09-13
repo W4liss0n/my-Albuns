@@ -499,6 +499,10 @@ export function useProjectMutations({
       void runWithErrorFeedback((port) =>
         imageProcessing.run((publish) => port.relink(mediaId, publish)),
       ),
+    replaceMedia: (mediaId: string) =>
+      void runWithErrorFeedback((port) =>
+        imageProcessing.run((publish) => port.replaceImage(mediaId, publish)),
+      ),
     retryUnavailableMedia: async (retry: (publish: (progress: ImageProcessingProgress) => void) => Promise<void>) => {
       await runWithErrorFeedback(async (port) => {
         await imageProcessing.run(retry);

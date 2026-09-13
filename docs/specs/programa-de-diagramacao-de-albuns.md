@@ -307,7 +307,7 @@ A saída final será uma Exportação JPEG, PNG ou PDF, `Por lâmina` ou `Por p�
 1. Como pessoa diagramadora, quero ordenar por Nome, Data de criação ou Data de alteração, para encontrar imagens por critérios diferentes.
 1. Como pessoa diagramadora, quero escolher direção crescente ou decrescente, para adaptar a visualização ao meu fluxo.
 1. Como pessoa diagramadora, quero que Nome use ordenação natural como `1`, `2`, `10`, para acompanhar sequências intuitivamente.
-1. Como pessoa diagramadora, quero que datas venham dos arquivos originais, ausentes fiquem no fim e empates usem Nome, para obter ordem determinística.
+1. Como pessoa diagramadora, quero que datas venham dos arquivos originais, a disponibilidade não altere a ordenação e empates usem Nome, para obter ordem determinística.
 1. Como pessoa diagramadora, quero filtrar por `Todas`, `Usadas` ou `Não usadas`, para localizar mídias posicionadas ou disponíveis.
 1. Como pessoa diagramadora, quero considerar uma Foto usada quando aparecer em algum Frame, para que o filtro reflita a composição.
 1. Como pessoa diagramadora, quero considerar um Decorativo usado quando aplicado ou definido como padrão, para reconhecer todas as referências relevantes.
@@ -320,7 +320,7 @@ A saída final será uma Exportação JPEG, PNG ou PDF, `Por lâmina` ou `Por p�
 1. Como pessoa diagramadora, quero que operações com muitos arquivos na mesma origem de rede reutilizem a resolução dessa raiz durante a execução, para evitar trabalho repetitivo sem criar estado permanente.
 1. Como pessoa diagramadora, quero observar a nova versão quando o conteúdo do mesmo caminho for substituído, para trabalhar com o original atual.
 1. Como pessoa diagramadora, quero relocalizar uma referência ausente somente no Projeto atual, para preservar o isolamento entre trabalhos.
-1. Como pessoa diagramadora, quero receber aviso sobre arquivo ausente que esteja apenas no Painel, para corrigi-lo sem bloquear saída que não o utiliza.
+1. Como pessoa diagramadora, quero identificar o arquivo ausente no próprio item do Painel de imagens, sem aviso no Painel contextual e sem bloquear saída que não o utiliza.
 1. Como pessoa diagramadora, quero bloquear a Exportação se um original necessário à seleção estiver ausente, para não gerar resultado incompleto pelo Cache.
 1. Como pessoa diagramadora, quero remover Foto em uso escolhendo remover tudo, manter Frames como placeholders ou cancelar, para controlar o impacto.
 1. Como pessoa diagramadora, quero aplicar uma única decisão ao remover várias Fotos, para não responder ao mesmo diálogo repetidamente.
@@ -478,21 +478,20 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 
 ### Configurações do aplicativo
 
-- `Configurações` abre uma janela global organizada nas abas iniciais `Desempenho` e `Photoshop`.
-- Nesta entrega, a janela pode ser aberta por `Ferramentas > Configurações` em qualquer Janela de Projeto; a entrada equivalente na Tela de Boas-vindas fica adiada até sua ligação com a nova UI.
+- `Configurações` abre uma janela global organizada nas abas iniciais `Desempenho` e `Outros`, pela Tela de Boas-vindas ou por `Ferramentas > Configurações`.
+- O título mostra somente `Configurações`, com o controle de fechar à direita. As demais janelas do programa ficam bloqueadas enquanto ela estiver aberta, inclusive para fechar o Projeto; fechar Configurações ou encerrar seu processo libera o bloqueio.
 - Existe somente uma janela de Configurações por instância do MyAlbuns; solicitações posteriores focalizam a existente.
 - As preferências dessa janela pertencem ao usuário e não integram arquivos de Projeto, Salvamento ou Undo/Redo.
-- Escolhas simples são aplicadas e persistidas imediatamente, sem botão geral `Aplicar` ou `Salvar`. `Liberar espaço` e `Limpar todo o Cache` mantêm seus próprios feedbacks e confirmações.
+- Escolhas simples são aplicadas e persistidas imediatamente, sem botão geral `Aplicar` ou `Salvar`. `Limpar cache` mantém confirmação e feedback próprios.
 - Preferências globais, catálogo global de Layouts e estado local reconstruível são persistidos independentemente, cada qual com schema e política de falha próprios. Podem compartilhar primitivas de substituição de um arquivo, mas não um armazenamento genérico que iguale suas garantias. Cada Janela consulta a revisão aplicável ao abrir ou receber foco; falha de escrita preserva a revisão confirmada anterior.
-- `Desempenho` apresenta somente o uso do Cache, o volume liberável de Projetos fechados, `Liberar espaço` e `Limpar todo o Cache`; não expõe calibração, processos, threads, memória ou paralelismo.
+- `Desempenho` apresenta somente `Cache dos álbuns`, com espaço ocupado e uma única ação `Limpar cache` na mesma linha, usando toda a largura útil. A seção é compacta, sem cartões, diagnóstico do Canvas ou botão `Atualizar`; consulta os dados ao abrir e recuperar foco.
 - Apagar o Cache não remove itens do Painel, vínculos, conteúdo de Projeto ou Arquivos originais. As representações interativas são reconstruídas quando necessárias e continuam proibidas como fonte de Exportação.
-- A seção mostra o espaço atualmente ocupado e quanto `Liberar espaço` pode remover.
-- `Liberar espaço` exige confirmação e remove integralmente somente o Cache de Projetos fechados; qualquer Projeto aberto ou com processo ativo é preservado.
+- A confirmação usa um balão ancorado ao botão, sem deslocar o conteúdo: `Ao limpar o cache, as próximas aberturas dos álbuns podem demorar mais.`, com `Cancelar` e `Confirmar`. Escape ou clique fora apenas fecha o balão.
 - O aplicativo não possui limite rígido nem apaga Cache automaticamente por tamanho na primeira versão.
 - O aplicativo não possui alertas progressivos por patamares arbitrários. Pouco espaço livre no volume pode gerar um aviso com o total ocupado, `Agora não` e `Liberar espaço`; se não houver espaço seguro para outro artefato, a geração daquele Cache é interrompida sem modificar o Projeto ou o original.
-- `Limpar todo o Cache` exige confirmação e só executa imediatamente quando não houver Projeto ou Processador ativo. Caso contrário, oferece agendar a limpeza para a próxima inicialização, antes da abertura de Projetos; o MVP não pausa editores nem remove Cache ativo ao vivo.
-- `Photoshop` lista as instalações compatíveis detectadas e mostra a disponibilidade da integração.
-- Sem preferência válida, a versão mais recente é selecionada automaticamente. O usuário pode escolher outra versão detectada ou usar `Localizar Photoshop...` para indicar manualmente o executável.
+- `Limpar cache` só executa imediatamente quando não houver Projeto ou Processador ativo. Caso contrário, agenda automaticamente para a próxima inicialização, antes da abertura de Projetos, informa uma única vez e desabilita novas solicitações; o MVP não pausa editores nem remove Cache ativo ao vivo.
+- A seção `Photoshop`, na aba `Outros`, aproxima o título das opções e reúne `Versão utilizada` e `Localizar…` na mesma linha, com o caminho abaixo. Não mostra `Disponível` nem `Atualizar`; consulta instalações ao abrir e recuperar foco.
+- Sem preferência válida, a versão mais recente é selecionada automaticamente. O usuário pode escolher outra versão detectada ou usar `Localizar…` para indicar manualmente o executável.
 - A instalação escolhida é uma preferência global reutilizada entre Projetos e sessões.
 - `Abrir no Photoshop` aparece no menu de contexto de uma Foto no Painel e de um Frame preenchido. `Ctrl + E` é seu atalho fixo na primeira versão.
 - O comando exige exatamente uma Foto contextual. Com Seleção de Frames múltipla, ele fica indisponível e não abre arquivos em massa.
@@ -967,7 +966,7 @@ validação das superfícies descritas nesta seção.
 - Durante esse arraste, Frames e Fotos são transparentes ao roteamento do gesto: o alvo é sempre a zona da Lâmina sob o ponteiro.
 - Dois cliques em um Decorativo aplicam-no a Ambos os lados da Lâmina usada como alvo implícito: Background sem modificador e Overlay com `Shift`.
 - A Ordenação do Painel oferece Nome, Data de criação e Data de alteração, em direção crescente ou decrescente.
-- A ordenação padrão é Nome crescente com comparação natural. Datas vêm do Arquivo vinculado; Arquivos ausentes ficam no fim e empates usam Nome natural.
+- A ordenação padrão é Nome crescente com comparação natural. A disponibilidade não participa da ordenação: Arquivos ausentes seguem o mesmo critério de Nome ou data dos demais itens, em ambas as direções. Datas vêm do Arquivo vinculado; datas conhecidas precedem desconhecidas e empates usam Nome natural.
 - O Filtro de uso oferece `Todas`, `Usadas` e `Não usadas`.
 - Uma Foto está usada quando aparece em algum Frame. Um Decorativo está usado quando está aplicado ou configurado no Padrão visual do Projeto.
 - Ordenação e filtro são preferências do aplicativo por aba, reutilizadas entre Projetos e sessões. Não alteram o Projeto e não participam de Undo/Redo.
@@ -1000,9 +999,13 @@ validação das superfícies descritas nesta seção.
 - Pan, Zoom, Frames, Layouts e demais decisões de composição não invalidam a representação reduzida; as mesmas regras determinísticas calculam o plano que a prévia e a saída final adaptam aos seus respectivos renderizadores.
 - Um Arquivo ausente ou indisponível pode conservar sua última representação e metadados conhecidos com indicação própria, mas continua inválido como fonte de Exportação.
 - Se uma origem acessível confirmar que um arquivo foi movido ou removido, cada Projeto o considera ausente e pode religá-lo independentemente. Arquivo indisponível preserva o vínculo e oferece nova tentativa, não Religação. Uma Religação aceita altera somente a referência daquele Projeto, participa de Undo/Redo, exige Salvamento e nunca move o arquivo original.
-- Arquivo ausente usado na seleção bloqueia a Exportação. Arquivo ausente apenas no Painel gera aviso, mas não bloqueia.
+- Arquivo ausente usado na seleção bloqueia a Exportação. Arquivo ausente apenas no Painel de imagens mantém indicação no próprio item, mas não bloqueia. O Painel contextual não apresenta aviso nem atalho de revisão de ausentes.
+- Na miniatura do Painel de imagens, um ícone quadrado no canto superior direito indica Arquivo ausente, sem texto ou botão sobre a imagem. Com Cache, a miniatura real permanece; sem Cache, aparece o placeholder genérico. `Religar` é oferecido apenas no menu do botão direito do item ausente e atua na imagem clicada, preservando a seleção múltipla existente.
+- `Religar` no Painel solicita uma pasta e procura o mesmo nome e extensão somente entre seus arquivos diretos, sem pesquisar subpastas. Se não encontrar, informa o problema e mantém o vínculo.
+- `Substituir Imagem` fica no menu do botão direito de todas as Fotos e Decorativos, independentemente de disponibilidade ou Cache. Seleciona diretamente um arquivo JPEG, PNG ou TIFF, inclusive com nome diferente, valida-o e troca a referência da imagem clicada em todos os seus usos no Projeto. Preserva identidade no catálogo, geometria e ajustes dos Frames e usos como Fundo ou Overlay, renovando a prévia. Cancelamento, mesmo caminho ou arquivo inválido não alteram a sessão. Participa de Undo/Redo e exige Salvamento manual, sem modificar o arquivo original.
 - O Cache de mídia serve exclusivamente à interação. Nunca substitui um original ausente e nunca é usado como fonte de Exportação.
-- `Liberar espaço` reserva atomicamente namespaces sem proprietário ativo e remove somente Cache de Projetos fechados. `Limpar todo o Cache` executa apenas sem Projeto ou Processador ativo; caso contrário, é agendado para a próxima inicialização segura, sem pausar editores nem remover Cache ativo ao vivo.
+- O placeholder de Arquivo ausente sem Cache tem fundo neutro uniforme e símbolo de imagem central. Na miniatura do Painel de imagens, mantém a proporção da mídia, sem texto, e conserva o indicador quadrado no canto superior direito. No Frame da Lâmina, mostra também `Imagem ausente`, sem indicador no canto; símbolo e texto se ajustam ao espaço do Frame e não acompanham as transformações da Foto. Essa apresentação não altera o conteúdo persistido nem a Exportação e não substitui a Foto quando há Cache, o Frame vazio ou os estados de carregamento e indisponibilidade.
+- A limpeza reserva atomicamente namespaces sem proprietário ativo. A única ação de Configurações, `Limpar cache`, executa apenas sem Projeto ou Processador ativo; caso contrário, é agendada automaticamente para a próxima inicialização segura, sem pausar editores nem remover Cache ativo ao vivo.
 
 ### Identidade, sessão e persistência
 
@@ -1065,8 +1068,8 @@ validação das superfícies descritas nesta seção.
 - A tela permite acessar os Projetos necessários à correção; a operação de origem permanece pendente e não inicia processamento final enquanto os problemas são tratados.
 - Quando a validação da Exportação encontra bloqueios, abre essa tela filtrada para o contexto da operação, antes de criar progresso ou saída.
 - Linhas de Frame placeholder oferecem `Abrir Projeto`; linhas de Arquivo ausente oferecem `Relinkar`; linhas de Arquivo indisponível oferecem `Tentar novamente` sem alterar a referência.
-- Na Exportação normal, `Relinkar` solicita a pasta das Fotos daquele Projeto e busca recursivamente o nome e a extensão exatos de cada Arquivo ausente. Somente uma correspondência única é aceita; nenhuma ou várias mantêm a pendência. Referências aceitas atualizam a sessão aberta, participam de Undo/Redo e ficam pendentes até o Salvamento manual, mas já podem ser usadas pela Exportação do estado visível.
-- A validação é repetida após cada correção. `Continuar Exportação` só é habilitado sem pendências sem decisão e ainda exige um clique explícito; resolver ou ignorar a última linha nunca inicia o processamento automaticamente.
+- Na Exportação normal, `Relinkar` solicita a pasta das Fotos daquele Projeto e busca o nome e a extensão exatos de cada Arquivo ausente somente nos arquivos diretamente nessa pasta, sem pesquisar subpastas. Somente uma correspondência única é aceita; nenhuma ou várias mantêm a pendência. Referências aceitas atualizam a sessão aberta, participam de Undo/Redo e ficam pendentes até o Salvamento manual, mas já podem ser usadas pela Exportação do estado visível.
+- A validação é repetida após cada correção. Na Exportação normal, resolver a última pendência fecha a Tela de Problemas e retoma automaticamente a tentativa para a mesma seleção, usando o estado visível atualizado. Não há tabela vazia nem clique adicional em `Continuar Exportação`. Enquanto restar algum problema, a tentativa permanece pendente. No lote, a continuação permanece explícita conforme sua etapa de pré-validação.
 - Fechar a tela cancela a Exportação pendente. Relinks individuais permanecem na sessão como mudanças não salvas, enquanto resoluções temporárias do lote são descartadas.
 - A saída inclui toda a superfície da unidade correspondente, inclusive sua Sangria, mas nunca inclui linhas-guia: usa a Dimensão da Lâmina para uma Lâmina dupla e a Dimensão da Página para cada saída `Por página` ou para uma Página única.
 - No modo `Por lâmina`, cada Lâmina gera uma unidade conjunta. Uma Página única gera somente a área ativa, sem metade vazia.
@@ -1157,7 +1160,7 @@ validação das superfícies descritas nesta seção.
 - Persistência e identidade devem cobrir Salvar, `Salvar como`, Cópia externa gravável e somente leitura, movimentação, Bloqueio de abertura, bloqueio órfão, isolamento, Undo/Redo em sessão e Recuperação consolidada que reinicia com Histórico vazio.
 - Cenários com arquivos temporários reais devem verificar vínculos externos, substituição no mesmo caminho, Arquivo ausente, Arquivo indisponível, religação independente, duplicação entre abas e remoção de itens usados.
 - Caminhos devem ser exercitados como local absoluto, UNC, unidade mapeada, verbatim local, verbatim UNC, caminho longo, relativo inválido, namespace de dispositivo, curinga, fluxo alternativo e componente reservado. Os testes também cobrem arquivo no lugar de diretório e o inverso, criação sob pai validado, aliases do mesmo Projeto, `Same`/`Different`/`Indeterminate` com política no chamador, rede indisponível e recuperada, transporte do mesmo plano imutável de bindings por IPC, bindings fixos até o estado terminal, nova captura em `Tentar novamente` ou retomada após reinício e abertura individual de cada original.
-- O Painel deve ser testado por ordenação natural, datas do original, arquivos ausentes no fim, busca sem distinção de caixa ou acento, interseção entre busca e filtros, textos temporários independentes por aba, redimensionamento contínuo das miniaturas sem corte, seleção individual, por intervalo e de todos os resultados visíveis, descarte de selecionados ocultados, preservação diante de reordenação, clique direito e remoção contextual por foco, além da persistência somente das preferências previstas sem alterar o Projeto.
+- O Painel deve ser testado por ordenação natural, datas do original, arquivos ausentes na ordenação normal, busca sem distinção de caixa ou acento, interseção entre busca e filtros, textos temporários independentes por aba, redimensionamento contínuo das miniaturas sem corte, seleção individual, por intervalo e de todos os resultados visíveis, descarte de selecionados ocultados, preservação diante de reordenação, clique direito e remoção contextual por foco, além da persistência somente das preferências previstas sem alterar o Projeto.
 - Testes de Exportação devem usar composições canônicas para verificar dimensões físicas, DPI, quantidade e ordem, namespace compartilhado entre modos, recorte central, transparência, Pilha visual, PDF multipágina e leitura dos originais.
 - Conflitos de Exportação e geração devem ser pré-calculados, apresentados em conjunto e nunca resultar em substituição ou renomeação silenciosa.
 - Nenhum teste de Exportação pode obter sucesso apenas por existir Cache quando o original estiver ausente.

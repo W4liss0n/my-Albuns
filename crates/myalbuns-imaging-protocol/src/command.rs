@@ -182,6 +182,7 @@ impl ImagingFailureStage {
 #[serde(tag = "kind", content = "request", rename_all = "camelCase")]
 #[allow(clippy::large_enum_variant)]
 pub enum ImagingCommand {
+    RenderAlbum(crate::AlbumRenderRequest),
     Render(ImagingRequest),
     BuildCache(CacheRequest),
     PreparePhotoImport(PhotoImportRequest),
@@ -200,6 +201,7 @@ impl ImagingCommand {
     /// external I/O.
     pub fn root_bindings(&self) -> &RootBindingPlan {
         match self {
+            Self::RenderAlbum(request) => &request.root_bindings,
             Self::Render(request) => &request.root_bindings,
             Self::BuildCache(request) => &request.root_bindings,
             Self::PreparePhotoImport(request) => &request.root_bindings,
@@ -210,7 +212,7 @@ impl ImagingCommand {
         match self {
             Self::BuildCache(request) => Some(&request.cache_paths),
             Self::PreparePhotoImport(request) => Some(&request.cache_paths),
-            Self::Render(_) => None,
+            Self::Render(_) | Self::RenderAlbum(_) => None,
         }
     }
 }

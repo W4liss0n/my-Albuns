@@ -65,10 +65,46 @@ pub(crate) fn render_request(
     request: &ImagingRequest,
     progress: &mut dyn FnMut(ImagingProgressStage, u32, u32) -> Result<(), String>,
 ) -> Result<RenderCompletion, RenderFailure> {
-    let sheet = &request.unit.sheet;
-    let raster = RasterPlan::new(sheet.width_um, sheet.height_um, request.dpi)?;
-    let pixels_per_micrometer = request.dpi as f64 / MICROMETERS_PER_INCH;
     let (sources, source_bytes) = load_render_sources(request, progress)?;
+    let image = render_unit(&request.unit, request.dpi, &sources, progress)?;
+    let raster = RasterPlan::new(
+        request.unit.sheet.width_um,
+        request.unit.sheet.height_um,
+        request.dpi,
+    )?;
+
+    progress(ImagingProgressStage::EncodingOutput, 0, 1)?;
+    let operational_output = request
+        .root_bindings
+        .resolve(request.prepared_output_path())
+        .map_err(|error| {
+            RenderFailure::new(
+                ImagingFailureCode::EncodeFailed,
+                format!("não foi possível aplicar o plano de caminhos: {error}"),
+            )
+        })?;
+    let verified = write_verified(&image, &operational_output, request.dpi)?;
+    progress(ImagingProgressStage::EncodingOutput, 1, 1)?;
+    Ok(RenderCompletion {
+        width_px: raster.width_px,
+        height_px: raster.height_px,
+        dpi: request.dpi,
+        source_count: sources.len(),
+        source_bytes,
+        output_bytes: verified.output_bytes,
+        output_sha256: verified.output_sha256,
+    })
+}
+
+pub(crate) fn render_unit(
+    unit: &myalbuns_core::ComposedOutputUnit,
+    dpi: u32,
+    sources: &HashMap<MediaId, RgbaImage>,
+    progress: &mut dyn FnMut(ImagingProgressStage, u32, u32) -> Result<(), String>,
+) -> Result<RgbaImage, RenderFailure> {
+    let sheet = &unit.sheet;
+    let raster = RasterPlan::new(sheet.width_um, sheet.height_um, dpi)?;
+    let pixels_per_micrometer = dpi as f64 / MICROMETERS_PER_INCH;
     let mut image = raster.allocate_rgba(opaque_rgb(&sheet.base.rgb))?;
 
     for background in &sheet.backgrounds {
@@ -95,7 +131,7 @@ pub(crate) fn render_request(
     let composition_units = frame_count.max(1);
     progress(ImagingProgressStage::Composing, 0, composition_units)?;
     for (index, frame) in sheet.frames.iter().enumerate() {
-        draw_frame(&mut image, frame, pixels_per_micrometer, raster, &sources)?;
+        draw_frame(&mut image, frame, pixels_per_micrometer, raster, sources)?;
         progress(
             ImagingProgressStage::Composing,
             u32::try_from(index + 1).map_err(|_| "a Lâmina contém Frames demais".to_string())?,
@@ -121,27 +157,7 @@ pub(crate) fn render_request(
         )?;
     }
 
-    progress(ImagingProgressStage::EncodingOutput, 0, 1)?;
-    let operational_output = request
-        .root_bindings
-        .resolve(request.prepared_output_path())
-        .map_err(|error| {
-            RenderFailure::new(
-                ImagingFailureCode::EncodeFailed,
-                format!("não foi possível aplicar o plano de caminhos: {error}"),
-            )
-        })?;
-    let verified = write_verified(&image, &operational_output, request.dpi)?;
-    progress(ImagingProgressStage::EncodingOutput, 1, 1)?;
-    Ok(RenderCompletion {
-        width_px: raster.width_px,
-        height_px: raster.height_px,
-        dpi: request.dpi,
-        source_count: sources.len(),
-        source_bytes,
-        output_bytes: verified.output_bytes,
-        output_sha256: verified.output_sha256,
-    })
+    Ok(image)
 }
 
 fn load_render_sources(

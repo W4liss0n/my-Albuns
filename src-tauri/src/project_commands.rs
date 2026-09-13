@@ -55,6 +55,7 @@ pub(crate) async fn apply_project_intent(
     state: State<'_, ProjectHost>,
     on_progress: tauri::ipc::Channel<crate::ipc_contract::ImageProcessingProgress>,
 ) -> Result<ProjectMutationOutcome, String> {
+    let _operation = crate::project_ui_operations::begin(&app)?;
     let previous_bindings = state.authorized_media_catalog()?.bindings;
     let intent_kind = match &intent {
         ProjectIntent::RemoveMedia { .. } => "remove_media",
@@ -126,6 +127,7 @@ pub(crate) async fn import_media(
     state: State<'_, ProjectHost>,
     on_progress: tauri::ipc::Channel<crate::ipc_contract::ImageProcessingProgress>,
 ) -> Result<ImportMediaResult, String> {
+    let _operation = crate::project_ui_operations::begin(&app)?;
     if window.label() != PROJECT_WINDOW_LABEL {
         return Err("A importação só está disponível na Janela do Projeto.".into());
     }
@@ -366,8 +368,53 @@ pub(crate) async fn relink_media(
     state: State<'_, ProjectHost>,
     on_progress: tauri::ipc::Channel<crate::ipc_contract::ImageProcessingProgress>,
 ) -> Result<EditorProjection, String> {
+    change_media_reference(
+        media_id,
+        app,
+        window,
+        state,
+        on_progress,
+        MediaChangeKind::Relink,
+    )
+    .await
+}
+
+#[tauri::command]
+pub(crate) async fn replace_media(
+    media_id: String,
+    app: AppHandle,
+    window: WebviewWindow,
+    state: State<'_, ProjectHost>,
+    on_progress: tauri::ipc::Channel<crate::ipc_contract::ImageProcessingProgress>,
+) -> Result<EditorProjection, String> {
+    change_media_reference(
+        media_id,
+        app,
+        window,
+        state,
+        on_progress,
+        MediaChangeKind::Replace,
+    )
+    .await
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub(crate) enum MediaChangeKind {
+    Relink,
+    Replace,
+}
+
+async fn change_media_reference(
+    media_id: String,
+    app: AppHandle,
+    window: WebviewWindow,
+    state: State<'_, ProjectHost>,
+    on_progress: tauri::ipc::Channel<crate::ipc_contract::ImageProcessingProgress>,
+    kind: MediaChangeKind,
+) -> Result<EditorProjection, String> {
+    let _operation = crate::project_ui_operations::begin(&app)?;
     if window.label() != PROJECT_WINDOW_LABEL {
-        return Err("A Religação só está disponível na Janela do Projeto.".into());
+        return Err("A alteração de imagem só está disponível na Janela do Projeto.".into());
     }
     let host = state.inner().clone();
     let binding = host
@@ -376,101 +423,170 @@ pub(crate) async fn relink_media(
         .into_iter()
         .find(|binding| binding.media_id == media_id)
         .ok_or_else(|| "A ocorrência de mídia não pertence a este Projeto.".to_string())?;
-    let inspected_binding = binding.clone();
-    let absent = tauri::async_runtime::spawn_blocking(move || {
-        occurrence_is_authoritatively_absent(&inspected_binding)
-    })
-    .await
-    .map_err(|_| "Não foi possível reinspecionar o Arquivo vinculado.".to_string())?;
-    if !absent {
-        return Err(
+    if kind == MediaChangeKind::Relink {
+        let inspected_binding = binding.clone();
+        let absent = tauri::async_runtime::spawn_blocking(move || {
+            occurrence_is_authoritatively_absent(&inspected_binding)
+        })
+        .await
+        .map_err(|_| "Não foi possível reinspecionar o Arquivo vinculado.".to_string())?;
+        if !absent {
+            return Err(
             "Somente um Arquivo comprovadamente ausente pode ser religado; tente novamente se a origem estiver indisponível."
                 .into(),
         );
+        }
     }
 
     let (sender, receiver) = tokio::sync::oneshot::channel();
-    app.dialog()
-        .file()
-        .add_filter(
-            "Imagens JPEG, PNG e TIFF",
-            &["jpg", "jpeg", "png", "tif", "tiff"],
-        )
-        .pick_file(move |selection| {
-            let _ = sender.send(selection);
-        });
+    let dialog = app.dialog().file().set_parent(&window);
+    match kind {
+        MediaChangeKind::Relink => dialog
+            .set_title("Escolher pasta para Religar Imagem")
+            .pick_folder(move |selection| {
+                let _ = sender.send(selection);
+            }),
+        MediaChangeKind::Replace => dialog
+            .set_title("Substituir Imagem")
+            .add_filter(
+                "Imagens JPEG, PNG e TIFF",
+                &["jpg", "jpeg", "png", "tif", "tiff"],
+            )
+            .pick_file(move |selection| {
+                let _ = sender.send(selection);
+            }),
+    }
     let selection = receiver
         .await
-        .map_err(|_| "Não foi possível concluir o diálogo de Religação.".to_string())?;
+        .map_err(|_| "Não foi possível concluir a seleção da imagem.".to_string())?;
     let Some(selection) = selection else {
         return host.projection();
     };
     let FilePath::Path(path) = selection else {
-        return Err("O local escolhido não é um Arquivo do Windows válido.".into());
+        return Err("O local escolhido não é um caminho do Windows válido.".into());
     };
+    if kind == MediaChangeKind::Replace && path == binding.logical_path {
+        return host.projection();
+    }
 
     let selected_media_id = binding.media_id.clone();
     let mut processing = ImageProcessingBatch::new(1, |progress| {
         let _ = on_progress.send(progress);
     });
-    let cache_pause = app.state::<CacheEngine>().pause().await;
-    let relink_app = app.clone();
-    let relinked = tauri::async_runtime::spawn_blocking(move || {
-        let mut inspection_paths = myalbuns_paths::OperationPathContext::new();
-        let _ = inspection_paths.capture(&path);
-        let estimate = crate::imaging_processor::ImageMemoryEstimate::in_plan(
-            &inspection_paths.freeze(), [path.as_path()],
-        );
-        // Religação already owns the exclusive Cache pause. Reserve the same
-        // CPU/RAM budget without trying to acquire nested Cache activity.
-        let cancellation = crate::cache_activity_gate::CacheCancellation::default();
-        let _inspection_reservation = tauri::async_runtime::block_on(
-            relink_app.state::<crate::imaging_processor::ImagingProcessor>()
-                .reserve_inspection(estimate, cancellation.flag()),
-        ).map_err(|error| error.to_string())?;
-        if !occurrence_is_authoritatively_absent(&binding) {
-            return Err(
-                "O Arquivo original reapareceu durante a Religação; nenhuma referência foi alterada."
-                    .to_string(),
-            );
+    let mut paths = myalbuns_paths::OperationPathContext::new();
+    let original_path = binding.logical_path.clone();
+    let candidate_path = path;
+    let search_binding = binding.clone();
+    let catalog = host.authorized_media_catalog()?;
+    let cache_root = app
+        .state::<ActiveCacheNamespace>()
+        .namespace()
+        .paths()
+        .root()
+        .to_path_buf();
+    let (path, roots) = tauri::async_runtime::spawn_blocking(move || {
+        let _ = paths.capture(&cache_root);
+        for media in &catalog.bindings {
+            let _ = paths.capture(&media.logical_path);
         }
-        let proposal = MediaResolver.propose_relink(&binding, path)?;
-        let engine = relink_app.state::<CacheEngine>();
-        let namespace = relink_app.state::<ActiveCacheNamespace>().namespace();
-        engine
-            .invalidate_relinked_media(
-                &cache_pause,
-                relink_app.state::<AppPaths>().inner(),
-                &namespace,
-                relink_app.state::<CachePreviewRegistry>().inner(),
-                &binding.media_id,
-            )
-            .map_err(|error| {
-                format!(
-                    "Não foi possível invalidar o Cache antes da Religação: {}",
-                    error.message
-                )
-            })?;
-        host.relink_media(proposal)
+        // Replacement does not require the old storage root to be reachable.
+        if kind == MediaChangeKind::Relink {
+            paths.capture(&original_path).map_err(|error| error.to_string())?;
+        }
+        paths
+            .capture(&candidate_path)
+            .map_err(|error| error.to_string())?;
+        let roots = paths.freeze();
+        let path = match kind {
+            MediaChangeKind::Replace => candidate_path,
+            MediaChangeKind::Relink => MediaResolver.find_relink_candidates(
+                &candidate_path, std::slice::from_ref(&search_binding), &roots,
+            )?.remove(&search_binding.media_id).ok_or_else(||
+                "A imagem com o mesmo nome e extensão não foi encontrada na pasta selecionada. Subpastas não são pesquisadas.".to_string())?,
+        };
+        Ok::<_, String>((path, roots))
     })
-    .await;
-    let relinked = relinked.map_err(|_| "Não foi possível concluir a Religação.".to_string())??;
+    .await
+    .map_err(|error| error.to_string())??;
+    let relinked = change_media_binding(&app, binding, path, roots.clone(), kind).await?;
     let relinked_binding = state
         .authorized_media_catalog()?
         .bindings
         .into_iter()
         .find(|binding| binding.media_id == selected_media_id)
-        .ok_or_else(|| "A imagem religada não pertence mais ao Projeto.".to_string())?;
-    processing.prepare(&app, &relinked_binding).await;
+        .ok_or_else(|| "A imagem não pertence mais ao Projeto.".to_string())?;
+    processing
+        .prepare_all_in_plan(&app, vec![relinked_binding], roots)
+        .await;
     tracing::info!(
         target: "myalbuns.desktop",
         process_role = ProcessRole::DesktopHost.as_str(),
         window_label = window.label(),
         media_id = safe_log_identifier(&selected_media_id),
         revision = relinked.state.revision,
-        event = "linked_media_relinked",
+        event = if kind == MediaChangeKind::Relink { "linked_media_relinked" } else { "linked_media_replaced" },
     );
     state.projection()
+}
+
+pub(crate) async fn change_media_binding(
+    app: &AppHandle,
+    binding: MediaBinding,
+    path: std::path::PathBuf,
+    roots: myalbuns_paths::RootBindingPlan,
+    kind: MediaChangeKind,
+) -> Result<EditorProjection, String> {
+    let cache_pause = app.state::<CacheEngine>().pause().await;
+    let relink_app = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let estimate =
+            crate::imaging_processor::ImageMemoryEstimate::in_plan(&roots, [path.as_path()]);
+        let cancellation = crate::cache_activity_gate::CacheCancellation::default();
+        let _reservation = tauri::async_runtime::block_on(
+            relink_app
+                .state::<crate::imaging_processor::ImagingProcessor>()
+                .reserve_inspection(estimate, cancellation.flag()),
+        )
+        .map_err(|error| error.to_string())?;
+        let proposal = match kind {
+            MediaChangeKind::Relink => {
+                MediaResolver.propose_relink_in_plan(&binding, path, &roots)?
+            }
+            MediaChangeKind::Replace => {
+                MediaResolver.propose_replacement_in_plan(&binding, path, &roots)?
+            }
+        };
+        let engine = relink_app.state::<CacheEngine>();
+        // Reject the catalog's duplicate-reference constraint before discarding
+        // the current Cache. The Core still validates the committed document.
+        if relink_app
+            .state::<ProjectHost>()
+            .authorized_media_catalog()?
+            .bindings
+            .iter()
+            .any(|other| {
+                other.media_id != binding.media_id
+                    && other.kind == binding.kind
+                    && other.logical_path == proposal.replacement_path()
+            })
+        {
+            return Err(
+                "O arquivo escolhido já está vinculado a outra imagem deste Projeto.".into(),
+            );
+        }
+        engine
+            .invalidate_relinked_media(
+                &cache_pause,
+                relink_app.state::<AppPaths>().inner(),
+                &relink_app.state::<ActiveCacheNamespace>().namespace(),
+                relink_app.state::<CachePreviewRegistry>().inner(),
+                &binding.media_id,
+            )
+            .map_err(|error| error.message)?;
+        relink_app.state::<ProjectHost>().relink_media(proposal)
+    })
+    .await
+    .map_err(|_| "Não foi possível atualizar a imagem.".to_string())?
 }
 
 fn occurrence_is_authoritatively_absent(binding: &MediaBinding) -> bool {
@@ -505,6 +621,7 @@ pub(crate) async fn undo_project(
     state: State<'_, ProjectHost>,
     on_progress: tauri::ipc::Channel<crate::ipc_contract::ImageProcessingProgress>,
 ) -> Result<EditorProjection, String> {
+    let _operation = crate::project_ui_operations::begin(&app)?;
     let previous_bindings = state.authorized_media_catalog()?.bindings;
     let projection = state.undo()?;
     prepare_changed_images(&app, &previous_bindings, |progress| {
@@ -529,6 +646,7 @@ pub(crate) async fn redo_project(
     state: State<'_, ProjectHost>,
     on_progress: tauri::ipc::Channel<crate::ipc_contract::ImageProcessingProgress>,
 ) -> Result<EditorProjection, String> {
+    let _operation = crate::project_ui_operations::begin(&app)?;
     let previous_bindings = state.authorized_media_catalog()?.bindings;
     let projection = state.redo()?;
     prepare_changed_images(&app, &previous_bindings, |progress| {
@@ -552,6 +670,8 @@ pub(crate) async fn save_project(
     window: WebviewWindow,
     state: State<'_, ProjectHost>,
 ) -> Result<SaveProjectResult, SaveProjectCommandError> {
+    let _operation = crate::project_ui_operations::begin(window.app_handle())
+        .map_err(|_| SaveProjectCommandError::SessionUnavailable)?;
     let host = state.inner().clone();
     let window_label = window.label().to_owned();
     let save = tauri::async_runtime::spawn_blocking(move || host.save(expected_revision))
@@ -618,6 +738,8 @@ pub(crate) async fn save_project_as(
     window: WebviewWindow,
     state: State<'_, ProjectHost>,
 ) -> Result<SaveAsProjectResult, SaveAsProjectCommandError> {
+    let _operation = crate::project_ui_operations::begin(window.app_handle())
+        .map_err(|_| SaveAsProjectCommandError::SessionUnavailable)?;
     if window.label() != PROJECT_WINDOW_LABEL {
         return Err(SaveAsProjectCommandError::SessionUnavailable);
     }

@@ -13,6 +13,7 @@ mod dev_job;
 mod dev_supervisor_protocol;
 mod export_attempts;
 mod export_commands;
+mod export_media;
 mod export_pipeline;
 mod global_activation;
 mod global_runtime;
@@ -47,14 +48,38 @@ mod project_commands;
 mod project_dialog_window;
 mod project_host;
 mod project_recovery;
+mod project_ui_operations;
 mod project_webview_authority;
 mod project_window_lifecycle;
 mod provisional_decoratives;
 mod recent_projects;
 mod runtime_role;
+mod settings_modality;
 mod settings_preferences;
 mod settings_window;
+#[cfg(windows)]
+mod webview_recovery;
 mod workspace_preferences;
+
+/// Support the native restoration example using the production WebView policy.
+#[cfg(windows)]
+#[doc(hidden)]
+pub fn configure_webview_restore_probe(
+    builder: tauri::Builder<tauri::Wry>,
+    on_ready: impl FnOnce(std::io::Result<()>) + Send + 'static,
+) -> tauri::Builder<tauri::Wry> {
+    let (signal, readiness) = desktop_webview_policy::page_load_handshake(None);
+    tauri::async_runtime::spawn(async move {
+        on_ready(readiness.wait().await);
+    });
+    builder
+        .manage(desktop_webview_policy::WindowWebviewVisibility::default())
+        .on_window_event(desktop_webview_policy::on_window_event)
+        .on_page_load(move |webview, payload| {
+            signal.observe_webview(webview, payload.event());
+        })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     #[cfg(debug_assertions)]
@@ -241,8 +266,6 @@ mod tests {
             dialog_capability["permissions"],
             serde_json::json!([
                 "message-dialog-window-commands",
-                "core:window:allow-center",
-                "core:window:allow-set-size",
                 "core:window:allow-start-dragging"
             ])
         );
@@ -254,8 +277,8 @@ mod tests {
             progress_dialog_capability["permissions"],
             serde_json::json!([
                 "owned-dialog-window-commands",
-                "core:window:allow-center",
-                "core:window:allow-set-size",
+                "core:event:allow-listen",
+                "core:event:allow-unlisten",
                 "core:window:allow-start-dragging"
             ])
         );
@@ -296,8 +319,6 @@ mod tests {
                 "core:event:allow-listen",
                 "core:event:allow-unlisten",
                 "core:window:allow-close",
-                "core:window:allow-center",
-                "core:window:allow-set-size",
                 "core:window:allow-start-dragging"
             ])
         );
@@ -316,6 +337,7 @@ mod tests {
             allowed_commands(&project_dialog_permission),
             BTreeSet::from([
                 "current_project_dialog_presentation",
+                "fit_owned_window",
                 "owned_window_content_ready",
                 "submit_project_dialog_action"
             ])
@@ -323,6 +345,8 @@ mod tests {
         assert_eq!(
             allowed_commands(&owned_dialog_permission),
             BTreeSet::from([
+                "fit_owned_window",
+                "opening_image_progress",
                 "owned_window_content_ready",
                 "resolve_opening_external_copy",
                 "resolve_opening_recovery",
@@ -330,7 +354,11 @@ mod tests {
         );
         assert_eq!(
             allowed_commands(&message_dialog_permission),
-            BTreeSet::from(["dismiss_owned_dialog", "owned_window_content_ready"])
+            BTreeSet::from([
+                "dismiss_owned_dialog",
+                "fit_owned_window",
+                "owned_window_content_ready"
+            ])
         );
         let global_commands = allowed_commands(&global_permission);
         let project_commands = allowed_commands(&project_permission);

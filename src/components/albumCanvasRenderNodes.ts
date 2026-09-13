@@ -30,6 +30,7 @@ import {
   type CanvasBounds,
 } from "./canvasSheetViewGeometry";
 import { pixiColor } from "./pixiColor";
+import { createMissingImageRenderNode } from "./missingImageRenderNode";
 import { createFrameSnapGuideRenderNode } from "./frameSnapGuideRenderNode";
 import { createDecorativeDropFeedback } from "./decorativeDropFeedback";
 import { createPhotoBlackAndWhiteFilter } from "./photoBlackAndWhite";
@@ -100,6 +101,7 @@ export interface SheetRenderNode {
 
 interface SheetRenderNodeCallbacks {
   previewTextureFor: (mediaId: string) => Texture | undefined;
+  isMediaMissing: (mediaId: string) => boolean;
   onSheetTap: (sheetId: string) => void;
   onSheetDoubleTap: (sheetId: string) => void;
   onFrameTap: (sheetId: string, frameId: string, toggle: boolean) => void;
@@ -303,6 +305,12 @@ export function createSheetRenderNode(
         thirdsGuides,
       );
       frameContent.addChild(photoViewport, clip);
+      if (!previewOptions.previewTexture && callbacks.isMediaMissing(frame.photo.mediaId)) {
+        const missingImage = createMissingImageRenderNode(frame.frameId, frameWidth, frameHeight);
+        frameContent.addChild(missingImage.fill);
+        frameContainer.addChild(missingImage.container);
+        framePlaceholders.push(missingImage);
+      }
 
       const baseZoom = frame.photo.placement.currentZoom;
       photoNode = {

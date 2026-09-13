@@ -26,6 +26,7 @@ const mediaPanelInteractions = {
   onRemoveMedia: () => undefined,
   onMediaDragChange: () => undefined,
   onRelinkMedia: () => undefined,
+  onReplaceMedia: () => undefined,
   onRetryUnavailableMedia: async () => undefined,
 };
 
@@ -286,24 +287,44 @@ test("combines accent-insensitive search with the usage filter and natural name 
   );
 });
 
-test("orders by the Original dates and keeps absent files last in both directions", async () => {
+test("orders absent and available Originals together by name and known dates", async () => {
   const user = userEvent.setup();
   render(<MediaPanel {...mediaPanelInteractions} mediaItems={mediaItems} mediaUsage={mediaUsage}
     onFillPhoto={vi.fn()} previewSource={{ kind: "static" }} preferences={{ kind: "local" }}
     mediaFiles={{
       "photo-album-10": { mediaId: "photo-album-10", state: "available", createdAtMs: 100, modifiedAtMs: 300 },
-      "photo-album-2": { mediaId: "photo-album-2", state: "available", createdAtMs: 200, modifiedAtMs: 100 },
-      "photo-retrato": { mediaId: "photo-retrato", state: "absent", createdAtMs: null, modifiedAtMs: null },
+      "photo-album-2": { mediaId: "photo-album-2", state: "absent", createdAtMs: 200, modifiedAtMs: 100 },
+      "photo-retrato": { mediaId: "photo-retrato", state: "available", createdAtMs: 150, modifiedAtMs: 200 },
     }} />);
+  expect(visibleMediaIds()).toEqual(["photo-album-2", "photo-album-10", "photo-retrato"]);
   await user.click(screen.getByRole("button", { name: "Filtro, ordem e tamanho" }));
   await user.selectOptions(screen.getByRole("combobox", { name: "Ordenar por" }), "createdAt-ascending");
-  expect(visibleMediaIds()).toEqual(["photo-album-10", "photo-album-2", "photo-retrato"]);
+  expect(visibleMediaIds()).toEqual(["photo-album-10", "photo-retrato", "photo-album-2"]);
   await user.selectOptions(screen.getByRole("combobox", { name: "Ordenar por" }), "createdAt-descending");
-  expect(visibleMediaIds()).toEqual(["photo-album-2", "photo-album-10", "photo-retrato"]);
+  expect(visibleMediaIds()).toEqual(["photo-album-2", "photo-retrato", "photo-album-10"]);
   await user.selectOptions(screen.getByRole("combobox", { name: "Ordenar por" }), "modifiedAt-ascending");
-  expect(visibleMediaIds()).toEqual(["photo-album-2", "photo-album-10", "photo-retrato"]);
+  expect(visibleMediaIds()).toEqual(["photo-album-2", "photo-retrato", "photo-album-10"]);
   await user.selectOptions(screen.getByRole("combobox", { name: "Ordenar por" }), "name-descending");
-  expect(visibleMediaIds()).toEqual(["photo-album-10", "photo-album-2", "photo-retrato"]);
+  expect(visibleMediaIds()).toEqual(["photo-retrato", "photo-album-10", "photo-album-2"]);
+});
+
+test.each(["photo", "decorative"] as const)("an absent %s keeps its natural position and selection without file dates", (kind) => {
+  const items = [media("first", kind, "Foto 1"), media("middle", kind, "Foto 2"), media("last", kind, "Foto 10")];
+  const props = { ...mediaPanelInteractions, mediaItems: items, mediaUsage: [], onFillPhoto: vi.fn(),
+    preferences: { kind: "local" as const }, previewSource: { kind: "static" as const } };
+  const view = render(<MediaPanel {...props} />);
+  if (kind === "decorative") fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
+  fireEvent.click(screen.getByRole("button", { name: "Foto 2" }));
+  view.rerender(<MediaPanel {...props} previewSource={{ kind: "static", previews: {
+    middle: { mediaId: "middle", state: "absent", url: null },
+  } }} />);
+  const grid = screen.getByRole("group", { name: kind === "photo" ? "Grade de Fotos" : "Grade de Decorativos" });
+  const order = () => Array.from(grid.querySelectorAll("[data-media-id]")).map(item => item.getAttribute("data-media-id"));
+  expect(order()).toEqual(["first", "middle", "last"]);
+  expect(screen.getByRole("button", { name: "Foto 2. Arquivo ausente" })).toHaveAttribute("aria-pressed", "true");
+  view.rerender(<MediaPanel {...props} />);
+  expect(order()).toEqual(["first", "middle", "last"]);
+  expect(screen.getByRole("button", { name: "Foto 2" })).toHaveAttribute("aria-pressed", "true");
 });
 
 test("treats compact options as a disclosure and restores its trigger on Escape", async () => {
@@ -856,6 +877,98 @@ test("Photoshop opens only one contextual Photo and never a multi-selection or D
   fireEvent.contextMenu(decorative);
   expect(screen.queryByRole("menuitem", { name: /Abrir no Photoshop/ })).not.toBeInTheDocument();
   expect(open).toHaveBeenCalledTimes(1);
+});
+
+test.each([
+  ["photo", null], ["photo", "asset://localhost/cache/retained.jpg"],
+  ["decorative", null], ["decorative", "asset://localhost/cache/retained.jpg"],
+] as const)("an absent %s with preview %s relinks only through its context menu", (kind, url) => {
+  const onRelinkMedia = vi.fn();
+  const onFillPhoto = vi.fn();
+  const onApplyDecorative = vi.fn();
+  render(<MediaPanel {...mediaPanelInteractions} onRelinkMedia={onRelinkMedia}
+    onFillPhoto={onFillPhoto} onApplyDecorative={onApplyDecorative}
+    mediaItems={[media("missing", kind, "Imagem 1")]} mediaUsage={[]}
+    preferences={{ kind: "local" }} previewSource={{ kind: "static", previews: {
+      missing: { mediaId: "missing", state: "absent", url },
+    } }} />);
+  if (kind === "decorative") fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
+  const card = screen.getByRole("button", { name: /^Imagem 1\. Arquivo ausente/ });
+  const status = within(card).getByRole("status", { name: /^Arquivo ausente/ });
+  expect(status.textContent).toBe("");
+  expect(status).toHaveAttribute("title", expect.stringContaining("Arquivo ausente"));
+  expect(card.querySelector("img")?.getAttribute("src") ?? null).toBe(url);
+  expect(card.querySelector(".media-preview-thumbnail"))
+    .toHaveAttribute("data-missing", String(!url));
+  expect(card.querySelector(".media-preview-thumbnail__missing-symbol") !== null).toBe(!url);
+  expect(screen.queryByRole("button", { name: /Religar/ })).not.toBeInTheDocument();
+  fireEvent.doubleClick(card);
+  if (kind === "photo") expect(onFillPhoto).toHaveBeenCalledWith("missing");
+  else expect(onApplyDecorative).toHaveBeenCalledWith("missing", "background");
+  fireEvent.contextMenu(card);
+  fireEvent.click(screen.getByRole("menuitem", { name: "Religar" }));
+  expect(onRelinkMedia).toHaveBeenCalledExactlyOnceWith("missing");
+  expect(screen.queryByRole("menu", { name: "Ações das imagens" })).not.toBeInTheDocument();
+});
+
+test.each(["photo", "decorative"] as const)("Substituir Imagem is available for every %s state and targets the clicked item", (kind) => {
+  const onReplaceMedia = vi.fn();
+  const states = ["ready", "absent", "unavailable", "cache_unavailable"] as const;
+  render(<MediaPanel {...mediaPanelInteractions} onReplaceMedia={onReplaceMedia}
+    mediaItems={states.map((state) => media(state, kind, state))} mediaUsage={[]}
+    onFillPhoto={vi.fn()} preferences={{ kind: "local" }} previewSource={{ kind: "static", previews:
+      Object.fromEntries(states.map((state) => [state, { mediaId: state, state, url: null }])) }} />);
+  if (kind === "decorative") fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
+  fireEvent.click(screen.getByRole("button", { name: /^ready/ }));
+  fireEvent.click(screen.getByRole("button", { name: /^absent/ }), { ctrlKey: true });
+  for (const state of states) {
+    fireEvent.contextMenu(screen.getByRole("button", { name: new RegExp(`^${state}`) }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Substituir Imagem" }));
+    expect(onReplaceMedia).toHaveBeenLastCalledWith(state);
+    expect(screen.queryByRole("menu", { name: "Ações das imagens" })).not.toBeInTheDocument();
+  }
+  expect(onReplaceMedia).toHaveBeenCalledTimes(4);
+});
+
+test("Religar targets the right-clicked absent item while preserving a selected group", () => {
+  const onRelinkMedia = vi.fn();
+  const props = { ...mediaPanelInteractions, onRelinkMedia, onFillPhoto: vi.fn(), mediaUsage: [],
+    mediaItems: [media("first", "photo", "Imagem 1"), media("second", "photo", "Imagem 2")],
+    preferences: { kind: "local" as const }, previewSource: { kind: "static" as const },
+    mediaFiles: {
+      first: { mediaId: "first", state: "absent" as const, createdAtMs: null, modifiedAtMs: null },
+      second: { mediaId: "second", state: "absent" as const, createdAtMs: null, modifiedAtMs: null },
+    } };
+  const view = render(<MediaPanel {...props} />);
+  const first = screen.getByRole("button", { name: /^Imagem 1/ });
+  const second = screen.getByRole("button", { name: /^Imagem 2/ });
+  fireEvent.click(first);
+  fireEvent.click(second, { ctrlKey: true });
+  fireEvent.contextMenu(second);
+  expect(first).toHaveAttribute("aria-pressed", "true");
+  expect(second).toHaveAttribute("aria-pressed", "true");
+  fireEvent.click(screen.getByRole("menuitem", { name: "Religar" }));
+  expect(onRelinkMedia).toHaveBeenCalledExactlyOnceWith("second");
+  fireEvent.contextMenu(first);
+  view.rerender(<MediaPanel {...props} mediaFiles={{ ...props.mediaFiles,
+    first: { ...props.mediaFiles.first, state: "available" },
+  }} />);
+  expect(screen.queryByRole("menuitem", { name: "Religar" })).not.toBeInTheDocument();
+});
+
+test.each(["relinkDisabled", "importPending"] as const)("Religar remains disabled during %s", (busyProp) => {
+  const onRelinkMedia = vi.fn();
+  render(<MediaPanel {...mediaPanelInteractions} {...{ [busyProp]: true }} onRelinkMedia={onRelinkMedia}
+    onFillPhoto={vi.fn()} mediaItems={[media("missing", "photo", "Imagem 1")]} mediaUsage={[]}
+    preferences={{ kind: "local" }} previewSource={{ kind: "static", previews: {
+      missing: { mediaId: "missing", state: "absent", url: null },
+    } }} />);
+  fireEvent.contextMenu(screen.getByRole("button", { name: /^Imagem 1/ }));
+  const relink = screen.getByRole("menuitem", { name: "Religar" });
+  expect(relink).toBeDisabled();
+  expect(screen.getByRole("menuitem", { name: "Substituir Imagem" })).toBeDisabled();
+  fireEvent.click(relink);
+  expect(onRelinkMedia).not.toHaveBeenCalled();
 });
 
 test("an unavailable Photoshop disables its Photo menu without blocking other actions", () => {

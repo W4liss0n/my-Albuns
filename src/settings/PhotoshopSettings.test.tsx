@@ -14,7 +14,7 @@ const port = (): PhotoshopSettingsPort => ({ status: vi.fn(async () => current),
 test("loads the persisted installation and commits an explicit alternative", async () => {
   const service = port();
   render(<PhotoshopSettings port={service} />);
-  const select = screen.getByRole("combobox", { name: "Instalação usada" });
+  const select = screen.getByRole("combobox", { name: "Versão utilizada" });
   await waitFor(() => expect(select).toHaveValue("new"));
   fireEvent.change(select, { target: { value: "old" } });
   await waitFor(() => expect(select).toHaveValue("old"));
@@ -39,11 +39,11 @@ test("manual cancellation preserves selection and an invalid executable displays
   const service = port();
   render(<PhotoshopSettings port={service} />);
   await screen.findByText(installations[0].path);
-  fireEvent.click(screen.getByRole("button", { name: "Localizar Photoshop…" }));
+  fireEvent.click(screen.getByRole("button", { name: "Localizar…" }));
   await waitFor(() => expect(screen.getByRole("combobox")).toBeEnabled());
   expect(screen.getByRole("combobox")).toHaveValue("new");
   vi.mocked(service.locate).mockRejectedValueOnce(new PhotoshopError("invalid_installation", "Selecione um executável do Adobe Photoshop."));
-  fireEvent.click(screen.getByRole("button", { name: "Localizar Photoshop…" }));
+  fireEvent.click(screen.getByRole("button", { name: "Localizar…" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("Selecione um executável");
   expect(screen.getByRole("combobox")).toHaveValue("new");
 });
@@ -52,9 +52,9 @@ test("absence disables only installation selection and focus discovers a later i
   const service = port();
   vi.mocked(service.status).mockResolvedValueOnce({ revision: 0, installations: [], selectedInstallationId: null });
   render(<PhotoshopSettings port={service} />);
-  await screen.findByText(/Photoshop não encontrado/);
+  await screen.findByRole("option", { name: "Nenhuma instalação encontrada" });
   expect(screen.getByRole("combobox")).toBeDisabled();
-  expect(screen.getByRole("button", { name: "Localizar Photoshop…" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Localizar…" })).toBeEnabled();
   fireEvent.focus(window);
   await waitFor(() => expect(screen.getByRole("combobox")).toHaveValue("new"));
 });

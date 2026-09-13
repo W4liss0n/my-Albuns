@@ -34,10 +34,21 @@ export function DialogFocusScope({
     initialFocusRef.current?.focus({ preventScroll: true });
   }, [focusKey, initialFocusRef]);
 
-  const focusableElements = () =>
-    Array.from(
+  const focusableElements = () => {
+    const candidates = Array.from(
       scopeRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR) ?? [],
     ).filter((element) => !element.hidden);
+    // A named radio group contributes its selected control to the Tab order.
+    return candidates.filter((element) => {
+      if (!(element instanceof HTMLInputElement) || element.type !== "radio"
+        || element.checked || !element.name) return true;
+      return !candidates.some((candidate) =>
+        candidate instanceof HTMLInputElement && candidate.type === "radio"
+        && candidate.checked && candidate.name === element.name
+        && candidate.form === element.form,
+      );
+    });
+  };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape") {

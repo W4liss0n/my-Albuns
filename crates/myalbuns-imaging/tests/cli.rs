@@ -38,6 +38,192 @@ use windows_sys::Win32::{
 
 static NEXT_CACHE_ID: AtomicU64 = AtomicU64::new(1);
 
+#[test]
+fn normal_export_without_sources_completes_the_loading_stage() {
+    use myalbuns_core::ExportMode;
+    use myalbuns_imaging_protocol::{AlbumRenderOutput, AlbumRenderRequest, RenderFormat};
+    let root = tempfile::tempdir().unwrap();
+    let snapshot = productive_snapshot(small_initial_project(25));
+    let units = snapshot
+        .export_units(
+            &[snapshot.composition.sheets[0].sheet_id.clone()],
+            ExportMode::Page,
+        )
+        .unwrap();
+    for format in [
+        RenderFormat::Png,
+        RenderFormat::Jpeg { quality: 100 },
+        RenderFormat::Pdf,
+    ] {
+        let prepared = root.path().join(format!("blank.{}", format.extension()));
+        let mut context = OperationPathContext::new();
+        context.capture(&prepared).unwrap();
+        let selected = if format == RenderFormat::Pdf {
+            units.clone()
+        } else {
+            vec![units.last().unwrap().clone()]
+        };
+        let request = AlbumRenderRequest {
+            protocol_version: IMAGING_PROTOCOL_VERSION,
+            request_id: "blank-export".into(),
+            snapshot: snapshot.clone(),
+            format,
+            outputs: vec![AlbumRenderOutput {
+                prepared_path: prepared.clone().into(),
+                units: selected,
+            }],
+            sources: vec![],
+            root_bindings: context.freeze(),
+        };
+        let result = invoke_imaging_command(&ImagingCommand::RenderAlbum(request), None);
+        let (_, response) = decode_event_stream(&result.stdout)
+            .expect("empty sources must still complete before composition");
+        let ImagingResponse::AlbumCompleted { completion, .. } = response else {
+            panic!("unexpected response: {response:?}");
+        };
+        assert_eq!(completion.outputs[0].source_count, 0);
+        assert!(prepared.is_file());
+    }
+}
+
+#[test]
+fn normal_export_png_jpeg_and_pdf_share_physical_page_geometry_and_originals() {
+    use myalbuns_core::ExportMode;
+    use myalbuns_imaging_protocol::{AlbumRenderOutput, AlbumRenderRequest, RenderFormat};
+    let root = tempfile::tempdir().unwrap();
+    let source = root.path().join("original.png");
+    RgbImage::from_fn(80, 40, |x, _| {
+        if x < 40 {
+            Rgb([210, 30, 20])
+        } else {
+            Rgb([20, 60, 210])
+        }
+    })
+    .save(&source)
+    .unwrap();
+    let source_before = std::fs::read(&source).unwrap();
+    let snapshot = productive_snapshot(small_initial_project(25).with_personalization(
+        InitialProjectPersonalization::new(
+            InitialBackground::BothSides {
+                both: InitialBackgroundContent::Media {
+                    path: source.clone(),
+                },
+            },
+            InitialOverlay::BothSides { both: None },
+            InitialFrameBorder::None,
+        ),
+    ));
+    let sheet_id = snapshot.composition.sheets[0].sheet_id.clone();
+    let media_id = snapshot.composition.sheets[0]
+        .referenced_media_ids()
+        .next()
+        .unwrap();
+    let units = snapshot
+        .export_units(&[sheet_id], ExportMode::Page)
+        .unwrap();
+    assert_eq!(units.len(), 2);
+    for (format, skip_first) in [
+        (RenderFormat::Png, false),
+        (RenderFormat::Jpeg { quality: 100 }, false),
+        (RenderFormat::Pdf, false),
+        (RenderFormat::Png, true),
+        (RenderFormat::Jpeg { quality: 100 }, true),
+    ] {
+        let groups = if format == RenderFormat::Pdf {
+            vec![units.clone()]
+        } else {
+            units
+                .iter()
+                .skip(usize::from(skip_first))
+                .cloned()
+                .map(|unit| vec![unit])
+                .collect()
+        };
+        let outputs: Vec<_> = groups
+            .into_iter()
+            .map(|units| AlbumRenderOutput {
+                prepared_path: root
+                    .path()
+                    .join(format!(
+                        "{}page-{}.{}",
+                        if skip_first { "retained-" } else { "" },
+                        units[0].index,
+                        format.extension()
+                    ))
+                    .into(),
+                units,
+            })
+            .collect();
+        let mut context = OperationPathContext::new();
+        context.capture(&source).unwrap();
+        for output in &outputs {
+            context.capture(output.prepared_path.as_path()).unwrap();
+        }
+        let request = AlbumRenderRequest {
+            protocol_version: IMAGING_PROTOCOL_VERSION,
+            request_id: "normal-export-formats".into(),
+            snapshot: snapshot.clone(),
+            format: format.clone(),
+            outputs: outputs.clone(),
+            sources: vec![RenderSource::new(media_id, source.clone()).unwrap()],
+            root_bindings: context.freeze(),
+        };
+        request.validate().unwrap();
+        if skip_first {
+            let mut invalid = request.clone();
+            invalid.outputs[0].units[0].index = 1;
+            assert!(
+                invalid.validate().is_err(),
+                "a retained right page cannot be renumbered as the left page"
+            );
+        } else if format != RenderFormat::Pdf {
+            let mut invalid = request.clone();
+            invalid.outputs.reverse();
+            assert!(
+                invalid.validate().is_err(),
+                "canonical output order remains mandatory"
+            );
+        }
+        let result = invoke_imaging_command(&ImagingCommand::RenderAlbum(request), None);
+        let (_, response) = decode_event_stream(&result.stdout).unwrap();
+        let ImagingResponse::AlbumCompleted { completion, .. } = response else {
+            panic!(
+                "unexpected response: {response:?}; {}",
+                String::from_utf8_lossy(&result.stderr)
+            );
+        };
+        assert_eq!(completion.outputs.len(), outputs.len());
+        for (index, output) in outputs.iter().enumerate() {
+            let path = output.prepared_path.as_path();
+            assert_eq!(completion.outputs[index].width_px, 13);
+            assert_eq!(completion.outputs[index].height_px, 13);
+            if format != RenderFormat::Pdf {
+                let image = image::open(path).unwrap().to_rgb8();
+                assert_eq!(image.dimensions(), (13, 13));
+                let expected = if output.units[0].index == 1 {
+                    [210_u8, 30, 20]
+                } else {
+                    [20_u8, 60, 210]
+                };
+                let actual = image.get_pixel(6, 6).0;
+                for channel in 0..3 {
+                    assert!(
+                        actual[channel].abs_diff(expected[channel])
+                            <= if format == RenderFormat::Png { 0 } else { 5 },
+                        "format {format:?}, page {index}, actual {actual:?}, expected {expected:?}"
+                    );
+                }
+            }
+            if let Some(directory) = std::env::var_os("MYALBUNS_TEST_EXPORT_ARTIFACTS") {
+                let directory = PathBuf::from(directory);
+                std::fs::create_dir_all(&directory).unwrap();
+                std::fs::copy(path, directory.join(path.file_name().unwrap())).unwrap();
+            }
+        }
+    }
+    assert_eq!(std::fs::read(&source).unwrap(), source_before);
+}
+
 struct TestCache {
     paths: CachePathPlan,
     project_id: String,

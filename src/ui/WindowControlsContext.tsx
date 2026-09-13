@@ -6,7 +6,7 @@ import {
 
 export interface WindowControls {
   close(): Promise<void> | void;
-  fitContent(height: number): Promise<void> | void;
+  fitContent(measureHeight: () => number, width?: number): Promise<void> | void;
   minimize(): Promise<void> | void;
   toggleMaximize(): Promise<void> | void;
 }

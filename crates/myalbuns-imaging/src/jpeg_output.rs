@@ -16,7 +16,7 @@ const ROUNDING_OFFSET: i128 = MICROMETERS_PER_INCH / 2;
 const MAX_JPEG_AXIS: u32 = 65_535;
 pub(crate) const MAX_OUTPUT_PIXELS: u64 = 134_217_728;
 const MAX_JPEG_HEADER_BYTES: usize = 1024 * 1024;
-const SRGB_2014: &[u8] = include_bytes!("../assets/sRGB2014.icc");
+pub(crate) const SRGB_2014: &[u8] = include_bytes!("../assets/sRGB2014.icc");
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct RasterPlan {
@@ -94,7 +94,7 @@ pub(crate) struct JpegFailure {
 }
 
 impl JpegFailure {
-    fn new(code: ImagingFailureCode, message: impl Into<String>) -> Self {
+    pub(crate) fn new(code: ImagingFailureCode, message: impl Into<String>) -> Self {
         Self {
             code,
             message: message.into(),
@@ -107,6 +107,21 @@ pub(crate) fn write_verified(
     prepared_output_path: &Path,
     dpi: u32,
 ) -> Result<VerifiedJpeg, JpegFailure> {
+    write_verified_quality(image, prepared_output_path, dpi, 100)
+}
+
+pub(crate) fn write_verified_quality(
+    image: &RgbaImage,
+    prepared_output_path: &Path,
+    dpi: u32,
+    quality: u8,
+) -> Result<VerifiedJpeg, JpegFailure> {
+    if !(1..=100).contains(&quality) {
+        return Err(JpegFailure::new(
+            ImagingFailureCode::EncodeFailed,
+            "qualidade JPEG inválida",
+        ));
+    }
     let rgb = opaque_rgb_bytes(image)?;
     let icc_profile = fallible_copy(
         SRGB_2014,
@@ -132,7 +147,7 @@ pub(crate) fn write_verified(
             })?;
         created = true;
         let mut writer = BufWriter::new(file);
-        let mut encoder = JpegEncoder::new_with_quality(&mut writer, 100);
+        let mut encoder = JpegEncoder::new_with_quality(&mut writer, quality);
         encoder.set_pixel_density(PixelDensity::dpi(density));
         encoder.set_icc_profile(icc_profile).map_err(|error| {
             JpegFailure::new(
@@ -198,7 +213,7 @@ fn raster_axis(micrometers: i64, dpi: u32) -> Result<u32, JpegFailure> {
     Ok(pixels)
 }
 
-fn opaque_rgb_bytes(image: &RgbaImage) -> Result<Vec<u8>, JpegFailure> {
+pub(crate) fn opaque_rgb_bytes(image: &RgbaImage) -> Result<Vec<u8>, JpegFailure> {
     let byte_count = u64::from(image.width())
         .checked_mul(u64::from(image.height()))
         .and_then(|value| value.checked_mul(3))

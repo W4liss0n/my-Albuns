@@ -2,11 +2,6 @@
 //! Run with an absolute, disposable WebView data directory as the first argument.
 
 #[cfg(windows)]
-#[allow(dead_code)]
-#[path = "../src/desktop_webview_policy.rs"]
-mod desktop_webview_policy;
-
-#[cfg(windows)]
 fn evaluate(
     window: &tauri::WebviewWindow,
     script: &str,
@@ -37,9 +32,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map(PathBuf::from)
         .filter(|path| path.is_absolute())
         .ok_or("an absolute disposable WebView data directory is required")?;
-    tauri::Builder::default()
-        .manage(desktop_webview_policy::WindowWebviewVisibility::default())
-        .on_window_event(desktop_webview_policy::on_window_event)
+    let (policy_ready, policy_readiness) = mpsc::channel();
+    myalbuns_desktop_lib::configure_webview_restore_probe(
+        tauri::Builder::default(),
+        move |result| {
+            let _ = policy_ready.send(result);
+        },
+    )
         .setup(move |app| {
             let window = WebviewWindowBuilder::new(
                 app,
@@ -51,11 +50,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .decorations(false)
             .data_directory(data_directory)
             .build()?;
-            desktop_webview_policy::enforce_webview(window.as_ref())?;
-
+            // Navigate after Tauri has attached the WebView so that the probe's
+            // readiness listener observes this document, even when about:blank
+            // completed while the native control was still being constructed.
+            window.navigate("about:blank?restore-probe".parse()?)?;
             thread::spawn(move || {
                 let probe = || -> Result<(), Box<dyn std::error::Error>> {
-                    thread::sleep(Duration::from_millis(500));
+                    policy_readiness
+                        .recv_timeout(Duration::from_secs(10))
+                        .map_err(|_| "the native WebView policy did not become ready")??;
                     evaluate(
                         &window,
                         "globalThis.restoreProbe = { size: [innerWidth, innerHeight], events: [] };\

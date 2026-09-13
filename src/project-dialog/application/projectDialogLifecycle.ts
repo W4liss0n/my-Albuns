@@ -7,6 +7,8 @@ export function defaultProjectDialogCloseAction(
   state: ProjectDialogState,
 ): ProjectDialogAction | null {
   switch (state.kind) {
+    case "exportConfiguration": return state.busy ? null : "dismissExport";
+    case "exportConflicts": return "dismissExport";
     case "mediaRemovalConfirmation": return state.busy ? null : "cancelMediaRemoval";
     case "layoutDeletionConfirmation":
       return state.busy ? null : "cancelLayoutDeletion";
@@ -28,6 +30,7 @@ export function defaultProjectDialogCloseAction(
       return state.cancellable && !state.cancelRequested
         ? "cancelExport"
         : null;
+    case "exportMediaProblems": return state.busy ? null : "dismissExport";
     case "exportFailure":
     case "exportProblems":
     case "exportSuccess":

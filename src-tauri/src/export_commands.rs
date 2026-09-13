@@ -29,6 +29,7 @@ use crate::{
 };
 
 static EXPORT_SEQUENCE: AtomicU64 = AtomicU64::new(1);
+pub(crate) mod normal;
 
 #[derive(Debug)]
 struct ConfirmedExportDestination {
@@ -48,9 +49,15 @@ struct PreparedExportCommand {
     acquisition: OperationLeaseAcquisition,
     attempt: ExportAttempt,
     operation_paths: Vec<PathBuf>,
-    plan: ExportPlan,
+    plan: ExportCommandPlan,
     project_id: Option<String>,
     request_id: String,
+}
+
+#[derive(Debug)]
+enum ExportCommandPlan {
+    Sheet(ExportPlan),
+    Album(export_pipeline::AlbumExportPlan),
 }
 
 impl ExportEvent {
@@ -107,6 +114,7 @@ impl ExportCommandError {
             message: "A Exportação foi cancelada.".into(),
             media_id: None,
             path_code: None,
+            media_problems: None,
             layout_problems: None,
         }
     }
@@ -117,6 +125,7 @@ impl ExportCommandError {
             message: message.into(),
             media_id: None,
             path_code: None,
+            media_problems: None,
             layout_problems: None,
         }
     }
@@ -128,6 +137,7 @@ impl ExportCommandError {
                 message: "Outra operação exclusiva já está em andamento. Aguarde sua conclusão e tente novamente.".into(),
                 media_id: None,
                 path_code: None,
+                media_problems: None,
                 layout_problems: None,
             },
             OperationGateError::Unavailable { reason } => Self {
@@ -135,6 +145,7 @@ impl ExportCommandError {
                 message: format!("Não foi possível reservar a Exportação: {reason}"),
                 media_id: None,
                 path_code: None,
+                media_problems: None,
                 layout_problems: None,
             },
         }
@@ -147,6 +158,7 @@ impl ExportCommandError {
                 message: failure.message,
                 media_id: processor.media_id,
                 path_code: processor.path_code.map(Into::into),
+                media_problems: None,
                 layout_problems: None,
             };
         }
@@ -157,6 +169,7 @@ impl ExportCommandError {
                 message: failure.message,
                 media_id: None,
                 path_code: None,
+                media_problems: None,
                 layout_problems: None,
             },
             export_pipeline::ExportFailureStage::Publish { .. } => Self {
@@ -164,6 +177,7 @@ impl ExportCommandError {
                 message: failure.message,
                 media_id: None,
                 path_code: None,
+                media_problems: None,
                 layout_problems: None,
             },
             _ => Self::failed(failure.message),
@@ -257,7 +271,7 @@ fn prepare_export_command(
         acquisition,
         attempt,
         operation_paths,
-        plan,
+        plan: ExportCommandPlan::Sheet(plan),
         project_id,
         request_id,
     })
@@ -331,6 +345,8 @@ pub(crate) async fn export_sheet(
     processor: State<'_, ImagingProcessor>,
     attempts: State<'_, ExportAttempts>,
 ) -> Result<ExportResult, ExportCommandError> {
+    let _operation =
+        crate::project_ui_operations::begin(&app).map_err(ExportCommandError::failed)?;
     let problems = state
         .validate_sheet_export(&sheet_id)
         .map_err(ExportCommandError::failed)?;
@@ -340,7 +356,26 @@ pub(crate) async fn export_sheet(
             message: "Preencha os Frames vazios antes de exportar a seleção.".into(),
             media_id: None,
             path_code: None,
+            media_problems: None,
             layout_problems: Some(problems),
+        });
+    }
+    let checking_host = state.inner().clone();
+    let checking_sheet = sheet_id.clone();
+    let media_problems = tauri::async_runtime::spawn_blocking(move || {
+        crate::export_media::inspect(&checking_host, &checking_sheet)
+    })
+    .await
+    .map_err(|error| ExportCommandError::failed(error.to_string()))?
+    .map_err(ExportCommandError::failed)?;
+    if !media_problems.is_empty() {
+        return Err(ExportCommandError {
+            code: ExportCommandErrorCode::MediaProblems,
+            message: "Confira os Arquivos necessários à Exportação.".into(),
+            media_id: None,
+            path_code: None,
+            media_problems: Some(media_problems),
+            layout_problems: None,
         });
     }
     let suggested_filename = suggested_export_filename(&project_name, sheet_number);
@@ -351,14 +386,7 @@ pub(crate) async fn export_sheet(
                 "Não foi possível escolher o Destino da Exportação: {error}"
             ))
         })?;
-    let PreparedExportCommand {
-        acquisition,
-        attempt,
-        operation_paths,
-        plan,
-        project_id,
-        request_id,
-    } = prepare_export_command(
+    let prepared = prepare_export_command(
         destination,
         ExportSelection {
             sheet_id: &sheet_id,
@@ -370,6 +398,27 @@ pub(crate) async fn export_sheet(
         &attempts,
         |selected_sheet_id| state.freeze_sheet_export(selected_sheet_id),
     )?;
+    run_export(app, window, on_event, logging, cache, processor, prepared).await
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn run_export(
+    app: AppHandle,
+    window: WebviewWindow,
+    on_event: Channel<ExportEvent>,
+    logging: State<'_, LoggingState>,
+    cache: State<'_, CacheEngine>,
+    processor: State<'_, ImagingProcessor>,
+    prepared: PreparedExportCommand,
+) -> Result<ExportResult, ExportCommandError> {
+    let PreparedExportCommand {
+        acquisition,
+        attempt,
+        operation_paths,
+        plan,
+        project_id,
+        request_id,
+    } = prepared;
     if on_event
         .send(ExportEvent::started(request_id.clone()))
         .is_err()
@@ -497,15 +546,30 @@ pub(crate) async fn export_sheet(
             );
         }
     };
-    let published = export_pipeline::execute(
-        &mut transport,
-        plan,
-        &root_bindings,
-        attempt.execution_control(),
-        &progress,
-        &context,
-    )
-    .await
+    let published = match plan {
+        ExportCommandPlan::Sheet(plan) => {
+            export_pipeline::execute(
+                &mut transport,
+                plan,
+                &root_bindings,
+                attempt.execution_control(),
+                &progress,
+                &context,
+            )
+            .await
+        }
+        ExportCommandPlan::Album(plan) => {
+            export_pipeline::execute_album(
+                &mut transport,
+                plan,
+                &root_bindings,
+                attempt.execution_control(),
+                &progress,
+                &context,
+            )
+            .await
+        }
+    }
     .map_err(|failure| {
         if failure.stage == export_pipeline::ExportFailureStage::Cancelled {
             log_export_cancelled(
@@ -571,6 +635,10 @@ pub(crate) fn cancel_export(
 }
 
 fn suggested_export_filename(project_name: &str, sheet_number: usize) -> String {
+    format!("{}_{sheet_number:03}.jpg", export_name(project_name))
+}
+
+pub(crate) fn export_name(project_name: &str) -> String {
     let sanitized = project_name
         .chars()
         .map(|character| {
@@ -592,7 +660,7 @@ fn suggested_export_filename(project_name: &str, sheet_number: usize) -> String 
     } else {
         sanitized
     };
-    format!("{project_name}_{sheet_number:03}.jpg")
+    project_name.to_owned()
 }
 
 #[cfg(test)]

@@ -40,6 +40,7 @@ interface ProjectApplicationMenuOptions {
   convertEdge(): void;
   deleteSheet(): void;
   exportSheet(): void;
+  exportAlbum(): void;
   mediaPanelVisible: boolean;
   redo(): void;
   save(): void;
@@ -78,6 +79,7 @@ export function createProjectApplicationMenus({
   convertEdge,
   deleteSheet,
   exportSheet,
+  exportAlbum,
   mediaPanelVisible,
   redo,
   save,
@@ -101,7 +103,7 @@ export function createProjectApplicationMenus({
         implemented("save-as", "project-window", saveAs),
         separator("file-export-separator"),
         implemented("export-sheet", "sheet", exportSheet, !canExport),
-        placeholder("export", "project-window"),
+        implemented("export", "project-window", exportAlbum, !canExport),
         separator("file-close-separator"),
         implemented("close", "project-window", closeProject),
       ],

@@ -120,7 +120,8 @@ test("native manifest rewrites remain clean after a Windows checkout", () => {
 test("default validation calls only the declared headless checks", () => {
   const validation = readFileSync(path.join(scripts, "Validate-Headless.ps1"), "utf8");
   assert.doesNotMatch(validation, /Test-FocusedOwnedDialogGate|Test-ProductiveJourney|Run-RealCanvasGate|AllowVisibleWindows/);
-  for (const command of ["sidecar:prepare", "build", "test:automation", "quality:rust", "test:rust"]) assert.ok(validation.includes(command));
+  for (const command of ["sidecar:prepare", "build", "test:owned-window-fitting", "test:automation", "quality:rust", "test:rust"]) assert.ok(validation.includes(command));
+  assert.ok(validation.indexOf("frontend-build") < validation.indexOf("owned-window-fitting"), "the fitting regression must exercise the frontend produced by this validation");
   assert.ok(validation.indexOf("sidecar:prepare") < validation.indexOf("frontend-build"), "the processor must exist before Tauri generates IPC contracts in a fresh checkout");
   const workflow = readFileSync(path.join(workspace, ".github/workflows/validation.yml"), "utf8");
   assert.match(workflow, /windows-2022/);

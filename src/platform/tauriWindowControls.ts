@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import type { WindowControls } from "../ui/WindowControlsContext";
 
@@ -17,6 +17,13 @@ let requestedFit: RequestedFit | null = null;
 let fitQueue: Promise<void> | null = null;
 let confirmedReadyToken: number | null = null;
 
+function availableOwnedWindowHeight() {
+  return Math.max(
+    MIN_OWNED_WINDOW_HEIGHT,
+    window.screen.availHeight - OWNED_WINDOW_SCREEN_MARGIN,
+  );
+}
+
 function currentReadyToken() {
   const token = Number(
     new URLSearchParams(window.location.search).get("ownedReadyToken"),
@@ -25,7 +32,6 @@ function currentReadyToken() {
 }
 
 async function runFitQueue() {
-  const currentWindow = getCurrentWindow();
   for (;;) {
     while (requestedFit) {
       const nextFit = requestedFit;
@@ -34,10 +40,10 @@ async function runFitQueue() {
         continue;
       }
 
-      await currentWindow.setSize(
-        new LogicalSize(nextFit.width, nextFit.height),
-      );
-      await currentWindow.center();
+      await invoke<void>("fit_owned_window", {
+        width: nextFit.width,
+        height: nextFit.height,
+      });
       lastFittedSize = nextFit.sizeKey;
       if (requestedFit === nextFit) requestedFit = null;
     }
@@ -74,12 +80,17 @@ function ensureFitQueue() {
   return runningQueue;
 }
 
-async function fitContent(height: number) {
-  const width = Math.ceil(document.documentElement.clientWidth);
-  const availableHeight = Math.max(
-    MIN_OWNED_WINDOW_HEIGHT,
-    window.screen.availHeight - OWNED_WINDOW_SCREEN_MARGIN,
+async function fitContent(measureHeight: () => number, preferredWidth?: number) {
+  const availableHeight = availableOwnedWindowHeight();
+  // Measure against the screen, not the provisional or previously fitted viewport.
+  document.documentElement.style.setProperty(
+    "--ui-owned-window-height-limit",
+    `${availableHeight}px`,
   );
+  const width = Math.ceil(preferredWidth ?? document.documentElement.clientWidth);
+  if (!Number.isFinite(width) || width <= 0) return;
+  const height = measureHeight();
+  if (!Number.isFinite(height) || height <= 0) return;
   const fittedHeight = Math.min(
     availableHeight,
     Math.max(MIN_OWNED_WINDOW_HEIGHT, Math.ceil(height)),
@@ -88,8 +99,10 @@ async function fitContent(height: number) {
   const readyToken = currentReadyToken();
   const readinessPending =
     readyToken !== null && confirmedReadyToken !== readyToken;
-  if (width <= 0 || (sizeKey === lastFittedSize && !readinessPending)) return;
-  if (sizeKey !== lastFittedSize && requestedFit?.sizeKey !== sizeKey) {
+  // A pending resize can still replace the last fitted size. Keep the latest
+  // request even when the content returns to that previously fitted size.
+  if (sizeKey === lastFittedSize && !requestedFit && !readinessPending) return;
+  if (requestedFit?.sizeKey !== sizeKey) {
     requestedFit = { height: fittedHeight, sizeKey, width };
   }
   await ensureFitQueue();

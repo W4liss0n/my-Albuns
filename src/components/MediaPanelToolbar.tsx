@@ -23,7 +23,6 @@ interface MediaPanelToolbarProps {
   activeMediaKind: MediaKind;
   missingCounts: Readonly<Record<MediaKind, number>>;
   missingOnly: boolean;
-  reviewingMissing: boolean;
   onMissingOnlyChange(value: boolean): void;
   importDisabled?: boolean;
   itemCount: number;
@@ -43,7 +42,6 @@ export function MediaPanelToolbar({
   activeMediaKind,
   missingCounts,
   missingOnly,
-  reviewingMissing,
   onMissingOnlyChange,
   importDisabled = false,
   itemCount,
@@ -80,7 +78,7 @@ export function MediaPanelToolbar({
   useEffect(() => {
     if (importDisabled && openPopup === "import") setOpenPopup(null);
   }, [importDisabled, openPopup]);
-  useEffect(() => { setOpenPopup(null); }, [activeMediaKind, reviewingMissing]);
+  useEffect(() => { setOpenPopup(null); }, [activeMediaKind]);
 
   function changeMediaKind(mediaKind: MediaKind) {
     setOpenPopup(null);
@@ -175,9 +173,6 @@ export function MediaPanelToolbar({
             aria-pressed={missingOnly} onClick={() => onMissingOnlyChange(!missingOnly)}>
             Ausentes<small>{missingCounts[activeMediaKind]}</small>
           </button>
-          {reviewingMissing && <button type="button" className="media-folder-add"
-            aria-label="Encerrar visualização de ausentes" title="Voltar à aba e aos filtros anteriores"
-            onClick={() => onMissingOnlyChange(false)}><AppIcon icon={X} size={12} /></button>}
           {/*
             PLACEHOLDER UI: organization chips belong here after the Project
             exposes Media organization folders through an application port.

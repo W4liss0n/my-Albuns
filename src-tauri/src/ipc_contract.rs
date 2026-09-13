@@ -94,6 +94,21 @@ pub struct ProjectDialogDetail {
 )]
 #[ts(tag = "kind")]
 pub enum ProjectDialogState {
+    ExportConfiguration {
+        sheets: Vec<ExportSheetInfo>,
+        options: NormalExportOptions,
+        busy: bool,
+        message: String,
+    },
+    ExportConflicts {
+        files: Vec<String>,
+    },
+    ExportMediaProblems {
+        project_name: String,
+        problems: Vec<ExportMediaProblem>,
+        busy: bool,
+        message: String,
+    },
     MediaRemovalConfirmation {
         media_kind: myalbuns_core::MediaKind,
         count: u32,
@@ -152,11 +167,18 @@ pub enum ProjectDialogState {
 pub struct ProjectDialogPresentation {
     pub(crate) session_id: String,
     pub(crate) state: ProjectDialogState,
+    pub(crate) window_width: u16,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub enum ProjectDialogAction {
+    ConfigureExport(NormalExportOptions),
+    ChooseExportDestination(NormalExportOptions),
+    ConfirmExportOverwrite,
+    SkipExportConflicts,
+    RelinkExportMedia,
+    RetryExportMedia,
     CancelMediaRemoval,
     RemoveAllMedia,
     RemoveMediaKeepFrames,
@@ -175,6 +197,40 @@ pub enum ProjectDialogAction {
     DismissImageProcessingProblems,
     RetryExport,
     SaveAndClose,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct NormalExportOptions {
+    pub scope: ExportScope,
+    pub sheet_ids: Vec<String>,
+    pub mode: myalbuns_core::ExportMode,
+    pub format: myalbuns_core::ExportFormat,
+    pub destination: String,
+    pub conflict_policy: ExportConflictPolicy,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum ExportConflictPolicy {
+    Ask,
+    Skip,
+    Replace,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum ExportScope {
+    Album,
+    Range,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportSheetInfo {
+    pub sheet_id: String,
+    pub number: u32,
+    pub page_count: u32,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, TS)]
@@ -228,7 +284,7 @@ mod project_dialog_contract_tests {
         ];
 
         for (action, expected) in cases {
-            let encoded = serde_json::to_value(action).expect("dialog action serializes");
+            let encoded = serde_json::to_value(&action).expect("dialog action serializes");
             assert_eq!(encoded, json!(expected));
             assert_eq!(
                 serde_json::from_value::<ProjectDialogAction>(encoded)
@@ -326,6 +382,7 @@ mod project_dialog_contract_tests {
         assert_eq!(
             serde_json::to_value(ProjectDialogPresentation {
                 session_id: "export-8".into(),
+                window_width: 440,
                 state: ProjectDialogState::ExportSuccess {
                     message: "Exportação concluída".into(),
                 },
@@ -333,6 +390,7 @@ mod project_dialog_contract_tests {
             .expect("the owned presentation serializes"),
             json!({
                 "sessionId": "export-8",
+                "windowWidth": 440,
                 "state": {
                     "kind": "exportSuccess",
                     "message": "Exportação concluída"
@@ -489,6 +547,7 @@ pub enum CancelDisposition {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]
 #[serde(rename_all = "snake_case")]
 pub enum ExportCommandErrorCode {
+    MediaProblems,
     UnfilledLayoutPositions,
     Cancelled,
     Conflict,
@@ -530,6 +589,8 @@ pub struct ExportCommandError {
     pub(crate) media_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) path_code: Option<ExportPathCode>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) media_problems: Option<Vec<ExportMediaProblem>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) layout_problems: Option<Vec<myalbuns_core::LayoutExportProblem>>,
 }
@@ -653,6 +714,13 @@ pub struct ImageProcessingProgress {
     pub(crate) total_files: u32,
     pub(crate) problem: Option<ImageProcessingProblem>,
     pub(crate) operation_problem: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct StartupImageProgress {
+    pub completed_files: u32,
+    pub total_files: u32,
 }
 
 #[derive(Serialize, TS)]
@@ -1174,4 +1242,28 @@ pub struct FrontendLogEvent {
 pub struct ImageProcessingProblem {
     pub(crate) file_name: String,
     pub(crate) reason: String,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum ExportMediaState {
+    Absent,
+    Unavailable,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportMediaProblem {
+    pub(crate) media_id: String,
+    pub(crate) file_name: String,
+    pub(crate) state: ExportMediaState,
+}
+
+#[derive(Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportRelinkResult {
+    #[ts(type = "import(\"../../domain/project\").EditorProjection")]
+    pub(crate) projection: myalbuns_core::EditorProjection,
+    pub(crate) problems: Vec<ExportMediaProblem>,
+    pub(crate) notes: Vec<ImageProcessingProblem>,
 }

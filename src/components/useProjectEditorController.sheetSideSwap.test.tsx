@@ -38,7 +38,7 @@ function harness(name = "mixed") {
     previewDecorativeDrop: async () => { throw new Error("Decorative preview is not configured in this fixture."); },
     previewPhotoAngle: async () => { throw new Error("Photo angle preview is not configured in this fixture."); },
     previewFrameGeometry: unsupported, saveAs: unsupported, validateAlbumInformation: unsupported,
-    importMedia: unsupported, resolvePhotoDropTarget: unsupported, relink: unsupported,
+    importMedia: unsupported, resolvePhotoDropTarget: unsupported, replaceImage: unsupported, relink: unsupported,
   };
   useEditorView.setState({ projectId: initial.state.projectId, editingSheetId: null,
     focusedSheetId: "sheet-002", centeredSheetId: "sheet-002", selectedFrameIds: ["side-frame-1-0"] });

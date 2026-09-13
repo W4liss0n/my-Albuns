@@ -40,7 +40,7 @@ function harness(effects = false) {
     previewPhotoAngle: async () => { throw new Error("Photo angle preview is not configured in this fixture."); },
     previewFrameGeometry: unsupported,
     saveAs: unsupported, validateAlbumInformation: unsupported, importMedia: unsupported,
-    resolvePhotoDropTarget: unsupported, relink: unsupported,
+    resolvePhotoDropTarget: unsupported, replaceImage: unsupported, relink: unsupported,
   };
   useEditorView.setState({ projectId: initial.state.projectId, editingSheetId: "sheet-001",
     focusedSheetId: "sheet-001", centeredSheetId: "sheet-001", selectedFrameIds: effects ? corpus.group : corpus.single });

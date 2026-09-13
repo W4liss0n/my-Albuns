@@ -4,6 +4,36 @@ import { expect, test, vi } from "vitest";
 
 import { ProjectDialogView } from "./ProjectDialogView";
 
+test("export media recovery offers distinct actions without a Continue step", async () => {
+  const user = userEvent.setup();
+  const onAction = vi.fn();
+  const state = { kind: "exportMediaProblems" as const, projectName: "Álbum", busy: false, message: "", problems: [
+    { mediaId: "photo-1", fileName: "Foto.jpg", state: "absent" as const },
+    { mediaId: "photo-2", fileName: "Rede.png", state: "unavailable" as const },
+  ] };
+  const view = render(<ProjectDialogView state={state} onAction={onAction} />);
+  expect(screen.queryByRole("button", { name: "Continuar Exportação" })).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Relinkar" }));
+  await user.click(screen.getByRole("button", { name: "Tentar novamente" }));
+  expect(onAction.mock.calls).toEqual([["relinkExportMedia"], ["retryExportMedia"]]);
+  view.rerender(<ProjectDialogView state={{ ...state, busy: true }} onAction={onAction} />);
+  await user.keyboard("{Escape}");
+  expect(screen.getByRole("button", { name: "Fechar" })).toBeDisabled();
+  expect(onAction).toHaveBeenCalledTimes(2);
+});
+
+test("export conflicts use a generic confirmation with skip, replace and cancel", async () => {
+  const user = userEvent.setup();
+  const onAction = vi.fn();
+  render(<ProjectDialogView onAction={onAction} state={{ kind: "exportConflicts", files: ["Album_001.png", "Album_002.png"] }} />);
+  expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  expect(screen.queryByText("Album_001.png")).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Ignorar" }));
+  await user.click(screen.getByRole("button", { name: "Substituir" }));
+  await user.click(screen.getByRole("button", { name: "Cancelar" }));
+  expect(onAction.mock.calls).toEqual([["skipExportConflicts"], ["confirmExportOverwrite"], ["dismissExport"]]);
+});
+
 test("custom Layout deletion explains its global scope and offers Cancel and Delete", async () => {
   const user = userEvent.setup();
   const onAction = vi.fn();
@@ -131,7 +161,7 @@ test("projects export progress and cancellation through the standard progress di
         progress: {
           completed: 2,
           kind: "determinate",
-          status: "Compondo a prova",
+          status: "Compondo a Exportação",
           total: 5,
         },
       }}
@@ -248,7 +278,7 @@ test("projects export success through the standard message dialog", async () => 
       onAction={onAction}
       state={{
         kind: "exportSuccess",
-        message: "A prova foi exportada com sucesso.",
+        message: "A Exportação foi concluída com sucesso.",
       }}
     />,
   );
@@ -257,7 +287,7 @@ test("projects export success through the standard message dialog", async () => 
     name: "Exportação concluída",
   });
   expect(within(dialog).getByRole("status")).toHaveTextContent(
-    "A prova foi exportada com sucesso.",
+    "A Exportação foi concluída com sucesso.",
   );
   await user.click(within(dialog).getByRole("button", { name: "Fechar" }));
   expect(onAction).toHaveBeenCalledWith("dismissExport");

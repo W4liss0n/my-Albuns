@@ -38,6 +38,42 @@ enum WorkerAcquisition {
 }
 
 impl NamedMutex {
+    /// Observe ownership without keeping a reservation. The owning worker is
+    /// always a different thread, including for callers in the same process.
+    pub(crate) fn is_owned(&self) -> Result<bool, NamedMutexError> {
+        let name = self
+            .name
+            .as_ref()
+            .map_err(|reason| NamedMutexError::Unavailable(reason.clone()))?;
+        // SAFETY: name is a terminated UTF-16 buffer; the handle stays local.
+        let handle = unsafe { CreateMutexW(std::ptr::null(), 0, name.as_ptr()) };
+        if handle.is_null() {
+            return Err(NamedMutexError::Unavailable(
+                io::Error::last_os_error().to_string(),
+            ));
+        }
+        // SAFETY: this is a live mutex handle and a non-blocking wait.
+        let result = unsafe { WaitForSingleObject(handle, 0) };
+        let observed = match result {
+            WAIT_OBJECT_0 | WAIT_ABANDONED => {
+                // SAFETY: the preceding wait granted ownership to this thread.
+                unsafe {
+                    ReleaseMutex(handle);
+                }
+                Ok(false)
+            }
+            WAIT_TIMEOUT => Ok(true),
+            _ => Err(NamedMutexError::Unavailable(
+                io::Error::last_os_error().to_string(),
+            )),
+        };
+        // SAFETY: no pending waits or references outlive this handle.
+        unsafe {
+            CloseHandle(handle);
+        }
+        observed
+    }
+
     pub(crate) fn scoped(
         app_paths: &AppPaths,
         kind: &str,

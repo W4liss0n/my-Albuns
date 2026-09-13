@@ -68,18 +68,29 @@ pub(crate) async fn show(app: &AppHandle, section: SettingsSection) -> Result<()
         SettingsSection::Photoshop => "photoshop",
         SettingsSection::Performance => "performance",
     };
-    let (signal, readiness) = desktop_webview_policy::page_load_handshake();
-    let window = WebviewWindowBuilder::new(
+    let reservation = app
+        .state::<crate::settings_modality::SettingsModality>()
+        .reserve()
+        .await?;
+    #[cfg(debug_assertions)]
+    let arguments = desktop_webview_policy::global_webview_debug_arguments()
+        .map_err(|error| error.to_string())?;
+    #[cfg(not(debug_assertions))]
+    let arguments: Option<String> = None;
+    let (signal, readiness) = desktop_webview_policy::page_load_handshake(arguments.as_deref());
+    let builder = WebviewWindowBuilder::new(
         app,
         SETTINGS_WINDOW_LABEL,
         WebviewUrl::App(format!("global.html?surface=settings&section={section}").into()),
     )
-    .title("Configurações — MyAlbuns")
-    .inner_size(640.0, 520.0)
+    .title("Configurações")
+    .inner_size(720.0, 440.0)
     .min_inner_size(480.0, 440.0)
     .resizable(true)
     .maximizable(false)
+    .minimizable(false)
     .visible(false)
+    .focused(false)
     .decorations(false)
     .data_directory(
         state
@@ -88,16 +99,34 @@ pub(crate) async fn show(app: &AppHandle, section: SettingsSection) -> Result<()
             .map_err(|error| error.to_string())?,
     )
     .center()
-    .prevent_overflow()
-    .on_page_load(move |window, payload| signal.observe(&window, payload.event()))
-    .build()
-    .map_err(|error| error.to_string())?;
+    .prevent_overflow();
+    #[cfg(debug_assertions)]
+    let builder = match arguments {
+        Some(arguments) => builder.additional_browser_args(&arguments),
+        None => builder,
+    };
+    let window = builder
+        .on_page_load(move |window, payload| signal.observe(&window, payload.event()))
+        .build()
+        .map_err(|error| error.to_string())?;
+    let reservation = std::sync::Mutex::new(Some(reservation));
+    window.on_window_event(move |event| {
+        if matches!(event, tauri::WindowEvent::Destroyed) {
+            reservation
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .take();
+        }
+    });
     if let Err(error) = readiness.wait().await {
         let _ = window.destroy();
         return Err(error.to_string());
     }
-    window.show().map_err(|error| error.to_string())?;
-    window.set_focus().map_err(|error| error.to_string())
+    if let Err(error) = window.show().and_then(|()| window.set_focus()) {
+        let _ = window.destroy();
+        return Err(error.to_string());
+    }
+    Ok(())
 }
 
 #[tauri::command]

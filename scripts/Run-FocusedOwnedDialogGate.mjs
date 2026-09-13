@@ -187,12 +187,14 @@ async function observeExternalCopyScenario() {
     "global_activation_batch_completed",
   ).length;
   const globalDebugPort = await findFreeTcpPortInRange(40_000, 44_999);
+  const openingDebugPort = await findFreeTcpPortInRange(40_000, 44_999);
   const hostDebugPort = await findFreeTcpPortInRange(40_000, 44_999);
   const projectDialogDebugPort = await findFreeTcpPortInRange(40_000, 44_999);
   const environment = {
     ...process.env,
     MYALBUNS_PROCESS_GATE_DATA_ROOT: processDataRoot,
     MYALBUNS_DEV_GLOBAL_WEBVIEW_DEBUG_PORT: String(globalDebugPort),
+    MYALBUNS_DEV_OPENING_DIALOG_WEBVIEW_DEBUG_PORT: String(openingDebugPort),
     MYALBUNS_DEV_HOST_WEBVIEW_DEBUG_PORT: String(hostDebugPort),
     MYALBUNS_DEV_PROJECT_DIALOG_WEBVIEW_DEBUG_PORT: String(
       projectDialogDebugPort,
@@ -220,7 +222,7 @@ async function observeExternalCopyScenario() {
   try {
     const target = await waitFor("external-copy decision target", async () => {
       const targets = await webViewDevToolsTargets(
-        globalDebugPort,
+        openingDebugPort,
         "external-copy opening owner",
       );
       const decisions = targets.filter((candidate) => {
@@ -248,7 +250,7 @@ async function observeExternalCopyScenario() {
     );
 
     driver = await attachWebView2Driver({
-      debugPort: globalDebugPort,
+      debugPort: openingDebugPort,
       label: "external-copy opening owner",
       driverLogPath: path.join(scratch, "webdriver-external-copy.log"),
       nativeDriverPath,

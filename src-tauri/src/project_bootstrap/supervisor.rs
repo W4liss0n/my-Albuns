@@ -2,7 +2,7 @@ use std::{
     io::{BufReader, Read, Write},
     path::{Path, PathBuf},
     process::{Child, ChildStdin, Command, Stdio},
-    sync::mpsc,
+    sync::{Arc, mpsc},
     thread,
     time::Duration,
 };
@@ -18,6 +18,25 @@ use super::{
 };
 
 const MAX_TERMINAL_BYTES: usize = 32 * 1024;
+
+#[derive(Clone)]
+pub(crate) struct StartupProgressReporter(
+    Arc<dyn Fn(crate::ipc_contract::StartupImageProgress) + Send + Sync>,
+);
+
+impl std::fmt::Debug for StartupProgressReporter {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("StartupProgressReporter")
+    }
+}
+
+impl StartupProgressReporter {
+    pub(crate) fn new(
+        publish: impl Fn(crate::ipc_contract::StartupImageProgress) + Send + Sync + 'static,
+    ) -> Self {
+        Self(Arc::new(publish))
+    }
+}
 #[cfg(debug_assertions)]
 const HOST_WEBVIEW_DEBUG_PORT_ENV: &str = "MYALBUNS_DEV_HOST_WEBVIEW_DEBUG_PORT";
 
@@ -26,6 +45,7 @@ pub(crate) struct ProjectHostBootstrap {
     executable: PathBuf,
     terminal_timeout: Duration,
     creation_timeout: Duration,
+    progress: Option<StartupProgressReporter>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -117,11 +137,17 @@ impl ProjectHostBootstrap {
             executable,
             terminal_timeout,
             creation_timeout: terminal_timeout,
+            progress: None,
         }
     }
 
     pub(crate) fn with_creation_timeout(mut self, timeout: Duration) -> Self {
         self.creation_timeout = timeout;
+        self
+    }
+
+    pub(crate) fn with_progress(mut self, progress: StartupProgressReporter) -> Self {
+        self.progress = Some(progress);
         self
     }
 
@@ -164,7 +190,7 @@ impl ProjectHostBootstrap {
             BootstrapIntent::CreateNew { .. } => self.creation_timeout,
             BootstrapIntent::OpenExisting => self.terminal_timeout,
         };
-        supervise_child(child, request, timeout)
+        supervise_child_with_progress(child, request, timeout, self.progress.clone())
     }
 }
 
@@ -254,10 +280,20 @@ fn configure_host_webview_debugging(command: &mut Command) -> Result<(), Bootstr
     Ok(())
 }
 
+#[cfg(test)]
 fn supervise_child(
     child: Child,
     request: BootstrapRequest,
     terminal_timeout: Duration,
+) -> Result<BootstrapOutcome, BootstrapFailure> {
+    supervise_child_with_progress(child, request, terminal_timeout, None)
+}
+
+fn supervise_child_with_progress(
+    child: Child,
+    request: BootstrapRequest,
+    terminal_timeout: Duration,
+    progress: Option<StartupProgressReporter>,
 ) -> Result<BootstrapOutcome, BootstrapFailure> {
     let mut pending = PendingChild::new(child);
     let mut stdin = pending
@@ -274,16 +310,23 @@ fn supervise_child(
         .take()
         .ok_or_else(transport_failure)?;
     let (terminal_sender, terminal_receiver) = mpsc::sync_channel(2);
+    let reader_request = request.clone();
+    let host_pid = pending.child_mut().id();
     thread::spawn(move || {
         let mut reader = BufReader::new(stdout);
-        let first = read_terminal(&mut reader);
+        let first = read_terminal(&mut reader, &reader_request, host_pid, progress.as_ref());
         let awaits_continuation = matches!(
             first,
             Ok(HostTerminal::ExternalCopyNotWritable { .. }
                 | HostTerminal::RecoveryAvailable { .. })
         );
         if terminal_sender.send(first).is_ok() && awaits_continuation {
-            let _ = terminal_sender.send(read_terminal(&mut reader));
+            let _ = terminal_sender.send(read_terminal(
+                &mut reader,
+                &reader_request,
+                host_pid,
+                progress.as_ref(),
+            ));
         }
     });
 
@@ -484,7 +527,47 @@ fn receive_terminal(
     }
 }
 
-fn read_terminal(reader: &mut impl Read) -> Result<HostTerminal, BootstrapFailure> {
+#[derive(serde::Deserialize)]
+#[serde(untagged)]
+enum HostMessage {
+    Terminal(HostTerminal),
+    Progress(super::HostProgress),
+}
+
+fn read_terminal(
+    reader: &mut impl Read,
+    request: &BootstrapRequest,
+    host_pid: u32,
+    reporter: Option<&StartupProgressReporter>,
+) -> Result<HostTerminal, BootstrapFailure> {
+    loop {
+        match read_host_message(reader)? {
+            HostMessage::Terminal(terminal) => return Ok(terminal),
+            HostMessage::Progress(message) => {
+                let progress =
+                    message
+                        .validate(request, host_pid)
+                        .map_err(|_| BootstrapFailure {
+                            kind: BootstrapFailureKind::CorrelationMismatch,
+                            stage: Some(super::FailureStage::Protocol),
+                            code: Some(super::FailureCode::CorrelationMismatch),
+                        })?;
+                if progress.total_files == 0 || progress.completed_files > progress.total_files {
+                    return Err(BootstrapFailure {
+                        kind: BootstrapFailureKind::InvalidTerminal,
+                        stage: Some(super::FailureStage::Protocol),
+                        code: Some(super::FailureCode::InvalidRequest),
+                    });
+                }
+                if let Some(reporter) = reporter {
+                    (reporter.0)(progress);
+                }
+            }
+        }
+    }
+}
+
+fn read_host_message(reader: &mut impl Read) -> Result<HostMessage, BootstrapFailure> {
     let mut bytes = Vec::new();
     for _ in 0..=MAX_TERMINAL_BYTES {
         let mut byte = [0_u8; 1];
@@ -579,6 +662,89 @@ mod tests {
     fn fixture_request() -> BootstrapRequest {
         let target = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("Projeto.myalbuns");
         new_open_request(authority(target)).expect("valid bootstrap fixture")
+    }
+
+    #[test]
+    fn startup_progress_stream_preserves_every_count_until_the_actual_terminal() {
+        use crate::ipc_contract::StartupImageProgress;
+        let request = fixture_request();
+        let mut stream = Vec::new();
+        for completed_files in 0..=3 {
+            super::super::write_host_progress(
+                &mut stream,
+                &super::super::HostProgress::preparing_images(
+                    &request,
+                    StartupImageProgress {
+                        completed_files,
+                        total_files: 3,
+                    },
+                ),
+            )
+            .unwrap();
+        }
+        let terminal = HostTerminal::ready(&request, "project".into(), 1);
+        super::super::write_host_terminal(&mut stream, &terminal).unwrap();
+        let (sender, receiver) = mpsc::channel();
+        let reporter = StartupProgressReporter::new(move |progress| {
+            sender.send(progress).unwrap();
+        });
+        let actual = read_terminal(
+            &mut stream.as_slice(),
+            &request,
+            std::process::id(),
+            Some(&reporter),
+        )
+        .unwrap();
+        assert_eq!(actual, terminal);
+        assert_eq!(
+            receiver
+                .try_iter()
+                .map(|p| p.completed_files)
+                .collect::<Vec<_>>(),
+            vec![0, 1, 2, 3]
+        );
+    }
+
+    #[test]
+    fn startup_progress_rejects_other_attempts_and_invalid_counts() {
+        use crate::ipc_contract::StartupImageProgress;
+        let request = fixture_request();
+        for (host_pid, completed_files, total_files, expected) in [
+            (
+                std::process::id() + 1,
+                0,
+                3,
+                BootstrapFailureKind::CorrelationMismatch,
+            ),
+            (
+                std::process::id(),
+                4,
+                3,
+                BootstrapFailureKind::InvalidTerminal,
+            ),
+            (
+                std::process::id(),
+                0,
+                0,
+                BootstrapFailureKind::InvalidTerminal,
+            ),
+        ] {
+            let mut stream = Vec::new();
+            super::super::write_host_progress(
+                &mut stream,
+                &super::super::HostProgress::preparing_images(
+                    &request,
+                    StartupImageProgress {
+                        completed_files,
+                        total_files,
+                    },
+                ),
+            )
+            .unwrap();
+            let error =
+                read_terminal(&mut stream.as_slice(), &request, host_pid, None).unwrap_err();
+            assert_eq!(error.kind, expected);
+        }
     }
 
     #[cfg(windows)]

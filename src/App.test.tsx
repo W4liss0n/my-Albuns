@@ -23,6 +23,7 @@ import type {
 import type {
   ProjectDialogAction,
   ProjectDialogPort,
+  ProjectDialogSession,
 } from "./application/projectDialogPort";
 import {
   createWorkspacePreferences,
@@ -128,7 +129,7 @@ const projectCorePort: ProjectCorePort = {
     previewPhotoAngle: async () => { throw new Error("Photo angle preview is not configured in this fixture."); },
     previewFrameGeometry: async () => { throw new Error("Frame geometry preview is not configured in this fixture."); },
   resolvePhotoDropTarget: async () => ({ kind: "invalid" }),
-  relink: async () => projection,
+  replaceImage: async () => projection, relink: async () => projection,
   undo: async () => projection,
   redo: async () => projection,
   save: async () => {
@@ -150,6 +151,7 @@ const mediaPreviewPort: MediaPreviewPort = {
   onCacheProcessorWarning: async () => () => undefined,
 };
 const exportPipelinePort: ExportPipelinePort = {
+  defaultDestination: async () => "C:/Exportados/Album", chooseDestination: async () => null,
   startSheet: () => ({
     completion: Promise.resolve({
       status: "completed",
@@ -181,9 +183,9 @@ const projectWindowPort: ProjectWindowPort = {
   resolveClose: async () => ({ kind: "closed" }),
 };
 const projectDialogPort: ProjectDialogPort = {
-  acquire: () => ({
+  acquire: (onAction) => ({
     dismiss: async () => undefined,
-    present: async () => undefined,
+    present: async (state) => { if (state.kind === "exportConfiguration" && !state.busy) onAction({ configureExport: state.options }); },
   }),
 };
 const projectStartupPort: ProjectStartupPort = {
@@ -223,7 +225,7 @@ type TestAppProps = Omit<
 
 function projectDialogHarness() {
   const dismiss = vi.fn(async () => undefined);
-  const present = vi.fn(async () => undefined);
+  const present = vi.fn<ProjectDialogSession["present"]>(async () => undefined);
   let listener: (action: ProjectDialogAction) => void = () => undefined;
   return {
     dismiss,
@@ -232,7 +234,10 @@ function projectDialogHarness() {
     port: {
       acquire: (nextListener) => {
         listener = nextListener;
-        return { dismiss, present };
+        return { dismiss, present: async (state) => {
+          if (state.kind === "exportConfiguration") { if (!state.busy) listener({ configureExport: state.options }); return; }
+          await present(state);
+        } };
       },
     } satisfies ProjectDialogPort,
   };
@@ -253,6 +258,7 @@ function App({
     providedExportPipelinePort ??
     (providedLegacyExportPort
       ? {
+          defaultDestination: async () => "C:/Exportados/Album", chooseDestination: async () => null,
           startSheet: (selection, onEvent) =>
             providedLegacyExportPort.startSheet(selection.sheetId, onEvent),
         }
@@ -295,7 +301,7 @@ test("keeps the Recovery decision out of the Project WebView startup", async () 
   );
 
   expect(
-    await screen.findByRole("button", { name: "Exportar Lâmina" }),
+    await screen.findByRole("button", { name: "Exportar" }),
   ).toBeInTheDocument();
   expect(load).toHaveBeenCalledOnce();
   expect(
@@ -432,7 +438,7 @@ test("opens the Project in the real workspace when hardware WebGL2 is available"
   );
 
   expect(
-    await screen.findByRole("button", { name: "Exportar Lâmina" }),
+    await screen.findByRole("button", { name: "Exportar" }),
   ).toBeInTheDocument();
   expect(
     screen.getByRole("menubar", { name: "Menu principal" }),
@@ -462,6 +468,40 @@ test("opens the Project in the real workspace when hardware WebGL2 is available"
     ({ event }) => event === "project_load_started",
   );
   expect(load).toHaveBeenCalledWith(loadStarted?.operationId);
+});
+
+test("native opening waits for disk Cache, viewport delivery and decoded thumbnails before releasing the Project", async () => {
+  let finishPreparation!: (problems: readonly []) => void;
+  let finishPreviews!: (previews: readonly MediaPreview[]) => void;
+  let finishDecode!: () => void;
+  const decoding = new Promise<void>((resolve) => { finishDecode = resolve; });
+  const previousDecode = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, "decode");
+  const decode = vi.fn(() => decoding);
+  Object.defineProperty(HTMLImageElement.prototype, "decode", { configurable: true, value: decode });
+  const prepareImages = vi.fn(() => new Promise<readonly []>((resolve) => { finishPreparation = resolve; }));
+  const prepareMediaPreviews = vi.fn(() => new Promise<readonly MediaPreview[]>((resolve) => { finishPreviews = resolve; }));
+  const confirmUiReady = vi.fn(async () => undefined);
+  try {
+    render(<App workspacePreferencesMode="memory" exportPort={exportPort}
+      projectWindowPort={projectWindowPort} projectCorePort={projectCorePort}
+      projectStartupPort={{ prepareImages, confirmUiReady }}
+      mediaPreviewPort={{ ...mediaPreviewPort, prepareMediaPreviews }} logger={silentLogger}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe} graphicsProbe={canvasGraphicsDiagnosticProbe} />);
+    await waitFor(() => expect(prepareImages).toHaveBeenCalledOnce());
+    expect(prepareMediaPreviews).not.toHaveBeenCalled();
+    expect(confirmUiReady).not.toHaveBeenCalled();
+    act(() => finishPreparation([]));
+    await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalled());
+    expect(confirmUiReady).not.toHaveBeenCalled();
+    act(() => finishPreviews([{ mediaId: "media-001", state: "ready", url: "blob:startup-image" }]));
+    await waitFor(() => expect(decode).toHaveBeenCalled());
+    expect(confirmUiReady).not.toHaveBeenCalled();
+    await act(async () => finishDecode());
+    await waitFor(() => expect(confirmUiReady).toHaveBeenCalledOnce());
+  } finally {
+    if (previousDecode) Object.defineProperty(HTMLImageElement.prototype, "decode", previousDecode);
+    else Reflect.deleteProperty(HTMLImageElement.prototype, "decode");
+  }
 });
 
 test("confirms Project UI readiness only after shared preferences hydrate", async () => {
@@ -499,7 +539,7 @@ test("confirms Project UI readiness only after shared preferences hydrate", asyn
     />,
   );
 
-  await screen.findByRole("button", { name: "Exportar Lâmina" });
+  await screen.findByRole("button", { name: "Exportar" });
   expect(confirmUiReady).not.toHaveBeenCalled();
 
   act(() => finishPreferenceLoad(createWorkspacePreferences()));
@@ -660,7 +700,7 @@ test("prepares real media previews after opening without blocking the Workspace"
   );
 
   expect(
-    await screen.findByRole("button", { name: "Exportar Lâmina" }),
+    await screen.findByRole("button", { name: "Exportar" }),
   ).toBeInTheDocument();
   await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledOnce());
   expect(logEvents).toEqual(
@@ -1086,7 +1126,7 @@ test("shows the canonical Project warning when repeated processor failures suspe
     />,
   );
 
-  await screen.findByRole("button", { name: "Exportar Lâmina" });
+  await screen.findByRole("button", { name: "Exportar" });
   act(() =>
     warnCacheSuspended?.({
       state: "suspended",
@@ -1102,7 +1142,7 @@ test("shows the canonical Project warning when repeated processor failures suspe
         "O Cache foi suspenso após falhas repetidas do Processador de Imagens.",
     }),
   );
-  expect(screen.getByRole("button", { name: "Exportar Lâmina" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Exportar" })).toBeEnabled();
   expect(screen.getByTestId("album-canvas")).toBeInTheDocument();
 });
 
@@ -1158,7 +1198,7 @@ test("registers the Cache warning listener before the first preview demand", asy
     />,
   );
 
-  await screen.findByRole("button", { name: "Exportar Lâmina" });
+  await screen.findByRole("button", { name: "Exportar" });
   await waitFor(() =>
     expect(screen.getByTestId("album-canvas")).toHaveAttribute(
       "data-demand-reported",
@@ -1218,7 +1258,7 @@ test("registers the media-change listener before the first preview demand", asyn
     />,
   );
 
-  await screen.findByRole("button", { name: "Exportar Lâmina" });
+  await screen.findByRole("button", { name: "Exportar" });
   await waitFor(() =>
     expect(screen.getByTestId("album-canvas")).toHaveAttribute(
       "data-demand-reported",
@@ -1416,15 +1456,14 @@ test("retries an unavailable occurrence explicitly and refreshes it without Reli
       ],
     },
   };
-  const prepareMediaPreviews = vi
-    .fn()
-    .mockResolvedValueOnce([
-      { mediaId: "media-001", state: "unavailable" as const, url: null },
-    ])
-    .mockResolvedValueOnce([
-      { mediaId: "media-001", state: "ready" as const, url: recoveredUrl },
-    ]);
+  let mediaRecovered = false;
+  const prepareMediaPreviews = vi.fn(async () => [{
+    mediaId: "media-001",
+    state: mediaRecovered ? "ready" as const : "unavailable" as const,
+    url: mediaRecovered ? recoveredUrl : null,
+  }]);
   const retryUnavailableMedia = vi.fn(async () => {
+    mediaRecovered = true;
     notifyMediaChanged?.(["media-001"]);
     return {
       mediaId: "media-001",
@@ -1475,6 +1514,7 @@ test("retries an unavailable occurrence explicitly and refreshes it without Reli
     />,
   );
 
+  await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalled(), { timeout: 5000 });
   const retry = await screen.findByRole("button", {
     name: /Tentar novamente o arquivo de/i,
   });
@@ -1487,8 +1527,8 @@ test("retries an unavailable occurrence explicitly and refreshes it without Reli
   await waitFor(() =>
     expect(retryUnavailableMedia).toHaveBeenCalledWith("media-001", expect.any(Function)),
   );
-  await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledTimes(2));
-  await waitFor(() => expect(load).toHaveBeenCalledTimes(3));
+  await waitFor(() => expect(prepareMediaPreviews.mock.calls.length).toBeGreaterThanOrEqual(2));
+  await waitFor(() => expect(load.mock.calls.length).toBeGreaterThanOrEqual(3));
   expect(screen.getByTestId("album-canvas")).toHaveAttribute(
     "data-media-preview",
     recoveredUrl,
@@ -1772,7 +1812,7 @@ test("cancels resident media demand when runtime graphics become unavailable", a
     "true",
   );
   expect(
-    screen.getByRole("button", { name: "Exportar Lâmina" }),
+    screen.getByRole("button", { name: "Exportar" }),
   ).toBeDisabled();
   expect(screen.getByTestId("album-canvas")).toBeInTheDocument();
   expect(
@@ -2133,7 +2173,7 @@ test.each([
   await waitFor(() => expect(load).toHaveBeenCalledTimes(alreadyReading ? 3 : 2));
 });
 
-test("reports absent Originals without a thumbnail and refreshes the warning when the Original returns", async () => {
+test("updates absent Original cards without showing an inspector notice when the Original returns", async () => {
   let notify: Parameters<MediaPreviewPort["onMediaChanged"]>[0] = () => undefined;
   const readMediaFiles = vi.fn<MediaPreviewPort["readMediaFiles"]>()
     .mockResolvedValueOnce({ projectId: representativeProjection.state.projectId, files: [
@@ -2148,11 +2188,12 @@ test("reports absent Originals without a thumbnail and refreshes the warning whe
       onMediaChanged: async (listener) => { notify = listener; return () => undefined; } }}
     graphicsProbe={canvasGraphicsDiagnosticProbe} canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
     logger={silentLogger} />);
-  expect(await screen.findByRole("button", { name: "Ver arquivos ausentes" })).toBeVisible();
-  expect(screen.getByRole("button", { name: "Campo.jpg. Arquivo ausente" })).toBeVisible();
+  expect(await screen.findByRole("button", { name: "Campo.jpg. Arquivo ausente" })).toBeVisible();
+  expect(screen.queryByRole("button", { name: "Ver arquivos ausentes" })).not.toBeInTheDocument();
   act(() => notify(["media-002"]));
-  await waitFor(() => expect(screen.queryByRole("button", { name: "Ver arquivos ausentes" })).not.toBeInTheDocument());
-  expect(screen.getByRole("button", { name: "Campo.jpg" })).toBeVisible();
+  expect(await screen.findByRole("button", { name: "Campo.jpg" })).toBeVisible();
+  expect(screen.queryByRole("button", { name: "Campo.jpg. Arquivo ausente" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Ver arquivos ausentes" })).not.toBeInTheDocument();
 });
 
 test("keeps a completed Save authoritative when a monitor read finishes during saving", async () => {

@@ -70,6 +70,7 @@ import {
 } from "./workspacePanelLayout";
 
 interface ProjectWorkspaceProps {
+  exportMediaPort?: import("../application/exportMedia").ExportMediaPort;
   photoshopPort?: import("../application/photoshop").PhotoshopPort;
   mediaDropPort?: import("../application/projectPorts").MediaDropPort;
   projection: EditorProjection;
@@ -95,6 +96,7 @@ interface ProjectWorkspaceProps {
 const SHEET_EDITING_MEDIA_PANEL_HEIGHT = 120;
 
 export function ProjectWorkspace({
+  exportMediaPort,
   photoshopPort,
   mediaDropPort,
   projection,
@@ -174,6 +176,12 @@ export function ProjectWorkspace({
     () => renderableMediaPreviewUrls(mediaPreviews),
     [mediaPreviews],
   );
+  const missingMediaIds = useMemo(() => new Set(
+    projection.state.album.media.filter((media) =>
+      (mediaFiles?.[media.id]?.state ?? mediaPreviews[media.id]?.state) === "absent"
+      && !mediaPreviewUrls[media.id],
+    ).map((media) => media.id),
+  ), [projection.state.album.media, mediaFiles, mediaPreviews, mediaPreviewUrls]);
   const albumDesignPreloadMediaIds = useMemo(
     () =>
       projection.state.album.media.flatMap((media) =>
@@ -625,6 +633,7 @@ export function ProjectWorkspace({
       void controller.deleteSheet();
     },
     exportSheet: () => exportControlRef.current?.start(),
+    exportAlbum: () => exportControlRef.current?.start("album"),
     mediaPanelVisible: workspacePanels.panels.media.visible,
     redo: () => void controller.redo(),
     save: () => void controller.save(),
@@ -681,10 +690,13 @@ export function ProjectWorkspace({
             saveAsBarrierActive ||
             graphicsFailure !== null
           }
+          exportMediaPort={exportMediaPort}
+          onProjectionChange={onProjectionChange}
           exportPipelinePort={exportPipelinePort}
           onActiveChange={setExportActive}
           projectId={projection.state.projectId}
           selection={exportSelection}
+          sheets={projection.composition.sheets.map(sheet => ({ sheetId: sheet.sheetId, number: sheet.number, pageCount: sheet.activeSides === "both" ? 2 : 1 }))}
         />
       </div>
 
@@ -724,6 +736,7 @@ export function ProjectWorkspace({
               onSelect: controller.canvasProps.onFocusSheet,
             }}
             mediaPreviewUrls={mediaPreviewUrls}
+            missingMediaIds={missingMediaIds}
             technicalGuides={{
               bleedUm: projection.state.document.bleedUm,
               safetyUm: projection.state.document.safetyUm,
@@ -754,12 +767,6 @@ export function ProjectWorkspace({
         )}
 
         {workspacePanels.panels.inspector.visible && <InspectorPanel
-          missingMedia={{ count: projection.state.album.media.filter((media) => mediaFiles?.[media.id]?.state === "absent").length,
-            onShow: () => {
-              if (controller.layoutPanel.visible) controller.layoutPanel.close();
-              workspacePreferences.update({ kind: "workspacePanelVisibility", panel: "media", visible: true });
-              mediaPanelRef.current?.showAbsent();
-            } }}
           saveLayout={{ enabled: controller.canSaveLayout, onSave: controller.saveLayout,
             feedback: noticeInInspector ? layoutNotice : null }}
           key={projectId}
@@ -838,6 +845,7 @@ export function ProjectWorkspace({
           onMediaDragChange={setMediaDrag}
           dragThreshold={controller.frameStyle.dragThreshold}
           onRelinkMedia={controller.relinkMedia}
+          onReplaceMedia={controller.replaceMedia}
           onRetryUnavailableMedia={(mediaId) => controller.retryUnavailableMedia(
             (publish) => onRetryUnavailableMedia(mediaId, publish),
           )}

@@ -9,6 +9,7 @@ import {
   type MouseEvent,
   type Ref,
 } from "react";
+import { ImageOff } from "lucide-react";
 import type {
   MediaPreview,
   MediaImportSelection,
@@ -17,6 +18,7 @@ import type {
 } from "../application/projectPorts";
 import { matchProjectCommandShortcut, projectCommandDescriptor, projectCommandShortcutLabel } from "../application/projectCommandCatalog";
 import { ContextMenuSurface } from "../ui/ContextMenuSurface";
+import { AppIcon } from "../ui/AppIcon";
 import type { MediaPanelPersistentPreference } from "../application/workspacePreferences";
 
 import type {
@@ -40,7 +42,6 @@ import "./MediaPanel.css";
 import { MEDIA_PANEL_PRELOAD_MARGIN, mediaPanelViewportDemand } from "./mediaPanelViewport";
 
 export interface MediaPanelHandle {
-  showAbsent(): void;
   planCatalog(mediaItems: readonly MediaCatalogItem[], mediaUsage: readonly MediaUsage[]): {
     demand: MediaPreviewDemand;
     commit(): void;
@@ -100,6 +101,7 @@ interface MediaPanelProps {
   onMediaDragChange(drag: MediaDrag | null): void;
   dragThreshold?: import("../application/projectPorts").PointerDragThreshold | null;
   onRelinkMedia(mediaId: string): void;
+  onReplaceMedia(mediaId: string): void;
   onRetryUnavailableMedia(mediaId: string): Promise<void>;
   relinkDisabled?: boolean;
   preferences: MediaPanelPreferenceMode;
@@ -130,13 +132,14 @@ export function MediaPanel({
   onMediaDragChange,
   dragThreshold = { x: 5, y: 5 },
   onRelinkMedia,
+  onReplaceMedia,
   onRetryUnavailableMedia,
   relinkDisabled = false,
   preferences: preferenceMode,
   previewSource,
 }: MediaPanelProps) {
   const mediaPreviews = previewSource.previews ?? {};
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; mediaId: string } | null>(null);
   const onMediaDemandChange =
     previewSource.kind === "connected" ? previewSource.onDemandChange : null;
   const controlledPersistent =
@@ -145,20 +148,13 @@ export function MediaPanel({
     preferenceMode.kind === "controlled"
       ? preferenceMode.thumbnailSize
       : null;
-  const [missingReview, setMissingReview] = useState<{
-    activeKind: MediaKind;
-    searches: Record<MediaKind, string>;
-    usageFilters: Record<MediaKind, MediaUsageFilter>;
-  } | null>(null);
   const [missingOnlyByKind, setMissingOnlyByKind] = useState<Record<MediaKind, boolean>>({ photo: false, decorative: false });
   const [localActiveMediaKind, setLocalActiveMediaKind] =
     useState<MediaKind>("photo");
-  const preferredActiveMediaKind = preferenceMode.kind === "controlled" ? preferenceMode.activeKind : localActiveMediaKind;
-  const activeMediaKind = missingReview?.activeKind ?? preferredActiveMediaKind;
+  const activeMediaKind = preferenceMode.kind === "controlled" ? preferenceMode.activeKind : localActiveMediaKind;
   useEffect(() => { setContextMenu(null); }, [activeMediaKind, hidden]);
   function setActiveMediaKind(activeKind: MediaKind) {
-    if (missingReview) setMissingReview({ ...missingReview, activeKind });
-    else if (preferenceMode.kind === "controlled") preferenceMode.onActiveKindChange(activeKind);
+    if (preferenceMode.kind === "controlled") preferenceMode.onActiveKindChange(activeKind);
     else setLocalActiveMediaKind(activeKind);
   }
   const fileInformation = useMemo(() => {
@@ -210,11 +206,10 @@ export function MediaPanel({
     () => mediaItems.filter((media) => media.kind === activeMediaKind),
     [activeMediaKind, mediaItems],
   );
-  const search = (missingReview?.searches ?? searchByKind)[activeMediaKind];
+  const search = searchByKind[activeMediaKind];
   const storedPreferences = preferencesByKind[activeMediaKind];
-  const preferences = { ...storedPreferences, thumbnailSize,
-    usageFilter: missingReview ? missingReview.usageFilters[activeMediaKind] : storedPreferences.usageFilter };
-  const missingOnly = missingReview !== null || missingOnlyByKind[activeMediaKind];
+  const preferences = { ...storedPreferences, thumbnailSize };
+  const missingOnly = missingOnlyByKind[activeMediaKind];
   const { sortKey, sortDirection, usageFilter } = preferences;
   const visibleMediaItems = useMemo(() => filterMediaItems(
     activeMediaItems, mediaUsageById, search, sortKey, sortDirection, usageFilter, fileInformation, missingOnly,
@@ -245,11 +240,6 @@ export function MediaPanel({
   });
 
   useImperativeHandle(ref, () => ({
-    showAbsent() {
-      if (!missingCounts.photo && !missingCounts.decorative) return;
-      setMissingReview({ activeKind: missingCounts[activeMediaKind] ? activeMediaKind : activeMediaKind === "photo" ? "decorative" : "photo",
-        searches: { photo: "", decorative: "" }, usageFilters: { photo: "all", decorative: "all" } });
-    },
     planCatalog(nextItems, nextUsage) {
       const ordered = filterMediaItems(
         nextItems.filter((media) => media.kind === activeMediaKind),
@@ -412,11 +402,6 @@ export function MediaPanel({
   function updatePreferences(
     nextPreferences: Partial<MediaPanelViewPreferences>,
   ) {
-    if (missingReview && nextPreferences.usageFilter !== undefined) {
-      setMissingReview({ ...missingReview, usageFilters: { ...missingReview.usageFilters, [activeMediaKind]: nextPreferences.usageFilter } });
-      const { usageFilter: _filter, ...remaining } = nextPreferences;
-      nextPreferences = remaining;
-    }
     if (preferenceMode.kind === "controlled" && nextPreferences.sortKey !== undefined) {
       preferenceMode.onSortKeyChange(activeMediaKind, nextPreferences.sortKey);
     }
@@ -550,10 +535,8 @@ export function MediaPanel({
         activeMediaKind={activeMediaKind}
         missingCounts={missingCounts}
         missingOnly={missingOnly}
-        reviewingMissing={missingReview !== null}
         onMissingOnlyChange={(value) => {
-          if (missingReview && !value) setMissingReview(null);
-          else setMissingOnlyByKind((current) => ({ ...current, [activeMediaKind]: value }));
+          setMissingOnlyByKind((current) => ({ ...current, [activeMediaKind]: value }));
         }}
         itemCount={activeMediaItems.length}
         preferences={preferences}
@@ -564,8 +547,7 @@ export function MediaPanel({
         onActiveMediaKindChange={setActiveMediaKind}
         onPreferencesChange={updatePreferences}
         onSearchChange={(nextSearch) => {
-          if (missingReview) setMissingReview({ ...missingReview, searches: { ...missingReview.searches, [activeMediaKind]: nextSearch } });
-          else setSearchByKind((current) => ({
+          setSearchByKind((current) => ({
             ...current,
             [activeMediaKind]: nextSearch,
           }));
@@ -627,12 +609,13 @@ export function MediaPanel({
                 kind="media"
                 media={media}
                 previewUrl={preview?.url ?? undefined}
+                missing={(file?.state ?? preview?.state) === "absent"}
                 selected={isSelected}
                 onClick={(event) => { if (!mediaDrag.suppressClick()) selectMedia(media.id, event); }}
                 onContextMenu={(event) => {
                   event.preventDefault();
                   selectMediaForContextMenu(media.id);
-                  setContextMenu({ x: event.clientX, y: event.clientY });
+                  setContextMenu({ x: event.clientX, y: event.clientY, mediaId: media.id });
                 }}
                 onPointerDown={(event) => mediaDrag.start(media.id, media.kind, event)}
                 onDoubleClick={(event) => {
@@ -647,24 +630,14 @@ export function MediaPanel({
                 {availabilityLabel && (
                   <span
                     aria-label={availabilityLabel ?? undefined}
-                    className="media-availability"
+                    className={preview?.state === "absent" ? "media-missing-indicator" : "media-availability"}
                     role="status"
+                    title={availabilityLabel}
                   >
-                    {preview?.state === "absent" ? "Ausente" : availabilityLabel}
+                    {preview?.state === "absent" ? <AppIcon icon={ImageOff} size={16} /> : availabilityLabel}
                   </span>
                 )}
                 </MediaPreviewCard>
-                {preview?.state === "absent" && (
-                  <button
-                    aria-label={`Religar arquivo de ${media.name}`}
-                    className="media-recovery-action"
-                    disabled={relinkDisabled}
-                    type="button"
-                    onClick={() => onRelinkMedia(media.id)}
-                  >
-                    Religar
-                  </button>
-                )}
                 {preview?.state === "unavailable" && (
                   <button
                     aria-label={`Tentar novamente o arquivo de ${media.name}`}
@@ -682,6 +655,26 @@ export function MediaPanel({
       </div>
       {contextMenu && <ContextMenuSurface label="Ações das imagens" position={contextMenu}
         onDismiss={() => { setContextMenu(null); panelHostRef.current?.focus({ preventScroll: true }); }}>
+        {fileInformation[contextMenu.mediaId]?.state === "absent" && (
+          <button type="button" role="menuitem" disabled={relinkDisabled || importPending}
+            onClick={() => {
+              const mediaId = contextMenu.mediaId;
+              setContextMenu(null);
+              panelHostRef.current?.focus({ preventScroll: true });
+              onRelinkMedia(mediaId);
+            }}>
+            Religar
+          </button>
+        )}
+        <button type="button" role="menuitem" disabled={relinkDisabled || importPending}
+          onClick={() => {
+            const mediaId = contextMenu.mediaId;
+            setContextMenu(null);
+            panelHostRef.current?.focus({ preventScroll: true });
+            onReplaceMedia(mediaId);
+          }}>
+          Substituir Imagem
+        </button>
         {mediaItems.some((media) => selectedMediaIds.has(media.id) && media.kind === "photo") && <button type="button" role="menuitem"
           disabled={!photoshopAvailable || relinkDisabled || importPending || selectedMediaIds.size !== 1}
           onClick={() => { const id = [...selectedMediaIds][0]; if (id) onOpenInPhotoshop?.(id); setContextMenu(null); panelHostRef.current?.focus({ preventScroll: true }); }}>
@@ -747,8 +740,6 @@ function filterMediaItems(
   ).sort((left, right) => {
     const leftFile = files[left.id];
     const rightFile = files[right.id];
-    const absent = Number(leftFile?.state === "absent") - Number(rightFile?.state === "absent");
-    if (absent) return absent;
     if (sortKey !== "name") {
       const leftDate = sortKey === "createdAt" ? leftFile?.createdAtMs : leftFile?.modifiedAtMs;
       const rightDate = sortKey === "createdAt" ? rightFile?.createdAtMs : rightFile?.modifiedAtMs;

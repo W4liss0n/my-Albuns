@@ -77,6 +77,7 @@ const canvasHarness = vi.hoisted(() => ({
     centeredSheetId: string | null;
     viewport: { offsetX: number };
     mediaPreviewUrls?: Readonly<Record<string, string>>;
+    missingMediaIds?: ReadonlySet<string>;
     technicalGuides?: CanvasTechnicalGuides;
     sheetReorder?: CanvasSheetReorder;
     onMediaDemandChange?(demand: MediaPreviewDemand): void;
@@ -231,6 +232,7 @@ function deferredValue<Value>() {
 }
 
 const exportPipelinePort: ExportPipelinePort = {
+  defaultDestination: async () => "C:/Exportados/Album", chooseDestination: async () => null,
   startSheet: () => ({
     completion: Promise.resolve({
       status: "completed",
@@ -265,9 +267,9 @@ const inertProjectWindowPort: ProjectWindowPort = {
 };
 
 const inertProjectDialogPort: ProjectDialogPort = {
-  acquire: () => ({
+  acquire: (onAction) => ({
     dismiss: async () => undefined,
-    present: async () => undefined,
+    present: async (state) => { if (state.kind === "exportConfiguration" && !state.busy) onAction({ configureExport: state.options }); },
   }),
 };
 
@@ -306,6 +308,10 @@ function projectDialogHarness() {
         }
       },
       present: async (state) => {
+        if (state.kind === "exportConfiguration") {
+          if (!state.busy) nextListener({ configureExport: state.options });
+          return;
+        }
         await present(state);
         if (session.closed || sessions.includes(session)) return;
         sessions.push(session);
@@ -371,7 +377,7 @@ function projectCorePortWithApply(
     previewPhotoAngle: async () => { throw new Error("Photo angle preview is not configured in this fixture."); },
     previewFrameGeometry: async () => { throw new Error("Frame geometry preview is not configured in this fixture."); },
     resolvePhotoDropTarget: async () => ({ kind: "invalid" }),
-    relink: async () => projection,
+    replaceImage: async () => projection, relink: async () => projection,
     undo: async () => projection,
     redo: async () => projection,
     save: async () => {
@@ -449,6 +455,7 @@ function ProjectWorkspace({
     providedExportPipelinePort ??
     (providedLegacyExportPort
       ? {
+          defaultDestination: async () => "C:/Exportados/Album", chooseDestination: async () => null,
           startSheet: (selection, onEvent) =>
             providedLegacyExportPort.startSheet(selection.sheetId, onEvent),
         }
@@ -2004,7 +2011,7 @@ test("consumes the first Escape in the image-panel options before leaving Sheet 
   expect(canvasHarness.props?.mode).toEqual({ kind: "normal" });
 });
 
-test("starts the implemented Lâmina export from the Arquivo menu", () => {
+test("starts the implemented Lâmina export from the Arquivo menu", async () => {
   const startSheet = vi.fn<ExportPort["startSheet"]>(() => ({
     completion: Promise.resolve({
       status: "completed",
@@ -2021,7 +2028,8 @@ test("starts the implemented Lâmina export from the Arquivo menu", () => {
     />,
   );
 
-  fireEvent.click(getApplicationCommand("Arquivo", "Exportar Lâmina…"));
+  const exportAction = getApplicationCommand("Arquivo", "Exportar Lâmina…");
+  await act(async () => { fireEvent.click(exportAction); });
 
   expect(startSheet).toHaveBeenCalledWith("sheet-001", expect.any(Function));
 });
@@ -2222,7 +2230,7 @@ test("uses the same close decision for the application command and blocks it whi
     kind: "projectCloseConfirmation",
   });
   expect(
-    screen.getByRole("button", { name: "Exportar Lâmina", hidden: true }),
+    screen.getByRole("button", { name: "Exportar", hidden: true }),
   ).toBeDisabled();
 
   await act(async () => finish());
@@ -2328,7 +2336,7 @@ test("never resumes or reports success after an indeterminate close save", async
     screen.getByRole("menuitem", { name: "Editar" }),
   ).toBeDisabled();
   expect(
-    screen.getByRole("button", { name: "Exportar Lâmina" }),
+    screen.getByRole("button", { name: "Exportar" }),
   ).toBeDisabled();
 });
 
@@ -2339,6 +2347,7 @@ test("blocks only Project commands while its Export attempt is active", async ()
     finish = resolve;
   });
   const controlledExportPipelinePort: ExportPipelinePort = {
+    defaultDestination: async () => "C:/Exportados/Album", chooseDestination: async () => null,
     startSheet: (_sheetId, onEvent) => {
       emit = onEvent;
       return {
@@ -2365,10 +2374,11 @@ test("blocks only Project commands while its Export attempt is active", async ()
   );
 
   fireEvent.click(
-    screen.getByRole("button", { name: "Exportar Lâmina" }),
+    screen.getByRole("button", { name: "Exportar" }),
   );
   expect(screen.getByRole("menuitem", { name: "Editar" })).toBeDisabled();
 
+  await waitFor(() => expect(emit).toBeTypeOf("function"));
   act(() => {
     emit({ event: "started", cancellable: true });
   });
@@ -3940,7 +3950,7 @@ test("saves with Ctrl+S without transient feedback or flashing unrelated control
   );
 
   const exportButton = screen.getByRole("button", {
-    name: "Exportar Lâmina",
+    name: "Exportar",
   });
   await act(async () => {
     fireEvent.keyDown(window, { ctrlKey: true, key: "s" });
@@ -3982,7 +3992,7 @@ test("keeps unrelated controls stable while a History command is pending", async
   );
 
   const exportButton = screen.getByRole("button", {
-    name: "Exportar Lâmina",
+    name: "Exportar",
   });
   await act(async () => {
     fireEvent.keyDown(window, { ctrlKey: true, key: "z" });
@@ -4414,7 +4424,8 @@ test("queues native Close behind Export and routes every action to its owning se
     />,
   );
 
-  fireEvent.click(screen.getByRole("button", { name: "Exportar Lâmina" }));
+  fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  await waitFor(() => expect(emitExport).toBeTypeOf("function"));
   act(() => emitExport({ event: "started", cancellable: true }));
   await waitFor(() =>
     expect(close.dialog.present).toHaveBeenCalledWith(
@@ -5521,6 +5532,24 @@ test("shows Page numbers instead of cover and final aliases", () => {
   );
 });
 
+test("Substituir Imagem in the Panel updates the workspace through the Project mutation flow", async () => {
+  const replacement = structuredClone(projection);
+  replacement.state.revision += 1;
+  replacement.state.dirty = true;
+  const selected = projection.state.album.media[0];
+  replacement.state.album.media[0].name = "Nova imagem.jpg";
+  const port = projectCorePortWithApply(async () => projection);
+  port.replaceImage = vi.fn(async () => replacement);
+  const onProjectionChange = vi.fn();
+  render(<ProjectWorkspace projection={projection} projectCorePort={port}
+    exportPipelinePort={exportPipelinePort} onProjectionChange={onProjectionChange} />);
+  fireEvent.contextMenu(screen.getByRole("button", { name: (name) => name.startsWith(selected.name) }));
+  expect(screen.queryByRole("menuitem", { name: "Religar" })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("menuitem", { name: "Substituir Imagem" }));
+  await waitFor(() => expect(port.replaceImage).toHaveBeenCalledWith(selected.id, expect.any(Function)));
+  await waitFor(() => expect(onProjectionChange).toHaveBeenCalledWith(replacement));
+});
+
 test("uses reduced Cache previews in the media panel and Canvas", () => {
   const mediaPreviewUrls = {
     "media-001": "asset://localhost/cache/media-001.jpg",
@@ -5550,6 +5579,21 @@ test("uses reduced Cache previews in the media panel and Canvas", () => {
   expect(canvasHarness.props?.mediaPreviewUrls).toEqual(
     mediaPreviewUrls,
   );
+});
+
+test.each([
+  ["absent", null, undefined, true],
+  ["absent", "asset://localhost/cache/retained.jpg", undefined, false],
+  ["unavailable", null, undefined, false],
+  ["cache_unavailable", null, undefined, false],
+  ["ready", null, "absent", true],
+  ["absent", null, "available", false],
+] as const)("projects missing-image presentation from preview %s, Cache %s and file %s", (state, url, fileState, missing) => {
+  render(<ProjectWorkspace exportPipelinePort={exportPipelinePort} projection={projection}
+    projectCorePort={projectCorePortWithApply(async () => projection)} onProjectionChange={() => undefined}
+    mediaPreviews={{ "media-001": { mediaId: "media-001", state, url } }}
+    mediaFiles={fileState ? { "media-001": { mediaId: "media-001", state: fileState, createdAtMs: null, modifiedAtMs: null } } : undefined} />);
+  expect(canvasHarness.props?.missingMediaIds?.has("media-001")).toBe(missing);
 });
 
 test("offers retry only for an unavailable occurrence and keeps Relink exclusive to absent", async () => {
@@ -5626,8 +5670,8 @@ test("offers retry only for an unavailable occurrence and keeps Relink exclusive
   );
 
   expect(
-    screen.getAllByRole("button", { name: /Religar arquivo de/i }),
-  ).toHaveLength(1);
+    screen.queryByRole("button", { name: /Religar arquivo de/i }),
+  ).not.toBeInTheDocument();
   expect(
     screen.getAllByRole("button", { name: /Tentar novamente o arquivo de/i }),
   ).toHaveLength(1);
@@ -5637,12 +5681,11 @@ test("offers retry only for an unavailable occurrence and keeps Relink exclusive
     name: /^(Arquivo ausente|Indisponível|Prévia indisponível)/,
   });
   expect(availabilityStatuses).toHaveLength(3);
-  expect(screen.getByRole("status", { name: /^Arquivo ausente/ })).toHaveTextContent(/^Ausente$/);
+  expect(screen.getByRole("status", { name: /^Arquivo ausente/ }).textContent).toBe("");
   expect(screen.getByRole("status", { name: "Indisponível" })).toHaveTextContent(/^Indisponível$/);
   expect(screen.getByRole("status", { name: /^Prévia indisponível/ })).toHaveTextContent(/^Prévia indisponível/);
-  fireEvent.click(
-    screen.getByRole("button", { name: /Religar arquivo de/i }),
-  );
+  fireEvent.contextMenu(screen.getByRole("button", { name: /Arquivo ausente/ }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Religar" }));
   fireEvent.click(
     screen.getByRole("button", { name: /Tentar novamente o arquivo de/i }),
   );
@@ -6165,7 +6208,7 @@ test("commits a slider zoom once without flashing a global busy state", async ()
 
   const slider = screen.getByRole("slider", { name: "Zoom da Foto" });
   const exportButton = screen.getByRole("button", {
-    name: "Exportar Lâmina",
+    name: "Exportar",
   });
 
   fireEvent.pointerDown(slider);
@@ -6558,23 +6601,20 @@ test("restores the active media tab in a new window without restoring its search
   expect(props.onProjectionChange).not.toHaveBeenCalled();
 });
 
-test("the album absence notice opens a temporary view and restores the previous tab and filters", async () => {
+test("absent Originals stay in the media panel without an album inspector notice", () => {
   render(<ProjectWorkspace exportPipelinePort={exportPipelinePort} projection={projection}
     projectCorePort={projectCorePortWithApply(async () => projection)} onProjectionChange={vi.fn()}
     mediaFiles={{ "media-002": { mediaId: "media-002", state: "absent", createdAtMs: null, modifiedAtMs: null } }} />);
-  fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
-  fireEvent.change(screen.getByRole("searchbox", { name: "Buscar Decorativos" }), { target: { value: "dourado" } });
-  fireEvent.click(screen.getByRole("button", { name: "Filtro, ordem e tamanho" }));
-  fireEvent.change(screen.getByRole("combobox", { name: "Filtro de uso" }), { target: { value: "used" } });
-  fireEvent.click(screen.getByRole("button", { name: "Ver arquivos ausentes" }));
+  expect(screen.queryByText(/arquivo original ausente/i)).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Ver arquivos ausentes" })).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Fotos" })).toHaveAttribute("aria-pressed", "true");
   expect(screen.getByRole("button", { name: "Campo.jpg. Arquivo ausente" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Serra ao amanhecer.jpg. Já usada. 1 uso" })).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: /Ausentes/ }));
   expect(screen.queryByRole("button", { name: "Serra ao amanhecer.jpg. Já usada. 1 uso" })).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Encerrar visualização de ausentes" }));
-  expect(screen.getByRole("button", { name: "Decorativos" })).toHaveAttribute("aria-pressed", "true");
-  expect(screen.getByRole("searchbox", { name: "Buscar Decorativos" })).toHaveValue("dourado");
-  fireEvent.click(screen.getByRole("button", { name: "Filtro, ordem e tamanho" }));
-  expect(screen.getByRole("combobox", { name: "Filtro de uso" })).toHaveValue("used");
+  expect(screen.getByRole("button", { name: "Campo.jpg. Arquivo ausente" })).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: /Todas/ }));
+  expect(screen.getByRole("button", { name: "Serra ao amanhecer.jpg. Já usada. 1 uso" })).toBeVisible();
 });
 
 test("reimporting a JPEG selects its existing card without a creative mutation", async () => {
@@ -6720,7 +6760,7 @@ test("starts a pointer drag for the directly pressed Photo and cancels it with E
   fireEvent.keyDown(window, { key: "Escape" });
   expect(canvasHarness.props?.draggedPhotoId).toBeNull();
 });
-test("starts Exportação for the Canvas-centered Lâmina even while focus remains on another Lâmina", () => {
+test("starts Exportação for the Canvas-centered Lâmina even while focus remains on another Lâmina", async () => {
   const startSheet = vi.fn<ExportPipelinePort["startSheet"]>(() => ({
     completion: Promise.resolve({
       status: "completed",
@@ -6731,7 +6771,7 @@ test("starts Exportação for the Canvas-centered Lâmina even while focus remai
 
   render(
     <ProjectWorkspace
-      exportPipelinePort={{ startSheet }}
+      exportPipelinePort={{ defaultDestination: async () => "C:/Exportados/Album", chooseDestination: async () => null, startSheet }}
       projection={twoSheetProjection}
       projectCorePort={projectCorePortWithApply(async () =>
         twoSheetProjection
@@ -6744,16 +6784,15 @@ test("starts Exportação for the Canvas-centered Lâmina even while focus remai
     canvasHarness.props?.onCenteredSheetChange?.("sheet-002");
   });
   expect(useEditorView.getState().focusedSheetId).toBe("sheet-001");
-  fireEvent.click(
-    screen.getByRole("button", { name: "Exportar Lâmina" }),
-  );
+  const exportAction = getApplicationCommand("Arquivo", "Exportar Lâmina…");
+  await act(async () => { fireEvent.click(exportAction); });
 
   expect(startSheet).toHaveBeenCalledWith(
-    {
+    expect.objectContaining({
       projectName: "Álbum Horizonte",
       sheetId: "sheet-002",
       sheetNumber: 2,
-    },
+    }),
     expect.any(Function),
   );
 });

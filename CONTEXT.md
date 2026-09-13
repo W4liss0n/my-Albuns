@@ -378,6 +378,11 @@ Arquivo vinculado cuja existência não pôde ser confirmada porque sua origem d
 **Religação de arquivo**:
 Substituição do caminho registrado de um Arquivo ausente por um caminho válido dentro de um único Projeto.
 
+**Substituição de imagem**:
+Troca explícita do Original vinculado a uma Foto ou Decorativo por outro arquivo,
+independentemente de sua disponibilidade, conservando sua identidade e seus usos
+no Projeto.
+
 **Monitor de Arquivos vinculados**:
 Observador de mudanças nos Arquivos vinculados, usado para invalidar representações derivadas sem alterar o original.
 

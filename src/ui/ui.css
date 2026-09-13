@@ -184,6 +184,7 @@
   min-width: 0;
   height: var(--ui-titlebar-height);
   align-items: center;
+  justify-content: flex-end;
   padding: 0;
   border-bottom: 1px solid var(--ui-border);
   background: var(--ui-surface);
@@ -599,6 +600,17 @@ kbd {
 
 .ui-dialog-window--message {
   grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.ui-dialog-window--form {
+  max-height: calc(var(--ui-owned-window-height-limit, 100vh) - var(--ui-titlebar-height) - 2px);
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.ui-dialog-window--form .ui-dialog-window__body {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 18px;
 }
 
 .ui-dialog-window--message .ui-dialog-window__body {

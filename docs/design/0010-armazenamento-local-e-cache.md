@@ -250,6 +250,16 @@ por tamanho ou data e não acrescenta campos ao índice persistido.
 Na reabertura, a recuperação exclusiva do namespace já valida e decodifica
 as representações indexadas. Ela conserva o hash desses bytes reduzidos para
 reaproveitar essa validação na primeira demanda, sem iniciar outro Processador.
+
+Quando faltarem gerações utilizáveis, inclusive depois de limpar o Cache, o
+diálogo de abertura permanece visível até terminar a preparação de todas as
+imagens cujos originais estejam disponíveis, mesmo fora da área visível do
+Painel. A primeira demanda visual é entregue e suas miniaturas visíveis são
+decodificadas antes de liberar o editor, evitando trabalho concorrente de
+reconstrução e apresentação durante a abertura. Gerações já validadas na
+recuperação são reutilizadas; originais ausentes ou indisponíveis conservam a apresentação
+normal com o Cache que existir ou o placeholder, sem impedir a abertura.
+
 Somente vínculos cujo caminho, tamanho e datas correspondem ao artefato
 recuperado podem ser adotados. O Host captura a identidade física atual e o
 Monitor adota essa mesma observação; mudanças posteriores revogam o resultado.
@@ -316,7 +326,7 @@ Não existe limite rígido, expiração automática por idade ou sequência de a
 - remove somente Cache de Projetos fechados;
 - preserva a pasta se não conseguir a reserva.
 
-`Limpar todo o Cache` executa imediatamente apenas quando não houver Projeto ou Processador ativo e depois de adquirir a concessão exclusiva única do `OperationGate`. Caso contrário, o usuário pode agendá-lo para a próxima inicialização, antes da abertura de Projetos. A concessão impede abertura, Processador ou Exportação concorrente e é liberada em sucesso, falha ou cancelamento. O MVP não pausa editores nem remove Cache ativo ao vivo.
+Configurações apresenta somente `Limpar cache`, para solicitar a limpeza completa. Ela executa imediatamente apenas quando não houver Projeto ou Processador ativo e depois de adquirir a concessão exclusiva única do `OperationGate`. Caso contrário, agenda automaticamente para a próxima inicialização, antes da abertura de Projetos. O usuário não escolhe o alcance nem o momento da limpeza. A concessão impede abertura, Processador ou Exportação concorrente e é liberada em sucesso, falha ou cancelamento. O MVP não pausa editores nem remove Cache ativo ao vivo. A manutenção de namespaces fechados acima permanece uma capacidade interna, não uma segunda opção na aba Desempenho.
 
 Nenhuma ação de Cache remove Projetos, itens do Painel, vínculos, Recuperação, Layouts, preferências, Exportações ou originais.
 

@@ -27,6 +27,7 @@ test("submits semantic actions and receives a validated owned presentation", asy
     command === "current_project_dialog_presentation"
       ? {
           sessionId: "project-close-3",
+          windowWidth: 440,
           state: { busy: false, kind: "projectCloseConfirmation" },
         }
       : undefined,
@@ -37,10 +38,12 @@ test("submits semantic actions and receives a validated owned presentation", asy
   ).resolves.toBe(unlisten);
   emit({
     sessionId: "project-close-4",
+    windowWidth: 440,
     state: { busy: true, kind: "projectCloseConfirmation" },
   });
   emit({
     sessionId: "project-close-5",
+    windowWidth: 440,
     state: { busy: "yes", kind: "projectCloseConfirmation" },
   });
   await tauriProjectDialogClient.submit(
@@ -55,10 +58,12 @@ test("submits semantic actions and receives a validated owned presentation", asy
   );
   expect(listener).toHaveBeenNthCalledWith(1, {
     sessionId: "project-close-3",
+    windowWidth: 440,
     state: { busy: false, kind: "projectCloseConfirmation" },
   });
   expect(listener).toHaveBeenNthCalledWith(2, {
     sessionId: "project-close-4",
+    windowWidth: 440,
     state: { busy: true, kind: "projectCloseConfirmation" },
   });
   expect(invoke).toHaveBeenNthCalledWith(
@@ -92,6 +97,7 @@ test("prefers an owned presentation emitted during initial hydration", async () 
   await Promise.resolve();
   emit({
     sessionId: "export-2",
+    windowWidth: 440,
     state: {
       cancelled: false,
       kind: "exportFailure",
@@ -101,6 +107,7 @@ test("prefers an owned presentation emitted during initial hydration", async () 
   });
   resolveCurrent({
     sessionId: "export-1",
+    windowWidth: 440,
     state: {
       cancelRequested: false,
       cancellable: true,
@@ -113,6 +120,7 @@ test("prefers an owned presentation emitted during initial hydration", async () 
   expect(listener).toHaveBeenCalledOnce();
   expect(listener).toHaveBeenCalledWith({
     sessionId: "export-2",
+    windowWidth: 440,
     state: {
       cancelled: false,
       kind: "exportFailure",

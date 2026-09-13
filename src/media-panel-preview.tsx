@@ -15,6 +15,9 @@ const mediaFiles: Record<string, MediaFileInfo> = parameters.has("files") ? Obje
   createdAtMs: index === 5 ? null : 1_780_000_000_000 + (mediaItems.length - index) * 1000,
   modifiedAtMs: index === 5 ? null : 1_780_000_000_000 + index * 1000,
 }])) : {};
+const displayedPreviews = parameters.get("cache") === "missing"
+  ? Object.fromEntries(Object.entries(mediaPreviews).filter(([mediaId]) => mediaFiles[mediaId]?.state !== "absent"))
+  : mediaPreviews;
 const acceptanceSurface =
   new URLSearchParams(window.location.search).get("acceptance") === "editor"
     ? "editor"
@@ -40,12 +43,13 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
         importPending={new URLSearchParams(window.location.search).get("import") === "pending"}
         onMediaDragChange={() => undefined}
         onRelinkMedia={() => undefined}
+        onReplaceMedia={() => undefined}
         onRetryUnavailableMedia={async () => undefined}
         preferences={{ kind: "local", initialThumbnailSize: parameters.get("files") === "dates" ? 96 : undefined,
           initial: parameters.get("files") === "dates" ? {
             photo: { sortKey: "createdAt", sortDirection: "descending", usageFilter: "all" },
           } : undefined }}
-        previewSource={{ kind: "static", previews: mediaPreviews }}
+        previewSource={{ kind: "static", previews: displayedPreviews }}
       />
     </main>
   </React.StrictMode>,

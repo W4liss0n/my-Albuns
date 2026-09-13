@@ -412,4 +412,18 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.media-missing-indicator {
+  position: absolute;
+  z-index: 2;
+  top: 3px;
+  right: 3px;
+  display: grid;
+  width: 18px;
+  height: 18px;
+  border-radius: 2px;
+  color: var(--ui-warning-text);
+  background: var(--ui-warning-soft);
+  place-items: center;
+}
 .media-panel[hidden] { display: none; }

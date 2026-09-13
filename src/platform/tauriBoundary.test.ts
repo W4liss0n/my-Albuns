@@ -26,8 +26,10 @@ const tauriCommandSources = {
   settings: ["./tauriCacheSettingsPort.ts", "./tauriSettingsWindow.ts"],
   ownedDialog: ["./tauriWindowControls.ts"],
   messageDialog: ["./tauriOwnedDialogControls.ts"],
-  openingDialog: ["./tauriOpeningDialogControls.ts"],
+  openingDialog: ["./tauriOpeningDialogControls.ts", "./tauriOpeningImageProgress.ts"],
   project: [
+    "./tauriExportMediaPort.ts",
+    "./invokeImageProcessing.ts",
     "./tauriProjectDialogPort.ts",
     "./tauriProjectPorts.ts",
     "./tauriProjectWindowPort.ts",
@@ -248,8 +250,6 @@ test("limits the Project dialog to state hydration and semantic actions", () => 
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "core:window:allow-close",
-    "core:window:allow-center",
-    "core:window:allow-set-size",
     "core:window:allow-start-dragging",
   ]);
   expect([...allowedCommands].sort()).toEqual([...invokedCommands].sort());
@@ -284,15 +284,13 @@ test("gives each standard dialog only the abilities exposed by its titlebar", ()
   expect(messageCapability.windows).toEqual(["dialog-project-failure"]);
   expect(messageCapability.permissions).toEqual([
     "message-dialog-window-commands",
-    "core:window:allow-center",
-    "core:window:allow-set-size",
     "core:window:allow-start-dragging",
   ]);
   expect(progressCapability.windows).toEqual(["dialog-opening-progress"]);
   expect(progressCapability.permissions).toEqual([
     "owned-dialog-window-commands",
-    "core:window:allow-center",
-    "core:window:allow-set-size",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
     "core:window:allow-start-dragging",
   ]);
   expect([...messageCommands].sort()).toEqual(

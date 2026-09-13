@@ -4239,7 +4239,7 @@ mod tests {
             let monitor = MediaMonitor::default();
             let runtime = MediaRuntime::default();
             MediaResolver
-                .inspect_photo_binding_in_plan(&binding, roots)
+                .inspect_media_binding_in_plan(&binding, roots)
                 .unwrap();
             monitor.adopt_prepared_inspections(
                 &runtime,
@@ -4277,7 +4277,7 @@ mod tests {
             let prepared = monitor.prepare_in_plan(&runtime, &bindings, roots).unwrap();
             assert!(
                 MediaResolver
-                    .inspect_photo_binding_in_plan(&binding, roots)
+                    .inspect_media_binding_in_plan(&binding, roots)
                     .is_err()
             );
             let rejected = monitor.commit_prepared(&runtime, prepared, &bindings, roots, &[]);
@@ -4304,7 +4304,7 @@ mod tests {
             );
             let prepared = monitor.prepare_in_plan(&runtime, &bindings, roots).unwrap();
             MediaResolver
-                .inspect_photo_binding_in_plan(&binding, roots)
+                .inspect_media_binding_in_plan(&binding, roots)
                 .unwrap();
             let confirmed =
                 monitor.commit_prepared(&runtime, prepared, &bindings, roots, &[binding.media_id]);

@@ -8,6 +8,8 @@ import {
   SaveProjectError,
 } from "../application/projectPorts";
 import { representativeProjection } from "../test/projectFixtures";
+import { MediaExportBlockedError } from "../application/exportMedia";
+import { ExportConflictsError } from "../application/normalExport";
 import {
   tauriExportPipelinePort,
   tauriMediaPreviewPort,
@@ -163,6 +165,38 @@ test("completes an Export attempt with the backend result", async () => {
   });
 });
 
+test("native media preflight failures reach the recovery screen before any started event", async () => {
+  const problems = [{ mediaId: "photo-1", fileName: "Foto.jpg", state: "absent" as const }];
+  vi.mocked(invoke).mockRejectedValueOnce({ code: "media_problems", mediaProblems: problems });
+  const event = vi.fn();
+  const attempt = tauriExportPipelinePort.startSheet(exportSelection, event);
+  await expect(attempt.completion).rejects.toEqual(new MediaExportBlockedError(problems));
+  expect(event).not.toHaveBeenCalled();
+});
+
+test("normal export sends the complete selection and maps overwrite conflicts without starting progress", async () => {
+  const options = { scope: "range" as const, sheetIds: ["sheet-002", "sheet-003"], mode: "page" as const,
+    format: { kind: "jpeg" as const, quality: 64 }, destination: "C:/Álbuns/Exportados", conflictPolicy: "ask" as const };
+  const conflicts = ["Álbum_003.jpg", "Álbum_004.jpg"];
+  vi.mocked(invoke).mockRejectedValueOnce({ code: "export_conflict", conflicts });
+  const event = vi.fn();
+  const attempt = tauriExportPipelinePort.startSheet({ ...exportSelection, options }, event);
+  await expect(attempt.completion).rejects.toEqual(new ExportConflictsError(conflicts));
+  expect(invoke).toHaveBeenCalledWith("export_project", { options, onEvent: tauriBoundary.channels[0] });
+  expect(event).not.toHaveBeenCalled();
+});
+
+test("an entirely skipped export completes without progress or fabricated output dimensions", async () => {
+  const options = { scope: "album" as const, sheetIds: [exportSelection.sheetId], mode: "sheet" as const,
+    format: { kind: "pdf" as const }, destination: "C:/Exportados", conflictPolicy: "skip" as const };
+  vi.mocked(invoke).mockResolvedValueOnce(null);
+  const event = vi.fn();
+  const attempt = tauriExportPipelinePort.startSheet({ ...exportSelection, options }, event);
+  await expect(attempt.completion).resolves.toEqual({ status: "skipped" });
+  expect(event).not.toHaveBeenCalled();
+  await expect(attempt.cancel()).resolves.toBe("not_found");
+});
+
 test("forwards Export events without exposing the backend operation id", () => {
   const onEvent = vi.fn();
 
@@ -292,6 +326,12 @@ test("resolves a queued cancellation as not_found when completion fails before s
   await expect(attempt.completion).rejects.toBe(failure);
   await expect(cancellation).resolves.toBe("not_found");
   expect(invoke).toHaveBeenCalledTimes(1);
+});
+
+test("sends image replacement through the native picker command with processing progress", async () => {
+  vi.mocked(invoke).mockResolvedValue(representativeProjection);
+  await expect(tauriProjectCorePort.replaceImage("media-001", vi.fn())).resolves.toBe(representativeProjection);
+  expect(invoke).toHaveBeenCalledWith("replace_media", { mediaId: "media-001", onProgress: tauriBoundary.channels[0] });
 });
 
 test("maps the Project and media ports to the desktop commands", async () => {
@@ -429,8 +469,10 @@ test.each(["completed", "failed"])("streams each media preview before the batch 
 });
 
 test("confirms Project UI readiness through its single startup seam", async () => {
+  await tauriProjectStartupPort.prepareImages!();
   await tauriProjectStartupPort.confirmUiReady();
 
+  expect(invoke).toHaveBeenCalledWith("prepare_project_startup_images");
   expect(invoke).toHaveBeenCalledWith("project_ui_ready");
 });
 

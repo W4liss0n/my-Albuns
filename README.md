@@ -125,6 +125,12 @@ React, testes da automação e verificações Rust sem abrir o MyAlbuns. O relat
 e os logs por etapa ficam em `.tools/validation/`. Durante uma edição, os comandos
 de teste focados continuam disponíveis; não é necessário repetir a suíte inteira.
 
+Essa validação também executa `npm run test:owned-window-fitting` depois do
+build. O teste carrega o diálogo compilado em navegador sem janela e aplica os
+pedidos reais de tamanho a um viewport, verificando que a tabela de Problemas
+permanece visível e consegue crescer novamente após o progresso. As evidências
+ficam em `.scratch/ui-acceptance/owned-window-fitting/`.
+
 A captura `npm run ui:acceptance` também usa navegador sem janela. Selecione
 somente os estados afetados com `MYALBUNS_UI_SCENARIO_IDS`; a aprovação visual
 continua dependendo da revisão das capturas.

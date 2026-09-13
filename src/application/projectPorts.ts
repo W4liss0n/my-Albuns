@@ -125,7 +125,7 @@ export type ExportOutcome =
       result: ExportResult;
     }
   | {
-      status: "cancelled";
+      status: "cancelled" | "skipped";
     };
 
 export type ExportCancelStatus =
@@ -235,6 +235,8 @@ export interface ProjectWindowPort {
 }
 
 export interface ProjectStartupPort {
+  /** Native startup prepares disk Cache before the first viewport demand. */
+  prepareImages?(): Promise<readonly ImageProcessingProblem[]>;
   confirmUiReady(): Promise<readonly ImageProcessingProblem[] | void>;
 }
 
@@ -306,6 +308,7 @@ export interface ProjectCorePort {
     yUm: number,
   ): Promise<PhotoDropTarget>;
   relink(mediaId: string, onProgress: (progress: ImageProcessingProgress) => void): Promise<EditorProjection>;
+  replaceImage(mediaId: string, onProgress: (progress: ImageProcessingProgress) => void): Promise<EditorProjection>;
   undo(onProgress?: (progress: ImageProcessingProgress) => void): Promise<EditorProjection>;
   redo(onProgress?: (progress: ImageProcessingProgress) => void): Promise<EditorProjection>;
   save(expectedRevision: number): Promise<SaveProjectResult>;
@@ -330,12 +333,15 @@ export interface MediaPreviewPort {
 }
 
 export interface ExportSheetSelection {
+  options?: import("./normalExport").NormalExportOptions;
   projectName: string;
   sheetId: string;
   sheetNumber: number;
 }
 
 export interface ExportPipelinePort {
+  defaultDestination(): Promise<string>;
+  chooseDestination(): Promise<string | null>;
   startSheet(
     selection: ExportSheetSelection,
     onEvent: (event: ExportProgressEvent) => void,

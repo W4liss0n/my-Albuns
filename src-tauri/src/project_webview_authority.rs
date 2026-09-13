@@ -42,6 +42,14 @@ pub(crate) struct CommittedProjectWebview {
     staged: StagedProjectWebview,
 }
 
+pub(crate) struct ProjectWebviewRecoveryReservation(ProjectWebviewAuthority);
+
+impl Drop for ProjectWebviewRecoveryReservation {
+    fn drop(&mut self) {
+        self.0.transitioning.store(false, Ordering::Release);
+    }
+}
+
 impl ProjectWebviewAuthority {
     pub(crate) fn new(app_paths: AppPaths, project_id: &str) -> Self {
         Self {
@@ -53,6 +61,13 @@ impl ProjectWebviewAuthority {
 
     pub(crate) fn is_transitioning(&self) -> bool {
         self.transitioning.load(Ordering::Acquire)
+    }
+
+    pub(crate) fn try_reserve_recovery(&self) -> Option<ProjectWebviewRecoveryReservation> {
+        self.transitioning
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .ok()
+            .map(|_| ProjectWebviewRecoveryReservation(self.clone()))
     }
 
     #[cfg(test)]
@@ -227,6 +242,7 @@ fn preflight(
         builder,
         PhysicalSize::new(1, 1),
         "o WebView do novo namespace não ficou pronto",
+        browser_arguments,
     )?;
     webview.close().map_err(io::Error::other)
 }
@@ -247,6 +263,7 @@ fn replace_project_webview(
     let mut builder =
         WebviewBuilder::new(PROJECT_WINDOW_LABEL, project_webview_url(startup_terminal))
             .data_directory(data_directory)
+            .focused(false)
             .auto_resize();
     if let Some(arguments) = browser_arguments {
         builder = builder.additional_browser_args(arguments);
@@ -256,6 +273,7 @@ fn replace_project_webview(
         builder,
         size,
         "o WebView da nova autoridade não ficou pronto",
+        browser_arguments,
     )?;
     webview.set_focus().map_err(io::Error::other)?;
     tracing::info!(
@@ -282,13 +300,18 @@ fn add_ready_webview(
     builder: WebviewBuilder<tauri::Wry>,
     size: PhysicalSize<u32>,
     timeout_message: &'static str,
+    browser_arguments: Option<&str>,
 ) -> io::Result<tauri::Webview<tauri::Wry>> {
     let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+    let arguments = desktop_webview_policy::browser_arguments(browser_arguments);
     let webview = window
         .add_child(
             builder.on_page_load(move |webview, payload| {
                 if payload.event() == tauri::webview::PageLoadEvent::Finished {
-                    let _ = sender.send(desktop_webview_policy::enforce_webview(&webview));
+                    let _ = sender.send(desktop_webview_policy::enforce_webview_with_arguments(
+                        &webview,
+                        arguments.clone(),
+                    ));
                 }
             }),
             PhysicalPosition::new(0, 0),
@@ -330,6 +353,19 @@ mod tests {
             project_data_namespace(project_id)
         );
         assert!(!authority.current_namespace().contains(project_id));
+    }
+
+    #[test]
+    fn recovery_reserves_the_same_transition_until_its_owner_is_dropped() {
+        let root = tempfile::tempdir().unwrap();
+        let paths = AppPaths::from_roots(&root.path().join("roaming"), &root.path().join("local"));
+        let authority = ProjectWebviewAuthority::new(paths, "recovery-test");
+        let reservation = authority.try_reserve_recovery().unwrap();
+        assert!(authority.is_transitioning());
+        assert!(authority.clone().try_reserve_recovery().is_none());
+        drop(reservation);
+        assert!(!authority.is_transitioning());
+        assert!(authority.try_reserve_recovery().is_some());
     }
 
     #[test]

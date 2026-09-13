@@ -15,6 +15,97 @@ import type {
   ExportProgressEvent,
 } from "../application/projectPorts";
 import { ExportPreviewControl } from "./ExportPreviewControl";
+import { MediaExportBlockedError, type ExportMediaPort } from "../application/exportMedia";
+import { representativeProjection } from "../test/projectFixtures";
+import { ExportConflictsError } from "../application/normalExport";
+
+test("opens normal export only after the destination is available, without a transient preparation state", async () => {
+  const dialog = createDialogHarness();
+  const harness = createExportHarness();
+  let resolveDestination!: (destination: string) => void;
+  harness.port.defaultDestination = () => new Promise(resolve => { resolveDestination = resolve; });
+  render(<ExportPreviewControl dialogPort={dialog.port} exportPipelinePort={harness.port} projectId="project-a"
+    selection={{ projectName: "Album", sheetId: "first", sheetNumber: 1 }}
+    sheets={[{ sheetId: "first", number: 1, pageCount: 2 }]} />);
+
+  fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  expect(screen.getByRole("button", { name: "Exportar" })).toBeDisabled();
+  expect(dialog.present).not.toHaveBeenCalled();
+
+  await act(async () => { resolveDestination("C:/Exportados/Album"); });
+  expect(dialog.present).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+    kind: "exportConfiguration", busy: false, message: "",
+    options: expect.objectContaining({ destination: "C:/Exportados/Album" }),
+  }));
+  expect(harness.startSheet).not.toHaveBeenCalled();
+});
+
+test("opens an editable configuration with the destination error instead of a temporary preparation state", async () => {
+  const dialog = createDialogHarness();
+  const harness = createExportHarness();
+  harness.port.defaultDestination = async () => { throw new Error("Destino indisponível"); };
+  render(<ExportPreviewControl dialogPort={dialog.port} exportPipelinePort={harness.port} projectId="project-a"
+    selection={{ projectName: "Album", sheetId: "first", sheetNumber: 1 }}
+    sheets={[{ sheetId: "first", number: 1, pageCount: 2 }]} />);
+
+  fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  await waitFor(() => expect(dialog.present).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+    kind: "exportConfiguration", busy: false, message: "Destino indisponível",
+    options: expect.objectContaining({ destination: "" }),
+  })));
+});
+
+test("does not open configuration if the control unmounts while resolving its destination", async () => {
+  const dialog = createDialogHarness();
+  const harness = createExportHarness();
+  const onActiveChange = vi.fn();
+  let resolveDestination!: (destination: string) => void;
+  harness.port.defaultDestination = () => new Promise(resolve => { resolveDestination = resolve; });
+  const view = render(<ExportPreviewControl dialogPort={dialog.port} exportPipelinePort={harness.port} projectId="project-a"
+    onActiveChange={onActiveChange} selection={{ projectName: "Album", sheetId: "first", sheetNumber: 1 }}
+    sheets={[{ sheetId: "first", number: 1, pageCount: 2 }]} />);
+
+  fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  view.unmount();
+  await act(async () => { resolveDestination("C:/Exportados/Album"); });
+  expect(dialog.present).not.toHaveBeenCalled();
+  expect(onActiveChange.mock.calls).toEqual([[true], [false]]);
+});
+
+test.each([
+  ["confirmExportOverwrite", "replace"],
+  ["skipExportConflicts", "skip"],
+  ["dismissExport", null],
+] as const)("normal export retries the same selection after %s", async (action, conflictPolicy) => {
+  const dialog = createDialogHarness(); const harness = createExportHarness();
+  render(<ExportPreviewControl dialogPort={dialog.port} exportPipelinePort={harness.port} projectId="project-a"
+    selection={{ projectName: "Album", sheetId: "second", sheetNumber: 2 }}
+    sheets={[{ sheetId: "first", number: 1, pageCount: 1 }, { sheetId: "second", number: 2, pageCount: 2 }]} />);
+  fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  await waitFor(() => expect(dialog.present).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "exportConfiguration", busy: false })));
+  expect(harness.startSheet).not.toHaveBeenCalled();
+  const options = { scope: "range" as const, sheetIds: ["second"], mode: "page" as const, format: { kind: "png" as const }, destination: "C:/Exportados", conflictPolicy: "ask" as const };
+  dialog.emit({ configureExport: options });
+  expect(dialog.present).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "exportConfiguration", busy: true, options }));
+  expect(harness.startSheet).toHaveBeenLastCalledWith({ projectName: "Album", sheetId: "second", sheetNumber: 2, options }, expect.any(Function));
+  await act(async () => { harness.attempts[0].reject(new ExportConflictsError(["Album_002.png", "Album_003.png"])); });
+  expect(dialog.present).toHaveBeenLastCalledWith({ kind: "exportConflicts", files: ["Album_002.png", "Album_003.png"] });
+  dialog.emit(action);
+  if (conflictPolicy === null) {
+    expect(dialog.dismiss).toHaveBeenCalledTimes(1);
+    expect(harness.startSheet).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "Exportar" })).toBeEnabled();
+    return;
+  }
+  expect(harness.startSheet).toHaveBeenLastCalledWith(expect.objectContaining({ options: { ...options, conflictPolicy } }), expect.any(Function));
+  dialog.emit(action); expect(harness.startSheet).toHaveBeenCalledTimes(2);
+  if (conflictPolicy === "skip") {
+    await act(async () => { harness.attempts[1].resolve({ status: "skipped" }); });
+    expect(dialog.dismiss).toHaveBeenCalledTimes(1);
+    expect(dialog.present.mock.calls.some(([state]) => state.kind === "exportProgress" || state.kind === "exportSuccess")).toBe(false);
+    expect(screen.getByRole("button", { name: "Exportar" })).toBeEnabled();
+  }
+});
 
 interface AttemptHarness {
   cancel: ReturnType<typeof vi.fn<() => Promise<ExportCancelStatus>>>;
@@ -40,14 +131,14 @@ function createExportHarness() {
 
   return {
     attempts,
-    port: { startSheet } satisfies ExportPipelinePort,
+    port: { defaultDestination: async () => "C:/Exportados/Album", chooseDestination: async () => null, startSheet } satisfies ExportPipelinePort,
     startSheet,
   };
 }
 
 function createDialogHarness() {
   let listener: ((action: ProjectDialogAction) => void) | undefined;
-  const dismiss = vi.fn(async () => undefined);
+  const dismiss = vi.fn<ProjectDialogSession["dismiss"]>(async () => undefined);
   const present = vi.fn<ProjectDialogSession["present"]>(
     async () => undefined,
   );
@@ -83,17 +174,23 @@ function renderControl({
   dialog = createDialogHarness(),
   exportHarness = createExportHarness(),
   onActiveChange,
+  exportMediaPort,
+  onProjectionChange,
   projectId = "project-a",
 }: {
   dialog?: ReturnType<typeof createDialogHarness>;
   exportHarness?: ReturnType<typeof createExportHarness>;
   onActiveChange?: (active: boolean) => void;
+  exportMediaPort?: ExportMediaPort;
+  onProjectionChange?: (projection: typeof representativeProjection) => void;
   projectId?: string;
 } = {}) {
   const view = render(
     <ExportPreviewControl
       dialogPort={dialog.port}
       exportPipelinePort={exportHarness.port}
+      exportMediaPort={exportMediaPort}
+      onProjectionChange={onProjectionChange}
       onActiveChange={onActiveChange}
       projectId={projectId}
       selection={{
@@ -110,9 +207,114 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+test("folder recovery publishes the unsaved projection and resumes once after closing Problems", async () => {
+  const problems = [{ mediaId: "photo-1", fileName: "Foto.jpg", state: "absent" as const }];
+  let resolve!: (result: Awaited<ReturnType<ExportMediaPort["relink"]>>) => void;
+  const relink = vi.fn<ExportMediaPort["relink"]>(() => new Promise(done => { resolve = done; }));
+  const inspect = vi.fn<ExportMediaPort["inspect"]>(async () => []);
+  const onProjectionChange = vi.fn();
+  const { dialog, exportHarness } = renderControl({ exportMediaPort: { relink, inspect }, onProjectionChange });
+  fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  await act(async () => exportHarness.attempts[0].reject(new MediaExportBlockedError(problems)));
+  dialog.emit("relinkExportMedia");
+  dialog.emit("relinkExportMedia");
+  dialog.emit("dismissExport");
+  expect(relink).toHaveBeenCalledOnce();
+  expect(dialog.dismiss).not.toHaveBeenCalled();
+  let finishDismiss!: () => void;
+  dialog.dismiss.mockImplementationOnce(() => new Promise<void>(done => { finishDismiss = done; }));
+  await act(async () => resolve({ projection: representativeProjection, problems: [], notes: [] }));
+  expect(onProjectionChange).toHaveBeenCalledWith(representativeProjection);
+  expect(dialog.present).not.toHaveBeenCalledWith(expect.objectContaining({ kind: "exportMediaProblems", problems: [] }));
+  expect(dialog.dismiss).toHaveBeenCalledOnce();
+  expect(exportHarness.startSheet).toHaveBeenCalledOnce();
+  await act(async () => finishDismiss());
+  expect(exportHarness.startSheet).toHaveBeenCalledTimes(2);
+  expect(inspect).not.toHaveBeenCalled();
+  await act(async () => exportHarness.attempts[1].resolve({ status: "cancelled" }));
+  expect(dialog.dismiss).toHaveBeenCalledOnce();
+  expect(screen.getByRole("button", { name: "Exportar" })).toBeEnabled();
+  fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  expect(exportHarness.startSheet).toHaveBeenCalledTimes(3);
+});
+
+test("unavailable sources resume only after reinspection clears the last problem", async () => {
+  const relink = vi.fn();
+  const problems = [{ mediaId: "photo-1", fileName: "Rede.png", state: "unavailable" as const }];
+  const inspect = vi.fn<ExportMediaPort["inspect"]>(async () => problems);
+  const { dialog, exportHarness } = renderControl({ exportMediaPort: { relink, inspect } });
+  fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  await act(async () => exportHarness.attempts[0].reject(new MediaExportBlockedError(problems)));
+  dialog.emit("retryExportMedia");
+  await waitFor(() => expect(dialog.present).toHaveBeenLastCalledWith(expect.objectContaining({ problems, busy: false })));
+  expect(relink).not.toHaveBeenCalled();
+  expect(exportHarness.startSheet).toHaveBeenCalledOnce();
+  expect(dialog.dismiss).not.toHaveBeenCalled();
+  inspect.mockResolvedValueOnce([]);
+  dialog.emit("retryExportMedia");
+  await waitFor(() => expect(exportHarness.startSheet).toHaveBeenCalledTimes(2));
+  expect(dialog.dismiss).toHaveBeenCalledOnce();
+  expect(dialog.present).not.toHaveBeenCalledWith(expect.objectContaining({ kind: "exportMediaProblems", problems: [] }));
+  await act(async () => exportHarness.attempts[1].reject(new MediaExportBlockedError(problems)));
+  expect(dialog.present).toHaveBeenLastCalledWith(expect.objectContaining({ problems, busy: false }));
+  expect(exportHarness.startSheet).toHaveBeenCalledTimes(2);
+});
+
+test("partial folder recovery keeps remaining problems and closing cancels the pending export", async () => {
+  const problems = [{ mediaId: "photo-1", fileName: "Foto.jpg", state: "absent" as const }];
+  const relink = vi.fn<ExportMediaPort["relink"]>(async () => ({ projection: representativeProjection, problems,
+    notes: [{ fileName: "Foto.jpg", reason: "Mais de uma correspondência encontrada." }] }));
+  const { dialog, exportHarness } = renderControl({ exportMediaPort: { relink, inspect: vi.fn() } });
+  fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  await act(async () => exportHarness.attempts[0].reject(new MediaExportBlockedError(problems)));
+  dialog.emit("relinkExportMedia");
+  await waitFor(() => expect(dialog.present).toHaveBeenLastCalledWith(expect.objectContaining({ problems, busy: false,
+    message: "Foto.jpg: Mais de uma correspondência encontrada." })));
+  expect(exportHarness.startSheet).toHaveBeenCalledOnce();
+  dialog.emit("dismissExport");
+  expect(dialog.dismiss).toHaveBeenCalledOnce();
+  expect(screen.getByRole("button", { name: "Exportar" })).toBeEnabled();
+});
+
+test("retiring the Project during recovery prevents automatic resumption", async () => {
+  let resolve!: (result: Awaited<ReturnType<ExportMediaPort["relink"]>>) => void;
+  const relink = vi.fn<ExportMediaPort["relink"]>(() => new Promise(done => { resolve = done; }));
+  const onProjectionChange = vi.fn();
+  const { dialog, exportHarness, view } = renderControl({ exportMediaPort: { relink, inspect: vi.fn() }, onProjectionChange });
+  fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  await act(async () => exportHarness.attempts[0].reject(new MediaExportBlockedError([
+    { mediaId: "photo-1", fileName: "Foto.jpg", state: "absent" },
+  ])));
+  dialog.emit("relinkExportMedia");
+  view.unmount();
+  await act(async () => resolve({ projection: representativeProjection, problems: [], notes: [] }));
+  expect(onProjectionChange).not.toHaveBeenCalled();
+  expect(exportHarness.startSheet).toHaveBeenCalledOnce();
+});
+
+test("a recovered Original with a failed preview shows the processing problem instead of silently resuming", async () => {
+  const notes = [{ fileName: "Foto.jpg", reason: "Não foi possível publicar a prévia do Cache." }];
+  const relink = vi.fn<ExportMediaPort["relink"]>(async () => ({ projection: representativeProjection, problems: [], notes }));
+  const onProjectionChange = vi.fn();
+  const { dialog, exportHarness } = renderControl({ exportMediaPort: { relink, inspect: vi.fn() }, onProjectionChange });
+  fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  await act(async () => exportHarness.attempts[0].reject(new MediaExportBlockedError([
+    { mediaId: "photo-1", fileName: "Foto.jpg", state: "absent" },
+  ])));
+  dialog.emit("relinkExportMedia");
+  await waitFor(() => expect(dialog.present).toHaveBeenLastCalledWith({
+    kind: "imageProcessingProblems", importedCount: null, operationProblem: null, problems: notes,
+  }));
+  expect(onProjectionChange).toHaveBeenCalledWith(representativeProjection);
+  expect(exportHarness.startSheet).toHaveBeenCalledOnce();
+  dialog.emit("dismissImageProcessingProblems");
+  expect(dialog.dismiss).toHaveBeenCalledOnce();
+  expect(screen.getByRole("button", { name: "Exportar" })).toBeEnabled();
+});
+
 test("placeholder validation presents Project problems and returns to the Project without retrying", async () => {
   const { dialog, exportHarness } = renderControl();
-  fireEvent.click(screen.getByRole("button", { name: "Exportar Lâmina" }));
+  fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
   const { LayoutExportBlockedError } = await import("../application/projectPorts");
   const problems = [{ sheetId: "sheet-001", sheetNumber: 1, frameId: "frame-002", frameNumber: 2 }];
   await act(async () => exportHarness.attempts[0].reject(new LayoutExportBlockedError(problems)));
@@ -120,13 +322,13 @@ test("placeholder validation presents Project problems and returns to the Projec
   dialog.emit("openExportProject");
   await waitFor(() => expect(dialog.dismiss).toHaveBeenCalledOnce());
   expect(exportHarness.startSheet).toHaveBeenCalledOnce();
-  expect(screen.getByRole("button", { name: "Exportar Lâmina" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Exportar" })).toBeEnabled();
 });
 
 test("waits for the backend started event before opening the native progress window", async () => {
   const user = userEvent.setup();
   const { dialog, exportHarness } = renderControl();
-  await user.click(screen.getByRole("button", { name: "Exportar Lâmina" }));
+  await user.click(screen.getByRole("button", { name: "Exportar" }));
 
   expect(exportHarness.startSheet).toHaveBeenCalledWith(
     {
@@ -157,7 +359,7 @@ test("waits for the backend started event before opening the native progress win
 test("projects measured and unmeasured progress through the dialog port", async () => {
   const user = userEvent.setup();
   const { dialog, exportHarness } = renderControl();
-  await user.click(screen.getByRole("button", { name: "Exportar Lâmina" }));
+  await user.click(screen.getByRole("button", { name: "Exportar" }));
   act(() => {
     exportHarness.attempts[0].emit({ event: "started", cancellable: true });
     exportHarness.attempts[0].emit({
@@ -180,7 +382,7 @@ test("projects measured and unmeasured progress through the dialog port", async 
     kind: "exportProgress",
     progress: {
       kind: "indeterminate",
-      status: "Preparando a prova",
+      status: "Preparando a Exportação",
     },
   });
   expect(dialog.present).toHaveBeenNthCalledWith(3, {
@@ -190,7 +392,7 @@ test("projects measured and unmeasured progress through the dialog port", async 
     progress: {
       completed: 2,
       kind: "determinate",
-      status: "Compondo a prova",
+      status: "Compondo a Exportação",
       total: 5,
     },
   });
@@ -199,7 +401,7 @@ test("projects measured and unmeasured progress through the dialog port", async 
 test("handles cancellation actions from the child window and keeps feedback there", async () => {
   const user = userEvent.setup();
   const { dialog, exportHarness } = renderControl();
-  await user.click(screen.getByRole("button", { name: "Exportar Lâmina" }));
+  await user.click(screen.getByRole("button", { name: "Exportar" }));
   act(() => {
     exportHarness.attempts[0].emit({ event: "started", cancellable: true });
   });
@@ -231,7 +433,7 @@ test("opens the standard failure dialog for a pre-start conflict", async () => {
   const user = userEvent.setup();
   const onActiveChange = vi.fn();
   const { dialog, exportHarness } = renderControl({ onActiveChange });
-  await user.click(screen.getByRole("button", { name: "Exportar Lâmina" }));
+  await user.click(screen.getByRole("button", { name: "Exportar" }));
 
   await act(async () => {
     exportHarness.attempts[0].reject({
@@ -260,7 +462,7 @@ test("recovers after the native progress window cannot be presented", async () =
   );
   const { exportHarness } = renderControl({ dialog, onActiveChange });
 
-  await user.click(screen.getByRole("button", { name: "Exportar Lâmina" }));
+  await user.click(screen.getByRole("button", { name: "Exportar" }));
   act(() => {
     exportHarness.attempts[0].emit({ event: "started", cancellable: true });
   });
@@ -276,13 +478,13 @@ test("recovers after the native progress window cannot be presented", async () =
   });
 
   expect(dialog.present).toHaveBeenCalledOnce();
-  expect(screen.getByRole("button", { name: "Exportar Lâmina" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Exportar" })).toBeEnabled();
   expect(onActiveChange.mock.calls).toEqual([[true], [false]]);
 });
 
 test("replaces native progress with the standard success dialog", async () => {
   const { dialog, exportHarness } = renderControl();
-  fireEvent.click(screen.getByRole("button", { name: "Exportar Lâmina" }));
+  fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
   act(() => {
     exportHarness.attempts[0].emit({ event: "started", cancellable: true });
   });
@@ -296,7 +498,7 @@ test("replaces native progress with the standard success dialog", async () => {
 
   expect(dialog.present).toHaveBeenLastCalledWith({
     kind: "exportSuccess",
-    message: "A prova foi exportada com sucesso.",
+    message: "A Exportação foi concluída com sucesso.",
   });
   expect(screen.queryByRole("status")).not.toBeInTheDocument();
 });
@@ -304,7 +506,7 @@ test("replaces native progress with the standard success dialog", async () => {
 test("retries and dismisses terminal feedback from semantic child-window actions", async () => {
   const user = userEvent.setup();
   const { dialog, exportHarness } = renderControl();
-  await user.click(screen.getByRole("button", { name: "Exportar Lâmina" }));
+  await user.click(screen.getByRole("button", { name: "Exportar" }));
   act(() => {
     exportHarness.attempts[0].emit({ event: "started", cancellable: true });
   });
@@ -335,7 +537,7 @@ test("retries and dismisses terminal feedback from semantic child-window actions
   });
   dialog.emit("dismissExport");
   expect(dialog.dismiss).toHaveBeenCalled();
-  expect(screen.getByRole("button", { name: "Exportar Lâmina" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Exportar" })).toBeEnabled();
 });
 
 test("retires the attempt and native presentation when the Project changes", async () => {
@@ -344,7 +546,7 @@ test("retires the attempt and native presentation when the Project changes", asy
   const dialog = createDialogHarness();
   const exportHarness = createExportHarness();
   const { view } = renderControl({ dialog, exportHarness, onActiveChange });
-  await user.click(screen.getByRole("button", { name: "Exportar Lâmina" }));
+  await user.click(screen.getByRole("button", { name: "Exportar" }));
   act(() => {
     exportHarness.attempts[0].emit({ event: "started", cancellable: true });
   });

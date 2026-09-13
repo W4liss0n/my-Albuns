@@ -46,7 +46,8 @@ use crate::{
 pub(crate) const GLOBAL_WINDOW_LABEL: &str = "global";
 const GLOBAL_ACTIVATION_TERMINAL_EVENT: &str = "myalbuns://global-activation-terminal";
 pub(crate) const GLOBAL_WEBVIEW_NAMESPACE: &str = "global";
-const HOST_TERMINAL_TIMEOUT: Duration = Duration::from_secs(30);
+// Reopening after cleanup can rebuild the entire Cache before exposing the editor.
+const HOST_TERMINAL_TIMEOUT: Duration = Duration::from_secs(300);
 // Creating also decodes initial originals and prepares their canonical Cache.
 const HOST_CREATION_TIMEOUT: Duration = Duration::from_secs(300);
 
@@ -122,6 +123,7 @@ const TAURI_WEBVIEW_AUTOMATION_ENV: &str = "TAURI_WEBVIEW_AUTOMATION";
 struct GlobalRuntimeState {
     bootstrap: ProjectHostBootstrap,
     global_webview_data_directory: PathBuf,
+    progress_webview_data_directory: PathBuf,
     graphics_gate: GraphicsLaunchGate,
     recent_projects: RecentProjectsStore,
     startup_failure: Arc<Mutex<Option<ProjectLaunchFailure>>>,
@@ -144,6 +146,9 @@ impl GlobalRuntimeState {
                 .with_creation_timeout(HOST_CREATION_TIMEOUT),
             global_webview_data_directory: app_paths
                 .webview_data_directory(GLOBAL_WEBVIEW_NAMESPACE)
+                .map_err(|error| std::io::Error::other(error.to_string()))?,
+            progress_webview_data_directory: app_paths
+                .webview_data_directory(native_dialog_window::PROGRESS_WEBVIEW_NAMESPACE)
                 .map_err(|error| std::io::Error::other(error.to_string()))?,
             graphics_gate: GraphicsLaunchGate::new(activation_projects),
             recent_projects: RecentProjectsStore::new(app_paths),
@@ -792,7 +797,7 @@ async fn launch_confirmed_project_with_progress(
 
 async fn launch_confirmed_project_with_bindings_and_progress(
     app: &AppHandle,
-    state: GlobalRuntimeState,
+    mut state: GlobalRuntimeState,
     project_path: PathBuf,
     launch: ConfirmedLaunch,
     root_bindings: RootBindingPlan,
@@ -803,7 +808,7 @@ async fn launch_confirmed_project_with_bindings_and_progress(
         app,
         presentation.owner_label,
         presentation.kind,
-        &state.global_webview_data_directory,
+        &state.progress_webview_data_directory,
     )
     .await
     {
@@ -818,6 +823,11 @@ async fn launch_confirmed_project_with_bindings_and_progress(
             None
         }
     };
+    if let Some(dialog) = progress.as_ref() {
+        state.bootstrap = state
+            .bootstrap
+            .with_progress(dialog.image_progress_reporter());
+    }
     let launch =
         launch_confirmed_project_with_bindings(state.clone(), project_path, launch, root_bindings)
             .await;
@@ -1451,10 +1461,21 @@ fn build_global_window(
         .iter()
         .find(|window| window.label == GLOBAL_WINDOW_LABEL)
         .ok_or_else(|| std::io::Error::other("the Global window configuration does not exist"))?;
-    let (policy_signal, policy_readiness) = desktop_webview_policy::page_load_handshake();
-    let window = WebviewWindowBuilder::from_config(app, config)
+    #[cfg(debug_assertions)]
+    let arguments = desktop_webview_policy::global_webview_debug_arguments()?;
+    #[cfg(not(debug_assertions))]
+    let arguments: Option<String> = None;
+    let (policy_signal, policy_readiness) =
+        desktop_webview_policy::page_load_handshake(arguments.as_deref());
+    let builder = WebviewWindowBuilder::from_config(app, config)
         .map_err(std::io::Error::other)?
-        .data_directory(webview_data_directory)
+        .data_directory(webview_data_directory);
+    #[cfg(debug_assertions)]
+    let builder = match arguments {
+        Some(arguments) => builder.additional_browser_args(&arguments),
+        None => builder,
+    };
+    let window = builder
         .on_page_load(move |window, payload| {
             policy_signal.observe(&window, payload.event());
         })
@@ -1618,7 +1639,7 @@ async fn initialize_global_window(
             }
             return;
         }
-        if let Err(error) = window.show() {
+        if let Err(error) = window.show().and_then(|()| window.set_focus()) {
             tracing::error!(
                 target: "myalbuns.desktop",
                 process_role = ProcessRole::Global.as_str(),
@@ -1634,6 +1655,7 @@ async fn initialize_global_window(
     if state.graphics_gate.expire() {
         state.record_startup_failure(graphics_gate_timeout_failure());
         let _ = window.show();
+        let _ = window.set_focus();
     }
 }
 
@@ -1713,6 +1735,9 @@ fn exit_global_after_handoff(app: &AppHandle) {
 }
 
 fn on_global_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
+    if crate::settings_modality::on_window_event(window, event) {
+        return;
+    }
     desktop_webview_policy::on_window_event(window, event);
     if window.label() == crate::settings_window::SETTINGS_WINDOW_LABEL
         && matches!(event, tauri::WindowEvent::Destroyed)
@@ -1885,6 +1910,7 @@ pub(crate) fn run(
         )
         .plugin(tauri_plugin_dialog::init())
         .manage(desktop_webview_policy::WindowWebviewVisibility::default())
+        .manage(native_dialog_window::OpeningImageProgressState::default())
         .on_window_event(on_global_window_event)
         .manage(state)
         .manage(crate::settings_window::SettingsWindowState::new(
@@ -1895,6 +1921,7 @@ pub(crate) fn run(
         .manage(provisional_decoratives)
         .setup(move |app| {
             logging::initialize(app, &app_paths, ProcessRole::Global);
+            crate::settings_modality::install(app.handle(), &app_paths);
             let app_handle = app.handle().clone();
             // Both configured windows use `create: false`. Install the first
             // owned WebView before setup returns; the page-load terminal then
@@ -1903,6 +1930,8 @@ pub(crate) fn run(
                 &app_handle,
                 setup_state.global_webview_data_directory.clone(),
             )?;
+            #[cfg(debug_assertions)]
+            desktop_webview_policy::retire_inherited_debug_arguments_before_replacement()?;
             let managed_cache_service = app.state::<CacheService>().inner().clone();
             tauri::async_runtime::spawn(initialize_global_runtime(
                 app_handle.clone(),
@@ -1926,8 +1955,10 @@ pub(crate) fn run(
             crate::photoshop::commands::choose_photoshop,
             crate::native_dialog_window::dismiss_owned_dialog,
             crate::native_dialog_window::owned_window_content_ready,
+            crate::native_dialog_window::fit_owned_window,
             crate::native_dialog_window::resolve_opening_external_copy,
             crate::native_dialog_window::resolve_opening_recovery,
+            crate::native_dialog_window::opening_image_progress,
             create_project,
             open_project,
             recent_projects,

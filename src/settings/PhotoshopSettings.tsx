@@ -39,21 +39,18 @@ export function PhotoshopSettings({ port }: { port: PhotoshopSettingsPort }) {
   const selected = status?.installations.find((installation) => installation.id === status.selectedInstallationId);
   return <section aria-label="Photoshop" className="application-settings-panel" aria-busy={pending}>
     <h2>Photoshop</h2>
-    <p>Abra a Foto original no Adobe Photoshop e acompanhe as alterações no Álbum.</p>
-    <label className="application-settings-field">
-      <span>Instalação usada</span>
-      <select disabled={pending || !status?.installations.length} value={status?.selectedInstallationId ?? ""}
+    <div className="application-settings-integration">
+      <label className="application-settings-field">
+        <span>Versão utilizada</span>
+        <select className="ui-field-control" disabled={pending || !status?.installations.length} value={status?.selectedInstallationId ?? ""}
         onChange={(event) => { const id = event.currentTarget.value; void update(() => port.select(id)); }}>
-        {!status?.installations.length && <option value="">{status ? "Nenhuma instalação detectada" : "Procurando instalações…"}</option>}
-        {status?.installations.map((installation) => <option key={installation.id} value={installation.id}>{installation.name} · {installation.version}</option>)}
-      </select>
-    </label>
-    {selected && <p className="application-settings-path ui-copyable-text" title={selected.path}>{selected.path}</p>}
-    <div className="application-settings-actions">
-      <ActionButton disabled={pending} onClick={() => void update(() => port.locate())}>Localizar Photoshop…</ActionButton>
-      <ActionButton disabled={pending} onClick={() => void refresh()}>Atualizar</ActionButton>
+          {!status?.installations.length && <option value="">{status ? "Nenhuma instalação encontrada" : "Buscando…"}</option>}
+          {status?.installations.map((installation) => <option key={installation.id} value={installation.id}>{installation.name} · {installation.version}</option>)}
+        </select>
+      </label>
+      <ActionButton className="application-settings-locate" disabled={pending} onClick={() => void update(() => port.locate())}>Localizar…</ActionButton>
+      {selected && <p className="application-settings-path ui-copyable-text" title={selected.path}>{selected.path}</p>}
     </div>
-    <p role="status" className="application-settings-status">{pending ? "Salvando preferência…" : status ? selected ? "Integração disponível" : "Photoshop não encontrado. Localize uma instalação para habilitar a integração." : "Procurando instalações do Photoshop…"}</p>
     {error && <InlineNotice role="alert" tone="error">{error}</InlineNotice>}
   </section>;
 }

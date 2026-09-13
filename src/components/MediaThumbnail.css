@@ -26,6 +26,18 @@
   background: #fff;
 }
 
+.media-preview-thumbnail[data-missing="true"] {
+  background: #efede8;
+}
+
+.media-preview-thumbnail__missing-symbol {
+  width: 26px;
+  height: 26px;
+  max-width: 60%;
+  max-height: 60%;
+  background: url("../ui/missingImageSymbol.svg") center / contain no-repeat;
+}
+
 .media-preview-thumbnail[data-portrait="true"] {
   width: auto;
   height: 100%;
@@ -39,4 +51,10 @@
   height: 100%;
   object-fit: contain;
   transition: opacity 120ms ease;
+}
+
+.media-preview-thumbnail img[data-pending="true"] {
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
 }

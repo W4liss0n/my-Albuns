@@ -126,7 +126,7 @@ test("locates the New Project flow through stable accessible names", () => {
   );
   assert.match(
     runner,
-    /startAttachedWebDriver\(\s*recoveryGlobalDebugPort/,
+    /startAttachedWebDriver\(\s*recoveryOpeningDebugPort/,
   );
   assert.match(
     runner,

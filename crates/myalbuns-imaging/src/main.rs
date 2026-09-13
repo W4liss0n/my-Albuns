@@ -1,4 +1,6 @@
+mod album_render;
 mod cache;
+mod format_output;
 mod jpeg_output;
 mod photo_import;
 mod process_tree;
@@ -143,6 +145,7 @@ fn run(app_paths: &AppPaths) -> Result<(), ProcessFailure> {
         );
     })?;
     match command {
+        ImagingCommand::RenderAlbum(request) => run_album_render(request),
         ImagingCommand::Render(request) => run_render(request),
         ImagingCommand::BuildCache(request) => {
             cache::run_cache(request, app_paths).map_err(cache_failure)
@@ -151,6 +154,30 @@ fn run(app_paths: &AppPaths) -> Result<(), ProcessFailure> {
             photo_import::run(request, app_paths).map_err(cache_failure)
         }
     }
+}
+
+fn run_album_render(
+    request: myalbuns_imaging_protocol::AlbumRenderRequest,
+) -> Result<(), ProcessFailure> {
+    let mut progress =
+        |stage, completed, total| write_progress(&request.request_id, stage, completed, total);
+    let response = match album_render::render(&request, &mut progress) {
+        Ok(completion) => ImagingResponse::AlbumCompleted {
+            request_id: request.request_id,
+            completion,
+        },
+        Err(failure) => {
+            tracing::error!(target: "myalbuns.imaging", operation_id = request.request_id, reason = failure.message, event = "album_render_failed");
+            ImagingResponse::failed(
+                request.request_id,
+                failure.failure.code,
+                failure.failure.media_id,
+                failure.failure.path_code,
+            )
+        }
+    };
+    write_response(&response)?;
+    Ok(())
 }
 
 fn cache_failure(_: String) -> ProcessFailure {

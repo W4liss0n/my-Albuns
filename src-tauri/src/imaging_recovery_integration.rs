@@ -316,6 +316,10 @@ fn partial_path(command: &ImagingCommand, process_id: u32) -> Option<PathBuf> {
                 )
                 .ok()
         }
+        ImagingCommand::RenderAlbum(request) => request
+            .outputs
+            .first()
+            .map(|output| output.prepared_path.as_path().to_path_buf()),
         ImagingCommand::Render(request) => Some(request.prepared_output_path().to_path_buf()),
         ImagingCommand::PreparePhotoImport(request) => {
             let candidate = request.candidates.first()?;

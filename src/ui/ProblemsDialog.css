@@ -1,12 +1,21 @@
+.ui-dialog-window--problems {
+  max-height: calc(var(--ui-owned-window-height-limit, 100vh) - var(--ui-titlebar-height) - 2px);
+}
+
 .ui-dialog-window--problems .ui-dialog-window__body {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
   padding: 0 18px 18px;
 }
 
 .ui-problems-description {
+  flex-shrink: 0;
   margin: 0 0 14px;
 }
 
 .ui-problems-scroll {
+  min-height: 0;
   max-height: 260px;
   overflow: auto;
   border: 1px solid var(--ui-border);

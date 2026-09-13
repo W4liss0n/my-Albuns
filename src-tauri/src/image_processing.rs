@@ -207,6 +207,10 @@ impl<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> ImageProcessingBatc
         while let Some((binding, owner, result)) = preparation.next().await {
             match result {
                 Ok(pending) => {
+                    // The reduced image is validated now. Report preparation as
+                    // it completes; publishing the shared index still belongs to
+                    // this awaited operation and must not count the image twice.
+                    self.complete(None);
                     prepared.push((binding, owner));
                     publications.push(pending);
                 }
@@ -259,11 +263,7 @@ impl<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> ImageProcessingBatc
                     .collect()
             });
             for ((binding, owner), result) in prepared.into_iter().zip(results) {
-                self.prepare_with(
-                    &binding,
-                    std::future::ready(processing_result(owner.complete(result))),
-                )
-                .await;
+                self.record_result(&binding, processing_result(owner.complete(result)), true);
             }
         }
         // Publish our owners before joining foreign flights, preventing cycles
@@ -302,7 +302,16 @@ impl<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> ImageProcessingBatc
         binding: &MediaBinding,
         preparation: impl std::future::Future<Output = Result<(), ProcessingFailure>>,
     ) {
-        let problem = match preparation.await {
+        self.record_result(binding, preparation.await, false);
+    }
+
+    fn record_result(
+        &mut self,
+        binding: &MediaBinding,
+        result: Result<(), ProcessingFailure>,
+        already_counted: bool,
+    ) {
+        let problem = match result {
             Ok(()) => None,
             Err(ProcessingFailure::Operation(reason)) => {
                 if self.operation_problem.is_none() {
@@ -323,7 +332,11 @@ impl<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> ImageProcessingBatc
                 })
             }
         };
-        self.complete(problem);
+        if !already_counted {
+            self.complete(problem);
+        } else if let Some(problem) = problem {
+            self.report_problem(problem);
+        }
     }
 
     pub(crate) fn complete(
@@ -834,6 +847,39 @@ mod tests {
                 [0, 1, 2, 3, 4]
             );
         });
+    }
+
+    #[test]
+    fn publication_reports_errors_without_counting_prepared_images_twice() {
+        let published = RefCell::new(Vec::new());
+        let binding = MediaBinding {
+            media_id: "photo-a".into(),
+            kind: myalbuns_core::MediaKind::Photo,
+            logical_path: "foto.jpg".into(),
+        };
+        let mut batch =
+            ImageProcessingBatch::new(2, |progress| published.borrow_mut().push(progress));
+        batch.complete(None);
+        assert_eq!(published.borrow().last().unwrap().completed_files, 1);
+        batch.complete(None);
+        batch.record_result(&binding, Ok(()), true);
+        batch.record_result(
+            &binding,
+            Err(ProcessingFailure::File("Índice indisponível".into())),
+            true,
+        );
+        let published = published.borrow();
+        assert_eq!(
+            published
+                .iter()
+                .map(|p| p.completed_files)
+                .collect::<Vec<_>>(),
+            [0, 1, 2, 2]
+        );
+        assert_eq!(
+            published.last().unwrap().problem.as_ref().unwrap().reason,
+            "Índice indisponível"
+        );
     }
 
     #[test]

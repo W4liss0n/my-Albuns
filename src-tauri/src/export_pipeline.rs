@@ -7,6 +7,8 @@ use std::{
         atomic::{AtomicBool, Ordering},
     },
 };
+mod album;
+pub(crate) use album::{AlbumExportOptions, AlbumExportPlan, execute_album, plan_album};
 
 use myalbuns_core::{ComposedOutputUnit, RenderSnapshot};
 use myalbuns_imaging_protocol::{

@@ -1,6 +1,7 @@
 // Exercises first-render pixels through the production thumbnail and Pixi scene.
 import { Application, Container } from "pixi.js";
 import { createRoot } from "react-dom/client";
+import { flushSync } from "react-dom";
 import { MediaThumbnail } from "../components/MediaThumbnail";
 import { AlbumCanvasScene } from "../components/albumCanvasScene";
 import { interactiveComposition } from "../components/albumCanvasTestFixtures";
@@ -88,12 +89,43 @@ for (let index = 0; index < count; index += 1) {
   await wait(40);
   samples.push({ index, first, settled: sample(index), expected: [...previews[index].rgb, 255] });
 }
+// A new generation of the same media must replace the visible pixels only
+// after its asynchronous texture load completes.
+const replacementUrl = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400"><rect width="600" height="400" fill="#216abb"/></svg>')}`;
+const replacementSample = { before: sample(0), pending: [] as number[], ready: [] as number[], expected: [33, 106, 187, 255] };
+input.mediaPreviewUrls = { ...input.mediaPreviewUrls, "photo-0": replacementUrl };
+scene.update(input, 500);
+replacementSample.pending = sample(0);
+for (let attempt = 0; attempt < 200 && sample(0)[2] !== 187; attempt += 1) await wait(10);
+replacementSample.ready = sample(0);
 // Development fixtures use SVG: they still need Pixi's rasterizing loader.
 input.mediaPreviewUrls = { ...input.mediaPreviewUrls, svg: svg.url };
 input.composition.sheets[0].frames[0].photo!.mediaId = "svg";
 scene.update(input, 500);
 await wait(300);
 const svgSample = { actual: sample(0), expected: [...svg.rgb, 255] };
+// Exercise the DOM image handoff independently of Pixi's texture lifetime.
+function sampleThumbnail() {
+  const image = document.querySelector<HTMLImageElement>('#thumbnails > span img:not([data-pending="true"])')!;
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 1;
+  const context = canvas.getContext("2d")!;
+  context.drawImage(image, 0, 0, 1, 1);
+  return Array.from(context.getImageData(0, 0, 1, 1).data);
+}
+const thumbnailSample = { before: sampleThumbnail(), pending: [] as number[], ready: [] as number[], expected: [194, 62, 110, 255] };
+const newThumbnail = document.createElement("canvas");
+newThumbnail.width = 600;
+newThumbnail.height = 400;
+const newThumbnailContext = newThumbnail.getContext("2d")!;
+newThumbnailContext.fillStyle = "#c23e6e";
+newThumbnailContext.fillRect(0, 0, 600, 400);
+const thumbnailUrl = newThumbnail.toDataURL();
+flushSync(() => thumbnails.render([...previews, svg].map(({ url }, index) => <MediaThumbnail key={index}
+  previewUrl={index === 0 ? thumbnailUrl : url} loading="eager" media={{ sourceWidthPx: 600, sourceHeightPx: 400 }} />)));
+thumbnailSample.pending = sampleThumbnail();
+for (let attempt = 0; attempt < 200 && !loadedMediaPreviewImage(thumbnailUrl); attempt += 1) await wait(10);
+thumbnailSample.ready = sampleThumbnail();
 app.render();
-Object.assign(window, { photoPlacementTest: { samples, svgSample, openingSample } });
+Object.assign(window, { photoPlacementTest: { samples, svgSample, openingSample, replacementSample, thumbnailSample } });
 document.body.dataset.ready = "true";

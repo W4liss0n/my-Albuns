@@ -1,3 +1,7 @@
+import { invokeImageProcessing } from "./invokeImageProcessing";
+import { MediaExportBlockedError } from "../application/exportMedia";
+import { parseExportMediaProblems } from "./exportMediaContract";
+import { ExportConflictsError } from "../application/normalExport";
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
@@ -17,7 +21,6 @@ import {
   type ExportPipelinePort,
   type ExportProgressEvent,
   type MediaPreviewPort,
-  type ImageProcessingProgress,
   type ImageProcessingProblem,
   type ProjectStartupPort,
   type ProjectCorePort,
@@ -41,7 +44,6 @@ import { parseLayoutExportProblems } from "./layoutExportContract";
 import type { ExportEvent as IpcExportEvent } from "./generated/ExportEvent";
 import type { ExportResult as IpcExportResult } from "./generated/ExportResult";
 import type { ImportMediaResult as IpcImportMediaResult } from "./generated/ImportMediaResult";
-import type { ImageProcessingProgress as IpcImageProcessingProgress } from "./generated/ImageProcessingProgress";
 import type { LinkedMediaChanged as IpcLinkedMediaChanged } from "./generated/LinkedMediaChanged";
 import type { MediaPreview as IpcMediaPreview } from "./generated/MediaPreview";
 import type { MediaFileCatalog as IpcMediaFileCatalog } from "./generated/MediaFileCatalog";
@@ -280,21 +282,6 @@ function toSaveProjectResult(value: unknown): ApplicationSaveProjectResult {
   };
 }
 
-async function invokeImageProcessing<T>(
-  command: string,
-  args: Record<string, unknown>,
-  onProgress?: (progress: ImageProcessingProgress) => void,
-): Promise<T> {
-  const progressChannel = new Channel<IpcImageProcessingProgress>();
-  let active = true;
-  progressChannel.onmessage = (progress) => { if (active) onProgress?.(progress); };
-  try {
-    return await invoke<T>(command, { ...args, onProgress: progressChannel });
-  } finally {
-    active = false;
-  }
-}
-
 export const tauriProjectCorePort: ProjectCorePort = {
   readFrameDragThreshold: () => invoke<PointerDragThreshold>("frame_drag_threshold"),
   readSliderDoubleClickTime: () => invoke<number>("slider_double_click_time"),
@@ -334,6 +321,8 @@ export const tauriProjectCorePort: ProjectCorePort = {
     }),
   relink: (mediaId, onProgress) =>
     invokeImageProcessing<EditorProjection>("relink_media", { mediaId }, onProgress),
+  replaceImage: (mediaId, onProgress) =>
+    invokeImageProcessing<EditorProjection>("replace_media", { mediaId }, onProgress),
   undo: (onProgress) => invokeImageProcessing<EditorProjection>("undo_project", {}, onProgress),
   redo: (onProgress) => invokeImageProcessing<EditorProjection>("redo_project", {}, onProgress),
   save: async (expectedRevision) => {
@@ -362,6 +351,7 @@ export const tauriProjectCorePort: ProjectCorePort = {
 };
 
 export const tauriProjectStartupPort: ProjectStartupPort = {
+  prepareImages: () => invoke<readonly ImageProcessingProblem[]>("prepare_project_startup_images"),
   confirmUiReady: () => invoke<readonly ImageProcessingProblem[]>("project_ui_ready"),
 };
 
@@ -442,8 +432,10 @@ export const tauriMediaPreviewPort: MediaPreviewPort = {
 };
 
 export const tauriExportPipelinePort: ExportPipelinePort = {
+  defaultDestination: () => invoke<string>("default_export_destination"),
+  chooseDestination: () => invoke<string | null>("choose_export_folder"),
   startSheet: (
-    { projectName, sheetId, sheetNumber },
+    { projectName, sheetId, sheetNumber, options },
     emitEvent: (event: ExportProgressEvent) => void,
   ) => {
     const onEvent = new Channel<IpcExportEvent>();
@@ -480,17 +472,16 @@ export const tauriExportPipelinePort: ExportPipelinePort = {
         cancellable: event.data.cancellable,
       });
     };
-    const completion = invoke<IpcExportResult>("export_sheet", {
-      projectName,
-      sheetId,
-      sheetNumber,
-      onEvent,
-    })
-      .then((result) => ({
+    const request = options
+      ? invoke<IpcExportResult | null>("export_project", { options, onEvent })
+      : invoke<IpcExportResult>("export_sheet", { projectName, sheetId, sheetNumber, onEvent });
+    const completion = request
+      .then((result) => result === null ? { status: "skipped" as const } : ({
         status: "completed" as const,
         result,
       }))
       .catch((error: unknown) => {
+        if (typeof error === "object" && error !== null && "code" in error && error.code === "export_conflict" && "conflicts" in error && Array.isArray(error.conflicts) && error.conflicts.every(file => typeof file === "string") && error.conflicts.length) throw new ExportConflictsError(error.conflicts);
         if (isCancelledExportError(error)) {
           return {
             status: "cancelled" as const,
@@ -502,6 +493,10 @@ export const tauriExportPipelinePort: ExportPipelinePort = {
           if (problems?.length) throw new LayoutExportBlockedError(problems);
         }
 
+        if (typeof error === "object" && error !== null && "code" in error && error.code === "media_problems" && "mediaProblems" in error) {
+          const problems = parseExportMediaProblems(error.mediaProblems);
+          if (problems?.length) throw new MediaExportBlockedError(problems);
+        }
         throw error;
       })
       .finally(() => {

@@ -14,7 +14,7 @@ use crate::{
 
 pub(crate) const PROJECT_DIALOG_ACTION_EVENT: &str = "myalbuns://project-dialog-action";
 pub(crate) const PROJECT_DIALOG_PRESENTATION_EVENT: &str = "myalbuns://project-dialog-presentation";
-const PROJECT_DIALOG_LABEL: &str = "project-dialog";
+pub(crate) const PROJECT_DIALOG_LABEL: &str = "project-dialog";
 const MAX_DIALOG_TEXT_CHARS: usize = 800;
 const MAX_DIALOG_DETAILS: usize = 10;
 const MAX_DIALOG_SESSION_ID_CHARS: usize = 128;
@@ -22,7 +22,19 @@ const MAX_DIALOG_SESSION_ID_CHARS: usize = 128;
 impl ProjectDialogState {
     fn sanitized(self) -> Self {
         match self {
+            Self::ExportConfiguration { .. } | Self::ExportConflicts { .. } => self,
             Self::MediaRemovalConfirmation { .. } => self,
+            Self::ExportMediaProblems {
+                project_name,
+                problems,
+                busy,
+                message,
+            } => Self::ExportMediaProblems {
+                project_name: bound_text(project_name),
+                problems,
+                busy,
+                message: bound_text(message),
+            },
             Self::LayoutDeletionConfirmation { busy } => Self::LayoutDeletionConfirmation { busy },
             Self::ExportProblems {
                 project_name,
@@ -98,6 +110,14 @@ impl ProjectDialogState {
 
     fn initial_dimensions(&self) -> (f64, f64) {
         match self {
+            Self::ExportConfiguration { .. } => (
+                800.0,
+                440.0 + native_dialog_window::OWNED_WINDOW_TITLEBAR_HEIGHT,
+            ),
+            Self::ExportConflicts { .. } => (
+                520.0,
+                180.0 + native_dialog_window::OWNED_WINDOW_TITLEBAR_HEIGHT,
+            ),
             Self::MediaRemovalConfirmation { .. } => (
                 660.0,
                 240.0 + native_dialog_window::OWNED_WINDOW_TITLEBAR_HEIGHT,
@@ -110,7 +130,9 @@ impl ProjectDialogState {
                 520.0,
                 240.0 + native_dialog_window::OWNED_WINDOW_TITLEBAR_HEIGHT,
             ),
-            Self::ImageProcessingProblems { .. } | Self::ExportProblems { .. } => (
+            Self::ImageProcessingProblems { .. }
+            | Self::ExportProblems { .. }
+            | Self::ExportMediaProblems { .. } => (
                 640.0,
                 400.0 + native_dialog_window::OWNED_WINDOW_TITLEBAR_HEIGHT,
             ),
@@ -161,6 +183,23 @@ impl ProjectDialogProgress {
 pub(crate) struct ProjectDialogPresentationStore(Mutex<Option<ProjectDialogPresentation>>);
 
 impl ProjectDialogPresentationStore {
+    pub(crate) fn recovery_url(&self, mut url: tauri::Url) -> Result<tauri::Url, String> {
+        let presentation = self
+            .current()?
+            .ok_or("the Project dialog is no longer active")?;
+        let parameters = url
+            .query_pairs()
+            .filter(|(key, _)| key != "presentation")
+            .map(|(key, value)| (key.into_owned(), value.into_owned()))
+            .collect::<Vec<_>>();
+        url.set_query(None);
+        url.query_pairs_mut().extend_pairs(parameters).append_pair(
+            "presentation",
+            &serde_json::to_string(&presentation).map_err(|error| error.to_string())?,
+        );
+        Ok(url)
+    }
+
     fn present(&self, session_id: &str, state: ProjectDialogState) -> Result<(), String> {
         let mut current = self
             .0
@@ -170,11 +209,13 @@ impl ProjectDialogPresentationStore {
             if current.session_id != session_id {
                 return Err("another Project dialog session owns the window".into());
             }
+            current.window_width = state.initial_dimensions().0 as u16;
             current.state = state;
             return Ok(());
         }
         *current = Some(ProjectDialogPresentation {
             session_id: session_id.into(),
+            window_width: state.initial_dimensions().0 as u16,
             state,
         });
         Ok(())
@@ -223,11 +264,13 @@ pub(crate) async fn present_project_dialog(
     state_store: State<'_, ProjectDialogPresentationStore>,
 ) -> Result<(), String> {
     require_project_owner(&window)?;
+    let _operation = crate::project_ui_operations::begin(&app)?;
     require_dialog_session_id(&session_id)?;
     let state = state.sanitized();
     state_store.present(&session_id, state.clone())?;
     let presentation = ProjectDialogPresentation {
         session_id: session_id.clone(),
+        window_width: state.initial_dimensions().0 as u16,
         state: state.clone(),
     };
     let owner = window;
@@ -360,6 +403,23 @@ fn require_project_owner(window: &WebviewWindow) -> Result<(), String> {
     }
 }
 
+/// A replaced editor cannot receive actions for its old frontend sessions.
+pub(crate) fn retire_editor_dialog(app: &AppHandle) -> Result<(), String> {
+    let store = app.state::<ProjectDialogPresentationStore>();
+    let Some(presentation) = store.current()? else {
+        return Ok(());
+    };
+    if let Some(dialog) = app.get_window(PROJECT_DIALOG_LABEL) {
+        dialog.destroy().map_err(|error| error.to_string())?;
+    }
+    store.clear(&presentation.session_id)?;
+    if let Some(owner) = app.get_webview_window(PROJECT_WINDOW_LABEL) {
+        native_dialog_window::release_blocked_owner_if_disabled(&owner, false);
+    }
+    tracing::info!(target: "myalbuns.desktop", event = "project_dialog_retired_after_editor_failure");
+    Ok(())
+}
+
 fn require_dialog_session_id(session_id: &str) -> Result<(), String> {
     let length = session_id.chars().count();
     if length == 0 || length > MAX_DIALOG_SESSION_ID_CHARS {
@@ -435,6 +495,50 @@ mod tests {
             })
                 if message == "Falha mais recente"
         ));
+    }
+
+    #[test]
+    fn a_reused_dialog_projects_its_new_width_with_its_content() {
+        let store = ProjectDialogPresentationStore::default();
+        store
+            .present(
+                "export",
+                ProjectDialogState::ProjectCloseConfirmation { busy: false },
+            )
+            .unwrap();
+        assert_eq!(store.current().unwrap().unwrap().window_width, 520);
+        store
+            .present(
+                "export",
+                ProjectDialogState::ExportProgress {
+                    cancel_requested: false,
+                    cancellable: true,
+                    progress: ProjectDialogProgress::Indeterminate {
+                        status: "Exportando".into(),
+                    },
+                },
+            )
+            .unwrap();
+        let presentation = store.current().unwrap().unwrap();
+        assert_eq!(presentation.window_width, 440);
+        assert!(matches!(
+            presentation.state,
+            ProjectDialogState::ExportProgress { .. }
+        ));
+        let url = tauri::Url::parse(
+            "http://tauri.localhost/project-dialog.html?presentation=stale&ownedReadyToken=7",
+        )
+        .unwrap();
+        let recovered = store.recovery_url(url).unwrap();
+        let parameters = recovered
+            .query_pairs()
+            .collect::<std::collections::HashMap<_, _>>();
+        assert_eq!(parameters.get("ownedReadyToken").unwrap(), "7");
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(parameters.get("presentation").unwrap())
+                .unwrap(),
+            serde_json::to_value(presentation).unwrap()
+        );
     }
 
     #[test]

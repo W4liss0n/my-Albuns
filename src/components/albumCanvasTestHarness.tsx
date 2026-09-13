@@ -234,6 +234,7 @@ vi.mock("pixi.js", () => {
   }
 
   class Graphics extends DisplayObject {
+    svg() { return this; }
     fillStyles: unknown[] = [];
     rectCommands: Array<{
       height: number;

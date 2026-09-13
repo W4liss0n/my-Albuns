@@ -324,7 +324,10 @@ test("the manifest covers the integrated workspace and every critical Project di
     [...capturedDialogKinds].sort(),
     [
       "albumInformationConfirmation",
+      "exportConfiguration",
+      "exportConflicts",
       "exportFailure",
+      "exportMediaProblems",
       "exportProblems",
       "exportProgress",
       "exportSuccess",

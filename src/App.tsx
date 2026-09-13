@@ -46,6 +46,7 @@ import "./components/StartupSurface.css";
 import "./App.css";
 
 type AppProps = {
+  exportMediaPort?: import("./application/exportMedia").ExportMediaPort;
   photoshopPort?: import("./application/photoshop").PhotoshopPort;
   exportPipelinePort: ExportPipelinePort;
   mediaPreviewPort: MediaPreviewPort;
@@ -81,6 +82,7 @@ interface ImportPresentation {
 }
 
 function App({
+  exportMediaPort,
   photoshopPort,
   exportPipelinePort,
   mediaPreviewPort,
@@ -107,6 +109,16 @@ function App({
   const [projection, setProjection] = useState<EditorProjection | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [initialImageProblems, setInitialImageProblems] = useState<readonly ImageProcessingProblem[]>([]);
+  const [startupPreparation, setStartupPreparation] = useState<{
+    projectId: string;
+    problems: readonly ImageProcessingProblem[];
+  } | null>(null);
+  const [startupPreviewReadiness, setStartupPreviewReadiness] = useState<{
+    projectId: string;
+    demand: MediaPreviewDemand;
+    refreshRevision: number;
+  } | null>(null);
+  const preparingStartupProject = useRef("");
   const [mediaPreviews, setMediaPreviews] = useState<
     Readonly<Record<string, MediaPreview>>
   >({});
@@ -520,10 +532,46 @@ function App({
   const mediaChangeListenerReady =
     mediaChangeSubscription?.projectId === projectId &&
     mediaChangeSubscription.port === mediaPreviewPort;
+  const startupPrepared = !projectStartupPort.prepareImages || startupPreparation?.projectId === projectId;
+  const startupPreviewDemand = editorGraphics.supported
+    ? mediaDemand : { visibleMediaIds: [], preloadMediaIds: [] };
+  const startupPreviewsReady = !projectStartupPort.prepareImages || (
+    startupPreviewReadiness?.projectId === projectId &&
+    startupPreviewReadiness.refreshRevision === mediaRefreshRevision &&
+    sameMediaDemand(startupPreviewReadiness.demand, startupPreviewDemand)
+  );
+
+  useEffect(() => {
+    if (
+      !projectStartupPort.prepareImages ||
+      !projectId ||
+      !mediaChangeListenerReady ||
+      preferencesReadyProject !== projectId ||
+      preparingStartupProject.current === projectId
+    ) return;
+    preparingStartupProject.current = projectId;
+    void projectStartupPort.prepareImages().then((problems) => {
+      if (projectionRef.current?.state.projectId === projectId) {
+        setStartupPreparation({ projectId, problems });
+      }
+    }).catch((error: unknown) => {
+      if (projectionRef.current?.state.projectId !== projectId) return;
+      logger.write({
+        level: "error",
+        component: "application",
+        event: "project_image_preparation_failed",
+        projectId,
+        reason: logReasonFromError(error),
+      });
+      setLoadError("Não foi possível preparar as imagens do Projeto.");
+    });
+  }, [logger, mediaChangeListenerReady, preferencesReadyProject, projectId, projectStartupPort]);
 
   useEffect(() => {
     if (
       !projectId ||
+      !startupPrepared ||
+      !startupPreviewsReady ||
       !mediaChangeListenerReady ||
       preferencesReadyProject !== projectId ||
       uiReadyProject.current === projectId
@@ -532,7 +580,12 @@ function App({
     }
     uiReadyProject.current = projectId;
     projectStartupPort.confirmUiReady().then((problems) => {
-      if (uiReadyProject.current === projectId && problems) setInitialImageProblems(problems);
+      if (uiReadyProject.current === projectId) {
+        setInitialImageProblems([
+          ...(startupPreparation?.projectId === projectId ? startupPreparation.problems : []),
+          ...(problems ?? []),
+        ]);
+      }
     }).catch((error: unknown) => {
       if (uiReadyProject.current === projectId) {
         uiReadyProject.current = "";
@@ -552,11 +605,15 @@ function App({
     preferencesReadyProject,
     projectId,
     projectStartupPort,
+    startupPrepared,
+    startupPreviewsReady,
+    startupPreparation,
   ]);
 
   useEffect(() => {
     if (
       !projectId ||
+      !startupPrepared ||
       !cacheWarningListenerReady ||
       !mediaChangeListenerReady ||
       importPresentation.current
@@ -578,6 +635,7 @@ function App({
       effectiveDemand.visibleMediaIds.length === 0 &&
       effectiveDemand.preloadMediaIds.length === 0;
     if (demandIsEmpty && mediaDemandSequence.current.revision === 0) {
+      setStartupPreviewReadiness({ projectId, demand: effectiveDemand, refreshRevision: mediaRefreshRevision });
       return;
     }
     const demand = {
@@ -602,9 +660,16 @@ function App({
           active ? { ...current, [preview.mediaId]: preview } : current,
         );
       })
-      .then((previews) => {
+      .then(async (previews) => {
         if (!active || demand.revision !== mediaDemandSequence.current.revision) return;
         completed = true;
+        if (projectStartupPort.prepareImages && uiReadyProject.current !== projectId) {
+          await Promise.all((previews ?? []).map((preview) => {
+            if (!preview.url || !effectiveDemand.visibleMediaIds.includes(preview.mediaId)) return;
+            return decodeMediaPreview(preview.url).catch(() => undefined);
+          }));
+          if (!active || demand.revision !== mediaDemandSequence.current.revision) return;
+        }
         setMediaPreviews(
           Object.fromEntries(
             (previews ?? []).map((preview) => [preview.mediaId, preview]),
@@ -617,6 +682,7 @@ function App({
           operationId,
           projectId,
         });
+        setStartupPreviewReadiness({ projectId, demand: effectiveDemand, refreshRevision: mediaRefreshRevision });
       })
       .catch((error: unknown) => {
         if (!active) return;
@@ -629,6 +695,7 @@ function App({
           projectId,
           reason: logReasonFromError(error),
         });
+        setStartupPreviewReadiness({ projectId, demand: effectiveDemand, refreshRevision: mediaRefreshRevision });
       });
     return () => {
       active = false;
@@ -642,6 +709,8 @@ function App({
     mediaRefreshRevision,
     mediaPreviewPort,
     projectId,
+    projectStartupPort,
+    startupPrepared,
   ]);
 
   if (loadError) {
@@ -690,6 +759,7 @@ function App({
           photoshopPort={photoshopPort}
           mediaDropPort={mediaDropPort}
           projection={projection}
+          exportMediaPort={exportMediaPort}
           exportPipelinePort={exportPipelinePort}
           projectDialogPort={projectDialogPort}
           projectWindowPort={projectWindowPort}

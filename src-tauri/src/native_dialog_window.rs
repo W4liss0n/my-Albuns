@@ -4,14 +4,16 @@ use std::{
     io,
     path::Path,
     sync::{
-        Mutex, OnceLock,
+        Arc, Mutex, OnceLock,
         atomic::{AtomicU64, Ordering},
     },
     time::Duration,
 };
 
 use serde::Deserialize;
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent};
+use tauri::{
+    AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
+};
 
 #[cfg(windows)]
 use windows::Win32::UI::Input::KeyboardAndMouse::IsWindowEnabled;
@@ -29,6 +31,8 @@ const PROJECT_RECOVERY_DIALOG_WIDTH: f64 = 492.0;
 const OWNED_WINDOW_READY_PARAMETER: &str = "ownedReadyToken";
 pub(crate) const OWNED_WINDOW_TITLEBAR_HEIGHT: f64 = 38.0;
 const OPENING_PROGRESS_LABEL: &str = "dialog-opening-progress";
+pub(crate) const PROGRESS_WEBVIEW_NAMESPACE: &str = "global-progress";
+const OPENING_IMAGE_PROGRESS_EVENT: &str = "myalbuns://opening-image-progress";
 const PROJECT_FAILURE_LABEL: &str = "dialog-project-failure";
 static NEXT_OWNED_WINDOW_READY_TOKEN: AtomicU64 = AtomicU64::new(1);
 static OWNED_WINDOW_READINESS: OnceLock<Mutex<OwnedWindowReadinessRegistry>> = OnceLock::new();
@@ -174,6 +178,111 @@ pub(crate) fn owned_window_content_ready(window: WebviewWindow, token: u64) -> R
         .signal(window.label(), token)
 }
 
+/// A replacement must not acknowledge an already consumed content-ready token.
+pub(crate) fn recovery_url(label: &str, mut url: tauri::Url) -> tauri::Url {
+    let parameters = url
+        .query_pairs()
+        .map(|(key, value)| (key.into_owned(), value.into_owned()))
+        .filter(|(key, value)| {
+            key != OWNED_WINDOW_READY_PARAMETER
+                || owned_window_readiness()
+                    .lock()
+                    .ok()
+                    .is_some_and(|registry| {
+                        registry
+                            .waiters
+                            .get(label)
+                            .is_some_and(|(token, _)| value.parse::<u64>().ok() == Some(*token))
+                    })
+        })
+        .collect::<Vec<_>>();
+    if url.query().is_some() {
+        url.set_query(None);
+        if !parameters.is_empty() {
+            url.query_pairs_mut().extend_pairs(parameters);
+        }
+    }
+    url
+}
+
+#[tauri::command]
+pub(crate) async fn fit_owned_window(
+    window: WebviewWindow,
+    width: f64,
+    height: f64,
+) -> Result<(), String> {
+    if !matches!(
+        window.label(),
+        "project-dialog" | OPENING_PROGRESS_LABEL | PROJECT_FAILURE_LABEL
+    ) {
+        return Err("content fitting belongs only to owned dialog windows".into());
+    }
+    if ![width, height]
+        .iter()
+        .all(|value| value.is_finite() && *value > 0.0 && *value <= 65535.0)
+    {
+        return Err("the owned window dimensions are invalid".into());
+    }
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    let target = window.clone();
+    window
+        .run_on_main_thread(move || {
+            let _ = sender.send(fit_owned_window_frame(&target, width, height));
+        })
+        .map_err(|error| error.to_string())?;
+    receiver
+        .await
+        .map_err(|_| "the owned window fitting became unavailable".to_owned())?
+        .map_err(|error| error.to_string())
+}
+
+fn fit_owned_window_frame(window: &WebviewWindow, width: f64, height: f64) -> io::Result<()> {
+    #[cfg(windows)]
+    {
+        use windows::Win32::UI::WindowsAndMessaging::{
+            SWP_NOACTIVATE, SWP_NOOWNERZORDER, SWP_NOZORDER, SetWindowPos,
+        };
+
+        let scale = window.scale_factor().map_err(io::Error::other)?;
+        let requested = tauri::LogicalSize::new(width, height).to_physical::<i32>(scale);
+        let inner = window.inner_size().map_err(io::Error::other)?;
+        let outer = window.outer_size().map_err(io::Error::other)?;
+        // Include the native frame/shadow offsets when converting client dimensions.
+        let outer_width = requested.width + outer.width as i32 - inner.width as i32;
+        let outer_height = requested.height + outer.height as i32 - inner.height as i32;
+        let monitor = window
+            .current_monitor()
+            .map_err(io::Error::other)?
+            .or(window.primary_monitor().map_err(io::Error::other)?)
+            .ok_or_else(|| io::Error::other("the dialog monitor is unavailable"))?;
+        let area = monitor.work_area();
+        let left = area.position.x + (area.size.width as i32 - outer_width) / 2;
+        let top = area.position.y + (area.size.height as i32 - outer_height) / 2;
+
+        // Resize and reposition in one native operation; separate calls expose an
+        // off-center frame between the content fit and the subsequent centering.
+        unsafe {
+            SetWindowPos(
+                window.hwnd().map_err(io::Error::other)?,
+                None,
+                left,
+                top,
+                outer_width,
+                outer_height,
+                SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_NOZORDER,
+            )
+        }
+        .map_err(io::Error::other)
+    }
+    #[cfg(not(windows))]
+    {
+        window
+            .set_size(tauri::LogicalSize::new(width, height))
+            .map_err(io::Error::other)?;
+        window.center().map_err(io::Error::other)
+    }
+}
+
 #[tauri::command]
 pub(crate) fn resolve_opening_recovery(
     window: WebviewWindow,
@@ -258,6 +367,26 @@ impl ProjectFailureDialogContext {
     }
 }
 
+#[derive(Clone, Default)]
+pub(crate) struct OpeningImageProgressState(
+    Arc<Mutex<Option<crate::ipc_contract::StartupImageProgress>>>,
+);
+
+#[tauri::command]
+pub(crate) fn opening_image_progress(
+    window: WebviewWindow,
+    state: tauri::State<'_, OpeningImageProgressState>,
+) -> Result<Option<crate::ipc_contract::StartupImageProgress>, String> {
+    if window.label() != OPENING_PROGRESS_LABEL {
+        return Err("Opening progress belongs only to its owned dialog".into());
+    }
+    state
+        .0
+        .lock()
+        .map(|progress| *progress)
+        .map_err(|_| "the opening progress state is unavailable".into())
+}
+
 pub(crate) struct NativeProgressDialog {
     closed: bool,
     decision_attempt: Option<OpeningDecisionAttempt>,
@@ -267,6 +396,19 @@ pub(crate) struct NativeProgressDialog {
 }
 
 impl NativeProgressDialog {
+    pub(crate) fn image_progress_reporter(
+        &self,
+    ) -> crate::project_bootstrap::StartupProgressReporter {
+        let window = self.window.clone();
+        let state = window.state::<OpeningImageProgressState>().inner().clone();
+        crate::project_bootstrap::StartupProgressReporter::new(move |progress| {
+            if let Ok(mut current) = state.0.lock() {
+                *current = Some(progress);
+                let _ = window.emit_to(window.label(), OPENING_IMAGE_PROGRESS_EVENT, progress);
+            }
+        })
+    }
+
     pub(crate) async fn request_external_copy_decision(
         &mut self,
         attempt_id: &str,
@@ -334,7 +476,12 @@ impl NativeProgressDialog {
             .lock()
             .map_err(|_| io::Error::other("the owned window readiness registry is unavailable"))?
             .register(self.window.label());
-        let mut url = self.window.url().map_err(io::Error::other)?;
+        let current_webview = self
+            .window
+            .app_handle()
+            .get_webview(self.window.label())
+            .ok_or_else(|| io::Error::other("the opening presentation is unavailable"))?;
+        let mut url = current_webview.url().map_err(io::Error::other)?;
         url.set_path("/dialog.html");
         url.set_query(Some(&format!(
             "kind={kind}&attemptId={}&{OWNED_WINDOW_READY_PARAMETER}={ready_token}",
@@ -343,7 +490,7 @@ impl NativeProgressDialog {
                 | OpeningDecisionAttempt::Recovery(attempt_id) => attempt_id,
             }),
         )));
-        if let Err(error) = self.window.navigate(url) {
+        if let Err(error) = current_webview.navigate(url) {
             cancel_owned_window_readiness(self.window.label(), ready_token);
             self.cancel_opening_decision();
             return Err(io::Error::other(error));
@@ -409,10 +556,7 @@ fn resize_owned_window_width(window: &WebviewWindow, width: f64) -> io::Result<(
         .inner_size()
         .map_err(io::Error::other)?
         .to_logical::<f64>(scale_factor);
-    window
-        .set_size(tauri::LogicalSize::new(width, current_size.height))
-        .map_err(io::Error::other)?;
-    window.center().map_err(io::Error::other)
+    fit_owned_window_frame(window, width, current_size.height)
 }
 
 impl Drop for NativeProgressDialog {
@@ -436,9 +580,28 @@ pub(crate) async fn show_native_progress(
     app: &AppHandle,
     owner_label: &str,
     kind: NativeProgressKind,
-    owner_webview_data_directory: &Path,
+    progress_webview_data_directory: &Path,
 ) -> io::Result<NativeProgressDialog> {
+    if let Some(state) = app.try_state::<OpeningImageProgressState>() {
+        *state
+            .0
+            .lock()
+            .map_err(|_| io::Error::other("the opening progress state is unavailable"))? = None;
+    }
     let owner = owned_window(app, owner_label)?;
+    #[cfg(debug_assertions)]
+    let browser_arguments = desktop_webview_policy::replacement_webview_debug_arguments(
+        std::env::var_os(desktop_webview_policy::OPENING_DIALOG_WEBVIEW_DEBUG_PORT_ENV),
+    )?;
+    #[cfg(not(debug_assertions))]
+    let browser_arguments: Option<String> = None;
+    // Temporary rendering mitigation for the small progress surface. It does
+    // not establish a GPU root cause and leaves the Canvas GPU intact.
+    let browser_arguments = format!(
+        "{} --disable-gpu",
+        browser_arguments
+            .unwrap_or_else(|| desktop_webview_policy::WRY_DEFAULT_DISABLED_FEATURES.to_owned())
+    );
     let window = build_hidden_owned_window(
         app,
         &owner,
@@ -447,8 +610,10 @@ pub(crate) async fn show_native_progress(
             url: kind.url(),
             width: DIALOG_WIDTH,
             height: 126.0 + OWNED_WINDOW_TITLEBAR_HEIGHT,
-            browser_arguments: None,
-            browser_data_directory: Some(owner_webview_data_directory),
+            browser_arguments: Some(&browser_arguments),
+            // A failure in the hidden Global browser must not blank the progress
+            // dialog while the independent Project Host is still preparing images.
+            browser_data_directory: Some(progress_webview_data_directory),
         },
     )
     .await?;
@@ -556,7 +721,8 @@ pub(crate) async fn build_hidden_owned_window(
         .register(label);
     let ready_url =
         append_query_parameter(url, OWNED_WINDOW_READY_PARAMETER, &ready_token.to_string());
-    let (policy_signal, policy_readiness) = desktop_webview_policy::page_load_handshake();
+    let (policy_signal, policy_readiness) =
+        desktop_webview_policy::page_load_handshake(browser_arguments);
     let mut builder = WebviewWindowBuilder::new(app, label, WebviewUrl::App(ready_url.into()))
         .title("MyAlbuns")
         .inner_size(width, height)
@@ -567,7 +733,9 @@ pub(crate) async fn build_hidden_owned_window(
         .decorations(false)
         .skip_taskbar(true)
         .shadow(true)
-        .focused(true)
+        // Wry 0.55 can discard the WebView if MoveFocus fails during creation.
+        // The presentation transaction focuses this dialog after it is shown.
+        .focused(false)
         .visible(false)
         .center()
         .prevent_overflow();
@@ -1132,6 +1300,27 @@ mod tests {
         registry.signal("project-dialog", token).unwrap();
         assert_eq!(readiness.try_recv(), Ok(()));
         assert!(registry.signal("project-dialog", token).is_err());
+    }
+
+    #[test]
+    fn recovered_dialog_preserves_pending_readiness_and_discards_a_consumed_token() {
+        let label = "recovery-url-test";
+        let (token, mut receiver) = owned_window_readiness().lock().unwrap().register(label);
+        let original = tauri::Url::parse(&format!(
+            "http://tauri.localhost/dialog.html?kind=project-recovery&attemptId=attempt-42&ownedReadyToken={token}#decision"
+        )).unwrap();
+        assert_eq!(recovery_url(label, original.clone()), original);
+        owned_window_readiness()
+            .lock()
+            .unwrap()
+            .signal(label, token)
+            .unwrap();
+        assert_eq!(receiver.try_recv(), Ok(()));
+        let recovered = recovery_url(label, original);
+        assert_eq!(
+            recovered.as_str(),
+            "http://tauri.localhost/dialog.html?kind=project-recovery&attemptId=attempt-42#decision"
+        );
     }
 
     #[test]

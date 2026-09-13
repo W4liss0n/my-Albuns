@@ -43,12 +43,34 @@ problema; leitura e Cache não reiniciam a barra em fases separadas. Mudanças d
 área visível não cancelam o trabalho necessário à ação. Atualizações automáticas
 da origem continuam em segundo plano e preservam a prévia anterior até a troca.
 
+A contagem avança assim que a prévia reduzida está preparada e validada. A
+publicação conjunta do índice do Cache permanece dentro da operação aguardada,
+sem contar novamente as imagens; uma falha nessa publicação continua sendo
+apresentada no resultado. Isso permite atualizar a barra durante a preparação,
+em vez de concentrar todos os avanços no fim do lote.
+
 Adicionar uma Foto ou aplicar um Decorativo já importado à Lâmina não inicia
 outra preparação, não abre progresso e não aguarda o Cache. O gesto atualiza
 a composição imediatamente e reutiliza a prévia disponível. Se uma prévia
 precisar ser recuperada, isso acontece sob demanda, em segundo plano. A mesma
 regra vale para desfazer e refazer essas aplicações. Novos vínculos, inclusive
 os restaurados no catálogo, continuam seguindo o processamento de imagens.
+
+Na abertura, o diálogo começa com `Preparando a Janela do Projeto…`. Quando
+existe Cache a reconstruir, a mesma janela passa para `Preparando imagens`,
+com barra determinada, porcentagem e contagem `X de Y` das imagens que precisam
+ser preparadas. O espaço da porcentagem fica reservado desde o início para
+evitar alteração do tamanho da janela nessa transição. A conclusão da contagem
+não libera o editor antes da entrega das miniaturas visíveis.
+
+Os diálogos de progresso do Global usam um grupo de processos WebView2 próprio,
+com perfil em `State/WebView2/global-progress` e renderização sem aceleração de
+GPU para essa superfície simples de texto e barra. O Canvas do Projeto mantém
+sua renderização acelerada em outro grupo. Assim, uma falha no navegador
+da Tela de Boas-vindas ou de Configurações não apaga o acompanhamento enquanto
+o Host prepara as imagens. A propriedade da janela, seu tamanho e a transição
+para o editor continuam seguindo o fluxo descrito acima. Falhas de processos
+WebView2 são registradas nos logs com a superfície e o código de saída.
 
 Na importação, o Painel de imagens mantém o conjunto anterior durante todo o
 lote. Novos cartões e sua contagem aparecem juntos quando o processamento

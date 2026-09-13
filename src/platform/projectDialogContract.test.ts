@@ -16,6 +16,7 @@ import {
 } from "./projectDialogContract";
 
 const states: readonly ProjectDialogState[] = [
+  { kind: "exportMediaProblems", projectName: "Álbum", problems: [{ mediaId: "photo-1", fileName: "Foto.jpg", state: "absent" }], busy: true, message: "Procurando arquivos…" },
   { kind: "layoutDeletionConfirmation", busy: false },
   { kind: "mediaRemovalConfirmation", mediaKind: "photo", count: 3, usedCount: 2, usageCount: 4, busy: false },
   { kind: "exportProblems", projectName: "Álbum", problems: [{ sheetId: "sheet-001", sheetNumber: 1, frameId: "frame-002", frameNumber: 2 }] },
@@ -52,6 +53,7 @@ const states: readonly ProjectDialogState[] = [
 ];
 
 const actions: readonly ProjectDialogAction[] = [
+  "relinkExportMedia", "retryExportMedia",
   "cancelLayoutDeletion",
   "confirmLayoutDeletion",
   "cancelMediaRemoval",
@@ -139,9 +141,13 @@ test("keeps the dialog action and initial window bound to their session", () => 
   ).toBeNull();
   const presentation = {
     sessionId: "album-information-7",
+    windowWidth: 520,
     state: states[0],
   };
   expect(parseProjectDialogPresentation(presentation)).toEqual(presentation);
+  for (const windowWidth of [undefined, 0, -1, 1.5, NaN, Infinity, 65536]) {
+    expect(parseProjectDialogPresentation({ ...presentation, windowWidth })).toBeNull();
+  }
   expect(
     parseInitialProjectDialogPresentation(
       `?presentation=${encodeURIComponent(JSON.stringify(presentation))}`,

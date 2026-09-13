@@ -35,13 +35,59 @@ preferência publica a versão 2 sem os antigos tamanhos por aba.
 
 O Host fornece criação, alteração e disponibilidade a partir das observações
 estabilizadas do Monitor, correlacionadas com o vínculo atual. Essa consulta
-não acessa Originais nem depende da demanda de miniaturas. Ausentes ficam
-depois dos demais arquivos em qualquer direção de ordenação; datas conhecidas
-precedem desconhecidas e o Nome natural desempata.
+não acessa Originais nem depende da demanda de miniaturas. A disponibilidade
+não participa da ordenação: arquivos ausentes seguem o mesmo critério de Nome
+ou data dos demais itens, em ambas as direções. Datas conhecidas precedem
+desconhecidas e o Nome natural desempata.
 
-O aviso de ausentes abre uma revisão temporária. Durante essa revisão, busca,
-filtros de uso e aba ficam sobrepostos às escolhas anteriores. Encerrá-la
-retoma as escolhas preservadas, sem gravar a revisão como preferência.
+O Painel contextual não exibe aviso de arquivos ausentes nem atalho para
+uma revisão temporária. A ausência continua indicada no próprio item do
+Painel de imagens. O filtro `Ausentes` permanece disponível por escolha do
+usuário, dentro da aba atual e em conjunto com a busca e o filtro de uso.
+
+Na miniatura, a ausência aparece somente como um ícone quadrado no canto
+superior direito, com descrição acessível e ao passar o mouse. Não há texto
+`Ausente` nem botão de Religação sobre a imagem. Com Cache, a miniatura real
+continua disponível; sem Cache, o mesmo ícone aparece sobre o placeholder
+genérico. A ação `Religar` fica exclusivamente no menu do botão direito da
+imagem ausente e atua no item clicado, preservando uma seleção múltipla
+existente. A ação respeita os bloqueios de operação e deixa de aparecer quando
+o Original retorna. A nova tentativa para Arquivo indisponível mantém seu fluxo.
+
+`Religar` solicita a pasta que contém o Original e procura somente entre os
+arquivos diretamente nessa pasta, pelo mesmo nome e extensão, sem pesquisar
+subpastas. A ausência de correspondência é informada e preserva o vínculo.
+O menu atua somente na imagem clicada, mesmo quando há várias selecionadas.
+A Religação da Exportação normal usa a mesma busca restrita à pasta escolhida.
+
+`Substituir Imagem` aparece no menu do botão direito de todas as Fotos e
+Decorativos, presentes, ausentes ou indisponíveis, com ou sem Cache. Abre o
+seletor de arquivo JPEG, PNG ou TIFF e permite escolher outro nome. A operação
+troca a referência da imagem clicada e atualiza todos os seus usos no Projeto,
+preservando sua identidade no catálogo, posição e tamanho dos Frames, seus
+ajustes e os usos como Fundo ou Overlay. Inspeciona o novo Original e renova
+o Cache. Cancelar ou escolher o mesmo caminho não altera a sessão; um arquivo
+inválido não substitui a imagem. As duas ações respeitam os bloqueios de
+operação, participam de Undo/Redo e exigem Salvamento manual. Nenhuma delas
+move ou sobrescreve o arquivo original.
+
+Ao atualizar ou substituir uma imagem, a prévia anterior continua visível no
+Painel e na Lâmina até a nova representação estar carregada. A troca ocorre
+diretamente, sem um intervalo vazio ou placeholder entre as duas versões.
+Essa retenção é temporária e visual: não modifica o Cache persistido nem a
+fonte usada na Exportação. Uma mídia sem prévia continua seguindo os estados
+de carregamento, ausência e indisponibilidade já definidos; a prévia antiga
+não reaparece depois de removida nem é transferida para outro Projeto.
+
+Para Arquivo ausente sem Cache, o placeholder usa fundo cinza quente uniforme
+(`#efede8`) e símbolo de imagem central (`#aaa397`). Na miniatura, conserva a
+proporção da mídia e a moldura branca, sem texto; o indicador quadrado de ausência
+permanece no canto superior direito. No Frame da Lâmina, o mesmo símbolo acompanha
+o texto `Imagem ausente` (`#7d766a`), sem indicador no canto. Símbolo e texto cabem
+no Frame, reduzindo juntos nos tamanhos pequenos, sem acompanhar Pan, Zoom ou
+rotação da Foto. A representação é exclusiva da interação e não muda a geometria
+ou o conteúdo persistido. Cache disponível continua mostrando a Foto; Frame
+vazio, carregamento e Arquivo indisponível mantêm suas apresentações próprias.
 
 ## Importação e gestos
 

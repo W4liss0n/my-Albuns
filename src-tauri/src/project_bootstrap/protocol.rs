@@ -7,7 +7,7 @@ use crate::ipc_contract::ProjectRecoveryDecision;
 
 use super::configuration::InitialProjectCreationConfiguration;
 
-pub(crate) const PROTOCOL_VERSION: u16 = 7;
+pub(crate) const PROTOCOL_VERSION: u16 = 8;
 const MAX_BOOTSTRAP_REQUEST_BYTES: u64 = 1024 * 1024;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -232,6 +232,64 @@ impl HostTerminal {
             code,
         }
     }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(
+    tag = "state",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum HostProgress {
+    PreparingImages {
+        attempt_id: String,
+        launch_nonce: String,
+        host_pid: u32,
+        progress: crate::ipc_contract::StartupImageProgress,
+    },
+}
+
+impl HostProgress {
+    pub(crate) fn preparing_images(
+        request: &BootstrapRequest,
+        progress: crate::ipc_contract::StartupImageProgress,
+    ) -> Self {
+        Self::PreparingImages {
+            attempt_id: request.attempt_id.clone(),
+            launch_nonce: request.launch_nonce.clone(),
+            host_pid: std::process::id(),
+            progress,
+        }
+    }
+
+    pub(crate) fn validate(
+        self,
+        request: &BootstrapRequest,
+        spawned_pid: u32,
+    ) -> Result<crate::ipc_contract::StartupImageProgress, TerminalValidationError> {
+        let Self::PreparingImages {
+            attempt_id,
+            launch_nonce,
+            host_pid,
+            progress,
+        } = self;
+        if attempt_id != request.attempt_id
+            || launch_nonce != request.launch_nonce
+            || host_pid != spawned_pid
+        {
+            return Err(TerminalValidationError::CorrelationMismatch);
+        }
+        Ok(progress)
+    }
+}
+
+pub(crate) fn write_host_progress(
+    mut writer: impl Write,
+    progress: &HostProgress,
+) -> std::io::Result<()> {
+    serde_json::to_writer(&mut writer, progress)?;
+    writer.write_all(b"\n")?;
+    writer.flush()
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

@@ -36,7 +36,7 @@ vi.mock("./AlbumDesignForm", () => ({
 }));
 
 const exportPipelinePort: ExportPipelinePort = {
-  startSheet: () => ({
+  defaultDestination: async () => "C:/Exportados/Album", chooseDestination: async () => null, startSheet: () => ({
     cancel: async () => "not_found",
     completion: Promise.resolve({
       status: "completed",
@@ -71,7 +71,7 @@ const projectCorePort: ProjectCorePort = {
     previewPhotoAngle: async () => { throw new Error("Photo angle preview is not configured in this fixture."); },
     previewFrameGeometry: async () => { throw new Error("Frame geometry preview is not configured in this fixture."); },
   resolvePhotoDropTarget: async () => ({ kind: "invalid" }),
-  relink: async () => representativeProjection,
+  replaceImage: async () => representativeProjection, relink: async () => representativeProjection,
   undo: async () => representativeProjection,
   redo: async () => representativeProjection,
   save: async () => ({

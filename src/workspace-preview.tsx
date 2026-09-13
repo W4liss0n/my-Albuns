@@ -1,4 +1,5 @@
 import React from "react";
+import retainedPhotoPreview from "./test/dev-media/serra-amanhecer.svg";
 import ReactDOM from "react-dom/client";
 
 import App from "./App";
@@ -250,7 +251,7 @@ const projectCorePort: ProjectCorePort = {
     ? frameContentSwapCorpus.dropProbes.find((probe) => probe.sheetId === sheetId &&
       Math.abs(probe.xUm - xUm) < 6_000 && Math.abs(probe.yUm - yUm) < 6_000)?.target ?? { kind: "invalid" }
     : { kind: "invalid" },
-  relink: async () => projection,
+  replaceImage: async () => projection, relink: async () => projection,
   undo: async () => restorePreviewHistory(undoStack, redoStack),
   redo: async () => restorePreviewHistory(redoStack, undoStack),
   save: async () => {
@@ -275,10 +276,14 @@ const projectCorePort: ProjectCorePort = {
 
 const mediaPreviewPort: MediaPreviewPort = {
   readMediaFiles: async () => ({ projectId: projection.state.projectId,
-    files: previewParameters.get("files") === "absent" ? projection.state.album.media.map((media, index) => ({
-      mediaId: media.id, state: index === 0 ? "absent" as const : "available" as const, createdAtMs: null, modifiedAtMs: null,
+    files: ["absent", "missing-placeholder"].includes(previewParameters.get("files") ?? "") ? projection.state.album.media.map((media, index) => ({
+      mediaId: media.id, state: index === (previewParameters.get("files") === "absent" ? 1 : 0) ? "absent" as const : "available" as const, createdAtMs: null, modifiedAtMs: null,
     })) : [] }),
   prepareMediaPreviews: async () =>
+    previewParameters.get("files") === "missing-placeholder" ? [{
+      mediaId: projection.state.album.media[0].id, state: "absent" as const,
+      url: previewParameters.get("cache") === "retained" ? retainedPhotoPreview : null,
+    }] :
     frameContext === "decorations" ? projection.state.album.media.map((media, index) => ({
       mediaId: media.id, state: "ready" as const,
       url: `data:image/svg+xml,${encodeURIComponent(index === 2
@@ -309,7 +314,7 @@ const mediaPreviewPort: MediaPreviewPort = {
 };
 
 const exportPipelinePort: ExportPipelinePort = {
-  startSheet: () => ({
+  defaultDestination: async () => "C:/Exportados/Album", chooseDestination: async () => null, startSheet: () => ({
     completion: Promise.resolve({
       status: "completed",
       result: { heightPx: 3_543, widthPx: 7_087 },
@@ -469,6 +474,14 @@ function createPreviewProjection(
   };
   frame.rect = fullSheetRect;
   composedFrame.clipRect = fullSheetRect;
+  if (previewParameters.get("files") === "missing-placeholder") {
+    const shape = previewParameters.get("shape");
+    const rect = { x: 60_000, y: 45_000,
+      width: shape === "small" ? 35_000 : shape === "portrait" ? 130_000 : 230_000,
+      height: shape === "small" ? 25_000 : shape === "portrait" ? 210_000 : 155_000 };
+    frame.rect = rect;
+    composedFrame.clipRect = rect;
+  }
   if (frameMode === "empty") {
     frame.photo = null;
     composedFrame.photo = null;

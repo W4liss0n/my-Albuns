@@ -6,8 +6,8 @@
   "windows": ["dialog-opening-progress"],
   "permissions": [
     "owned-dialog-window-commands",
-    "core:window:allow-center",
-    "core:window:allow-set-size",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
     "core:window:allow-start-dragging"
   ]
 }

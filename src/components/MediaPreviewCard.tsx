@@ -19,6 +19,7 @@ type MediaPreviewCardProps =
       loading?: "eager" | "lazy";
       media: Pick<MediaCatalogItem, "sourceHeightPx" | "sourceWidthPx">;
       previewUrl?: string;
+      missing?: boolean;
       selected: boolean;
     })
   | (MediaPreviewCardBaseProps & {
@@ -88,6 +89,7 @@ export function MediaPreviewCard(props: MediaPreviewCardProps) {
     loading,
     media,
     previewUrl,
+    missing,
     selected,
     ...buttonProps
   } = props;
@@ -102,6 +104,7 @@ export function MediaPreviewCard(props: MediaPreviewCardProps) {
         loading={loading}
         media={media}
         previewUrl={previewUrl}
+        missing={missing}
       >
         {children}
       </MediaThumbnail>

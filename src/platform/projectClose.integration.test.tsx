@@ -62,7 +62,7 @@ function projectCorePortWithApply(
     previewPhotoAngle: async () => { throw new Error("Photo angle preview is not configured in this fixture."); },
     previewFrameGeometry: async () => { throw new Error("Frame geometry preview is not configured in this fixture."); },
     resolvePhotoDropTarget: async () => ({ kind: "invalid" }),
-    relink: async () => projection,
+    replaceImage: async () => projection, relink: async () => projection,
     undo: async () => projection,
     redo: async () => projection,
     save: async () => {
@@ -104,7 +104,7 @@ test.each(["pending", "completed"] as const)(
       const runProjectMutation = useProjectMutationRunner(current.state.projectId, corePort);
       return (
         <ProjectWorkspace
-          exportPipelinePort={{ startSheet: () => { throw new Error("No export in this scenario"); } }}
+          exportPipelinePort={{ defaultDestination: async () => "C:/Exportados/Album", chooseDestination: async () => null, startSheet: () => { throw new Error("No export in this scenario"); } }}
           runProjectMutation={runProjectMutation}
           mediaPreviews={{}}
           onMediaDemandChange={() => undefined}
