@@ -45,6 +45,26 @@ Tauri/WRY nem amplia a desativação de GPU usada pelo progresso de abertura.
 
 ## Coordenação
 
+### Criação e foco
+
+As janelas de Boas-vindas, Projeto, Configurações e diálogos são criadas sem
+solicitar foco. O foco é transferido depois da prontidão e da apresentação;
+o mesmo vale para a substituição do editor em `Salvar como`.
+
+No Wry 0.55.1, `MoveFocus` durante a criação pode retornar `0x80070057` quando
+a janela não pode receber foco. Isso descarta o controle, embora a criação da
+janela no Tauri aparente sucesso. O handshake continua obrigatório: não se
+considera pronto um WebView cujo carregamento foi interrompido.
+
+O teste `npm run test:native-webview-creation -- -AllowVisibleWindows` usa a
+configuração do Projeto em uma janela descartável minimizada, exige a prontidão
+nativa e verifica a resposta do renderizador depois da restauração. A falha e a
+correção do contrato externo estão documentadas no
+[Wry #1798](https://github.com/tauri-apps/wry/issues/1798) e na
+[correção #1799](https://github.com/tauri-apps/wry/pull/1799).
+
+### Recuperação
+
 O callback COM apenas registra a falha e agenda a reconstrução fora de sua
 execução. A espera por carregamento também ocorre fora da thread da interface.
 Na queda do navegador, a reconstrução aguarda `BrowserProcessExited` do PID

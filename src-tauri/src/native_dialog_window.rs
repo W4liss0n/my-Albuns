@@ -733,7 +733,9 @@ pub(crate) async fn build_hidden_owned_window(
         .decorations(false)
         .skip_taskbar(true)
         .shadow(true)
-        .focused(true)
+        // Wry 0.55 can discard the WebView if MoveFocus fails during creation.
+        // The presentation transaction focuses this dialog after it is shown.
+        .focused(false)
         .visible(false)
         .center()
         .prevent_overflow();

@@ -1,5 +1,7 @@
 param(
-    [switch] $AllowVisibleWindows
+    [switch] $AllowVisibleWindows,
+    [ValidateSet('restore', 'creation')]
+    [string] $Scenario = 'restore'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -10,9 +12,10 @@ if (-not $AllowVisibleWindows) {
 . (Join-Path $PSScriptRoot 'Local-Toolchain.ps1')
 Initialize-MyAlbunsToolchain
 $targetDirectory = Resolve-MyAlbunsCargoTargetDirectory
-$probeExecutable = Join-Path $targetDirectory 'debug/examples/probe_webview_restore.exe'
+$example = 'probe_webview_' + $Scenario
+$probeExecutable = Join-Path $targetDirectory ('debug/examples/' + $example + '.exe')
 $runDirectory = Join-Path $script:WorkspaceRoot (
-    '.scratch/webview-restore-gate/' + (Get-Date -Format 'yyyyMMdd-HHmmss-ffff')
+    '.scratch/webview-' + $Scenario + '-gate/' + (Get-Date -Format 'yyyyMMdd-HHmmss-ffff')
 )
 $null = New-Item -ItemType Directory -Path $runDirectory -Force
 $buildLog = Join-Path $runDirectory 'build.log'
@@ -22,8 +25,14 @@ $dataDirectory = Join-Path $runDirectory 'webview-data'
 
 Push-Location $script:WorkspaceRoot
 try {
-    & $script:CargoExecutable build -p myalbuns-desktop --example probe_webview_restore --features tauri/custom-protocol *> $buildLog
-    if ($LASTEXITCODE -ne 0) {
+    # Windows PowerShell turns redirected native stderr warnings into errors.
+    # Capture both streams directly and use Cargo's exit code as the result.
+    $build = Start-Process -FilePath $script:CargoExecutable `
+        -ArgumentList @('build', '-p', 'myalbuns-desktop', '--example', $example, '--features', 'tauri/custom-protocol') `
+        -WorkingDirectory $script:WorkspaceRoot -WindowStyle Hidden -PassThru -Wait `
+        -RedirectStandardOutput (Join-Path $runDirectory 'build.stdout.log') `
+        -RedirectStandardError $buildLog
+    if ($build.ExitCode -ne 0) {
         throw "The native probe build failed. See $buildLog"
     }
     if (-not (Test-Path -LiteralPath $probeExecutable -PathType Leaf)) {
@@ -42,6 +51,7 @@ try {
         -WorkingDirectory (Split-Path -Parent $probeExecutable) `
         -WindowStyle Hidden -PassThru `
         -RedirectStandardOutput $stdoutLog -RedirectStandardError $stderrLog
+    $null = $probe.Handle
     if (-not $probe.WaitForExit(30000)) {
         $probe.Kill()
         $probe.WaitForExit()
@@ -50,9 +60,9 @@ try {
     Get-Content -LiteralPath $stdoutLog
     Get-Content -LiteralPath $stderrLog
     if ($probe.ExitCode -ne 0) {
-        throw "The native restore probe failed with exit code $($probe.ExitCode). See $runDirectory"
+        throw "The native $Scenario probe failed with exit code $($probe.ExitCode). See $runDirectory"
     }
-    Write-Output "Native restore evidence: $runDirectory"
+    Write-Output "Native $Scenario evidence: $runDirectory"
 }
 finally {
     Pop-Location

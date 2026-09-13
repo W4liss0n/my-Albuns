@@ -263,6 +263,7 @@ fn replace_project_webview(
     let mut builder =
         WebviewBuilder::new(PROJECT_WINDOW_LABEL, project_webview_url(startup_terminal))
             .data_directory(data_directory)
+            .focused(false)
             .auto_resize();
     if let Some(arguments) = browser_arguments {
         builder = builder.additional_browser_args(arguments);

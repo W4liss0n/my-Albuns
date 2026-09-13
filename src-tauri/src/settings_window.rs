@@ -90,6 +90,7 @@ pub(crate) async fn show(app: &AppHandle, section: SettingsSection) -> Result<()
     .maximizable(false)
     .minimizable(false)
     .visible(false)
+    .focused(false)
     .decorations(false)
     .data_directory(
         state

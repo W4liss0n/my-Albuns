@@ -50,6 +50,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .decorations(false)
             .data_directory(data_directory)
             .build()?;
+            // Navigate after Tauri has attached the WebView so that the probe's
+            // readiness listener observes this document, even when about:blank
+            // completed while the native control was still being constructed.
+            window.navigate("about:blank?restore-probe".parse()?)?;
             thread::spawn(move || {
                 let probe = || -> Result<(), Box<dyn std::error::Error>> {
                     policy_readiness

@@ -1639,7 +1639,7 @@ async fn initialize_global_window(
             }
             return;
         }
-        if let Err(error) = window.show() {
+        if let Err(error) = window.show().and_then(|()| window.set_focus()) {
             tracing::error!(
                 target: "myalbuns.desktop",
                 process_role = ProcessRole::Global.as_str(),
@@ -1655,6 +1655,7 @@ async fn initialize_global_window(
     if state.graphics_gate.expire() {
         state.record_startup_failure(graphics_gate_timeout_failure());
         let _ = window.show();
+        let _ = window.set_focus();
     }
 }
 

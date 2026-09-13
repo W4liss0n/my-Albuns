@@ -1,7 +1,7 @@
 // Use only a disposable fixture: the gate changes its in-memory DPI without saving.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { findFreeTcpPort } from "./GateWebDriver.mjs";
 import { captureProcessInstance, processInstancesByExecutable, terminateProcessInstance, waitForProcessInstance } from "./DevLifecycleProcessInstances.mjs";
@@ -24,7 +24,9 @@ delete env.WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS;
 delete env.TAURI_WEBVIEW_AUTOMATION;
 const sockets = [], instances = [];
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
-const application = spawn(executable, [fixture], { windowsHide: true, stdio: "ignore", env });
+const stderr = openSync(path.join(output, "stderr.log"), "w");
+const application = spawn(executable, [fixture], { windowsHide: true, stdio: ["ignore", "ignore", stderr], env });
+closeSync(stderr);
 instances.push(await waitForProcessInstance(application.pid, "dialog recovery Global"));
 const records = () => {
   const directory = path.join(root, "Local", "MyAlbuns2", "Logs");
@@ -72,7 +74,7 @@ async function connect(port, pathname) {
     pending.set(id, { resolve, reject, timer });
     socket.send(JSON.stringify({ id, method, params }));
   });
-  return {
+  const client = {
     call,
     async evaluate(expression) {
       const result = await call("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });
@@ -80,6 +82,8 @@ async function connect(port, pathname) {
       return result.result.value;
     },
   };
+  await waitUntil(() => client.evaluate("Boolean(window.__TAURI_INTERNALS__?.invoke)"), `The ${pathname} IPC bridge is ready`);
+  return client;
 }
 const click = (client, label) => client.evaluate(`(() => {
   const button = [...document.querySelectorAll('button')].find(b => b.textContent.trim() === ${JSON.stringify(label)} || b.getAttribute('aria-label') === ${JSON.stringify(label)});
@@ -87,7 +91,12 @@ const click = (client, label) => client.evaluate(`(() => {
   button.click();
 })()`);
 try {
-  await waitUntil(() => records().some(row => row.event === "project_ui_ready"), "initial Project ready");
+  await waitUntil(() => {
+    const events = records();
+    const failure = events.find(row => row.event?.endsWith("initialization_failed"));
+    if (failure) throw new Error(`Initial native window failed: ${failure.error}`);
+    return events.some(row => row.event === "project_ui_ready");
+  }, "initial Project ready");
   const host = records().find(row => row.event === "project_host_started");
   const instance = await waitForProcessInstance(host.process_id, "dialog recovery Project"); instances.push(instance);
   let owner = await connect(ownerPort, "/");
