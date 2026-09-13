@@ -78,6 +78,8 @@ Ao selecionar `Intervalo personalizado`, o campo vazio permanece neutro. Um valo
 
 ## Pré-validação
 
+Durante a verificação após `Exportar`, o formulário mantém seu tamanho e bloqueia os controles. Não acrescenta linhas temporárias de status, como “Preparando exportação…”, antes de apresentar o próximo diálogo.
+
 Ao acionar `Exportar`, placeholders e originais necessários ausentes ou indisponíveis não são exibidos dentro deste formulário. O programa abre a [Tela de Problemas](0005-tela-de-problemas.md) filtrada para a Exportação, que identifica cada bloqueio e oferece as ações apropriadas antes de qualquer progresso.
 
 ## Preparação e Publicação

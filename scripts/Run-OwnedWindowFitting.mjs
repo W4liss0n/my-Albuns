@@ -104,6 +104,8 @@ try {
     { id: "export-range-invalid", interval: "3-2", stableWindow: true, rows: 0, invalid: true },
     { id: "export-range-cleared", interval: "", stableWindow: true, rows: 0, invalid: false },
     { id: "export-range-valid", interval: "1-2", stableWindow: true, rows: 0, invalid: false },
+    { id: "export-checking", state: { ...opening, busy: true }, rows: 0, preserveOpeningSize: true },
+    { id: "export-conflicts", state: { kind: "exportConflicts", files: ["Album_001.png"] }, rows: 0, width: 520 },
     { id: "missing-original", state: missing, rows: 1, width: 640 },
     { id: "processing", state: { kind: "imageProcessingProgress", progress: { kind: "determinate", completed: 0, total: 1, status: "Preparando a Foto…" } }, rows: 0, width: 440 },
     { id: "problems-after-progress", state: missing, rows: 1, width: 640 },
@@ -156,13 +158,17 @@ try {
     }
     assert.equal(result.rows, scenario.rows, "Problem data must reach the real dialog");
     assert.equal(result.width, scenario.width ?? 800, "The window must use the width delivered with the current dialog");
+    if (scenario.preserveOpeningSize) {
+      assert.equal(result.height, results[0].height, "Checking export must not enlarge the configuration window before showing the next dialog");
+      assert.deepEqual(result.fits, [], "Checking export must preserve the existing window size");
+    }
     if (scenario.stableWindow) {
       assert.equal(result.fits.length, 0, "Range editing and tooltips must not resize the window");
       assert.equal(result.height, results[0].height, "Range editing must preserve the opening height");
       assert.equal(result.intervalInvalid, scenario.invalid, "An empty interval must remain neutral");
       assert.equal(result.tooltipVisible, scenario.invalid, "Only a filled invalid interval needs an error tooltip");
       assert.ok(result.tooltipContained, "The tooltip must remain fully visible inside the dialog");
-    } else assert.ok(result.fits.length > 0 && result.fits.length <= 4, "Automatic fitting must settle without a shrinking loop");
+    } else if (!scenario.preserveOpeningSize) assert.ok(result.fits.length > 0 && result.fits.length <= 4, "Automatic fitting must settle without a shrinking loop");
     assert.ok(result.height <= result.screenLimit, "The dialog must respect the available screen height");
     assert.ok(result.footerBottom <= result.height, "The footer must remain inside the native viewport");
     if (scenario.rows) assert.ok(result.firstRowVisible >= Math.min(result.rowHeight, 50), "The first problem must remain visible after automatic fitting");

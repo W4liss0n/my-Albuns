@@ -61,7 +61,7 @@ export function ExportConfigurationDialog({ state, onAction }: {
             onClick={() => onAction({ configureExport: request })}>Exportar</ActionButton>
         </>
       }>
-        <form className="export-configuration" onSubmit={event => event.preventDefault()}>
+        <form className="export-configuration" aria-busy={state.busy} onSubmit={event => event.preventDefault()}>
           <fieldset className="export-configuration__section export-configuration__section--destination" disabled={state.busy}>
             <legend>Destino da exportação</legend>
             <div className="export-configuration__destination">
@@ -123,7 +123,6 @@ export function ExportConfigurationDialog({ state, onAction }: {
             </div>
             <FieldValidationTooltip tooltip={rangeTooltip} />
           </fieldset>
-          {state.busy && <p role="status" className="export-configuration__status">Preparando exportação…</p>}
           {state.message && <p role="alert" className="export-configuration__status export-configuration__error">{state.message}</p>}
         </form>
       </DialogWindowFrame>
