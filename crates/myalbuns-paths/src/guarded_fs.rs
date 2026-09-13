@@ -8,7 +8,28 @@ pub(crate) enum GuardedFsError {
     AlreadyExists,
     NotFound,
     Unavailable,
+    StorageFull,
     OutsideRoot,
+}
+
+impl GuardedFsError {
+    #[cfg(any(not(windows), feature = "test-support"))]
+    fn io(error: std::io::Error) -> Self {
+        if crate::AppPathsError::cache_io(&error) == crate::AppPathsError::CacheStorageFull {
+            Self::StorageFull
+        } else {
+            Self::Unavailable
+        }
+    }
+
+    #[cfg(windows)]
+    fn ntstatus(status: windows_sys::Win32::Foundation::NTSTATUS) -> Self {
+        use windows_sys::Win32::Foundation::{STATUS_DISK_FULL, STATUS_DISK_QUOTA_EXCEEDED};
+        match status {
+            STATUS_DISK_FULL | STATUS_DISK_QUOTA_EXCEEDED => Self::StorageFull,
+            _ => Self::Unavailable,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -27,7 +48,7 @@ pub(crate) fn ensure_direct_child(
     match fs::create_dir(child_path) {
         Ok(()) => {}
         Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
-        Err(_) => return Err(GuardedFsError::Unavailable),
+        Err(error) => return Err(GuardedFsError::io(error)),
     }
     let metadata = fs::symlink_metadata(child_path).map_err(|_| GuardedFsError::Unavailable)?;
     open_validated_direct_child(parent, child_path, &metadata)
@@ -323,7 +344,7 @@ mod relative_file {
                 ) {
                     GuardedFsError::NotFound
                 } else {
-                    GuardedFsError::Unavailable
+                    GuardedFsError::ntstatus(status)
                 },
             );
         }
@@ -379,7 +400,7 @@ pub(crate) fn create_new_deletable_file(
         .write(true)
         .create_new(true)
         .open(path)
-        .map_err(|_| GuardedFsError::Unavailable)?;
+        .map_err(GuardedFsError::io)?;
     validate_open_file(parent, path, &file)?;
     Ok(file)
 }
@@ -506,12 +527,31 @@ pub(crate) fn delete_open_file(
     fs::remove_file(path).map_err(|_| GuardedFsError::Unavailable)
 }
 
-#[cfg(windows)]
 pub(crate) fn rename_open_file(
     parent: &DirectoryGuard,
     source_path: &Path,
     file: &File,
     target_name: &std::ffi::OsStr,
+) -> Result<(), GuardedFsError> {
+    rename_open_file_with_replacement(parent, source_path, file, target_name, false)
+}
+
+pub(crate) fn replace_open_file(
+    parent: &DirectoryGuard,
+    source_path: &Path,
+    file: &File,
+    target_name: &std::ffi::OsStr,
+) -> Result<(), GuardedFsError> {
+    rename_open_file_with_replacement(parent, source_path, file, target_name, true)
+}
+
+#[cfg(windows)]
+fn rename_open_file_with_replacement(
+    parent: &DirectoryGuard,
+    source_path: &Path,
+    file: &File,
+    target_name: &std::ffi::OsStr,
+    replace: bool,
 ) -> Result<(), GuardedFsError> {
     use std::os::windows::{ffi::OsStrExt, io::AsRawHandle};
     use windows_sys::{
@@ -539,7 +579,7 @@ pub(crate) fn rename_open_file(
     // SAFETY: buffer is aligned and sized for the fixed header plus every
     // encoded target-name byte. RootDirectory remains live for the call.
     unsafe {
-        (*rename).Anonymous.ReplaceIfExists = false;
+        (*rename).Anonymous.ReplaceIfExists = replace;
         (*rename).RootDirectory = parent.containment_handle.as_raw_handle().cast();
         (*rename).FileNameLength = target_bytes;
         std::ptr::copy_nonoverlapping(
@@ -549,6 +589,9 @@ pub(crate) fn rename_open_file(
         );
     }
     let mut io_status = IO_STATUS_BLOCK::default();
+    #[cfg(feature = "test-support")]
+    crate::test_support::rename(&parent.logical_path.join(target_name))
+        .map_err(GuardedFsError::io)?;
     // SAFETY: rename addresses the initialized buffer described above, the
     // source handle was opened with DELETE access, and io_status is writable
     // for the documented user-mode NtSetInformationFile call.
@@ -565,27 +608,30 @@ pub(crate) fn rename_open_file(
         if status == windows_sys::Win32::Foundation::STATUS_OBJECT_NAME_COLLISION {
             return Err(GuardedFsError::AlreadyExists);
         }
-        return Err(GuardedFsError::Unavailable);
+        return Err(GuardedFsError::ntstatus(status));
     }
     Ok(())
 }
 
 #[cfg(not(windows))]
-pub(crate) fn rename_open_file(
+fn rename_open_file_with_replacement(
     parent: &DirectoryGuard,
     source_path: &Path,
     file: &File,
     target_name: &std::ffi::OsStr,
+    replace: bool,
 ) -> Result<(), GuardedFsError> {
     validate_open_file(parent, source_path, file)?;
     if Path::new(target_name).components().count() != 1 {
         return Err(GuardedFsError::OutsideRoot);
     }
-    if parent.logical_path.join(target_name).exists() {
+    if !replace && parent.logical_path.join(target_name).exists() {
         return Err(GuardedFsError::AlreadyExists);
     }
-    fs::rename(source_path, parent.logical_path.join(target_name))
-        .map_err(|_| GuardedFsError::Unavailable)
+    #[cfg(feature = "test-support")]
+    crate::test_support::rename(&parent.logical_path.join(target_name))
+        .map_err(GuardedFsError::io)?;
+    fs::rename(source_path, parent.logical_path.join(target_name)).map_err(GuardedFsError::io)
 }
 
 fn same_component(left: &std::ffi::OsStr, right: &std::ffi::OsStr) -> bool {

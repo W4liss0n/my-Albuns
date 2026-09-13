@@ -57,7 +57,7 @@ export interface MediaPreviewRequest extends MediaPreviewDemand {
 }
 
 export interface CacheProcessorWarning {
-  state: "suspended";
+  state: "suspended" | "storage_full";
   message: string;
 }
 

@@ -14,6 +14,7 @@ use crate::{
         DirectoryGuard, GuardedFsError, create_new_deletable_file, delete_open_file,
         ensure_direct_child, is_reparse_point, open_deletable_file, open_directory,
         open_existing_direct_child, open_readable_file, remove_empty_directory, rename_open_file,
+        replace_open_file,
     },
 };
 
@@ -79,6 +80,7 @@ impl From<GuardedFsError> for AppPathsError {
             | GuardedFsError::NotFound
             | GuardedFsError::Unavailable => Self::CacheStorageUnavailable,
             GuardedFsError::OutsideRoot => Self::CacheStorageOutsideRoot,
+            GuardedFsError::StorageFull => Self::CacheStorageFull,
         }
     }
 }
@@ -581,14 +583,17 @@ impl PreparedCacheStorage {
             self.validate_publication_paths(temporary, final_path)?;
         debug_assert_eq!(temporary_parent.logical_path, final_parent.logical_path);
         match open_deletable_file(final_parent, final_path) {
-            Ok(existing) => delete_open_file(final_parent, final_path, &existing)?,
+            // Validate the existing leaf without unlinking it. The guarded
+            // rename replaces it only on success, preserving it on disk-full
+            // or sharing failures. Close our validation handle before rename.
+            Ok(existing) => drop(existing),
             Err(GuardedFsError::NotFound) => {}
             Err(error) => return Err(error.into()),
         }
         let target_name = final_path
             .file_name()
             .ok_or(AppPathsError::CacheStorageOutsideRoot)?;
-        rename_open_file(temporary_parent, temporary, temporary_file, target_name)?;
+        replace_open_file(temporary_parent, temporary, temporary_file, target_name)?;
         Ok(())
     }
 
@@ -637,6 +642,11 @@ fn is_final_generation_name(name: &std::ffi::OsStr) -> bool {
 
 impl Write for PendingCachePublication<'_> {
     fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
+        #[cfg(feature = "test-support")]
+        return crate::test_support::write(&self.final_path, buffer, |bytes| {
+            self.temporary.file_mut().write(bytes)
+        });
+        #[cfg(not(feature = "test-support"))]
         self.temporary.file_mut().write(buffer)
     }
 
@@ -684,7 +694,7 @@ impl TemporaryCacheFile<'_> {
     fn sync(&mut self) -> Result<(), AppPathsError> {
         self.file_mut()
             .sync_all()
-            .map_err(|_| AppPathsError::CacheStorageUnavailable)
+            .map_err(|error| AppPathsError::cache_io(&error))
     }
 }
 

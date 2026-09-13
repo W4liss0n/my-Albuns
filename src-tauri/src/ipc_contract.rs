@@ -780,6 +780,7 @@ pub enum MediaFileDrag {
 #[serde(rename_all = "snake_case")]
 pub enum CacheProcessorState {
     Suspended,
+    StorageFull,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, TS)]

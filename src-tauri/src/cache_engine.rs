@@ -22,11 +22,12 @@ use myalbuns_imaging_protocol::{
     CACHE_REPRESENTATION_VERSION, CacheArtifact, CacheArtifactFormat, CacheArtifactProperties,
     CacheBasicColorProfile, CacheCompletion, CacheFingerprint, CacheJob, CacheMediaSource,
     CacheRepresentationPolicy, CacheRequest, CacheReusableGeneration, IMAGING_PROTOCOL_VERSION,
-    ImagingCommand, ImagingResponse,
+    ImagingCommand, ImagingFailureStage, ImagingResponse,
 };
 use myalbuns_logging::ProcessRole;
 use myalbuns_paths::{
-    AppPaths, CachePathPlan, PreparedCacheStorage, RootBindingPlan, project_data_namespace,
+    AppPaths, AppPathsError, CachePathPlan, PreparedCacheStorage, RootBindingPlan,
+    project_data_namespace,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -284,6 +285,7 @@ pub(crate) enum CacheFailureStage {
     ValidateResponse,
     VerifyArtifacts,
     PublishIndex,
+    StorageFull,
     Cancelled,
 }
 
@@ -686,9 +688,13 @@ impl CacheEngine {
         let paths = command.cache_paths().ok_or_else(|| {
             CacheFailure::new(CacheFailureStage::Plan, "O comando não pertence ao Cache.")
         })?;
-        let storage = app_paths
-            .prepare_cache_storage(paths)
-            .map_err(|error| CacheFailure::new(CacheFailureStage::Plan, error.to_string()))?;
+        let storage = app_paths.prepare_cache_storage(paths).map_err(|error| {
+            cache_storage_failure(
+                CacheFailureStage::Plan,
+                "Não foi possível preparar o Cache",
+                error,
+            )
+        })?;
         invoke_with_recovery(
             self, transport, app_paths, &storage, command, context, control,
         )
@@ -1498,9 +1504,10 @@ async fn prepare_cache<T: ImagingTransport>(
     let storage = app_paths
         .prepare_cache_storage(work.namespace.paths())
         .map_err(|error| {
-            CacheFailure::new(
+            cache_storage_failure(
                 CacheFailureStage::VerifyArtifacts,
-                format!("Não foi possível verificar o Cache: {error}"),
+                "Não foi possível verificar o Cache",
+                error,
             )
         })?;
     let (response, recovery) = invoke_with_recovery(
@@ -1609,9 +1616,10 @@ fn plan_request(app_paths: &AppPaths, work: &CacheWork) -> Result<CacheRequest, 
         let storage = app_paths
             .prepare_cache_storage(work.namespace.paths())
             .map_err(|error| {
-                CacheFailure::new(
+                cache_storage_failure(
                     CacheFailureStage::Plan,
-                    format!("Não foi possível ler o índice do Cache: {error}"),
+                    "Não foi possível ler o índice do Cache",
+                    error,
                 )
             })?;
         CacheIndex::read(
@@ -1747,7 +1755,26 @@ async fn invoke_with_recovery<T: ImagingTransport>(
 }
 
 fn cache_processor_failure(failure: InvocationFailure) -> CacheFailure {
+    if failure.stage == InvocationFailureStage::Processor(ImagingFailureStage::CacheStorageFull) {
+        return CacheFailure {
+            stage: CacheFailureStage::StorageFull,
+            exit_code: failure.exit_code,
+            message: AppPathsError::CacheStorageFull.to_string(),
+        };
+    }
     CacheFailure::from_invocation(failure, CacheFailureStage::Processor)
+}
+
+fn cache_storage_failure(
+    stage: CacheFailureStage,
+    context: &str,
+    error: AppPathsError,
+) -> CacheFailure {
+    if error == AppPathsError::CacheStorageFull {
+        CacheFailure::new(CacheFailureStage::StorageFull, error.to_string())
+    } else {
+        CacheFailure::new(stage, format!("{context}: {error}"))
+    }
 }
 
 fn discard_command_candidates(
@@ -1988,12 +2015,19 @@ fn publish_metadata(
     let mut publication = storage
         .begin_file_publication(&temporary_path, &metadata_path)
         .map_err(|error| {
-            CacheFailure::new(
+            cache_storage_failure(
                 CacheFailureStage::PublishIndex,
-                format!("Não foi possível criar o índice temporário: {error}"),
+                "Não foi possível criar o índice temporário",
+                error,
             )
         })?;
     publication.write_all(&metadata_bytes).map_err(|error| {
+        if AppPathsError::cache_io(&error) == AppPathsError::CacheStorageFull {
+            return CacheFailure::new(
+                CacheFailureStage::StorageFull,
+                AppPathsError::CacheStorageFull.to_string(),
+            );
+        }
         CacheFailure::new(
             CacheFailureStage::PublishIndex,
             format!("Não foi possível gravar o índice temporário: {error}"),
@@ -2002,16 +2036,18 @@ fn publish_metadata(
     publication
         .sync()
         .map_err(|error| {
-            CacheFailure::new(
+            cache_storage_failure(
                 CacheFailureStage::PublishIndex,
-                format!("Não foi possível sincronizar o índice: {error}"),
+                "Não foi possível sincronizar o índice",
+                error,
             )
         })?
         .publish()
         .map_err(|error| {
-            CacheFailure::new(
+            cache_storage_failure(
                 CacheFailureStage::PublishIndex,
-                format!("Não foi possível publicar o índice: {error}"),
+                "Não foi possível publicar o índice",
+                error,
             )
         })
 }
@@ -2125,8 +2161,8 @@ mod tests {
     use tauri::http::{Method, Request, StatusCode};
 
     use super::{
-        AuthorizedCacheNamespace, CacheEngine, CacheFailureStage, CacheFlightClaim, CacheWork,
-        RecoveredCacheArtifact,
+        AuthorizedCacheNamespace, CacheEngine, CacheFailureStage, CacheFlightClaim,
+        CacheProcessorStatus, CacheWork, RecoveredCacheArtifact,
     };
     use crate::{
         cache_activity_gate::CacheCancellation,
@@ -2154,6 +2190,7 @@ mod tests {
         CrashAndObsolete(u32, CacheCancellation),
         Cancel(u32),
         Deterministic(u32),
+        DiskFull(u32),
         Unconfirmed(u32),
     }
 
@@ -2296,6 +2333,10 @@ mod tests {
                 }
                 Script::Deterministic(process_id) => Err(InvocationFailure::deterministic(
                     ImagingFailureStage::CacheProcessing,
+                    process_id,
+                )),
+                Script::DiskFull(process_id) => Err(InvocationFailure::deterministic(
+                    ImagingFailureStage::CacheStorageFull,
                     process_id,
                 )),
             };
@@ -2682,6 +2723,98 @@ mod tests {
                     .count()
                     >= 2
             );
+        });
+    }
+
+    #[test]
+    fn disk_full_during_index_write_preserves_project_original_and_previous_cache() {
+        tauri::async_runtime::block_on(async {
+            for during_rename in [false, true] {
+                let fixture = fixture();
+                let engine = CacheEngine::default();
+                let old = verified_preview_artifact(&fixture, &engine).await;
+                let paths = fixture.work.namespace.paths();
+                let previous_path = paths
+                    .preview_file(&old.media_id, &old.generation_id, old.format)
+                    .unwrap();
+                let previous_preview = std::fs::read(&previous_path).unwrap();
+                let previous_index = std::fs::read(paths.metadata_file()).unwrap();
+                let project_path = fixture._root.path().join("Projeto.myalbuns");
+                let project_before = std::fs::read(&project_path).unwrap();
+                // A changed Original requests a new generation while the previous
+                // committed generation remains owned by the current index.
+                std::fs::write(fixture.work.source.source_path(), b"original-photo-v2").unwrap();
+                let original_before = std::fs::read(fixture.work.source.source_path()).unwrap();
+                let fault = if during_rename {
+                    myalbuns_paths::test_support::CacheDiskFull::on_rename(&paths.metadata_file())
+                } else {
+                    myalbuns_paths::test_support::CacheDiskFull::after_bytes(
+                        &paths.metadata_file(),
+                        32,
+                    )
+                };
+                let mut transport = ScriptedTransport {
+                    app_paths: fixture.app_paths.clone(),
+                    scripts: VecDeque::from([Script::Complete(CacheArtifactFormat::Jpeg)]),
+                    attempts: Vec::new(),
+                };
+                let failure = engine
+                    .execute(
+                        &mut transport,
+                        &fixture.app_paths,
+                        fixture.work.clone(),
+                        &fixture.context,
+                        &CacheCancellation::default(),
+                    )
+                    .await
+                    .unwrap_err();
+                assert_eq!(failure.stage, CacheFailureStage::StorageFull);
+                if !during_rename {
+                    assert_eq!(fault.written_bytes(), 32);
+                }
+                assert!(fault.failure_count() > 0);
+                assert!(
+                    failure.message.contains("Libere espaço"),
+                    "{}",
+                    failure.message
+                );
+                assert_eq!(std::fs::read(&project_path).unwrap(), project_before);
+                assert_eq!(
+                    std::fs::read(fixture.work.source.source_path()).unwrap(),
+                    original_before
+                );
+                assert_eq!(
+                    std::fs::read(paths.metadata_file()).unwrap(),
+                    previous_index
+                );
+                assert_eq!(std::fs::read(&previous_path).unwrap(), previous_preview);
+                assert!(!paths.metadata_temporary_file(std::process::id()).exists());
+                let remaining = std::fs::read_dir(paths.media_directory())
+                    .unwrap()
+                    .map(|entry| entry.unwrap().path())
+                    .collect::<Vec<_>>();
+                assert_eq!(remaining, vec![previous_path]);
+                assert_eq!(engine.processor_status(), CacheProcessorStatus::Ready);
+                drop(fault);
+
+                let recovered = verified_preview_artifact(&fixture, &engine).await;
+                assert_ne!(recovered.generation_id, old.generation_id);
+                assert!(
+                    paths
+                        .preview_file(
+                            &recovered.media_id,
+                            &recovered.generation_id,
+                            recovered.format
+                        )
+                        .unwrap()
+                        .is_file()
+                );
+                assert_eq!(std::fs::read(&project_path).unwrap(), project_before);
+                assert_eq!(
+                    std::fs::read(fixture.work.source.source_path()).unwrap(),
+                    original_before
+                );
+            }
         });
     }
 
@@ -5642,34 +5775,47 @@ mod tests {
     #[test]
     fn deterministic_processor_failure_is_not_retried() {
         tauri::async_runtime::block_on(async {
-            let fixture = fixture();
-            let mut transport = ScriptedTransport {
-                app_paths: fixture.app_paths.clone(),
-                scripts: VecDeque::from([Script::Deterministic(4_444)]),
-                attempts: Vec::new(),
-            };
+            for disk_full in [false, true] {
+                let fixture = fixture();
+                let mut transport = ScriptedTransport {
+                    app_paths: fixture.app_paths.clone(),
+                    scripts: VecDeque::from([if disk_full {
+                        Script::DiskFull(4_444)
+                    } else {
+                        Script::Deterministic(4_444)
+                    }]),
+                    attempts: Vec::new(),
+                };
 
-            let engine = CacheEngine::default();
-            let failure = engine
-                .execute(
-                    &mut transport,
-                    &fixture.app_paths,
-                    fixture.work,
-                    &fixture.context,
-                    &CacheCancellation::default(),
-                )
-                .await
-                .expect_err("deterministic failure remains visible");
+                let engine = CacheEngine::default();
+                let failure = engine
+                    .execute(
+                        &mut transport,
+                        &fixture.app_paths,
+                        fixture.work.clone(),
+                        &fixture.context,
+                        &CacheCancellation::default(),
+                    )
+                    .await
+                    .expect_err("deterministic failure remains visible");
 
-            assert_eq!(
-                failure.stage,
-                CacheFailureStage::Processor(
-                    crate::imaging_processor::InvocationFailureStage::Processor(
-                        ImagingFailureStage::CacheProcessing,
-                    ),
-                )
-            );
-            assert_eq!(transport.attempts, [1]);
+                if disk_full {
+                    assert_eq!(failure.stage, CacheFailureStage::StorageFull);
+                    assert!(failure.message.contains("Libere espaço"));
+                    assert_eq!(engine.processor_status(), CacheProcessorStatus::Ready);
+                    verified_preview_artifact(&fixture, &engine).await;
+                } else {
+                    assert_eq!(
+                        failure.stage,
+                        CacheFailureStage::Processor(
+                            crate::imaging_processor::InvocationFailureStage::Processor(
+                                ImagingFailureStage::CacheProcessing,
+                            ),
+                        )
+                    );
+                }
+                assert_eq!(transport.attempts, [1]);
+            }
         });
     }
 

@@ -18,7 +18,7 @@ Na primeira versão, a janela contém:
 - `Desempenho`;
 - `Outros`, que reúne as integrações, começando pelo Photoshop.
 
-As preferências pertencem ao usuário, não participam de Undo/Redo e não exigem `Salvar` no Projeto. Escolhas simples são persistidas imediatamente; ações destrutivas ou demoradas mantêm confirmação e progresso próprios.
+As preferências pertencem ao usuário, não participam de Undo/Redo e não exigem `Salvar` no Projeto. Escolhas simples são persistidas imediatamente. A limpeza do Cache mantém sua confirmação e, depois de autorizada, acontece em segundo plano, sem diálogo de progresso nem controle de cancelamento durante a execução.
 
 ```text
 ┌──────────────────────────────────────────────────────────────────┐

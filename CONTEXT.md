@@ -402,7 +402,7 @@ Aviso associado à pressão real de armazenamento do volume que hospeda o Cache.
 Remoção do Cache pertencente a Projetos fechados, preservando Projetos ativos e todos os Arquivos vinculados.
 
 **Limpeza total do Cache**:
-Remoção de todo o Cache quando não existem Projetos ou processos ativos, ou limpeza agendada para a próxima inicialização segura.
+Remoção de todo o Cache quando não existem Projetos ou processos ativos, ou limpeza agendada para a próxima inicialização segura. Depois da confirmação, acontece em segundo plano, sem diálogo de progresso nem cancelamento durante a execução.
 
 ## Exportação
 

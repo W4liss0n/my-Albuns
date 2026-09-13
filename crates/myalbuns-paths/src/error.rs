@@ -18,10 +18,27 @@ pub enum AppPathsError {
     OperationPathIoFailure,
     CacheArtifactOutsideRoot,
     CacheStorageUnavailable,
+    CacheStorageFull,
     CacheStorageOutsideRoot,
     ExportStorageUnavailable,
     ExportStorageOutsideDestination,
     ExportTargetConflict,
+}
+
+impl AppPathsError {
+    /// Retains actionable storage exhaustion without depending on localized OS text.
+    pub fn cache_io(error: &std::io::Error) -> Self {
+        #[cfg(windows)]
+        if matches!(error.raw_os_error(), Some(39 | 112)) {
+            return Self::CacheStorageFull;
+        }
+        match error.kind() {
+            std::io::ErrorKind::StorageFull | std::io::ErrorKind::QuotaExceeded => {
+                Self::CacheStorageFull
+            }
+            _ => Self::CacheStorageUnavailable,
+        }
+    }
 }
 
 impl Display for AppPathsError {
@@ -64,6 +81,9 @@ impl Display for AppPathsError {
             Self::CacheStorageUnavailable => {
                 formatter.write_str("a estrutura de diretórios do Cache está indisponível")
             }
+            Self::CacheStorageFull => formatter.write_str(
+                "Não há espaço para preparar as imagens. Libere espaço no disco e abra o álbum novamente.",
+            ),
             Self::CacheStorageOutsideRoot => {
                 formatter.write_str("a estrutura física do Cache escapou da raiz autorizada")
             }

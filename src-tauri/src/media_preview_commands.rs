@@ -9,7 +9,7 @@ use crate::{
     cache_activity_gate::CacheCancellation,
     cache_engine::{
         self, AuthorizedCacheNamespace, CACHE_PROCESSOR_SUSPENDED_MESSAGE, CacheEngine,
-        CacheFlightClaim, CacheProcessorStatus, CacheWork,
+        CacheFailureStage, CacheFlightClaim, CacheProcessorStatus, CacheWork,
     },
     cache_previews::{CachePreviewError, CachePreviewRegistry},
     cache_service::ActiveCacheNamespace,
@@ -560,14 +560,21 @@ impl DemandedPreviewPreparation<'_> {
                 )))
             }
             Err(failure) => {
-                if engine.processor_status() == CacheProcessorStatus::Suspended
-                    && let Err(error) = window.emit(
-                        CACHE_PROCESSOR_WARNING_EVENT,
-                        CacheProcessorWarning {
-                            state: CacheProcessorState::Suspended,
-                            message: CACHE_PROCESSOR_SUSPENDED_MESSAGE.into(),
-                        },
-                    )
+                let warning = if failure.stage == CacheFailureStage::StorageFull {
+                    Some(CacheProcessorWarning {
+                        state: CacheProcessorState::StorageFull,
+                        message: failure.message.clone(),
+                    })
+                } else if engine.processor_status() == CacheProcessorStatus::Suspended {
+                    Some(CacheProcessorWarning {
+                        state: CacheProcessorState::Suspended,
+                        message: CACHE_PROCESSOR_SUSPENDED_MESSAGE.into(),
+                    })
+                } else {
+                    None
+                };
+                if let Some(warning) = warning
+                    && let Err(error) = window.emit(CACHE_PROCESSOR_WARNING_EVENT, warning)
                 {
                     tracing::warn!(
                         target: "myalbuns.desktop",

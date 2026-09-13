@@ -485,10 +485,16 @@ function App({
     setCacheProcessorWarning(null);
     if (!projectId) return;
     let active = true;
+    let storageFullReported = false;
     let unlisten: (() => void) | undefined;
     void mediaPreviewPort
       .onCacheProcessorWarning((warning) => {
-        if (active) setCacheProcessorWarning(warning);
+        if (!active) return;
+        if (warning.state === "storage_full") {
+          if (storageFullReported) return;
+          storageFullReported = true;
+        }
+        setCacheProcessorWarning(warning);
       })
       .then((dispose) => {
         if (active) {

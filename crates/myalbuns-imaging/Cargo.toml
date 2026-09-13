@@ -24,4 +24,5 @@ flate2 = "=1.1.9"
 windows-sys.workspace = true
 
 [dev-dependencies]
+myalbuns-paths = { path = "../myalbuns-paths", features = ["test-support"] }
 tempfile.workspace = true

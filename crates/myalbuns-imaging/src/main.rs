@@ -1,5 +1,6 @@
 mod album_render;
 mod cache;
+mod cache_error;
 mod format_output;
 mod jpeg_output;
 mod photo_import;
@@ -151,7 +152,7 @@ fn run(app_paths: &AppPaths) -> Result<(), ProcessFailure> {
             cache::run_cache(request, app_paths).map_err(cache_failure)
         }
         ImagingCommand::PreparePhotoImport(request) => {
-            photo_import::run(request, app_paths).map_err(cache_failure)
+            photo_import::run(request, app_paths).map_err(|error| cache_failure(error.into()))
         }
     }
 }
@@ -180,9 +181,12 @@ fn run_album_render(
     Ok(())
 }
 
-fn cache_failure(_: String) -> ProcessFailure {
+fn cache_failure(error: cache_error::CacheError) -> ProcessFailure {
     ProcessFailure {
-        stage: Some(ImagingFailureStage::CacheProcessing),
+        stage: Some(match error {
+            cache_error::CacheError::StorageFull => ImagingFailureStage::CacheStorageFull,
+            cache_error::CacheError::Other(_) => ImagingFailureStage::CacheProcessing,
+        }),
     }
 }
 
