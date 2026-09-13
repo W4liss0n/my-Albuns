@@ -8990,7 +8990,28 @@
         "width": 720,
         "height": 440
       },
-      "readySelector": ".application-settings [role=\"tabpanel\"]:not([hidden]) .ui-inline-notice",
+      "readySelector": ".application-settings-cache-confirmation",
+      "actions": [
+        {
+          "type": "click-text",
+          "text": "Limpar cache"
+        }
+      ]
+    },
+    {
+      "id": "settings-cache-confirmation-small",
+      "title": "Configurações — confirmação de limpeza em janela estreita",
+      "implementationPath": "/settings-preview.html?section=performance",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "application-settings",
+        "reason": "Configurações e integração com Photoshop definidas nos contratos aceitos 0009 e 0010 e no Programa 33; a referência visual vigente não contém estes estados. Componentes de produção com portas determinísticas."
+      },
+      "viewport": {
+        "width": 480,
+        "height": 440
+      },
+      "readySelector": ".application-settings-cache-confirmation",
       "actions": [
         {
           "type": "click-text",

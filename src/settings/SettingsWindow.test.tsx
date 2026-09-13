@@ -47,6 +47,27 @@ test("canceling cleanup returns to the cache actions without deleting anything",
   expect(cachePort.clearAll).not.toHaveBeenCalled();
 });
 
+test.each(["escape", "outside", "focus"])("dismissing the cache confirmation with %s never requests cleanup", async (reason) => {
+  const cachePort: CacheSettingsPort = {
+    status: async () => ({ occupiedBytes: 1000, releasableBytes: 500, clearAllScheduled: false }),
+    freeClosedProjects: vi.fn(async () => ({ freedBytes: 500 })),
+    clearAll: vi.fn(async () => ({ kind: "scheduled" as const })),
+  };
+  render(<SettingsWindow photoshopPort={photoshopSettingsPreview(null)} cachePort={cachePort} close={vi.fn()} />);
+  const trigger = screen.getByRole("button", { name: "Limpar cache" });
+  await waitFor(() => expect(trigger).toBeEnabled());
+  fireEvent.click(trigger);
+  expect(screen.getByRole("dialog", { name: "Confirmar limpeza do cache" })).toBeInTheDocument();
+  expect(screen.getByText("Espaço ocupado")).toBeVisible();
+  if (reason === "escape") fireEvent.keyDown(document, { key: "Escape" });
+  else if (reason === "outside") fireEvent.pointerDown(screen.getByRole("tab", { name: "Outros" }));
+  else fireEvent.focusIn(screen.getByRole("tab", { name: "Outros" }));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(cachePort.clearAll).not.toHaveBeenCalled();
+  expect(cachePort.freeClosedProjects).not.toHaveBeenCalled();
+  if (reason === "escape") expect(trigger).toHaveFocus();
+});
+
 test("a forwarded settings request changes section and unregisters its listener on close", async () => {
   let request!: (section: "photoshop" | "performance") => void;
   const release = vi.fn();

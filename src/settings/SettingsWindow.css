@@ -50,7 +50,22 @@
 }
 .application-settings-cache-row dt { color: var(--ui-text-secondary); }
 .application-settings-cache-row dd { margin: 0; font-variant-numeric: tabular-nums; }
-.application-settings-cache-row .ui-action-button { width: 100%; }
+.application-settings-cache-trigger { position: relative; }
+.application-settings-cache-trigger > .ui-action-button { width: 100%; }
+.application-settings-cache-confirmation {
+  --ui-tooltip-pointer-inline-start: auto;
+  --ui-tooltip-pointer-inline-end: 72px;
+  left: auto;
+  width: min(320px, calc(100vw - 48px));
+  padding: 12px;
+  font-size: var(--ui-font-size-control);
+  line-height: 1.5;
+  white-space: normal;
+}
+.application-settings-cache-confirmation .application-settings-actions {
+  justify-content: flex-end;
+  margin-top: 12px;
+}
 
 .application-settings-integration { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 10px 12px; }
 .application-settings-field { display: grid; min-width: 0; gap: 6px; color: var(--ui-text-secondary); font-size: var(--ui-font-size-label); }
@@ -58,7 +73,6 @@
 .application-settings-field select:disabled { color: var(--ui-text-muted); background: var(--ui-surface-muted); }
 .application-settings-path { grid-column: 1 / -1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ui-text-muted); font-size: var(--ui-font-size-support); }
 .application-settings-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.application-settings-panel .ui-inline-notice .application-settings-actions { justify-content: flex-end; margin-top: 12px; }
 .application-settings-panel > [role="status"] { color: var(--ui-text-secondary); font-size: var(--ui-font-size-control); }
 .application-settings footer { display: flex; justify-content: flex-end; padding: var(--ui-footer-padding); border-top: 1px solid var(--ui-border); }
 

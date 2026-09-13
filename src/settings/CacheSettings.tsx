@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { CacheSettingsPort, CacheSettingsStatus } from "../application/cacheSettings";
 import { ActionButton, InlineNotice } from "../ui";
+import { useDismissableSurface } from "../ui/useDismissableSurface";
 
 export function formatCacheBytes(bytes: number) {
   if (bytes < 1024 * 1024) return `${new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 }).format(bytes / 1024)} KB`;
@@ -17,12 +18,27 @@ export function CacheSettings({ port }: { port: CacheSettingsPort }) {
   const running = useRef(false);
   const clearButton = useRef<HTMLButtonElement>(null);
   const cancelButton = useRef<HTMLButtonElement>(null);
-  const previousConfirmation = useRef(confirmation);
+  const confirmationAnchor = useRef<HTMLElement>(null);
+  const confirmationId = useId();
   useEffect(() => {
     if (confirmation) cancelButton.current?.focus();
-    else if (previousConfirmation.current) clearButton.current?.focus();
-    previousConfirmation.current = confirmation;
   }, [confirmation]);
+  const cancel = () => {
+    setConfirmation(false);
+    clearButton.current?.focus({ preventScroll: true });
+  };
+  useDismissableSurface({
+    enabled: confirmation && !pending,
+    includeFocusOutside: true,
+    rootRef: confirmationAnchor,
+    onDismiss: ({ reason, event }) => {
+      if (reason === "escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        cancel();
+      } else setConfirmation(false);
+    },
+  });
   const refresh = useCallback(async () => {
     if (running.current) return;
     const request = ++sequence.current;
@@ -51,20 +67,26 @@ export function CacheSettings({ port }: { port: CacheSettingsPort }) {
   const feedback = status?.clearAllScheduled ? "Limpeza agendada para a próxima inicialização." : message;
   return <section aria-label="Cache dos álbuns" className="application-settings-panel application-settings-panel--cache" aria-busy={pending}>
     <h2>Cache dos álbuns</h2>
-    {!confirmation && <dl className="application-settings-cache">
+    <dl className="application-settings-cache">
       <div className="application-settings-cache-row">
         <dt>Espaço ocupado</dt>
         <dd>{status ? formatCacheBytes(status.occupiedBytes) : "Calculando…"}</dd>
-        <dd><ActionButton ref={clearButton} disabled={pending || !status || status.clearAllScheduled} onClick={() => setConfirmation(true)}>Limpar cache</ActionButton></dd>
+        <dd ref={confirmationAnchor} className="application-settings-cache-trigger">
+          <ActionButton ref={clearButton} disabled={pending || !status || status.clearAllScheduled}
+            aria-haspopup="dialog" aria-expanded={confirmation} aria-controls={confirmation ? confirmationId : undefined}
+            onClick={() => setConfirmation((open) => !open)}>Limpar cache</ActionButton>
+          {confirmation && <div id={confirmationId} role="dialog" aria-label="Confirmar limpeza do cache"
+            aria-describedby={`${confirmationId}-description`}
+            className="ui-anchored-tooltip application-settings-cache-confirmation">
+            <p id={`${confirmationId}-description`}>Ao limpar o cache, as próximas aberturas dos álbuns podem demorar mais.</p>
+            <div className="application-settings-actions">
+              <ActionButton ref={cancelButton} disabled={pending} onClick={cancel}>Cancelar</ActionButton>
+              <ActionButton disabled={pending} variant="primary" onClick={() => void confirm()}>{pending ? "Limpando…" : "Confirmar"}</ActionButton>
+            </div>
+          </div>}
+        </dd>
       </div>
-    </dl>}
-    {confirmation && <InlineNotice title="Limpar cache?">
-      <p>Se o cache estiver em uso, a limpeza ficará para a próxima inicialização. Os projetos e as fotos originais serão mantidos.</p>
-      <div className="application-settings-actions">
-        <ActionButton ref={cancelButton} disabled={pending} onClick={() => setConfirmation(false)}>Cancelar</ActionButton>
-        <ActionButton disabled={pending} variant="primary" onClick={() => void confirm()}>{pending ? "Limpando…" : "Confirmar"}</ActionButton>
-      </div>
-    </InlineNotice>}
+    </dl>
     {feedback && <p role="status">{feedback}</p>}
     {error && <InlineNotice role="alert" tone="error">{error}</InlineNotice>}
   </section>;

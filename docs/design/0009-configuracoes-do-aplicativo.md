@@ -48,7 +48,7 @@ A primeira versão não expõe calibração, número de processos, threads, mem�
 
 `Limpar cache` solicita a limpeza completa e nunca remove Cache pertencente a um Projeto aberto durante a execução normal. Depois da confirmação, o aplicativo executa imediatamente se não houver Projeto ou Processador ativo; caso contrário, agenda automaticamente para a próxima inicialização, antes da abertura de Projetos. O usuário não precisa escolher o alcance ou o momento da limpeza. Projetos, itens do Painel, vínculos e Arquivos originais permanecem intactos. Não existe limpeza ao vivo de Cache ativo no MVP. Quando agendada, a limpeza apresenta uma única mensagem e o botão fica desabilitado para impedir solicitações repetidas.
 
-A confirmação ocupa a área dos indicadores, com largura limitada a 480 pixels lógicos e sem aumentar a janela. Ela informa o efeito da ação e a preservação dos Projetos e originais; `Cancelar` retorna aos indicadores.
+A confirmação aparece em um balão ancorado ao botão `Limpar cache`, mantendo os indicadores visíveis e sem deslocar o conteúdo ou aumentar a janela. O único texto é `Ao limpar o cache, as próximas aberturas dos álbuns podem demorar mais.`, seguido de `Cancelar` e `Confirmar`. Cancelar, pressionar Escape ou sair do balão sem confirmar apenas fecha a confirmação; não solicita a limpeza.
 
 O programa não impõe limite rígido, não expira Cache por idade e não mostra uma progressão de alertas por patamares arbitrários. Ele exibe o total ocupado em Configurações e avisa quando o espaço livre do volume estiver baixo, oferecendo `Liberar espaço`.
 
