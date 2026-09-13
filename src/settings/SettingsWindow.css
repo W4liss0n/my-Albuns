@@ -52,7 +52,7 @@
 .application-settings-cache-row dd { margin: 0; font-variant-numeric: tabular-nums; }
 .application-settings-cache-trigger { position: relative; }
 .application-settings-cache-trigger > .ui-action-button { width: 100%; }
-.application-settings-cache-confirmation {
+.application-settings-cache-trigger .application-settings-cache-confirmation {
   --ui-tooltip-pointer-inline-start: auto;
   --ui-tooltip-pointer-inline-end: 72px;
   left: auto;
