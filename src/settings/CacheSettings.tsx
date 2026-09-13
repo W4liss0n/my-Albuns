@@ -52,25 +52,20 @@ export function CacheSettings({ port }: { port: CacheSettingsPort }) {
     } catch { if (request === sequence.current) setError("Não foi possível concluir a limpeza do Cache. Tente novamente."); }
     finally { running.current = false; if (request === sequence.current) setPending(false); }
   };
-  return <section aria-label="Cache" className="application-settings-panel" aria-busy={pending}>
-    <div className="application-settings-section-heading">
-      <h2>Cache de imagens</h2>
-      <ActionButton variant="quiet" disabled={pending} onClick={() => void refresh()}>Atualizar</ActionButton>
-    </div>
-    {!confirmation && <div className="application-settings-columns">
-      <div className="application-settings-cache-column">
-        <dl className="application-settings-metrics">
-          <dt>Espaço ocupado</dt><dd>{status ? formatCacheBytes(status.occupiedBytes) : "Calculando…"}</dd>
-        </dl>
-        <ActionButton ref={clearButton} disabled={pending || !status || status.clearAllScheduled} onClick={() => setConfirmation("all")}>Limpar todo o cache</ActionButton>
+  return <section aria-label="Cache dos álbuns" className="application-settings-panel application-settings-panel--cache" aria-busy={pending}>
+    <h2>Cache dos álbuns</h2>
+    {!confirmation && <dl className="application-settings-cache">
+      <div className="application-settings-cache-row">
+        <dt>Espaço ocupado</dt>
+        <dd>{status ? formatCacheBytes(status.occupiedBytes) : "Calculando…"}</dd>
+        <dd><ActionButton ref={clearButton} disabled={pending || !status || status.clearAllScheduled} onClick={() => setConfirmation("all")}>Limpar todo o cache</ActionButton></dd>
       </div>
-      <div className="application-settings-cache-column">
-        <dl className="application-settings-metrics">
-          <dt>Disponível para liberar</dt><dd title="Prévias de projetos fechados">{status ? formatCacheBytes(status.releasableBytes) : "Calculando…"}</dd>
-        </dl>
-        <ActionButton ref={freeButton} disabled={pending || !status || status.releasableBytes === 0} onClick={() => setConfirmation("closed")}>Liberar espaço</ActionButton>
+      <div className="application-settings-cache-row">
+        <dt>Álbuns fechados</dt>
+        <dd>{status ? formatCacheBytes(status.releasableBytes) : "Calculando…"}</dd>
+        <dd><ActionButton ref={freeButton} disabled={pending || !status || status.releasableBytes === 0} onClick={() => setConfirmation("closed")}>Liberar espaço</ActionButton></dd>
       </div>
-    </div>}
+    </dl>}
     {confirmation && <InlineNotice title={confirmation === "closed" ? "Liberar espaço?" : "Limpar todo o cache?"}>
       <p>{confirmation === "closed" ? `Remove até ${formatCacheBytes(status?.releasableBytes ?? 0)} de prévias de projetos fechados.` : "Se o cache estiver em uso, a limpeza ficará para a próxima inicialização."} Os projetos e as fotos originais serão mantidos.</p>
       <div className="application-settings-actions">

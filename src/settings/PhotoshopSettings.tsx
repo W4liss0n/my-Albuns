@@ -38,13 +38,7 @@ export function PhotoshopSettings({ port }: { port: PhotoshopSettingsPort }) {
 
   const selected = status?.installations.find((installation) => installation.id === status.selectedInstallationId);
   return <section aria-label="Photoshop" className="application-settings-panel" aria-busy={pending}>
-    <div className="application-settings-section-heading">
-      <div className="application-settings-integration-heading">
-        <h2>Photoshop</h2>
-        <p role="status" className="application-settings-status" data-available={Boolean(selected)}>{pending ? "Salvando…" : status ? selected ? "Disponível" : "Não encontrado" : "Buscando…"}</p>
-      </div>
-      <ActionButton variant="quiet" disabled={pending} onClick={() => void refresh()}>Atualizar</ActionButton>
-    </div>
+    <h2>Photoshop</h2>
     <div className="application-settings-integration">
       <label className="application-settings-field">
         <span>Versão utilizada</span>

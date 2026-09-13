@@ -34,16 +34,14 @@ As preferências pertencem ao usuário, não participam de Undo/Redo e não exig
 
 ## Desempenho
 
-A primeira versão não expõe calibração, número de processos, threads, memória ou paralelismo. A aba apresenta somente o uso do Cache e as ações seguras para liberar espaço. Os indicadores e suas ações ficam em duas colunas, com `Atualizar` no cabeçalho da seção.
+A primeira versão não expõe calibração, número de processos, threads, memória ou paralelismo. A aba apresenta somente `Cache dos álbuns`, em uma seção compacta com largura de conteúdo limitada a 480 pixels lógicos. Cada linha reúne rótulo, espaço ocupado e ação correspondente. Não há cartões de indicadores, números em destaque nem botão `Atualizar`; os dados são consultados ao abrir a janela e quando ela recupera o foco.
 
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
-│  Cache de imagens                                  Atualizar     │
+│  Cache dos álbuns                                                │
 ├──────────────────────────────────────────────────────────────────┤
-│  Espaço ocupado               │  Disponível para liberar          │
-│  {espaço calculado}           │  {espaço calculado}               │
-│                                                                  │
-│  [ Limpar todo o cache ]       │  [ Liberar espaço ]               │
+│  Espaço ocupado    {total}        [ Limpar todo o cache ]         │
+│  Álbuns fechados   {liberável}    [ Liberar espaço ]               │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -59,7 +57,7 @@ A organização física, a invalidação e as garantias do Cache estão em [Arma
 
 ## Outros
 
-A seção `Photoshop` apresenta as instalações detectadas do Adobe Photoshop e a disponibilidade da integração. O estado fica ao lado do título; `Atualizar` permanece à direita. O seletor `Versão utilizada` e o botão `Localizar…` ficam na mesma linha. O caminho da instalação aparece abaixo, abreviado visualmente se necessário, com o texto completo disponível para cópia e no tooltip.
+A seção `Photoshop` apresenta as instalações detectadas do Adobe Photoshop. O título fica próximo às opções, sem indicação `Disponível` e sem botão `Atualizar`. O seletor `Versão utilizada` e o botão `Localizar…` ficam na mesma linha. O caminho da instalação aparece abaixo, abreviado visualmente se necessário, com o texto completo disponível para cópia e no tooltip. A ausência de instalação é informada no próprio seletor; erros de operação continuam visíveis. As instalações são consultadas ao abrir a janela e quando ela recupera o foco.
 
 Sem preferência válida, a versão compatível mais recente começa selecionada. O usuário pode escolher outra instalação detectada ou usar `Localizar…` para indicar o executável. A mudança do nome da aba não altera o destino dos comandos existentes que abrem diretamente as preferências do Photoshop.
 
@@ -71,7 +69,7 @@ Um Monitor de Arquivos consolida eventos rápidos e os trata como indícios. Dep
 
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
-│  Photoshop  Disponível                             Atualizar     │
+│  Photoshop                                                       │
 ├──────────────────────────────────────────────────────────────────┤
 │  Versão utilizada                                                │
 │  [ Adobe Photoshop 2026                 ▾ ]   [ Localizar… ]      │
@@ -79,7 +77,7 @@ Um Monitor de Arquivos consolida eventos rápidos e os trata como indícios. Dep
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-A janela abre com 720 × 440 pixels lógicos, usa o cabeçalho, as cores e os controles compartilhados do projeto e mantém as abas e o rodapé fixos. Conteúdo excedente rola somente na área central. Textos introdutórios redundantes são omitidos; erros e confirmações necessários continuam visíveis. Em larguras reduzidas, os espaçamentos se ajustam e as colunas podem se empilhar, sem cortar controles.
+A janela abre com 720 × 440 pixels lógicos, usa o cabeçalho, as cores e os controles compartilhados do projeto e mantém as abas e o rodapé fixos. Segue a densidade das janelas auxiliares: títulos de seção de 13 pixels, controles de 31 pixels e texto de controle de 12,5 pixels, com 12 pixels entre título e conteúdo. Conteúdo excedente rola somente na área central. Textos introdutórios redundantes são omitidos; erros e confirmações necessários continuam visíveis. Em larguras reduzidas, os espaçamentos se ajustam e as colunas podem se empilhar, sem cortar controles.
 
 ## Comandos e associações
 

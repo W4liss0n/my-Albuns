@@ -52,7 +52,7 @@ test("absence disables only installation selection and focus discovers a later i
   const service = port();
   vi.mocked(service.status).mockResolvedValueOnce({ revision: 0, installations: [], selectedInstallationId: null });
   render(<PhotoshopSettings port={service} />);
-  await screen.findByText("Não encontrado");
+  await screen.findByRole("option", { name: "Nenhuma instalação encontrada" });
   expect(screen.getByRole("combobox")).toBeDisabled();
   expect(screen.getByRole("button", { name: "Localizar…" })).toBeEnabled();
   fireEvent.focus(window);

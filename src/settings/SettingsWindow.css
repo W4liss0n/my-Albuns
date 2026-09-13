@@ -4,13 +4,13 @@
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   color: var(--ui-text);
   background: var(--ui-surface);
-  font-size: var(--ui-font-size-form-control);
+  font-size: var(--ui-font-size-control);
 }
 
 .application-settings-tabs {
   display: flex;
   gap: 24px;
-  padding: 12px 28px 0;
+  padding: 8px 24px 0;
   border-bottom: 1px solid var(--ui-border);
 }
 
@@ -36,53 +36,44 @@
 }
 
 .application-settings main { min-width: 0; overflow: auto; }
-.application-settings-panel { display: grid; gap: 24px; padding: 24px 28px 28px; }
+.application-settings-panel { display: grid; gap: 12px; padding: 24px; }
 .application-settings-panel h2, .application-settings-panel p { margin: 0; }
-.application-settings-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.application-settings-section-heading h2 { font-size: var(--ui-font-size-form-heading); font-weight: 650; }
-.application-settings-section-heading > .ui-action-button { margin-right: -12px; }
-.application-settings-integration-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-.application-settings .ui-action-button { height: 36px; font-size: var(--ui-font-size-form-control); }
+.application-settings-panel > h2 { font-size: var(--ui-font-size-heading); font-weight: 600; }
+.application-settings-panel--cache { max-width: 528px; }
 
-.application-settings-columns {
+.application-settings-cache { margin: 0; }
+.application-settings-cache-row {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius);
-  background: var(--ui-surface-raised);
+  grid-template-columns: minmax(0, 1fr) max-content 154px;
+  align-items: center;
+  gap: 20px;
+  padding: 12px 0;
 }
-
-.application-settings-cache-column { display: grid; justify-items: start; gap: 24px; min-width: 0; padding: 24px; }
-.application-settings-cache-column + .application-settings-cache-column { border-left: 1px solid var(--ui-border); }
-.application-settings-metrics { display: grid; gap: 8px; margin: 0; }
-.application-settings-metrics dt { color: var(--ui-text-secondary); font-size: var(--ui-font-size-control); }
-.application-settings-metrics dd { margin: 0; font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.application-settings-cache-row:first-child { padding-top: 0; }
+.application-settings-cache-row + .application-settings-cache-row { border-top: 1px solid var(--ui-border); }
+.application-settings-cache-row dt { color: var(--ui-text-secondary); }
+.application-settings-cache-row dd { margin: 0; font-variant-numeric: tabular-nums; }
+.application-settings-cache-row .ui-action-button { width: 100%; }
 
 .application-settings-integration { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 10px 12px; }
-.application-settings-field { display: grid; min-width: 0; gap: 12px; color: var(--ui-text-secondary); font-size: var(--ui-font-size-control); }
-.application-settings-field select { width: 100%; min-width: 0; height: 36px; padding-inline: 12px; font-size: var(--ui-font-size-form-control); }
+.application-settings-field { display: grid; min-width: 0; gap: 6px; color: var(--ui-text-secondary); font-size: var(--ui-font-size-label); }
+.application-settings-field select { height: var(--ui-control-height); }
 .application-settings-field select:disabled { color: var(--ui-text-muted); background: var(--ui-surface-muted); }
-.application-settings-path { grid-column: 1 / -1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ui-text-muted); font-size: var(--ui-font-size-action); }
-.application-settings-status { color: var(--ui-text-secondary); font-size: var(--ui-font-size-action); }
-.application-settings-status[data-available="true"] { color: var(--ui-success-text); }
+.application-settings-path { grid-column: 1 / -1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ui-text-muted); font-size: var(--ui-font-size-support); }
 .application-settings-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.application-settings-panel .ui-inline-notice { font-size: var(--ui-font-size-control); }
 .application-settings-panel .ui-inline-notice .application-settings-actions { justify-content: flex-end; margin-top: 12px; }
 .application-settings-panel > [role="status"] { color: var(--ui-text-secondary); font-size: var(--ui-font-size-control); }
-.application-settings footer { display: flex; justify-content: flex-end; padding: 14px 28px; border-top: 1px solid var(--ui-border); }
-.application-settings footer .ui-action-button { min-width: 100px; }
+.application-settings footer { display: flex; justify-content: flex-end; padding: var(--ui-footer-padding); border-top: 1px solid var(--ui-border); }
 
 @media (max-width: 560px) {
   .application-settings-tabs { padding-inline: 20px; }
   .application-settings-panel { padding-inline: 20px; }
-  .application-settings-cache-column { gap: 20px; padding: 18px 14px; }
-  .application-settings-cache-column .ui-action-button { padding-inline: 10px; font-size: var(--ui-font-size-control); }
-  .application-settings footer { padding-inline: 20px; }
+  .application-settings-cache-row { gap: 12px; }
 }
 
 @media (max-width: 400px) {
-  .application-settings-columns { grid-template-columns: minmax(0, 1fr); }
-  .application-settings-cache-column + .application-settings-cache-column { border-top: 1px solid var(--ui-border); border-left: 0; }
+  .application-settings-cache-row { grid-template-columns: minmax(0, 1fr) max-content; }
+  .application-settings-cache-row dd:last-child { grid-column: 1 / -1; justify-self: start; }
   .application-settings-integration { grid-template-columns: minmax(0, 1fr); }
   .application-settings-locate { justify-self: start; }
 }

@@ -8839,7 +8839,7 @@
         "width": 720,
         "height": 440
       },
-      "readySelector": ".application-settings-status",
+      "readySelector": ".application-settings-field select",
       "actions": []
     },
     {
@@ -8855,7 +8855,7 @@
         "width": 720,
         "height": 440
       },
-      "readySelector": ".application-settings-status",
+      "readySelector": ".application-settings-field select",
       "actions": []
     },
     {
@@ -8906,7 +8906,7 @@
     },
     {
       "id": "settings-cache-overview",
-      "title": "Configurações — cache em duas colunas",
+      "title": "Configurações — cache dos álbuns compacto",
       "implementationPath": "/settings-preview.html?section=performance",
       "comparison": {
         "kind": "implementation-only",
@@ -8917,7 +8917,7 @@
         "width": 720,
         "height": 440
       },
-      "readySelector": ".application-settings-columns",
+      "readySelector": ".application-settings-cache",
       "actions": []
     },
     {
@@ -8933,7 +8933,7 @@
         "width": 480,
         "height": 440
       },
-      "readySelector": ".application-settings-columns",
+      "readySelector": ".application-settings-cache",
       "actions": []
     },
     {
