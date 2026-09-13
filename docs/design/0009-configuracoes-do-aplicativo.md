@@ -34,20 +34,17 @@ As preferências pertencem ao usuário, não participam de Undo/Redo e não exig
 
 ## Desempenho
 
-A primeira versão não expõe calibração, número de processos, threads, memória ou paralelismo. A aba apresenta somente `Cache dos álbuns`, em uma seção compacta com largura de conteúdo limitada a 480 pixels lógicos. Cada linha reúne rótulo, espaço ocupado e ação correspondente. Não há cartões de indicadores, números em destaque nem botão `Atualizar`; os dados são consultados ao abrir a janela e quando ela recupera o foco.
+A primeira versão não expõe calibração, número de processos, threads, memória ou paralelismo. A aba apresenta somente `Cache dos álbuns`, em uma seção compacta com largura de conteúdo limitada a 480 pixels lógicos. Uma única linha reúne o espaço ocupado e o botão `Limpar cache`. Não há uma ação separada para álbuns fechados, cartões de indicadores, números em destaque nem botão `Atualizar`; os dados são consultados ao abrir a janela e quando ela recupera o foco.
 
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
 │  Cache dos álbuns                                                │
 ├──────────────────────────────────────────────────────────────────┤
-│  Espaço ocupado    {total}        [ Limpar todo o cache ]         │
-│  Álbuns fechados   {liberável}    [ Liberar espaço ]               │
+│  Espaço ocupado    {total}        [ Limpar cache ]                │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-`Liberar espaço` informa quanto pode remover e, depois da confirmação, exclui somente o Cache de Projetos fechados e sem proprietário ativo. Projetos, itens do Painel, vínculos e Arquivos originais permanecem intactos.
-
-`Limpar todo o cache` nunca remove Cache pertencente a um Projeto aberto durante a execução normal. Se não houver Projeto ou Processador ativo, pode executar imediatamente; caso contrário, oferece agendar a limpeza para a próxima inicialização do aplicativo, antes da abertura de Projetos. Não existe limpeza ao vivo de Cache ativo no MVP.
+`Limpar cache` solicita a limpeza completa e nunca remove Cache pertencente a um Projeto aberto durante a execução normal. Depois da confirmação, o aplicativo executa imediatamente se não houver Projeto ou Processador ativo; caso contrário, agenda automaticamente para a próxima inicialização, antes da abertura de Projetos. O usuário não precisa escolher o alcance ou o momento da limpeza. Projetos, itens do Painel, vínculos e Arquivos originais permanecem intactos. Não existe limpeza ao vivo de Cache ativo no MVP. Quando agendada, a limpeza apresenta uma única mensagem e o botão fica desabilitado para impedir solicitações repetidas.
 
 A confirmação ocupa a área dos indicadores, sem aumentar a janela. Ela informa o efeito da ação e a preservação dos Projetos e originais; `Cancelar` retorna aos indicadores.
 

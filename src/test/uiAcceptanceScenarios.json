@@ -8937,8 +8937,8 @@
       "actions": []
     },
     {
-      "id": "settings-cache-free-confirmation",
-      "title": "Configurações — liberar cache de projetos fechados",
+      "id": "settings-cache-scheduled",
+      "title": "Configurações — limpeza de cache agendada",
       "implementationPath": "/settings-preview.html?section=performance",
       "comparison": {
         "kind": "implementation-only",
@@ -8949,11 +8949,15 @@
         "width": 720,
         "height": 440
       },
-      "readySelector": ".application-settings [role=\"tabpanel\"]:not([hidden]) .ui-inline-notice",
+      "readySelector": ".application-settings [role=\"tabpanel\"]:not([hidden]) [role=\"status\"]",
       "actions": [
         {
           "type": "click-text",
-          "text": "Liberar espaço"
+          "text": "Limpar cache"
+        },
+        {
+          "type": "click-text",
+          "text": "Confirmar"
         }
       ]
     },
@@ -8974,7 +8978,7 @@
       "actions": [
         {
           "type": "click-text",
-          "text": "Limpar todo o cache"
+          "text": "Limpar cache"
         }
       ]
     },

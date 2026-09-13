@@ -47,10 +47,7 @@
   grid-template-columns: minmax(0, 1fr) max-content 154px;
   align-items: center;
   gap: 20px;
-  padding: 12px 0;
 }
-.application-settings-cache-row:first-child { padding-top: 0; }
-.application-settings-cache-row + .application-settings-cache-row { border-top: 1px solid var(--ui-border); }
 .application-settings-cache-row dt { color: var(--ui-text-secondary); }
 .application-settings-cache-row dd { margin: 0; font-variant-numeric: tabular-nums; }
 .application-settings-cache-row .ui-action-button { width: 100%; }
