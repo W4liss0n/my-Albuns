@@ -163,6 +163,7 @@ fn validate_marker_bytes(bytes: &[u8]) -> Result<(), AppPathsError> {
 fn map_guarded_error(error: GuardedFsError) -> AppPathsError {
     match error {
         GuardedFsError::OutsideRoot => AppPathsError::CacheStorageOutsideRoot,
+        GuardedFsError::StorageFull => AppPathsError::CacheStorageFull,
         GuardedFsError::AlreadyExists | GuardedFsError::NotFound | GuardedFsError::Unavailable => {
             AppPathsError::CacheStorageUnavailable
         }

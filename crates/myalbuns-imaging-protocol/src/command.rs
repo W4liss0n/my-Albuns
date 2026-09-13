@@ -124,6 +124,7 @@ pub struct ImagingFailure {
 pub enum ImagingFailureStage {
     InvalidRenderRequest,
     CacheProcessing,
+    CacheStorageFull,
     ResourceLimitExceeded,
     SourceVerification,
     SourceDecode,
@@ -138,6 +139,7 @@ impl ImagingFailureStage {
         match self {
             Self::InvalidRenderRequest => "invalid_render_request",
             Self::CacheProcessing => "cache_processing",
+            Self::CacheStorageFull => "cache_storage_full",
             Self::ResourceLimitExceeded => "resource_limit_exceeded",
             Self::SourceVerification => "source_verification",
             Self::SourceDecode => "source_decode",
@@ -152,6 +154,7 @@ impl ImagingFailureStage {
         match self {
             Self::InvalidRenderRequest => 29,
             Self::CacheProcessing => 27,
+            Self::CacheStorageFull => 30,
             Self::ResourceLimitExceeded => 28,
             Self::SourceVerification => 20,
             Self::SourceDecode => 21,
@@ -166,6 +169,7 @@ impl ImagingFailureStage {
         match exit_code {
             29 => Some(Self::InvalidRenderRequest),
             27 => Some(Self::CacheProcessing),
+            30 => Some(Self::CacheStorageFull),
             28 => Some(Self::ResourceLimitExceeded),
             20 => Some(Self::SourceVerification),
             21 => Some(Self::SourceDecode),

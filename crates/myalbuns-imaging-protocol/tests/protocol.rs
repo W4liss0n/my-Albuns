@@ -36,6 +36,7 @@ fn imaging_failure_stages_have_stable_process_exit_codes() {
     let stages = [
         ImagingFailureStage::InvalidRenderRequest,
         ImagingFailureStage::CacheProcessing,
+        ImagingFailureStage::CacheStorageFull,
         ImagingFailureStage::SourceVerification,
         ImagingFailureStage::SourceDecode,
         ImagingFailureStage::Composition,

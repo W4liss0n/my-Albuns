@@ -13,6 +13,7 @@ use myalbuns_logging::{ProcessRole, safe_log_identifier};
 use myalbuns_paths::{AppPaths, ExpectedObject, PreparedCacheStorage};
 
 use crate::{
+    cache_error::{CacheError, CacheWriteMonitor},
     source::{
         MAX_DECODED_SOURCE_PIXELS_TOTAL, fingerprint_source, open_cache_source,
         verify_source_fingerprint,
@@ -20,7 +21,7 @@ use crate::{
     write_response,
 };
 
-pub(crate) fn run_cache(request: CacheRequest, app_paths: &AppPaths) -> Result<(), String> {
+pub(crate) fn run_cache(request: CacheRequest, app_paths: &AppPaths) -> Result<(), CacheError> {
     let operation_id = safe_log_identifier(&request.request_id);
     let project_id = safe_log_identifier(&request.project_id);
     let root_binding_plan_sha256 = root_binding_plan_sha256(&request.root_bindings)?;
@@ -43,7 +44,7 @@ pub(crate) fn run_cache(request: CacheRequest, app_paths: &AppPaths) -> Result<(
             protocol_version = request.protocol_version,
             operation_id,
             project_id,
-            error,
+            error = %error,
             event = "cache_request_failed",
         );
     })?;
@@ -65,15 +66,23 @@ pub(crate) fn run_cache(request: CacheRequest, app_paths: &AppPaths) -> Result<(
         request.request_id,
         completion,
     ))
+    .map_err(Into::into)
 }
 
-fn build_cache(request: &CacheRequest, app_paths: &AppPaths) -> Result<CacheCompletion, String> {
+fn build_cache(
+    request: &CacheRequest,
+    app_paths: &AppPaths,
+) -> Result<CacheCompletion, CacheError> {
     if request.policy.max_decoded_pixels != MAX_DECODED_SOURCE_PIXELS_TOTAL {
-        return Err("a política de decode diverge do limite comum do Processador".into());
+        return Err(
+            "a política de decode diverge do limite comum do Processador"
+                .to_string()
+                .into(),
+        );
     }
     let storage = app_paths
         .prepare_cache_storage(&request.cache_paths)
-        .map_err(|error| format!("não foi possível preparar o Cache: {error}"))?;
+        .map_err(|error| CacheError::paths("não foi possível preparar o Cache", error))?;
 
     let mut artifacts = Vec::with_capacity(request.jobs.len());
     let mut generated_count = 0;
@@ -185,7 +194,7 @@ fn generate_preview(
     job: &CacheJob,
     resolved: &myalbuns_paths::ResolvedObject,
     fingerprint: CacheFingerprint,
-) -> Result<CacheArtifact, String> {
+) -> Result<CacheArtifact, CacheError> {
     let source = &job.source;
     let opened = open_cache_source(resolved).map_err(|failure| failure.message)?;
     let pixel_count = opened.pixel_count().map_err(|failure| failure.message)?;
@@ -193,7 +202,8 @@ fn generate_preview(
         return Err(format!(
             "a mídia {} excede o limite de pixels decodificados",
             source.media_id()
-        ));
+        )
+        .into());
     }
     let exif_orientation = opened.exif_orientation();
     let source_page_count = opened.source_page_count();
@@ -258,7 +268,7 @@ pub(crate) fn write_preview(
     decoded: DynamicImage,
     paths: impl FnOnce(CacheArtifactFormat) -> Result<(std::path::PathBuf, std::path::PathBuf), String>,
     verify_source: impl FnOnce() -> Result<(), String>,
-) -> Result<PreviewOutput, String> {
+) -> Result<PreviewOutput, CacheError> {
     let (width, height) = decoded.dimensions();
     let preview = if width > policy.max_edge_px || height > policy.max_edge_px {
         decoded.thumbnail(policy.max_edge_px, policy.max_edge_px)
@@ -276,49 +286,63 @@ pub(crate) fn write_preview(
     let (temporary_path, preview_path) = paths(format)?;
     let mut publication = storage
         .begin_file_publication(&temporary_path, &preview_path)
-        .map_err(|error| format!("não foi possível criar o Cache temporário: {error}"))?;
+        .map_err(|error| CacheError::paths("não foi possível criar o Cache temporário", error))?;
     {
-        let mut writer = BufWriter::new(&mut publication);
-        match format {
-            CacheArtifactFormat::Jpeg => {
-                let mut encoder = JpegEncoder::new_with_quality(&mut writer, policy.jpeg_quality);
-                encoder
-                    .set_icc_profile(SRGB_PROFILE.to_vec())
-                    .map_err(|error| format!("não foi possível incluir o perfil sRGB: {error}"))?;
-                let result = match &preview {
-                    DynamicImage::ImageRgb8(rgb) => encoder.encode_image(rgb),
-                    _ => encoder.encode_image(&preview),
-                };
-                result.map_err(|error| {
-                    format!("não foi possível codificar a prévia JPEG: {error}")
-                })?;
+        let mut writer = CacheWriteMonitor::new(BufWriter::new(&mut publication));
+        let encoded = (|| -> Result<(), CacheError> {
+            match format {
+                CacheArtifactFormat::Jpeg => {
+                    let mut encoder =
+                        JpegEncoder::new_with_quality(&mut writer, policy.jpeg_quality);
+                    encoder
+                        .set_icc_profile(SRGB_PROFILE.to_vec())
+                        .map_err(|error| {
+                            format!("não foi possível incluir o perfil sRGB: {error}")
+                        })?;
+                    let result = match &preview {
+                        DynamicImage::ImageRgb8(rgb) => encoder.encode_image(rgb),
+                        _ => encoder.encode_image(&preview),
+                    };
+                    result.map_err(|error| {
+                        CacheError::image("não foi possível codificar a prévia JPEG", error)
+                    })?;
+                }
+                CacheArtifactFormat::Png => {
+                    let mut encoder = PngEncoder::new(&mut writer);
+                    encoder
+                        .set_icc_profile(SRGB_PROFILE.to_vec())
+                        .map_err(|error| {
+                            format!("não foi possível incluir o perfil sRGB: {error}")
+                        })?;
+                    encoder
+                        .write_image(
+                            preview.as_bytes(),
+                            preview.width(),
+                            preview.height(),
+                            ExtendedColorType::Rgba8,
+                        )
+                        .map_err(|error| {
+                            CacheError::image("não foi possível codificar a prévia PNG", error)
+                        })?;
+                }
             }
-            CacheArtifactFormat::Png => {
-                let mut encoder = PngEncoder::new(&mut writer);
-                encoder
-                    .set_icc_profile(SRGB_PROFILE.to_vec())
-                    .map_err(|error| format!("não foi possível incluir o perfil sRGB: {error}"))?;
-                encoder
-                    .write_image(
-                        preview.as_bytes(),
-                        preview.width(),
-                        preview.height(),
-                        ExtendedColorType::Rgba8,
-                    )
-                    .map_err(|error| format!("não foi possível codificar a prévia PNG: {error}"))?;
-            }
+            writer
+                .flush()
+                .map_err(|error| CacheError::io("não foi possível finalizar a prévia", error))?;
+            Ok(())
+        })();
+        if writer.storage_full {
+            return Err(CacheError::StorageFull);
         }
-        writer
-            .flush()
-            .map_err(|error| format!("não foi possível finalizar a prévia: {error}"))?;
+        encoded?;
     }
     let publication = publication
         .sync()
-        .map_err(|error| format!("não foi possível sincronizar a prévia: {error}"))?;
+        .map_err(|error| CacheError::paths("não foi possível sincronizar a prévia", error))?;
     verify_source()?;
     publication
         .publish()
-        .map_err(|error| format!("não foi possível publicar a prévia: {error}"))?;
+        .map_err(|error| CacheError::paths("não foi possível publicar a prévia", error))?;
     let preview_bytes = storage
         .open_existing_file(&preview_path)
         .map_err(|error| format!("representação reduzida indisponível: {error}"))?

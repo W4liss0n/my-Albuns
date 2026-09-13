@@ -59,4 +59,5 @@ windows = { version = "0.61", features = [
 windows-core = "0.61"
 
 [dev-dependencies]
+myalbuns-paths = { path = "../crates/myalbuns-paths", features = ["test-support"] }
 tempfile.workspace = true

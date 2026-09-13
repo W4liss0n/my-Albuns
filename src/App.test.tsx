@@ -1146,6 +1146,41 @@ test("shows the canonical Project warning when repeated processor failures suspe
   expect(screen.getByTestId("album-canvas")).toBeInTheDocument();
 });
 
+test("reports a full Cache disk once per opened Project and keeps editing available", async () => {
+  const dialog = projectDialogHarness();
+  let warn: Parameters<MediaPreviewPort["onCacheProcessorWarning"]>[0] | undefined;
+  render(<App
+    exportPipelinePort={exportPipelinePort}
+    mediaPreviewPort={{ ...mediaPreviewPort, onCacheProcessorWarning: async (listener) => {
+      warn = listener;
+      return () => undefined;
+    } }}
+    projectStartupPort={projectStartupPort}
+    projectCorePort={{ ...projectCorePort, load: async () => representativeProjection }}
+    projectWindowPort={projectWindowPort}
+    projectDialogPort={dialog.port}
+    graphicsProbe={canvasGraphicsDiagnosticProbe}
+    canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+    logger={silentLogger}
+  />);
+  await screen.findByRole("button", { name: "Exportar" });
+  const warning = {
+    state: "storage_full" as const,
+    message: "Não há espaço para preparar as imagens. Libere espaço no disco e abra o álbum novamente.",
+  };
+  act(() => warn?.(warning));
+  await waitFor(() => expect(dialog.present).toHaveBeenCalledWith({
+    kind: "projectOperationFailure", message: warning.message,
+  }));
+  act(() => dialog.emit("dismissProjectOperationFailure"));
+  await waitFor(() => expect(dialog.dismiss).toHaveBeenCalled());
+  const presentationsBeforeNextImage = dialog.present.mock.calls.length;
+  await act(async () => { warn?.(warning); });
+  expect(dialog.present).toHaveBeenCalledTimes(presentationsBeforeNextImage);
+  expect(screen.getByRole("button", { name: "Exportar" })).toBeEnabled();
+  expect(screen.getByTestId("album-canvas")).toBeInTheDocument();
+});
+
 test("registers the Cache warning listener before the first preview demand", async () => {
   let resolveWarningRegistration:
     | ((dispose: () => void) => void)

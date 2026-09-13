@@ -296,6 +296,159 @@ mod tests {
     }
 
     #[test]
+    fn disk_full_during_preview_keeps_valid_originals_and_continues_the_batch() {
+        for (format, size) in [
+            (ImageFormat::Jpeg, 31),
+            (ImageFormat::Jpeg, 256),
+            (ImageFormat::Png, 256),
+        ] {
+            let height = if size == 31 { 17 } else { 256 };
+            let root = tempfile::tempdir().unwrap();
+            let paths =
+                AppPaths::from_roots(&root.path().join("roaming"), &root.path().join("local"));
+            let request = request(root.path(), &paths, 2);
+            if format == ImageFormat::Png {
+                image::RgbaImage::from_fn(size, height, |x, y| {
+                    image::Rgba([x as u8, (x * y) as u8, (x ^ y) as u8, 120])
+                })
+                .save_with_format(request.candidates[0].path(), format)
+                .unwrap();
+            } else {
+                RgbImage::from_fn(size, height, |x, y| {
+                    Rgb([x as u8, (x * y) as u8, (x ^ y) as u8])
+                })
+                .save_with_format(request.candidates[0].path(), format)
+                .unwrap();
+            }
+            let cache_format = if format == ImageFormat::Png {
+                myalbuns_paths::CacheArtifactFormat::Png
+            } else {
+                myalbuns_paths::CacheArtifactFormat::Jpeg
+            };
+            let originals = request
+                .candidates
+                .iter()
+                .map(|candidate| std::fs::read(candidate.path()).unwrap())
+                .collect::<Vec<_>>();
+            let candidate = &request.candidates[0];
+            let preview_path = request
+                .cache_paths
+                .import_preview_file(
+                    &request.attempt_id,
+                    candidate.source_id.as_str(),
+                    &candidate.generation_id,
+                    cache_format,
+                )
+                .unwrap();
+            let temporary_path = request
+                .cache_paths
+                .import_preview_temporary_file(
+                    &request.attempt_id,
+                    candidate.source_id.as_str(),
+                    &candidate.generation_id,
+                    cache_format,
+                    std::process::id(),
+                )
+                .unwrap();
+            let fault = myalbuns_paths::test_support::CacheDiskFull::after_bytes(&preview_path, 32);
+            let mut progress = Vec::new();
+            let completion = prepare(&request, &paths, |completed, total| {
+                progress.push((completed, total));
+                Ok(())
+            })
+            .unwrap();
+            completion.validate_for(&request).unwrap();
+            assert_eq!(fault.written_bytes(), 32);
+            assert!(fault.failure_count() > 0);
+            let PhotoImportOutcome::Validated {
+                dimensions,
+                preview: ImportedPhotoPreview::Unavailable { reason },
+                ..
+            } = &completion.photos[0].outcome
+            else {
+                panic!("a full Cache disk must preserve the validated Original");
+            };
+            assert_eq!((dimensions.width_px, dimensions.height_px), (size, height));
+            assert!(reason.contains("Libere espaço"), "{reason}");
+            assert!(matches!(
+                completion.photos[1].outcome,
+                PhotoImportOutcome::Validated {
+                    preview: ImportedPhotoPreview::Prepared { .. },
+                    ..
+                }
+            ));
+            assert_eq!(progress, [(0, 2), (1, 2), (2, 2)]);
+            assert!(!preview_path.exists());
+            assert!(!temporary_path.exists());
+            for (candidate, before) in request.candidates.iter().zip(&originals) {
+                assert_eq!(std::fs::read(candidate.path()).unwrap(), *before);
+            }
+            drop(fault);
+
+            let recovered = prepare(&request, &paths, |_, _| Ok(())).unwrap();
+            assert!(matches!(
+                recovered.photos[0].outcome,
+                PhotoImportOutcome::Validated {
+                    preview: ImportedPhotoPreview::Prepared { .. },
+                    ..
+                }
+            ));
+            assert_eq!(
+                image::open(&preview_path).unwrap().dimensions(),
+                (size, height)
+            );
+        }
+    }
+
+    #[test]
+    fn disk_full_during_cache_command_reports_a_deterministic_storage_failure() {
+        use myalbuns_imaging_protocol::{
+            CacheJob, CacheMediaSource, CacheRequest, ImagingFailureStage,
+        };
+        let root = tempfile::tempdir().unwrap();
+        let paths = AppPaths::from_roots(&root.path().join("roaming"), &root.path().join("local"));
+        let import = request(root.path(), &paths, 1);
+        let source = CacheMediaSource::new(
+            "photo",
+            myalbuns_core::MediaKind::Photo,
+            import.candidates[0].path().to_owned(),
+        )
+        .unwrap();
+        let original = std::fs::read(source.source_path()).unwrap();
+        let preview = import
+            .cache_paths
+            .preview_file(
+                "photo",
+                "new-generation",
+                myalbuns_paths::CacheArtifactFormat::Jpeg,
+            )
+            .unwrap();
+        let request = CacheRequest::new(
+            "cache-test",
+            import.project_id,
+            import.cache_paths,
+            vec![CacheJob::new(source, "new-generation", None).unwrap()],
+            import.policy,
+            import.root_bindings,
+        )
+        .unwrap();
+        let fault = myalbuns_paths::test_support::CacheDiskFull::after_bytes(&preview, 32);
+        let error = crate::cache::run_cache(request, &paths).unwrap_err();
+        assert!(fault.failure_count() > 0);
+        assert!(matches!(error, crate::cache_error::CacheError::StorageFull));
+        assert_eq!(
+            crate::cache_failure(error).stage,
+            Some(ImagingFailureStage::CacheStorageFull)
+        );
+        assert_eq!(ImagingFailureStage::CacheStorageFull.exit_code(), 30);
+        assert_eq!(
+            std::fs::read(import.candidates[0].path()).unwrap(),
+            original
+        );
+        assert!(!preview.exists());
+    }
+
+    #[test]
     fn a_cache_failure_still_returns_fingerprinted_original_dimensions() {
         let root = tempfile::tempdir().unwrap();
         let paths = AppPaths::from_roots(&root.path().join("roaming"), &root.path().join("local"));
