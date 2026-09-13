@@ -424,7 +424,9 @@ fn setup_host(
             .find(|window| window.label == PROJECT_WINDOW_LABEL)
             .cloned()
             .ok_or_else(|| io::Error::other("the Project window configuration does not exist"))?;
-        let (policy_signal, policy_readiness) = desktop_webview_policy::page_load_handshake();
+        let (policy_signal, policy_readiness) = desktop_webview_policy::page_load_handshake(
+            project_config.additional_browser_args.as_deref(),
+        );
         let window = WebviewWindowBuilder::from_config(app, &project_config)?
             .data_directory(webview_data_directory)
             .on_page_load(move |window, payload| {

@@ -13,7 +13,7 @@ import { findFreeTcpPort } from "./GateWebDriver.mjs";
 
 const [applicationArgument, projectArgument, outputArgument, countArgument] = process.argv.slice(2);
 assert.ok(applicationArgument && projectArgument && outputArgument && countArgument,
-  "Usage: Run-OpeningProgressPaintGate.mjs <application> <fixture-project> <new-output> <image-count> [--fail-owner-browser]");
+  "Usage: Run-OpeningProgressPaintGate.mjs <application> <fixture-project> <new-output> <image-count> [--fail-owner-browser | --fail-progress-browser]");
 const application = path.resolve(applicationArgument);
 const project = path.resolve(projectArgument);
 const output = path.resolve(outputArgument);
@@ -28,12 +28,16 @@ for (const key of Object.keys(environment)) {
   if (key.startsWith("MYALBUNS_DEV_") || key === "TAURI_WEBVIEW_AUTOMATION" ||
       key === "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS") delete environment[key];
 }
+const failProgress = process.argv.includes("--fail-progress-browser");
 const failOwner = process.argv.includes("--fail-owner-browser");
+const injectFailure = failOwner || failProgress;
 let globalPort;
-if (failOwner) {
+let openingPort;
+if (injectFailure) {
   globalPort = await findFreeTcpPort();
+  openingPort = await findFreeTcpPort();
   environment.MYALBUNS_DEV_GLOBAL_WEBVIEW_DEBUG_PORT = String(globalPort);
-  environment.MYALBUNS_DEV_OPENING_DIALOG_WEBVIEW_DEBUG_PORT = String(await findFreeTcpPort());
+  environment.MYALBUNS_DEV_OPENING_DIALOG_WEBVIEW_DEBUG_PORT = String(openingPort);
   environment.MYALBUNS_DEV_HOST_WEBVIEW_DEBUG_PORT = String(await findFreeTcpPort());
   environment.WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = `--remote-debugging-port=${globalPort}`;
 }
@@ -53,17 +57,22 @@ try {
   observerCompletion = new Promise((resolve) => observer.once("exit", (code) => resolve(code)));
   for (let attempt = 0; attempt < 100 && !existsSync(path.join(output, "observer.ready")); attempt++) await pause(50);
   assert.ok(existsSync(path.join(output, "observer.ready")), "The native observer must start");
-  const browser = failOwner ? captureListeningProcessInstance(globalPort) : null;
+  let browser = failOwner ? captureListeningProcessInstance(globalPort) : null;
   if (failOwner) {
     assert.equal(browser?.parentProcessId, global.pid, "Only the test Global browser may be terminated");
     assert.ok(browser.commandLine.includes(path.join(dataRoot, "Local", "MyAlbuns2", "State", "WebView2", "global")));
   }
   spawn(application, [project], { windowsHide: true, stdio: "ignore", env: environment });
-  if (failOwner) {
+  if (injectFailure) {
     for (let attempt = 0; attempt < 100 && !existsSync(path.join(output, "painted.png")); attempt++) await pause(50);
     assert.ok(existsSync(path.join(output, "painted.png")), "The dialog must paint before browser failure");
+    if (failProgress) {
+      browser = captureListeningProcessInstance(openingPort);
+      assert.equal(browser?.parentProcessId, global.pid, "Only the test progress browser may be terminated");
+      assert.ok(browser.commandLine.includes(path.join(dataRoot, "Local", "MyAlbuns2", "State", "WebView2", "global-progress")));
+    }
     writeFileSync(path.join(output, "injected-failure.json"), JSON.stringify({ utc: Date.now(), browser }, null, 2));
-    terminateProcessInstance(browser);
+    assert.equal(terminateProcessInstance(browser), true, "The exact test browser must be terminated for this regression gate");
   }
   const observerCode = await observerCompletion;
   writeFileSync(path.join(output, "observer.log"), observerLog);
@@ -89,13 +98,19 @@ try {
     .split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line)));
   const ready = records.find((record) => record.event === "project_ui_ready");
   writeFileSync(path.join(output, "result.json"), JSON.stringify({
-    application, failOwner, expectedImages, cacheEntries, longestBlackMilliseconds,
+    application, failOwner, failProgress, expectedImages, cacheEntries, longestBlackMilliseconds,
     exposedSamples: exposed.length, projectReady: Boolean(ready),
   }, null, 2));
   assert.ok(longestBlackMilliseconds < 500, `The native dialog stayed black for ${longestBlackMilliseconds} ms`);
   assert.ok(existsSync(path.join(output, "progress.png")), "Measured progress must actually paint beyond the initial indeterminate indicator");
   assert.equal(cacheEntries, expectedImages, "All fixture images must be prepared before release");
   assert.ok(ready, "The Project must complete its UI readiness handshake");
+  if (failProgress) {
+    assert.ok(records.some(record => record.event === "webview_recovery_ready" && record.webview_label === "dialog-opening-progress"),
+      "The failed progress control must be recreated");
+  }
+  assert.equal(new Set(exposed.map(sample => `${sample.Width}x${sample.Height}`)).size, 1,
+    "Recovery must preserve the native dialog dimensions");
   assert.ok(!records.some((record) => record.event === "imaging_process_spawned" &&
     record.process_id === ready.process_id && record.operation === "cache" && record.timestamp > ready.timestamp),
   "Cache reconstruction must finish before the Project is released");

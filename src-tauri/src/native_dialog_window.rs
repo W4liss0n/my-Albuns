@@ -178,6 +178,33 @@ pub(crate) fn owned_window_content_ready(window: WebviewWindow, token: u64) -> R
         .signal(window.label(), token)
 }
 
+/// A replacement must not acknowledge an already consumed content-ready token.
+pub(crate) fn recovery_url(label: &str, mut url: tauri::Url) -> tauri::Url {
+    let parameters = url
+        .query_pairs()
+        .map(|(key, value)| (key.into_owned(), value.into_owned()))
+        .filter(|(key, value)| {
+            key != OWNED_WINDOW_READY_PARAMETER
+                || owned_window_readiness()
+                    .lock()
+                    .ok()
+                    .is_some_and(|registry| {
+                        registry
+                            .waiters
+                            .get(label)
+                            .is_some_and(|(token, _)| value.parse::<u64>().ok() == Some(*token))
+                    })
+        })
+        .collect::<Vec<_>>();
+    if url.query().is_some() {
+        url.set_query(None);
+        if !parameters.is_empty() {
+            url.query_pairs_mut().extend_pairs(parameters);
+        }
+    }
+    url
+}
+
 #[tauri::command]
 pub(crate) async fn fit_owned_window(
     window: WebviewWindow,
@@ -449,7 +476,12 @@ impl NativeProgressDialog {
             .lock()
             .map_err(|_| io::Error::other("the owned window readiness registry is unavailable"))?
             .register(self.window.label());
-        let mut url = self.window.url().map_err(io::Error::other)?;
+        let current_webview = self
+            .window
+            .app_handle()
+            .get_webview(self.window.label())
+            .ok_or_else(|| io::Error::other("the opening presentation is unavailable"))?;
+        let mut url = current_webview.url().map_err(io::Error::other)?;
         url.set_path("/dialog.html");
         url.set_query(Some(&format!(
             "kind={kind}&attemptId={}&{OWNED_WINDOW_READY_PARAMETER}={ready_token}",
@@ -458,7 +490,7 @@ impl NativeProgressDialog {
                 | OpeningDecisionAttempt::Recovery(attempt_id) => attempt_id,
             }),
         )));
-        if let Err(error) = self.window.navigate(url) {
+        if let Err(error) = current_webview.navigate(url) {
             cancel_owned_window_readiness(self.window.label(), ready_token);
             self.cancel_opening_decision();
             return Err(io::Error::other(error));
@@ -563,11 +595,12 @@ pub(crate) async fn show_native_progress(
     )?;
     #[cfg(not(debug_assertions))]
     let browser_arguments: Option<String> = None;
-    // This small text/progress surface does not need the GPU compositor that
-    // failed during opening. Its separate environment leaves the Canvas GPU intact.
+    // Temporary rendering mitigation for the small progress surface. It does
+    // not establish a GPU root cause and leaves the Canvas GPU intact.
     let browser_arguments = format!(
         "{} --disable-gpu",
-        browser_arguments.unwrap_or_else(|| desktop_webview_policy::WRY_DEFAULT_DISABLED_FEATURES.to_owned())
+        browser_arguments
+            .unwrap_or_else(|| desktop_webview_policy::WRY_DEFAULT_DISABLED_FEATURES.to_owned())
     );
     let window = build_hidden_owned_window(
         app,
@@ -688,7 +721,8 @@ pub(crate) async fn build_hidden_owned_window(
         .register(label);
     let ready_url =
         append_query_parameter(url, OWNED_WINDOW_READY_PARAMETER, &ready_token.to_string());
-    let (policy_signal, policy_readiness) = desktop_webview_policy::page_load_handshake();
+    let (policy_signal, policy_readiness) =
+        desktop_webview_policy::page_load_handshake(browser_arguments);
     let mut builder = WebviewWindowBuilder::new(app, label, WebviewUrl::App(ready_url.into()))
         .title("MyAlbuns")
         .inner_size(width, height)
@@ -1264,6 +1298,27 @@ mod tests {
         registry.signal("project-dialog", token).unwrap();
         assert_eq!(readiness.try_recv(), Ok(()));
         assert!(registry.signal("project-dialog", token).is_err());
+    }
+
+    #[test]
+    fn recovered_dialog_preserves_pending_readiness_and_discards_a_consumed_token() {
+        let label = "recovery-url-test";
+        let (token, mut receiver) = owned_window_readiness().lock().unwrap().register(label);
+        let original = tauri::Url::parse(&format!(
+            "http://tauri.localhost/dialog.html?kind=project-recovery&attemptId=attempt-42&ownedReadyToken={token}#decision"
+        )).unwrap();
+        assert_eq!(recovery_url(label, original.clone()), original);
+        owned_window_readiness()
+            .lock()
+            .unwrap()
+            .signal(label, token)
+            .unwrap();
+        assert_eq!(receiver.try_recv(), Ok(()));
+        let recovered = recovery_url(label, original);
+        assert_eq!(
+            recovered.as_str(),
+            "http://tauri.localhost/dialog.html?kind=project-recovery&attemptId=attempt-42#decision"
+        );
     }
 
     #[test]

@@ -72,7 +72,12 @@ pub(crate) async fn show(app: &AppHandle, section: SettingsSection) -> Result<()
         .state::<crate::settings_modality::SettingsModality>()
         .reserve()
         .await?;
-    let (signal, readiness) = desktop_webview_policy::page_load_handshake();
+    #[cfg(debug_assertions)]
+    let arguments = desktop_webview_policy::global_webview_debug_arguments()
+        .map_err(|error| error.to_string())?;
+    #[cfg(not(debug_assertions))]
+    let arguments: Option<String> = None;
+    let (signal, readiness) = desktop_webview_policy::page_load_handshake(arguments.as_deref());
     let builder = WebviewWindowBuilder::new(
         app,
         SETTINGS_WINDOW_LABEL,
@@ -95,9 +100,7 @@ pub(crate) async fn show(app: &AppHandle, section: SettingsSection) -> Result<()
     .center()
     .prevent_overflow();
     #[cfg(debug_assertions)]
-    let builder = match desktop_webview_policy::global_webview_debug_arguments()
-        .map_err(|error| error.to_string())?
-    {
+    let builder = match arguments {
         Some(arguments) => builder.additional_browser_args(&arguments),
         None => builder,
     };

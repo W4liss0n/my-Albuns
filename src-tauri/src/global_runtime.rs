@@ -1461,12 +1461,17 @@ fn build_global_window(
         .iter()
         .find(|window| window.label == GLOBAL_WINDOW_LABEL)
         .ok_or_else(|| std::io::Error::other("the Global window configuration does not exist"))?;
-    let (policy_signal, policy_readiness) = desktop_webview_policy::page_load_handshake();
+    #[cfg(debug_assertions)]
+    let arguments = desktop_webview_policy::global_webview_debug_arguments()?;
+    #[cfg(not(debug_assertions))]
+    let arguments: Option<String> = None;
+    let (policy_signal, policy_readiness) =
+        desktop_webview_policy::page_load_handshake(arguments.as_deref());
     let builder = WebviewWindowBuilder::from_config(app, config)
         .map_err(std::io::Error::other)?
         .data_directory(webview_data_directory);
     #[cfg(debug_assertions)]
-    let builder = match desktop_webview_policy::global_webview_debug_arguments()? {
+    let builder = match arguments {
         Some(arguments) => builder.additional_browser_args(&arguments),
         None => builder,
     };

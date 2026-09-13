@@ -53,9 +53,11 @@ mod project_window_lifecycle;
 mod provisional_decoratives;
 mod recent_projects;
 mod runtime_role;
-mod settings_preferences;
 mod settings_modality;
+mod settings_preferences;
 mod settings_window;
+#[cfg(windows)]
+mod webview_recovery;
 mod workspace_preferences;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {

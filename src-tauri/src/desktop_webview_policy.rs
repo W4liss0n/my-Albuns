@@ -60,6 +60,7 @@ pub(crate) fn on_window_event(window: &tauri::Window, event: &tauri::WindowEvent
             }
         }
         tauri::WindowEvent::Destroyed => {
+            crate::webview_recovery::forget(window.label());
             let state = window.state::<WindowWebviewVisibility>();
             if let Ok(mut minimized) = state.minimized.lock() {
                 minimized.remove(window.label());
@@ -187,17 +188,40 @@ use {
 #[derive(Clone)]
 pub(crate) struct WebviewPolicyLoadSignal {
     sender: Arc<Mutex<Option<tokio::sync::oneshot::Sender<std::io::Result<()>>>>>,
+    browser_arguments: String,
 }
 
 pub(crate) struct WebviewPolicyReadiness {
     receiver: tokio::sync::oneshot::Receiver<std::io::Result<()>>,
 }
 
-pub(crate) fn page_load_handshake() -> (WebviewPolicyLoadSignal, WebviewPolicyReadiness) {
+pub(crate) fn browser_arguments(arguments: Option<&str>) -> String {
+    let defaults = format!(
+        "{} --autoplay-policy=no-user-gesture-required",
+        crate::desktop_webview_policy::WRY_DEFAULT_DISABLED_FEATURES
+    );
+    let arguments = arguments.unwrap_or(&defaults).to_owned();
+    // The debug launcher retires this inherited variable after the initial view.
+    #[cfg(debug_assertions)]
+    let arguments = {
+        let mut arguments = arguments;
+        if let Ok(inherited) = std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS") {
+            arguments.push(' ');
+            arguments.push_str(&inherited);
+        }
+        arguments
+    };
+    arguments
+}
+
+pub(crate) fn page_load_handshake(
+    arguments: Option<&str>,
+) -> (WebviewPolicyLoadSignal, WebviewPolicyReadiness) {
     let (sender, receiver) = tokio::sync::oneshot::channel();
     (
         WebviewPolicyLoadSignal {
             sender: Arc::new(Mutex::new(Some(sender))),
+            browser_arguments: browser_arguments(arguments),
         },
         WebviewPolicyReadiness { receiver },
     )
@@ -214,7 +238,10 @@ impl WebviewPolicyLoadSignal {
         }
         let sender = self.sender.lock().ok().and_then(|mut sender| sender.take());
         if let Some(sender) = sender {
-            let _ = sender.send(enforce_webview(webview));
+            let _ = sender.send(enforce_webview_with_arguments(
+                webview,
+                self.browser_arguments.clone(),
+            ));
         }
     }
 }
@@ -227,15 +254,36 @@ impl WebviewPolicyReadiness {
     }
 }
 
-pub(crate) fn enforce_webview(webview: &tauri::Webview) -> std::io::Result<()> {
+pub(crate) fn enforce_webview_with_arguments(
+    webview: &tauri::Webview,
+    arguments: String,
+) -> std::io::Result<()> {
     #[cfg(windows)]
     {
         let (sender, receiver) = std::sync::mpsc::sync_channel(1);
         let label = webview.label().to_owned();
+        let app = webview.app_handle().clone();
+        let native_window = webview.window().hwnd().map_err(std::io::Error::other)?.0 as usize;
+        let url = webview.url().map_err(std::io::Error::other)?;
+        let can_recover = label == webview.window().label();
         webview
             .with_webview(move |webview| {
-                let result =
-                    enforce_windows_policy(&webview, &label).map_err(|error| error.to_string());
+                let result = enforce_windows_policy(&webview)
+                    .and_then(|()| {
+                        if can_recover {
+                            crate::webview_recovery::install(
+                                &webview,
+                                app,
+                                label,
+                                native_window,
+                                url,
+                                arguments,
+                            )
+                        } else {
+                            Ok(())
+                        }
+                    })
+                    .map_err(|error| error.to_string());
                 let _ = sender.send(result);
             })
             .map_err(std::io::Error::other)?;
@@ -254,7 +302,7 @@ pub(crate) fn enforce_webview(webview: &tauri::Webview) -> std::io::Result<()> {
     }
 
     #[cfg(not(windows))]
-    let _ = webview;
+    let _ = (webview, arguments);
 
     Ok(())
 }
@@ -493,47 +541,9 @@ mod tests {
 }
 
 #[cfg(windows)]
-fn enforce_windows_policy(
-    webview: &tauri::webview::PlatformWebview,
-    label: &str,
-) -> windows::core::Result<()> {
+fn enforce_windows_policy(webview: &tauri::webview::PlatformWebview) -> windows::core::Result<()> {
     unsafe {
         let core_webview = webview.controller().CoreWebView2()?;
-        use webview2_com::{
-            Microsoft::Web::WebView2::Win32::{
-                COREWEBVIEW2_PROCESS_FAILED_KIND, COREWEBVIEW2_PROCESS_FAILED_REASON,
-                ICoreWebView2ProcessFailedEventArgs2,
-            },
-            ProcessFailedEventHandler,
-        };
-        let mut browser_pid = 0;
-        core_webview.BrowserProcessId(&mut browser_pid)?;
-        let label = label.to_owned();
-        let mut token = 0;
-        core_webview.add_ProcessFailed(
-            &ProcessFailedEventHandler::create(Box::new(move |_, args| {
-                if let Some(args) = args {
-                    let mut kind = COREWEBVIEW2_PROCESS_FAILED_KIND::default();
-                    args.ProcessFailedKind(&mut kind)?;
-                    let args = args.cast::<ICoreWebView2ProcessFailedEventArgs2>()?;
-                    let mut reason = COREWEBVIEW2_PROCESS_FAILED_REASON::default();
-                    let mut code = 0;
-                    args.Reason(&mut reason)?;
-                    args.ExitCode(&mut code)?;
-                    tracing::error!(
-                        target: "myalbuns.desktop",
-                        event = "webview_process_failed",
-                        webview_label = label,
-                        browser_process_id = browser_pid,
-                        failure_kind = kind.0,
-                        failure_reason = reason.0,
-                        exit_code = code,
-                    );
-                }
-                Ok(())
-            })),
-            &mut token,
-        )?;
         let settings = core_webview.Settings()?;
         settings.SetAreDefaultContextMenusEnabled(false)?;
         settings

@@ -14,7 +14,7 @@ use crate::{
 
 pub(crate) const PROJECT_DIALOG_ACTION_EVENT: &str = "myalbuns://project-dialog-action";
 pub(crate) const PROJECT_DIALOG_PRESENTATION_EVENT: &str = "myalbuns://project-dialog-presentation";
-const PROJECT_DIALOG_LABEL: &str = "project-dialog";
+pub(crate) const PROJECT_DIALOG_LABEL: &str = "project-dialog";
 const MAX_DIALOG_TEXT_CHARS: usize = 800;
 const MAX_DIALOG_DETAILS: usize = 10;
 const MAX_DIALOG_SESSION_ID_CHARS: usize = 128;
@@ -183,6 +183,23 @@ impl ProjectDialogProgress {
 pub(crate) struct ProjectDialogPresentationStore(Mutex<Option<ProjectDialogPresentation>>);
 
 impl ProjectDialogPresentationStore {
+    pub(crate) fn recovery_url(&self, mut url: tauri::Url) -> Result<tauri::Url, String> {
+        let presentation = self
+            .current()?
+            .ok_or("the Project dialog is no longer active")?;
+        let parameters = url
+            .query_pairs()
+            .filter(|(key, _)| key != "presentation")
+            .map(|(key, value)| (key.into_owned(), value.into_owned()))
+            .collect::<Vec<_>>();
+        url.set_query(None);
+        url.query_pairs_mut().extend_pairs(parameters).append_pair(
+            "presentation",
+            &serde_json::to_string(&presentation).map_err(|error| error.to_string())?,
+        );
+        Ok(url)
+    }
+
     fn present(&self, session_id: &str, state: ProjectDialogState) -> Result<(), String> {
         let mut current = self
             .0
@@ -490,6 +507,20 @@ mod tests {
             presentation.state,
             ProjectDialogState::ExportProgress { .. }
         ));
+        let url = tauri::Url::parse(
+            "http://tauri.localhost/project-dialog.html?presentation=stale&ownedReadyToken=7",
+        )
+        .unwrap();
+        let recovered = store.recovery_url(url).unwrap();
+        let parameters = recovered
+            .query_pairs()
+            .collect::<std::collections::HashMap<_, _>>();
+        assert_eq!(parameters.get("ownedReadyToken").unwrap(), "7");
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(parameters.get("presentation").unwrap())
+                .unwrap(),
+            serde_json::to_value(presentation).unwrap()
+        );
     }
 
     #[test]
