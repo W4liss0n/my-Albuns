@@ -235,6 +235,8 @@ export interface ProjectWindowPort {
 }
 
 export interface ProjectStartupPort {
+  /** Native startup prepares disk Cache before the first viewport demand. */
+  prepareImages?(): Promise<readonly ImageProcessingProblem[]>;
   confirmUiReady(): Promise<readonly ImageProcessingProblem[] | void>;
 }
 

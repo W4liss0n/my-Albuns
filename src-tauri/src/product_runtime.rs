@@ -239,6 +239,7 @@ pub(crate) fn run(
             crate::native_dialog_window::owned_window_content_ready,
             crate::native_dialog_window::fit_owned_window,
             project_ui_ready,
+            prepare_project_startup_images,
             crate::project_commands::project_state,
             crate::project_commands::validate_album_information,
             crate::project_commands::apply_project_intent,
@@ -570,6 +571,24 @@ impl InitialImageProcessing {
             .map(|mut problems| std::mem::take(&mut *problems))
             .map_err(|_| "could not collect initial image processing problems".into())
     }
+}
+
+#[tauri::command]
+async fn prepare_project_startup_images(
+    window: tauri::WebviewWindow,
+    startup: tauri::State<'_, ProjectStartupHandshake>,
+    image_processing: tauri::State<'_, InitialImageProcessing>,
+) -> Result<Vec<crate::ipc_contract::ImageProcessingProblem>, String> {
+    if window.label() != PROJECT_WINDOW_LABEL {
+        return Err("Image preparation belongs only to the Project window".into());
+    }
+    image_processing
+        .prepare(window.app_handle())
+        .await
+        .map_err(|error| {
+            startup.emit_failed(FailureStage::Initialize, FailureCode::IoFailure);
+            error
+        })
 }
 
 #[tauri::command]

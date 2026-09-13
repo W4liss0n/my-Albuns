@@ -469,8 +469,10 @@ test.each(["completed", "failed"])("streams each media preview before the batch 
 });
 
 test("confirms Project UI readiness through its single startup seam", async () => {
+  await tauriProjectStartupPort.prepareImages!();
   await tauriProjectStartupPort.confirmUiReady();
 
+  expect(invoke).toHaveBeenCalledWith("prepare_project_startup_images");
   expect(invoke).toHaveBeenCalledWith("project_ui_ready");
 });
 

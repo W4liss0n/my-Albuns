@@ -351,6 +351,7 @@ export const tauriProjectCorePort: ProjectCorePort = {
 };
 
 export const tauriProjectStartupPort: ProjectStartupPort = {
+  prepareImages: () => invoke<readonly ImageProcessingProblem[]>("prepare_project_startup_images"),
   confirmUiReady: () => invoke<readonly ImageProcessingProblem[]>("project_ui_ready"),
 };
 

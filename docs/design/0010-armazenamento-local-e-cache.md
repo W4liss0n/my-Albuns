@@ -254,8 +254,10 @@ reaproveitar essa validação na primeira demanda, sem iniciar outro Processador
 Quando faltarem gerações utilizáveis, inclusive depois de limpar o Cache, o
 diálogo de abertura permanece visível até terminar a preparação de todas as
 imagens cujos originais estejam disponíveis, mesmo fora da área visível do
-Painel. Só então o editor é liberado. Gerações já validadas na recuperação são
-reutilizadas; originais ausentes ou indisponíveis conservam a apresentação
+Painel. A primeira demanda visual é entregue e suas miniaturas visíveis são
+decodificadas antes de liberar o editor, evitando trabalho concorrente de
+reconstrução e apresentação durante a abertura. Gerações já validadas na
+recuperação são reutilizadas; originais ausentes ou indisponíveis conservam a apresentação
 normal com o Cache que existir ou o placeholder, sem impedir a abertura.
 
 Somente vínculos cujo caminho, tamanho e datas correspondem ao artefato

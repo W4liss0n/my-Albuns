@@ -470,6 +470,40 @@ test("opens the Project in the real workspace when hardware WebGL2 is available"
   expect(load).toHaveBeenCalledWith(loadStarted?.operationId);
 });
 
+test("native opening waits for disk Cache, viewport delivery and decoded thumbnails before releasing the Project", async () => {
+  let finishPreparation!: (problems: readonly []) => void;
+  let finishPreviews!: (previews: readonly MediaPreview[]) => void;
+  let finishDecode!: () => void;
+  const decoding = new Promise<void>((resolve) => { finishDecode = resolve; });
+  const previousDecode = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, "decode");
+  const decode = vi.fn(() => decoding);
+  Object.defineProperty(HTMLImageElement.prototype, "decode", { configurable: true, value: decode });
+  const prepareImages = vi.fn(() => new Promise<readonly []>((resolve) => { finishPreparation = resolve; }));
+  const prepareMediaPreviews = vi.fn(() => new Promise<readonly MediaPreview[]>((resolve) => { finishPreviews = resolve; }));
+  const confirmUiReady = vi.fn(async () => undefined);
+  try {
+    render(<App workspacePreferencesMode="memory" exportPort={exportPort}
+      projectWindowPort={projectWindowPort} projectCorePort={projectCorePort}
+      projectStartupPort={{ prepareImages, confirmUiReady }}
+      mediaPreviewPort={{ ...mediaPreviewPort, prepareMediaPreviews }} logger={silentLogger}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe} graphicsProbe={canvasGraphicsDiagnosticProbe} />);
+    await waitFor(() => expect(prepareImages).toHaveBeenCalledOnce());
+    expect(prepareMediaPreviews).not.toHaveBeenCalled();
+    expect(confirmUiReady).not.toHaveBeenCalled();
+    act(() => finishPreparation([]));
+    await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalled());
+    expect(confirmUiReady).not.toHaveBeenCalled();
+    act(() => finishPreviews([{ mediaId: "media-001", state: "ready", url: "blob:startup-image" }]));
+    await waitFor(() => expect(decode).toHaveBeenCalled());
+    expect(confirmUiReady).not.toHaveBeenCalled();
+    await act(async () => finishDecode());
+    await waitFor(() => expect(confirmUiReady).toHaveBeenCalledOnce());
+  } finally {
+    if (previousDecode) Object.defineProperty(HTMLImageElement.prototype, "decode", previousDecode);
+    else Reflect.deleteProperty(HTMLImageElement.prototype, "decode");
+  }
+});
+
 test("confirms Project UI readiness only after shared preferences hydrate", async () => {
   let finishPreferenceLoad: (value: WorkspacePreferences) => void =
     () => undefined;

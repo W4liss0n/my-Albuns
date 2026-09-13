@@ -7,6 +7,7 @@
         "allow": [
           "frontend_log",
           "project_ui_ready",
+          "prepare_project_startup_images",
           "project_state",
           "validate_album_information",
           "apply_project_intent",
