@@ -593,9 +593,8 @@ async fn prepare_project_startup_images(
     image_processing
         .prepare(window.app_handle())
         .await
-        .map_err(|error| {
+        .inspect_err(|_| {
             startup.emit_failed(FailureStage::Initialize, FailureCode::IoFailure);
-            error
         })
 }
 
@@ -612,9 +611,8 @@ async fn project_ui_ready(
     let problems = image_processing
         .prepare(window.app_handle())
         .await
-        .map_err(|error| {
+        .inspect_err(|_| {
             startup.emit_failed(FailureStage::Initialize, FailureCode::IoFailure);
-            error
         })?;
     match startup.confirm_ui_ready() {
         Ok(transition) => {
@@ -1094,16 +1092,16 @@ enum StartupSignal {
 
 impl ProjectStartupHandshake {
     fn report_image_progress(&self, progress: crate::ipc_contract::StartupImageProgress) {
-        if let Ok(state) = self.state.lock() {
-            if !state.terminal.emitted {
-                let _ = crate::project_bootstrap::write_host_progress(
-                    io::stdout().lock(),
-                    &crate::project_bootstrap::HostProgress::preparing_images(
-                        &state.terminal.request,
-                        progress,
-                    ),
-                );
-            }
+        if let Ok(state) = self.state.lock()
+            && !state.terminal.emitted
+        {
+            let _ = crate::project_bootstrap::write_host_progress(
+                io::stdout().lock(),
+                &crate::project_bootstrap::HostProgress::preparing_images(
+                    &state.terminal.request,
+                    progress,
+                ),
+            );
         }
     }
 

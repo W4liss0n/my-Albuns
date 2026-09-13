@@ -60,6 +60,26 @@ mod settings_window;
 #[cfg(windows)]
 mod webview_recovery;
 mod workspace_preferences;
+
+/// Support the native restoration example using the production WebView policy.
+#[cfg(windows)]
+#[doc(hidden)]
+pub fn configure_webview_restore_probe(
+    builder: tauri::Builder<tauri::Wry>,
+    on_ready: impl FnOnce(std::io::Result<()>) + Send + 'static,
+) -> tauri::Builder<tauri::Wry> {
+    let (signal, readiness) = desktop_webview_policy::page_load_handshake(None);
+    tauri::async_runtime::spawn(async move {
+        on_ready(readiness.wait().await);
+    });
+    builder
+        .manage(desktop_webview_policy::WindowWebviewVisibility::default())
+        .on_window_event(desktop_webview_policy::on_window_event)
+        .on_page_load(move |webview, payload| {
+            signal.observe_webview(webview, payload.event());
+        })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     #[cfg(debug_assertions)]

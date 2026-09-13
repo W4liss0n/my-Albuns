@@ -199,7 +199,7 @@ pub(crate) fn install(
                 runtime_version = version, failure_report_directory = report_directory);
                 // GPU and utility failures recover within WebView2. A failed browser or
                 // main renderer requires replacing the presentation owned by this Host.
-                if matches!(kind.0, 0 | 1 | 2) {
+                if matches!(kind.0, 0..=2) {
                     request_recovery(
                         app.clone(),
                         label.clone(),

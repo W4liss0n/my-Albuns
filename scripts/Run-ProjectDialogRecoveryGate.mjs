@@ -135,6 +135,7 @@ try {
   await click(owner, "Exportar");
   const replacement = await connect(dialogPort, "/project-dialog.html");
   await waitUntil(() => replacement.evaluate("document.body.innerText.includes('Destino da exportação')"), "a new export can open");
+  await waitUntil(() => nativeOwnedWindowState(instance).dialog?.visible, "the new dialog is visible to its user");
   await click(replacement, "Cancelar");
   await waitUntil(() => owner.evaluate("!document.querySelector('button[aria-label=\"Exportar\"]').disabled"), "new Cancel action finishes");
   assert.equal(nativeOwnedWindowState(instance).dialogCount, 0);
