@@ -1,4 +1,4 @@
-//! Application-wide Settings modality across the Global and Project Hosts.
+//! Application-wide Settings and batch modality across Global and Project Hosts.
 //! Each process disables its own windows. A kernel-owned reservation ensures
 //! that even a crashed Global cannot leave other processes permanently blocked.
 use std::{collections::HashMap, sync::Mutex, time::Duration};
@@ -12,14 +12,16 @@ use crate::{
     settings_window::SETTINGS_WINDOW_LABEL,
 };
 
-pub(crate) struct SettingsModality {
+pub(crate) struct ApplicationModality {
     gate: NamedMutex,
+    batch: NamedMutex,
     blocked: Mutex<HashMap<isize, (WebviewWindow, bool)>>,
 }
 
-impl SettingsModality {
+impl ApplicationModality {
     pub(crate) fn new(paths: &AppPaths) -> Self {
         Self {
+            batch: crate::batch_exclusivity::gate(paths),
             gate: NamedMutex::scoped(
                 paths,
                 "settings-modal",
@@ -31,6 +33,9 @@ impl SettingsModality {
     }
 
     pub(crate) async fn reserve(&self) -> Result<NamedMutexGrant, String> {
+        if self.batch_active() {
+            return Err("Aguarde o término da exportação em lote.".into());
+        }
         // A non-owning observer can briefly acquire the free kernel mutex.
         // Settings requests themselves are serialized by SettingsWindowState.
         let deadline = std::time::Instant::now() + Duration::from_secs(2);
@@ -52,9 +57,21 @@ impl SettingsModality {
         self.gate.is_owned().unwrap_or(true)
     }
 
+    pub(crate) fn batch_active(&self) -> bool {
+        self.batch.is_owned().unwrap_or(true)
+    }
+
+    fn allows(&self, label: &str) -> bool {
+        if self.batch_active() {
+            label == "batch-progress"
+        } else {
+            !self.is_active() || label == SETTINGS_WINDOW_LABEL
+        }
+    }
+
     /// Called only on the window thread, including restoration after close.
     fn synchronize(&self, app: &AppHandle) {
-        let active = self.is_active();
+        let active = self.is_active() || self.batch_active();
         let mut blocked = self
             .blocked
             .lock()
@@ -69,11 +86,14 @@ impl SettingsModality {
         }
         let windows = app.webview_windows();
         blocked.retain(|_, (window, _)| windows.contains_key(window.label()));
-        for window in windows
-            .values()
-            .filter(|window| window.label() != SETTINGS_WINDOW_LABEL)
-        {
+        for window in windows.values() {
             let Ok(handle) = window.hwnd() else { continue };
+            if self.allows(window.label()) {
+                if let Some((_, true)) = blocked.remove(&(handle.0 as isize)) {
+                    let _ = window.set_enabled(true);
+                }
+                continue;
+            }
             // SAFETY: the live WebviewWindow supplied this HWND on its UI thread.
             let enabled = unsafe { IsWindowEnabled(handle) }.as_bool();
             blocked
@@ -87,7 +107,7 @@ impl SettingsModality {
 }
 
 pub(crate) fn install(app: &AppHandle, paths: &AppPaths) {
-    app.manage(SettingsModality::new(paths));
+    app.manage(ApplicationModality::new(paths));
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         loop {
@@ -95,7 +115,7 @@ pub(crate) fn install(app: &AppHandle, paths: &AppPaths) {
             let current = app.clone();
             if app
                 .run_on_main_thread(move || {
-                    current.state::<SettingsModality>().synchronize(&current);
+                    current.state::<ApplicationModality>().synchronize(&current);
                     let _ = done.send(());
                 })
                 .is_err()
@@ -112,11 +132,23 @@ pub(crate) fn install(app: &AppHandle, paths: &AppPaths) {
     });
 }
 
+pub(crate) async fn synchronize(app: &AppHandle) -> Result<(), String> {
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    let current = app.clone();
+    app.run_on_main_thread(move || {
+        current.state::<ApplicationModality>().synchronize(&current);
+        let _ = sender.send(());
+    })
+    .map_err(|error| error.to_string())?;
+    receiver
+        .await
+        .map_err(|_| "Não foi possível bloquear as janelas do Álbum.".into())
+}
+
 pub(crate) fn blocks(window: &Window) -> bool {
-    window.label() != SETTINGS_WINDOW_LABEL
-        && window
-            .try_state::<SettingsModality>()
-            .is_some_and(|state| state.is_active())
+    window
+        .try_state::<ApplicationModality>()
+        .is_some_and(|state| !state.allows(window.label()))
 }
 
 pub(crate) fn on_window_event(window: &Window, event: &WindowEvent) -> bool {
@@ -172,7 +204,7 @@ mod tests {
         let ready = root.path().join("ready");
         let mut child = Command::new(env::current_exe().unwrap())
             .args([
-                "settings_modality::tests::settings_modal_owner_process",
+                "application_modality::tests::settings_modal_owner_process",
                 "--exact",
                 "--ignored",
             ])

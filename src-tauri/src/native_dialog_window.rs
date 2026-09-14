@@ -213,7 +213,11 @@ pub(crate) async fn fit_owned_window(
 ) -> Result<(), String> {
     if !matches!(
         window.label(),
-        "project-dialog" | OPENING_PROGRESS_LABEL | PROJECT_FAILURE_LABEL
+        "project-dialog"
+            | "batch-export"
+            | "batch-progress"
+            | OPENING_PROGRESS_LABEL
+            | PROJECT_FAILURE_LABEL
     ) {
         return Err("content fitting belongs only to owned dialog windows".into());
     }
@@ -792,7 +796,10 @@ fn append_query_parameter(url: &str, name: &str, value: &str) -> String {
     )
 }
 
-fn display_transition_dialog(owner: &WebviewWindow, window: &WebviewWindow) -> io::Result<()> {
+pub(crate) fn display_transition_dialog(
+    owner: &WebviewWindow,
+    window: &WebviewWindow,
+) -> io::Result<()> {
     display_dialog(owner, window, OwnerPresentation::Replace)
 }
 

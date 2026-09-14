@@ -87,6 +87,53 @@ impl ExportPathPlan {
         self.authorization
     }
 
+    /// Discards only the guarded, flat preparation of a terminated attempt.
+    /// The caller must first establish that its writer can no longer run.
+    pub fn discard_abandoned_preparation(&self) -> Result<(), AppPathsError> {
+        match fs::symlink_metadata(&self.preparation_directory) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(_) => return Err(AppPathsError::ExportStorageUnavailable),
+            Ok(metadata) if is_reparse_point(&metadata) || !metadata.is_dir() => {
+                return Err(AppPathsError::ExportStorageOutsideDestination);
+            }
+            _ => {}
+        }
+        let parent = open_directory(
+            self.output_path
+                .parent()
+                .ok_or(AppPathsError::InvalidExportPath)?,
+        )
+        .map_err(export_storage_error)?;
+        let preparation =
+            open_directory(&self.preparation_directory).map_err(export_storage_error)?;
+        if !is_direct_physical_child(
+            &parent.physical_path,
+            &preparation.physical_path,
+            self.preparation_directory
+                .file_name()
+                .ok_or(AppPathsError::InvalidExportPath)?,
+        ) {
+            return Err(AppPathsError::ExportStorageOutsideDestination);
+        }
+        let mut children = vec![];
+        for entry in fs::read_dir(&self.preparation_directory)
+            .map_err(|_| AppPathsError::ExportStorageUnavailable)?
+        {
+            let path = entry
+                .map_err(|_| AppPathsError::ExportStorageUnavailable)?
+                .path();
+            open_export_file(&preparation, &path, false)?;
+            children.push(path);
+        }
+        for path in children {
+            fs::remove_file(path).map_err(|_| AppPathsError::ExportStorageUnavailable)?;
+        }
+        drop(preparation);
+        drop(parent);
+        fs::remove_dir(&self.preparation_directory)
+            .map_err(|_| AppPathsError::ExportStorageUnavailable)
+    }
+
     pub fn prepare(&self) -> Result<PreparedExportStorage, AppPathsError> {
         let destination_path = self
             .output_path

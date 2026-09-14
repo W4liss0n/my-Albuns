@@ -4,6 +4,7 @@ mod identity_registry;
 mod versioned_codec;
 mod windows_publish;
 
+use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 
 use myalbuns_paths::{
@@ -95,6 +96,7 @@ pub enum LoadProjectError {
 
 pub(crate) struct LoadedStoredRevision {
     pub(crate) revision: ProjectRevision,
+    pub(crate) content_sha256: String,
     pub(crate) physical_identity: Option<PhysicalFileIdentity>,
     pub(crate) project_path: PathBuf,
     pub(crate) root_bindings: RootBindingPlan,
@@ -125,6 +127,7 @@ pub(crate) fn read(location: &ProjectLocation) -> Result<LoadedStoredRevision, D
     let source = resolved.read_to_string().map_err(map_read_error)?;
     versioned_codec::decode(source.as_bytes()).map(|decoded| LoadedStoredRevision {
         revision: decoded.revision,
+        content_sha256: format!("{:x}", Sha256::digest(source.as_bytes())),
         physical_identity,
         project_path: location.project_path.clone(),
         root_bindings: location.root_bindings.clone(),

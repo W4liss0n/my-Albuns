@@ -89,6 +89,8 @@ todo o catálogo decodificado na memória.
 
 ## Progresso em lote
 
+Na Exportação em lote do MVP, o refinamento específico mostra somente a barra geral determinada, o percentual e a posição `X/Y`. Não lista o Projeto atual, estado individual ou fila. `Cancelar` é a única ação.
+
 O lote reutiliza a mesma barra geral e acrescenta somente um resumo compacto do
 conjunto: item atual, estado desse item, posição `X/Y` e uma síntese da fila. Não
 exibe uma tabela nem os trabalhos simultâneos.

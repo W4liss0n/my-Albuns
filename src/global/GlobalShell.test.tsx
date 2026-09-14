@@ -73,12 +73,14 @@ function createProjectPort(
 
 test("shows the global welcome surface without a Project workspace", () => {
   const projectPort = createProjectPort({ openProject: vi.fn() });
+  const openBatch = vi.fn(async () => undefined);
 
   render(
     <GlobalShell
       graphicsDiagnostic={supportedGraphics}
       newProjectPort={createNewProjectPortStub()}
       projectPort={projectPort}
+      onOpenBatch={openBatch}
     />,
   );
 
@@ -98,11 +100,9 @@ test("shows the global welcome surface without a Project workspace", () => {
   const batchExportPlaceholder = screen.getByRole("button", {
     name: "Exportação em lote",
   });
-  expect(batchExportPlaceholder).toBeDisabled();
-  expect(batchExportPlaceholder).toHaveAttribute(
-    "data-placeholder-feature",
-    "batch-export",
-  );
+  expect(batchExportPlaceholder).toBeEnabled();
+  fireEvent.click(batchExportPlaceholder);
+  expect(openBatch).toHaveBeenCalledOnce();
   expect(screen.queryByTestId("album-canvas")).not.toBeInTheDocument();
 });
 

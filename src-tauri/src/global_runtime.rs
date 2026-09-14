@@ -94,8 +94,44 @@ struct GlobalProjectLaunchCoordinator {
     serial: Arc<tokio::sync::Mutex<()>>,
 }
 
-struct GlobalProjectLaunchPermit {
+pub(crate) struct GlobalProjectLaunchPermit {
     _guard: tokio::sync::OwnedMutexGuard<()>,
+}
+
+pub(crate) async fn reserve_batch_launches(app: &AppHandle) -> GlobalProjectLaunchPermit {
+    app.state::<GlobalRuntimeState>()
+        .project_launches
+        .enter()
+        .await
+}
+
+pub(crate) async fn open_batch_project(app: &AppHandle, path: PathBuf) -> ProjectLaunchOutcome {
+    let state = app.state::<GlobalRuntimeState>().inner().clone();
+    if let Some(error) = state.scheduled_cleanup_failure().await {
+        return ProjectLaunchOutcome::Failed { error };
+    }
+    if let Some(rejection) = state.project_host_gate_rejection() {
+        return rejection;
+    }
+    let permit = state.project_launches.enter_interactive().await;
+    let outcome = launch_confirmed_project_with_progress(
+        app,
+        state,
+        path,
+        ConfirmedLaunch::OpenExisting,
+        ProjectLaunchProgress {
+            kind: NativeProgressKind::Opening,
+            owner_label: crate::batch_window::BATCH_WINDOW_LABEL,
+            restore_owner_on_failure: true,
+        },
+        &permit,
+    )
+    .await;
+    if let Some(window) = app.get_webview_window(crate::batch_window::BATCH_WINDOW_LABEL) {
+        let _ = window.set_enabled(true);
+        let _ = window.show();
+    }
+    outcome
 }
 
 impl GlobalProjectLaunchCoordinator {
@@ -1715,6 +1751,12 @@ async fn initialize_global_runtime(
 
 fn exit_global_after_handoff(app: &AppHandle) {
     if app
+        .get_webview_window(crate::batch_window::BATCH_WINDOW_LABEL)
+        .is_some()
+    {
+        return;
+    }
+    if app
         .get_webview_window(crate::settings_window::SETTINGS_WINDOW_LABEL)
         .is_some()
     {
@@ -1735,7 +1777,7 @@ fn exit_global_after_handoff(app: &AppHandle) {
 }
 
 fn on_global_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
-    if crate::settings_modality::on_window_event(window, event) {
+    if crate::application_modality::on_window_event(window, event) {
         return;
     }
     desktop_webview_policy::on_window_event(window, event);
@@ -1909,6 +1951,13 @@ pub(crate) fn run(
             },
         )
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_shell::init())
+        .manage(crate::batch_window::BatchWindowState::new(
+            app_paths.clone(),
+        ))
+        .manage(crate::cache_engine::CacheEngine::default())
+        .manage(crate::imaging_processor::ImagingProcessor::default())
+        .manage(crate::operation_gate::OperationGate::new(&app_paths))
         .manage(desktop_webview_policy::WindowWebviewVisibility::default())
         .manage(native_dialog_window::OpeningImageProgressState::default())
         .on_window_event(on_global_window_event)
@@ -1921,7 +1970,7 @@ pub(crate) fn run(
         .manage(provisional_decoratives)
         .setup(move |app| {
             logging::initialize(app, &app_paths, ProcessRole::Global);
-            crate::settings_modality::install(app.handle(), &app_paths);
+            crate::application_modality::install(app.handle(), &app_paths);
             let app_handle = app.handle().clone();
             // Both configured windows use `create: false`. Install the first
             // owned WebView before setup returns; the page-load terminal then
@@ -1947,6 +1996,23 @@ pub(crate) fn run(
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            crate::batch_window::open_batch_export,
+            crate::batch_window::close_batch_export,
+            crate::batch_window::batch_choose_folder,
+            crate::batch_window::batch_count_projects,
+            crate::batch_window::batch_current,
+            crate::batch_window::batch_progress,
+            crate::batch_window::batch_prepare,
+            crate::batch_window::batch_recheck,
+            crate::batch_window::batch_ignore,
+            crate::batch_window::batch_relink,
+            crate::batch_window::batch_open_project,
+            crate::batch_window::batch_recoveries,
+            crate::batch_window::batch_resume,
+            crate::batch_window::batch_end,
+            crate::batch_window::batch_cancel,
+            crate::batch_window::batch_result_ready,
+            crate::batch_window::execution::batch_run,
             complete_graphics_gate,
             crate::settings_window::open_application_settings,
             crate::settings_window::close_application_settings,

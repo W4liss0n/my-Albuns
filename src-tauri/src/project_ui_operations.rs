@@ -17,6 +17,11 @@ pub(crate) struct ProjectUiOperation(ProjectUiOperations);
 pub(crate) struct ProjectUiRecovery(ProjectUiOperations);
 
 impl ProjectUiOperations {
+    pub(crate) fn is_idle(&self) -> bool {
+        self.0
+            .lock()
+            .is_ok_and(|state| state.active == 0 && !state.recovering)
+    }
     pub(crate) fn begin(&self) -> Result<ProjectUiOperation, String> {
         let mut state = self
             .0
@@ -65,6 +70,12 @@ impl Drop for ProjectUiRecovery {
 }
 
 pub(crate) fn begin(app: &AppHandle) -> Result<ProjectUiOperation, String> {
+    if app
+        .try_state::<crate::application_modality::ApplicationModality>()
+        .is_some_and(|state| state.batch_active())
+    {
+        return Err("Aguarde o término da exportação em lote.".into());
+    }
     app.state::<ProjectUiOperations>().begin()
 }
 

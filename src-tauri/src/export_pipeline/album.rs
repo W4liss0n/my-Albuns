@@ -109,6 +109,9 @@ pub(crate) fn plan_album(
 }
 
 impl AlbumExportPlan {
+    pub(crate) fn preparation_directory(&self) -> &std::path::Path {
+        self.outputs[0].0.preparation_directory()
+    }
     /// Keeps original numbering and create-only publication for the remaining files.
     /// A file appearing after this check must never be silently overwritten.
     pub(crate) fn skip_existing_outputs(&mut self) -> Result<bool, ExportFailure> {

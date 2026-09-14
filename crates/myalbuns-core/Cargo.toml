@@ -8,6 +8,7 @@ license.workspace = true
 myalbuns-paths = { path = "../myalbuns-paths" }
 serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
 thiserror.workspace = true
 ts-rs.workspace = true
 uuid.workspace = true
@@ -15,5 +16,4 @@ windows-sys.workspace = true
 
 [dev-dependencies]
 image = { workspace = true, features = ["jpeg", "png"] }
-sha2.workspace = true
 tempfile.workspace = true

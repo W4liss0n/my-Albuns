@@ -25,6 +25,12 @@ fn main() {
     let config = Config::new()
         .with_out_dir(output_dir)
         .with_large_int("number");
+    myalbuns_desktop_lib::ipc_contract::BatchExportView::export_all(&config)
+        .expect("batch bindings");
+    myalbuns_desktop_lib::ipc_contract::BatchExportProgress::export_all(&config)
+        .expect("batch progress bindings");
+    myalbuns_desktop_lib::ipc_contract::BatchRecoverySummary::export_all(&config)
+        .expect("batch recovery bindings");
     myalbuns_desktop_lib::ipc_contract::PhotoshopStatus::export_all(&config)
         .expect("Photoshop status bindings");
     myalbuns_desktop_lib::ipc_contract::PhotoshopPhotoTarget::export_all(&config)

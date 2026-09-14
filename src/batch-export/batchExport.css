@@ -1,0 +1,10 @@
+.batch-configuration__columns { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+.batch-configuration__columns select { width: 100%; }
+.batch-configuration__destination-mode { display: flex; gap: 28px; margin-bottom: 18px; }
+.batch-configuration__destination-mode label { display: inline-flex; align-items: center; gap: 9px; }
+.batch-configuration__destination-mode input { accent-color: var(--ui-accent); margin: 0; }
+.batch-problem-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.batch-problem-actions .ui-action-button { white-space: nowrap; }
+.batch-project-path { display: block; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ui-text-muted); font-size: 11px; margin-top: 5px; }
+.batch-problem-reasons { display: grid; gap: 5px; }
+.batch-export .ui-problems-scroll { max-height: 380px; }

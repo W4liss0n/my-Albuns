@@ -172,7 +172,7 @@ pub(crate) fn run(
         .manage(layout_catalog)
         .manage(crate::workspace_preferences::WorkspacePreferencesStore::new(&app_paths))
         .on_window_event(|window, event| {
-            if crate::settings_modality::on_window_event(window, event) {
+            if crate::application_modality::on_window_event(window, event) {
                 return;
             }
             desktop_webview_policy::on_window_event(window, event);
@@ -404,9 +404,11 @@ fn setup_host(
         .startup_projection()
         .map_err(io::Error::other)?;
     logging::initialize(app, &app_paths, ProcessRole::DesktopHost);
-    crate::settings_modality::install(app.handle(), &app_paths);
+    crate::application_modality::install(app.handle(), &app_paths);
     app.manage(OperationGate::new(&app_paths));
     app.manage(ImagingProcessor::default());
+    crate::batch_exclusivity::install_project(app.handle(), &app_paths)
+        .map_err(io::Error::other)?;
 
     let (project_window, policy_readiness) = if desktop_webview_policy::automation_enabled() {
         (
