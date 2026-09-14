@@ -7,7 +7,7 @@ import { MessageDialog } from "../ui/MessageDialog";
 import { OwnedWindowShell } from "../ui/OwnedWindowShell";
 import { ProblemsDialog } from "../ui/ProblemsDialog";
 import { TextInput } from "../ui/TextInput";
-import "../ui/ExportForm.css";
+import "../ui/OperationForm.css";
 import "./generation.css";
 
 export function GenerationWindow({ port }: { port: ProjectGenerationPort }) {
@@ -96,18 +96,18 @@ function GenerationConfiguration({ model, port, busy, onSubmit, onError, onClose
     try { const chosen = await port.chooseFolder(); if (chosen !== null) (target === "source" ? setSource : setDestination)(chosen); }
     catch (error) { onError(error); }
   };
-  return <div className="ui-export-dialog"><DialogWindowFrame title="Gerar Projetos em lote" layout="form" actions={<>
-    <span className="ui-export-form__summary" aria-live="polite">{count === null ? "" : `${count} ${count === 1 ? "Projeto será gerado" : "Projetos serão gerados"}`}</span>
+  return <div className="ui-operation-dialog"><DialogWindowFrame title="Gerar Projetos em lote" layout="form" actions={<>
+    <span className="ui-operation-form__summary" aria-live="polite">{count === null ? "" : `${count} ${count === 1 ? "Projeto será gerado" : "Projetos serão gerados"}`}</span>
     <ActionButton disabled={busy} onClick={onClose}>Cancelar</ActionButton>
     <ActionButton variant="primary" disabled={busy || !model || !source.trim() || !destination.trim()} onClick={() => onSubmit({ sourceFolder: source.trim(), destinationFolder: destination.trim() })}>Verificar e gerar</ActionButton>
   </>}>
-    <form className="ui-export-form" onSubmit={event => event.preventDefault()} aria-busy={busy}>
+    <form className="ui-operation-form" onSubmit={event => event.preventDefault()} aria-busy={busy}>
       <div className="generation-model" title="Inclui as alterações ainda não salvas. O modelo permanece inalterado."><span>Projeto modelo</span><strong>{model}</strong></div>
-      <fieldset className="ui-export-form__section" disabled={busy}><legend title="Cada pasta com fotos gera um Projeto, incluindo subpastas. As novas fotos entram somente no Painel.">Pasta de origem</legend>
-        <div className="ui-export-form__destination"><TextInput className="ui-field-control" aria-label="Pasta de origem" value={source} title={source} onChange={event => setSource(event.target.value)} /><ActionButton onClick={() => void choose("source")}>Escolher…</ActionButton></div>
+      <fieldset className="ui-operation-form__section" disabled={busy}><legend title="Cada pasta com fotos gera um Projeto, incluindo subpastas. As novas fotos entram somente no Painel.">Pasta de origem</legend>
+        <div className="ui-operation-form__destination"><TextInput className="ui-field-control" aria-label="Pasta de origem" value={source} title={source} onChange={event => setSource(event.target.value)} /><ActionButton onClick={() => void choose("source")}>Escolher…</ActionButton></div>
       </fieldset>
-      <fieldset className="ui-export-form__section" disabled={busy}><legend title="A hierarquia da origem será mantida. Escolha um destino fora da origem.">Pasta de destino</legend>
-        <div className="ui-export-form__destination"><TextInput className="ui-field-control" aria-label="Pasta de destino" value={destination} title={destination} onChange={event => setDestination(event.target.value)} /><ActionButton onClick={() => void choose("destination")}>Escolher…</ActionButton></div>
+      <fieldset className="ui-operation-form__section" disabled={busy}><legend title="A hierarquia da origem será mantida. Escolha um destino fora da origem.">Pasta de destino</legend>
+        <div className="ui-operation-form__destination"><TextInput className="ui-field-control" aria-label="Pasta de destino" value={destination} title={destination} onChange={event => setDestination(event.target.value)} /><ActionButton onClick={() => void choose("destination")}>Escolher…</ActionButton></div>
       </fieldset>
     </form>
   </DialogWindowFrame></div>;

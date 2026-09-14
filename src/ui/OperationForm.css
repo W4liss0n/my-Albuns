@@ -1,0 +1,58 @@
+.ui-operation-dialog .ui-dialog-window--form .ui-dialog-window__body {
+  padding: 32px 28px 28px;
+}
+
+.ui-operation-dialog .ui-dialog-window--form .ui-dialog-window__footer {
+  gap: 12px;
+  padding: 16px 28px 18px;
+}
+
+.ui-operation-dialog .ui-action-button {
+  min-width: 112px;
+  height: 36px;
+  font-size: var(--ui-font-size-form-control);
+}
+
+.ui-operation-form {
+  display: grid;
+  gap: 34px;
+  margin: 0;
+  font-size: var(--ui-font-size-form-control);
+}
+
+.ui-operation-form__section {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.ui-operation-form__section legend {
+  margin-bottom: 18px;
+  padding: 0;
+  color: var(--ui-text);
+  font-size: var(--ui-font-size-form-heading);
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.ui-operation-form .ui-field-control {
+  height: 36px;
+  padding-inline: 12px;
+  font-size: var(--ui-font-size-form-control);
+}
+
+.ui-operation-form .ui-field-control:disabled {
+  color: var(--ui-text-disabled);
+  background: var(--ui-surface-muted);
+}
+
+.ui-operation-form__destination { display: flex; gap: 12px; }
+.ui-operation-form__destination input { flex: 1; text-overflow: ellipsis; }
+.ui-operation-form__destination .ui-action-button { flex: none; }
+.ui-operation-form__summary { margin-right: auto; color: var(--ui-text-secondary); font-size: var(--ui-font-size-form-control); }
+
+@media (max-width: 560px) {
+  .ui-operation-dialog .ui-dialog-window--form .ui-dialog-window__body { padding: 24px 20px; }
+  .ui-operation-dialog .ui-dialog-window--form .ui-dialog-window__footer { padding-inline: 20px; flex-wrap: wrap; }
+}

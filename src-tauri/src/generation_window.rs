@@ -37,6 +37,7 @@ pub(crate) struct GenerationWindowState {
     view: Mutex<Option<GenerationView>>,
     progress: Mutex<Option<GenerationProgress>>,
     active: AtomicBool,
+    close_requested: AtomicBool,
     cancel: Arc<AtomicBool>,
     result_ready: Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
 }
@@ -50,6 +51,7 @@ impl GenerationWindowState {
             view: Mutex::new(None),
             progress: Mutex::new(None),
             active: AtomicBool::new(false),
+            close_requested: AtomicBool::new(false),
             cancel: Arc::new(AtomicBool::new(false)),
             result_ready: Mutex::new(None),
         }
@@ -72,12 +74,20 @@ struct Attempt(AppHandle);
 impl Attempt {
     fn begin(app: &AppHandle) -> Result<Self, String> {
         let state = app.state::<GenerationWindowState>();
+        if state.close_requested.load(Ordering::Acquire) {
+            return Err("A janela de geração está fechando.".into());
+        }
         state
             .active
             .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
             .map_err(|_| "Aguarde a operação atual.")?;
         state.cancel.store(false, Ordering::Release);
-        Ok(Self(app.clone()))
+        let attempt = Self(app.clone());
+        if state.close_requested.load(Ordering::Acquire) {
+            state.cancel.store(true, Ordering::Release);
+            return Err("A janela de geração está fechando.".into());
+        }
+        Ok(attempt)
     }
 }
 impl Drop for Attempt {
@@ -86,6 +96,15 @@ impl Drop for Attempt {
             .state::<GenerationWindowState>()
             .active
             .store(false, Ordering::Release);
+        if self
+            .0
+            .state::<GenerationWindowState>()
+            .close_requested
+            .load(Ordering::Acquire)
+            && let Some(window) = self.0.get_webview_window(LABEL)
+        {
+            let _ = window.destroy();
+        }
     }
 }
 
@@ -103,6 +122,7 @@ pub(crate) async fn open_project_generation(
         return existing.set_focus().map_err(|error| error.to_string());
     }
     let operations = app.state::<ProjectUiOperations>();
+    state.close_requested.store(false, Ordering::Release);
     let pause = operations.pause_for_batch()?;
     let deadline = tokio::time::Instant::now() + Duration::from_secs(15);
     while !operations.is_idle() {
@@ -261,8 +281,9 @@ pub(crate) async fn generation_prepare(
             state.paths.project_identity_leases_dir(),
             state.paths.project_identities_dir(),
         );
+        let cancellation = state.cancel.clone();
         let view = tauri::async_runtime::spawn_blocking(move || {
-            let next = GenerationRunner::prepare(options, template, core)?;
+            let next = GenerationRunner::prepare(options, template, core, &cancellation)?;
             let view = next.view();
             *runner = Some(next);
             Ok::<_, String>(view)
@@ -292,7 +313,8 @@ pub(crate) async fn generation_recheck(
     window: WebviewWindow,
 ) -> Result<GenerationView, String> {
     configuration(&window)?;
-    update(app, |runner| runner.recheck()).await
+    let cancellation = app.state::<GenerationWindowState>().cancel.clone();
+    update(app, move |runner| runner.recheck(&cancellation)).await
 }
 async fn update(
     app: AppHandle,
@@ -430,6 +452,7 @@ pub(crate) fn close_project_generation(
 ) -> Result<(), String> {
     configuration(&window)?;
     let state = app.state::<GenerationWindowState>();
+    state.close_requested.store(true, Ordering::Release);
     if state.active.load(Ordering::Acquire) {
         state.cancel.store(true, Ordering::Release);
         return Ok(());
@@ -440,6 +463,9 @@ pub(crate) fn on_window_event(window: &tauri::Window, event: &WindowEvent) -> bo
     let app = window.app_handle();
     let state = app.state::<GenerationWindowState>();
     if let WindowEvent::CloseRequested { api, .. } = event {
+        if window.label() == LABEL {
+            state.close_requested.store(true, Ordering::Release);
+        }
         if window.label() == "project" && state.template.lock().is_ok_and(|model| model.is_some()) {
             api.prevent_close();
             return true;

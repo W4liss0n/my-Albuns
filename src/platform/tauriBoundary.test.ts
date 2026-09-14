@@ -13,6 +13,8 @@ import settingsWindowCapability from "../../src-tauri/capabilities/settings.json
 import settingsWindowPermission from "../../src-tauri/permissions/settings-window.json?raw";
 import batchWindowCapability from "../../src-tauri/capabilities/batch-window.json?raw";
 import batchWindowPermission from "../../src-tauri/permissions/batch-window.json?raw";
+import generationWindowCapability from "../../src-tauri/capabilities/generation-window.json?raw";
+import generationWindowPermission from "../../src-tauri/permissions/generation-window.json?raw";
 import productRuntimeSource from "../../src-tauri/src/product_runtime.rs?raw";
 import projectCommandsSource from "../../src-tauri/src/project_commands.rs?raw";
 
@@ -26,12 +28,14 @@ const tauriCommandSources = {
   shared: ["./tauriLogger.ts"],
   storageRecovery: ["./tauriStorageRecoveryPort.ts"],
   batch: ["./tauriBatchExportPort.ts"],
+  generation: ["./tauriProjectGenerationPort.ts"],
   photoshop: ["./tauriPhotoshopPort.ts"],
   settings: ["./tauriCacheSettingsPort.ts", "./tauriSettingsWindow.ts"],
   ownedDialog: ["./tauriWindowControls.ts"],
   messageDialog: ["./tauriOwnedDialogControls.ts"],
   openingDialog: ["./tauriOpeningDialogControls.ts", "./tauriOpeningImageProgress.ts"],
   project: [
+    "./tauriProjectGenerationLauncher.ts",
     "./tauriExportMediaPort.ts",
     "./invokeImageProcessing.ts",
     "./tauriProjectDialogPort.ts",
@@ -49,6 +53,7 @@ const tauriCommandSources = {
 } as const;
 
 const compositionRoots = new Set([
+  "../generation/main.tsx",
   "../dialog/main.tsx",
   "../global/main.tsx",
   "../main.tsx",
@@ -152,6 +157,7 @@ test("assigns every Tauri command adapter to an explicit surface", () => {
     ...tauriCommandSources.shared,
     ...tauriCommandSources.storageRecovery,
     ...tauriCommandSources.batch,
+    ...tauriCommandSources.generation,
     ...tauriCommandSources.photoshop,
     ...tauriCommandSources.settings,
     ...tauriCommandSources.ownedDialog,
@@ -164,6 +170,14 @@ test("assigns every Tauri command adapter to an explicit surface", () => {
 
   expect(new Set(assignedSources).size).toBe(assignedSources.length);
   expect([...assignedSources].sort()).toEqual(invokingSources);
+});
+
+test("keeps generation commands restricted to its owned surfaces", () => {
+  const invoked = extractInvokedCommands([...tauriCommandSources.generation, ...tauriCommandSources.ownedDialog]);
+  const { capability, allowedCommands } = parseSurfaceContract(generationWindowCapability, generationWindowPermission);
+  expect(capability.windows).toEqual(["generation", "generation-progress"]);
+  expect([...allowedCommands].sort()).toEqual([...invoked].sort());
+  expect(allowedCommands.has("open_project_generation")).toBe(false);
 });
 
 test("keeps the project-window capability aligned with the invoked commands", () => {

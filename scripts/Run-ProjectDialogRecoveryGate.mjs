@@ -122,7 +122,7 @@ try {
   const crashSocket = await socketAt(version.webSocketDebuggerUrl);
   if (mode === "progress") {
     const destination = path.join(output, "export"); mkdirSync(destination);
-    await dialog.evaluate("document.querySelector('.ui-export-form input').focus()");
+    await dialog.evaluate("document.querySelector('.ui-operation-form input').focus()");
     await dialog.call("Input.dispatchKeyEvent", { type: "keyDown", key: "a", code: "KeyA", modifiers: 2, windowsVirtualKeyCode: 65 });
     await dialog.call("Input.dispatchKeyEvent", { type: "keyUp", key: "a", code: "KeyA", modifiers: 2, windowsVirtualKeyCode: 65 });
     await dialog.call("Input.insertText", { text: destination });

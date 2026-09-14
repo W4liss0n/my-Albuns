@@ -45,7 +45,7 @@ impl GenerationRunner {
     pub(crate) fn count_folders(source: &Path) -> Result<usize, String> {
         let mut paths = OperationPathContext::new();
         paths.capture(source).map_err(|error| error.to_string())?;
-        Ok(discover_folders(source, &mut paths)?.len())
+        Ok(discover_folders(source, &mut paths, &AtomicBool::new(false))?.len())
     }
 
     pub(crate) fn decide(
@@ -83,7 +83,7 @@ impl GenerationRunner {
         Ok(())
     }
 
-    pub(crate) fn recheck(&mut self) -> Result<(), String> {
+    pub(crate) fn recheck(&mut self, cancellation: &AtomicBool) -> Result<(), String> {
         if self.phase != GenerationPhase::Prepared {
             return Err("Verifique a geração novamente.".into());
         }
@@ -92,6 +92,7 @@ impl GenerationRunner {
             self.options.clone(),
             self.template.clone(),
             self.core.clone(),
+            cancellation,
         )?;
         Ok(())
     }
@@ -99,7 +100,9 @@ impl GenerationRunner {
         options: GenerationOptions,
         template: ProjectTemplate,
         core: ProjectCore,
+        cancellation: &AtomicBool,
     ) -> Result<Self, String> {
+        ensure_running(cancellation)?;
         let source = Path::new(&options.source_folder);
         let destination = Path::new(&options.destination_folder);
         let mut paths = OperationPathContext::new();
@@ -109,7 +112,7 @@ impl GenerationRunner {
             .map_err(|error| error.to_string())?;
         let guard = MirroredDestination::open(&paths.current_plan(), source, destination)
             .map_err(|error| error.to_string())?;
-        let folders = discover_folders(source, &mut paths)?;
+        let folders = discover_folders(source, &mut paths, cancellation)?;
         if folders.is_empty() {
             return Err("Nenhuma pasta com fotos encontrada na origem.".into());
         }
@@ -126,6 +129,7 @@ impl GenerationRunner {
         let mut items = Vec::new();
         let mut destinations = HashSet::new();
         for (folder, photos) in folders {
+            ensure_running(cancellation)?;
             let name = folder
                 .file_name()
                 .ok_or("A pasta de origem precisa ter um nome.")?
@@ -199,6 +203,7 @@ impl GenerationRunner {
                 status: GenerationItemStatus::Pending,
             });
         }
+        ensure_running(cancellation)?;
         Ok(Self {
             id: uuid::Uuid::new_v4().to_string(),
             options,
@@ -230,7 +235,14 @@ impl GenerationRunner {
                     name: item.name.clone(),
                     destination: item.destination.to_string_lossy().into(),
                     status: item.status,
-                    problems: item.problems.clone(),
+                    problems: if item.status == GenerationItemStatus::Ignored
+                        && item.exists
+                        && item.problems.is_empty()
+                    {
+                        vec!["Já existe um Projeto no destino.".into()]
+                    } else {
+                        item.problems.clone()
+                    },
                     conflict: item.exists,
                     can_replace: item.conflict.is_some() && item.problems.is_empty(),
                     decision: item.decision,
@@ -334,11 +346,13 @@ fn creation_error(error: myalbuns_core::CreateProjectError) -> String {
 fn discover_folders(
     root: &Path,
     paths: &mut OperationPathContext,
+    cancellation: &AtomicBool,
 ) -> Result<Vec<(PathBuf, Vec<PathBuf>)>, String> {
     let mut pending = vec![root.to_path_buf()];
     let mut seen = HashSet::new();
     let mut folders = Vec::new();
     while let Some(folder) = pending.pop() {
+        ensure_running(cancellation)?;
         let directory = paths
             .resolve_existing(&folder, ExpectedObject::Directory)
             .map_err(|error| format!("Não foi possível ler {}: {error}", folder.display()))?;
@@ -379,6 +393,14 @@ fn discover_folders(
     }
     folders.sort_by(|left, right| left.0.cmp(&right.0));
     Ok(folders)
+}
+
+fn ensure_running(cancellation: &AtomicBool) -> Result<(), String> {
+    if cancellation.load(Ordering::Acquire) {
+        Err("A geração foi cancelada.".into())
+    } else {
+        Ok(())
+    }
 }
 
 #[cfg(test)]

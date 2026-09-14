@@ -1,5 +1,5 @@
 import { tauriExportMediaPort } from "./platform/tauriExportMediaPort";
-import { tauriProjectGenerationLauncher } from "./platform/tauriProjectGenerationPort";
+import { tauriProjectGenerationLauncher } from "./platform/tauriProjectGenerationLauncher";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";

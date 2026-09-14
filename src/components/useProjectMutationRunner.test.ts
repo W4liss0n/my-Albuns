@@ -18,6 +18,7 @@ import { expect, test, vi } from "vitest";
 import type { ProjectCorePort } from "../application/projectPorts";
 import type { EditorProjection } from "../domain/project";
 import { representativeProjection } from "../test/projectFixtures";
+import { openProjectGeneration } from "./openProjectGeneration";
 import { useProjectMutationRunner } from "./useProjectMutationRunner";
 
 function deferredProjection() {
@@ -266,4 +267,91 @@ test("starts a new Project queue immediately and discards obsolete queued work",
   await expect(running).resolves.toEqual({ status: "obsolete" });
   await expect(queued).resolves.toEqual({ status: "obsolete" });
   expect(obsoleteQueuedOperation).not.toHaveBeenCalled();
+});
+test("drains both queued model mutations before opening generation and keeps the barrier until opening finishes", async () => {
+  const first = deferredProjection();
+  const second = deferredProjection();
+  let completeOpen!: () => void;
+  const openFinished = new Promise<void>(resolve => { completeOpen = resolve; });
+  const launcher = { open: vi.fn(() => openFinished) };
+  const setBarrier = vi.fn<(active: boolean) => void>();
+  const core = projectCorePort();
+  const view = renderHook(() => useProjectMutationRunner("project-001", core));
+  const firstProjection = {
+    ...representativeProjection,
+    state: { ...representativeProjection.state, revision: 26 },
+  };
+  const secondProjection = {
+    ...representativeProjection,
+    state: { ...representativeProjection.state, revision: 27 },
+  };
+  const secondOperation = vi.fn((_port: ProjectCorePort, latest: EditorProjection | null) => {
+    expect(latest).toBe(firstProjection);
+    return second.promise;
+  });
+  const firstResult = view.result.current.run(() => first.promise);
+  const secondResult = view.result.current.run(secondOperation);
+  const opening = openProjectGeneration(launcher, view.result.current, setBarrier);
+
+  expect(setBarrier.mock.calls).toEqual([[true]]);
+  expect(secondOperation).not.toHaveBeenCalled();
+  expect(launcher.open).not.toHaveBeenCalled();
+
+  await act(async () => { first.resolve(firstProjection); await firstResult; });
+  expect(secondOperation).toHaveBeenCalledOnce();
+  expect(launcher.open).not.toHaveBeenCalled();
+  expect(setBarrier.mock.calls).toEqual([[true]]);
+
+  await act(async () => { second.resolve(secondProjection); await secondResult; });
+  expect(launcher.open).toHaveBeenCalledOnce();
+  expect(setBarrier.mock.calls).toEqual([[true]]);
+
+  await act(async () => { completeOpen(); await opening; });
+  expect(setBarrier.mock.calls).toEqual([[true], [false]]);
+});
+
+test("does not open generation when the latest queued model mutation fails", async () => {
+  const first = deferredProjection();
+  const latest = deferredProjection();
+  const failure = new Error("Não foi possível aplicar a alteração ao modelo.");
+  const launcher = { open: vi.fn(async () => {}) };
+  const setBarrier = vi.fn<(active: boolean) => void>();
+  const core = projectCorePort();
+  const view = renderHook(() => useProjectMutationRunner("project-001", core));
+  const firstResult = view.result.current.run(() => first.promise);
+  const latestResult = view.result.current.run(async () => {
+    await latest.promise;
+    throw failure;
+  });
+  const opening = openProjectGeneration(launcher, view.result.current, setBarrier)
+    .then(() => null, error => error);
+
+  expect(setBarrier.mock.calls).toEqual([[true]]);
+  expect(launcher.open).not.toHaveBeenCalled();
+  await act(async () => { first.resolve(representativeProjection); await firstResult; });
+  expect(launcher.open).not.toHaveBeenCalled();
+  await act(async () => { latest.resolve(representativeProjection); await latestResult; await opening; });
+
+  await expect(latestResult).resolves.toEqual({ status: "failed", error: failure });
+  expect(launcher.open).not.toHaveBeenCalled();
+  expect(setBarrier.mock.calls).toEqual([[true], [false]]);
+});
+
+test("does not open generation from an obsolete project queue", async () => {
+  const pending = deferredProjection();
+  const launcher = { open: vi.fn(async () => {}) };
+  const setBarrier = vi.fn<(active: boolean) => void>();
+  const core = projectCorePort();
+  const view = renderHook(({ projectId }) => useProjectMutationRunner(projectId, core), {
+    initialProps: { projectId: "project-001" },
+  });
+  const mutation = view.result.current.run(() => pending.promise);
+  const opening = openProjectGeneration(launcher, view.result.current, setBarrier)
+    .then(() => null, error => error);
+  view.rerender({ projectId: "project-002" });
+  await act(async () => { pending.resolve(representativeProjection); await mutation; await opening; });
+
+  await expect(mutation).resolves.toEqual({ status: "obsolete" });
+  expect(launcher.open).not.toHaveBeenCalled();
+  expect(setBarrier.mock.calls).toEqual([[true], [false]]);
 });

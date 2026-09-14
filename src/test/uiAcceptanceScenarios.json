@@ -179,7 +179,7 @@
         "width": 800,
         "height": 650
       },
-      "readySelector": ".ui-export-form",
+      "readySelector": ".ui-operation-form",
       "actions": []
     },
     {
@@ -196,7 +196,7 @@
         "width": 640,
         "height": 650
       },
-      "readySelector": ".ui-export-form",
+      "readySelector": ".ui-operation-form",
       "actions": []
     },
     {
@@ -213,7 +213,7 @@
         "width": 800,
         "height": 650
       },
-      "readySelector": ".ui-export-form",
+      "readySelector": ".ui-operation-form",
       "actions": [
         {
           "type": "focus",
@@ -239,7 +239,7 @@
         "width": 800,
         "height": 650
       },
-      "readySelector": ".ui-export-form",
+      "readySelector": ".ui-operation-form",
       "actions": []
     },
     {
@@ -256,7 +256,7 @@
         "width": 800,
         "height": 650
       },
-      "readySelector": ".ui-export-form",
+      "readySelector": ".ui-operation-form",
       "actions": []
     },
     {
@@ -273,7 +273,7 @@
         "width": 800,
         "height": 650
       },
-      "readySelector": ".ui-export-form",
+      "readySelector": ".ui-operation-form",
       "actions": [
         {
           "type": "click",
@@ -295,7 +295,7 @@
         "width": 640,
         "height": 650
       },
-      "readySelector": ".ui-export-form",
+      "readySelector": ".ui-operation-form",
       "actions": [
         {
           "type": "input",
@@ -318,7 +318,7 @@
         "width": 800,
         "height": 650
       },
-      "readySelector": ".ui-export-form",
+      "readySelector": ".ui-operation-form",
       "actions": [
         {
           "type": "input",
@@ -341,7 +341,7 @@
         "width": 800,
         "height": 650
       },
-      "readySelector": ".ui-export-form",
+      "readySelector": ".ui-operation-form",
       "actions": []
     },
     {
@@ -375,7 +375,7 @@
         "width": 800,
         "height": 650
       },
-      "readySelector": ".ui-export-form",
+      "readySelector": ".ui-operation-form",
       "actions": []
     },
     {

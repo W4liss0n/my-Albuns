@@ -47,6 +47,7 @@ fn conflicts_require_explicit_decisions_and_recheck_after_closing_a_project() {
         },
         model.freeze_template().unwrap(),
         core,
+        &AtomicBool::new(false),
     )
     .unwrap();
     assert!(batch.view().items[0].conflict);
@@ -56,9 +57,14 @@ fn conflicts_require_explicit_decisions_and_recheck_after_closing_a_project() {
     assert!(!batch.view().can_continue);
     drop(existing);
     assert!(!batch.view().can_continue);
-    batch.recheck().unwrap();
+    batch.recheck(&AtomicBool::new(false)).unwrap();
     assert!(batch.view().items[0].can_replace);
     assert!(!batch.view().can_continue);
+    batch.decide(None, GenerationDecision::Ignore).unwrap();
+    assert_eq!(
+        batch.view().items[0].problems,
+        ["Já existe um Projeto no destino."]
+    );
     batch.decide(None, GenerationDecision::Replace).unwrap();
     assert!(batch.view().can_continue);
     assert_eq!(batch.view().phase, GenerationPhase::Prepared);
@@ -101,6 +107,7 @@ fn nested_folders_generate_independent_projects_from_the_unsaved_model_after_pre
         },
         model.freeze_template().unwrap(),
         core.clone(),
+        &AtomicBool::new(false),
     )
     .unwrap();
     assert_eq!(batch.view().items.len(), 2);
@@ -186,6 +193,7 @@ impl Fixture {
             self.options(),
             self.model.freeze_template().unwrap(),
             self.core.clone(),
+            &AtomicBool::new(false),
         )
     }
 }
@@ -264,7 +272,8 @@ fn unavailable_roots_and_destinations_inside_source_are_rejected_before_any_writ
             GenerationRunner::prepare(
                 options,
                 fixture.model.freeze_template().unwrap(),
-                fixture.core.clone()
+                fixture.core.clone(),
+                &AtomicBool::new(false),
             )
             .is_err()
         );
@@ -286,4 +295,23 @@ fn a_file_blocking_the_mirrored_parent_is_found_in_preflight() {
         std::fs::read_to_string(fixture.destination.join("Turma")).unwrap(),
         "preserve"
     );
+}
+
+#[test]
+fn cancelled_preflight_and_recheck_do_not_publish_projects() {
+    let fixture = Fixture::new();
+    fixture.photo("001");
+    let cancel = AtomicBool::new(true);
+    assert!(
+        GenerationRunner::prepare(
+            fixture.options(),
+            fixture.model.freeze_template().unwrap(),
+            fixture.core.clone(),
+            &cancel,
+        )
+        .is_err()
+    );
+    let mut runner = fixture.prepare().unwrap();
+    assert!(runner.recheck(&cancel).is_err());
+    assert_eq!(std::fs::read_dir(&fixture.destination).unwrap().count(), 0);
 }
