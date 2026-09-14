@@ -98,6 +98,7 @@ test("disk full presents a compact pause modal instead of a failed-project table
   expect(api.resultReady).toHaveBeenCalled();
   expect(api.run).not.toHaveBeenCalled();
   expect(api.resume).not.toHaveBeenCalled();
+  await waitFor(() => expect(screen.getByRole("button", { name: "Retomar" })).toBeEnabled());
   fireEvent.click(screen.getByRole("button", { name: "Retomar" }));
   await screen.findByText("Exportação concluída");
   expect(api.resume).toHaveBeenCalledWith("batch");
@@ -108,6 +109,7 @@ test("the user can cancel a batch paused for disk space without starting another
   const api = port({ current: async () => ({ ...ready, phase: "storageFull", canContinue: false }) });
   render(<BatchExportWindow port={api} />);
   await screen.findByText("Espaço insuficiente");
+  await waitFor(() => expect(screen.getByRole("button", { name: "Cancelar" })).toBeEnabled());
   fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
   await waitFor(() => expect(api.end).toHaveBeenCalledWith("batch"));
   expect(api.run).not.toHaveBeenCalled();
@@ -118,6 +120,7 @@ test("the storage modal discloses a partial publication before the user cancels"
   render(<BatchExportWindow port={api} />);
   await screen.findByText("Espaço insuficiente");
   expect(screen.getByText(/álbum atual foi publicado parcialmente/)).toBeVisible();
+  await waitFor(() => expect(screen.getByRole("button", { name: "Cancelar" })).toBeEnabled());
   fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
   await waitFor(() => expect(api.end).toHaveBeenCalledWith("batch"));
 });
