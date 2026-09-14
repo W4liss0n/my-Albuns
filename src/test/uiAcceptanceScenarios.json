@@ -38,7 +38,7 @@
       "id": "generation-error", "title": "Geração de Projetos — falha real",
       "implementationPath": "/generation-preview.html?scenario=error",
       "comparison": { "kind": "implementation-only", "surface": "generation-window", "implementationCaptureSelector": ".ui-owned-window-shell", "reason": "Falhas reais usam o diálogo padrão de mensagem, sem faixa de erro no formulário." },
-      "viewport": { "width": 800, "height": 650 }, "readySelector": ".generation-model__identity strong",
+      "viewport": { "width": 800, "height": 650 }, "readySelector": ".ui-standard-message[data-tone='error']",
       "actions": [
         { "type": "input", "selector": "input[aria-label='Pasta de origem']", "value": "D:\\Fotos\\Formatura 2026" },
         { "type": "input", "selector": "input[aria-label='Pasta de destino']", "value": "E:\\Álbuns\\Formatura 2026" },
