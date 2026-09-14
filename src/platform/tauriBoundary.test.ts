@@ -24,6 +24,7 @@ const sourceFiles = import.meta.glob("../**/*.{ts,tsx}", {
 
 const tauriCommandSources = {
   shared: ["./tauriLogger.ts"],
+  storageRecovery: ["./tauriStorageRecoveryPort.ts"],
   batch: ["./tauriBatchExportPort.ts"],
   photoshop: ["./tauriPhotoshopPort.ts"],
   settings: ["./tauriCacheSettingsPort.ts", "./tauriSettingsWindow.ts"],
@@ -149,6 +150,7 @@ test("assigns every Tauri command adapter to an explicit surface", () => {
     .sort();
   const assignedSources = [
     ...tauriCommandSources.shared,
+    ...tauriCommandSources.storageRecovery,
     ...tauriCommandSources.batch,
     ...tauriCommandSources.photoshop,
     ...tauriCommandSources.settings,
@@ -166,7 +168,7 @@ test("assigns every Tauri command adapter to an explicit surface", () => {
 
 test("keeps the project-window capability aligned with the invoked commands", () => {
   const invokedCommands = extractInvokedCommands(
-    [...tauriCommandSources.shared, ...tauriCommandSources.project],
+    [...tauriCommandSources.shared, ...tauriCommandSources.storageRecovery, ...tauriCommandSources.project],
   );
   photoshopProjectCommands.forEach((command) => invokedCommands.add(command));
   const { capability, allowedCommands } = parseSurfaceContract(
@@ -199,6 +201,7 @@ test("keeps the global-window capability isolated from project commands", () => 
   ]);
   const projectCommands = extractInvokedCommands([
     ...tauriCommandSources.shared,
+    ...tauriCommandSources.storageRecovery,
     ...tauriCommandSources.project,
   ]);
   photoshopProjectCommands.forEach((command) => projectCommands.add(command));
@@ -227,7 +230,7 @@ test("keeps the global-window capability isolated from project commands", () => 
 });
 
 test("assigns the batch adapter to its owned surfaces and explicit global entry points", () => {
-  const commands = extractInvokedCommands(tauriCommandSources.batch);
+  const commands = extractInvokedCommands([...tauriCommandSources.batch, ...tauriCommandSources.storageRecovery]);
   commands.delete("open_batch_export");
   const { capability, allowedCommands } = parseSurfaceContract(batchWindowCapability, batchWindowPermission);
   expect(capability.windows).toEqual(["batch-export", "batch-progress"]);
