@@ -339,6 +339,7 @@ test("the manifest covers the integrated workspace and every critical Project di
       "projectCloseConfirmation",
       "projectCloseFailure",
       "projectOperationFailure",
+      "storageFull",
     ],
   );
 });
