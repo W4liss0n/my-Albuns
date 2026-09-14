@@ -252,7 +252,7 @@ test("the manifest covers the integrated workspace and every critical Project di
       cancelRequested: true,
       cancellable: true,
       kind: "exportProgress",
-      progressKind: "indeterminate",
+      progressKind: "determinate",
     },
     "export-progress-non-cancellable": {
       cancelRequested: false,
@@ -339,6 +339,7 @@ test("the manifest covers the integrated workspace and every critical Project di
       "projectCloseConfirmation",
       "projectCloseFailure",
       "projectOperationFailure",
+      "storageFull",
     ],
   );
 });

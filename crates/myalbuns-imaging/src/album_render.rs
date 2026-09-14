@@ -12,9 +12,18 @@ use myalbuns_imaging_protocol::{
 use myalbuns_paths::ExpectedObject;
 use std::collections::{HashMap, HashSet};
 
+#[cfg(test)]
 pub(crate) fn render(
     request: &AlbumRenderRequest,
     progress: &mut dyn FnMut(ImagingProgressStage, u32, u32) -> Result<(), String>,
+) -> Result<AlbumRenderCompletion, RenderFailure> {
+    render_retaining(request, progress, &mut Vec::new())
+}
+
+pub(crate) fn render_retaining(
+    request: &AlbumRenderRequest,
+    progress: &mut dyn FnMut(ImagingProgressStage, u32, u32) -> Result<(), String>,
+    outputs: &mut Vec<RenderCompletion>,
 ) -> Result<AlbumRenderCompletion, RenderFailure> {
     request.validate().map_err(|message| {
         RenderFailure::typed(
@@ -67,7 +76,6 @@ pub(crate) fn render(
         .map(|output| output.units.len())
         .sum::<usize>() as u32;
     let mut done = 0;
-    let mut outputs = Vec::new();
     for output in &request.outputs {
         let path = request
             .root_bindings
@@ -160,7 +168,9 @@ pub(crate) fn render(
         });
     }
     progress(ImagingProgressStage::EncodingOutput, total, total)?;
-    Ok(AlbumRenderCompletion { outputs })
+    Ok(AlbumRenderCompletion {
+        outputs: outputs.clone(),
+    })
 }
 
 /// Translate the already-composed physical geometry. Clipping occurs while rasterizing
@@ -207,6 +217,109 @@ fn translate_viewport(unit: &mut ComposedOutputUnit, view: &RectUm) {
         shift(&mut overlay.draw_rect);
         if let Some(clip) = &mut overlay.clip_rect {
             shift(clip);
+        }
+    }
+}
+
+#[cfg(test)]
+mod recovery_tests {
+    use super::*;
+    use myalbuns_core::{
+        CreateAuthorization, CreateProjectRequest, ExportMode, InitialProject, ProjectCore,
+        ProjectLocation,
+    };
+    use myalbuns_imaging_protocol::{AlbumRenderOutput, IMAGING_PROTOCOL_VERSION};
+    use myalbuns_paths::{NativePathDto, OperationPathContext, test_support::DiskFull};
+
+    #[test]
+    fn encoder_disk_full_returns_only_finished_receipts_and_retries_the_incomplete_file() {
+        for format in [
+            RenderFormat::Jpeg { quality: 100 },
+            RenderFormat::Png,
+            RenderFormat::Pdf,
+        ] {
+            let root = tempfile::tempdir().unwrap();
+            let project_path = root.path().join("test.myalbuns");
+            let mut paths = OperationPathContext::new();
+            paths.capture(&project_path).unwrap();
+            let project = ProjectCore::new()
+                .with_identity_storage_roots(
+                    root.path().join("leases"),
+                    root.path().join("identities"),
+                )
+                .create_editable(CreateProjectRequest::new(
+                    ProjectLocation::new(project_path, paths.freeze()),
+                    InitialProject::neutral(),
+                    CreateAuthorization::CreateOnly,
+                ))
+                .unwrap();
+            let mut snapshot = project.render_snapshot();
+            snapshot.dpi = 4;
+            let ids = snapshot
+                .composition
+                .sheets
+                .iter()
+                .map(|sheet| sheet.sheet_id.clone())
+                .collect::<Vec<_>>();
+            let units = snapshot.export_units(&ids, ExportMode::Sheet).unwrap();
+            let groups = if format == RenderFormat::Pdf {
+                vec![units]
+            } else {
+                units.into_iter().map(|unit| vec![unit]).collect()
+            };
+            let mut paths = OperationPathContext::new();
+            let outputs = groups
+                .into_iter()
+                .enumerate()
+                .map(|(index, units)| {
+                    let path = root
+                        .path()
+                        .join(format!("prepared-{index}.{}", format.extension()));
+                    paths.capture(&path).unwrap();
+                    AlbumRenderOutput {
+                        prepared_path: NativePathDto::from(path),
+                        units,
+                    }
+                })
+                .collect::<Vec<_>>();
+            let failed_index = usize::from(outputs.len() > 1);
+            let failed_path = outputs[failed_index].prepared_path.as_path().to_owned();
+            let mut request = AlbumRenderRequest {
+                protocol_version: IMAGING_PROTOCOL_VERSION,
+                request_id: "recovery-test".into(),
+                snapshot,
+                format,
+                outputs,
+                sources: vec![],
+                root_bindings: paths.freeze(),
+            };
+            let fault = DiskFull::after_bytes(&failed_path, 32);
+            let mut completed = Vec::new();
+            let failure =
+                render_retaining(&request, &mut |_, _, _| Ok(()), &mut completed).unwrap_err();
+            assert_eq!(failure.failure.code, ImagingFailureCode::OutputStorageFull);
+            assert!(fault.failure_count() > 0);
+            assert_eq!(completed.len(), failed_index);
+            drop(fault);
+            let earlier = (failed_index > 0)
+                .then(|| std::fs::read(request.outputs[0].prepared_path.as_path()).unwrap());
+            if failed_path.exists() {
+                std::fs::remove_file(&failed_path).unwrap();
+            }
+            request.outputs.drain(..failed_index);
+            let result = render(&request, &mut |_, _, _| Ok(()))
+                .unwrap_or_else(|error| panic!("{}", error.message));
+            assert_eq!(result.outputs.len(), request.outputs.len());
+            if let Some(earlier) = earlier {
+                assert_eq!(
+                    std::fs::read(
+                        root.path()
+                            .join(format!("prepared-0.{}", request.format.extension()))
+                    )
+                    .unwrap(),
+                    earlier
+                );
+            }
         }
     }
 }

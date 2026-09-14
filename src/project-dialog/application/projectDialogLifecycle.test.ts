@@ -11,7 +11,7 @@ test.each<{
   { expected: "cancelMediaRemoval", state: { kind: "mediaRemovalConfirmation", mediaKind: "photo", count: 2, usedCount: 1, usageCount: 3, busy: false } },
   { expected: null, state: { kind: "mediaRemovalConfirmation", mediaKind: "photo", count: 2, usedCount: 1, usageCount: 3, busy: true } },
   { expected: null, state: { kind: "layoutDeletionConfirmation", busy: true } },
-  { expected: null, state: { kind: "imageProcessingProgress", progress: { kind: "determinate", completed: 5, total: 12, status: "5 de 12" } } },
+  { expected: null, state: { kind: "imageProcessingProgress", progress: { kind: "determinate", completed: 5, total: 12, status: "" } } },
   {
     expected: "cancelAlbumInformation",
     state: {

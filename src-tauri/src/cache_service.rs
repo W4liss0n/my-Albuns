@@ -224,6 +224,35 @@ impl CacheService {
         self.clear_reserved_namespaces(reserved, skipped_active_namespace_count)
     }
 
+    /// Recovery only offers immediately reclaimable namespaces on the failed
+    /// volume. Reservations exclude every open Project, including this host.
+    pub(crate) fn recover_storage(
+        &self,
+        volume: &myalbuns_paths::StorageVolume,
+        clear: bool,
+    ) -> Result<u64, CacheServiceError> {
+        let _maintenance = self.try_maintenance()?;
+        let mut reserved = Vec::new();
+        for paths in self.list_namespaces()? {
+            if myalbuns_paths::StorageVolume::containing(paths.root()).as_ref() != Some(volume) {
+                continue;
+            }
+            if let CacheNamespaceRemovalReservation::Reserved(namespace) =
+                self.reserve_namespace_for_removal(&paths)?
+            {
+                reserved.push(namespace);
+            }
+        }
+        if clear {
+            return self
+                .clear_reserved_namespaces(reserved, 0)
+                .map(|result| result.freed_bytes);
+        }
+        reserved.iter().try_fold(0, |total, entry| {
+            checked_add_usage(total, entry.usage.bytes())
+        })
+    }
+
     pub(crate) fn clear_all_or_schedule(&self) -> Result<CacheClearAllOutcome, CacheServiceError> {
         match self.try_clear_all()? {
             Some(result) => Ok(CacheClearAllOutcome::Cleared { result }),
@@ -859,6 +888,25 @@ mod tests {
         assert_eq!(measured.releasable_bytes, 20);
         assert_eq!(measured.namespace_count, 2);
         assert_eq!(measured.releasable_namespace_count, 1);
+
+        let volume = myalbuns_paths::StorageVolume::containing(root.path()).unwrap();
+        assert_eq!(service.recover_storage(&volume, false).unwrap(), 20);
+        assert_eq!(service.recover_storage(&volume, true).unwrap(), 20);
+        assert!(!second_paths.root().exists(), "recovery waits for deletion");
+        assert!(
+            first_paths.root().exists(),
+            "the open album remains reserved"
+        );
+        assert_eq!(service.recover_storage(&volume, true).unwrap(), 0);
+        let second_owner = service
+            .reserve_namespace(second.identity_authority())
+            .unwrap();
+        std::fs::write(
+            second_paths.media_directory().join("second.bin"),
+            vec![2_u8; 20],
+        )
+        .unwrap();
+        drop(second_owner);
 
         let released = service
             .free_closed_projects()

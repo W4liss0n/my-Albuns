@@ -38,6 +38,7 @@ import { ProjectWorkspace } from "./components/ProjectWorkspace";
 import { useProjectCloseController } from "./components/useProjectCloseController";
 import { useProjectMutationRunner } from "./components/useProjectMutationRunner";
 import { useProjectOperationResultDialog } from "./components/useProjectOperationResultDialog";
+import { useCacheStorageRecovery } from "./components/useCacheStorageRecovery";
 import { useProjectGraphicsFailureDialog } from "./components/useProjectGraphicsFailureDialog";
 import { BrandWordmark, InlineNotice } from "./ui";
 import "./ui/theme.css";
@@ -163,7 +164,7 @@ function App({
     message:
       initialGraphicsCloseError ??
       saveAsStartupFailure ??
-      cacheProcessorWarning?.message ??
+      (cacheProcessorWarning?.state === "storage_full" && mediaPreviewPort.storageRecovery ? null : cacheProcessorWarning?.message) ??
       null,
     projectDialogPort,
     onDismiss: (kind) => {
@@ -366,6 +367,7 @@ function App({
       const prepared = new Map(previews.map((preview) => [preview.mediaId, preview]));
       await Promise.all(demand.visibleMediaIds.map(async (mediaId) => {
         const preview = prepared.get(mediaId);
+        if (preview?.state === "cache_paused") return;
         if (preview && preview.state !== "ready") {
           reportUnavailablePreview(mediaId);
           return;
@@ -490,7 +492,7 @@ function App({
     void mediaPreviewPort
       .onCacheProcessorWarning((warning) => {
         if (!active) return;
-        if (warning.state === "storage_full") {
+        if (warning.state === "storage_full" && !mediaPreviewPort.storageRecovery) {
           if (storageFullReported) return;
           storageFullReported = true;
         }
@@ -546,6 +548,13 @@ function App({
     startupPreviewReadiness.refreshRevision === mediaRefreshRevision &&
     sameMediaDemand(startupPreviewReadiness.demand, startupPreviewDemand)
   );
+  useCacheStorageRecovery({
+    projectId,
+    enabled: Boolean(projectId) && startupPrepared && startupPreviewsReady,
+    warning: cacheProcessorWarning?.state === "storage_full",
+    port: mediaPreviewPort, dialogPort: projectDialogPort,
+    onResumed: () => { setCacheProcessorWarning(null); setMediaRefreshRevision(revision => revision + 1); },
+  });
 
   useEffect(() => {
     if (

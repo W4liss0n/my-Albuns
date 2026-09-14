@@ -74,6 +74,7 @@ pub(crate) struct ImageProcessingBatch<F: FnMut(crate::ipc_contract::ImageProces
 
 #[derive(Debug)]
 enum ProcessingFailure {
+    StorageFull,
     File(String),
     Operation(String),
 }
@@ -169,12 +170,18 @@ impl<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> ImageProcessingBatc
         }
         drop(permit);
         let resource_interrupted = std::sync::atomic::AtomicBool::new(false);
+        let storage_interrupted = std::sync::atomic::AtomicBool::new(false);
         let preparation = stream::iter(owners)
             .map(|(binding, work, owner)| {
                 let resource_interrupted = &resource_interrupted;
+                let storage_interrupted = &storage_interrupted;
                 async move {
-                    let result = if resource_interrupted.load(std::sync::atomic::Ordering::Acquire)
-                    {
+                    let result = if storage_interrupted.load(std::sync::atomic::Ordering::Acquire) {
+                        Err(CacheFailure::new(
+                            CacheFailureStage::StorageFull,
+                            "Espaço insuficiente.",
+                        ))
+                    } else if resource_interrupted.load(std::sync::atomic::Ordering::Acquire) {
                         Err(CacheFailure::new(
                             CacheFailureStage::MemoryPressure,
                             ProcessorAdmissionFailure::MemoryPressure.to_string(),
@@ -197,6 +204,12 @@ impl<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> ImageProcessingBatc
                     {
                         resource_interrupted.store(true, std::sync::atomic::Ordering::Release);
                     }
+                    if result
+                        .as_ref()
+                        .is_err_and(|failure| failure.stage == CacheFailureStage::StorageFull)
+                    {
+                        storage_interrupted.store(true, std::sync::atomic::Ordering::Release);
+                    }
                     (binding, owner, result)
                 }
             })
@@ -216,8 +229,11 @@ impl<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> ImageProcessingBatc
                 }
                 Err(failure) => {
                     let result = owner.complete(Err(failure));
-                    self.prepare_with(&binding, std::future::ready(processing_result(result)))
-                        .await;
+                    self.prepare_with(
+                        &binding,
+                        std::future::ready(processing_result_for_app(app, result)),
+                    )
+                    .await;
                 }
             }
         }
@@ -263,14 +279,20 @@ impl<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> ImageProcessingBatc
                     .collect()
             });
             for ((binding, owner), result) in prepared.into_iter().zip(results) {
-                self.record_result(&binding, processing_result(owner.complete(result)), true);
+                self.record_result(
+                    &binding,
+                    processing_result_for_app(app, owner.complete(result)),
+                    true,
+                );
             }
         }
         // Publish our owners before joining foreign flights, preventing cycles
         // between overlapping foreground batches and viewport demands.
         for (binding, waiter) in waiters {
-            self.prepare_with(&binding, async { processing_result(waiter.wait().await) })
-                .await;
+            self.prepare_with(&binding, async {
+                processing_result_for_app(app, waiter.wait().await)
+            })
+            .await;
         }
     }
 
@@ -312,6 +334,7 @@ impl<F: FnMut(crate::ipc_contract::ImageProcessingProgress)> ImageProcessingBatc
         already_counted: bool,
     ) {
         let problem = match result {
+            Err(ProcessingFailure::StorageFull) => return,
             Ok(()) => None,
             Err(ProcessingFailure::Operation(reason)) => {
                 if self.operation_problem.is_none() {
@@ -474,10 +497,26 @@ async fn synchronize_processing_sources(
     .map_err(|_| "Não foi possível inspecionar as imagens do Projeto.".to_string())?
 }
 
+fn processing_result_for_app(
+    app: &AppHandle,
+    result: Result<cache_engine::CacheExecution, CacheFailure>,
+) -> Result<(), ProcessingFailure> {
+    if result
+        .as_ref()
+        .is_err_and(|failure| failure.stage == CacheFailureStage::StorageFull)
+    {
+        crate::storage_recovery::pause_cache(app);
+    }
+    processing_result(result)
+}
+
 fn processing_result(
     execution: Result<cache_engine::CacheExecution, CacheFailure>,
 ) -> Result<(), ProcessingFailure> {
     execution.map(|_| ()).map_err(|failure| {
+        if failure.stage == CacheFailureStage::StorageFull {
+            return ProcessingFailure::StorageFull;
+        }
         if failure.stage == CacheFailureStage::MemoryPressure {
             return ProcessingFailure::Operation(failure.message);
         }

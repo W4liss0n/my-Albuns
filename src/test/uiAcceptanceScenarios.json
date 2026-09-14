@@ -63,6 +63,22 @@
       "readySelector": ".ui-progress-dialog", "actions": []
     },
     {
+      "id": "batch-export-storage-full",
+      "title": "Exportação em lote — pausa por falta real de espaço",
+      "implementationPath": "/batch-export-preview.html?scenario=storage-full",
+      "comparison": { "kind": "implementation-only", "surface": "batch-export-window", "implementationCaptureSelector": ".ui-owned-window-shell", "reason": "Decisão aceita em 14/09/2026: falta real de espaço pausa o lote e abre um modal compacto com Retomar e Cancelar, sem registrar falha na tabela nem avançar para outro Álbum." },
+      "viewport": { "width": 520, "height": 340 },
+      "readySelector": ".ui-standard-message", "actions": []
+    },
+    {
+      "id": "batch-export-storage-full-partial",
+      "title": "Exportação em lote — pausa com publicação parcial",
+      "implementationPath": "/batch-export-preview.html?scenario=storage-full-partial",
+      "comparison": { "kind": "implementation-only", "surface": "batch-export-window", "implementationCaptureSelector": ".ui-owned-window-shell", "reason": "ADR 0006 e decisão aceita de pausa: avisar no próprio modal quando arquivos do Álbum atual já foram publicados antes da falta de espaço. Mensagem condicional, sem tabela de falhas." },
+      "viewport": { "width": 520, "height": 340 },
+      "readySelector": ".ui-standard-message", "actions": []
+    },
+    {
       "id": "batch-export-result",
       "title": "Exportação em lote — resultado com falhas e ignorados",
       "implementationPath": "/batch-export-preview.html?scenario=result",
@@ -661,9 +677,43 @@
       "actions": []
     },
     {
+      "id": "export-progress-starting",
+      "title": "Exportação — contagem inicial de lâminas",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportProgress%22%2C%22cancelRequested%22%3Afalse%2C%22cancellable%22%3Atrue%2C%22progress%22%3A%7B%22kind%22%3A%22determinate%22%2C%22completed%22%3A0%2C%22total%22%3A100%2C%22status%22%3A%220%20l%C3%A2minas%20de%2018%22%7D%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-progress-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "A Exportação usa progresso pertencente à Janela conforme as decisões aceitas posteriores."
+      },
+      "viewport": {
+        "width": 440,
+        "height": 320
+      },
+      "readySelector": ".ui-progress-dialog__track[role=\"progressbar\"]",
+      "actions": []
+    },
+    {
+      "id": "export-progress-pages",
+      "title": "Exportação — contagem de páginas",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportProgress%22%2C%22cancelRequested%22%3Afalse%2C%22cancellable%22%3Atrue%2C%22progress%22%3A%7B%22kind%22%3A%22determinate%22%2C%22completed%22%3A38%2C%22total%22%3A100%2C%22status%22%3A%2216%20p%C3%A1ginas%20de%2036%22%7D%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-progress-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "A Exportação usa progresso pertencente à Janela conforme as decisões aceitas posteriores."
+      },
+      "viewport": {
+        "width": 440,
+        "height": 320
+      },
+      "readySelector": ".ui-progress-dialog__track[role=\"progressbar\"]",
+      "actions": []
+    },
+    {
       "id": "export-progress-determinate",
       "title": "Diálogo de Exportação — progresso determinado",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportProgress%22%2C%22cancelRequested%22%3Afalse%2C%22cancellable%22%3Atrue%2C%22progress%22%3A%7B%22kind%22%3A%22determinate%22%2C%22completed%22%3A3%2C%22total%22%3A8%2C%22status%22%3A%22Compondo%20L%C3%A2minas%E2%80%A6%22%7D%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportProgress%22%2C%22cancelRequested%22%3Afalse%2C%22cancellable%22%3Atrue%2C%22progress%22%3A%7B%22kind%22%3A%22determinate%22%2C%22completed%22%3A38%2C%22total%22%3A100%2C%22status%22%3A%228%20l%C3%A2minas%20de%2018%22%7D%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-progress-dialog",
@@ -677,7 +727,7 @@
     {
       "id": "export-progress-cancel-requested",
       "title": "Diálogo de Exportação — cancelamento solicitado",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportProgress%22%2C%22cancelRequested%22%3Atrue%2C%22cancellable%22%3Atrue%2C%22progress%22%3A%7B%22kind%22%3A%22indeterminate%22%2C%22status%22%3A%22Cancelando%20Exporta%C3%A7%C3%A3o%E2%80%A6%22%7D%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportProgress%22%2C%22cancelRequested%22%3Atrue%2C%22cancellable%22%3Atrue%2C%22progress%22%3A%7B%22kind%22%3A%22determinate%22%2C%22completed%22%3A38%2C%22total%22%3A100%2C%22status%22%3A%228%20l%C3%A2minas%20de%2018%22%7D%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-progress-dialog",
@@ -691,7 +741,7 @@
     {
       "id": "export-progress-non-cancellable",
       "title": "Diálogo de Exportação — publicação não cancelável",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportProgress%22%2C%22cancelRequested%22%3Afalse%2C%22cancellable%22%3Afalse%2C%22progress%22%3A%7B%22kind%22%3A%22determinate%22%2C%22completed%22%3A8%2C%22total%22%3A8%2C%22status%22%3A%22Publicando%20Exporta%C3%A7%C3%A3o%E2%80%A6%22%7D%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportProgress%22%2C%22cancelRequested%22%3Afalse%2C%22cancellable%22%3Afalse%2C%22progress%22%3A%7B%22kind%22%3A%22determinate%22%2C%22completed%22%3A92%2C%22total%22%3A100%2C%22status%22%3A%2218%20l%C3%A2minas%20de%2018%22%7D%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-progress-dialog",
@@ -2101,9 +2151,26 @@
       "actions": []
     },
     {
+      "id": "cache-recovery-progress",
+      "title": "Recuperação do Cache — progresso determinado",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22imageProcessingProgress%22%2C%22progress%22%3A%7B%22kind%22%3A%22determinate%22%2C%22completed%22%3A3%2C%22total%22%3A10%2C%22status%22%3A%22Preparando%20imagens%22%7D%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-progress-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "A recuperação de Cache reutiliza o contador automático e o padrão determinado definido em docs/design/0007-progresso-de-operacoes.md."
+      },
+      "viewport": {
+        "width": 440,
+        "height": 360
+      },
+      "readySelector": "[role=\"progressbar\"][aria-valuenow=\"3\"]",
+      "actions": []
+    },
+    {
       "id": "photo-import-progress",
       "title": "Processamento de imagens — progresso",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22imageProcessingProgress%22%2C%22progress%22%3A%7B%22kind%22%3A%22determinate%22%2C%22completed%22%3A5%2C%22total%22%3A12%2C%22status%22%3A%225%20de%2012%22%7D%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22imageProcessingProgress%22%2C%22progress%22%3A%7B%22kind%22%3A%22determinate%22%2C%22completed%22%3A5%2C%22total%22%3A12%2C%22status%22%3A%22%22%7D%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-import-dialog",
@@ -9209,6 +9276,142 @@
           "selector": "[role=\"menuitem\"][aria-label=\"Abrir no Photoshop\"]"
         }
       ]
+    },
+    {
+      "id": "batch-export-storage-full-cache",
+      "title": "Exportação em lote — limpar cache e retomar",
+      "implementationPath": "/batch-export-preview.html?scenario=storage-full-cache",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "batch-export-window",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "Design 0010, decisão aceita em 14/09/2026: mesmo modal para espera manual e limpeza explícita de cache no volume afetado; botões bloqueados durante a remoção, sem linha temporária."
+      },
+      "viewport": {
+        "width": 520,
+        "height": 340
+      },
+      "readySelector": ".ui-action-button--primary:not(:disabled)",
+      "actions": []
+    },
+    {
+      "id": "storage-full-cache-manual",
+      "title": "Cache — falta de espaço (manual)",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22storageFull%22%2C%22message%22%3A%22Libere%20espa%C3%A7o%20para%20continuar%20preparando%20as%20imagens.%22%2C%22canClearCache%22%3Afalse%2C%22busy%22%3Afalse%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "batch-export-window",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "Design 0010, decisão aceita em 14/09/2026: mesmo modal para espera manual e limpeza explícita de cache no volume afetado; botões bloqueados durante a remoção, sem linha temporária."
+      },
+      "viewport": {
+        "width": 520,
+        "height": 340
+      },
+      "readySelector": ".ui-standard-message",
+      "actions": []
+    },
+    {
+      "id": "storage-full-cache-cleanup",
+      "title": "Cache — falta de espaço (cleanup)",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22storageFull%22%2C%22message%22%3A%22Libere%20espa%C3%A7o%20para%20continuar%20preparando%20as%20imagens.%22%2C%22canClearCache%22%3Atrue%2C%22busy%22%3Afalse%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "batch-export-window",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "Design 0010, decisão aceita em 14/09/2026: mesmo modal para espera manual e limpeza explícita de cache no volume afetado; botões bloqueados durante a remoção, sem linha temporária."
+      },
+      "viewport": {
+        "width": 520,
+        "height": 340
+      },
+      "readySelector": ".ui-standard-message",
+      "actions": []
+    },
+    {
+      "id": "storage-full-cache-busy",
+      "title": "Cache — falta de espaço (busy)",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22storageFull%22%2C%22message%22%3A%22Libere%20espa%C3%A7o%20para%20continuar%20preparando%20as%20imagens.%22%2C%22canClearCache%22%3Atrue%2C%22busy%22%3Atrue%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "batch-export-window",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "Design 0010, decisão aceita em 14/09/2026: mesmo modal para espera manual e limpeza explícita de cache no volume afetado; botões bloqueados durante a remoção, sem linha temporária."
+      },
+      "viewport": {
+        "width": 520,
+        "height": 340
+      },
+      "readySelector": ".ui-standard-message",
+      "actions": []
+    },
+    {
+      "id": "storage-full-export-manual",
+      "title": "Exportação — falta de espaço (manual)",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22storageFull%22%2C%22message%22%3A%22Libere%20espa%C3%A7o%20para%20continuar.%20Arquivos%20j%C3%A1%20exportados%20foram%20mantidos.%22%2C%22canClearCache%22%3Afalse%2C%22busy%22%3Afalse%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "batch-export-window",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "Design 0010, decisão aceita em 14/09/2026: mesmo modal para espera manual e limpeza explícita de cache no volume afetado; botões bloqueados durante a remoção, sem linha temporária."
+      },
+      "viewport": {
+        "width": 520,
+        "height": 340
+      },
+      "readySelector": ".ui-standard-message",
+      "actions": []
+    },
+    {
+      "id": "storage-full-export-cleanup",
+      "title": "Exportação — falta de espaço (cleanup)",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22storageFull%22%2C%22message%22%3A%22Libere%20espa%C3%A7o%20para%20continuar.%20Arquivos%20j%C3%A1%20exportados%20foram%20mantidos.%22%2C%22canClearCache%22%3Atrue%2C%22busy%22%3Afalse%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "batch-export-window",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "Design 0010, decisão aceita em 14/09/2026: mesmo modal para espera manual e limpeza explícita de cache no volume afetado; botões bloqueados durante a remoção, sem linha temporária."
+      },
+      "viewport": {
+        "width": 520,
+        "height": 340
+      },
+      "readySelector": ".ui-standard-message",
+      "actions": []
+    },
+    {
+      "id": "storage-full-export-busy",
+      "title": "Exportação — falta de espaço (busy)",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22storageFull%22%2C%22message%22%3A%22Libere%20espa%C3%A7o%20para%20continuar.%20Arquivos%20j%C3%A1%20exportados%20foram%20mantidos.%22%2C%22canClearCache%22%3Atrue%2C%22busy%22%3Atrue%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "batch-export-window",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "Design 0010, decisão aceita em 14/09/2026: mesmo modal para espera manual e limpeza explícita de cache no volume afetado; botões bloqueados durante a remoção, sem linha temporária."
+      },
+      "viewport": {
+        "width": 520,
+        "height": 340
+      },
+      "readySelector": ".ui-standard-message",
+      "actions": []
+    },
+    {
+      "id": "storage-full-export-partial",
+      "title": "Exportação — falta de espaço com publicação parcial",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22storageFull%22%2C%22message%22%3A%22O%20%C3%A1lbum%20foi%20publicado%20parcialmente.%20Libere%20espa%C3%A7o%20e%20retome%20para%20concluir.%20Os%20arquivos%20j%C3%A1%20exportados%20foram%20mantidos.%22%2C%22canClearCache%22%3Atrue%2C%22busy%22%3Afalse%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "batch-export-window",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "Design 0010, decisão aceita em 14/09/2026: mesmo modal para espera manual e limpeza explícita de cache no volume afetado; botões bloqueados durante a remoção, sem linha temporária."
+      },
+      "viewport": {
+        "width": 520,
+        "height": 340
+      },
+      "readySelector": ".ui-standard-message",
+      "actions": []
     }
   ]
 }

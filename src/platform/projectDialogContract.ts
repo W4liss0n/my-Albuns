@@ -42,6 +42,7 @@ const projectDialogActionMap = {
   dismissProjectOperationFailure: "dismissProjectOperationFailure",
   dismissImageProcessingProblems: "dismissImageProcessingProblems",
   retryExport: "retryExport",
+  resumeStorage: "resumeStorage", clearStorageCache: "clearStorageCache", cancelStorage: "cancelStorage",
   saveAndClose: "saveAndClose",
 } as const satisfies Record<Extract<IpcProjectDialogAction, string>, ProjectDialogAction> &
   Record<Extract<ProjectDialogAction, string>, IpcProjectDialogAction>;
@@ -196,6 +197,8 @@ const stateDecoders: Record<
           retryDisabled: value.retryDisabled,
         }
       : null,
+  storageFull: value => typeof value.message === "string" && typeof value.canClearCache === "boolean" && typeof value.busy === "boolean"
+    ? { kind: "storageFull", message: value.message, canClearCache: value.canClearCache, busy: value.busy } : null,
   exportProgress: (value) => {
     const progress = decodeProgress(value.progress);
     return typeof value.cancelRequested === "boolean" &&
@@ -313,6 +316,7 @@ export function toIpcProjectDialogState(
   state: ProjectDialogState,
 ): IpcProjectDialogState {
   switch (state.kind) {
+    case "storageFull": return { ...state };
     case "exportConfiguration": return { ...state };
     case "exportConflicts": return { ...state };
     case "mediaRemovalConfirmation": return { ...state };
@@ -360,6 +364,7 @@ function fromIpcProjectDialogState(
   state: IpcProjectDialogState,
 ): ProjectDialogState {
   switch (state.kind) {
+    case "storageFull": return { ...state };
     case "exportConfiguration": return { ...state };
     case "exportConflicts": return { ...state };
     case "mediaRemovalConfirmation": return { ...state };

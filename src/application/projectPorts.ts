@@ -27,7 +27,8 @@ export type MediaPreviewState =
   | "ready"
   | "absent"
   | "unavailable"
-  | "cache_unavailable";
+  | "cache_unavailable"
+  | "cache_paused";
 
 export interface MediaPreview {
   mediaId: string;
@@ -316,6 +317,8 @@ export interface ProjectCorePort {
 }
 
 export interface MediaPreviewPort {
+  storageRecovery?: import("./storageRecovery").StorageRecoveryPort;
+  resumeCacheImages?(onProgress: (progress: ImageProcessingProgress) => void): Promise<boolean>;
   readMediaFiles(): Promise<MediaFileCatalog>;
   // Completion replaces the presentation snapshot: demanded outcomes plus the
   // native registry's bounded recent residents. Omission revokes a prior URL.
@@ -333,6 +336,7 @@ export interface MediaPreviewPort {
 }
 
 export interface ExportSheetSelection {
+  recoveryId?: string;
   options?: import("./normalExport").NormalExportOptions;
   projectName: string;
   sheetId: string;
@@ -340,6 +344,8 @@ export interface ExportSheetSelection {
 }
 
 export interface ExportPipelinePort {
+  discardRecovery?(id: string): Promise<void>;
+  storageRecovery?: import("./storageRecovery").StorageRecoveryPort;
   defaultDestination(): Promise<string>;
   chooseDestination(): Promise<string | null>;
   startSheet(

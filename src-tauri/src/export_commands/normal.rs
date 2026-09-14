@@ -65,6 +65,7 @@ pub(crate) async fn export_project(
     app: AppHandle,
     window: WebviewWindow,
     options: NormalExportOptions,
+    recovery_id: Option<String>,
     on_event: Channel<ExportEvent>,
     state: State<'_, ProjectHost>,
     logging: State<'_, LoggingState>,
@@ -76,6 +77,34 @@ pub(crate) async fn export_project(
     let _operation =
         crate::project_ui_operations::begin(&app).map_err(ExportCommandError::failed)?;
     require_owner(&window).map_err(ExportCommandError::failed)?;
+    let recoveries = app.state::<crate::storage_recovery::StorageRecoveries>();
+    if let Some(id) = recovery_id {
+        let acquisition =
+            OperationLease::begin(&operation_gate).map_err(ExportCommandError::from_gate)?;
+        if let Some(recovery) = recoveries
+            .take_export(&id)
+            .map_err(ExportCommandError::failed)?
+        {
+            let request_id = recovery.request_id().to_owned();
+            let attempt = attempts
+                .begin(request_id.clone(), window.label())
+                .map_err(|error| ExportCommandError::failed(error.to_string()))?;
+            let prepared = PreparedExportCommand {
+                acquisition,
+                attempt,
+                operation_paths: recovery.required_paths(),
+                project_id: Some(recovery.project_id().to_owned()),
+                request_id,
+                plan: ExportCommandPlan::Resume(recovery),
+            };
+            return run_export(app, window, on_event, logging, cache, processor, prepared)
+                .await
+                .map(Some)
+                .map_err(Into::into);
+        }
+        drop(acquisition);
+    }
+    recoveries.finish("export");
     options
         .format
         .validate()
@@ -132,6 +161,7 @@ pub(crate) async fn export_project(
         return Err(ExportCommandError::failed("Escolha uma pasta de destino absoluta.").into());
     }
     let conflict_policy = options.conflict_policy;
+    let destination_volume = myalbuns_paths::StorageVolume::containing(&destination);
     let plan = tauri::async_runtime::spawn_blocking(move || {
         let mut plan = export_pipeline::plan_album(
             snapshot,
@@ -154,8 +184,9 @@ pub(crate) async fn export_project(
         let conflicts = plan.conflicts()?;
         if conflicts.is_empty() || conflict_policy != ExportConflictPolicy::Ask {
             std::fs::create_dir_all(&destination).map_err(|error| {
-                export_pipeline::ExportFailure::new(
+                export_pipeline::ExportFailure::from_path_error(
                     export_pipeline::ExportFailureStage::Prepare,
+                    myalbuns_paths::AppPathsError::export_io(&error),
                     format!("Não foi possível criar a pasta de destino: {error}"),
                 )
             })?;
@@ -166,7 +197,12 @@ pub(crate) async fn export_project(
     })
     .await
     .map_err(|error| ExportCommandError::failed(error.to_string()))?
-    .map_err(ExportCommandError::from_pipeline)?;
+    .map_err(|failure| {
+        if failure.is_storage_full() {
+            recoveries.pause("export", destination_volume);
+        }
+        ExportCommandError::from_pipeline(failure)
+    })?;
     let (plan, conflicts, has_outputs) = plan;
     if !conflicts.is_empty() && conflict_policy == ExportConflictPolicy::Ask {
         let mut error = ExportCommandError::failed("Já existem arquivos no Destino da Exportação.");

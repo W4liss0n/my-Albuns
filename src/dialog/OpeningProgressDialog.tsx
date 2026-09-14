@@ -20,7 +20,6 @@ export function OpeningProgressDialog({
       completed: images.completedFiles,
       total: images.totalFiles,
       status: "Preparando imagens",
-      remaining: `${images.completedFiles} de ${images.totalFiles}`,
     } : {
       kind: "indeterminate",
       status: "Preparando a Janela do Projeto…",

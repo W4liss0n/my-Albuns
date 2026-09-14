@@ -1,4 +1,5 @@
 import type { ExportMediaProblem } from "./exportMedia";
+import type { StorageFullPresentation, StorageRecoveryAction } from "./storageRecovery";
 import type { NormalExportOptions, ExportSheetInfo } from "./normalExport";
 import type { ImageProcessingProblem } from "./projectPorts";
 import type { LayoutExportProblem } from "../domain/project";
@@ -21,6 +22,7 @@ export interface ProjectDialogDetail {
 }
 
 export type ProjectDialogState =
+  | StorageFullPresentation
   | { kind: "exportConfiguration"; sheets: ExportSheetInfo[]; options: NormalExportOptions; busy: boolean; message: string }
   | { kind: "exportConflicts"; files: string[] }
   | { kind: "exportMediaProblems"; projectName: string; problems: readonly ExportMediaProblem[]; busy: boolean; message: string }
@@ -73,6 +75,7 @@ export type ProjectDialogState =
     };
 
 export type ProjectDialogAction =
+  | StorageRecoveryAction
   | { configureExport: NormalExportOptions }
   | { chooseExportDestination: NormalExportOptions }
   | "confirmExportOverwrite"

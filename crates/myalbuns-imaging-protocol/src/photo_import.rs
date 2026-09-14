@@ -117,6 +117,7 @@ pub struct ImportedPhotoDimensions {
     rename_all_fields = "camelCase"
 )]
 pub enum ImportedPhotoPreview {
+    StorageFull,
     Prepared {
         generation: Box<CacheReusableGeneration>,
     },
@@ -132,6 +133,9 @@ pub enum ImportedPhotoPreview {
     rename_all_fields = "camelCase"
 )]
 pub enum PhotoImportOutcome {
+    /// The bounded writer stopped after a real storage failure. The host may
+    /// inspect metadata, but must wait for the user before preparing Cache.
+    DeferredForStorage,
     Validated {
         dimensions: ImportedPhotoDimensions,
         fingerprint: CacheFingerprint,

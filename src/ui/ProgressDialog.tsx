@@ -7,8 +7,8 @@ import { DialogWindowFrame } from "./DialogWindowFrame";
 type DeterminateProgress = {
   completed: number;
   kind: "determinate";
-  remaining?: ReactNode;
-  status: ReactNode;
+  countLabel?: string;
+  status?: ReactNode;
   total: number;
 };
 
@@ -17,17 +17,7 @@ type IndeterminateProgress = {
   status: ReactNode;
 };
 
-type BatchProgress = {
-  completed: number;
-  currentItem: ReactNode;
-  currentItemStatus: ReactNode;
-  kind: "batch";
-  summary?: ReactNode;
-  total: number;
-};
-
 export type ProgressDialogState =
-  | BatchProgress
   | DeterminateProgress
   | IndeterminateProgress;
 
@@ -55,6 +45,9 @@ export function ProgressDialog({
   const indicatorStyle = measured
     ? ({ "--ui-progress-width": `${percentage}%` } as CSSProperties)
     : undefined;
+  const countLabel = measured
+    ? progress.countLabel ?? `${Math.min(completed ?? 0, Math.max(0, progress.total))} de ${Math.max(0, progress.total)}`
+    : undefined;
 
   return (
     <DialogWindowFrame
@@ -72,58 +65,26 @@ export function ProgressDialog({
       title={title}
     >
       <div className="ui-progress-dialog">
-        {progress.kind === "batch" ? (
-          <>
-            <ProgressBar
-              completed={completed}
-              indicatorStyle={indicatorStyle}
-              title={title}
-              total={total}
-            />
-            <div
-              aria-live="polite"
-              className="ui-progress-dialog__current-item"
-              role="status"
-            >
-              <span aria-hidden="true" className="ui-progress-dialog__spinner" />
-              <span className="ui-progress-dialog__item-name">
-                {progress.currentItem}
-              </span>
-              <span className="ui-progress-dialog__item-status">
-                {progress.currentItemStatus}
-              </span>
-            </div>
-            <div className="ui-progress-dialog__meta">
-              <span>
-                Álbum {Math.min((completed ?? 0) + 1, total ?? 1)} de {total}
-              </span>
-              {progress.summary ? <span>{progress.summary}</span> : null}
-            </div>
-          </>
-        ) : (
-          <>
-            <p
-              aria-live="polite"
-              className="ui-progress-dialog__status"
-              role="status"
-            >
-              {progress.status}
-            </p>
-            <ProgressBar
-              completed={completed}
-              indicatorStyle={indicatorStyle}
-              title={title}
-              total={total}
-            />
-            {progress.kind === "determinate" || reserveProgressMeta ? (
-              <div className="ui-progress-dialog__meta" aria-hidden={!measured || undefined}>
-                <span>{measured ? `${percentage}%` : "\u00a0"}</span>
-                <span className="ui-progress-dialog__meta-spacer" />
-                {progress.kind === "determinate" && progress.remaining ? <span>{progress.remaining}</span> : null}
-              </div>
-            ) : null}
-          </>
-        )}
+        {progress.status ? <p
+          aria-live="polite"
+          className="ui-progress-dialog__status"
+          role="status"
+        >
+          {progress.status}
+        </p> : null}
+        <ProgressBar
+          completed={completed}
+          indicatorStyle={indicatorStyle}
+          title={title}
+          total={total}
+        />
+        {measured || reserveProgressMeta ? (
+          <div className="ui-progress-dialog__meta" aria-hidden={!measured || undefined}>
+            <span>{measured ? `${percentage}%` : "\u00a0"}</span>
+            <span className="ui-progress-dialog__meta-spacer" />
+            {measured ? <span>{countLabel}</span> : null}
+          </div>
+        ) : null}
       </div>
     </DialogWindowFrame>
   );

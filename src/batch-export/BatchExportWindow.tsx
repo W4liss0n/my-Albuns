@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { BatchExportPort, BatchExportView, BatchRecoverySummary, ExportConflictPolicy } from "../application/batchExport";
 import { ActionButton } from "../ui/ActionButton";
 import { ConfirmationDialog } from "../ui/ConfirmationDialog";
@@ -6,6 +6,8 @@ import { MessageDialog } from "../ui/MessageDialog";
 import { OwnedWindowShell } from "../ui/OwnedWindowShell";
 import { ProblemsDialog } from "../ui/ProblemsDialog";
 import { BatchConfiguration } from "./BatchConfiguration";
+import { StorageRecoveryController, unavailableStorageRecovery, type StorageFullPresentation } from "../application/storageRecovery";
+import { StorageFullDialog } from "../ui/StorageFullDialog";
 
 export function BatchExportWindow({ port }: { port: BatchExportPort }) {
   const [view, setView] = useState<BatchExportView | null>(null);
@@ -13,6 +15,22 @@ export function BatchExportWindow({ port }: { port: BatchExportPort }) {
   const [busy, setBusy] = useState(false);
   const [conflicts, setConflicts] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [storageState, setStorageState] = useState<StorageFullPresentation | null>(null);
+  const storageMessage = view?.partialPublication
+    ? "O álbum atual foi publicado parcialmente. Libere espaço e retome para concluir. Os álbuns já exportados foram mantidos."
+    : "Libere espaço para continuar. Os álbuns já exportados foram mantidos.";
+  const storageCallbacks = useRef({ resume: () => {}, cancel: () => {} });
+  const storageController = useMemo(() => new StorageRecoveryController(
+    port.storageRecovery ?? unavailableStorageRecovery, setStorageState,
+    () => storageCallbacks.current.resume(), () => storageCallbacks.current.cancel(),
+  ), [port.storageRecovery]);
+  useEffect(() => {
+    setStorageState(null);
+    if (view?.phase === "storageFull") {
+      void storageController.open(view.id, storageMessage);
+    }
+    return () => storageController.dispose();
+  }, [storageController, view, storageMessage]);
   const report = useCallback((reason: unknown) => setError(String(reason)), []);
   useEffect(() => {
     let active = true;
@@ -26,7 +44,7 @@ export function BatchExportWindow({ port }: { port: BatchExportPort }) {
     return () => { active = false; release?.(); };
   }, [port, report]);
   useLayoutEffect(() => {
-    if (view?.phase === "finished" || view?.phase === "interrupted") {
+    if (view?.phase === "finished" || view?.phase === "interrupted" || view?.phase === "storageFull") {
       void port.resultReady().catch(report);
     }
   }, [view, port, report]);
@@ -54,6 +72,18 @@ export function BatchExportWindow({ port }: { port: BatchExportPort }) {
     setRecoveries(await port.recoveries());
   });
   const recovery = !view ? recoveries[0] : undefined;
+  storageCallbacks.current = {
+    resume: () => void act(async () => {
+      if (!view) return;
+      try {
+        const next = await port.resume(view.id);
+        if (next.canContinue) await continueBatch(next); else setView(next);
+      } catch {
+        await storageController.open(view.id, storageMessage);
+      }
+    }),
+    cancel: () => { if (view) end(view.id); },
+  };
   const terminal = view?.phase === "finished" || view?.phase === "interrupted";
   const resultSummary = view ? `Exportados: ${view.items.filter(item => item.status === "completed").length} · Ignorados: ${view.items.filter(item => item.status === "ignored").length} · Com falha: ${view.items.filter(item => item.status === "failed").length}` : "";
   const problems = view?.items.filter(item => item.status !== "completed" &&
@@ -75,6 +105,11 @@ export function BatchExportWindow({ port }: { port: BatchExportPort }) {
     content = <ConfirmationDialog title="Lote interrompido" description="Os arquivos já exportados foram mantidos."
       cancelAction={{ label: "Encerrar", disabled: busy, onClick: () => end(view.id) }}
       confirmAction={{ label: "Retomar", disabled: busy, onClick: () => refresh(() => port.resume(view.id)) }} />;
+  } else if (view?.phase === "storageFull") {
+    content = <StorageFullDialog state={storageState ? { ...storageState, busy: busy || storageState.busy } : {
+      kind: "storageFull", message: storageMessage, canClearCache: false, busy: true,
+    }}
+      onAction={action => void storageController.act(action)} />;
   } else if (terminal && problems.length === 0) {
     content = <MessageDialog title="Exportação concluída" description="Todos os Álbuns foram exportados." tone="success"
       primaryAction={{ label: "Fechar", disabled: busy, onClick: close }} />;
@@ -113,7 +148,7 @@ export function BatchExportWindow({ port }: { port: BatchExportPort }) {
       confirmAction={{ label: "Continuar Exportação", disabled: busy || !view.canContinue,
         onClick: () => void act(() => continueBatch(view)) }} />;
   }
-  return <OwnedWindowShell controls={busy ? "none" : "close"} context="Exportação em lote" width={800}>
+  return <OwnedWindowShell controls={busy || (view?.phase === "storageFull" && storageState?.busy) ? "none" : "close"} context="Exportação em lote" width={view?.phase === "storageFull" ? 520 : 800}>
     <div className="batch-export" hidden={error !== null}>
       {!view && !recovery && !conflicts ? <BatchConfiguration port={port} busy={busy} onError={report} onClose={close}
         onSubmit={options => void act(async () => {

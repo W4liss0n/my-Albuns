@@ -9,7 +9,8 @@ use std::{
 };
 mod album;
 pub(crate) use album::{
-    AlbumExportOptions, AlbumExportPlan, execute_album, plan_album, plan_album_in_paths,
+    AlbumExportOptions, AlbumExportPlan, AlbumExportRecovery, execute_album, plan_album,
+    plan_album_in_paths, resume_album,
 };
 
 use myalbuns_core::{ComposedOutputUnit, RenderSnapshot};
@@ -87,12 +88,24 @@ pub(crate) struct PublishedExport {
     pub(crate) completion: RenderCompletion,
 }
 
+#[derive(Debug)]
 struct ExportPreparationGuard {
     storage: Option<PreparedExportStorage>,
     context: InvocationContext,
 }
 
 impl ExportPreparationGuard {
+    fn publish_retaining(&mut self) -> Result<(), myalbuns_paths::AppPathsError> {
+        self.storage
+            .as_ref()
+            .expect("owned output")
+            .publish_retaining()?;
+        // Drop the directory handles before attempting to remove the empty folder.
+        if let Some(storage) = self.storage.take() {
+            let _ = storage.discard();
+        }
+        Ok(())
+    }
     fn new(storage: PreparedExportStorage, context: &InvocationContext) -> Self {
         Self {
             storage: Some(storage),
@@ -170,6 +183,8 @@ pub(crate) struct ExportFailure {
     pub(crate) exit_code: Option<i32>,
     pub(crate) message: String,
     pub(crate) processor_failure: Option<ImagingFailure>,
+    pub(crate) path_failure: Option<AppPathsError>,
+    pub(crate) recovery: Option<Box<AlbumExportRecovery>>,
 }
 
 impl ExportFailure {
@@ -179,7 +194,34 @@ impl ExportFailure {
             exit_code: None,
             message: message.into(),
             processor_failure: None,
+            path_failure: None,
+            recovery: None,
         }
+    }
+
+    pub(crate) fn from_path_error(
+        stage: ExportFailureStage,
+        error: AppPathsError,
+        message: impl Into<String>,
+    ) -> Self {
+        Self {
+            path_failure: Some(error),
+            ..Self::new(stage, message)
+        }
+    }
+
+    pub(crate) fn is_storage_full(&self) -> bool {
+        self.path_failure == Some(AppPathsError::ExportStorageFull)
+            || matches!(
+                self.stage,
+                ExportFailureStage::Processor(InvocationFailureStage::Processor(
+                    myalbuns_imaging_protocol::ImagingFailureStage::OutputStorageFull
+                ))
+            )
+            || self
+                .processor_failure
+                .as_ref()
+                .is_some_and(|failure| failure.code == ImagingFailureCode::OutputStorageFull)
     }
 
     fn from_invocation(
@@ -191,6 +233,8 @@ impl ExportFailure {
             exit_code: failure.exit_code,
             message: failure.message,
             processor_failure: None,
+            path_failure: None,
+            recovery: None,
         }
     }
 
@@ -204,6 +248,8 @@ impl ExportFailure {
             exit_code: None,
             message: message.into(),
             processor_failure: Some(failure),
+            path_failure: None,
+            recovery: None,
         }
     }
 }
@@ -468,7 +514,7 @@ pub(crate) async fn execute_group<T: ImagingTransport>(
                     total_outputs: total_units,
                 }
             };
-            return Err(ExportFailure::new(stage, message));
+            return Err(ExportFailure::from_path_error(stage, error, message));
         }
         published.push(PublishedExport { completion });
     }
@@ -534,8 +580,9 @@ async fn prepare_export<T: ImagingTransport>(
     ));
     let preparation = ExportPreparationGuard::new(
         execution_path_plan.prepare().map_err(|error| {
-            ExportFailure::new(
+            ExportFailure::from_path_error(
                 ExportFailureStage::Prepare,
+                error,
                 format!("Não foi possível preparar a Exportação: {error}"),
             )
         })?,

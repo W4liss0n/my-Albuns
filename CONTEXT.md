@@ -514,3 +514,6 @@ Raiz opcional que recebe as saídas dos Itens de lote preservando sua hierarquia
 
 **Resultado de lote**:
 Resumo dos Itens concluídos, ignorados ou com falha em uma operação em lote.
+
+**Pausa por falta de espaço no lote**:
+Interrupção da tentativa causada por falta real de espaço durante uma gravação, sem avançar para o próximo Item nem classificar o Álbum interrompido como falha. Um modal oferece Retomar ou Cancelar; os Itens concluídos são preservados. A retomada explícita revalida os pendentes.

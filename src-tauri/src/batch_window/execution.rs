@@ -88,12 +88,8 @@ async fn execute(
     let mut visible = initial.clone();
     visible.phase = BatchPhase::Running;
     visible.can_continue = false;
-    let total = initial.items.len() as u32;
-    *state.progress.lock().map_err(|_| "Lote indisponível.")? = Some(BatchExportProgress {
-        completed: 0,
-        total,
-        percent: 0.0,
-    });
+    *state.progress.lock().map_err(|_| "Lote indisponível.")? =
+        runner.as_ref().map(BatchRunner::progress);
     state.publish(Some(visible));
     let result = run_attempt(app, &owner, &mut runner, &cancel, policy).await;
     let view = match &result {
@@ -171,6 +167,8 @@ async fn run_attempt(
     let logging = app.state::<LoggingState>();
     let mut transport = TauriImagingTransport::new(app, &logging, lease.processor_reservation());
     let batch = runner.take().ok_or("Lote indisponível.")?;
+    app.state::<crate::storage_recovery::StorageRecoveries>()
+        .finish(&batch.view().id);
     let outcome = batch
         .run(&mut transport, cancel, policy, &|progress| {
             *state
@@ -184,6 +182,12 @@ async fn run_attempt(
     drop(mode);
     let batch = outcome?;
     let view = batch.view();
+    let recoveries = app.state::<crate::storage_recovery::StorageRecoveries>();
+    if view.phase == crate::ipc_contract::BatchPhase::StorageFull {
+        recoveries.pause(&view.id, batch.storage_volume());
+    } else {
+        recoveries.finish(&view.id);
+    }
     *runner = Some(batch);
     let (sender, ready) = tokio::sync::oneshot::channel();
     *state

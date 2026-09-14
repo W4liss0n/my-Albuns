@@ -8,6 +8,7 @@ use myalbuns_paths::{AppPaths, ExpectedObject};
 
 use crate::{
     cache::write_preview,
+    cache_error::CacheError,
     source::{fingerprint_source, open_cache_source, verify_source_fingerprint},
 };
 
@@ -38,13 +39,25 @@ fn prepare(
     let mut completed = 0;
     progress(completed, total)?;
     let mut photos = Vec::with_capacity(request.candidates.len());
+    let mut storage_full = false;
     for candidate in &request.candidates {
         let photo = PreparedPhotoImport {
             source_id: candidate.source_id.clone(),
-            outcome: prepare_photo(request, candidate, app_paths)
-                .unwrap_or_else(|reason| PhotoImportOutcome::InspectionRequired { reason }),
+            outcome: if storage_full {
+                PhotoImportOutcome::DeferredForStorage
+            } else {
+                prepare_photo(request, candidate, app_paths)
+                    .unwrap_or_else(|reason| PhotoImportOutcome::InspectionRequired { reason })
+            },
         };
-        if matches!(photo.outcome, PhotoImportOutcome::Validated { .. }) {
+        storage_full |= matches!(
+            photo.outcome,
+            PhotoImportOutcome::Validated {
+                preview: ImportedPhotoPreview::StorageFull,
+                ..
+            }
+        );
+        if !storage_full && matches!(photo.outcome, PhotoImportOutcome::Validated { .. }) {
             completed += 1;
             progress(completed, total)?;
         }
@@ -87,10 +100,10 @@ fn prepare_photo(
     };
     // A failed Cache directory, write, or encoder still yields the validated
     // Original metadata. Its fingerprint is checked even on the error path.
-    let preview = (|| {
+    let preview = (|| -> Result<CacheReusableGeneration, CacheError> {
         let storage = app_paths
             .prepare_cache_storage(&request.cache_paths)
-            .map_err(|error| error.to_string())?;
+            .map_err(|error| CacheError::paths("Não foi possível preparar o Cache", error))?;
         let output = write_preview(
             &storage,
             request.policy,
@@ -120,7 +133,7 @@ fn prepare_photo(
             },
             verify,
         )?;
-        CacheReusableGeneration::new(
+        Ok(CacheReusableGeneration::new(
             candidate.generation_id.clone(),
             CacheArtifactProperties::new(
                 output.format,
@@ -132,15 +145,18 @@ fn prepare_photo(
                 basic_color_profile,
             ),
             fingerprint.clone(),
-        )
+        )?)
     })();
     let preview = match preview {
         Ok(generation) => ImportedPhotoPreview::Prepared {
             generation: Box::new(generation),
         },
-        Err(reason) => {
+        Err(error) => {
             verify()?;
-            ImportedPhotoPreview::Unavailable { reason }
+            match error {
+                CacheError::StorageFull => ImportedPhotoPreview::StorageFull,
+                CacheError::Other(reason) => ImportedPhotoPreview::Unavailable { reason },
+            }
         }
     };
     Ok(PhotoImportOutcome::Validated {
@@ -296,7 +312,7 @@ mod tests {
     }
 
     #[test]
-    fn disk_full_during_preview_keeps_valid_originals_and_continues_the_batch() {
+    fn disk_full_during_preview_preserves_metadata_and_defers_remaining_cache() {
         for (format, size) in [
             (ImageFormat::Jpeg, 31),
             (ImageFormat::Jpeg, 256),
@@ -362,22 +378,18 @@ mod tests {
             assert!(fault.failure_count() > 0);
             let PhotoImportOutcome::Validated {
                 dimensions,
-                preview: ImportedPhotoPreview::Unavailable { reason },
+                preview: ImportedPhotoPreview::StorageFull,
                 ..
             } = &completion.photos[0].outcome
             else {
                 panic!("a full Cache disk must preserve the validated Original");
             };
             assert_eq!((dimensions.width_px, dimensions.height_px), (size, height));
-            assert!(reason.contains("Libere espaço"), "{reason}");
             assert!(matches!(
                 completion.photos[1].outcome,
-                PhotoImportOutcome::Validated {
-                    preview: ImportedPhotoPreview::Prepared { .. },
-                    ..
-                }
+                PhotoImportOutcome::DeferredForStorage
             ));
-            assert_eq!(progress, [(0, 2), (1, 2), (2, 2)]);
+            assert_eq!(progress, [(0, 2)]);
             assert!(!preview_path.exists());
             assert!(!temporary_path.exists());
             for (candidate, before) in request.candidates.iter().zip(&originals) {

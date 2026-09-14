@@ -3,6 +3,21 @@ use crate::ipc_contract::BatchRecoverySummary;
 use myalbuns_paths::NativePathDto;
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug)]
+pub(super) enum SaveFailure {
+    StorageFull,
+    Other(String),
+}
+
+impl From<SaveFailure> for String {
+    fn from(error: SaveFailure) -> Self {
+        match error {
+            SaveFailure::StorageFull => "Não há espaço para registrar a retomada do lote.".into(),
+            SaveFailure::Other(message) => message,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct InterruptedPreparation {
@@ -178,6 +193,9 @@ impl BatchRunner {
             })
             .collect();
         let mut batch = Self {
+            retained: None,
+            resume_policy: None,
+            progress_percent: 0.0,
             id: saved.id,
             configuration,
             core,
@@ -185,6 +203,8 @@ impl BatchRunner {
             paths,
             items,
             phase: BatchPhase::Prepared,
+            partial_publication: false,
+            storage_volume: None,
             current: None,
         };
         batch.recheck();
@@ -193,6 +213,8 @@ impl BatchRunner {
 
     /// Ends recovery explicitly; published outputs and project files are never touched.
     pub(crate) fn abandon(mut self, cleanup_preparation: bool) -> Result<(), String> {
+        // Release live guards first; persistent recovery then cleans any remainder.
+        self.retained = None;
         for item in &self.items {
             if cleanup_preparation && let Some(preparation) = &item.preparation {
                 let result = self
@@ -208,7 +230,28 @@ impl BatchRunner {
         self.remove_checkpoint()
     }
 
-    pub(super) fn save_checkpoint(&self) -> Result<(), String> {
+    pub(super) fn checkpoint_or_pause(&mut self) -> Result<(), String> {
+        match self.save_checkpoint() {
+            Ok(()) => Ok(()),
+            Err(SaveFailure::StorageFull) => {
+                if self.phase != BatchPhase::StorageFull {
+                    self.storage_volume =
+                        myalbuns_paths::StorageVolume::containing(&self.checkpoint_root);
+                }
+                // Keep the live runner even if the full volume cannot record
+                // its new state. The last atomic checkpoint remains intact.
+                self.phase = BatchPhase::StorageFull;
+                Ok(())
+            }
+            Err(error) if self.phase == BatchPhase::StorageFull => {
+                tracing::warn!(target: "myalbuns.desktop", event = "batch_checkpoint_deferred", error = %String::from(error));
+                Ok(())
+            }
+            Err(error) => Err(error.into()),
+        }
+    }
+
+    pub(super) fn save_checkpoint(&self) -> Result<(), SaveFailure> {
         let value = Checkpoint {
             version: 1,
             id: self.id.clone(),
@@ -229,13 +272,22 @@ impl BatchRunner {
                 })
                 .collect(),
         };
-        let bytes = serde_json::to_vec(&value).map_err(|error| error.to_string())?;
+        let bytes =
+            serde_json::to_vec(&value).map_err(|error| SaveFailure::Other(error.to_string()))?;
         crate::local_store_io::write_atomically(
-            &checkpoint_path(&self.checkpoint_root, &self.id)?,
+            &checkpoint_path(&self.checkpoint_root, &self.id).map_err(SaveFailure::Other)?,
             &bytes,
             "batch-checkpoint",
         )
-        .map_err(|error| format!("Não foi possível registrar a retomada do lote: {error}"))
+        .map_err(|error| {
+            if myalbuns_paths::AppPathsError::is_storage_full(&error) {
+                SaveFailure::StorageFull
+            } else {
+                SaveFailure::Other(format!(
+                    "Não foi possível registrar a retomada do lote: {error}"
+                ))
+            }
+        })
     }
 
     pub(super) fn remove_checkpoint(&self) -> Result<(), String> {

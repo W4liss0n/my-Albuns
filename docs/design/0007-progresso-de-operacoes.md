@@ -17,23 +17,39 @@ A representação também não decide o ciclo de vida da janela solicitante. Ela
 
 Quando a operação conhece um total confiável, a janela mostra:
 
-- uma linha curta com a etapa ou unidade atual;
+- o título da operação e, somente quando necessário, uma linha curta com o estado atual;
 - uma única barra de progresso geral;
-- a porcentagem concluída;
-- uma estimativa de tempo somente quando a operação oferece esse dado confiável.
+- a porcentagem concluída à esquerda, abaixo da barra;
+- a contagem `X de Y` à direita, na mesma linha, com a tipografia de apoio do componente.
 
 ```text
 ┌──────────────────────────────────────────────┐
 │  Exportando                                  │
 │                                              │
 │  ███████████████░░░░░░░░░░░░                │
-│  43%                         cerca de 2 min   │
+│  43%                           18 de 42       │
 └──────────────────────────────────────────────┘
 ```
 
-A linha de estado pode usar `X/Y` para a unidade própria da operação, como
-`Lâmina 18 de 42`. A janela não inventa tempo restante quando o produtor de
-progresso não consegue estimá-lo.
+Esse é o padrão de todos os diálogos determinados: abertura e geração de Cache,
+importação, processamento de imagens e exportações normal e em lote. O componente
+compartilhado calcula e apresenta `X de Y` automaticamente a partir das unidades
+concluídas e do total. A contagem não ocupa uma linha acima da barra.
+
+Quando as unidades da operação diferem da escala da porcentagem geral, o fluxo
+fornece apenas o rótulo da contagem, como `8 lâminas de 18` ou `7 álbuns de 18`.
+Posição, tipografia e espaçamento permanecem sob responsabilidade do mesmo
+componente. Não há apresentação alternativa para o lote, nem estimativa de tempo
+nesse espaço. Uma linha de estado opcional descreve a operação sem repetir sua
+contagem ou seu título.
+
+Na Exportação, o refinamento vigente mostra `Exportando`, a contagem
+`X lâminas de Y` ou `X páginas de Y`, barra geral, porcentagem e cancelamento
+quando disponível. A contagem acompanha as unidades preparadas, inclusive as
+páginas internas de um PDF. Não apresenta carregamento dos
+Originais, composição, codificação, verificação ou publicação como etapas visíveis.
+A porcentagem é contínua entre essas etapas e ao retomar uma tentativa viva.
+O lote conserva a contagem compacta `X álbuns de Y`. Nas duas exportações, a contagem ocupa o espaço à direita abaixo da barra, na mesma linha da porcentagem e com a mesma tipografia da geração de Cache. O componente compartilhado fornece essa apresentação; não há uma linha de contagem acima da barra.
 
 O processamento de imagens usa `Processando Imagens` e `X de Y` em qualquer
 ação explícita que precise preparar imagens do Projeto. Uma unidade inclui a
@@ -89,11 +105,11 @@ todo o catálogo decodificado na memória.
 
 ## Progresso em lote
 
-Na Exportação em lote do MVP, o refinamento específico mostra somente a barra geral determinada, o percentual e a posição `X/Y`. Não lista o Projeto atual, estado individual ou fila. `Cancelar` é a única ação.
+Na Exportação em lote do MVP, o refinamento específico mostra `Exportando`, a barra geral determinada, o percentual e a contagem `X álbuns de Y`. Não lista o Projeto atual, estado individual ou fila. `Cancelar` é a única ação.
 
-O lote reutiliza a mesma barra geral e acrescenta somente um resumo compacto do
-conjunto: item atual, estado desse item, posição `X/Y` e uma síntese da fila. Não
-exibe uma tabela nem os trabalhos simultâneos.
+O lote usa a mesma apresentação determinada das demais operações, com a contagem
+de álbuns no campo inferior direito. Não acrescenta resumo da fila ou estado do
+item atual.
 
 ## Cancelamento
 

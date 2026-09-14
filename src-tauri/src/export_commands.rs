@@ -9,7 +9,7 @@ use myalbuns_imaging_protocol::{
 };
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
 use myalbuns_paths::ExportWriteAuthorization;
-use tauri::{AppHandle, State, WebviewWindow, ipc::Channel};
+use tauri::{AppHandle, Manager, State, WebviewWindow, ipc::Channel};
 
 use crate::{
     cache_engine::CacheEngine,
@@ -58,6 +58,7 @@ struct PreparedExportCommand {
 enum ExportCommandPlan {
     Sheet(ExportPlan),
     Album(export_pipeline::AlbumExportPlan),
+    Resume(Box<export_pipeline::AlbumExportRecovery>),
 }
 
 impl ExportEvent {
@@ -152,6 +153,16 @@ impl ExportCommandError {
     }
 
     fn from_pipeline(failure: export_pipeline::ExportFailure) -> Self {
+        if failure.is_storage_full() {
+            return Self {
+                code: ExportCommandErrorCode::OutputStorageFull,
+                message: failure.message,
+                media_id: None,
+                path_code: None,
+                media_problems: None,
+                layout_problems: None,
+            };
+        }
         if let Some(processor) = failure.processor_failure {
             return Self {
                 code: processor.code.into(),
@@ -420,6 +431,9 @@ async fn run_export(
         project_id,
         request_id,
     } = prepared;
+    let storage_recoveries = app.state::<crate::storage_recovery::StorageRecoveries>();
+    storage_recoveries.finish("export");
+    let output_path = operation_paths.first().cloned();
     if on_event
         .send(ExportEvent::started(request_id.clone()))
         .is_err()
@@ -443,7 +457,17 @@ async fn run_export(
         window_label = window.label(),
         event = "export_started",
     );
-    let root_bindings_completion = path_io::capture_root_bindings(operation_paths);
+    let retained_roots = match &plan {
+        ExportCommandPlan::Resume(recovery) => Some(recovery.roots().clone()),
+        _ => None,
+    };
+    let root_bindings_completion = async move {
+        if let Some(roots) = retained_roots {
+            Ok(roots)
+        } else {
+            path_io::capture_root_bindings(operation_paths).await
+        }
+    };
     tokio::pin!(root_bindings_completion);
     let root_bindings = tokio::select! {
         bindings = &mut root_bindings_completion => bindings.map_err(|error| {
@@ -471,6 +495,10 @@ async fn run_export(
     };
     let root_binding_plan_sha256 =
         root_binding_plan_sha256(&root_bindings).map_err(ExportCommandError::failed)?;
+    let storage_volume = output_path
+        .as_ref()
+        .and_then(|path| root_bindings.resolve(path).ok())
+        .and_then(|path| myalbuns_paths::StorageVolume::containing(&path));
     tracing::info!(
         target: "myalbuns.desktop",
         process_role = ProcessRole::DesktopHost.as_str(),
@@ -548,6 +576,16 @@ async fn run_export(
         }
     };
     let published = match plan {
+        ExportCommandPlan::Resume(recovery) => {
+            export_pipeline::resume_album(
+                &mut transport,
+                recovery,
+                attempt.execution_control(),
+                &progress,
+                &context,
+            )
+            .await
+        }
         ExportCommandPlan::Sheet(plan) => {
             export_pipeline::execute(
                 &mut transport,
@@ -571,7 +609,10 @@ async fn run_export(
             .await
         }
     }
-    .map_err(|failure| {
+    .map_err(|mut failure| {
+        if failure.is_storage_full() {
+            storage_recoveries.retain_export(storage_volume, failure.recovery.take());
+        }
         if failure.stage == export_pipeline::ExportFailureStage::Cancelled {
             log_export_cancelled(
                 &request_id,
@@ -875,6 +916,8 @@ mod tests {
             ),
             exit_code: None,
             message: "O original não está mais disponível.".into(),
+            path_failure: None,
+            recovery: None,
             processor_failure: Some(ImagingFailure {
                 code: ImagingFailureCode::SourceUnavailable,
                 media_id: Some("media-cover".into()),
@@ -891,6 +934,19 @@ mod tests {
                 "pathCode": "not_found",
             })
         );
+    }
+
+    #[test]
+    fn native_publication_disk_full_keeps_the_shared_export_error_code() {
+        let failure = ExportCommandError::from_pipeline(ExportFailure::from_path_error(
+            ExportFailureStage::Publish {
+                promoted_outputs: 1,
+                total_outputs: 2,
+            },
+            myalbuns_paths::AppPathsError::ExportStorageFull,
+            myalbuns_paths::AppPathsError::EXPORT_STORAGE_FULL_MESSAGE,
+        ));
+        assert_eq!(failure.code, ExportCommandErrorCode::OutputStorageFull);
     }
 
     #[test]

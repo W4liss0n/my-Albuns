@@ -12,7 +12,8 @@ export interface BatchRecoverySummary { id: string; sourceFolder: string; total:
 export interface BatchExportView {
   id: string;
   options: BatchExportOptions;
-  phase: "prepared" | "running" | "interrupted" | "finished";
+  phase: "prepared" | "running" | "interrupted" | "storageFull" | "finished";
+  partialPublication: boolean;
   items: {
     id: string;
     name: string;
@@ -26,6 +27,7 @@ export interface BatchExportView {
 }
 
 export interface BatchExportPort {
+  storageRecovery?: import("./storageRecovery").StorageRecoveryPort;
   current(): Promise<BatchExportView | null>;
   recoveries(): Promise<BatchRecoverySummary[]>;
   chooseFolder(): Promise<string | null>;

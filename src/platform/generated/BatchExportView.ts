@@ -3,4 +3,4 @@ import type { BatchExportOptions } from "./BatchExportOptions";
 import type { BatchItemView } from "./BatchItemView";
 import type { BatchPhase } from "./BatchPhase";
 
-export type BatchExportView = { id: string, options: BatchExportOptions, phase: BatchPhase, items: Array<BatchItemView>, hasConflicts: boolean, canContinue: boolean, };
+export type BatchExportView = { id: string, options: BatchExportOptions, phase: BatchPhase, partialPublication: boolean, items: Array<BatchItemView>, hasConflicts: boolean, canContinue: boolean, };

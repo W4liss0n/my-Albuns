@@ -16,6 +16,8 @@ Cada Exportação segue duas fases:
 
 Uma falha ou cancelamento durante a preparação remove a tentativa quando possível e preserva o conjunto final anterior.
 
+Refinamento aceito: falta real de espaço é uma pausa recuperável durante a tentativa viva. Nesse caso, a preparação válida fica retida até `Retomar` ou `Cancelar`. A retomada repete apenas arquivos incompletos e continua a publicação no arquivo pendente; cancelamento, encerramento e demais falhas mantêm as regras de limpeza abaixo. Não é uma recuperação persistente nem uma transação atômica do conjunto inteiro.
+
 Depois que a publicação começa, não existe garantia de rollback atômico do conjunto inteiro. Uma falha, remoção do Destino, falta de energia, corrupção física, interferência do sistema operacional ou modificação externa concorrente pode deixar uma combinação de arquivos anteriores e novos. Nessa situação:
 
 - a operação termina como falha e nunca é apresentada como concluída;
@@ -33,6 +35,6 @@ Na implementação, o `ExportPipeline` possui o ciclo de vida da preparação e 
 - O usuário nunca recebe sucesso antes de todas as saídas planejadas estarem no Destino.
 - Falhas antes da publicação preservam a saída anterior; falhas durante a publicação possuem um envelope explicitamente limitado.
 - Não são necessários backups integrais nem um protocolo de recuperação permanente no Destino.
-- Uma nova Exportação integral para o mesmo Destino é o caminho para restabelecer um conjunto coerente depois de uma publicação parcial.
+- Depois de uma falha terminal com publicação parcial, uma nova Exportação integral para o mesmo Destino restabelece um conjunto coerente. Durante uma pausa viva por falta de espaço, `Retomar` conclui a publicação pendente sem refazer as saídas preparadas.
 - Destinos locais, UNC, em unidade mapeada ou verbatim local/UNC usam o mesmo contrato; o suporte real à substituição atômica continua sendo verificado pela operação do sistema de arquivos.
 - Testes devem distinguir falha de preparação, falha antes da primeira promoção, falha entre duas promoções, queda do Processador e falha durante a limpeza de temporários.

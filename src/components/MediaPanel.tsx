@@ -698,6 +698,8 @@ function mediaAvailabilityLabel(preview: MediaPreview) {
       return `Indisponível${previous}`;
     case "cache_unavailable":
       return `Prévia indisponível${previous}`;
+    case "cache_paused":
+      return `Prévia aguardando espaço${previous}`;
     case "ready":
       return null;
   }

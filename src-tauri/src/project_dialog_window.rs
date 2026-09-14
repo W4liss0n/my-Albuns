@@ -22,6 +22,15 @@ const MAX_DIALOG_SESSION_ID_CHARS: usize = 128;
 impl ProjectDialogState {
     fn sanitized(self) -> Self {
         match self {
+            Self::StorageFull {
+                message,
+                can_clear_cache,
+                busy,
+            } => Self::StorageFull {
+                message: bound_text(message),
+                can_clear_cache,
+                busy,
+            },
             Self::ExportConfiguration { .. } | Self::ExportConflicts { .. } => self,
             Self::MediaRemovalConfirmation { .. } => self,
             Self::ExportMediaProblems {
@@ -110,6 +119,10 @@ impl ProjectDialogState {
 
     fn initial_dimensions(&self) -> (f64, f64) {
         match self {
+            Self::StorageFull { .. } => (
+                520.0,
+                202.0 + native_dialog_window::OWNED_WINDOW_TITLEBAR_HEIGHT,
+            ),
             Self::ExportConfiguration { .. } => (
                 800.0,
                 440.0 + native_dialog_window::OWNED_WINDOW_TITLEBAR_HEIGHT,

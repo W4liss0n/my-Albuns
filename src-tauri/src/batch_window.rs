@@ -316,7 +316,18 @@ pub(crate) async fn batch_resume(
     state.require_idle()?;
     let root = state.recovery_root();
     let core = state.core();
+    app.state::<crate::storage_recovery::StorageRecoveries>()
+        .finish(&id);
     let view = tauri::async_runtime::spawn_blocking(move || {
+        if let Some(batch) = runner.as_mut()
+            && batch.view().id == id
+            && batch.view().phase == crate::ipc_contract::BatchPhase::StorageFull
+        {
+            // Disk exhaustion may have prevented the last checkpoint write.
+            // The live runner retains completed items and temporary relinks.
+            batch.retry_preflight();
+            return Ok(batch.view());
+        }
         let batch = BatchRunner::resume(&root, &id, core)?;
         let view = batch.view();
         *runner = Some(batch);
@@ -345,6 +356,8 @@ pub(crate) async fn batch_end(
     let cleanup_preparation = processor.reserve().await.is_ok();
     let root = state.recovery_root();
     let core = state.core();
+    app.state::<crate::storage_recovery::StorageRecoveries>()
+        .finish(&id);
     tauri::async_runtime::spawn_blocking(move || {
         let batch = if runner.as_ref().is_some_and(|batch| batch.view().id == id) {
             runner.take().expect("matched batch exists")
@@ -389,6 +402,12 @@ pub(crate) async fn close_batch_export(
     window: WebviewWindow,
 ) -> Result<(), String> {
     require_configuration(&window)?;
+    if app
+        .state::<crate::storage_recovery::StorageRecoveries>()
+        .is_cleaning()
+    {
+        return Err("Aguarde a limpeza do Cache terminar.".into());
+    }
     let state = app.state::<BatchWindowState>();
     let _serial = state.window_serial.lock().await;
     state.require_idle()?;

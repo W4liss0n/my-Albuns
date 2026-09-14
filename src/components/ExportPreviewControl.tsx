@@ -2,6 +2,7 @@ import {
   forwardRef,
   useImperativeHandle,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -16,7 +17,6 @@ import type {
   ExportAttempt,
   ExportPipelinePort,
   ExportProgressEvent,
-  ExportProgressStage,
   ExportSheetSelection,
 } from "../application/projectPorts";
 import { ActionButton } from "../ui";
@@ -25,6 +25,7 @@ import "./ExportPreviewControl.css";
 import { MediaExportBlockedError, type ExportMediaPort } from "../application/exportMedia";
 import type { EditorProjection } from "../domain/project";
 import { ExportConflictsError, type ExportSheetInfo, type NormalExportOptions } from "../application/normalExport";
+import { StorageFullError, StorageRecoveryController, unavailableStorageRecovery } from "../application/storageRecovery";
 
 interface ExportPreviewControlProps {
   sheets?: ExportSheetInfo[];
@@ -63,6 +64,8 @@ export const ExportPreviewControl = forwardRef<
     "idle" | "configuring" | "starting" | "running" | "cancelled" | "completed" | "failed"
   >("idle");
   const nextAttemptId = useRef(0);
+  const exportPercent = useRef(0);
+  const exportUnits = useRef({ completed: 0, total: 1 });
   const recoveryGeneration = useRef(0);
   const recoveryPending = useRef(false);
   const attemptedSelection = useRef<ExportSheetSelection | null>(null);
@@ -85,6 +88,21 @@ export const ExportPreviewControl = forwardRef<
   );
 
   useImperativeHandle(ref, () => ({ start: startExport }));
+  const resumeStorage = (id?: string) => {
+    if (attemptedSelection.current) startSelectedExport({ ...attemptedSelection.current, recoveryId: id });
+  };
+  const cancelStorage = (id?: string) => {
+    if (!id || !exportPipelinePort.discardRecovery) { dismissFeedback(); return; }
+    void exportPipelinePort.discardRecovery(id).catch(() => undefined).finally(dismissFeedback);
+  };
+  const storageCallbacks = useRef({ presentDialog, resume: resumeStorage, cancel: cancelStorage });
+  storageCallbacks.current = { presentDialog, resume: resumeStorage, cancel: cancelStorage };
+  const storageController = useMemo(() => new StorageRecoveryController(
+    exportPipelinePort.storageRecovery ?? unavailableStorageRecovery,
+    state => storageCallbacks.current.presentDialog(state),
+    id => storageCallbacks.current.resume(id), id => storageCallbacks.current.cancel(id),
+  ), [exportPipelinePort.storageRecovery]);
+  useLayoutEffect(() => () => storageController.dispose(), [storageController, projectId]);
 
   dialogActionListener.current = (action) => {
     if (typeof action !== "string") {
@@ -96,6 +114,8 @@ export const ExportPreviewControl = forwardRef<
       return;
     }
     switch (action) {
+      case "resumeStorage": case "clearStorageCache": case "cancelStorage":
+        void storageController.act(action); break;
       case "confirmExportOverwrite":
       case "skipExportConflicts": {
         const selected = attemptedSelection.current;
@@ -181,7 +201,17 @@ export const ExportPreviewControl = forwardRef<
       return;
     }
 
-    attemptedSelection.current = { ...selected };
+    // A native recovery token is consumed by this call, never by a later fresh retry.
+    attemptedSelection.current = { ...selected, recoveryId: undefined };
+    if (!selected.recoveryId) {
+      exportPercent.current = 0;
+      const options = selected.options;
+      const total = options && sheets
+        ? sheets.filter(sheet => options.sheetIds.includes(sheet.sheetId))
+          .reduce((count, sheet) => count + (options.mode === "page" ? sheet.pageCount : 1), 0)
+        : 1;
+      exportUnits.current = { completed: 0, total };
+    }
     if (lastDialogState.current?.kind === "exportConfiguration") presentDialog({ ...lastDialogState.current, options: selected.options ?? lastDialogState.current.options, busy: true, message: "" });
     const attemptId = ++nextAttemptId.current;
     currentAttemptId.current = attemptId;
@@ -204,14 +234,18 @@ export const ExportPreviewControl = forwardRef<
             cancellable: event.cancellable,
             kind: "exportProgress",
             progress: {
-              kind: "indeterminate",
-              status: "Iniciando a Exportação",
+              kind: "determinate", completed: exportPercent.current, total: 100,
+              status: exportCountStatus(exportUnits.current, selected.options?.mode),
             },
           });
           return;
         }
 
-        presentDialog(progressDialogState(event));
+        exportUnits.current = exportUnitProgress(event, exportUnits.current, Boolean(selected.options));
+        const state = progressDialogState(event, exportPercent.current,
+          exportCountStatus(exportUnits.current, selected.options?.mode));
+        exportPercent.current = state.progress.completed;
+        presentDialog(state);
       });
     } catch (error: unknown) {
       finishAttemptWithFailure(attemptId, error);
@@ -284,7 +318,7 @@ export const ExportPreviewControl = forwardRef<
           if (generation !== recoveryGeneration.current) return;
           presentDialog({ kind: "imageProcessingProgress", progress: {
             kind: "determinate", completed: progress.completedFiles, total: progress.totalFiles,
-            status: `${progress.completedFiles} de ${progress.totalFiles}`,
+            status: "",
           } });
         });
         if (generation !== recoveryGeneration.current) return;
@@ -415,6 +449,11 @@ export const ExportPreviewControl = forwardRef<
     if (!finished) return;
 
     const message = messageFromError(error);
+    if (error instanceof StorageFullError) {
+      setPhase("failed");
+      void storageController.open("export", message);
+      return;
+    }
     if (error instanceof ExportConflictsError) {
       setPhase("failed");
       presentDialog({ kind: "exportConflicts", files: error.files });
@@ -504,25 +543,41 @@ export const ExportPreviewControl = forwardRef<
 
 function progressDialogState(
   event: Extract<ExportProgressEvent, { event: "progress" }>,
-): ProjectDialogState {
-  const status = progressStageLabel(event.stage);
+  previous: number,
+  status: string,
+) {
+  const fraction = event.units.kind === "measured" && event.units.totalUnits > 0
+    ? Math.min(1, Math.max(0, event.units.completedUnits / event.units.totalUnits)) : 0;
+  const ranges = { preparing: [0, 0], loading_sources: [0, 10], composing: [10, 65],
+    encoding_output: [10, 65], verifying: [75, 10], publishing: [85, 14], completed: [100, 0] };
+  const [start, span] = ranges[event.stage];
   return {
     cancelRequested: false,
     cancellable: event.cancellable,
-    kind: "exportProgress",
-    progress:
-      event.units.kind === "measured"
-        ? {
-            completed: event.units.completedUnits,
-            kind: "determinate",
-            status,
-            total: event.units.totalUnits,
-          }
-        : {
-            kind: "indeterminate",
-            status,
-          },
+    kind: "exportProgress" as const,
+    progress: { completed: Math.floor(Math.max(previous, start + span * fraction)), kind: "determinate" as const,
+      status, total: 100 },
   };
+}
+
+function exportCountStatus(units: { completed: number; total: number }, mode?: "sheet" | "page") {
+  const unit = mode === "page" ? "página" : "lâmina";
+  return `${units.completed} ${unit}${units.completed === 1 ? "" : "s"} de ${units.total}`;
+}
+
+function exportUnitProgress(
+  event: Extract<ExportProgressEvent, { event: "progress" }>,
+  previous: { completed: number; total: number },
+  album: boolean,
+) {
+  if (album && event.units.kind === "measured" &&
+      (event.stage === "preparing" || event.stage === "composing" || event.stage === "encoding_output")) {
+    return { completed: event.units.completedUnits, total: event.units.totalUnits };
+  }
+  if (event.stage === "verifying" || event.stage === "publishing" || event.stage === "completed") {
+    return { ...previous, completed: previous.total };
+  }
+  return previous;
 }
 
 function messageFromError(error: unknown) {
@@ -536,23 +591,4 @@ function messageFromError(error: unknown) {
     return error.message;
   }
   return "Não foi possível concluir a Exportação.";
-}
-
-function progressStageLabel(stage: ExportProgressStage) {
-  switch (stage) {
-    case "preparing":
-      return "Preparando a Exportação";
-    case "loading_sources":
-      return "Carregando os originais";
-    case "composing":
-      return "Compondo a Exportação";
-    case "encoding_output":
-      return "Gerando os arquivos";
-    case "verifying":
-      return "Verificando os arquivos";
-    case "publishing":
-      return "Publicando os arquivos";
-    case "completed":
-      return "Finalizando a Exportação";
-  }
 }

@@ -57,6 +57,8 @@ fn main() {
         .expect("Cache service error bindings should be generated");
     CacheServiceStatus::export_all(&config)
         .expect("Cache service status bindings should be generated");
+    myalbuns_desktop_lib::ipc_contract::StorageRecovery::export_all(&config)
+        .expect("storage recovery bindings should be generated");
     ExportCommandError::export_all(&config).expect("export error bindings should be generated");
     ExportEvent::export_all(&config).expect("export event bindings should be generated");
     ExportResult::export_all(&config).expect("export result bindings should be generated");

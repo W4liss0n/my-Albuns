@@ -2,6 +2,44 @@
 use super::*;
 use myalbuns_imaging_protocol::{PhotoImportCandidate, PhotoImportSourceId};
 
+#[derive(Clone, Debug)]
+pub(crate) enum ImportCacheFailure {
+    StorageFull,
+    Other(String),
+}
+
+impl From<String> for ImportCacheFailure {
+    fn from(message: String) -> Self {
+        Self::Other(message)
+    }
+}
+
+impl From<&str> for ImportCacheFailure {
+    fn from(message: &str) -> Self {
+        Self::Other(message.into())
+    }
+}
+
+impl From<AppPathsError> for ImportCacheFailure {
+    fn from(error: AppPathsError) -> Self {
+        if error == AppPathsError::CacheStorageFull {
+            Self::StorageFull
+        } else {
+            Self::Other(error.to_string())
+        }
+    }
+}
+
+impl From<CacheFailure> for ImportCacheFailure {
+    fn from(error: CacheFailure) -> Self {
+        if error.stage == CacheFailureStage::StorageFull {
+            Self::StorageFull
+        } else {
+            Self::Other(error.message)
+        }
+    }
+}
+
 struct PreparedImportGeneration {
     candidate: PhotoImportCandidate,
     source: MediaObservation,
@@ -26,10 +64,10 @@ impl CacheEngine {
         namespace: AuthorizedCacheNamespace,
         attempt_id: String,
         candidates: &[PhotoImportCandidate],
-    ) -> Result<CacheImportStage, String> {
+    ) -> Result<CacheImportStage, ImportCacheFailure> {
         let storage = app_paths
             .prepare_cache_storage(namespace.paths())
-            .map_err(|error| error.to_string())?;
+            .map_err(ImportCacheFailure::from)?;
         let mut cleanup = HashSet::new();
         for candidate in candidates {
             for format in [CacheArtifactFormat::Jpeg, CacheArtifactFormat::Png] {
@@ -64,7 +102,7 @@ impl CacheEngine {
         bindings: &[MediaBinding],
         root_bindings: &RootBindingPlan,
         observation_generation: u64,
-    ) -> Vec<(PhotoImportSourceId, String)> {
+    ) -> Vec<(PhotoImportSourceId, ImportCacheFailure)> {
         let _guard = self
             .transition_and_publication_gate
             .lock()
@@ -83,9 +121,14 @@ impl CacheEngine {
         let mut obsolete = Vec::new();
         let mut published_paths = Vec::new();
         let mut adopted_ids = Vec::new();
+        let mut storage_full = false;
         for prepared in std::mem::take(&mut stage.prepared) {
             let source_id = prepared.candidate.source_id.clone();
-            let result = (|| -> Result<(), String> {
+            if storage_full {
+                problems.push((source_id, ImportCacheFailure::StorageFull));
+                continue;
+            }
+            let result = (|| -> Result<(), ImportCacheFailure> {
                 let binding = by_path
                     .get(&(prepared.source.kind, prepared.candidate.path()))
                     .ok_or("A imagem não pertence mais ao Projeto.")?;
@@ -115,7 +158,7 @@ impl CacheEngine {
                 stage
                     .storage
                     .relocate_generation(&candidate_path, &target)
-                    .map_err(|error| error.to_string())?;
+                    .map_err(ImportCacheFailure::from)?;
                 // Until the index commits, both the old and new names belong to
                 // this guard and are discarded on every failure/early return.
                 stage.cleanup.insert(target.clone());
@@ -148,6 +191,7 @@ impl CacheEngine {
                 Ok(())
             })();
             if let Err(reason) = result {
+                storage_full = matches!(reason, ImportCacheFailure::StorageFull);
                 problems.push((source_id, reason));
             }
         }
@@ -181,7 +225,7 @@ impl CacheEngine {
                 Err(error) => problems.extend(
                     adopted_ids
                         .into_iter()
-                        .map(|id| (id, error.message.clone())),
+                        .map(|id| (id, ImportCacheFailure::from(error.clone()))),
                 ),
             }
         }

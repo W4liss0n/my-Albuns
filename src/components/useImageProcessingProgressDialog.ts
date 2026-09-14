@@ -28,7 +28,7 @@ export function useImageProcessingProgressDialog(
               kind: "determinate",
               completed: progress.completedFiles,
               total: progress.totalFiles,
-              status: `${progress.completedFiles} de ${progress.totalFiles}`,
+              status: "",
             }
           : { kind: "indeterminate", status: "Aguarde…" },
       })

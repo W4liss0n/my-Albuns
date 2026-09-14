@@ -80,7 +80,7 @@ export function ProjectDialogApplication(
     <WindowControlsProvider controls={controls}>
       <OwnedWindowShell
         controls={closeAction ? "close" : "none"}
-        width={props.mode === "owned" ? presentation?.windowWidth : undefined}
+        width={props.mode === "owned" ? presentation?.windowWidth : state?.kind === "storageFull" ? 520 : undefined}
       >
         {state ? (
           <ProjectDialogView onAction={submit} state={state} />

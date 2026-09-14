@@ -54,6 +54,7 @@ pub enum BatchPhase {
     Prepared,
     Running,
     Interrupted,
+    StorageFull,
     Finished,
 }
 
@@ -63,6 +64,7 @@ pub struct BatchExportView {
     pub id: String,
     pub options: BatchExportOptions,
     pub phase: BatchPhase,
+    pub partial_publication: bool,
     pub items: Vec<BatchItemView>,
     pub has_conflicts: bool,
     pub can_continue: bool,

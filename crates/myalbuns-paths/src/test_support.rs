@@ -1,7 +1,49 @@
 //! Scoped filesystem failures for tests of real Cache and Export output paths.
 //! This module is enabled only by test dependencies, never by application builds.
 
+use std::sync::{
+    Arc, LazyLock, Mutex,
+    atomic::{AtomicUsize, Ordering},
+};
 use std::{cell::RefCell, io, marker::PhantomData, path::Path, path::PathBuf, rc::Rc};
+
+static SHARED_CREATE_FAILURES: LazyLock<
+    Mutex<std::collections::HashMap<PathBuf, Arc<AtomicUsize>>>,
+> = LazyLock::new(|| Mutex::new(std::collections::HashMap::new()));
+
+/// Exact-path creation failure for workflows that dispatch storage to a worker.
+/// Its guard removes the failure on drop, including during unwinding.
+pub struct DiskFullAcrossThreads {
+    destination: PathBuf,
+    failures: Arc<AtomicUsize>,
+}
+
+impl DiskFullAcrossThreads {
+    pub fn on_create(destination: &Path) -> Self {
+        let destination = destination.to_owned();
+        let failures = Arc::new(AtomicUsize::new(0));
+        let mut active = SHARED_CREATE_FAILURES.lock().unwrap();
+        assert!(!active.contains_key(&destination), "duplicate shared fault");
+        active.insert(destination.clone(), Arc::clone(&failures));
+        Self {
+            destination,
+            failures,
+        }
+    }
+
+    pub fn failure_count(&self) -> usize {
+        self.failures.load(Ordering::Acquire)
+    }
+}
+
+impl Drop for DiskFullAcrossThreads {
+    fn drop(&mut self) {
+        SHARED_CREATE_FAILURES
+            .lock()
+            .unwrap()
+            .remove(&self.destination);
+    }
+}
 
 thread_local! {
     static WRITE_LIMIT: RefCell<Option<WriteLimit>> = const { RefCell::new(None) };
@@ -120,6 +162,12 @@ pub fn sync(destination: &Path) -> io::Result<()> {
 }
 
 fn fail_operation(destination: &Path, operation: Operation) -> io::Result<()> {
+    if operation == Operation::Create
+        && let Some(failures) = SHARED_CREATE_FAILURES.lock().unwrap().get(destination)
+    {
+        failures.fetch_add(1, Ordering::AcqRel);
+        return Err(io::ErrorKind::StorageFull.into());
+    }
     WRITE_LIMIT.with_borrow_mut(|current| {
         if let Some(limit) = current
             .as_mut()

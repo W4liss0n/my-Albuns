@@ -32,17 +32,15 @@ test("presents indeterminate progress without inventing a percentage", () => {
   expect(within(dialog).queryByRole("button")).not.toBeInTheDocument();
 });
 
-test("presents determined and batch progress through the same interface", () => {
+test("shows percentage and an automatic count below every determinate bar", () => {
   const { rerender } = render(
     <ProgressDialog
       progress={{
         completed: 14,
         kind: "determinate",
-        remaining: "cerca de 4 min restantes",
-        status: "Lâmina 14 de 40 · Formatura Medicina 2026",
         total: 40,
       }}
-      title="Exportando PDF para gráfica"
+      title="Processando Imagens"
     />,
   );
 
@@ -51,28 +49,44 @@ test("presents determined and batch progress through the same interface", () => 
     "14",
   );
   expect(screen.getByText("35%")).toBeInTheDocument();
-  expect(screen.queryByText("14/40")).not.toBeInTheDocument();
+  expect(screen.getByText("14 de 40").closest(".ui-progress-dialog__meta"))
+    .toBe(screen.getByText("35%").closest(".ui-progress-dialog__meta"));
+  expect(screen.queryByRole("status")).not.toBeInTheDocument();
 
   rerender(
     <ProgressDialog
       progress={{
-        completed: 1,
-        currentItem: "15 anos Beatriz",
-        currentItemStatus: "lâmina 7 de 18",
-        kind: "batch",
-        summary: "1 concluído · 1 na fila",
-        total: 3,
+        completed: 43,
+        countLabel: "7 álbuns de 18",
+        kind: "determinate",
+        total: 100,
       }}
-      title="Exportando 3 álbuns"
+      title="Exportando"
     />,
   );
 
-  expect(screen.getByText("15 anos Beatriz")).toBeInTheDocument();
-  expect(screen.getByText("Álbum 2 de 3")).toBeInTheDocument();
+  expect(screen.getByText("7 álbuns de 18").closest(".ui-progress-dialog__meta"))
+    .toBe(screen.getByText("43%").closest(".ui-progress-dialog__meta"));
+  expect(screen.queryByText("43 de 100")).not.toBeInTheDocument();
   expect(screen.getByRole("progressbar")).toHaveAttribute(
     "aria-valuemax",
-    "3",
+    "100",
   );
+});
+
+test("keeps zero and complete counts in the standard row without inventing units", () => {
+  const { rerender } = render(<ProgressDialog title="Processando Imagens"
+    progress={{ kind: "determinate", completed: 0, total: 0 }} />);
+  expect(screen.getByText("0 de 0")).toBeVisible();
+  expect(screen.getByText("0%")).toBeVisible();
+  rerender(<ProgressDialog title="Processando Imagens"
+    progress={{ kind: "determinate", completed: 12, total: 12 }} />);
+  expect(screen.getByText("12 de 12")).toBeVisible();
+  expect(screen.getByText("100%")).toBeVisible();
+  rerender(<ProgressDialog title="Processando Imagens" reserveProgressMeta
+    progress={{ kind: "indeterminate", status: "Aguarde…" }} />);
+  expect(screen.queryByText("12 de 12")).not.toBeInTheDocument();
+  expect(screen.queryByText(/%/)).not.toBeInTheDocument();
 });
 
 test("keeps confirmation actions in their standard semantic positions", async () => {
