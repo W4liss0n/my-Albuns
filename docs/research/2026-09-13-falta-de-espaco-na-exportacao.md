@@ -38,8 +38,8 @@ as cópias de executáveis geradas anteriormente.
 
 ## Fronteiras verificadas
 
-- Encoders reais JPEG/PNG/PDF: erro na criação, gravação parcial com imagem pequena,
-  gravação durante codificação de imagem maior e sincronização final. Depois de
+- Encoders reais JPEG/PNG/PDF: erro na criação, gravação parcial com imagens pequenas
+  e maiores e sincronização final. Depois de
   remover a falha, a codificação conclui. Conflito com arquivo existente preserva
   seus bytes e não é tratado como disco cheio.
 - Publicação pelo Host: erro antes do primeiro arquivo e depois de publicar um
@@ -55,3 +55,31 @@ As falhas são injetadas em caminhos temporários exatos, nas fronteiras de I/O,
 por suporte habilitado somente nos testes. Não foi preenchido um volume físico.
 Os testes do fluxo do Host usam transporte controlado; os encoders usam arquivos
 e codificação reais. Não houve mudança de layout nem nova aceitação visual nativa.
+
+## Revisão
+
+Revisões independentes do intervalo `9312b29...11be82f`:
+
+- Standards: nenhum achado; classificação e mensagem têm um único dono, e a
+  fronteira de gravação compartilhada atende aos três formatos existentes.
+- Spec: nenhum achado; implementação e documentação atendem à #98 e à decisão
+  de avisar somente após uma falha real.
+
+## Validação final
+
+Executada no Windows, com o código de `11be82f`:
+
+- `npm test`: 1.157 testes aprovados.
+- `scripts/Test-Rust.ps1`: 867 resultados aprovados, incluindo reabertura e
+  Exportação com o Processador real, Importação real e os novos casos de disco
+  cheio. As etapas seletivas executam explicitamente os testes de integração
+  que a primeira passagem da suíte deixa marcados como ignorados.
+- `scripts/Test-RustQuality.ps1`: formatação e Clippy aprovados, inclusive o
+  supervisor de desenvolvimento.
+- `npm run build`: contratos de domínio e IPC atualizados, TypeScript e
+  compilação Vite aprovados.
+- `git diff --check`: aprovado.
+
+Os executáveis de teste anteriores permanecem na versão em que foram gerados;
+esta entrega registra a implementação e a validação do código, sem gerar uma
+nova distribuição do aplicativo.
