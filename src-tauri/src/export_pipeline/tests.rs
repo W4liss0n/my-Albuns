@@ -168,7 +168,7 @@ fn disk_full_during_album_publication_reports_real_failure_and_preserves_remaini
         assert!(
             failure
                 .message
-                .contains("Não há espaço no destino para concluir a exportação"),
+                .contains("Libere espaço"),
             "{}",
             failure.message
         );

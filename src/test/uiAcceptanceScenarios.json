@@ -9348,7 +9348,7 @@
     {
       "id": "storage-full-export-partial",
       "title": "Exportação — falta de espaço com publicação parcial",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22storageFull%22%2C%22message%22%3A%22N%C3%A3o%20foi%20poss%C3%ADvel%20concluir%20a%20publica%C3%A7%C3%A3o%20(1%20de%202%20arquivos%20confirmados)%3A%20N%C3%A3o%20h%C3%A1%20espa%C3%A7o%20no%20destino%20para%20concluir%20a%20exporta%C3%A7%C3%A3o.%20Libere%20espa%C3%A7o%20ou%20escolha%20outra%20pasta%20e%20tente%20novamente.%20O%20Destino%20pode%20conter%20sa%C3%ADdas%20anteriores%20e%20novas.%20Fa%C3%A7a%20uma%20nova%20Exporta%C3%A7%C3%A3o%20integral.%22%2C%22canClearCache%22%3Atrue%2C%22busy%22%3Afalse%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22storageFull%22%2C%22message%22%3A%22O%20%C3%A1lbum%20foi%20publicado%20parcialmente.%20Libere%20espa%C3%A7o%20e%20retome%20para%20concluir.%20Os%20arquivos%20j%C3%A1%20exportados%20foram%20mantidos.%22%2C%22canClearCache%22%3Atrue%2C%22busy%22%3Afalse%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "batch-export-window",

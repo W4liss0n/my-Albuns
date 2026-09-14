@@ -259,14 +259,22 @@ impl AlbumExportRecovery {
                             total_outputs: total,
                         },
                         error,
-                        format!(
-                            "Não foi possível concluir a publicação: {error}. {}",
+                        if error == AppPathsError::ExportStorageFull {
                             if self.published > 0 {
-                                "O álbum foi publicado parcialmente. Retome para concluir."
+                                "O álbum foi publicado parcialmente. Libere espaço e retome para concluir. Os arquivos já exportados foram mantidos.".into()
                             } else {
-                                "Os arquivos já existentes foram mantidos."
+                                "Libere espaço para continuar. Os arquivos já existentes foram mantidos.".into()
                             }
-                        ),
+                        } else {
+                            format!(
+                                "Não foi possível concluir a publicação: {error}. {}",
+                                if self.published > 0 {
+                                    "O álbum foi publicado parcialmente. Tente exportar novamente para concluir."
+                                } else {
+                                    "Os arquivos já existentes foram mantidos."
+                                }
+                            )
+                        },
                     )
                 })?;
             self.published += 1;

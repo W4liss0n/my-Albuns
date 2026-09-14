@@ -35,6 +35,6 @@ Na implementação, o `ExportPipeline` possui o ciclo de vida da preparação e 
 - O usuário nunca recebe sucesso antes de todas as saídas planejadas estarem no Destino.
 - Falhas antes da publicação preservam a saída anterior; falhas durante a publicação possuem um envelope explicitamente limitado.
 - Não são necessários backups integrais nem um protocolo de recuperação permanente no Destino.
-- Uma nova Exportação integral para o mesmo Destino é o caminho para restabelecer um conjunto coerente depois de uma publicação parcial.
+- Depois de uma falha terminal com publicação parcial, uma nova Exportação integral para o mesmo Destino restabelece um conjunto coerente. Durante uma pausa viva por falta de espaço, `Retomar` conclui a publicação pendente sem refazer as saídas preparadas.
 - Destinos locais, UNC, em unidade mapeada ou verbatim local/UNC usam o mesmo contrato; o suporte real à substituição atômica continua sendo verificado pela operação do sistema de arquivos.
 - Testes devem distinguir falha de preparação, falha antes da primeira promoção, falha entre duas promoções, queda do Processador e falha durante a limpeza de temporários.
