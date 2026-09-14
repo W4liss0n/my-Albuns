@@ -214,6 +214,143 @@ fn disk_full_during_album_publication_reports_real_failure_and_preserves_remaini
 }
 
 #[test]
+fn complete_image_exports_clean_only_their_namespace_after_reduction_and_mode_changes() {
+    use myalbuns_core::{ExportFormat, ExportMode};
+
+    for format in [ExportFormat::Jpeg { quality: 100 }, ExportFormat::Png] {
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("original.jpg");
+        RgbImage::from_pixel(4, 4, Rgb([20, 50, 90]))
+            .save(&source)
+            .unwrap();
+        let original = std::fs::read(&source).unwrap();
+        let mut snapshot = productive_snapshot(source.clone());
+        snapshot.project_name = "Album".into();
+        let template = snapshot.composition.sheets[0].clone();
+        snapshot.composition.sheets = (1..=36)
+            .map(|number| {
+                let mut sheet = template.clone();
+                sheet.sheet_id = uuid::Uuid::new_v4().to_string();
+                sheet.number = number;
+                sheet
+            })
+            .collect();
+        let media_id = template.referenced_media_ids().next().unwrap();
+        let extension = format.extension();
+        let other_extension = if extension == "jpg" { "png" } else { "jpg" };
+        let preserved: Vec<_> = [
+            format!("Outro_1000.{extension}"),
+            format!("Album_1000.{other_extension}"),
+            format!("Album_000.{extension}"),
+            format!("Album_0001.{extension}"),
+            format!("Album_01000.{extension}"),
+            format!("Album_+001.{extension}"),
+            format!("Album_-001.{extension}"),
+            format!("Album_1.{extension}"),
+            format!("Album_1000_notes.{extension}"),
+        ]
+        .into_iter()
+        .map(|name| root.path().join(name))
+        .collect();
+        for path in &preserved {
+            std::fs::write(path, b"unrelated file").unwrap();
+        }
+        let nested = root.path().join("subfolder");
+        std::fs::create_dir(&nested).unwrap();
+        let nested_output = nested.join(format!("Album_1000.{extension}"));
+        std::fs::write(&nested_output, b"nested file").unwrap();
+        let manual_orphan = root.path().join(format!("Album_1000.{extension}"));
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+
+        for (attempt, sheet_count, mode, output_count, conflict_count) in [
+            ("initial", 36, ExportMode::Sheet, 36, 0),
+            ("reduced", 34, ExportMode::Sheet, 34, 37),
+            ("pages", 34, ExportMode::Page, 68, 35),
+            ("sheets", 34, ExportMode::Sheet, 34, 69),
+        ] {
+            snapshot.composition.sheets.truncate(sheet_count);
+            if attempt != "initial" {
+                // No manifest can distinguish this file from a prior export.
+                std::fs::write(&manual_orphan, b"manually created orphan").unwrap();
+            }
+            let plan = super::plan_album(
+                snapshot.clone(),
+                super::AlbumExportOptions {
+                    protected_originals: vec![source.clone()],
+                    sheet_ids: snapshot
+                        .composition
+                        .sheets
+                        .iter()
+                        .map(|sheet| sheet.sheet_id.clone())
+                        .collect(),
+                    whole_album: true,
+                    mode,
+                    format: format.clone(),
+                    destination: root.path().to_path_buf(),
+                    authorization: if attempt == "initial" {
+                        ExportWriteAuthorization::CreateOnly
+                    } else {
+                        ExportWriteAuthorization::ReplaceConfirmed
+                    },
+                    sources: vec![RenderSource::new(media_id, source.clone()).unwrap()],
+                    request_id: attempt.into(),
+                },
+            )
+            .unwrap();
+            assert_eq!(plan.conflicts().unwrap().len(), conflict_count);
+            let mut roots = OperationPathContext::new();
+            for path in plan.required_paths() {
+                roots.capture(&path).unwrap();
+            }
+            let first_output = root.path().join(format!("Album_001.{extension}"));
+            let prior_output = if first_output.exists() {
+                first_output
+            } else {
+                source.clone()
+            };
+            let mut transport = AlbumTransport {
+                fail: None,
+                prior_bytes: std::fs::read(&prior_output).unwrap(),
+                prior_output,
+            };
+            runtime
+                .block_on(super::execute_album(
+                    &mut transport,
+                    plan,
+                    &roots.freeze(),
+                    &ExportExecutionControl::default(),
+                    &|progress| {
+                        if attempt != "initial" && progress.stage == ExportProgressStage::Publishing
+                        {
+                            assert!(manual_orphan.exists(), "cleanup must follow publication");
+                        }
+                    },
+                    &context(attempt),
+                ))
+                .unwrap();
+            assert!(!manual_orphan.exists());
+            for index in 1..=output_count {
+                assert_eq!(
+                    std::fs::read(root.path().join(format!("Album_{index:03}.{extension}")))
+                        .unwrap(),
+                    format!("prepared-{}", index - 1).as_bytes()
+                );
+            }
+            for path in &preserved {
+                assert_eq!(std::fs::read(path).unwrap(), b"unrelated file");
+            }
+            assert_eq!(std::fs::read(&nested_output).unwrap(), b"nested file");
+            assert_eq!(std::fs::read(&source).unwrap(), original);
+            assert_eq!(
+                std::fs::read_dir(root.path()).unwrap().count(),
+                output_count + preserved.len() + 2,
+                "only the complete output set, preserved files, Original and subfolder remain"
+            );
+        }
+    }
+}
+
+#[test]
 fn normal_export_prepares_the_entire_set_before_publish_and_cleans_a_failed_set() {
     for (failure_code, whole_album) in [
         (None, false),
@@ -264,6 +401,15 @@ fn normal_export_prepares_the_entire_set_before_publish_and_cleans_a_failed_set(
             },
         )
         .unwrap();
+        assert_eq!(
+            plan.conflicts().unwrap(),
+            if whole_album {
+                vec!["Album_003.png"]
+            } else {
+                vec![]
+            },
+            "orphan-only conflicts must also require confirmation for an integral export"
+        );
         let first = root.path().join("Album_001.png");
         let second = root.path().join("Album_002.png");
         std::fs::write(&first, b"old-first").unwrap();

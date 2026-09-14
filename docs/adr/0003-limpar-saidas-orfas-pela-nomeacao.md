@@ -1,7 +1,7 @@
 ---
 status: accepted
 date: 2026-07-27
-updated: 2026-09-01
+updated: 2026-09-13
 ---
 
 # Limpar saídas órfãs pela convenção de nomes
@@ -12,7 +12,7 @@ Quando uma nova Exportação JPEG ou PNG do Álbum inteiro produzir menos arquiv
 
 - Uma Exportação por intervalo nunca remove arquivos que não pertençam ao intervalo selecionado.
 - Uma falha antes da conclusão preserva as saídas excedentes da exportação anterior.
-- Uma Exportação integral confirmada substitui o conjunto anterior do mesmo Nome e extensão, inclusive quando ele foi criado no outro modo; a confirmação explica esse efeito.
+- Uma Exportação integral confirmada substitui o conjunto anterior do mesmo Nome e extensão, inclusive quando ele foi criado no outro modo. A decisão posterior de interface usa a confirmação genérica `Ignorar`, `Substituir` e `Cancelar`, sem listar arquivos ou acrescentar avisos sobre o modo anterior; `Substituir` abrange os conflitos e as Saídas órfãs elegíveis dessa tentativa. `Ignorar` nunca limpa Saídas órfãs.
 - Na Exportação em lote, cada Projeto é concluído e limpo independentemente dos demais.
 - Arquivos com outro Nome do Projeto ou outra extensão não são considerados, portanto podem permanecer após renomear o Projeto ou trocar o formato.
 - Um arquivo criado manualmente que coincida com o nome, a extensão e um índice órfão será indistinguível de uma saída anterior e poderá ser removido após a confirmação explícita de sobrescrita.
