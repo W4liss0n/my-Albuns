@@ -1,8 +1,6 @@
 use super::*;
 use crate::{
-    export_pipeline::{
-        ExportExecutionControl, ExportFailureStage, ExportProgressStage, ExportProgressUnits,
-    },
+    export_pipeline::{ExportExecutionControl, ExportFailureStage},
     imaging_processor::{ImagingTransport, InvocationContext},
     ipc_contract::BatchExportProgress,
 };
@@ -228,25 +226,10 @@ impl BatchRunner {
                 percent: *last_percent.lock().unwrap(),
             });
             let report = |update: export_pipeline::ExportProgress| {
-                let fraction = match update.units {
-                    ExportProgressUnits::Measured {
-                        completed_units,
-                        total_units,
-                    } if total_units > 0 => f64::from(completed_units) / f64::from(total_units),
-                    _ => 0.0,
-                };
-                let item_fraction = match update.stage {
-                    ExportProgressStage::Preparing => 0.0,
-                    ExportProgressStage::LoadingSources => 0.1 * fraction,
-                    ExportProgressStage::Composing | ExportProgressStage::EncodingOutput => {
-                        0.1 + 0.65 * fraction
-                    }
-                    ExportProgressStage::Verifying => 0.75 + 0.1 * fraction,
-                    ExportProgressStage::Publishing => 0.85 + 0.14 * fraction,
-                    ExportProgressStage::Completed => 0.99,
-                };
+                // The flow reports item completion after recording its result below.
+                let item_percent = update.overall_percent().min(99.0);
                 let mut last = last_percent.lock().expect("batch progress is available");
-                *last = last.max((f64::from(completed) + item_fraction) / f64::from(total) * 100.0);
+                *last = last.max((f64::from(completed) * 100.0 + item_percent) / f64::from(total));
                 progress(BatchExportProgress {
                     completed,
                     total,

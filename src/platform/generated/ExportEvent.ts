@@ -2,4 +2,4 @@
 import type { ExportProgressStagePayload } from "./ExportProgressStagePayload";
 import type { ExportProgressUnitsPayload } from "./ExportProgressUnitsPayload";
 
-export type ExportEvent = { "event": "started", "data": { operationId: string, cancellable: boolean, } } | { "event": "progress", "data": { operationId: string, stage: ExportProgressStagePayload, units: ExportProgressUnitsPayload, cancellable: boolean, } };
+export type ExportEvent = { "event": "started", "data": { operationId: string, cancellable: boolean, } } | { "event": "progress", "data": { operationId: string, stage: ExportProgressStagePayload, units: ExportProgressUnitsPayload, overallPercent: number, cancellable: boolean, } };

@@ -1446,7 +1446,9 @@ fn a_verified_preparation_is_published_only_after_the_response_is_validated() {
         let bindings = root_bindings(&plan);
         let cancellation = ExportExecutionControl::default();
         let stages = Mutex::new(Vec::new());
+        let percentages = Mutex::new(Vec::new());
         let progress = |progress: super::ExportProgress| {
+            percentages.lock().unwrap().push(progress.overall_percent());
             stages
                 .lock()
                 .expect("the progress collector is available")
@@ -1465,6 +1467,10 @@ fn a_verified_preparation_is_published_only_after_the_response_is_validated() {
         .expect("the verified Export is published");
 
         assert_eq!(published.completion, completion);
+        assert_eq!(
+            *percentages.lock().unwrap(),
+            [0.0, 10.0, 75.0, 75.0, 75.0, 85.0, 100.0]
+        );
         assert_eq!(
             std::fs::read(&output).expect("the published Export is readable"),
             b"verified export"

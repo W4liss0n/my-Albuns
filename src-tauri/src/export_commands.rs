@@ -89,6 +89,7 @@ impl ExportEvent {
             operation_id: operation_id.into(),
             stage: progress.stage.into(),
             units,
+            overall_percent: progress.overall_percent(),
             cancellable: progress.cancellable,
         }
     }
@@ -797,6 +798,7 @@ mod tests {
                     "data": {
                         "operationId": "export-42",
                         "stage": "composing",
+                        "overallPercent": 36.0,
                         "units": {
                             "kind": "measured",
                             "completedUnits": 2,
@@ -966,6 +968,7 @@ mod tests {
                 "data": {
                     "operationId": "export-publishing",
                     "stage": "publishing",
+                    "overallPercent": 85.0,
                     "units": {
                         "kind": "unmeasured",
                     },

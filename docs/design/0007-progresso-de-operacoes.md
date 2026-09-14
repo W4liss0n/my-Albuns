@@ -51,6 +51,19 @@ Originais, composição, codificação, verificação ou publicação como etapa
 A porcentagem é contínua entre essas etapas e ao retomar uma tentativa viva.
 O lote conserva a contagem compacta `X álbuns de Y`. Nas duas exportações, a contagem ocupa o espaço à direita abaixo da barra, na mesma linha da porcentagem e com a mesma tipografia da geração de Cache. O componente compartilhado fornece essa apresentação; não há uma linha de contagem acima da barra.
 
+O `ExportPipeline` possui a conversão das etapas em percentual geral por Álbum.
+A Exportação normal recebe esse valor pelo contrato de eventos, e o lote agrega
+o mesmo cálculo entre seus Itens. Carregamento ocupa 0–10%, composição e
+codificação 10–75%, verificação 75–85% e publicação 85–99%. As etapas continuam
+internas; a interface apresenta somente o progresso geral.
+
+Cada fluxo preserva o maior percentual apresentado durante a tentativa viva,
+inclusive ao retomar, e possui sua conclusão terminal. A Exportação normal
+converte o valor recebido em inteiro ao apresentar o diálogo; o lote mantém o
+Álbum em até 99% até registrar seu resultado, quando pode contar o Item concluído.
+As contagens de Unidades de Exportação e de Álbuns permanecem independentes
+desse percentual.
+
 O processamento de imagens usa `Processando Imagens` e `X de Y` em qualquer
 ação explícita que precise preparar imagens do Projeto. Uma unidade inclui a
 validação da origem e a conclusão do Cache, inclusive seu reuso quando válido.

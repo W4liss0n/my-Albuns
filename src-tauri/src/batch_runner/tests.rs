@@ -1,5 +1,6 @@
 use super::*;
 use myalbuns_core::{CreateAuthorization, CreateProjectRequest, InitialProject, ProjectLocation};
+use std::sync::Mutex;
 
 pub(super) fn fixture(
     root: &std::path::Path,
@@ -165,7 +166,7 @@ impl crate::imaging_processor::ImagingTransport for RecordingTransport {
         _context: &'a crate::imaging_processor::InvocationContext,
         _operation: crate::imaging_processor::ImagingOperation,
         _attempt: u8,
-        _control: crate::imaging_processor::InvocationControl<'a>,
+        control: crate::imaging_processor::InvocationControl<'a>,
     ) -> crate::imaging_processor::InvocationFuture<'a> {
         use myalbuns_imaging_protocol::{
             AlbumRenderCompletion, ImagingCommand, ImagingResponse, RenderCompletion,
@@ -186,6 +187,35 @@ impl crate::imaging_processor::ImagingTransport for RecordingTransport {
                 .map(|source| source.source_path().to_path_buf())
                 .collect(),
         );
+        let total_units = request
+            .outputs
+            .iter()
+            .map(|output| output.units.len() as u32)
+            .sum::<u32>();
+        use myalbuns_imaging_protocol::{ImagingProgress, ImagingProgressStage};
+        for (stage, completed, total) in [
+            (
+                ImagingProgressStage::LoadingSources,
+                request.sources.len() as u32,
+                request.sources.len() as u32,
+            ),
+            (
+                ImagingProgressStage::Composing,
+                total_units.min(1),
+                total_units,
+            ),
+            (
+                ImagingProgressStage::EncodingOutput,
+                total_units,
+                total_units,
+            ),
+        ] {
+            if total > 0 {
+                control.report(
+                    ImagingProgress::new(&request.request_id, stage, completed, total).unwrap(),
+                );
+            }
+        }
         let mut outputs = vec![];
         self.prior_outputs.clear();
         for (index, output) in request.outputs.iter().enumerate() {
@@ -227,6 +257,80 @@ impl crate::imaging_processor::ImagingTransport for RecordingTransport {
         };
         Box::pin(async move { Ok(response) })
     }
+}
+
+#[test]
+fn batch_progress_aggregates_pipeline_percentages_and_never_regresses_on_live_resume() {
+    let root = tempfile::tempdir().unwrap();
+    let (core, _first) = fixture(root.path(), "source/A.myalbuns");
+    let (_, _second) = fixture(root.path(), "source/B.myalbuns");
+    let batch = BatchRunner::discover(
+        BatchConfiguration {
+            source: root.path().join("source"),
+            destination: None,
+            format: ExportFormat::Png,
+            mode: ExportMode::Sheet,
+        },
+        core,
+        root.path().join("checkpoints"),
+    )
+    .unwrap();
+    let updates = Mutex::new(Vec::new());
+    let report = |update: crate::ipc_contract::BatchExportProgress| {
+        assert_eq!(update.total, 2);
+        updates
+            .lock()
+            .unwrap()
+            .push((update.completed, update.percent));
+    };
+    let fault =
+        myalbuns_paths::test_support::DiskFull::on_rename(&root.path().join("source/A/A_002.png"));
+    let mut transport = RecordingTransport::default();
+    let mut paused = tauri::async_runtime::block_on(batch.run(
+        &mut transport,
+        &BatchCancellation::default(),
+        ExportConflictPolicy::Ask,
+        &report,
+    ))
+    .unwrap();
+    assert_eq!(fault.failure_count(), 1);
+    assert_eq!(paused.view().phase, BatchPhase::StorageFull);
+    assert_eq!(paused.progress().percent, 46.0);
+    drop(fault);
+    paused.retry_preflight();
+    let completed = tauri::async_runtime::block_on(paused.run(
+        &mut transport,
+        &BatchCancellation::default(),
+        ExportConflictPolicy::Ask,
+        &report,
+    ))
+    .unwrap();
+    assert_eq!(completed.view().phase, BatchPhase::Finished);
+    assert_eq!(
+        transport.names,
+        ["A", "B"],
+        "resuming publication does not render A again"
+    );
+    let updates = updates.into_inner().unwrap();
+    for expected in [
+        (0, 21.25),
+        (0, 46.0),
+        (0, 49.5),
+        (1, 50.0),
+        (1, 71.25),
+        (1, 99.5),
+        (2, 100.0),
+    ] {
+        assert!(
+            updates.contains(&expected),
+            "missing {expected:?} in {updates:?}"
+        );
+    }
+    assert!(
+        updates.windows(2).all(|pair| pair[0].1 <= pair[1].1),
+        "{updates:?}"
+    );
+    assert_eq!(updates.last(), Some(&(2, 100.0)));
 }
 
 #[test]
