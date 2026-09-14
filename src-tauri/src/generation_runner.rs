@@ -1,4 +1,4 @@
-//! Owns discovery, preflight and serial generation; ProjectCore owns copied state and publication.
+//! Owns discovery, preflight and bounded generation; ProjectCore owns copied state and publication.
 use crate::ipc_contract::{
     GenerationDecision, GenerationItemStatus, GenerationItemView, GenerationOptions,
     GenerationPhase, GenerationProgress, GenerationView,
@@ -12,8 +12,13 @@ use std::{
     collections::HashSet,
     fmt,
     path::{Path, PathBuf},
-    sync::atomic::{AtomicBool, Ordering},
+    sync::{
+        Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
 };
+
+const PROJECT_GENERATION_CONCURRENCY: usize = 4;
 
 #[derive(Debug)]
 pub(crate) enum GenerationPreparationError {
@@ -257,31 +262,109 @@ impl GenerationRunner {
             return;
         }
         self.phase = GenerationPhase::Running;
-        let total = self.items.len() as u32;
+        self.phase = generate_items(
+            &mut self.items,
+            PROJECT_GENERATION_CONCURRENCY,
+            cancellation,
+            progress,
+            |item| generate_item(&self.core, &self.template, &self.roots, &self.options, item),
+        );
+    }
+}
+
+/// Workers own separate items; only this coordinator emits ordered progress.
+/// Scope completion joins every active publication before the result can be shown.
+fn generate_items(
+    items: &mut [GenerationItem],
+    concurrency: usize,
+    cancellation: &AtomicBool,
+    progress: &dyn Fn(GenerationProgress),
+    generate: impl Fn(&GenerationItem) -> Result<(), String> + Sync,
+) -> GenerationPhase {
+    let total = items.len() as u32;
+    let pending = items
+        .iter()
+        .filter(|item| item.status == GenerationItemStatus::Pending)
+        .count();
+    let mut completed = total - pending as u32;
+    let report = |completed| {
         progress(GenerationProgress {
-            completed: 0,
+            completed,
             total: Some(total),
-        });
-        for (index, item) in self.items.iter_mut().enumerate() {
+        })
+    };
+    report(0);
+    if completed > 0 {
+        report(completed);
+    }
+    let candidates = Mutex::new(
+        items
+            .iter_mut()
+            .filter(|item| item.status == GenerationItemStatus::Pending),
+    );
+    let process_next = || {
+        let item = {
+            let mut candidates = candidates.lock().expect("the generation queue is healthy");
+            // Claiming an item admits it to publication. Cancellation stops new claims,
+            // while already claimed items retain their destination guards until finished.
             if cancellation.load(Ordering::Acquire) {
-                self.phase = GenerationPhase::Cancelled;
-                return;
+                return false;
             }
-            if item.status == GenerationItemStatus::Pending {
-                match generate_item(&self.core, &self.template, &self.roots, &self.options, item) {
-                    Ok(()) => item.status = GenerationItemStatus::Completed,
-                    Err(error) => {
-                        item.status = GenerationItemStatus::Failed;
-                        item.problems.push(error);
+            candidates.next()
+        };
+        let Some(item) = item else {
+            return false;
+        };
+        match generate(item) {
+            Ok(()) => item.status = GenerationItemStatus::Completed,
+            Err(error) => {
+                item.status = GenerationItemStatus::Failed;
+                item.problems.push(error);
+            }
+        }
+        true
+    };
+    let (sender, receiver) = std::sync::mpsc::channel();
+    std::thread::scope(|scope| {
+        let mut workers = 0;
+        for index in 0..pending.min(concurrency.clamp(1, PROJECT_GENERATION_CONCURRENCY)) {
+            let sender = sender.clone();
+            let process_next = &process_next;
+            match std::thread::Builder::new()
+                .name(format!("project-generation-{index}"))
+                .spawn_scoped(scope, move || {
+                    while process_next() {
+                        if sender.send(()).is_err() {
+                            break;
+                        }
                     }
+                }) {
+                Ok(_) => workers += 1,
+                Err(error) => {
+                    tracing::warn!("Could not start a project generation worker: {error}");
+                    break;
                 }
             }
-            progress(GenerationProgress {
-                completed: index as u32 + 1,
-                total: Some(total),
-            });
         }
-        self.phase = GenerationPhase::Finished;
+        drop(sender);
+        if workers == 0 {
+            // The operation already runs off the UI thread; keep working serially
+            // if the OS cannot create another thread, with the same cancellation rule.
+            while process_next() {
+                completed += 1;
+                report(completed);
+            }
+        } else {
+            for () in receiver {
+                completed += 1;
+                report(completed);
+            }
+        }
+    });
+    if completed < total {
+        GenerationPhase::Cancelled
+    } else {
+        GenerationPhase::Finished
     }
 }
 
@@ -290,7 +373,7 @@ fn generate_item(
     template: &ProjectTemplate,
     roots: &RootBindingPlan,
     options: &GenerationOptions,
-    item: &mut GenerationItem,
+    item: &GenerationItem,
 ) -> Result<(), String> {
     let destination = MirroredDestination::open(
         roots,

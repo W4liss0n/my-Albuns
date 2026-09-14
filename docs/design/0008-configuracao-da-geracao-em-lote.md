@@ -85,6 +85,16 @@ decisões. Mesmo sem pendências restantes, mantém a confirmação explícita e
 
 Durante a execução, a operação usa o [Progresso de operação](0007-progresso-de-operacoes.md). Sucesso integral recebe confirmação curta; itens ignorados ou com falha são apresentados depois na Tela de Problemas.
 
+A criação usa até quatro Projetos simultâneos, todos baseados no mesmo modelo
+imutável e no mesmo plano de caminhos. Cada Projeto mantém suas próprias proteções
+de destino até terminar a gravação. Uma falha pertence somente ao Projeto afetado;
+os outros continuam. Se o sistema não puder iniciar todos os trabalhadores, a
+operação continua com os disponíveis, podendo executar em sequência.
+
+A fila e o resultado mantêm a ordem da descoberta, mas as gravações podem terminar
+em outra ordem. A barra avança pela quantidade de itens concluídos, ignorados ou
+com falha, sem retroceder e sem apresentar cada trabalhador na interface.
+
 A janela de progresso tem largura própria. A configuração permanece com suas
 dimensões enquanto a janela de progresso é preparada; o resultado só reaparece
 depois de estar pronto. Cancelar preserva os Projetos já concluídos e identifica
@@ -92,8 +102,11 @@ os itens que não chegaram a ser gerados.
 
 Cancelar a verificação fecha o progresso e devolve a configuração, mantendo as
 pastas escolhidas e sem aviso de cancelamento. Ao cancelar `Verificar novamente`,
-as decisões anteriores são mantidas. Durante a gravação, o Projeto em andamento
-termina antes da interrupção; os concluídos são preservados no resultado.
+as decisões anteriores são mantidas. Durante a gravação, cancelar impede a retirada
+de novos Projetos da fila. Os Projetos já em andamento terminam antes de fechar o
+progresso; os concluídos são preservados, e os não iniciados continuam identificados
+no resultado. Se todos os itens terminarem, o resultado é de conclusão, mesmo que
+o cancelamento tenha sido solicitado durante a última gravação.
 
 Cancelamento é um resultado normal, distinto de falha. Falhas reais usam o diálogo
 padrão de mensagem com `Voltar`, preservando os campos. A janela de geração não

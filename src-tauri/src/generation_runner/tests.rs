@@ -298,25 +298,170 @@ fn generation_does_not_require_read_access_to_the_photo_contents() {
 }
 
 #[test]
-fn cancellation_preserves_completed_projects_without_starting_the_next_one() {
+fn cancellation_before_generation_does_not_start_any_project() {
     let fixture = Fixture::new();
     fixture.photo("001");
     fixture.photo("002");
     let mut runner = fixture.prepare().unwrap();
-    let cancel = AtomicBool::new(false);
-    runner.run(&cancel, &|progress| {
-        if progress.completed == 1 {
-            cancel.store(true, Ordering::Release);
+    let cancel = AtomicBool::new(true);
+    runner.run(&cancel, &|_| {});
+    assert_eq!(runner.view().phase, GenerationPhase::Cancelled);
+    assert_eq!(runner.view().items[0].status, GenerationItemStatus::Pending);
+    assert_eq!(runner.view().items[1].status, GenerationItemStatus::Pending);
+    assert!(!fixture.destination.join("001.myalbuns").exists());
+    assert!(!fixture.destination.join("002.myalbuns").exists());
+}
+
+#[test]
+fn parallel_cancellation_stops_admission_and_waits_for_every_active_publication() {
+    use std::{sync::mpsc, time::Duration};
+    let fixture = Fixture::new();
+    for index in 0..8 {
+        fixture.photo(&format!("Turma/{index:03}"));
+    }
+    let mut runner = fixture.prepare().unwrap();
+    let cancellation = AtomicBool::new(false);
+    let (started, starts) = mpsc::channel();
+    let (updates, progress) = mpsc::channel();
+    let (release, waits): (Vec<_>, Vec<_>) = (0..8)
+        .map(|_| {
+            let (sender, receiver) = mpsc::channel::<()>();
+            (sender, Mutex::new(receiver))
+        })
+        .unzip();
+    let timeout = Duration::from_secs(10);
+    std::thread::scope(|scope| {
+        let running = scope.spawn(|| {
+            generate_items(
+                &mut runner.items,
+                PROJECT_GENERATION_CONCURRENCY,
+                &cancellation,
+                &|value| {
+                    updates.send(value).unwrap();
+                },
+                |item| {
+                    let index: usize = item.name.parse().unwrap();
+                    started.send(index).unwrap();
+                    waits[index].lock().unwrap().recv_timeout(timeout).unwrap();
+                    generate_item(
+                        &runner.core,
+                        &runner.template,
+                        &runner.roots,
+                        &runner.options,
+                        item,
+                    )
+                },
+            )
+        });
+        let mut admitted = (0..4)
+            .map(|_| starts.recv_timeout(timeout).unwrap())
+            .collect::<Vec<_>>();
+        admitted.sort_unstable();
+        assert_eq!(admitted, [0, 1, 2, 3]);
+        assert!(starts.try_recv().is_err());
+        assert_eq!(progress.recv_timeout(timeout).unwrap().completed, 0);
+        cancellation.store(true, Ordering::Release);
+        // Force completion out of discovery order. The remaining admitted item
+        // keeps the operation alive even after three results have been reported.
+        for (completed, index) in [3, 2, 1].into_iter().enumerate() {
+            release[index].send(()).unwrap();
+            let update = progress.recv_timeout(timeout).unwrap();
+            assert_eq!(update.completed, completed as u32 + 1);
+            assert_eq!(update.total, Some(8));
+            assert!(!running.is_finished());
+        }
+        release[0].send(()).unwrap();
+        assert_eq!(progress.recv_timeout(timeout).unwrap().completed, 4);
+        assert_eq!(running.join().unwrap(), GenerationPhase::Cancelled);
+    });
+    assert!(
+        starts.try_recv().is_err(),
+        "Cancelled queued items must never start"
+    );
+    for (index, item) in runner.view().items.iter().enumerate() {
+        assert_eq!(item.name, format!("{index:03}"));
+        assert_eq!(
+            item.status,
+            if index < 4 {
+                GenerationItemStatus::Completed
+            } else {
+                GenerationItemStatus::Pending
+            }
+        );
+        assert_eq!(Path::new(&item.destination).is_file(), index < 4);
+    }
+}
+
+#[test]
+fn parallel_generation_shares_parents_isolates_failures_and_reports_each_terminal_item_once() {
+    use std::cell::RefCell;
+    let fixture = Fixture::new();
+    for index in 0..16 {
+        fixture.photo(&format!("Turma/{index:03}"));
+    }
+    std::fs::create_dir(fixture.destination.join("Turma")).unwrap();
+    let ignored_path = fixture.destination.join("Turma/000.myalbuns");
+    std::fs::write(&ignored_path, "preserve ignored destination").unwrap();
+    let mut runner = fixture.prepare().unwrap();
+    let ignored_id = runner.view().items[0].id.clone();
+    runner
+        .decide(Some(&ignored_id), GenerationDecision::Ignore)
+        .unwrap();
+    assert!(runner.view().can_continue);
+    // A destination can change after verification. Only its item may fail.
+    std::fs::create_dir(fixture.destination.join("Turma/001.myalbuns")).unwrap();
+    let updates = RefCell::new(Vec::new());
+    let coordinator = std::thread::current().id();
+    runner.run(&AtomicBool::new(false), &|value| {
+        assert_eq!(std::thread::current().id(), coordinator);
+        assert_eq!(value.total, Some(16));
+        updates.borrow_mut().push(value.completed);
+    });
+    assert_eq!(runner.view().phase, GenerationPhase::Finished);
+    assert_eq!(*updates.borrow(), (0..=16).collect::<Vec<_>>());
+    assert_eq!(runner.view().items[0].status, GenerationItemStatus::Ignored);
+    assert_eq!(
+        std::fs::read_to_string(&ignored_path).unwrap(),
+        "preserve ignored destination"
+    );
+    assert_eq!(runner.view().items[1].status, GenerationItemStatus::Failed);
+    let mut identities = HashSet::new();
+    for item in runner.view().items.iter().skip(2) {
+        assert_eq!(
+            item.status,
+            GenerationItemStatus::Completed,
+            "{}: {:?}",
+            item.name,
+            item.problems
+        );
+        let generated = fixture
+            .core
+            .load_persisted_revision(LoadProjectRequest::new(location(Path::new(
+                &item.destination,
+            ))))
+            .unwrap();
+        assert!(identities.insert(generated.project_id()));
+        assert_ne!(generated.project_id(), fixture.model.project_id());
+        assert_eq!(generated.project().media().len(), 1);
+    }
+}
+
+#[test]
+fn cancellation_after_the_last_publication_keeps_the_complete_result() {
+    let fixture = Fixture::new();
+    fixture.photo("001");
+    let mut runner = fixture.prepare().unwrap();
+    let cancellation = AtomicBool::new(false);
+    runner.run(&cancellation, &|value| {
+        if value.completed == 1 {
+            cancellation.store(true, Ordering::Release);
         }
     });
-    assert_eq!(runner.view().phase, GenerationPhase::Cancelled);
+    assert_eq!(runner.view().phase, GenerationPhase::Finished);
     assert_eq!(
         runner.view().items[0].status,
         GenerationItemStatus::Completed
     );
-    assert_eq!(runner.view().items[1].status, GenerationItemStatus::Pending);
-    assert!(fixture.destination.join("001.myalbuns").is_file());
-    assert!(!fixture.destination.join("002.myalbuns").exists());
 }
 
 #[test]

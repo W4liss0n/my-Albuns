@@ -1111,6 +1111,8 @@ validação das superfícies descritas nesta seção.
 - Um Projeto de destino aberto nunca é incluído em sobrescrita individual ou global. `Sobrescrever` permanece indisponível para sua linha, e ele só pode ser ignorado enquanto continuar aberto.
 - A geração só pode continuar quando todos os conflitos tiverem uma decisão e sempre exige clique explícito em `Continuar Geração`; resolver a última linha não inicia a operação automaticamente.
 - Uma falha de geração não interrompe ou reverte os demais itens. O resumo final separa sucessos, ignorados e falhas.
+- A Geração de Projetos em lote cria até quatro Projetos simultâneos a partir do mesmo modelo imutável e do mesmo plano de caminhos. A fila e o resultado preservam a ordem da descoberta; as gravações podem concluir fora dessa ordem, e o progresso conta itens terminados, ignorados ou com falha. Cada publicação mantém as proteções de destino do núcleo compartilhado.
+- Cancelar a geração impede novos inícios e aguarda todos os Projetos já admitidos terminarem suas gravações. Os concluídos são mantidos e os não iniciados permanecem pendentes no resultado; se todos os itens terminarem, o lote é apresentado como concluído.
 - A Exportação em lote encontra recursivamente Projetos e sempre exporta o Álbum inteiro de cada um.
 - A Tela de Boas-vindas abre uma janela dedicada de configuração do lote com pasta de origem, Formato, Modo e Destino.
 - A janela mostra a quantidade de Projetos descobertos na origem e oferece `Cancelar` e `Verificar e exportar`.
@@ -1130,7 +1132,7 @@ validação das superfícies descritas nesta seção.
 - O progresso da Exportação em lote mostra somente a barra geral determinada, percentual e posição `X/Y`, com `Cancelar` como única ação. Não expõe a tabela de Projetos, trabalhos simultaneamente ativos ou histórico item a item durante o processamento.
 - Nenhuma Exportação normal, edição, Salvamento, abertura ou fechamento de Projeto pode começar enquanto o Modo de lote exclusivo estiver ativo.
 - Concluir, falhar ou cancelar o lote libera a concessão e a pausa, reabilita todas as janelas e permite retomar os trabalhos de Cache, sem salvar ou alterar automaticamente qualquer Projeto aberto.
-- O MVP processa exatamente um Projeto por vez, em ordem determinística, sem Perfil de desempenho, calibração ou paralelismo entre Álbuns. Paralelismo só pode ser reconsiderado depois de medições representativas.
+- A Exportação em lote processa exatamente um Projeto por vez, em ordem determinística, sem Perfil de desempenho, calibração ou paralelismo entre Álbuns. Paralelismo na Exportação só pode ser reconsiderado depois de medições representativas.
 - Por padrão, cada Projeto recebe sua pasta de saída com o próprio Nome ao lado de seu arquivo.
 - Em um destino alternativo, a hierarquia relativa dos Projetos é preservada e cada Projeto recebe uma pasta com seu Nome.
 - Conflitos de todo o lote são apresentados antes do início por aviso genérico com `Ignorar`, `Substituir` ou `Cancelar`. `Ignorar` preserva as saídas existentes, exporta somente as faltantes e não limpa órfãos.
@@ -1165,7 +1167,7 @@ validação das superfícies descritas nesta seção.
 - Conflitos de Exportação e geração devem ser pré-calculados, apresentados em conjunto e nunca resultar em substituição ou renomeação silenciosa.
 - Nenhum teste de Exportação pode obter sucesso apenas por existir Cache quando o original estiver ausente.
 - Publicação deve cobrir falha na preparação, sucesso integral e falha após uma ou mais promoções finais, verificando atomicidade por arquivo quando suportada, aviso de possível mistura, ausência de rollback prometido e proibição de remover órfãos em falha ou intervalo parcial.
-- Operações em lote devem cobrir descoberta recursiva, execução estritamente serial, caminho exato no espelho da árvore, conflitos, proteção de Projeto aberto, relinks individuais e globais estritos, revalidação da revisão persistida antes do snapshot, checkpoint por item, retomada que refaz o item interrompido, isolamento de falhas, cópia integral do estado visível do Projeto modelo e importação das novas imagens somente no Painel.
+- Operações em lote devem cobrir descoberta recursiva, caminho exato no espelho da árvore, conflitos, proteção de Projeto aberto e isolamento de falhas. A Exportação em lote cobre execução estritamente serial, relinks individuais e globais estritos, revalidação da revisão persistida antes do snapshot, checkpoint por item e retomada que refaz o item interrompido. A geração cobre concorrência limitada, cancelamento com espera das gravações ativas, progresso monotônico por item, cópia integral do estado visível do Projeto modelo e inclusão das novas imagens somente no Painel.
 - Namespace, representação reduzida única, metadados, invalidação e políticas de liberação do Cache exigem testes próprios, incluindo a impossibilidade de limpar Cache ativo ao vivo. Formato, resolução, fingerprint e eventual tiling aguardam medições.
 - Álbuns longos devem ser testados com virtualização da cena, margem de pré-carga, descarte e reconstrução de texturas, preservando todo o modelo lógico e a latência de navegação.
 - O spike arquitetural exercitou a pequena interface externa do núcleo e o mesmo conjunto de cenários nas topologias A e B, registrando memória, GPU, processos, abertura, latência do Canvas, propagação de falhas, recuperação e complexidade de IPC/logs. A regressão da topologia adotada deve abrir ao menos dois hosts independentes e provar o isolamento entre Projetos sem acoplar os testes às subdivisões internas.
@@ -1189,7 +1191,7 @@ validação das superfícies descritas nesta seção.
 - Marcas de corte renderizadas na saída.
 - Valores de Sangria ou segurança diferentes por borda.
 - Exportação parcial em lote.
-- Processamento paralelo de Álbuns, calibração automática ou Perfil de desempenho para lote.
+- Exportação paralela de Álbuns, calibração automática ou Perfil de desempenho para lote.
 - Interface de remapeamento de atalhos ou modificadores de gestos.
 - Eleição ou reinício automático do componente global após falha.
 - Rollback integral do conjunto durante a Publicação da Exportação.
@@ -1226,7 +1228,7 @@ As funcionalidades abaixo permanecem no produto, mas seus detalhes foram deliber
 
 - limite numérico da Mudança dimensional segura e eventual ponto focal adicional;
 - formato e resolução da representação visual reduzida, representação concreta dos identificadores de geração/versão, algoritmo de fingerprint e eventual adoção de tiles depois do spike;
-- eventual paralelismo entre itens de lote, somente se medições demonstrarem ganho e preservarem o contrato serial observável;
+- eventual paralelismo entre itens de Exportação em lote, somente se medições demonstrarem ganho e preservarem o contrato serial observável;
 - perfis de hardware mínimo e recomendado e metas quantitativas de desempenho, que serão definidos somente após medições reais do spike;
 - detalhes idiomáticos da implementação de movimentações e Cópias externas, sem alterar a autoridade, a evidência e os estados fechados definidos nos designs aceitos.
 
