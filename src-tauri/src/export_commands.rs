@@ -290,6 +290,7 @@ impl From<ImagingFailureCode> for ExportCommandErrorCode {
             ImagingFailureCode::CompositionFailed => Self::CompositionFailed,
             ImagingFailureCode::ResourceLimitExceeded => Self::ResourceLimitExceeded,
             ImagingFailureCode::EncodeFailed => Self::EncodeFailed,
+            ImagingFailureCode::OutputStorageFull => Self::OutputStorageFull,
             ImagingFailureCode::VerificationFailed => Self::VerificationFailed,
         }
     }

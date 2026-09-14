@@ -37,7 +37,7 @@ struct ScriptedTransport {
 }
 
 struct AlbumTransport {
-    fail: bool,
+    fail: Option<ImagingFailureCode>,
     prior_output: PathBuf,
     prior_bytes: Vec<u8>,
 }
@@ -76,13 +76,8 @@ impl ImagingTransport for AlbumTransport {
                 output_sha256: format!("{:x}", Sha256::digest(&bytes)),
             });
         }
-        let response = if self.fail {
-            ImagingResponse::failed(
-                request.request_id.clone(),
-                ImagingFailureCode::EncodeFailed,
-                None::<String>,
-                None,
-            )
+        let response = if let Some(code) = self.fail {
+            ImagingResponse::failed(request.request_id.clone(), code, None::<String>, None)
         } else {
             ImagingResponse::AlbumCompleted {
                 request_id: request.request_id.clone(),
@@ -96,8 +91,139 @@ impl ImagingTransport for AlbumTransport {
 }
 
 #[test]
+fn disk_full_during_album_publication_reports_real_failure_and_preserves_remaining_outputs() {
+    for failed_index in 0..2 {
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("original.jpg");
+        RgbImage::from_pixel(4, 4, Rgb([20, 50, 90]))
+            .save(&source)
+            .unwrap();
+        let original = std::fs::read(&source).unwrap();
+        let mut snapshot = productive_snapshot(source.clone());
+        snapshot.project_name = "Album".into();
+        snapshot.composition.sheets.truncate(2);
+        let media_id = snapshot.composition.sheets[0]
+            .referenced_media_ids()
+            .next()
+            .unwrap();
+        let make_plan = || {
+            super::plan_album(
+                snapshot.clone(),
+                super::AlbumExportOptions {
+                    protected_originals: vec![source.clone()],
+                    sheet_ids: snapshot
+                        .composition
+                        .sheets
+                        .iter()
+                        .map(|sheet| sheet.sheet_id.clone())
+                        .collect(),
+                    whole_album: true,
+                    mode: myalbuns_core::ExportMode::Sheet,
+                    format: myalbuns_core::ExportFormat::Png,
+                    destination: root.path().to_path_buf(),
+                    authorization: ExportWriteAuthorization::ReplaceConfirmed,
+                    sources: vec![RenderSource::new(media_id, source.clone()).unwrap()],
+                    request_id: "disk-full-export".into(),
+                },
+            )
+            .unwrap()
+        };
+        let outputs = [
+            root.path().join("Album_001.png"),
+            root.path().join("Album_002.png"),
+        ];
+        for output in &outputs {
+            std::fs::write(output, b"previous export").unwrap();
+        }
+        let orphan = root.path().join("Album_003.png");
+        std::fs::write(&orphan, b"previous orphan").unwrap();
+        let plan = make_plan();
+        let mut roots = OperationPathContext::new();
+        for path in plan.required_paths() {
+            roots.capture(&path).unwrap();
+        }
+        let mut transport = AlbumTransport {
+            fail: None,
+            prior_output: outputs[0].clone(),
+            prior_bytes: b"previous export".to_vec(),
+        };
+        let fault = myalbuns_paths::test_support::DiskFull::on_rename(&outputs[failed_index]);
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let failure = runtime
+            .block_on(super::execute_album(
+                &mut transport,
+                plan,
+                &roots.freeze(),
+                &ExportExecutionControl::default(),
+                &|_| {},
+                &context("disk-full-export"),
+            ))
+            .unwrap_err();
+        assert_eq!(fault.failure_count(), 1);
+        assert!(
+            failure
+                .message
+                .contains("Não há espaço no destino para concluir a exportação"),
+            "{}",
+            failure.message
+        );
+        assert_eq!(
+            failure.stage,
+            ExportFailureStage::Publish {
+                promoted_outputs: failed_index as u32,
+                total_outputs: 2
+            }
+        );
+        drop(fault);
+        assert_eq!(
+            std::fs::read(&outputs[0]).unwrap(),
+            if failed_index == 0 {
+                b"previous export".to_vec()
+            } else {
+                b"prepared-0".to_vec()
+            }
+        );
+        assert_eq!(std::fs::read(&outputs[1]).unwrap(), b"previous export");
+        assert_eq!(std::fs::read(&orphan).unwrap(), b"previous orphan");
+        assert_eq!(std::fs::read(&source).unwrap(), original);
+        assert!(
+            !root
+                .path()
+                .join(".myalbuns-export-disk-full-export.tmp")
+                .exists()
+        );
+        let retry = make_plan();
+        let mut roots = OperationPathContext::new();
+        for path in retry.required_paths() {
+            roots.capture(&path).unwrap();
+        }
+        transport.prior_bytes = std::fs::read(&outputs[0]).unwrap();
+        runtime
+            .block_on(super::execute_album(
+                &mut transport,
+                retry,
+                &roots.freeze(),
+                &ExportExecutionControl::default(),
+                &|_| {},
+                &context("disk-full-export"),
+            ))
+            .unwrap();
+        assert_eq!(std::fs::read(&outputs[1]).unwrap(), b"prepared-1");
+        assert!(!orphan.exists());
+    }
+}
+
+#[test]
 fn normal_export_prepares_the_entire_set_before_publish_and_cleans_a_failed_set() {
-    for (fail, whole_album) in [(false, false), (true, false), (false, true), (true, true)] {
+    for (failure_code, whole_album) in [
+        (None, false),
+        (Some(ImagingFailureCode::EncodeFailed), false),
+        (None, true),
+        (Some(ImagingFailureCode::EncodeFailed), true),
+        (Some(ImagingFailureCode::OutputStorageFull), false),
+        (Some(ImagingFailureCode::OutputStorageFull), true),
+    ] {
+        let fail = failure_code.is_some();
         let root = tempfile::tempdir().unwrap();
         let source = root.path().join("original.jpg");
         RgbImage::from_pixel(4, 4, Rgb([20, 50, 90]))
@@ -155,7 +281,7 @@ fn normal_export_prepares_the_entire_set_before_publish_and_cleans_a_failed_set(
             roots.capture(&path).unwrap();
         }
         let mut transport = AlbumTransport {
-            fail,
+            fail: failure_code,
             prior_output: first.clone(),
             prior_bytes: b"old-first".to_vec(),
         };
@@ -170,6 +296,12 @@ fn normal_export_prepares_the_entire_set_before_publish_and_cleans_a_failed_set(
                 &InvocationContext::new("normal-export-set", None::<String>),
             ));
         assert_eq!(result.is_err(), fail);
+        if failure_code == Some(ImagingFailureCode::OutputStorageFull) {
+            assert_eq!(
+                result.as_ref().unwrap_err().message,
+                "Não há espaço no destino para concluir a exportação. Libere espaço ou escolha outra pasta e tente novamente."
+            );
+        }
         assert_eq!(
             std::fs::read(&first).unwrap(),
             if fail {
@@ -239,7 +371,7 @@ fn normal_export_skip_preserves_existing_files_and_numbering_without_orphan_clea
                 roots.capture(&path).unwrap();
             }
             let mut transport = AlbumTransport {
-                fail: false,
+                fail: None,
                 prior_output: outputs[0].clone(),
                 prior_bytes: b"keep-first".to_vec(),
             };
@@ -396,7 +528,7 @@ fn normal_export_never_replaces_or_cleans_an_original_outside_the_render_selecti
             roots.capture(&path).unwrap();
         }
         let mut transport = AlbumTransport {
-            fail: false,
+            fail: None,
             prior_output: protected.clone(),
             prior_bytes: original_bytes.clone(),
         };

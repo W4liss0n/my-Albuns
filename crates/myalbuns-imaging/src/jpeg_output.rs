@@ -1,5 +1,5 @@
 use std::{
-    fs::{self, File, OpenOptions},
+    fs::{self, File},
     io::{BufReader, BufWriter, Read, Write},
     path::Path,
 };
@@ -94,6 +94,20 @@ pub(crate) struct JpegFailure {
 }
 
 impl JpegFailure {
+    pub(crate) fn io(context: &str, error: &std::io::Error) -> Self {
+        if myalbuns_paths::AppPathsError::is_storage_full(error) {
+            Self::new(
+                ImagingFailureCode::OutputStorageFull,
+                myalbuns_paths::AppPathsError::EXPORT_STORAGE_FULL_MESSAGE,
+            )
+        } else {
+            Self::new(
+                ImagingFailureCode::EncodeFailed,
+                format!("{context}: {error}"),
+            )
+        }
+    }
+
     pub(crate) fn new(code: ImagingFailureCode, message: impl Into<String>) -> Self {
         Self {
             code,
@@ -135,16 +149,9 @@ pub(crate) fn write_verified_quality(
     })?;
     let mut created = false;
     let write_result = (|| {
-        let file = OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(prepared_output_path)
-            .map_err(|error| {
-                JpegFailure::new(
-                    ImagingFailureCode::EncodeFailed,
-                    format!("não foi possível criar a preparação da Exportação: {error}"),
-                )
-            })?;
+        let file = crate::export_output::create_output(prepared_output_path).map_err(|error| {
+            JpegFailure::io("não foi possível criar a preparação da Exportação", &error)
+        })?;
         created = true;
         let mut writer = BufWriter::new(file);
         let mut encoder = JpegEncoder::new_with_quality(&mut writer, quality);
@@ -158,29 +165,27 @@ pub(crate) fn write_verified_quality(
         encoder
             .encode(&rgb, image.width(), image.height(), ExtendedColorType::Rgb8)
             .map_err(|error| {
-                JpegFailure::new(
-                    ImagingFailureCode::EncodeFailed,
-                    format!("não foi possível codificar a imagem exportada: {error}"),
-                )
+                if let image::ImageError::IoError(error) = error {
+                    JpegFailure::io("não foi possível codificar a imagem exportada", &error)
+                } else {
+                    JpegFailure::new(
+                        ImagingFailureCode::EncodeFailed,
+                        format!("não foi possível codificar a imagem exportada: {error}"),
+                    )
+                }
             })?;
         drop(encoder);
         writer.flush().map_err(|error| {
-            JpegFailure::new(
-                ImagingFailureCode::EncodeFailed,
-                format!("não foi possível finalizar a imagem exportada: {error}"),
-            )
+            JpegFailure::io("não foi possível finalizar a imagem exportada", &error)
         })?;
         let file = writer.into_inner().map_err(|error| {
-            JpegFailure::new(
-                ImagingFailureCode::EncodeFailed,
-                format!("não foi possível finalizar a imagem exportada: {error}"),
+            JpegFailure::io(
+                "não foi possível finalizar a imagem exportada",
+                error.error(),
             )
         })?;
         file.sync_all().map_err(|error| {
-            JpegFailure::new(
-                ImagingFailureCode::EncodeFailed,
-                format!("não foi possível sincronizar a imagem exportada: {error}"),
-            )
+            JpegFailure::io("não foi possível sincronizar a imagem exportada", &error)
         })?;
         drop(file);
         verify_prepared_jpeg(prepared_output_path, image.width(), image.height(), density)

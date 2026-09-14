@@ -50,7 +50,7 @@ A primeira versão não expõe calibração, número de processos, threads, mem�
 
 A confirmação aparece em um balão ancorado ao botão `Limpar cache`, mantendo os indicadores visíveis e sem deslocar o conteúdo ou aumentar a janela. O único texto é `Ao limpar o cache, as próximas aberturas dos álbuns podem demorar mais.`, seguido de `Cancelar` e `Confirmar`. Cancelar, pressionar Escape ou sair do balão sem confirmar apenas fecha a confirmação; não solicita a limpeza.
 
-O programa não impõe limite rígido, não expira Cache por idade e não mostra uma progressão de alertas por patamares arbitrários. Ele exibe o total ocupado em Configurações e avisa quando o espaço livre do volume estiver baixo, oferecendo `Liberar espaço`.
+O programa não impõe limite rígido, não expira Cache por idade e não mostra alertas preventivos por espaço livre ou estimativa de tamanho. Ele exibe o total ocupado em Configurações. O aviso de falta de espaço aparece somente quando a criação, gravação, finalização ou publicação de um arquivo realmente falha por esse motivo; orienta a liberar espaço e tentar novamente, sem iniciar limpeza automática.
 
 A organização física, a invalidação e as garantias do Cache estão em [Armazenamento local e Cache](0010-armazenamento-local-e-cache.md).
 

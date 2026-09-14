@@ -1,7 +1,7 @@
 ---
 status: accepted
 document: design
-updated: 2026-09-12
+updated: 2026-09-13
 ---
 
 # Exportação normal
@@ -93,6 +93,8 @@ Ao iniciar, a operação adquire o `OperationLease` exclusivo; não existe fila 
 O `ExportPipeline` possui internamente planejamento, execução e `Publisher`. Primeiro recebe `RenderSnapshot` e opções e devolve o plano com todas as dependências e raízes necessárias. O proprietário captura então o `RootBindingPlan` definido pela [política de caminhos](0011-resolucao-e-politica-de-caminhos.md) e inicia a execução. Se host e Processador participarem da tentativa, ambos recebem o mesmo plano; todo Original necessário é aberto uma vez no conjunto imutável da tentativa e reutilizado por todas as Unidades de Exportação.
 
 Todas as saídas selecionadas são renderizadas e verificadas em uma pasta de preparação reservada dentro do próprio Destino antes da Publicação. Isso mantém preparação e nomes finais na mesma árvore de destino. Uma falha nessa fase não modifica os nomes finais.
+
+A Exportação não consulta espaço livre nem estima tamanho para avisar ou bloquear preventivamente. Quando a criação, gravação, finalização ou publicação realmente falha por falta de espaço ou de cota, informa que não há espaço no Destino e orienta liberar espaço ou escolher outra pasta antes de tentar novamente. A classificação preserva a causa de I/O dos encoders JPEG, PNG e PDF, sem depender do texto do sistema. Projeto e Originais permanecem intactos, e a preparação incompleta é descartada depois da confirmação do término do Processador. A falha não autoriza limpeza do Cache ou nova Exportação automática.
 
 Depois da preparação integral, o `Publisher` promove cada arquivo separadamente ao nome final com atomicidade por arquivo quando o Destino suportar. Não há rollback do conjunto: uma falha durante a Publicação pode deixar mistura entre saídas anteriores e novas, deve informar essa condição e não remove Saídas órfãs.
 

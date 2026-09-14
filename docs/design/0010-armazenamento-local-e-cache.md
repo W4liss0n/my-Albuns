@@ -317,9 +317,11 @@ A importação combina a validação inicial dos JPEGs e o preparo da prévia no
 
 ## Liberação de espaço
 
-Não existe limite rígido, expiração automática por idade ou sequência de alertas por tamanho. O aplicativo mostra o total ocupado e avisa quando o espaço livre do volume estiver baixo.
+Não existe limite rígido, expiração automática por idade ou sequência de alertas por tamanho. O aplicativo mostra o total ocupado. Por decisão de 13 de setembro de 2026, não consulta espaço livre nem estima o tamanho da operação para apresentar um aviso preventivo ou impedir seu início. O aviso aparece somente diante de uma falha real de falta de espaço ou de cota na criação, gravação, finalização ou publicação do arquivo. A classificação usa o erro de I/O; não interpreta textos localizados do sistema.
 
-`Liberar espaço`:
+No Cache, falha somente a preparação afetada; Projeto, Original e geração anterior válida permanecem intactos, e outras imagens do lote podem continuar. A falta de espaço não é queda do Processador nem torna o Original ausente. Na Exportação, valem as regras de preparação integral e Publicação por arquivo do [fluxo normal](0004-exportacao-normal.md). A mensagem orienta a liberar espaço no volume correspondente e tentar novamente. Avisos não se repetem a cada miniatura no mesmo Projeto aberto.
+
+`Liberar espaço`, capacidade interna de manutenção:
 
 - calcula previamente o volume removível;
 - reserva atomicamente cada namespace sem proprietário ativo;

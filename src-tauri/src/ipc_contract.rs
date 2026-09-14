@@ -563,6 +563,7 @@ pub enum ExportCommandErrorCode {
     CompositionFailed,
     ResourceLimitExceeded,
     EncodeFailed,
+    OutputStorageFull,
     VerificationFailed,
     Failed,
 }

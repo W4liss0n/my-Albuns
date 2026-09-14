@@ -1,6 +1,7 @@
 mod album_render;
 mod cache;
 mod cache_error;
+mod export_output;
 mod format_output;
 mod jpeg_output;
 mod photo_import;

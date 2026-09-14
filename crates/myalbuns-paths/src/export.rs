@@ -180,9 +180,9 @@ impl PreparedExportStorage {
             }
             _ => publish_new_file(&self.plan.prepared_output_path, &self.plan.output_path),
         };
-        if publication.is_err() {
+        if let Err(error) = publication {
             let _ = self.discard();
-            return Err(AppPathsError::ExportStorageUnavailable);
+            return Err(AppPathsError::export_io(&error));
         }
         let preparation_directory = self.plan.preparation_directory.clone();
         drop(self);
@@ -243,7 +243,7 @@ fn create_unique_export_directory(
     if preparation_path.parent() != Some(destination.logical_path.as_path()) {
         return Err(AppPathsError::ExportStorageOutsideDestination);
     }
-    fs::create_dir(preparation_path).map_err(|_| AppPathsError::ExportStorageUnavailable)?;
+    fs::create_dir(preparation_path).map_err(|error| AppPathsError::export_io(&error))?;
     let metadata = fs::symlink_metadata(preparation_path)
         .map_err(|_| AppPathsError::ExportStorageUnavailable)?;
     if is_reparse_point(&metadata) || !metadata.is_dir() {
@@ -289,9 +289,9 @@ fn open_export_file(
 fn export_storage_error(error: GuardedFsError) -> AppPathsError {
     match error {
         GuardedFsError::OutsideRoot => AppPathsError::ExportStorageOutsideDestination,
-        GuardedFsError::AlreadyExists
-        | GuardedFsError::NotFound
-        | GuardedFsError::Unavailable
-        | GuardedFsError::StorageFull => AppPathsError::ExportStorageUnavailable,
+        GuardedFsError::StorageFull => AppPathsError::ExportStorageFull,
+        GuardedFsError::AlreadyExists | GuardedFsError::NotFound | GuardedFsError::Unavailable => {
+            AppPathsError::ExportStorageUnavailable
+        }
     }
 }
