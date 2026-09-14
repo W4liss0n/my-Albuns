@@ -2,7 +2,7 @@
 status: ready-for-agent
 document: product-spec
 implementation-readiness: decision-tickets-required
-updated: 2026-09-11
+updated: 2026-09-13
 ---
 
 # Programa de Diagramação de Álbuns
@@ -400,7 +400,7 @@ A saída final será uma Exportação JPEG, PNG ou PDF, `Por lâmina` ou `Por p�
 1. Como pessoa diagramadora, quero escolher outro destino, para integrar a saída ao meu fluxo de entrega.
 1. Como pessoa diagramadora, quero exportar toda a Dimensão configurada, inclusive a Sangria, para produzir o arquivo físico correto.
 1. Como pessoa diagramadora, quero excluir as linhas-guia da saída, para não renderizar elementos de interface.
-1. Como pessoa diagramadora, quero ver todos os conflitos antes do início, para decidir globalmente entre sobrescrever ou cancelar.
+1. Como pessoa diagramadora, quero receber uma confirmação genérica antes de modificar uma Exportação existente, para escolher entre `Ignorar`, `Substituir` e `Cancelar` sem uma lista de arquivos.
 1. Como pessoa diagramadora, quero ver bloqueios de Exportação em uma tabela com Projeto, problema e ação, para corrigi-los no contexto adequado.
 1. Como pessoa diagramadora, quero abrir o Projeto quando houver placeholder ou relinkar a pasta de Fotos quando faltar um original, para resolver cada tipo de problema pelo fluxo correto.
 1. Como pessoa diagramadora, quero impedir substituição ou renomeação silenciosa, para conservar controle sobre os arquivos.
@@ -411,7 +411,6 @@ A saída final será uma Exportação JPEG, PNG ou PDF, `Por lâmina` ou `Por p�
 1. Como pessoa diagramadora, quero que cada arquivo final seja promovido atomicamente quando o destino suportar e que uma falha de publicação informe claramente a possível mistura entre saídas antigas e novas, para não receber uma promessa irreal de rollback.
 1. Como pessoa diagramadora, quero decidir quando tentar novamente após uma falha, para que uma ação final nunca seja repetida automaticamente.
 1. Como pessoa diagramadora, quero que uma Exportação parcial nunca remova arquivos fora da seleção, para não apagar saídas válidas.
-1. Como pessoa diagramadora, quero ser avisada de que uma Exportação parcial não consegue provar o modo das saídas preexistentes sem manifesto, para não confundir um intervalo atualizado com um conjunto integral coerente.
 1. Como pessoa diagramadora, quero manter arquivos com outro Nome ou extensão, para restringir a limpeza ao conjunto correspondente.
 1. Como pessoa diagramadora, quero evitar manifesto ou arquivo auxiliar, para manter a pasta contendo somente as saídas finais.
 
@@ -1081,7 +1080,7 @@ validação das superfícies descritas nesta seção.
 - PDF gera `{nome-do-projeto}.pdf`, com uma página por unidade do modo selecionado.
 - O Destino padrão é uma pasta com o Nome do Projeto ao lado do arquivo do Projeto; o usuário pode escolher outro local.
 - Destinos locais, UNC, em unidade mapeada ou verbatim local/UNC seguem o mesmo fluxo. Resolução ou acesso de rede nunca executa na thread da interface.
-- Todos os conflitos são detectados antes do início e apresentados em um único diálogo com `Sobrescrever todos` ou `Cancelar`.
+- Conflitos e candidatos órfãos são detectados antes do início e abrangidos por um único aviso genérico com `Ignorar`, `Substituir` e `Cancelar`, sem listar arquivos. `Substituir` confirma a atualização do conjunto selecionado e, em uma Exportação integral JPEG/PNG concluída com sucesso, a limpeza aplicável. `Ignorar` preserva arquivos existentes e nunca remove Saídas órfãs.
 - Nenhuma saída é renomeada ou sobrescrita silenciosamente.
 - Cada tentativa cria uma pasta de preparação reservada dentro da própria pasta de Destino, renderiza e verifica ali todas as saídas selecionadas e só então inicia a publicação.
 - Falha ou cancelamento durante a preparação remove seus temporários, não repete automaticamente a Exportação e não modifica os nomes finais. O modal oferece `Tentar novamente` ou `Fechar` e libera o Bloqueio global ao encerrar a tentativa.
@@ -1089,7 +1088,7 @@ validação das superfícies descritas nesta seção.
 - A operação só informa sucesso depois de publicar todo o conjunto. Temporários são removidos no sucesso normal ou na falha tratada, sem manifesto persistente no Destino.
 - Após uma Exportação JPEG ou PNG do Álbum inteiro, confirmada para sobrescrita e concluída com sucesso, arquivos órfãos do mesmo Nome e extensão são removidos pela convenção exata.
 - A limpeza não cria manifesto, não ocorre em Exportação parcial e só ocorre depois da publicação bem-sucedida de todo o conjunto integral.
-- Como os modos `Por lâmina` e `Por página` compartilham o mesmo namespace e não existe manifesto, uma Exportação parcial nunca presume conhecer o modo das saídas preexistentes: ela preserva tudo fora do intervalo e avisa que apenas uma Exportação integral restabelece um conjunto autoritativo completo.
+- Como os modos `Por lâmina` e `Por página` compartilham o mesmo namespace e não existe manifesto, uma Exportação parcial nunca presume conhecer o modo das saídas preexistentes: ela preserva tudo fora do intervalo e não declara a pasta como um conjunto integral coerente. Somente uma Exportação integral restabelece esse conjunto; a interface não acrescenta um aviso sobre o modo anterior ou os arquivos fora do intervalo.
 
 ### Operações em lote
 
