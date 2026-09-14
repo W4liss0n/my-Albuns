@@ -542,14 +542,14 @@ impl NativeProgressDialog {
         self.cancel_opening_decision();
         match self.owner_presentation {
             OwnerPresentation::Replace if restore_owner_window => {
-                let _ = self.window.destroy();
+                let _ = self.window.destroy_dialog();
                 restore_owner(&self.owner);
             }
             OwnerPresentation::BlockedBehindDialog => {
                 let _ = dismiss_blocked_dialog(&self.owner, &self.window, restore_owner_window);
             }
             OwnerPresentation::Replace => {
-                let _ = self.window.destroy();
+                let _ = self.window.destroy_dialog();
             }
         }
         self.closed = true;
@@ -574,7 +574,7 @@ impl Drop for NativeProgressDialog {
                     let _ = dismiss_blocked_dialog(&self.owner, &self.window, true);
                 }
                 OwnerPresentation::Replace => {
-                    let _ = self.window.destroy();
+                    let _ = self.window.destroy_dialog();
                     release_owner(&self.owner, self.owner_presentation, true);
                 }
             }
@@ -625,10 +625,7 @@ pub(crate) async fn show_native_progress(
     .await?;
 
     let owner_presentation = kind.owner_presentation();
-    match owner_presentation {
-        OwnerPresentation::Replace => display_transition_dialog(&owner, &window)?,
-        OwnerPresentation::BlockedBehindDialog => display_owned_dialog(&owner, &window)?,
-    }
+    display_progress_dialog(&owner, &window, kind)?;
     Ok(NativeProgressDialog {
         closed: false,
         decision_attempt: None,
@@ -678,7 +675,7 @@ pub(crate) async fn show_project_failure(
         }
     });
 
-    display_dialog(&owner, &window, context.owner_presentation())
+    display_dialog(&owner, &window, context.owner_presentation(), false)
 }
 
 #[tauri::command]
@@ -802,26 +799,48 @@ pub(crate) fn display_transition_dialog(
     owner: &WebviewWindow,
     window: &WebviewWindow,
 ) -> io::Result<()> {
-    display_dialog(owner, window, OwnerPresentation::Replace)
+    display_dialog(owner, window, OwnerPresentation::Replace, false)
 }
 
 pub(crate) fn display_owned_dialog(
     owner: &WebviewWindow,
     window: &WebviewWindow,
 ) -> io::Result<()> {
-    display_dialog(owner, window, OwnerPresentation::BlockedBehindDialog)
+    display_dialog(owner, window, OwnerPresentation::BlockedBehindDialog, false)
+}
+
+fn display_progress_dialog(
+    owner: &impl DialogOwner,
+    window: &impl DialogSurface,
+    kind: NativeProgressKind,
+) -> io::Result<()> {
+    display_dialog(
+        owner,
+        window,
+        kind.owner_presentation(),
+        kind == NativeProgressKind::Opening,
+    )
 }
 
 fn display_dialog(
     owner: &impl DialogOwner,
     window: &impl DialogSurface,
     owner_presentation: OwnerPresentation,
+    show_in_taskbar: bool,
 ) -> io::Result<()> {
     if window.is_dialog_visible()? {
         return Ok(());
     }
     prepare_owner(owner, owner_presentation)?;
-    if let Err(error) = window.show_dialog() {
+    if let Err(error) = window.show_dialog().and_then(|()| {
+        // Opening hides Welcome, so this owned window must be explicitly registered
+        // with the taskbar after it is shown. Other dialogs keep their visible owner.
+        if show_in_taskbar {
+            window.set_dialog_taskbar_visible(true)
+        } else {
+            Ok(())
+        }
+    }) {
         let _ = window.destroy_dialog();
         release_owner(owner, owner_presentation, true);
         return Err(error);
@@ -861,6 +880,7 @@ trait DialogSurface {
     fn is_dialog_visible(&self) -> io::Result<bool>;
     fn show_dialog(&self) -> io::Result<()>;
     fn focus_dialog(&self) -> io::Result<()>;
+    fn set_dialog_taskbar_visible(&self, visible: bool) -> io::Result<()>;
     fn destroy_dialog(&self) -> io::Result<()>;
 }
 
@@ -911,7 +931,14 @@ impl DialogSurface for WebviewWindow {
         self.set_focus().map_err(io::Error::other)
     }
 
+    fn set_dialog_taskbar_visible(&self, visible: bool) -> io::Result<()> {
+        self.set_skip_taskbar(!visible).map_err(io::Error::other)
+    }
+
     fn destroy_dialog(&self) -> io::Result<()> {
+        // Tao registers owned windows through ITaskbarList::AddTab. Pair that
+        // registration with DeleteTab before destroying the native window.
+        let _ = self.set_dialog_taskbar_visible(false);
         self.destroy().map_err(io::Error::other)
     }
 }
@@ -1033,6 +1060,8 @@ mod tests {
     struct RecordingDialog {
         actions: RefCell<Vec<String>>,
         visible: Cell<bool>,
+        taskbar_visible: Cell<bool>,
+        fail_taskbar: bool,
     }
 
     impl RecordingDialog {
@@ -1040,6 +1069,8 @@ mod tests {
             Self {
                 actions: RefCell::new(Vec::new()),
                 visible: Cell::new(true),
+                taskbar_visible: Cell::new(false),
+                fail_taskbar: false,
             }
         }
     }
@@ -1100,7 +1131,17 @@ mod tests {
             Ok(())
         }
 
+        fn set_dialog_taskbar_visible(&self, visible: bool) -> io::Result<()> {
+            self.actions.borrow_mut().push(format!("taskbar:{visible}"));
+            if visible && self.fail_taskbar {
+                return Err(io::Error::other("injected taskbar failure"));
+            }
+            self.taskbar_visible.set(visible);
+            Ok(())
+        }
+
         fn destroy_dialog(&self) -> io::Result<()> {
+            self.taskbar_visible.set(false);
             self.actions.borrow_mut().push("destroy".into());
             self.visible.set(false);
             Ok(())
@@ -1157,6 +1198,15 @@ mod tests {
 
         fn focus_dialog(&self) -> io::Result<()> {
             self.0.borrow_mut().push("dialog.focus");
+            Ok(())
+        }
+
+        fn set_dialog_taskbar_visible(&self, visible: bool) -> io::Result<()> {
+            self.0.borrow_mut().push(if visible {
+                "dialog.taskbar:true"
+            } else {
+                "dialog.taskbar:false"
+            });
             Ok(())
         }
 
@@ -1281,11 +1331,76 @@ mod tests {
     }
 
     #[test]
+    fn opening_progress_remains_in_the_taskbar_when_welcome_is_hidden() {
+        for welcome_visible in [true, false] {
+            let owner = RecordingOwner {
+                visible: Cell::new(welcome_visible),
+                ..RecordingOwner::default()
+            };
+            // Hidden owned dialogs start with skip_taskbar(true) in the builder.
+            let dialog = RecordingDialog::visible();
+            dialog.visible.set(false);
+            display_progress_dialog(&owner, &dialog, NativeProgressKind::Opening).unwrap();
+            assert!(!owner.visible.get());
+            assert!(dialog.visible.get());
+            assert!(
+                dialog.taskbar_visible.get(),
+                "Opening hides Welcome, so its progress must provide the taskbar entry"
+            );
+            assert_eq!(dialog.actions.take(), ["show", "taskbar:true", "focus"]);
+            // Changing opening content into an image progress or Recovery decision
+            // reuses this visible native surface and must not re-register its button.
+            display_progress_dialog(&owner, &dialog, NativeProgressKind::Opening).unwrap();
+            assert!(dialog.actions.borrow().is_empty());
+            assert!(dialog.taskbar_visible.get());
+        }
+    }
+
+    #[test]
+    fn progress_with_a_visible_owner_does_not_add_another_taskbar_entry() {
+        for kind in [
+            NativeProgressKind::Creating,
+            NativeProgressKind::ProcessingImages,
+        ] {
+            let owner = RecordingOwner::default();
+            let dialog = RecordingDialog::visible();
+            dialog.visible.set(false);
+            display_progress_dialog(&owner, &dialog, kind).unwrap();
+            assert!(owner.visible.get());
+            assert!(!owner.enabled.get());
+            assert!(!dialog.taskbar_visible.get());
+            assert_eq!(dialog.actions.take(), ["show", "focus"]);
+        }
+    }
+
+    #[test]
+    fn a_taskbar_registration_failure_does_not_leave_opening_without_a_visible_owner() {
+        let owner = RecordingOwner::default();
+        let dialog = RecordingDialog {
+            fail_taskbar: true,
+            ..RecordingDialog::visible()
+        };
+        dialog.visible.set(false);
+        assert!(display_progress_dialog(&owner, &dialog, NativeProgressKind::Opening).is_err());
+        assert!(owner.visible.get());
+        assert!(owner.enabled.get());
+        assert!(!dialog.visible.get());
+        assert!(!dialog.taskbar_visible.get());
+        assert_eq!(dialog.actions.take(), ["show", "taskbar:true", "destroy"]);
+    }
+
+    #[test]
     fn presenting_an_already_visible_owned_dialog_is_a_noop() {
         let owner = RecordingOwner::default();
         let dialog = RecordingDialog::visible();
 
-        display_dialog(&owner, &dialog, OwnerPresentation::BlockedBehindDialog).unwrap();
+        display_dialog(
+            &owner,
+            &dialog,
+            OwnerPresentation::BlockedBehindDialog,
+            false,
+        )
+        .unwrap();
 
         assert!(owner.actions.borrow().is_empty());
         assert!(dialog.actions.borrow().is_empty());
