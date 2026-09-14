@@ -324,6 +324,66 @@ fn disk_full_pauses_batch_before_the_next_project_and_preserves_completed_items(
 }
 
 #[test]
+fn disk_full_in_the_next_album_does_not_reuse_previous_partial_publication_notice() {
+    let root = tempfile::tempdir().unwrap();
+    let (core, _first) = fixture(root.path(), "source/A.myalbuns");
+    let (_, _second) = fixture(root.path(), "source/B.myalbuns");
+    let batch = BatchRunner::discover(
+        BatchConfiguration {
+            source: root.path().join("source"),
+            destination: None,
+            format: ExportFormat::Png,
+            mode: ExportMode::Sheet,
+        },
+        core,
+        root.path().join("checkpoints"),
+    )
+    .unwrap();
+    let first_fault =
+        myalbuns_paths::test_support::DiskFull::on_rename(&root.path().join("source/A/A_002.png"));
+    let mut first_transport = RecordingTransport::default();
+    let mut paused = tauri::async_runtime::block_on(batch.run(
+        &mut first_transport,
+        &BatchCancellation::default(),
+        ExportConflictPolicy::Ask,
+        &|_| {},
+    ))
+    .unwrap();
+    assert_eq!(first_fault.failure_count(), 1);
+    assert_eq!(first_transport.names, ["A"]);
+    assert!(paused.view().partial_publication);
+    assert!(root.path().join("source/A/A_001.png").is_file());
+    assert!(!root.path().join("source/A/A_002.png").exists());
+    drop(first_fault);
+
+    paused.retry_preflight();
+    let second_destination = root.path().join("source/B");
+    let second_fault =
+        myalbuns_paths::test_support::DiskFullAcrossThreads::on_create(&second_destination);
+    let mut resumed_transport = RecordingTransport::default();
+    let paused_again = tauri::async_runtime::block_on(paused.run(
+        &mut resumed_transport,
+        &BatchCancellation::default(),
+        ExportConflictPolicy::Ask,
+        &|_| {},
+    ))
+    .unwrap();
+    assert_eq!(second_fault.failure_count(), 1);
+    assert!(resumed_transport.names.is_empty());
+    assert!(root.path().join("source/A/A_002.png").is_file());
+    assert!(!second_destination.exists());
+    let view = paused_again.view();
+    assert_eq!(view.phase, BatchPhase::StorageFull);
+    assert_eq!(view.items[0].status, BatchItemStatus::Completed);
+    assert_eq!(view.items[1].status, BatchItemStatus::Pending);
+    assert!(view.items[1].problems.is_empty());
+    assert!(
+        !view.partial_publication,
+        "the next album has not published anything and must not inherit the previous album's notice"
+    );
+}
+
+#[test]
 fn disk_full_checkpoint_keeps_live_progress_and_the_previous_atomic_checkpoint() {
     let root = tempfile::tempdir().unwrap();
     let (core, _editor) = fixture(root.path(), "source/A.myalbuns");

@@ -7,60 +7,13 @@ import type {
   ProjectDialogPort,
   ProjectDialogSession,
 } from "../application/projectDialogPort";
-import type {
-  ExportAttempt,
-  ExportCancelStatus,
-  ExportOutcome,
-  ExportPipelinePort,
-  ExportProgressEvent,
-} from "../application/projectPorts";
+import type { ExportPipelinePort } from "../application/projectPorts";
 import { ExportPreviewControl } from "./ExportPreviewControl";
 import { MediaExportBlockedError, type ExportMediaPort } from "../application/exportMedia";
 import { representativeProjection } from "../test/projectFixtures";
 import { ExportConflictsError } from "../application/normalExport";
 import { StorageFullError } from "../application/storageRecovery";
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
-import { createTauriProjectDialogPort } from "../platform/tauriProjectDialogPort";
-import { parseProjectDialogState } from "../platform/projectDialogContract";
-
-vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
-vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn() }));
-
-test.each([
-  ["loading_sources", 14],
-  ["composing", 3],
-  ["publishing", 18],
-] as const)("keeps the native export dialog open for %s progress with %i units", async (stage, totalUnits) => {
-  const harness = createExportHarness();
-  const rejectedStates: unknown[] = [];
-  vi.mocked(listen).mockResolvedValue(() => undefined);
-  const native = vi.mocked(invoke).mockImplementation(async (command, args) => {
-    if (command === "present_project_dialog" &&
-        !parseProjectDialogState((args as { state: unknown }).state)) {
-      rejectedStates.push((args as { state: unknown }).state);
-      throw new Error("Invalid native dialog payload");
-    }
-  });
-  render(<ExportPreviewControl dialogPort={createTauriProjectDialogPort()}
-    exportPipelinePort={harness.port} projectId="project-a"
-    selection={{ projectName: "Album", sheetId: "first", sheetNumber: 1 }} />);
-  fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
-  await act(async () => harness.attempts[0].emit({ event: "started", cancellable: true }));
-  native.mockClear();
-
-  // Replay the logged loading sequence through the real dialog adapter and IPC decoder.
-  for (let completedUnits = 0; completedUnits <= totalUnits; completedUnits++) {
-    await act(async () => harness.attempts[0].emit({ event: "progress", stage,
-      units: { kind: "measured", completedUnits, totalUnits }, cancellable: stage !== "publishing" }));
-  }
-
-  expect(native.mock.calls.some(([command]) => command === "dismiss_project_dialog"), JSON.stringify(rejectedStates)).toBe(false);
-  expect(harness.attempts[0].cancel).not.toHaveBeenCalled();
-  expect(native).toHaveBeenLastCalledWith("present_project_dialog", expect.objectContaining({
-    state: expect.objectContaining({ kind: "exportProgress" }),
-  }));
-});
+import { createExportHarness } from "../test/exportPipelineHarness";
 
 test("normal export keeps its dialog and resumes only after cache cleanup", async () => {
   let finish!: (freed: boolean) => void;
@@ -272,35 +225,6 @@ test.each([
     expect(screen.getByRole("button", { name: "Exportar" })).toBeEnabled();
   }
 });
-
-interface AttemptHarness {
-  cancel: ReturnType<typeof vi.fn<() => Promise<ExportCancelStatus>>>;
-  emit(event: ExportProgressEvent): void;
-  reject(error: unknown): void;
-  resolve(outcome: ExportOutcome): void;
-}
-
-function createExportHarness() {
-  const attempts: AttemptHarness[] = [];
-  const startSheet = vi.fn<ExportPipelinePort["startSheet"]>((_selection, onEvent) => {
-    let resolve!: (outcome: ExportOutcome) => void;
-    let reject!: (error: unknown) => void;
-    const completion = new Promise<ExportOutcome>((resolvePromise, rejectPromise) => {
-      resolve = resolvePromise;
-      reject = rejectPromise;
-    });
-    const cancel = vi.fn(async (): Promise<ExportCancelStatus> => "requested");
-    const attempt: ExportAttempt = { completion, cancel };
-    attempts.push({ cancel, emit: onEvent, reject, resolve });
-    return attempt;
-  });
-
-  return {
-    attempts,
-    port: { defaultDestination: async () => "C:/Exportados/Album", chooseDestination: async () => null, startSheet } satisfies ExportPipelinePort,
-    startSheet,
-  };
-}
 
 function createDialogHarness() {
   let listener: ((action: ProjectDialogAction) => void) | undefined;

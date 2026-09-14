@@ -112,6 +112,7 @@ impl BatchRunner {
                     if self.current.as_ref() == Some(&self.items[index].id) {
                         self.retained = None;
                         self.current = None;
+                        self.partial_publication = false;
                         self.resume_policy = None;
                     }
                     if let Some(preparation) = &self.items[index].preparation {
@@ -325,6 +326,7 @@ impl BatchRunner {
                 }
             }
             self.current = None;
+            self.partial_publication = false;
             self = self.persist().await?;
             let completed = self
                 .items
