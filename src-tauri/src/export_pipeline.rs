@@ -8,7 +8,9 @@ use std::{
     },
 };
 mod album;
-pub(crate) use album::{AlbumExportOptions, AlbumExportPlan, execute_album, plan_album};
+pub(crate) use album::{
+    AlbumExportOptions, AlbumExportPlan, execute_album, plan_album, plan_album_in_paths,
+};
 
 use myalbuns_core::{ComposedOutputUnit, RenderSnapshot};
 use myalbuns_imaging_protocol::{

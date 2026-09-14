@@ -84,6 +84,26 @@ impl BatchRunner {
                 break;
             }
             if self.items[index].status != BatchItemStatus::Pending {
+                // A recovered item can be ignored without being rendered again.
+                // Its retained preparation still belongs to this attempt and is
+                // removed only while the caller owns the processor reservation.
+                let roots = bindings.clone();
+                self = tauri::async_runtime::spawn_blocking(move || {
+                    if let Some(preparation) = &self.items[index].preparation {
+                        match preparation.discard(&roots) {
+                            Ok(()) => self.items[index].preparation = None,
+                            Err(error) => {
+                                self.items[index].status = BatchItemStatus::Failed;
+                                self.items[index].problems =
+                                    vec![problem(BatchProblemKind::Unavailable, error)];
+                            }
+                        }
+                        self.save_checkpoint()?;
+                    }
+                    Ok::<_, String>(self)
+                })
+                .await
+                .map_err(|error| error.to_string())??;
                 continue;
             }
             let roots = bindings.clone();

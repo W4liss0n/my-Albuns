@@ -196,9 +196,17 @@ impl BatchRunner {
         }
     }
 
+    pub(crate) fn retry_preflight(&mut self) {
+        self.paths = OperationPathContext::new();
+        self.recheck();
+    }
+
     pub(crate) fn recheck(&mut self) {
         self.phase = BatchPhase::Prepared;
         for item in &mut self.items {
+            if let Some(preparation) = &item.preparation {
+                let _ = self.paths.capture(preparation.path.as_path());
+            }
             if matches!(
                 item.status,
                 BatchItemStatus::Completed | BatchItemStatus::Ignored
@@ -423,7 +431,7 @@ fn inspect_and_plan(
     let (snapshot, _) = frozen
         .into_export(&sheet_ids)
         .map_err(|error| vec![problem(BatchProblemKind::InvalidProject, error.to_string())])?;
-    let plan = export_pipeline::plan_album(
+    let plan = export_pipeline::plan_album_in_paths(
         snapshot,
         AlbumExportOptions {
             protected_originals: originals,
@@ -440,6 +448,7 @@ fn inspect_and_plan(
             sources,
             request_id: request_id.into(),
         },
+        paths,
     )
     .map_err(|error| vec![problem(BatchProblemKind::Unavailable, error.message)])?;
     for path in plan.required_paths() {

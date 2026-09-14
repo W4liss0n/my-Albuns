@@ -1781,6 +1781,17 @@ fn on_global_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
         return;
     }
     desktop_webview_policy::on_window_event(window, event);
+    if window.label() == crate::batch_window::BATCH_WINDOW_LABEL
+        && let tauri::WindowEvent::CloseRequested { api, .. } = event
+    {
+        api.prevent_close();
+        let app = window.app_handle().clone();
+        if let Some(batch) = app.get_webview_window(crate::batch_window::BATCH_WINDOW_LABEL) {
+            tauri::async_runtime::spawn(async move {
+                let _ = crate::batch_window::close_batch_export(app, batch).await;
+            });
+        }
+    }
     if window.label() == crate::settings_window::SETTINGS_WINDOW_LABEL
         && matches!(event, tauri::WindowEvent::Destroyed)
     {

@@ -60,13 +60,14 @@ pub(crate) fn install_project(app: &AppHandle, paths: &AppPaths) -> Result<(), S
     tauri::async_runtime::spawn(async move {
         loop {
             if owner.is_owned().unwrap_or(true) {
+                let operations = app.state::<crate::project_ui_operations::ProjectUiOperations>();
+                let Ok(_admission) = operations.pause_for_batch() else {
+                    tokio::time::sleep(Duration::from_millis(40)).await;
+                    continue;
+                };
                 // Previously admitted commands must finish before the global
                 // owner receives the acknowledgement; new commands are denied.
-                while owner.is_owned().unwrap_or(true)
-                    && !app
-                        .state::<crate::project_ui_operations::ProjectUiOperations>()
-                        .is_idle()
-                {
+                while owner.is_owned().unwrap_or(true) && !operations.is_idle() {
                     tokio::time::sleep(Duration::from_millis(20)).await;
                 }
                 if !owner.is_owned().unwrap_or(true) {

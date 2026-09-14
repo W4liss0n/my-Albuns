@@ -69,6 +69,94 @@ struct RecordingTransport {
     dpis: Vec<u32>,
 }
 
+#[test]
+fn explicit_preflight_retry_recaptures_roots_instead_of_reusing_failed_bindings() {
+    let root = tempfile::tempdir().unwrap();
+    let (core, _editor) = fixture(root.path(), "source/A.myalbuns");
+    let mut batch = BatchRunner::discover(
+        BatchConfiguration {
+            source: root.path().join("source"),
+            destination: None,
+            format: myalbuns_core::ExportFormat::Png,
+            mode: myalbuns_core::ExportMode::Sheet,
+        },
+        core,
+        root.path().join("checkpoints"),
+    )
+    .unwrap();
+    let unavailable = tempfile::tempdir().unwrap();
+    batch.paths = OperationPathContext::new();
+    batch
+        .paths
+        .capture_with_binding(&batch.items[0].path, unavailable.path())
+        .unwrap();
+    batch.recheck();
+    assert!(!batch.view().can_continue);
+    batch.retry_preflight();
+    assert!(batch.view().can_continue);
+}
+
+#[cfg(windows)]
+#[test]
+fn batch_conflicts_skip_and_orphan_cleanup_use_the_frozen_destination() {
+    for policy in [ExportConflictPolicy::Skip, ExportConflictPolicy::Replace] {
+        let root = tempfile::tempdir().unwrap();
+        let (core, _editor) = fixture(root.path(), "source/A.myalbuns");
+        let mut batch = BatchRunner::discover(
+            BatchConfiguration {
+                source: root.path().join("source"),
+                destination: None,
+                format: myalbuns_core::ExportFormat::Png,
+                mode: myalbuns_core::ExportMode::Sheet,
+            },
+            core,
+            root.path().join("checkpoints"),
+        )
+        .unwrap();
+        let bound = root.path().join("bound");
+        let later = root.path().join("later");
+        std::fs::create_dir_all(bound.join("Delivery")).unwrap();
+        std::fs::create_dir_all(later.join("Delivery")).unwrap();
+        std::fs::write(bound.join("Delivery/A_001.png"), b"bound-first").unwrap();
+        std::fs::write(bound.join("Delivery/A_003.png"), b"bound-orphan").unwrap();
+        std::fs::write(later.join("Delivery/A_002.png"), b"later-second").unwrap();
+        let logical = PathBuf::from(r"Z:\Delivery");
+        batch.items[0].destination = logical.clone();
+        batch.paths.capture_with_binding(&logical, &bound).unwrap();
+        batch.recheck();
+        assert!(batch.view().has_conflicts);
+        assert!(batch.paths.capture_with_binding(&logical, &later).is_err());
+        let mut transport = RecordingTransport::default();
+        let completed = tauri::async_runtime::block_on(batch.run(
+            &mut transport,
+            &BatchCancellation::default(),
+            policy,
+            &|_| {},
+        ))
+        .unwrap();
+        assert_eq!(completed.view().items[0].status, BatchItemStatus::Completed);
+        assert!(bound.join("Delivery/A_002.png").is_file());
+        assert_eq!(
+            bound.join("Delivery/A_003.png").exists(),
+            policy == ExportConflictPolicy::Skip
+        );
+        if policy == ExportConflictPolicy::Skip {
+            assert_eq!(
+                std::fs::read(bound.join("Delivery/A_001.png")).unwrap(),
+                b"bound-first"
+            );
+        }
+        assert_eq!(
+            std::fs::read(later.join("Delivery/A_002.png")).unwrap(),
+            b"later-second"
+        );
+        assert_eq!(
+            std::fs::read_dir(later.join("Delivery")).unwrap().count(),
+            1
+        );
+    }
+}
+
 impl crate::imaging_processor::ImagingTransport for RecordingTransport {
     fn invoke<'a>(
         &'a mut self,
@@ -311,7 +399,12 @@ fn batch_crash_child() {
 
 #[test]
 fn process_exit_before_during_and_after_publication_replays_the_whole_interrupted_item() {
-    for phase in ["prepare", "publish", "published"] {
+    for (phase, ignore_recovered) in [
+        ("prepare", false),
+        ("publish", false),
+        ("published", false),
+        ("prepare", true),
+    ] {
         let root = tempfile::tempdir().unwrap();
         let (core, _first) = fixture(root.path(), "source/A.myalbuns");
         let (_, _second) = fixture(root.path(), "source/B.myalbuns");
@@ -351,7 +444,10 @@ fn process_exit_before_during_and_after_publication_replays_the_whole_interrupte
         let summaries = BatchRunner::recoveries(&checkpoint_root).unwrap();
         assert_eq!(summaries.len(), 1);
         assert_eq!(summaries[0].remaining, 2);
-        let resumed = BatchRunner::resume(&checkpoint_root, &summaries[0].id, core).unwrap();
+        let mut resumed = BatchRunner::resume(&checkpoint_root, &summaries[0].id, core).unwrap();
+        if ignore_recovered {
+            resumed.ignore(&resumed.view().items[0].id).unwrap();
+        }
         let mut transport = RecordingTransport::default();
         let completed = tauri::async_runtime::block_on(resumed.run(
             &mut transport,
@@ -360,19 +456,33 @@ fn process_exit_before_during_and_after_publication_replays_the_whole_interrupte
             &|_| {},
         ))
         .unwrap();
-        assert_eq!(transport.names, ["A", "B"]);
-        assert!(
-            completed
-                .view()
-                .items
-                .iter()
-                .all(|item| item.status == BatchItemStatus::Completed)
+        assert_eq!(
+            transport.names,
+            if ignore_recovered {
+                vec!["B"]
+            } else {
+                vec!["A", "B"]
+            }
         );
+        assert!(completed.view().items.iter().all(|item| matches!(
+            item.status,
+            BatchItemStatus::Completed | BatchItemStatus::Ignored
+        )));
         assert_eq!(
             std::fs::read_dir(&destination).unwrap().count(),
-            2,
+            if ignore_recovered { 3 } else { 2 },
             "no interrupted preparation or orphan remains"
         );
+        if ignore_recovered {
+            assert_eq!(
+                std::fs::read(destination.join("A_001.png")).unwrap(),
+                b"old-first"
+            );
+            assert_eq!(
+                std::fs::read(destination.join("A_003.png")).unwrap(),
+                b"orphan"
+            );
+        }
         assert!(
             BatchRunner::recoveries(&checkpoint_root)
                 .unwrap()
@@ -414,6 +524,44 @@ fn background_fixture(
         ))
         .unwrap();
     (core, project, original)
+}
+
+#[test]
+fn global_relink_respects_a_prior_claim_through_another_file_alias() {
+    let root = tempfile::tempdir().unwrap();
+    let (core, _first, original_a) = background_fixture(root.path(), "A");
+    let (_, _second, original_b) = background_fixture(root.path(), "B");
+    let individual = root.path().join("individual");
+    let global = root.path().join("global");
+    std::fs::create_dir(&individual).unwrap();
+    std::fs::create_dir_all(global.join("B")).unwrap();
+    let replacement = individual.join("001.jpg");
+    std::fs::copy(&original_a, &replacement).unwrap();
+    std::fs::hard_link(&replacement, global.join("B/001.jpg")).unwrap();
+    std::fs::remove_file(original_a).unwrap();
+    std::fs::remove_file(original_b).unwrap();
+    let mut batch = BatchRunner::discover(
+        BatchConfiguration {
+            source: root.path().join("source"),
+            destination: None,
+            format: ExportFormat::Png,
+            mode: ExportMode::Sheet,
+        },
+        core,
+        root.path().join("checkpoints"),
+    )
+    .unwrap();
+    let first_id = batch.view().items[0].id.clone();
+    batch.relink(&first_id, &individual).unwrap();
+    batch.relink_all(&global).unwrap();
+    let view = batch.view();
+    assert!(view.items[0].problems.is_empty());
+    assert!(
+        view.items[1]
+            .problems
+            .iter()
+            .any(|problem| problem.kind == BatchProblemKind::MissingMedia)
+    );
 }
 
 #[test]

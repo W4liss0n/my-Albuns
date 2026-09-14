@@ -55,6 +55,7 @@ export function BatchExportWindow({ port }: { port: BatchExportPort }) {
   });
   const recovery = !view ? recoveries[0] : undefined;
   const terminal = view?.phase === "finished" || view?.phase === "interrupted";
+  const resultSummary = view ? `Exportados: ${view.items.filter(item => item.status === "completed").length} · Ignorados: ${view.items.filter(item => item.status === "ignored").length} · Com falha: ${view.items.filter(item => item.status === "failed").length}` : "";
   const problems = view?.items.filter(item => item.status !== "completed" &&
     (item.problems.length > 0 || item.status === "ignored")) ?? [];
   let content;
@@ -79,7 +80,7 @@ export function BatchExportWindow({ port }: { port: BatchExportPort }) {
       primaryAction={{ label: "Fechar", disabled: busy, onClick: close }} />;
   } else if (view && problems.length > 0) {
     content = <ProblemsDialog title={terminal ? "Resultado da exportação" : "Problemas na exportação"}
-      description={terminal ? "Confira os Projetos ignorados ou não exportados." : "Resolva ou ignore os Projetos abaixo para continuar."}
+      description={terminal ? resultSummary : "Resolva ou ignore os Projetos abaixo para continuar."}
       columns={["Projeto", "Problema", "Ações"]} rows={problems.map(item => [
         <span key="project">{item.name}<span className="batch-project-path" title={item.projectPath}>{item.projectPath}</span></span>,
         <div key="reasons" className="batch-problem-reasons">{item.status === "ignored" && <strong>Ignorado neste lote</strong>}

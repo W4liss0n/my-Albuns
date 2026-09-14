@@ -73,7 +73,25 @@ impl BatchRunner {
         }
         // A global search never assigns one candidate to different projects,
         // including claims retained from a previous partial search.
-        let mut claims: HashMap<PathBuf, HashSet<usize>> = HashMap::new();
+        if individual.is_some() {
+            for (index, id, link) in proposals {
+                self.items[index].relinks.individual.insert(id, link);
+            }
+            self.recheck();
+            return Ok(());
+        }
+        let paths = self.paths.current_plan();
+        let identity = |path: &Path| -> Result<String, String> {
+            paths
+                .resolve_existing(path, ExpectedObject::RegularFile)
+                .map_err(|error| error.to_string())?
+                .physical_identity()
+                .map(|identity| identity.to_local_token())
+                .ok_or_else(|| {
+                    "Não foi possível confirmar a identidade da imagem para religar o lote.".into()
+                })
+        };
+        let mut claims: HashMap<String, HashSet<usize>> = HashMap::new();
         for (index, item) in self.items.iter().enumerate() {
             for link in item
                 .relinks
@@ -82,21 +100,19 @@ impl BatchRunner {
                 .chain(item.relinks.global.values())
             {
                 claims
-                    .entry(link.replacement.clone())
+                    .entry(identity(&link.replacement)?)
                     .or_default()
                     .insert(index);
             }
         }
         for (index, _, link) in &proposals {
             claims
-                .entry(link.replacement.clone())
+                .entry(identity(&link.replacement)?)
                 .or_default()
                 .insert(*index);
         }
         for (index, id, link) in proposals {
-            if individual.is_some() {
-                self.items[index].relinks.individual.insert(id, link);
-            } else if claims[&link.replacement].len() == 1 {
+            if claims[&identity(&link.replacement)?].len() == 1 {
                 self.items[index].relinks.global.insert(id, link);
             }
         }

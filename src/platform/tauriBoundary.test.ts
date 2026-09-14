@@ -11,6 +11,8 @@ import projectWindowPermission from "../../src-tauri/permissions/project-window.
 import projectDialogWindowPermission from "../../src-tauri/permissions/project-dialog-window.json?raw";
 import settingsWindowCapability from "../../src-tauri/capabilities/settings.json?raw";
 import settingsWindowPermission from "../../src-tauri/permissions/settings-window.json?raw";
+import batchWindowCapability from "../../src-tauri/capabilities/batch-window.json?raw";
+import batchWindowPermission from "../../src-tauri/permissions/batch-window.json?raw";
 import productRuntimeSource from "../../src-tauri/src/product_runtime.rs?raw";
 import projectCommandsSource from "../../src-tauri/src/project_commands.rs?raw";
 
@@ -22,6 +24,7 @@ const sourceFiles = import.meta.glob("../**/*.{ts,tsx}", {
 
 const tauriCommandSources = {
   shared: ["./tauriLogger.ts"],
+  batch: ["./tauriBatchExportPort.ts"],
   photoshop: ["./tauriPhotoshopPort.ts"],
   settings: ["./tauriCacheSettingsPort.ts", "./tauriSettingsWindow.ts"],
   ownedDialog: ["./tauriWindowControls.ts"],
@@ -146,6 +149,7 @@ test("assigns every Tauri command adapter to an explicit surface", () => {
     .sort();
   const assignedSources = [
     ...tauriCommandSources.shared,
+    ...tauriCommandSources.batch,
     ...tauriCommandSources.photoshop,
     ...tauriCommandSources.settings,
     ...tauriCommandSources.ownedDialog,
@@ -190,6 +194,8 @@ test("keeps the global-window capability isolated from project commands", () => 
     ...globalCommands,
     ...issue16GlobalCacheCommands,
     "open_application_settings",
+    "open_batch_export",
+    "batch_recoveries",
   ]);
   const projectCommands = extractInvokedCommands([
     ...tauriCommandSources.shared,
@@ -218,6 +224,14 @@ test("keeps the global-window capability isolated from project commands", () => 
   expect(
     [...allowedCommands].filter((command) => projectCommands.has(command)),
   ).toEqual(["open_application_settings"]);
+});
+
+test("assigns the batch adapter to its owned surfaces and explicit global entry points", () => {
+  const commands = extractInvokedCommands(tauriCommandSources.batch);
+  commands.delete("open_batch_export");
+  const { capability, allowedCommands } = parseSurfaceContract(batchWindowCapability, batchWindowPermission);
+  expect(capability.windows).toEqual(["batch-export", "batch-progress"]);
+  expect([...allowedCommands].sort()).toEqual([...commands, "fit_owned_window", "owned_window_content_ready"].sort());
 });
 
 test("routes Photoshop commands to their explicit surfaces and isolates Settings mutations", () => {

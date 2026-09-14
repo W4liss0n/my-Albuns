@@ -1,11 +1,29 @@
 import type { ProjectLaunchOutcome } from "../global/application/globalProjectPort";
-import type { BatchExportOptions } from "../platform/generated/BatchExportOptions";
-import type { BatchExportProgress } from "../platform/generated/BatchExportProgress";
-import type { BatchExportView } from "../platform/generated/BatchExportView";
-import type { BatchRecoverySummary } from "../platform/generated/BatchRecoverySummary";
-import type { ExportConflictPolicy } from "../platform/generated/ExportConflictPolicy";
 
-export type { BatchExportOptions, BatchExportProgress, BatchExportView, BatchRecoverySummary, ExportConflictPolicy };
+export type ExportConflictPolicy = "ask" | "skip" | "replace";
+export interface BatchExportOptions {
+  sourceFolder: string;
+  destinationFolder: string | null;
+  format: { kind: "jpeg"; quality: number } | { kind: "png" } | { kind: "pdf" };
+  mode: "sheet" | "page";
+}
+export interface BatchExportProgress { completed: number; total: number; percent: number }
+export interface BatchRecoverySummary { id: string; sourceFolder: string; total: number; remaining: number }
+export interface BatchExportView {
+  id: string;
+  options: BatchExportOptions;
+  phase: "prepared" | "running" | "interrupted" | "finished";
+  items: {
+    id: string;
+    name: string;
+    projectPath: string;
+    destination: string;
+    status: "pending" | "completed" | "ignored" | "failed";
+    problems: { kind: "placeholder" | "missingMedia" | "unavailable" | "invalidProject" | "changed" | "failed"; message: string; mediaId: string | null }[];
+  }[];
+  hasConflicts: boolean;
+  canContinue: boolean;
+}
 
 export interface BatchExportPort {
   current(): Promise<BatchExportView | null>;

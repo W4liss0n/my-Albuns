@@ -243,7 +243,7 @@ pub(crate) async fn batch_recheck(
 ) -> Result<BatchExportView, String> {
     require_configuration(&window)?;
     update(&app, |batch| {
-        batch.recheck();
+        batch.retry_preflight();
         Ok(())
     })
     .await
@@ -390,6 +390,7 @@ pub(crate) async fn close_batch_export(
 ) -> Result<(), String> {
     require_configuration(&window)?;
     let state = app.state::<BatchWindowState>();
+    let _serial = state.window_serial.lock().await;
     state.require_idle()?;
     let mut runner = state.runner.lock().await;
     state.require_idle()?;
