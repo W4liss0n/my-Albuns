@@ -679,40 +679,6 @@ kbd {
   gap: 8px;
 }
 
-.ui-progress-dialog__current-item {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  color: var(--ui-text);
-  font-size: var(--ui-font-size-control);
-  gap: 9px;
-}
-
-.ui-progress-dialog__spinner {
-  width: 13px;
-  height: 13px;
-  flex: none;
-  border: 2px solid var(--ui-accent);
-  border-right-color: transparent;
-  border-radius: 50%;
-  animation: ui-progress-spin 850ms linear infinite;
-}
-
-.ui-progress-dialog__item-name {
-  overflow: hidden;
-  min-width: 0;
-  flex: 1;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ui-progress-dialog__item-status {
-  flex: none;
-  color: var(--ui-text-muted);
-  font-family: var(--ui-font-mono);
-  font-size: var(--ui-font-size-caption);
-}
-
 .ui-standard-message {
   display: flex;
   align-items: flex-start;
@@ -806,12 +772,6 @@ kbd {
   }
 }
 
-@keyframes ui-progress-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 @media (max-width: 1180px) {
   .ui-application-header__identity small {
     display: none;
@@ -819,8 +779,7 @@ kbd {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ui-progress-dialog__indicator--indeterminate,
-  .ui-progress-dialog__spinner {
+  .ui-progress-dialog__indicator--indeterminate {
     animation-duration: 3s;
   }
 }

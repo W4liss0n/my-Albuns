@@ -30,7 +30,7 @@ export function BatchProgressWindow({ port }: { port: BatchExportPort }) {
   return <OwnedWindowShell controls="none" width={400}>
     <ProgressDialog title="Exportando" progress={{ kind: "determinate", completed: progress.percent, total: 100,
       status: null,
-      remaining: `${progress.completed} ${progress.completed === 1 ? "álbum" : "álbuns"} de ${progress.total}` }}
+      countLabel: `${progress.completed} ${progress.completed === 1 ? "álbum" : "álbuns"} de ${progress.total}` }}
       cancelAction={{ label: "Cancelar", disabled: cancelled, onClick: () => {
         setCancelled(true);
         void port.cancel().catch(() => setCancelled(false));

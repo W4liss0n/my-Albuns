@@ -318,7 +318,7 @@ export const ExportPreviewControl = forwardRef<
           if (generation !== recoveryGeneration.current) return;
           presentDialog({ kind: "imageProcessingProgress", progress: {
             kind: "determinate", completed: progress.completedFiles, total: progress.totalFiles,
-            status: `${progress.completedFiles} de ${progress.totalFiles}`,
+            status: "",
           } });
         });
         if (generation !== recoveryGeneration.current) return;

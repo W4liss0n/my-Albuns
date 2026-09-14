@@ -2151,9 +2151,26 @@
       "actions": []
     },
     {
+      "id": "cache-recovery-progress",
+      "title": "Recuperação do Cache — progresso determinado",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22imageProcessingProgress%22%2C%22progress%22%3A%7B%22kind%22%3A%22determinate%22%2C%22completed%22%3A3%2C%22total%22%3A10%2C%22status%22%3A%22Preparando%20imagens%22%7D%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-progress-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "A recuperação de Cache reutiliza o contador automático e o padrão determinado definido em docs/design/0007-progresso-de-operacoes.md."
+      },
+      "viewport": {
+        "width": 440,
+        "height": 360
+      },
+      "readySelector": "[role=\"progressbar\"][aria-valuenow=\"3\"]",
+      "actions": []
+    },
+    {
       "id": "photo-import-progress",
       "title": "Processamento de imagens — progresso",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22imageProcessingProgress%22%2C%22progress%22%3A%7B%22kind%22%3A%22determinate%22%2C%22completed%22%3A5%2C%22total%22%3A12%2C%22status%22%3A%225%20de%2012%22%7D%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22imageProcessingProgress%22%2C%22progress%22%3A%7B%22kind%22%3A%22determinate%22%2C%22completed%22%3A5%2C%22total%22%3A12%2C%22status%22%3A%22%22%7D%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-import-dialog",

@@ -6499,12 +6499,12 @@ test.each((["files", "folder"] as const).flatMap((source) =>
     act(() => progress?.({ completedFiles: 0, totalFiles: 12 }));
     await waitFor(() => expect(dialogs.present).toHaveBeenCalledWith({
       kind: "imageProcessingProgress",
-      progress: { kind: "determinate", completed: 0, total: 12, status: "0 de 12" },
+      progress: { kind: "determinate", completed: 0, total: 12, status: "" },
     }));
     act(() => progress({ completedFiles: 5, totalFiles: 12 }));
     await waitFor(() => expect(dialogs.present).toHaveBeenLastCalledWith({
       kind: "imageProcessingProgress",
-      progress: { kind: "determinate", completed: 5, total: 12, status: "5 de 12" },
+      progress: { kind: "determinate", completed: 5, total: 12, status: "" },
     }));
   }
   await act(async () => {

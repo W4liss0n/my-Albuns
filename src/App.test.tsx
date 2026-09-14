@@ -2352,7 +2352,7 @@ test.each(["ready", "decode_failed", "native_unavailable", "storage_paused"] as 
     fireEvent.click(screen.getByRole("menuitem", { name: "Arquivos…" }));
     await waitFor(() => expect(dialog.present).toHaveBeenCalledWith({
       kind: "imageProcessingProgress",
-      progress: { kind: "determinate", completed: 2, total: 2, status: "2 de 2" },
+      progress: { kind: "determinate", completed: 2, total: 2, status: "" },
     }));
     await act(async () => finishImport());
     expect(screen.queryByRole("button", { name: "Batch 1.jpg" })).not.toBeInTheDocument();

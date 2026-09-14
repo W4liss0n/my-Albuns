@@ -209,7 +209,7 @@ export function ProjectDialogView({
               : undefined
           }
           progress={state.progress.kind === "determinate"
-            ? { ...state.progress, status: null, remaining: state.progress.status }
+            ? { ...state.progress, status: null, countLabel: state.progress.status }
             : { ...state.progress, status: null }}
           title="Exportando"
           reserveProgressMeta

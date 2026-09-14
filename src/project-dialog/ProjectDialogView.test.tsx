@@ -265,12 +265,15 @@ test("projects a fatal graphics diagnostic through the owned Project dialog", as
 test("shows photo import file progress without an unsafe cancel action", () => {
   const onAction = vi.fn();
   render(<ProjectDialogView onAction={onAction} state={{ kind: "imageProcessingProgress",
-    progress: { kind: "determinate", completed: 6, total: 12, status: "6 de 12" } }} />);
+    progress: { kind: "determinate", completed: 6, total: 12, status: "" } }} />);
   const dialog = screen.getByRole("dialog", { name: "Processando Imagens" });
   expect(within(dialog).getByText("6 de 12")).toBeInTheDocument();
   expect(within(dialog).getByRole("progressbar")).toHaveAttribute("aria-valuenow", "6");
   expect(within(dialog).getByRole("progressbar")).toHaveAttribute("aria-valuemax", "12");
   expect(within(dialog).getByText("50%")).toBeInTheDocument();
+  expect(within(dialog).getByText("6 de 12").closest(".ui-progress-dialog__meta"))
+    .toBe(within(dialog).getByText("50%").closest(".ui-progress-dialog__meta"));
+  expect(within(dialog).queryByRole("status")).not.toBeInTheDocument();
   expect(within(dialog).queryByRole("button")).not.toBeInTheDocument();
 });
 
