@@ -75,8 +75,12 @@ export function BatchExportWindow({ port }: { port: BatchExportPort }) {
   storageCallbacks.current = {
     resume: () => void act(async () => {
       if (!view) return;
-      const next = await port.resume(view.id);
-      if (next.canContinue) await continueBatch(next); else setView(next);
+      try {
+        const next = await port.resume(view.id);
+        if (next.canContinue) await continueBatch(next); else setView(next);
+      } catch {
+        await storageController.open(view.id, storageMessage);
+      }
     }),
     cancel: () => { if (view) end(view.id); },
   };

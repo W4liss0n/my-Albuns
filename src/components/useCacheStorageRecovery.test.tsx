@@ -4,6 +4,34 @@ import type { ProjectDialogAction, ProjectDialogPort } from "../application/proj
 import type { ImageProcessingProgress, MediaPreviewPort } from "../application/projectPorts";
 import { useCacheStorageRecovery } from "./useCacheStorageRecovery";
 
+test("a delayed initial status cannot invalidate cleanup opened by a warning", async () => {
+  let initialStatus!: (value: { id: string; canClearCache: boolean }) => void;
+  let finishCleanup!: (value: boolean) => void;
+  let action!: (action: ProjectDialogAction) => void;
+  const paused = { id: "paused", canClearCache: true };
+  const present = vi.fn(async () => {});
+  const port = {
+    storageRecovery: {
+      status: vi.fn().mockImplementationOnce(() => new Promise(resolve => { initialStatus = resolve; }))
+        .mockResolvedValue(paused),
+      clear: vi.fn(() => new Promise<boolean>(resolve => { finishCleanup = resolve; })),
+    },
+    resumeCacheImages: vi.fn(async () => true),
+  } as unknown as MediaPreviewPort;
+  const dialogPort: ProjectDialogPort = { acquire: listener => {
+    action = listener; return { present, dismiss: vi.fn(async () => {}) };
+  } };
+  const hook = renderHook(({ warning }) => useCacheStorageRecovery({ projectId: "album", enabled: true,
+    warning, port, dialogPort, onResumed: vi.fn() }), { initialProps: { warning: false } });
+  hook.rerender({ warning: true });
+  await waitFor(() => expect(present).toHaveBeenLastCalledWith(expect.objectContaining({ canClearCache: true })));
+  await act(async () => action("clearStorageCache"));
+  await act(async () => initialStatus(paused));
+  expect(present).toHaveBeenLastCalledWith(expect.objectContaining({ busy: true }));
+  await act(async () => finishCleanup(true));
+  expect(port.resumeCacheImages).toHaveBeenCalledOnce();
+});
+
 test("cache recovery awaits cleanup, uses determinate progress and waits again on disk exhaustion", async () => {
   let action!: (action: ProjectDialogAction) => void;
   let finishCleanup!: (freed: boolean) => void;

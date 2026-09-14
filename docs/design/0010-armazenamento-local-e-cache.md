@@ -335,6 +335,8 @@ A limpeza preserva todos os namespaces ativos. Não agenda a limpeza para outra 
 
 Ao retomar, a Exportação usa seu fluxo normal e preserva os álbuns já concluídos; conflitos ou problemas novos seguem os diálogos existentes. A preparação do Cache volta ao progresso determinado das imagens. Cancelar mantém os arquivos e o Cache válido existentes.
 
+Na importação de imagens novas, falta de espaço na prévia, no estágio temporário ou na publicação do índice segue essa mesma pausa. Os metadados válidos dos Originais continuam vinculados ao Álbum; o Cache pendente aguarda a retomada. Essa causa não gera uma linha de erro para cada foto. O protocolo Host–Processador 25 conserva a distinção entre falha de armazenamento, prévia indisponível por outro motivo e preparação adiada.
+
 `Liberar espaço`, capacidade interna de manutenção:
 
 - calcula previamente o volume removível;

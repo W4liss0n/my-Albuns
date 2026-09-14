@@ -10,6 +10,8 @@ import {
 import { representativeProjection } from "../test/projectFixtures";
 import { MediaExportBlockedError } from "../application/exportMedia";
 import { ExportConflictsError } from "../application/normalExport";
+import { StorageFullError } from "../application/storageRecovery";
+
 import {
   tauriExportPipelinePort,
   tauriMediaPreviewPort,
@@ -135,6 +137,14 @@ test("composes machine-local State with roaming Settings and routes updates to t
       sortDirection: "descending",
     },
   });
+});
+
+test("storage exhaustion preserves the native partial-publication warning", async () => {
+  const message = "O Destino pode conter saídas anteriores e novas. Faça uma nova Exportação integral.";
+  vi.mocked(invoke).mockRejectedValueOnce({ code: "output_storage_full", message });
+  const attempt = tauriExportPipelinePort.startSheet(exportSelection, vi.fn());
+  await expect(attempt.completion).rejects.toBeInstanceOf(StorageFullError);
+  await expect(attempt.completion).rejects.toThrow(message);
 });
 
 test("completes an Export attempt with the backend result", async () => {

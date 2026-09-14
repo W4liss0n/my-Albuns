@@ -52,9 +52,7 @@ export function useCacheStorageRecovery({ projectId, enabled, warning, port, dia
           .finally(() => { running.current = false; });
       }, dismiss);
     controllerRef.current = controller;
-    void port.storageRecovery.status("cache").then(recovery => {
-      if (active && recovery) void controller.open("cache", message);
-    }).catch(() => undefined);
+    void controller.open("cache", message, true);
     return () => { active = false; controller.dispose(); controllerRef.current = null; dismiss(); };
   }, [initialized, projectId, port, dialogPort]);
   useEffect(() => {

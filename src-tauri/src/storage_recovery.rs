@@ -4,7 +4,10 @@ use crate::{cache_service::CacheService, ipc_contract::StorageRecovery};
 use myalbuns_paths::StorageVolume;
 use std::{
     collections::HashMap,
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicUsize, Ordering},
+    },
 };
 use tauri::{Emitter, Manager, State};
 
@@ -16,9 +19,19 @@ struct PausedStorage {
 }
 
 #[derive(Clone, Default)]
-pub(crate) struct StorageRecoveries(Arc<Mutex<HashMap<String, PausedStorage>>>);
+pub(crate) struct StorageRecoveries(Arc<Mutex<HashMap<String, PausedStorage>>>, Arc<AtomicUsize>);
+
+struct CleaningGuard<'a>(&'a AtomicUsize);
+impl Drop for CleaningGuard<'_> {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::AcqRel);
+    }
+}
 
 impl StorageRecoveries {
+    pub(crate) fn is_cleaning(&self) -> bool {
+        self.1.load(Ordering::Acquire) > 0
+    }
     pub(crate) fn is_paused(&self, owner: &str) -> bool {
         self.0
             .lock()
@@ -65,6 +78,8 @@ impl StorageRecoveries {
     }
 
     fn clear(&self, id: &str, cache: &CacheService) -> Result<bool, String> {
+        self.1.fetch_add(1, Ordering::AcqRel);
+        let _cleaning = CleaningGuard(&self.1);
         // Serializes cleanup with replacement/retirement of the failed attempt.
         let mut entries = self
             .0

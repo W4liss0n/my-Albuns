@@ -1,7 +1,7 @@
 mod import;
 mod index;
 mod publication;
-pub(crate) use import::CacheImportStage;
+pub(crate) use import::{CacheImportStage, ImportCacheFailure};
 use index::CacheIndex;
 pub(crate) use publication::PendingCachePublication;
 
@@ -5946,6 +5946,41 @@ mod tests {
         drop(stage);
         assert!(engine.can_sweep_after_publication());
         assert!(final_path.is_file());
+    }
+
+    #[test]
+    fn import_publication_keeps_disk_full_typed_at_preview_and_index_boundaries() {
+        for index_full in [false, true] {
+            let fixture = fixture();
+            let engine = CacheEngine::default();
+            let (mut stage, candidate, candidate_path, binding) = staged_import(&fixture, &engine);
+            let paths = fixture.work.namespace.paths();
+            let final_path = paths
+                .preview_file(
+                    &binding.media_id,
+                    &candidate.generation_id,
+                    CacheArtifactFormat::Jpeg,
+                )
+                .unwrap();
+            let destination = if index_full {
+                paths.metadata_file()
+            } else {
+                final_path.clone()
+            };
+            let fault = myalbuns_paths::test_support::DiskFull::on_rename(&destination);
+            let problems =
+                engine.publish_import_stage(&mut stage, &[binding], &fixture.work.root_bindings, 1);
+            assert!(fault.failure_count() > 0);
+            assert!(matches!(
+                problems.as_slice(),
+                [(_, super::ImportCacheFailure::StorageFull)]
+            ));
+            drop(stage);
+            assert!(!candidate_path.exists());
+            assert!(!final_path.exists());
+            assert!(!paths.metadata_file().is_file());
+            assert!(candidate.path().is_file());
+        }
     }
 
     #[test]

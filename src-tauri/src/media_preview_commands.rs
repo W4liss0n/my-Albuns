@@ -480,6 +480,20 @@ impl DemandedPreviewPreparation<'_> {
         if let Some(preview) = prepared.get(media_id) {
             return Ok(Some(preview.clone()));
         }
+        // Viewport demand must not restart pending Cache work while recovery
+        // waits for the user. Already prepared representations remain usable.
+        let recovery = app.state::<crate::storage_recovery::StorageRecoveries>();
+        if recovery.is_cleaning() || recovery.is_paused("cache") {
+            return Ok(Some(contextual_preview(
+                engine,
+                registry,
+                app_paths,
+                namespace,
+                demand_revision,
+                &source,
+                cache_failure_state(),
+            )));
+        }
         let work = match works.get(media_id) {
             Some(work) => work.clone(),
             None => {

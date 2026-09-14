@@ -24,7 +24,7 @@ use crate::{
     cache_activity_gate::{CacheCancellation, CacheCancellationReason},
     cache_engine::{
         AuthorizedCacheNamespace, CacheEngine, CacheFailureStage, CacheImportStage,
-        CacheProcessorStatus,
+        CacheProcessorStatus, ImportCacheFailure,
     },
     cache_previews::CachePreviewRegistry,
     cache_service::ActiveCacheNamespace,
@@ -213,18 +213,38 @@ pub(crate) async fn import_selected_media(
     let new_source_count = attempt.sources.len();
     let native_progress = NativeImportProgress::new(progress, &requests);
     let interrupted = AtomicBool::new(false);
+    let storage_interrupted = AtomicBool::new(false);
     let batches = stream::iter(requests)
         .map(|request| {
             let progress = &native_progress;
             let interrupted = &interrupted;
+            let storage_interrupted = &storage_interrupted;
             async move {
-                let result = if interrupted.load(Ordering::Acquire) {
+                let result = if storage_interrupted.load(Ordering::Acquire) {
+                    Err(BatchFailure::StorageFull)
+                } else if interrupted.load(Ordering::Acquire) {
                     Err(BatchFailure::MemoryPressure)
                 } else {
                     execute_import_batch(app, &request, &|event| progress.report(event)).await
                 };
                 if matches!(result, Err(BatchFailure::MemoryPressure)) {
                     interrupted.store(true, Ordering::Release);
+                }
+                if matches!(result, Err(BatchFailure::StorageFull))
+                    || result.as_ref().is_ok_and(|completion| {
+                        completion.photos.iter().any(|photo| {
+                            matches!(
+                                photo.outcome,
+                                PhotoImportOutcome::DeferredForStorage
+                                    | PhotoImportOutcome::Validated {
+                                        preview: ImportedPhotoPreview::StorageFull,
+                                        ..
+                                    }
+                            )
+                        })
+                    })
+                {
+                    storage_interrupted.store(true, Ordering::Release);
                 }
                 (request, result)
             }
@@ -254,6 +274,11 @@ pub(crate) async fn import_selected_media(
             Err(BatchFailure::MemoryPressure) => {
                 attempt.operation_problem =
                     Some(ProcessorAdmissionFailure::MemoryPressure.to_string());
+            }
+            Err(BatchFailure::StorageFull) => {
+                outcomes.extend(request.candidates.into_iter().map(|candidate| {
+                    (candidate.source_id, PhotoImportOutcome::DeferredForStorage)
+                }));
             }
             Err(BatchFailure::Recoverable(message) | BatchFailure::Quarantined(message)) => {
                 for candidate in request.candidates {
@@ -307,6 +332,7 @@ pub(crate) async fn import_selected_media(
         roots,
         cache_problems,
         new_paths,
+        storage_full,
     } = tauri::async_runtime::spawn_blocking(move || {
         commit_prepared_import(
             commit_app.state::<ProjectHost>().inner(),
@@ -327,7 +353,7 @@ pub(crate) async fn import_selected_media(
             ..
         }
     );
-    let mut progress = if interrupted {
+    let mut progress = if interrupted || storage_full {
         native_progress.interrupt()
     } else {
         native_progress.finish((new_source_count + unsupported_count) as u32)
@@ -337,11 +363,14 @@ pub(crate) async fn import_selected_media(
             progress.report_problem(cache_problem(&path, reason.clone()));
         }
     }
-    if !interrupted {
+    if !interrupted && !storage_full {
         progress.prepare_all_in_plan(app, existing, roots).await;
     }
     if let ImportMediaResult::Completed { projection, .. } = &mut result {
         *projection = host.projection()?;
+    }
+    if storage_full {
+        crate::storage_recovery::pause_cache(app);
     }
     Ok(result)
 }
@@ -352,6 +381,7 @@ struct PreparedImport {
     proposal: PhotoImportsProposal,
     cache_problems: HashMap<PathBuf, String>,
     accepted_paths: Vec<PathBuf>,
+    storage_full: bool,
 }
 
 fn prepare_proposal_with_inspection(
@@ -359,7 +389,7 @@ fn prepare_proposal_with_inspection(
     mut stage: Option<CacheImportStage>,
     mut outcomes: HashMap<PhotoImportSourceId, PhotoImportOutcome>,
     mut cache_problems: HashMap<PathBuf, String>,
-    stage_error: Option<String>,
+    stage_error: Option<ImportCacheFailure>,
     unsupported: Vec<ImageProcessingProblem>,
     inspect: impl Fn(&PhotoImportCandidate) -> PhotoImportsProposal,
 ) -> Result<PreparedImport, String> {
@@ -376,6 +406,8 @@ fn prepare_proposal_with_inspection(
         inspections: Vec::new(),
     };
     let mut accepted_paths = Vec::new();
+    let stage_full = matches!(stage_error, Some(ImportCacheFailure::StorageFull));
+    let mut storage_full = stage_full;
     for path in &attempt.paths {
         let Some(source) = sources.get(path.as_path()) else {
             proposal
@@ -383,11 +415,15 @@ fn prepare_proposal_with_inspection(
                 .push(ImportPhoto::select_existing(path.clone()));
             continue;
         };
+        let outcome = outcomes.remove(&source.candidate.source_id);
+        let deferred =
+            stage_full || matches!(outcome, Some(PhotoImportOutcome::DeferredForStorage));
+        storage_full |= deferred;
         if let Some(PhotoImportOutcome::Validated {
             dimensions,
             fingerprint,
             preview,
-        }) = outcomes.remove(&source.candidate.source_id)
+        }) = outcome
         {
             let current =
                 MediaResolver.observe_in_plan(&attempt.roots, &source_binding(attempt.kind, path));
@@ -413,6 +449,10 @@ fn prepare_proposal_with_inspection(
                             stage.record(source.candidate.clone(), current, *generation)
                         }),
                     ImportedPhotoPreview::Unavailable { reason } => Err(reason),
+                    ImportedPhotoPreview::StorageFull => {
+                        storage_full = true;
+                        Ok(())
+                    }
                 };
                 if let Err(reason) = prepared {
                     cache_problems.insert(path.clone(), reason);
@@ -432,11 +472,14 @@ fn prepare_proposal_with_inspection(
         let fallback = inspect(&source.candidate);
         if !fallback.commands.is_empty() {
             accepted_paths.push(path.clone());
-            cache_problems.entry(path.clone()).or_insert_with(|| {
-                stage_error.clone().unwrap_or_else(|| {
-                    "A imagem exige uma nova tentativa de preparação da miniatura.".into()
-                })
-            });
+            if !deferred {
+                cache_problems
+                    .entry(path.clone())
+                    .or_insert_with(|| match &stage_error {
+                        Some(ImportCacheFailure::Other(message)) => message.clone(),
+                        _ => "A imagem exige uma nova tentativa de preparação da miniatura.".into(),
+                    });
+            }
         }
         proposal.commands.extend(fallback.commands);
         proposal.problems.extend(fallback.problems);
@@ -449,6 +492,7 @@ fn prepare_proposal_with_inspection(
         proposal,
         cache_problems,
         accepted_paths,
+        storage_full,
     })
 }
 
@@ -458,6 +502,7 @@ struct CommittedImport {
     roots: RootBindingPlan,
     cache_problems: HashMap<PathBuf, String>,
     new_paths: Vec<PathBuf>,
+    storage_full: bool,
 }
 
 fn commit_prepared_import(
@@ -580,11 +625,16 @@ fn commit_prepared_import(
         let generation = poll
             .confirmed_observation()
             .map_or(0, |observation| observation.generation());
-        for (source_id, reason) in
+        for (source_id, failure) in
             engine.publish_import_stage(stage, &catalog.bindings, &attempt.roots, generation)
         {
-            if let Some(path) = source_paths.get(&source_id) {
-                prepared.cache_problems.insert(path.to_path_buf(), reason);
+            match failure {
+                ImportCacheFailure::StorageFull => prepared.storage_full = true,
+                ImportCacheFailure::Other(reason) => {
+                    if let Some(path) = source_paths.get(&source_id) {
+                        prepared.cache_problems.insert(path.to_path_buf(), reason);
+                    }
+                }
             }
         }
     }
@@ -607,10 +657,12 @@ fn commit_prepared_import(
         roots: attempt.roots,
         cache_problems: prepared.cache_problems,
         new_paths: prepared.accepted_paths,
+        storage_full: prepared.storage_full,
     })
 }
 
 enum BatchFailure {
+    StorageFull,
     Recoverable(String),
     MemoryPressure,
     Quarantined(String),
@@ -727,6 +779,9 @@ async fn execute_import_batch(
                 return Err(BatchFailure::Quarantined(failure.message));
             }
             Err(failure) => {
+                if failure.stage == CacheFailureStage::StorageFull {
+                    return Err(BatchFailure::StorageFull);
+                }
                 if matches!(
                     failure.stage,
                     CacheFailureStage::Cancelled
@@ -844,7 +899,7 @@ mod tests {
         stage: Option<CacheImportStage>,
         outcomes: HashMap<PhotoImportSourceId, PhotoImportOutcome>,
         problems: HashMap<PathBuf, String>,
-        stage_error: Option<String>,
+        stage_error: Option<ImportCacheFailure>,
         unsupported: Vec<ImageProcessingProblem>,
     ) -> Result<PreparedImport, String> {
         let bindings = attempt.catalog.bindings.clone();
@@ -945,6 +1000,62 @@ mod tests {
             preview: ImportedPhotoPreview::Unavailable {
                 reason: "Cache indisponível".into(),
             },
+        }
+    }
+
+    #[test]
+    fn storage_paused_import_preserves_valid_sources_without_cache_problem_rows() {
+        for stage_full in [false, true] {
+            let fixture = Fixture::new();
+            let first = fixture.photo("primeira.jpg");
+            let second = fixture.photo("segunda.jpg");
+            let attempt = fixture.attempt(vec![first.clone(), second.clone()]);
+            let mut outcomes = HashMap::new();
+            if !stage_full {
+                let mut first_outcome = validated(&attempt.sources[0]);
+                if let PhotoImportOutcome::Validated { preview, .. } = &mut first_outcome {
+                    *preview = ImportedPhotoPreview::StorageFull;
+                }
+                outcomes.insert(
+                    attempt.sources[0].candidate.source_id.clone(),
+                    first_outcome,
+                );
+                outcomes.insert(
+                    attempt.sources[1].candidate.source_id.clone(),
+                    PhotoImportOutcome::DeferredForStorage,
+                );
+            }
+            let prepared = prepare_proposal(
+                attempt,
+                None,
+                outcomes,
+                HashMap::new(),
+                stage_full.then_some(ImportCacheFailure::StorageFull),
+                Vec::new(),
+            )
+            .unwrap();
+            assert!(prepared.storage_full);
+            assert!(prepared.cache_problems.is_empty());
+            assert!(prepared.proposal.problems.is_empty());
+            assert_eq!(prepared.accepted_paths, [first, second]);
+            let committed = commit_prepared_import(
+                &fixture.host,
+                &CacheEngine::default(),
+                &MediaMonitor::default(),
+                &MediaRuntime::default(),
+                &CachePreviewRegistry::new("paused-import"),
+                prepared,
+            )
+            .unwrap();
+            assert!(committed.storage_full);
+            assert!(committed.cache_problems.is_empty());
+            assert!(matches!(
+                committed.result,
+                ImportMediaResult::Completed {
+                    imported_count: 2,
+                    ..
+                }
+            ));
         }
     }
 

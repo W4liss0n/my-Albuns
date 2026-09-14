@@ -402,6 +402,12 @@ pub(crate) async fn close_batch_export(
     window: WebviewWindow,
 ) -> Result<(), String> {
     require_configuration(&window)?;
+    if app
+        .state::<crate::storage_recovery::StorageRecoveries>()
+        .is_cleaning()
+    {
+        return Err("Aguarde a limpeza do Cache terminar.".into());
+    }
     let state = app.state::<BatchWindowState>();
     let _serial = state.window_serial.lock().await;
     state.require_idle()?;

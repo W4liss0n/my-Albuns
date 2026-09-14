@@ -24,11 +24,13 @@ export class StorageRecoveryController {
     private readonly resume: () => void,
     private readonly cancel: () => void) {}
 
-  async open(owner: string, message: string) {
+  async open(owner: string, message: string, onlyIfPaused = false) {
+    if (this.current) return;
     const generation = ++this.generation;
     this.current = null;
     const recovery = await this.port.status(owner).catch(() => null);
     if (generation !== this.generation) return;
+    if (onlyIfPaused && !recovery) return;
     this.current = { recovery, state: { kind: "storageFull", message, canClearCache: recovery?.canClearCache ?? false, busy: false } };
     this.present(this.current.state);
   }
