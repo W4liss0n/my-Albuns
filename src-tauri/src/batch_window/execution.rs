@@ -88,12 +88,8 @@ async fn execute(
     let mut visible = initial.clone();
     visible.phase = BatchPhase::Running;
     visible.can_continue = false;
-    let total = initial.items.len() as u32;
-    *state.progress.lock().map_err(|_| "Lote indisponível.")? = Some(BatchExportProgress {
-        completed: 0,
-        total,
-        percent: 0.0,
-    });
+    *state.progress.lock().map_err(|_| "Lote indisponível.")? =
+        runner.as_ref().map(BatchRunner::progress);
     state.publish(Some(visible));
     let result = run_attempt(app, &owner, &mut runner, &cancel, policy).await;
     let view = match &result {

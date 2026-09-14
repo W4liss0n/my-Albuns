@@ -679,7 +679,7 @@
     {
       "id": "export-progress-determinate",
       "title": "Diálogo de Exportação — progresso determinado",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportProgress%22%2C%22cancelRequested%22%3Afalse%2C%22cancellable%22%3Atrue%2C%22progress%22%3A%7B%22kind%22%3A%22determinate%22%2C%22completed%22%3A3%2C%22total%22%3A8%2C%22status%22%3A%22Compondo%20L%C3%A2minas%E2%80%A6%22%7D%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportProgress%22%2C%22cancelRequested%22%3Afalse%2C%22cancellable%22%3Atrue%2C%22progress%22%3A%7B%22kind%22%3A%22determinate%22%2C%22completed%22%3A38%2C%22total%22%3A100%2C%22status%22%3A%22Exportando%22%7D%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-progress-dialog",
@@ -693,7 +693,7 @@
     {
       "id": "export-progress-cancel-requested",
       "title": "Diálogo de Exportação — cancelamento solicitado",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportProgress%22%2C%22cancelRequested%22%3Atrue%2C%22cancellable%22%3Atrue%2C%22progress%22%3A%7B%22kind%22%3A%22indeterminate%22%2C%22status%22%3A%22Cancelando%20Exporta%C3%A7%C3%A3o%E2%80%A6%22%7D%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportProgress%22%2C%22cancelRequested%22%3Atrue%2C%22cancellable%22%3Atrue%2C%22progress%22%3A%7B%22kind%22%3A%22determinate%22%2C%22completed%22%3A38%2C%22total%22%3A100%2C%22status%22%3A%22Exportando%22%7D%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-progress-dialog",
@@ -707,7 +707,7 @@
     {
       "id": "export-progress-non-cancellable",
       "title": "Diálogo de Exportação — publicação não cancelável",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportProgress%22%2C%22cancelRequested%22%3Afalse%2C%22cancellable%22%3Afalse%2C%22progress%22%3A%7B%22kind%22%3A%22determinate%22%2C%22completed%22%3A8%2C%22total%22%3A8%2C%22status%22%3A%22Publicando%20Exporta%C3%A7%C3%A3o%E2%80%A6%22%7D%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportProgress%22%2C%22cancelRequested%22%3Afalse%2C%22cancellable%22%3Afalse%2C%22progress%22%3A%7B%22kind%22%3A%22determinate%22%2C%22completed%22%3A92%2C%22total%22%3A100%2C%22status%22%3A%22Exportando%22%7D%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-progress-dialog",

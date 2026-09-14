@@ -16,6 +16,8 @@ Cada Exportação segue duas fases:
 
 Uma falha ou cancelamento durante a preparação remove a tentativa quando possível e preserva o conjunto final anterior.
 
+Refinamento aceito: falta real de espaço é uma pausa recuperável durante a tentativa viva. Nesse caso, a preparação válida fica retida até `Retomar` ou `Cancelar`. A retomada repete apenas arquivos incompletos e continua a publicação no arquivo pendente; cancelamento, encerramento e demais falhas mantêm as regras de limpeza abaixo. Não é uma recuperação persistente nem uma transação atômica do conjunto inteiro.
+
 Depois que a publicação começa, não existe garantia de rollback atômico do conjunto inteiro. Uma falha, remoção do Destino, falta de energia, corrupção física, interferência do sistema operacional ou modificação externa concorrente pode deixar uma combinação de arquivos anteriores e novos. Nessa situação:
 
 - a operação termina como falha e nunca é apresentada como concluída;

@@ -152,6 +152,14 @@ impl ExportPathPlan {
 }
 
 impl PreparedExportStorage {
+    /// Removes only this attempt's unfinished regular file after its writer stopped.
+    pub fn discard_unfinished_output(&self) -> Result<(), AppPathsError> {
+        if open_export_file(&self.preparation, &self.plan.prepared_output_path, true)?.is_some() {
+            fs::remove_file(&self.plan.prepared_output_path)
+                .map_err(|error| AppPathsError::export_io(&error))?;
+        }
+        Ok(())
+    }
     /// Removes only explicitly named regular children of a guarded destination.
     pub fn remove_obsolete_outputs(
         destination: &Path,
@@ -163,7 +171,7 @@ impl PreparedExportStorage {
                 return Err(AppPathsError::ExportStorageOutsideDestination);
             }
             if open_export_file(&guard, path, true)?.is_some() {
-                fs::remove_file(path).map_err(|_| AppPathsError::ExportStorageUnavailable)?;
+                fs::remove_file(path).map_err(|error| AppPathsError::export_io(&error))?;
             }
         }
         Ok(())
@@ -195,6 +203,19 @@ impl PreparedExportStorage {
     }
 
     pub fn publish(self) -> Result<(), AppPathsError> {
+        if let Err(error) = self.publish_retaining() {
+            let _ = self.discard();
+            return Err(error);
+        }
+        let preparation_directory = self.plan.preparation_directory.clone();
+        drop(self);
+        let _ = fs::remove_dir(preparation_directory);
+        Ok(())
+    }
+
+    /// Keeps the guarded preparation owned by the caller if publication fails.
+    /// A successful call moves this output; it must not be published twice.
+    pub fn publish_retaining(&self) -> Result<(), AppPathsError> {
         let validation = (|| {
             let prepared =
                 open_export_file(&self.preparation, &self.plan.prepared_output_path, false)?
@@ -213,13 +234,7 @@ impl PreparedExportStorage {
             }
             Ok(final_exists)
         })();
-        let final_exists = match validation {
-            Ok(final_exists) => final_exists,
-            Err(error) => {
-                let _ = self.discard();
-                return Err(error);
-            }
-        };
+        let final_exists = validation?;
 
         let publication = match (self.plan.authorization, final_exists) {
             (ExportWriteAuthorization::ReplaceConfirmed, true) => {
@@ -228,13 +243,8 @@ impl PreparedExportStorage {
             _ => publish_new_file(&self.plan.prepared_output_path, &self.plan.output_path),
         };
         if let Err(error) = publication {
-            let _ = self.discard();
             return Err(AppPathsError::export_io(&error));
         }
-        let preparation_directory = self.plan.preparation_directory.clone();
-        drop(self);
-        // A remaining empty directory is a disposable orphan and does not undo Publicação.
-        let _ = fs::remove_dir(preparation_directory);
         Ok(())
     }
 

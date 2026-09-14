@@ -65,6 +65,7 @@ pub(crate) async fn export_project(
     app: AppHandle,
     window: WebviewWindow,
     options: NormalExportOptions,
+    recovery_id: Option<String>,
     on_event: Channel<ExportEvent>,
     state: State<'_, ProjectHost>,
     logging: State<'_, LoggingState>,
@@ -77,6 +78,32 @@ pub(crate) async fn export_project(
         crate::project_ui_operations::begin(&app).map_err(ExportCommandError::failed)?;
     require_owner(&window).map_err(ExportCommandError::failed)?;
     let recoveries = app.state::<crate::storage_recovery::StorageRecoveries>();
+    if let Some(id) = recovery_id {
+        let acquisition =
+            OperationLease::begin(&operation_gate).map_err(ExportCommandError::from_gate)?;
+        if let Some(recovery) = recoveries
+            .take_export(&id)
+            .map_err(ExportCommandError::failed)?
+        {
+            let request_id = recovery.request_id().to_owned();
+            let attempt = attempts
+                .begin(request_id.clone(), window.label())
+                .map_err(|error| ExportCommandError::failed(error.to_string()))?;
+            let prepared = PreparedExportCommand {
+                acquisition,
+                attempt,
+                operation_paths: recovery.required_paths(),
+                project_id: Some(recovery.project_id().to_owned()),
+                request_id,
+                plan: ExportCommandPlan::Resume(recovery),
+            };
+            return run_export(app, window, on_event, logging, cache, processor, prepared)
+                .await
+                .map(Some)
+                .map_err(Into::into);
+        }
+        drop(acquisition);
+    }
     recoveries.finish("export");
     options
         .format

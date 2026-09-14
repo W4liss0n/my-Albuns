@@ -438,9 +438,10 @@ export const tauriMediaPreviewPort: MediaPreviewPort = {
 export const tauriExportPipelinePort: ExportPipelinePort = {
   storageRecovery: tauriStorageRecoveryPort,
   defaultDestination: () => invoke<string>("default_export_destination"),
+  discardRecovery: id => invoke<void>("discard_export_recovery", { id }),
   chooseDestination: () => invoke<string | null>("choose_export_folder"),
   startSheet: (
-    { projectName, sheetId, sheetNumber, options },
+    { projectName, sheetId, sheetNumber, options, recoveryId },
     emitEvent: (event: ExportProgressEvent) => void,
   ) => {
     const onEvent = new Channel<IpcExportEvent>();
@@ -478,7 +479,7 @@ export const tauriExportPipelinePort: ExportPipelinePort = {
       });
     };
     const request = options
-      ? invoke<IpcExportResult | null>("export_project", { options, onEvent })
+      ? invoke<IpcExportResult | null>("export_project", { options, onEvent, ...(recoveryId ? { recoveryId } : {}) })
       : invoke<IpcExportResult>("export_sheet", { projectName, sheetId, sheetNumber, onEvent });
     const completion = request
       .then((result) => result === null ? { status: "skipped" as const } : ({

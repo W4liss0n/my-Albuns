@@ -193,6 +193,9 @@ impl BatchRunner {
             })
             .collect();
         let mut batch = Self {
+            retained: None,
+            resume_policy: None,
+            progress_percent: 0.0,
             id: saved.id,
             configuration,
             core,
@@ -210,6 +213,8 @@ impl BatchRunner {
 
     /// Ends recovery explicitly; published outputs and project files are never touched.
     pub(crate) fn abandon(mut self, cleanup_preparation: bool) -> Result<(), String> {
+        // Release live guards first; persistent recovery then cleans any remainder.
+        self.retained = None;
         for item in &self.items {
             if cleanup_preparation && let Some(preparation) = &item.preparation {
                 let result = self

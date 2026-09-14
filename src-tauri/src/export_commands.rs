@@ -58,6 +58,7 @@ struct PreparedExportCommand {
 enum ExportCommandPlan {
     Sheet(ExportPlan),
     Album(export_pipeline::AlbumExportPlan),
+    Resume(Box<export_pipeline::AlbumExportRecovery>),
 }
 
 impl ExportEvent {
@@ -456,7 +457,17 @@ async fn run_export(
         window_label = window.label(),
         event = "export_started",
     );
-    let root_bindings_completion = path_io::capture_root_bindings(operation_paths);
+    let retained_roots = match &plan {
+        ExportCommandPlan::Resume(recovery) => Some(recovery.roots().clone()),
+        _ => None,
+    };
+    let root_bindings_completion = async move {
+        if let Some(roots) = retained_roots {
+            Ok(roots)
+        } else {
+            path_io::capture_root_bindings(operation_paths).await
+        }
+    };
     tokio::pin!(root_bindings_completion);
     let root_bindings = tokio::select! {
         bindings = &mut root_bindings_completion => bindings.map_err(|error| {
@@ -565,6 +576,16 @@ async fn run_export(
         }
     };
     let published = match plan {
+        ExportCommandPlan::Resume(recovery) => {
+            export_pipeline::resume_album(
+                &mut transport,
+                recovery,
+                attempt.execution_control(),
+                &progress,
+                &context,
+            )
+            .await
+        }
         ExportCommandPlan::Sheet(plan) => {
             export_pipeline::execute(
                 &mut transport,
@@ -588,9 +609,9 @@ async fn run_export(
             .await
         }
     }
-    .map_err(|failure| {
+    .map_err(|mut failure| {
         if failure.is_storage_full() {
-            storage_recoveries.pause("export", storage_volume);
+            storage_recoveries.retain_export(storage_volume, failure.recovery.take());
         }
         if failure.stage == export_pipeline::ExportFailureStage::Cancelled {
             log_export_cancelled(
@@ -896,6 +917,7 @@ mod tests {
             exit_code: None,
             message: "O original não está mais disponível.".into(),
             path_failure: None,
+            recovery: None,
             processor_failure: Some(ImagingFailure {
                 code: ImagingFailureCode::SourceUnavailable,
                 media_id: Some("media-cover".into()),

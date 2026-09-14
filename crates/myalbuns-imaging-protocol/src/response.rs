@@ -12,6 +12,11 @@ use crate::render::RenderCompletion;
     rename_all_fields = "camelCase"
 )]
 pub enum ImagingResponse {
+    AlbumStorageFull {
+        request_id: String,
+        completion: crate::AlbumRenderCompletion,
+        failure: ImagingFailure,
+    },
     AlbumCompleted {
         request_id: String,
         completion: crate::AlbumRenderCompletion,
@@ -88,6 +93,11 @@ impl ImagingResponse {
 
     pub fn failure_for(&self, expected_request_id: &str) -> Option<ImagingFailure> {
         match self {
+            Self::AlbumStorageFull {
+                request_id,
+                failure,
+                ..
+            } if request_id == expected_request_id => Some(failure.clone()),
             Self::Failed {
                 request_id,
                 failure,
@@ -97,12 +107,13 @@ impl ImagingResponse {
     }
 
     pub fn is_failure(&self) -> bool {
-        matches!(self, Self::Failed { .. })
+        matches!(self, Self::Failed { .. } | Self::AlbumStorageFull { .. })
     }
 
     pub fn request_id(&self) -> &str {
         match self {
-            Self::AlbumCompleted { request_id, .. }
+            Self::AlbumStorageFull { request_id, .. }
+            | Self::AlbumCompleted { request_id, .. }
             | Self::Completed { request_id, .. }
             | Self::CacheCompleted { request_id, .. }
             | Self::PhotoImportCompleted { request_id, .. }

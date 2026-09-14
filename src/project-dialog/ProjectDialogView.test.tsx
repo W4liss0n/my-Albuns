@@ -176,6 +176,8 @@ test("projects export progress and cancellation through the standard progress di
     screen.getByRole("button", { name: "Cancelar Exportação" }),
   );
   expect(onAction).toHaveBeenCalledWith("cancelExport");
+  expect(screen.queryByText("Compondo a Exportação")).not.toBeInTheDocument();
+  expect(screen.getByText("Exportando")).toBeInTheDocument();
 });
 
 test("projects export failure through the standard message dialog", async () => {

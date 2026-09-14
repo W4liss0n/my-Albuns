@@ -336,6 +336,7 @@ export interface MediaPreviewPort {
 }
 
 export interface ExportSheetSelection {
+  recoveryId?: string;
   options?: import("./normalExport").NormalExportOptions;
   projectName: string;
   sheetId: string;
@@ -343,6 +344,7 @@ export interface ExportSheetSelection {
 }
 
 export interface ExportPipelinePort {
+  discardRecovery?(id: string): Promise<void>;
   storageRecovery?: import("./storageRecovery").StorageRecoveryPort;
   defaultDestination(): Promise<string>;
   chooseDestination(): Promise<string | null>;

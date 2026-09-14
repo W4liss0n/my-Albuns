@@ -163,11 +163,22 @@ fn run_album_render(
 ) -> Result<(), ProcessFailure> {
     let mut progress =
         |stage, completed, total| write_progress(&request.request_id, stage, completed, total);
-    let response = match album_render::render(&request, &mut progress) {
+    let mut completed = Vec::new();
+    let response = match album_render::render_retaining(&request, &mut progress, &mut completed) {
         Ok(completion) => ImagingResponse::AlbumCompleted {
             request_id: request.request_id,
             completion,
         },
+        Err(failure)
+            if failure.failure.code
+                == myalbuns_imaging_protocol::ImagingFailureCode::OutputStorageFull =>
+        {
+            ImagingResponse::AlbumStorageFull {
+                request_id: request.request_id,
+                completion: myalbuns_imaging_protocol::AlbumRenderCompletion { outputs: completed },
+                failure: failure.failure,
+            }
+        }
         Err(failure) => {
             tracing::error!(target: "myalbuns.imaging", operation_id = request.request_id, reason = failure.message, event = "album_render_failed");
             ImagingResponse::failed(

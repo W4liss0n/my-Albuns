@@ -34,7 +34,45 @@ test("normal export keeps its dialog and resumes only after cache cleanup", asyn
   expect(dialog.dismiss).not.toHaveBeenCalled();
   await act(async () => finish(true));
   expect(harness.startSheet).toHaveBeenCalledTimes(2);
+  expect(harness.startSheet).toHaveBeenLastCalledWith(expect.objectContaining({ recoveryId: "full" }), expect.any(Function));
   expect(dialog.dismiss).not.toHaveBeenCalled();
+});
+
+test("retrying after cancelling a resumed export does not reuse its consumed native token", async () => {
+  const harness = createExportHarness();
+  (harness.port as ExportPipelinePort).storageRecovery = {
+    status: async () => ({ id: "full", canClearCache: false }), clear: async () => false,
+  };
+  const { dialog } = renderControl({ exportHarness: harness });
+  fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  await act(async () => harness.attempts[0].reject(new StorageFullError("Libere espaço.")));
+  await waitFor(() => expect(dialog.present).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "storageFull", busy: false })));
+  dialog.emit("resumeStorage");
+  expect(harness.startSheet.mock.calls[1][0].recoveryId).toBe("full");
+  await act(async () => {
+    harness.attempts[1].emit({ event: "started", cancellable: true });
+    harness.attempts[1].resolve({ status: "cancelled" });
+  });
+  dialog.emit("retryExport");
+  expect(harness.startSheet.mock.calls[2][0].recoveryId).toBeUndefined();
+});
+
+test("cancelling the disk-full dialog waits for native preparation disposal before closing", async () => {
+  const harness = createExportHarness();
+  let finish!: () => void;
+  const discard = vi.fn(() => new Promise<void>(resolve => { finish = resolve; }));
+  const port = harness.port as ExportPipelinePort;
+  port.discardRecovery = discard;
+  port.storageRecovery = { status: async () => ({ id: "paused", canClearCache: false }), clear: async () => false };
+  const { dialog } = renderControl({ exportHarness: harness });
+  fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  await act(async () => harness.attempts[0].reject(new StorageFullError("Libere espaço.")));
+  await waitFor(() => expect(dialog.present).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "storageFull", busy: false })));
+  dialog.emit("cancelStorage");
+  expect(discard).toHaveBeenCalledWith("paused");
+  expect(dialog.dismiss).not.toHaveBeenCalled();
+  await act(async () => finish());
+  expect(dialog.dismiss).toHaveBeenCalledOnce();
 });
 
 test("opens normal export only after the destination is available, without a transient preparation state", async () => {
@@ -367,8 +405,8 @@ test("waits for the backend started event before opening the native progress win
     cancellable: false,
     kind: "exportProgress",
     progress: {
-      kind: "indeterminate",
-      status: "Iniciando a Exportação",
+      kind: "determinate", completed: 0, total: 100,
+      status: "Exportando",
     },
   });
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -399,8 +437,8 @@ test("projects measured and unmeasured progress through the dialog port", async 
     cancellable: true,
     kind: "exportProgress",
     progress: {
-      kind: "indeterminate",
-      status: "Preparando a Exportação",
+      kind: "determinate", completed: 0, total: 100,
+      status: "Exportando",
     },
   });
   expect(dialog.present).toHaveBeenNthCalledWith(3, {
@@ -408,10 +446,10 @@ test("projects measured and unmeasured progress through the dialog port", async 
     cancellable: true,
     kind: "exportProgress",
     progress: {
-      completed: 2,
+      completed: 36,
       kind: "determinate",
-      status: "Compondo a Exportação",
-      total: 5,
+      status: "Exportando",
+      total: 100,
     },
   });
 });
@@ -432,7 +470,7 @@ test("handles cancellation actions from the child window and keeps feedback ther
     cancelRequested: true,
     cancellable: true,
     kind: "exportProgress",
-    progress: expect.objectContaining({ kind: "indeterminate" }),
+    progress: expect.objectContaining({ kind: "determinate", status: "Exportando" }),
   });
 
   await act(async () => {

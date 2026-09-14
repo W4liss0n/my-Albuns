@@ -35,6 +35,12 @@ A linha de estado pode usar `X/Y` para a unidade própria da operação, como
 `Lâmina 18 de 42`. A janela não inventa tempo restante quando o produtor de
 progresso não consegue estimá-lo.
 
+Na Exportação, o refinamento vigente mostra somente `Exportando`, barra geral,
+porcentagem e cancelamento quando disponível. Não apresenta carregamento dos
+Originais, composição, codificação, verificação ou publicação como etapas visíveis.
+A porcentagem é contínua entre essas etapas e ao retomar uma tentativa viva.
+O lote conserva também sua posição compacta `X/Y`.
+
 O processamento de imagens usa `Processando Imagens` e `X de Y` em qualquer
 ação explícita que precise preparar imagens do Projeto. Uma unidade inclui a
 validação da origem e a conclusão do Cache, inclusive seu reuso quando válido.

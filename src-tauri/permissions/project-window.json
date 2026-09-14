@@ -7,6 +7,7 @@
         "allow": [
           "storage_recovery_status",
           "clear_storage_recovery_cache",
+          "discard_export_recovery",
           "resume_cache_images",
           "frontend_log",
           "project_ui_ready",

@@ -24,6 +24,7 @@ use super::{
     ExportPlan, ExportProgressStage, ExportProgressUnits, bind_execution_paths, execute,
     execute_group, plan,
 };
+mod recovery_tests;
 use crate::imaging_processor::{
     ImagingOperation, ImagingTransport, InvocationContext, InvocationControl, InvocationFailure,
     InvocationFuture,
@@ -149,7 +150,7 @@ fn disk_full_during_album_publication_reports_real_failure_and_preserves_remaini
         };
         let fault = myalbuns_paths::test_support::DiskFull::on_rename(&outputs[failed_index]);
         let runtime = tokio::runtime::Runtime::new().unwrap();
-        let failure = runtime
+        let mut failure = runtime
             .block_on(super::execute_album(
                 &mut transport,
                 plan,
@@ -191,28 +192,33 @@ fn disk_full_during_album_publication_reports_real_failure_and_preserves_remaini
         assert_eq!(std::fs::read(&orphan).unwrap(), b"previous orphan");
         assert_eq!(std::fs::read(&source).unwrap(), original);
         assert!(
-            !root
-                .path()
+            root.path()
                 .join(".myalbuns-export-disk-full-export.tmp")
                 .exists()
         );
-        let retry = make_plan();
-        let mut roots = OperationPathContext::new();
-        for path in retry.required_paths() {
-            roots.capture(&path).unwrap();
-        }
-        transport.prior_bytes = std::fs::read(&outputs[0]).unwrap();
+        let retry = failure
+            .recovery
+            .take()
+            .expect("a live preparation is retained");
+        let mut stages = Vec::new();
+        let stages = Mutex::new(&mut stages);
         runtime
-            .block_on(super::execute_album(
+            .block_on(super::resume_album(
                 &mut transport,
                 retry,
-                &roots.freeze(),
                 &ExportExecutionControl::default(),
-                &|_| {},
+                &|progress| stages.lock().unwrap().push(progress.stage),
                 &context("disk-full-export"),
             ))
             .unwrap();
         assert_eq!(std::fs::read(&outputs[1]).unwrap(), b"prepared-1");
+        assert!(
+            !stages.lock().unwrap().iter().any(|stage| matches!(
+                stage,
+                ExportProgressStage::LoadingSources | ExportProgressStage::Composing
+            )),
+            "publication recovery must never invoke the renderer"
+        );
         assert!(!orphan.exists());
     }
 }
@@ -472,6 +478,8 @@ fn normal_export_prepares_the_entire_set_before_publish_and_cleans_a_failed_set(
         for name in ["Album_004.jpg", "Album_005_notes.png", "Album_0006.png"] {
             assert_eq!(std::fs::read(root.path().join(name)).unwrap(), b"keep");
         }
+        // Ending the paused attempt disposes retained output guards as well.
+        drop(result);
         assert!(
             !root
                 .path()

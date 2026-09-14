@@ -11,11 +11,11 @@ use std::{
 };
 use tauri::{Emitter, Manager, State};
 
-#[derive(Clone)]
 struct PausedStorage {
     id: String,
     volume: Option<StorageVolume>,
     cleanup_attempted: bool,
+    export: Option<Box<crate::export_pipeline::AlbumExportRecovery>>,
 }
 
 #[derive(Clone, Default)]
@@ -29,6 +29,38 @@ impl Drop for CleaningGuard<'_> {
 }
 
 impl StorageRecoveries {
+    pub(crate) fn retain_export(
+        &self,
+        volume: Option<StorageVolume>,
+        export: Option<Box<crate::export_pipeline::AlbumExportRecovery>>,
+    ) {
+        self.0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .insert(
+                "export".into(),
+                PausedStorage {
+                    id: uuid::Uuid::new_v4().to_string(),
+                    volume,
+                    cleanup_attempted: false,
+                    export,
+                },
+            );
+    }
+
+    pub(crate) fn take_export(
+        &self,
+        id: &str,
+    ) -> Result<Option<Box<crate::export_pipeline::AlbumExportRecovery>>, String> {
+        let mut entries = self
+            .0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if !entries.get("export").is_some_and(|paused| paused.id == id) {
+            return Err("Esta exportação pausada não está mais disponível.".into());
+        }
+        Ok(entries.remove("export").and_then(|paused| paused.export))
+    }
     pub(crate) fn is_cleaning(&self) -> bool {
         self.1.load(Ordering::Acquire) > 0
     }
@@ -48,6 +80,7 @@ impl StorageRecoveries {
                     id: uuid::Uuid::new_v4().to_string(),
                     volume,
                     cleanup_attempted: false,
+                    export: None,
                 },
             );
     }
@@ -165,6 +198,21 @@ pub(crate) async fn clear_storage_recovery_cache(
     let recoveries = recoveries.inner().clone();
     let cache = cache.inner().clone();
     tauri::async_runtime::spawn_blocking(move || recoveries.clear(&id, &cache))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+pub(crate) async fn discard_export_recovery(
+    id: String,
+    window: tauri::WebviewWindow,
+    recoveries: State<'_, StorageRecoveries>,
+) -> Result<(), String> {
+    if window.label() != crate::product_runtime::PROJECT_WINDOW_LABEL {
+        return Err("A Exportação pertence à Janela do Projeto.".into());
+    }
+    let recoveries = recoveries.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || recoveries.take_export(&id).map(drop))
         .await
         .map_err(|error| error.to_string())?
 }

@@ -9,7 +9,8 @@ use std::{
 };
 mod album;
 pub(crate) use album::{
-    AlbumExportOptions, AlbumExportPlan, execute_album, plan_album, plan_album_in_paths,
+    AlbumExportOptions, AlbumExportPlan, AlbumExportRecovery, execute_album, plan_album,
+    plan_album_in_paths, resume_album,
 };
 
 use myalbuns_core::{ComposedOutputUnit, RenderSnapshot};
@@ -87,12 +88,24 @@ pub(crate) struct PublishedExport {
     pub(crate) completion: RenderCompletion,
 }
 
+#[derive(Debug)]
 struct ExportPreparationGuard {
     storage: Option<PreparedExportStorage>,
     context: InvocationContext,
 }
 
 impl ExportPreparationGuard {
+    fn publish_retaining(&mut self) -> Result<(), myalbuns_paths::AppPathsError> {
+        self.storage
+            .as_ref()
+            .expect("owned output")
+            .publish_retaining()?;
+        // Drop the directory handles before attempting to remove the empty folder.
+        if let Some(storage) = self.storage.take() {
+            let _ = storage.discard();
+        }
+        Ok(())
+    }
     fn new(storage: PreparedExportStorage, context: &InvocationContext) -> Self {
         Self {
             storage: Some(storage),
@@ -171,6 +184,7 @@ pub(crate) struct ExportFailure {
     pub(crate) message: String,
     pub(crate) processor_failure: Option<ImagingFailure>,
     pub(crate) path_failure: Option<AppPathsError>,
+    pub(crate) recovery: Option<Box<AlbumExportRecovery>>,
 }
 
 impl ExportFailure {
@@ -181,6 +195,7 @@ impl ExportFailure {
             message: message.into(),
             processor_failure: None,
             path_failure: None,
+            recovery: None,
         }
     }
 
@@ -219,6 +234,7 @@ impl ExportFailure {
             message: failure.message,
             processor_failure: None,
             path_failure: None,
+            recovery: None,
         }
     }
 
@@ -233,6 +249,7 @@ impl ExportFailure {
             message: message.into(),
             processor_failure: Some(failure),
             path_failure: None,
+            recovery: None,
         }
     }
 }

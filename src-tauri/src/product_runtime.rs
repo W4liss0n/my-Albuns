@@ -239,6 +239,7 @@ pub(crate) fn run(
         .invoke_handler(tauri::generate_handler![
             crate::storage_recovery::storage_recovery_status,
             crate::storage_recovery::clear_storage_recovery_cache,
+            crate::storage_recovery::discard_export_recovery,
             crate::storage_recovery::resume_cache_images,
             crate::logging::frontend_log,
             crate::native_dialog_window::owned_window_content_ready,

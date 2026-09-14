@@ -74,9 +74,27 @@ pub(crate) struct BatchRunner {
     partial_publication: bool,
     storage_volume: Option<myalbuns_paths::StorageVolume>,
     current: Option<String>,
+    retained: Option<Box<export_pipeline::AlbumExportRecovery>>,
+    resume_policy: Option<ExportConflictPolicy>,
+    progress_percent: f64,
 }
 
 impl BatchRunner {
+    pub(crate) fn progress(&self) -> crate::ipc_contract::BatchExportProgress {
+        let completed = self
+            .items
+            .iter()
+            .filter(|item| item.status != BatchItemStatus::Pending)
+            .count() as u32;
+        let total = self.items.len() as u32;
+        crate::ipc_contract::BatchExportProgress {
+            completed,
+            total,
+            percent: self
+                .progress_percent
+                .max(f64::from(completed) / f64::from(total.max(1)) * 100.0),
+        }
+    }
     pub(crate) fn storage_volume(&self) -> Option<myalbuns_paths::StorageVolume> {
         self.storage_volume.clone()
     }
@@ -150,6 +168,9 @@ impl BatchRunner {
             })
             .collect();
         let mut batch = Self {
+            retained: None,
+            resume_policy: None,
+            progress_percent: 0.0,
             id: uuid::Uuid::new_v4().to_string(),
             configuration,
             core,
@@ -180,10 +201,11 @@ impl BatchRunner {
             },
             phase: self.phase,
             partial_publication: self.partial_publication,
-            has_conflicts: self
-                .items
-                .iter()
-                .any(|item| item.status == BatchItemStatus::Pending && item.has_conflicts),
+            has_conflicts: self.retained.is_none()
+                && self
+                    .items
+                    .iter()
+                    .any(|item| item.status == BatchItemStatus::Pending && item.has_conflicts),
             can_continue: self.phase == BatchPhase::Prepared
                 && !self.items.is_empty()
                 && self.items.iter().all(|item| {
@@ -205,6 +227,11 @@ impl BatchRunner {
     }
 
     pub(crate) fn retry_preflight(&mut self) {
+        if self.retained.is_some() {
+            self.phase = BatchPhase::Prepared;
+            return;
+        }
+        self.resume_policy = None;
         self.current = None;
         self.partial_publication = false;
         self.storage_volume = None;

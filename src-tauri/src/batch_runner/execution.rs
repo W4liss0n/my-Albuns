@@ -74,6 +74,7 @@ impl BatchRunner {
         policy: ExportConflictPolicy,
         progress: &(impl Fn(BatchExportProgress) + Send + Sync),
     ) -> Result<Self, String> {
+        let policy = self.resume_policy.unwrap_or(policy);
         let view = self.view();
         if !view.can_continue {
             return Err("Corrija ou ignore os Projetos com problemas antes de continuar.".into());
@@ -81,7 +82,11 @@ impl BatchRunner {
         if view.has_conflicts && policy == ExportConflictPolicy::Ask {
             return Err("Confirme como tratar a exportação existente antes de continuar.".into());
         }
-        let bindings = std::mem::take(&mut self.paths).freeze();
+        let bindings = self
+            .retained
+            .as_ref()
+            .map(|recovery| recovery.roots().clone())
+            .unwrap_or_else(|| std::mem::take(&mut self.paths).freeze());
         self.phase = BatchPhase::Running;
         self = tauri::async_runtime::spawn_blocking(move || {
             self.checkpoint_or_pause()?;
@@ -104,6 +109,11 @@ impl BatchRunner {
                 // removed only while the caller owns the processor reservation.
                 let roots = bindings.clone();
                 self = tauri::async_runtime::spawn_blocking(move || {
+                    if self.current.as_ref() == Some(&self.items[index].id) {
+                        self.retained = None;
+                        self.current = None;
+                        self.resume_policy = None;
+                    }
                     if let Some(preparation) = &self.items[index].preparation {
                         match preparation.discard(&roots) {
                             Ok(()) => self.items[index].preparation = None,
@@ -127,7 +137,13 @@ impl BatchRunner {
                     .resolve(&self.items[index].destination)
                     .ok()
                     .and_then(|path| myalbuns_paths::StorageVolume::containing(&path));
-                let planned = self.prepare_item(index, &roots, policy);
+                let planned = if self.retained.is_some()
+                    && self.current.as_ref() == Some(&self.items[index].id)
+                {
+                    Ok(None)
+                } else {
+                    self.prepare_item(index, &roots, policy).map(Some)
+                };
                 (self, planned)
             })
             .await
@@ -147,15 +163,18 @@ impl BatchRunner {
                     continue;
                 }
             };
-            if policy == ExportConflictPolicy::Skip {
+            if policy == ExportConflictPolicy::Skip
+                && let Some(current_plan) = plan.take()
+            {
                 let (returned_plan, has_outputs) =
                     tauri::async_runtime::spawn_blocking(move || {
+                        let mut plan = current_plan;
                         let has_outputs = plan.skip_existing_outputs();
                         (plan, has_outputs)
                     })
                     .await
                     .map_err(|error| error.to_string())?;
-                plan = returned_plan;
+                plan = Some(returned_plan);
                 match has_outputs {
                     Ok(true) => {}
                     Ok(false) => {
@@ -176,15 +195,21 @@ impl BatchRunner {
                     }
                 }
             }
-            let request_id = plan.request_id().to_owned();
+            let request_id = plan
+                .as_ref()
+                .map(|plan| plan.request_id())
+                .unwrap_or_else(|| self.retained.as_ref().expect("paused album").request_id())
+                .to_owned();
             self.current = Some(self.items[index].id.clone());
-            self.items[index].preparation = Some(checkpoint::InterruptedPreparation {
-                request_id: request_id.clone(),
-                path: bindings
-                    .resolve(plan.preparation_directory())
-                    .map_err(|error| error.to_string())?
-                    .into(),
-            });
+            if let Some(plan) = &plan {
+                self.items[index].preparation = Some(checkpoint::InterruptedPreparation {
+                    request_id: request_id.clone(),
+                    path: bindings
+                        .resolve(plan.preparation_directory())
+                        .map_err(|error| error.to_string())?
+                        .into(),
+                });
+            }
             self = self.persist().await?;
             if self.phase == BatchPhase::StorageFull {
                 break;
@@ -195,47 +220,60 @@ impl BatchRunner {
                 .iter()
                 .filter(|item| item.status != BatchItemStatus::Pending)
                 .count() as u32;
-            let last_percent = Mutex::new((f64::from(completed) / f64::from(total)) * 100.0);
+            let last_percent = Mutex::new(self.progress().percent);
             progress(BatchExportProgress {
                 completed,
                 total,
                 percent: *last_percent.lock().unwrap(),
             });
-            let result = export_pipeline::execute_album(
-                transport,
-                plan,
-                &bindings,
-                &item_control,
-                &|update| {
-                    let fraction = match update.units {
-                        ExportProgressUnits::Measured {
-                            completed_units,
-                            total_units,
-                        } if total_units > 0 => f64::from(completed_units) / f64::from(total_units),
-                        _ => 0.0,
-                    };
-                    let item_fraction = match update.stage {
-                        ExportProgressStage::Preparing => 0.0,
-                        ExportProgressStage::LoadingSources => 0.1 * fraction,
-                        ExportProgressStage::Composing | ExportProgressStage::EncodingOutput => {
-                            0.1 + 0.65 * fraction
-                        }
-                        ExportProgressStage::Verifying => 0.75 + 0.1 * fraction,
-                        ExportProgressStage::Publishing => 0.85 + 0.14 * fraction,
-                        ExportProgressStage::Completed => 0.99,
-                    };
-                    let mut last = last_percent.lock().expect("batch progress is available");
-                    *last =
-                        last.max((f64::from(completed) + item_fraction) / f64::from(total) * 100.0);
-                    progress(BatchExportProgress {
-                        completed,
-                        total,
-                        percent: *last,
-                    });
-                },
-                &InvocationContext::new(&request_id, None::<String>),
-            )
-            .await;
+            let report = |update: export_pipeline::ExportProgress| {
+                let fraction = match update.units {
+                    ExportProgressUnits::Measured {
+                        completed_units,
+                        total_units,
+                    } if total_units > 0 => f64::from(completed_units) / f64::from(total_units),
+                    _ => 0.0,
+                };
+                let item_fraction = match update.stage {
+                    ExportProgressStage::Preparing => 0.0,
+                    ExportProgressStage::LoadingSources => 0.1 * fraction,
+                    ExportProgressStage::Composing | ExportProgressStage::EncodingOutput => {
+                        0.1 + 0.65 * fraction
+                    }
+                    ExportProgressStage::Verifying => 0.75 + 0.1 * fraction,
+                    ExportProgressStage::Publishing => 0.85 + 0.14 * fraction,
+                    ExportProgressStage::Completed => 0.99,
+                };
+                let mut last = last_percent.lock().expect("batch progress is available");
+                *last = last.max((f64::from(completed) + item_fraction) / f64::from(total) * 100.0);
+                progress(BatchExportProgress {
+                    completed,
+                    total,
+                    percent: *last,
+                });
+            };
+            let context = InvocationContext::new(&request_id, None::<String>);
+            let result = if let Some(plan) = plan {
+                export_pipeline::execute_album(
+                    transport,
+                    plan,
+                    &bindings,
+                    &item_control,
+                    &report,
+                    &context,
+                )
+                .await
+            } else {
+                export_pipeline::resume_album(
+                    transport,
+                    self.retained.take().expect("paused album"),
+                    &item_control,
+                    &report,
+                    &context,
+                )
+                .await
+            };
+            self.progress_percent = *last_percent.lock().expect("batch progress is available");
             *cancellation
                 .current
                 .lock()
@@ -252,11 +290,14 @@ impl BatchRunner {
             }
             match result {
                 Ok(_) => {
+                    self.resume_policy = None;
                     self.items[index].status = BatchItemStatus::Completed;
                     self.items[index].preparation = None;
                 }
-                Err(error) => {
+                Err(mut error) => {
                     if error.is_storage_full() {
+                        self.retained = error.recovery.take();
+                        self.resume_policy = Some(policy);
                         self.partial_publication = matches!(
                             error.stage,
                             ExportFailureStage::Publish { promoted_outputs, .. } if promoted_outputs > 0

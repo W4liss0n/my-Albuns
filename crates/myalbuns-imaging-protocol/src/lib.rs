@@ -40,7 +40,7 @@ pub use render::{
 };
 pub use response::ImagingResponse;
 
-pub const IMAGING_PROTOCOL_VERSION: u32 = 25;
+pub const IMAGING_PROTOCOL_VERSION: u32 = 26;
 
 pub(crate) fn is_safe_identifier(value: &str) -> bool {
     !value.is_empty()
