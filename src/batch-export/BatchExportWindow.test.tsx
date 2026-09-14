@@ -96,6 +96,9 @@ test("updates the batch album count separately from its overall percentage", asy
   await screen.findByText("0 álbuns de 18");
   act(() => report({ completed: 7, total: 18, percent: 43 }));
   expect(screen.getByText("7 álbuns de 18")).toBeVisible();
+  expect(screen.getByText("7 álbuns de 18").closest(".ui-progress-dialog__meta"))
+    .toBe(screen.getByText("43%").closest(".ui-progress-dialog__meta"));
+  expect(screen.queryByRole("status")).not.toBeInTheDocument();
   expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "43");
 });
 

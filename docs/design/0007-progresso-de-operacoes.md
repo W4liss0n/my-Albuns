@@ -41,7 +41,7 @@ quando disponível. A contagem acompanha as unidades preparadas, inclusive as
 páginas internas de um PDF. Não apresenta carregamento dos
 Originais, composição, codificação, verificação ou publicação como etapas visíveis.
 A porcentagem é contínua entre essas etapas e ao retomar uma tentativa viva.
-O lote conserva a contagem compacta `X álbuns de Y`.
+O lote conserva a contagem compacta `X álbuns de Y`. Nas duas exportações, a contagem ocupa o espaço à direita abaixo da barra, na mesma linha da porcentagem e com a mesma tipografia da geração de Cache. O componente compartilhado fornece essa apresentação; não há uma linha de contagem acima da barra.
 
 O processamento de imagens usa `Processando Imagens` e `X de Y` em qualquer
 ação explícita que precise preparar imagens do Projeto. Uma unidade inclui a

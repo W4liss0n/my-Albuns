@@ -177,6 +177,9 @@ test("projects export progress and cancellation through the standard progress di
   );
   expect(onAction).toHaveBeenCalledWith("cancelExport");
   expect(screen.getByText("2 lâminas de 5")).toBeVisible();
+  expect(screen.getByText("2 lâminas de 5").closest(".ui-progress-dialog__meta"))
+    .toBe(screen.getByText("40%").closest(".ui-progress-dialog__meta"));
+  expect(screen.queryByRole("status")).not.toBeInTheDocument();
   expect(screen.getByText("Exportando")).toBeInTheDocument();
 });
 

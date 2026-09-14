@@ -102,13 +102,13 @@ export function ProgressDialog({
           </>
         ) : (
           <>
-            <p
+            {progress.status ? <p
               aria-live="polite"
               className="ui-progress-dialog__status"
               role="status"
             >
               {progress.status}
-            </p>
+            </p> : null}
             <ProgressBar
               completed={completed}
               indicatorStyle={indicatorStyle}
