@@ -267,6 +267,10 @@ fn disk_full_pauses_batch_before_the_next_project_and_preserves_completed_items(
         .unwrap();
         assert_eq!(transport.names, ["A", "B"], "disk full must stop before C");
         assert_eq!(paused.view().phase, BatchPhase::StorageFull);
+        assert_eq!(
+            paused.view().partial_publication,
+            publication_index == Some(1)
+        );
         assert_eq!(paused.view().items[0].status, BatchItemStatus::Completed);
         assert_eq!(paused.view().items[1].status, BatchItemStatus::Pending);
         assert_eq!(paused.view().items[2].status, BatchItemStatus::Pending);
@@ -345,6 +349,54 @@ fn disk_full_checkpoint_keeps_live_progress_and_the_previous_atomic_checkpoint()
     );
     assert_eq!(finished.view().phase, BatchPhase::Finished);
     assert!(!path.exists());
+}
+
+#[test]
+fn disk_full_live_retry_does_not_revive_an_ignored_project_after_restart() {
+    let root = tempfile::tempdir().unwrap();
+    let (core, _first) = fixture(root.path(), "source/A.myalbuns");
+    let (_, _second) = fixture(root.path(), "source/B.myalbuns");
+    let (_, third) = fixture(root.path(), "source/C.myalbuns");
+    let third_bytes = std::fs::read(third.project_path()).unwrap();
+    let checkpoints = root.path().join("checkpoints");
+    let batch = BatchRunner::discover(
+        BatchConfiguration {
+            source: root.path().join("source"),
+            destination: None,
+            format: ExportFormat::Png,
+            mode: ExportMode::Sheet,
+        },
+        core.clone(),
+        checkpoints.clone(),
+    )
+    .unwrap();
+    let id = batch.id.clone();
+    let mut transport = RecordingTransport {
+        storage_full_for: Some("B".into()),
+        ..Default::default()
+    };
+    let mut paused = tauri::async_runtime::block_on(batch.run(
+        &mut transport,
+        &BatchCancellation::default(),
+        ExportConflictPolicy::Ask,
+        &|_| {},
+    ))
+    .unwrap();
+    paused.retry_preflight();
+    paused.ignore(&paused.items[1].id.clone()).unwrap();
+    std::fs::write(third.project_path(), b"changed after preflight").unwrap();
+    let finished = tauri::async_runtime::block_on(paused.run(
+        &mut RecordingTransport::default(),
+        &BatchCancellation::default(),
+        ExportConflictPolicy::Ask,
+        &|_| {},
+    ))
+    .unwrap();
+    assert_eq!(finished.items[1].status, BatchItemStatus::Ignored);
+    assert_eq!(finished.items[2].status, BatchItemStatus::Failed);
+    std::fs::write(third.project_path(), third_bytes).unwrap();
+    let recovered = BatchRunner::resume(&checkpoints, &id, core).unwrap();
+    assert_eq!(recovered.items[1].status, BatchItemStatus::Ignored);
 }
 
 #[test]
@@ -670,7 +722,7 @@ fn process_exit_before_during_and_after_publication_replays_the_whole_interrupte
     }
 }
 
-fn background_fixture(
+pub(super) fn background_fixture(
     root: &Path,
     name: &str,
 ) -> (ProjectCore, myalbuns_core::EditableProject, PathBuf) {

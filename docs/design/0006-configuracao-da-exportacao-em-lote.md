@@ -66,6 +66,8 @@ A falta real de espaço durante a preparação, gravação ou publicação pausa
 
 O progresso dá lugar a um modal compacto de `Espaço insuficiente`, com `Retomar` e `Cancelar`. O Álbum interrompido permanece pendente; os Álbuns concluídos não são repetidos. Depois de liberar espaço, `Retomar` faz nova verificação e exige confirmação para executar, incluindo o tratamento de conflitos de saídas que já existam. A publicação continua atômica por arquivo; a retomada não pressupõe desfazer arquivos já publicados.
 
+Quando já houver arquivos publicados do Álbum atual, o próprio modal informa a publicação parcial e orienta a retomar para concluir. Essa frase não aparece quando a falta de espaço ocorre antes de qualquer publicação desse Álbum.
+
 Durante essa pausa, a janela mantém o estado e as Religações temporárias em memória. A retomada recaptura os bindings. Se o disco cheio também impedir atualizar o checkpoint, o registro anterior permanece íntegro e a janela conserva o progresso mais recente. Após fechar o aplicativo, valem o último checkpoint gravado e as regras de recuperação acima. `Cancelar` encerra esse lote e preserva as saídas já publicadas.
 
 ## Propriedade da execução

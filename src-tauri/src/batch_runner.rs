@@ -71,6 +71,7 @@ pub(crate) struct BatchRunner {
     paths: OperationPathContext,
     items: Vec<BatchItem>,
     phase: BatchPhase,
+    partial_publication: bool,
     current: Option<String>,
 }
 
@@ -152,6 +153,7 @@ impl BatchRunner {
             paths,
             items,
             phase: BatchPhase::Prepared,
+            partial_publication: false,
             current: None,
         };
         batch.recheck();
@@ -172,6 +174,7 @@ impl BatchRunner {
                 mode: self.configuration.mode,
             },
             phase: self.phase,
+            partial_publication: self.partial_publication,
             has_conflicts: self
                 .items
                 .iter()
@@ -197,6 +200,8 @@ impl BatchRunner {
     }
 
     pub(crate) fn retry_preflight(&mut self) {
+        self.current = None;
+        self.partial_publication = false;
         self.paths = OperationPathContext::new();
         self.recheck();
     }

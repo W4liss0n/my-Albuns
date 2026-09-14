@@ -200,6 +200,7 @@ impl BatchRunner {
             paths,
             items,
             phase: BatchPhase::Prepared,
+            partial_publication: false,
             current: None,
         };
         batch.recheck();

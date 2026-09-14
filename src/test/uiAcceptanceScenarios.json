@@ -71,6 +71,14 @@
       "readySelector": ".ui-standard-message", "actions": []
     },
     {
+      "id": "batch-export-storage-full-partial",
+      "title": "Exportação em lote — pausa com publicação parcial",
+      "implementationPath": "/batch-export-preview.html?scenario=storage-full-partial",
+      "comparison": { "kind": "implementation-only", "surface": "batch-export-window", "implementationCaptureSelector": ".ui-owned-window-shell", "reason": "ADR 0006 e decisão aceita de pausa: avisar no próprio modal quando arquivos do Álbum atual já foram publicados antes da falta de espaço. Mensagem condicional, sem tabela de falhas." },
+      "viewport": { "width": 520, "height": 340 },
+      "readySelector": ".ui-standard-message", "actions": []
+    },
+    {
       "id": "batch-export-result",
       "title": "Exportação em lote — resultado com falhas e ignorados",
       "implementationPath": "/batch-export-preview.html?scenario=result",

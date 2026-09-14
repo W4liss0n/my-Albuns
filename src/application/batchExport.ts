@@ -13,6 +13,7 @@ export interface BatchExportView {
   id: string;
   options: BatchExportOptions;
   phase: "prepared" | "running" | "interrupted" | "storageFull" | "finished";
+  partialPublication: boolean;
   items: {
     id: string;
     name: string;

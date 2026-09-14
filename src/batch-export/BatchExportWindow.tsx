@@ -77,7 +77,9 @@ export function BatchExportWindow({ port }: { port: BatchExportPort }) {
       confirmAction={{ label: "Retomar", disabled: busy, onClick: () => refresh(() => port.resume(view.id)) }} />;
   } else if (view?.phase === "storageFull") {
     content = <ConfirmationDialog title="Espaço insuficiente" tone="neutral"
-      description="Libere espaço para continuar. Os álbuns já exportados foram mantidos."
+      description={<>{view.partialPublication
+        ? "O álbum atual foi publicado parcialmente. Libere espaço e retome para concluir."
+        : "Libere espaço para continuar."} Os álbuns já exportados foram mantidos.</>}
       cancelAction={{ label: "Cancelar", disabled: busy, onClick: () => end(view.id) }}
       confirmAction={{ label: "Retomar", disabled: busy, onClick: () => refresh(() => port.resume(view.id)) }} />;
   } else if (terminal && problems.length === 0) {

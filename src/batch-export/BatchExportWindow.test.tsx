@@ -11,7 +11,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 const ready: BatchExportView = {
   id: "batch", options: { sourceFolder: "C:\\Projetos", destinationFolder: null, format: { kind: "jpeg", quality: 100 }, mode: "sheet" },
-  phase: "prepared", hasConflicts: false, canContinue: true,
+  phase: "prepared", hasConflicts: false, canContinue: true, partialPublication: false,
   items: [{ id: "album", name: "A", projectPath: "C:\\Projetos\\A.myalbuns", destination: "C:\\Projetos\\A", status: "pending", problems: [] }],
 };
 function port(overrides: Partial<BatchExportPort> = {}): BatchExportPort {
@@ -92,6 +92,7 @@ test("disk full presents a compact pause modal instead of a failed-project table
   const api = port({ current: async () => ({ ...ready, phase: "storageFull", canContinue: false }) });
   const { container } = render(<BatchExportWindow port={api} />);
   await screen.findByText("Espaço insuficiente");
+  expect(screen.queryByText(/álbum atual foi publicado parcialmente/)).not.toBeInTheDocument();
   expect(screen.queryByRole("table")).not.toBeInTheDocument();
   expect(container.querySelector(".ui-owned-window-shell")).toHaveStyle({ width: "520px" });
   expect(api.resultReady).toHaveBeenCalled();
@@ -112,4 +113,13 @@ test("the user can cancel a batch paused for disk space without starting another
   fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
   await waitFor(() => expect(api.end).toHaveBeenCalledWith("batch"));
   expect(api.run).not.toHaveBeenCalled();
+});
+
+test("the storage modal discloses a partial publication before the user cancels", async () => {
+  const api = port({ current: async () => ({ ...ready, phase: "storageFull", canContinue: false, partialPublication: true }) });
+  render(<BatchExportWindow port={api} />);
+  await screen.findByText("Espaço insuficiente");
+  expect(screen.getByText(/álbum atual foi publicado parcialmente/)).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+  await waitFor(() => expect(api.end).toHaveBeenCalledWith("batch"));
 });

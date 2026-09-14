@@ -253,6 +253,10 @@ impl BatchRunner {
                 }
                 Err(error) => {
                     if error.is_storage_full() {
+                        self.partial_publication = matches!(
+                            error.stage,
+                            ExportFailureStage::Publish { promoted_outputs, .. } if promoted_outputs > 0
+                        );
                         self.phase = BatchPhase::StorageFull;
                         break;
                     }
@@ -288,33 +292,35 @@ impl BatchRunner {
                 percent: f64::from(completed) / f64::from(total) * 100.0,
             });
         }
+        tauri::async_runtime::spawn_blocking(move || self.finish_attempt())
+            .await
+            .map_err(|error| error.to_string())?
+    }
+
+    fn finish_attempt(mut self) -> Result<Self, String> {
         if !matches!(
             self.phase,
             BatchPhase::Interrupted | BatchPhase::StorageFull
         ) {
             self.phase = BatchPhase::Finished;
         }
+        if self.items.iter().all(|item| {
+            matches!(
+                item.status,
+                BatchItemStatus::Completed | BatchItemStatus::Ignored
+            )
+        }) && self.phase == BatchPhase::Finished
+        {
+            self.remove_checkpoint()?;
+        } else {
+            self.checkpoint_or_pause()?;
+        }
         if self.phase != BatchPhase::StorageFull {
             for item in &mut self.items {
                 item.relinks = ItemRelinks::default();
             }
         }
-        tauri::async_runtime::spawn_blocking(move || {
-            if self.items.iter().all(|item| {
-                matches!(
-                    item.status,
-                    BatchItemStatus::Completed | BatchItemStatus::Ignored
-                )
-            }) && self.phase == BatchPhase::Finished
-            {
-                self.remove_checkpoint()?;
-            } else {
-                self.checkpoint_or_pause()?;
-            }
-            Ok(self)
-        })
-        .await
-        .map_err(|error| error.to_string())?
+        Ok(self)
     }
 
     async fn persist(mut self) -> Result<Self, String> {
@@ -400,6 +406,45 @@ fn create_destination(path: &Path) -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn disk_full_at_the_final_checkpoint_preserves_live_relinks() {
+        let root = tempfile::tempdir().unwrap();
+        let (core, _editor, original) =
+            crate::batch_runner::tests::background_fixture(root.path(), "A");
+        let replacement = root.path().join("relocated");
+        std::fs::create_dir_all(&replacement).unwrap();
+        std::fs::rename(&original, replacement.join("001.jpg")).unwrap();
+        let mut batch = BatchRunner::discover(
+            BatchConfiguration {
+                source: root.path().join("source"),
+                destination: None,
+                format: ExportFormat::Png,
+                mode: ExportMode::Sheet,
+            },
+            core,
+            root.path().join("checkpoints"),
+        )
+        .unwrap();
+        batch
+            .relink(&batch.items[0].id.clone(), &replacement)
+            .unwrap();
+        batch.items[0].status = BatchItemStatus::Failed;
+        batch.phase = BatchPhase::Running;
+        batch.save_checkpoint().unwrap();
+        let fault = myalbuns_paths::test_support::DiskFull::on_create(
+            &batch.checkpoint_root.join(format!("{}.json", batch.id)),
+        );
+        let mut paused = batch.finish_attempt().unwrap();
+        assert_eq!(fault.failure_count(), 1);
+        assert_eq!(paused.view().phase, BatchPhase::StorageFull);
+        drop(fault);
+        paused.retry_preflight();
+        assert!(
+            paused.view().can_continue,
+            "a final checkpoint failure must retain relinks for retry"
+        );
+    }
 
     #[test]
     fn disk_full_while_creating_the_destination_is_a_pause_not_an_item_problem() {
