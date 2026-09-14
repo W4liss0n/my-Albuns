@@ -55,11 +55,15 @@ export function GenerationWindow({ port }: { port: ProjectGenerationPort }) {
       secondaryAction={{ label: "Fechar", disabled: busy, onClick: close }} /> : <ProblemsDialog
       title={terminal ? view.phase === "cancelled" ? "Geração cancelada" : "Resultado da geração" : "Problemas na Geração"}
       description={terminal ? `${view.items.filter(item => item.status === "completed").length} de ${view.items.length} Projetos gerados.` : "Resolva ou ignore as pendências para continuar."}
-      columns={["Projeto", "Problema", "Ações"]}
-      rows={issues.map(item => [
+      columns={terminal ? ["Projeto", "Situação", "Motivo"] : ["Projeto", "Problema", "Ações"]}
+      rows={issues.map(item => terminal ? [
         <span title={item.destination}>{item.name}</span>,
-        item.problems.length > 0 ? item.problems.join(" ") : terminal ? item.status === "ignored" ? "Ignorado" : "Não gerado" : item.decision === "replace" ? "Será sobrescrito" : item.decision === "ignore" ? "Ignorado" : "Já existe no destino",
-        terminal ? "—" : <div className="generation-row-actions">
+        item.status === "ignored" ? "Ignorado" : item.status === "failed" ? "Falhou" : "Não gerado",
+        item.problems.join(" ") || "—",
+      ] : [
+        <span title={item.destination}>{item.name}</span>,
+        item.problems.length > 0 ? item.problems.join(" ") : item.decision === "replace" ? "Será sobrescrito" : item.decision === "ignore" ? "Ignorado" : "Já existe no destino",
+        <div className="generation-row-actions">
           {item.conflict && <ActionButton disabled={busy || !item.canReplace} onClick={() => void perform(() => port.decide(item.id, "replace"))}>Sobrescrever</ActionButton>}
           <ActionButton disabled={busy || item.status === "ignored"} onClick={() => void perform(() => port.decide(item.id, "ignore"))}>Ignorar</ActionButton>
         </div>,

@@ -44,3 +44,13 @@ test("presents pending cancelled items in the final result", async () => {
   await screen.findByText("Geração cancelada");
   expect(screen.getByText("Não gerado")).toBeVisible();
 });
+test("distinguishes ignored projects from failures even when both retain a reason", async () => {
+  render(<GenerationWindow port={port({ current: async () => ({ ...ready, phase: "finished", items: [
+    { ...ready.items[0], status: "ignored", problems: ["O Projeto está aberto."] },
+    { ...ready.items[0], id: "failed", status: "failed", problems: ["A foto mudou."] },
+  ] }) })} />);
+  await screen.findByText("Ignorado");
+  expect(screen.getByText("Falhou")).toBeVisible();
+  expect(screen.getByText("O Projeto está aberto.")).toBeVisible();
+  expect(screen.getByText("A foto mudou.")).toBeVisible();
+});
