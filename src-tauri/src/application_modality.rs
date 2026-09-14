@@ -98,6 +98,9 @@ impl ApplicationModality {
             let enabled = unsafe { IsWindowEnabled(handle) }.as_bool();
             blocked
                 .entry(handle.0 as isize)
+                // A dialog can finish while application modality still owns the
+                // block. Remember its restoration intent before disabling again.
+                .and_modify(|(_, was_enabled)| *was_enabled |= enabled)
                 .or_insert_with(|| (window.clone(), enabled));
             if enabled {
                 let _ = window.set_enabled(false);

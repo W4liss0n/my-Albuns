@@ -62,6 +62,17 @@ try {
 
     & $script:CargoExecutable test `
         -p myalbuns-desktop `
+        'batch_runner::tests::real_processor_exports_persisted_batches_in_every_format' `
+        -- `
+        --ignored `
+        --exact `
+        --test-threads=1
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+
+    & $script:CargoExecutable test `
+        -p myalbuns-desktop `
         'photo_import::native_flow_tests::real_import_flow' `
         -- `
         --ignored `

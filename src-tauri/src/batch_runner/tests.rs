@@ -815,7 +815,7 @@ fn global_relink_requires_unique_exact_names_in_each_project_folder_and_never_sa
 }
 
 #[test]
-#[ignore = "executed with MYALBUNS_REAL_IMAGING_PROCESSOR by the native integration gate"]
+#[ignore = "executed with a matching Processor by the integration gates"]
 fn real_processor_exports_persisted_batches_in_every_format() {
     use crate::{
         cache_engine::CacheEngine, imaging_processor::ImagingProcessor,
@@ -823,8 +823,11 @@ fn real_processor_exports_persisted_batches_in_every_format() {
         operation_lease::OperationLease,
     };
     tauri::async_runtime::block_on(async {
-        let executable =
-            PathBuf::from(std::env::var_os("MYALBUNS_REAL_IMAGING_PROCESSOR").unwrap());
+        let executable = PathBuf::from(
+            std::env::var_os("MYALBUNS_TEST_IMAGING_PROCESSOR")
+                .or_else(|| std::env::var_os("MYALBUNS_REAL_IMAGING_PROCESSOR"))
+                .expect("the integration gate provides a matching Processor"),
+        );
         let root = tempfile::tempdir().unwrap();
         let (core, mut first, _) = background_fixture(root.path(), "A");
         let (_, mut second, _) = background_fixture(root.path(), "B");
@@ -864,7 +867,7 @@ fn real_processor_exports_persisted_batches_in_every_format() {
             let lease = OperationLease::acquire(&gate, &cache, &processor)
                 .await
                 .unwrap();
-            let mut transport = RealProcessTransport::stable(executable.clone(), logs);
+            let mut transport = RealProcessTransport::in_data_root(executable.clone(), logs);
             let result = batch
                 .run(
                     &mut transport,
