@@ -19,6 +19,7 @@ pub enum ImagingFailureCode {
     CompositionFailed,
     ResourceLimitExceeded,
     EncodeFailed,
+    OutputStorageFull,
     VerificationFailed,
 }
 
@@ -35,6 +36,7 @@ impl ImagingFailureCode {
             Self::CompositionFailed => "composition_failed",
             Self::ResourceLimitExceeded => "resource_limit_exceeded",
             Self::EncodeFailed => "encode_failed",
+            Self::OutputStorageFull => "output_storage_full",
             Self::VerificationFailed => "verification_failed",
         }
     }
@@ -51,6 +53,7 @@ impl ImagingFailureCode {
             Self::CompositionFailed => ImagingFailureStage::Composition,
             Self::ResourceLimitExceeded => ImagingFailureStage::ResourceLimitExceeded,
             Self::EncodeFailed => ImagingFailureStage::OutputEncode,
+            Self::OutputStorageFull => ImagingFailureStage::OutputStorageFull,
             Self::VerificationFailed => ImagingFailureStage::OutputVerify,
         }
     }
@@ -131,6 +134,7 @@ pub enum ImagingFailureStage {
     Composition,
     OutputPrepare,
     OutputEncode,
+    OutputStorageFull,
     OutputVerify,
 }
 
@@ -146,6 +150,7 @@ impl ImagingFailureStage {
             Self::Composition => "composition",
             Self::OutputPrepare => "output_prepare",
             Self::OutputEncode => "output_encode",
+            Self::OutputStorageFull => "output_storage_full",
             Self::OutputVerify => "output_verify",
         }
     }
@@ -161,6 +166,7 @@ impl ImagingFailureStage {
             Self::Composition => 22,
             Self::OutputPrepare => 23,
             Self::OutputEncode => 24,
+            Self::OutputStorageFull => 31,
             Self::OutputVerify => 26,
         }
     }
@@ -176,6 +182,7 @@ impl ImagingFailureStage {
             22 => Some(Self::Composition),
             23 => Some(Self::OutputPrepare),
             24 => Some(Self::OutputEncode),
+            31 => Some(Self::OutputStorageFull),
             26 => Some(Self::OutputVerify),
             _ => None,
         }

@@ -4,6 +4,8 @@ use std::{io, path::Path};
 pub fn publish_new_file(prepared: &Path, target: &Path) -> io::Result<()> {
     use windows_sys::Win32::Storage::FileSystem::MoveFileExW;
 
+    #[cfg(feature = "test-support")]
+    crate::test_support::rename(target)?;
     let prepared = crate::wide_api_path(prepared);
     let target = crate::wide_api_path(target);
     // No replacement flag: a concurrently created target remains protected.
@@ -17,6 +19,8 @@ pub fn publish_new_file(prepared: &Path, target: &Path) -> io::Result<()> {
 
 #[cfg(not(windows))]
 pub fn publish_new_file(prepared: &Path, target: &Path) -> io::Result<()> {
+    #[cfg(feature = "test-support")]
+    crate::test_support::rename(target)?;
     std::fs::hard_link(prepared, target)?;
     std::fs::remove_file(prepared)
 }
@@ -25,6 +29,8 @@ pub fn publish_new_file(prepared: &Path, target: &Path) -> io::Result<()> {
 pub fn replace_existing_file(prepared: &Path, target: &Path) -> io::Result<()> {
     use windows_sys::Win32::Storage::FileSystem::ReplaceFileW;
 
+    #[cfg(feature = "test-support")]
+    crate::test_support::rename(target)?;
     let target = crate::wide_api_path(target);
     let prepared = crate::wide_api_path(prepared);
     let succeeded = unsafe {
@@ -46,5 +52,7 @@ pub fn replace_existing_file(prepared: &Path, target: &Path) -> io::Result<()> {
 
 #[cfg(not(windows))]
 pub fn replace_existing_file(prepared: &Path, target: &Path) -> io::Result<()> {
+    #[cfg(feature = "test-support")]
+    crate::test_support::rename(target)?;
     std::fs::rename(prepared, target)
 }

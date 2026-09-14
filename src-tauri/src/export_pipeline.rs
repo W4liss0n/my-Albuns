@@ -641,6 +641,9 @@ fn processor_failure_message(code: ImagingFailureCode) -> &'static str {
             "A Exportação excede o limite seguro de recursos desta versão."
         }
         ImagingFailureCode::EncodeFailed => "O JPEG não pôde ser codificado e sincronizado.",
+        ImagingFailureCode::OutputStorageFull => {
+            myalbuns_paths::AppPathsError::EXPORT_STORAGE_FULL_MESSAGE
+        }
         ImagingFailureCode::VerificationFailed => {
             "O JPEG preparado não passou pela verificação de integridade."
         }

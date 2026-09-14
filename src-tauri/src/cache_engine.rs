@@ -2746,12 +2746,9 @@ mod tests {
                 std::fs::write(fixture.work.source.source_path(), b"original-photo-v2").unwrap();
                 let original_before = std::fs::read(fixture.work.source.source_path()).unwrap();
                 let fault = if during_rename {
-                    myalbuns_paths::test_support::CacheDiskFull::on_rename(&paths.metadata_file())
+                    myalbuns_paths::test_support::DiskFull::on_rename(&paths.metadata_file())
                 } else {
-                    myalbuns_paths::test_support::CacheDiskFull::after_bytes(
-                        &paths.metadata_file(),
-                        32,
-                    )
+                    myalbuns_paths::test_support::DiskFull::after_bytes(&paths.metadata_file(), 32)
                 };
                 let mut transport = ScriptedTransport {
                     app_paths: fixture.app_paths.clone(),

@@ -42,6 +42,7 @@ fn imaging_failure_stages_have_stable_process_exit_codes() {
         ImagingFailureStage::Composition,
         ImagingFailureStage::OutputPrepare,
         ImagingFailureStage::OutputEncode,
+        ImagingFailureStage::OutputStorageFull,
         ImagingFailureStage::OutputVerify,
         ImagingFailureStage::ResourceLimitExceeded,
     ];
@@ -59,6 +60,19 @@ fn imaging_failure_stages_have_stable_process_exit_codes() {
         None,
         "publication belongs to the host ExportPipeline"
     );
+}
+
+#[test]
+fn output_storage_full_is_a_typed_wire_failure() {
+    let response: ImagingResponse = serde_json::from_str(
+        r#"{"kind":"failed","requestId":"disk-full","code":"outputStorageFull"}"#,
+    )
+    .unwrap();
+    let failure = response.failure_for("disk-full").unwrap();
+    assert_eq!(failure.code, ImagingFailureCode::OutputStorageFull);
+    assert_eq!(failure.code.stage(), ImagingFailureStage::OutputStorageFull);
+    assert_eq!(failure.code.stage().exit_code(), 31);
+    assert_eq!(failure.media_id, None);
 }
 
 #[test]

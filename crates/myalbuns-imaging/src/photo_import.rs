@@ -350,7 +350,7 @@ mod tests {
                     std::process::id(),
                 )
                 .unwrap();
-            let fault = myalbuns_paths::test_support::CacheDiskFull::after_bytes(&preview_path, 32);
+            let fault = myalbuns_paths::test_support::DiskFull::after_bytes(&preview_path, 32);
             let mut progress = Vec::new();
             let completion = prepare(&request, &paths, |completed, total| {
                 progress.push((completed, total));
@@ -432,7 +432,7 @@ mod tests {
             import.root_bindings,
         )
         .unwrap();
-        let fault = myalbuns_paths::test_support::CacheDiskFull::after_bytes(&preview, 32);
+        let fault = myalbuns_paths::test_support::DiskFull::after_bytes(&preview, 32);
         let error = crate::cache::run_cache(request, &paths).unwrap_err();
         assert!(fault.failure_count() > 0);
         assert!(matches!(error, crate::cache_error::CacheError::StorageFull));

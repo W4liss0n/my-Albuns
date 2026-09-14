@@ -76,7 +76,8 @@ aprovações. O contrato IPC foi regenerado a partir do Rust.
 TypeScript, build da interface, formatação Rust e Clippy também passaram.
 
 Esta verificação cobre falhas de gravação e publicação. Não equivale a um teste
-manual com um volume físico cheio nem conclui o aviso preventivo de pouco espaço
-com `Liberar espaço`/`Agora não`. Esses critérios e a migração final de namespace
-continuam em #16/#40. A decisão de manter a limpeza em segundo plano permanece
-inalterada.
+manual com um volume físico cheio. Depois dessa verificação, em 13 de setembro
+de 2026, o usuário dispensou o aviso preventivo: somente falhas reais de falta de
+espaço devem gerar aviso, conforme o design de armazenamento atualizado.
+A migração final de namespace continua em #16/#40. A decisão de manter a limpeza
+em segundo plano permanece inalterada.

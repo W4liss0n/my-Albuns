@@ -21,23 +21,39 @@ pub enum AppPathsError {
     CacheStorageFull,
     CacheStorageOutsideRoot,
     ExportStorageUnavailable,
+    ExportStorageFull,
     ExportStorageOutsideDestination,
     ExportTargetConflict,
 }
 
 impl AppPathsError {
+    pub const EXPORT_STORAGE_FULL_MESSAGE: &'static str = "Não há espaço no destino para concluir a exportação. Libere espaço ou escolha outra pasta e tente novamente.";
+    pub fn export_io(error: &std::io::Error) -> Self {
+        if Self::is_storage_full(error) {
+            Self::ExportStorageFull
+        } else {
+            Self::ExportStorageUnavailable
+        }
+    }
+
     /// Retains actionable storage exhaustion without depending on localized OS text.
     pub fn cache_io(error: &std::io::Error) -> Self {
+        if Self::is_storage_full(error) {
+            Self::CacheStorageFull
+        } else {
+            Self::CacheStorageUnavailable
+        }
+    }
+
+    pub fn is_storage_full(error: &std::io::Error) -> bool {
         #[cfg(windows)]
         if matches!(error.raw_os_error(), Some(39 | 112)) {
-            return Self::CacheStorageFull;
+            return true;
         }
-        match error.kind() {
-            std::io::ErrorKind::StorageFull | std::io::ErrorKind::QuotaExceeded => {
-                Self::CacheStorageFull
-            }
-            _ => Self::CacheStorageUnavailable,
-        }
+        matches!(
+            error.kind(),
+            std::io::ErrorKind::StorageFull | std::io::ErrorKind::QuotaExceeded
+        )
     }
 }
 
@@ -90,6 +106,9 @@ impl Display for AppPathsError {
             Self::ExportStorageUnavailable => {
                 formatter.write_str("a preparação da Exportação está indisponível")
             }
+            Self::ExportStorageFull => formatter.write_str(
+                Self::EXPORT_STORAGE_FULL_MESSAGE,
+            ),
             Self::ExportStorageOutsideDestination => {
                 formatter.write_str("a preparação da Exportação escapou do Destino autorizado")
             }

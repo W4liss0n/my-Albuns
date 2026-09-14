@@ -4,13 +4,24 @@ use myalbuns_imaging_protocol::ImagingFailureCode;
 use sha2::{Digest, Sha256};
 use std::{
     borrow::Cow,
-    fs::{File, OpenOptions},
+    fs::File,
     io::{BufReader, BufWriter, Read, Seek, Write},
     path::Path,
 };
 
 fn failed(error: impl std::fmt::Display) -> JpegFailure {
     JpegFailure::new(ImagingFailureCode::EncodeFailed, error.to_string())
+}
+
+fn io_failed(error: std::io::Error) -> JpegFailure {
+    JpegFailure::io("não foi possível preparar a Exportação", &error)
+}
+
+fn png_failed(error: png::EncodingError) -> JpegFailure {
+    match error {
+        png::EncodingError::IoError(error) => io_failed(error),
+        other => failed(other),
+    }
 }
 
 pub(crate) fn receipt(path: &Path) -> Result<VerifiedJpeg, JpegFailure> {
@@ -38,11 +49,7 @@ pub(crate) fn write_png(
     dpi: u32,
 ) -> Result<VerifiedJpeg, JpegFailure> {
     let rgb = opaque_rgb_bytes(image)?;
-    let file = OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(path)
-        .map_err(failed)?;
+    let file = crate::export_output::create_output(path).map_err(io_failed)?;
     let mut writer = BufWriter::new(file);
     let mut info = png::Info::with_size(image.width(), image.height());
     info.color_type = png::ColorType::Rgb;
@@ -55,13 +62,13 @@ pub(crate) fn write_png(
         unit: png::Unit::Meter,
     });
     let mut encoder = png::Encoder::with_info(&mut writer, info)
-        .map_err(failed)?
+        .map_err(png_failed)?
         .write_header()
-        .map_err(failed)?;
-    encoder.write_image_data(&rgb).map_err(failed)?;
-    encoder.finish().map_err(failed)?;
-    writer.flush().map_err(failed)?;
-    writer.get_ref().sync_all().map_err(failed)?;
+        .map_err(png_failed)?;
+    encoder.write_image_data(&rgb).map_err(png_failed)?;
+    encoder.finish().map_err(png_failed)?;
+    writer.flush().map_err(io_failed)?;
+    writer.get_ref().sync_all().map_err(io_failed)?;
     drop(writer);
     let mut decoder = png::Decoder::new(BufReader::new(File::open(path).map_err(failed)?))
         .read_info()
@@ -95,18 +102,14 @@ pub(crate) fn write_png(
 /// A deliberately small PDF writer: one lossless, ICCBased raster per physical page.
 /// Streams are written page by page; the document never retains the album's rasters.
 pub(crate) struct PdfOutput {
-    writer: BufWriter<File>,
+    writer: BufWriter<crate::export_output::OutputFile>,
     offsets: Vec<u64>,
     pages: Vec<usize>,
 }
 
 impl PdfOutput {
     pub(crate) fn create(path: &Path) -> Result<Self, JpegFailure> {
-        let file = OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(path)
-            .map_err(failed)?;
+        let file = crate::export_output::create_output(path).map_err(io_failed)?;
         let mut result = Self {
             writer: BufWriter::new(file),
             offsets: vec![0; 4],
@@ -115,20 +118,20 @@ impl PdfOutput {
         result
             .writer
             .write_all(b"%PDF-1.7\n%\xe2\xe3\xcf\xd3\n")
-            .map_err(failed)?;
+            .map_err(io_failed)?;
         result.object(1, b"<< /Type /Catalog /Pages 2 0 R >>")?;
         result.stream(3, "/N 3 /Alternate /DeviceRGB", SRGB_2014)?;
         Ok(result)
     }
     fn begin_object(&mut self, id: usize) -> Result<(), JpegFailure> {
         self.offsets.resize(self.offsets.len().max(id + 1), 0);
-        self.offsets[id] = self.writer.stream_position().map_err(failed)?;
-        writeln!(self.writer, "{id} 0 obj").map_err(failed)
+        self.offsets[id] = self.writer.stream_position().map_err(io_failed)?;
+        writeln!(self.writer, "{id} 0 obj").map_err(io_failed)
     }
     fn object(&mut self, id: usize, contents: &[u8]) -> Result<(), JpegFailure> {
         self.begin_object(id)?;
-        self.writer.write_all(contents).map_err(failed)?;
-        self.writer.write_all(b"\nendobj\n").map_err(failed)
+        self.writer.write_all(contents).map_err(io_failed)?;
+        self.writer.write_all(b"\nendobj\n").map_err(io_failed)
     }
     fn stream(&mut self, id: usize, dictionary: &str, data: &[u8]) -> Result<(), JpegFailure> {
         self.begin_object(id)?;
@@ -137,11 +140,11 @@ impl PdfOutput {
             "<< {dictionary} /Length {} >>\nstream",
             data.len()
         )
-        .map_err(failed)?;
-        self.writer.write_all(data).map_err(failed)?;
+        .map_err(io_failed)?;
+        self.writer.write_all(data).map_err(io_failed)?;
         self.writer
             .write_all(b"\nendstream\nendobj\n")
-            .map_err(failed)
+            .map_err(io_failed)
     }
     pub(crate) fn add_page(
         &mut self,
@@ -152,14 +155,14 @@ impl PdfOutput {
         let rgb = opaque_rgb_bytes(image)?;
         let mut compressed =
             flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::default());
-        compressed.write_all(&rgb).map_err(failed)?;
-        let compressed = compressed.finish().map_err(failed)?;
+        compressed.write_all(&rgb).map_err(io_failed)?;
+        let compressed = compressed.finish().map_err(io_failed)?;
         // Verify the lossless payload before it becomes part of a prepared document.
         let mut decoded = flate2::read::ZlibDecoder::new(compressed.as_slice());
         let mut buffer = [0_u8; 65536];
         let mut offset = 0;
         loop {
-            let count = decoded.read(&mut buffer).map_err(failed)?;
+            let count = decoded.read(&mut buffer).map_err(io_failed)?;
             if count == 0 {
                 break;
             }
@@ -205,27 +208,27 @@ impl PdfOutput {
             )
             .as_bytes(),
         )?;
-        let xref = self.writer.stream_position().map_err(failed)?;
+        let xref = self.writer.stream_position().map_err(io_failed)?;
         writeln!(
             self.writer,
             "xref\n0 {}\n0000000000 65535 f ",
             self.offsets.len()
         )
-        .map_err(failed)?;
+        .map_err(io_failed)?;
         for offset in &self.offsets[1..] {
             if *offset > 9_999_999_999 {
                 return Err(failed("o PDF excedeu o tamanho suportado"));
             }
-            writeln!(self.writer, "{offset:010} 00000 n ").map_err(failed)?;
+            writeln!(self.writer, "{offset:010} 00000 n ").map_err(io_failed)?;
         }
         writeln!(
             self.writer,
             "trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF",
             self.offsets.len()
         )
-        .map_err(failed)?;
-        self.writer.flush().map_err(failed)?;
-        self.writer.get_ref().sync_all().map_err(failed)?;
+        .map_err(io_failed)?;
+        self.writer.flush().map_err(io_failed)?;
+        self.writer.get_ref().sync_all().map_err(io_failed)?;
         drop(self);
         receipt(path)
     }

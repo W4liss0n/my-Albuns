@@ -396,10 +396,10 @@ Estado técnico e temporário pertencente ao componente que conduz uma tentativa
 Medida do espaço ocupado pelas representações descartáveis mantidas pelo aplicativo.
 
 **Aviso de espaço**:
-Aviso associado à pressão real de armazenamento do volume que hospeda o Cache.
+Aviso provocado por uma falha real de falta de espaço ou de cota na criação, gravação, finalização ou publicação de um arquivo de Cache ou Exportação. Não depende de estimativa, consulta preventiva ou patamar de espaço livre e nunca bloqueia uma operação por previsão de tamanho.
 
 **Liberar espaço**:
-Remoção do Cache pertencente a Projetos fechados, preservando Projetos ativos e todos os Arquivos vinculados.
+Capacidade interna de remoção do Cache pertencente a Projetos fechados, preservando Projetos ativos e todos os Arquivos vinculados. Não é uma segunda ação de Configurações nem uma ação de aviso preventivo.
 
 **Limpeza total do Cache**:
 Remoção de todo o Cache quando não existem Projetos ou processos ativos, ou limpeza agendada para a próxima inicialização segura. Depois da confirmação, acontece em segundo plano, sem diálogo de progresso nem cancelamento durante a execução.
