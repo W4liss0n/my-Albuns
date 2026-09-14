@@ -13,6 +13,7 @@ import {
 } from "../ui";
 import "./ProjectDialogView.css";
 import { ExportConfigurationDialog } from "./ExportConfigurationDialog";
+import { StorageFullDialog } from "../ui/StorageFullDialog";
 
 interface ProjectDialogViewProps {
   onAction(action: ProjectDialogAction): void;
@@ -32,6 +33,7 @@ export function ProjectDialogView({
   }, [state.kind]);
 
   switch (state.kind) {
+    case "storageFull": return <StorageFullDialog state={state} onAction={onAction} />;
     case "exportConfiguration": return <ExportConfigurationDialog state={state} onAction={onAction} />;
     case "exportConflicts": return <ConfirmationDialog title="Já existe uma exportação"
       description="Há arquivos exportados na pasta de destino. Deseja ignorar os existentes ou substituí-los?"

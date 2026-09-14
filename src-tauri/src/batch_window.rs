@@ -316,6 +316,8 @@ pub(crate) async fn batch_resume(
     state.require_idle()?;
     let root = state.recovery_root();
     let core = state.core();
+    app.state::<crate::storage_recovery::StorageRecoveries>()
+        .finish(&id);
     let view = tauri::async_runtime::spawn_blocking(move || {
         if let Some(batch) = runner.as_mut()
             && batch.view().id == id
@@ -354,6 +356,8 @@ pub(crate) async fn batch_end(
     let cleanup_preparation = processor.reserve().await.is_ok();
     let root = state.recovery_root();
     let core = state.core();
+    app.state::<crate::storage_recovery::StorageRecoveries>()
+        .finish(&id);
     tauri::async_runtime::spawn_blocking(move || {
         let batch = if runner.as_ref().is_some_and(|batch| batch.view().id == id) {
             runner.take().expect("matched batch exists")

@@ -201,6 +201,7 @@ impl BatchRunner {
             items,
             phase: BatchPhase::Prepared,
             partial_publication: false,
+            storage_volume: None,
             current: None,
         };
         batch.recheck();
@@ -228,6 +229,10 @@ impl BatchRunner {
         match self.save_checkpoint() {
             Ok(()) => Ok(()),
             Err(SaveFailure::StorageFull) => {
+                if self.phase != BatchPhase::StorageFull {
+                    self.storage_volume =
+                        myalbuns_paths::StorageVolume::containing(&self.checkpoint_root);
+                }
                 // Keep the live runner even if the full volume cannot record
                 // its new state. The last atomic checkpoint remains intact.
                 self.phase = BatchPhase::StorageFull;

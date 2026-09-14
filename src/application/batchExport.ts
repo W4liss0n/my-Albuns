@@ -27,6 +27,7 @@ export interface BatchExportView {
 }
 
 export interface BatchExportPort {
+  storageRecovery?: import("./storageRecovery").StorageRecoveryPort;
   current(): Promise<BatchExportView | null>;
   recoveries(): Promise<BatchRecoverySummary[]>;
   chooseFolder(): Promise<string | null>;

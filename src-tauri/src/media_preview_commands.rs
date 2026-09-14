@@ -561,6 +561,7 @@ impl DemandedPreviewPreparation<'_> {
             }
             Err(failure) => {
                 let warning = if failure.stage == CacheFailureStage::StorageFull {
+                    crate::storage_recovery::pause_cache(window.app_handle());
                     Some(CacheProcessorWarning {
                         state: CacheProcessorState::StorageFull,
                         message: failure.message.clone(),

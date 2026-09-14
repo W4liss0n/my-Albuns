@@ -15,6 +15,7 @@ mod project_file_lock;
 #[cfg(windows)]
 mod project_transition_barrier;
 mod resolve;
+mod storage_volume;
 mod windows_path;
 
 #[cfg(feature = "test-support")]
@@ -45,5 +46,6 @@ pub use resolve::{
     ExpectedObject, PhysicalFileIdentity, PhysicalIdentityEvidence, PreparedFileDestination,
     ResolveError, ResolvedObject,
 };
+pub use storage_volume::StorageVolume;
 #[cfg(windows)]
 pub use windows_path::wide_api_path;

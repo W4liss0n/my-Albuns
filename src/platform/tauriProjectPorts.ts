@@ -2,6 +2,8 @@ import { invokeImageProcessing } from "./invokeImageProcessing";
 import { MediaExportBlockedError } from "../application/exportMedia";
 import { parseExportMediaProblems } from "./exportMediaContract";
 import { ExportConflictsError } from "../application/normalExport";
+import { StorageFullError } from "../application/storageRecovery";
+import { tauriStorageRecoveryPort } from "./tauriStorageRecoveryPort";
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
@@ -391,6 +393,8 @@ export const tauriWorkspacePreferencesPort: WorkspacePreferencesPort = {
 };
 
 export const tauriMediaPreviewPort: MediaPreviewPort = {
+  storageRecovery: tauriStorageRecoveryPort,
+  resumeCacheImages: onProgress => invokeImageProcessing<boolean>("resume_cache_images", {}, onProgress),
   readMediaFiles: () => invoke<IpcMediaFileCatalog>("read_media_files"),
   prepareMediaPreviews: async (demand, publish) => {
     const onPreview = new Channel<IpcMediaPreview>();
@@ -432,6 +436,7 @@ export const tauriMediaPreviewPort: MediaPreviewPort = {
 };
 
 export const tauriExportPipelinePort: ExportPipelinePort = {
+  storageRecovery: tauriStorageRecoveryPort,
   defaultDestination: () => invoke<string>("default_export_destination"),
   chooseDestination: () => invoke<string | null>("choose_export_folder"),
   startSheet: (
@@ -481,6 +486,9 @@ export const tauriExportPipelinePort: ExportPipelinePort = {
         result,
       }))
       .catch((error: unknown) => {
+        if (typeof error === "object" && error !== null && "code" in error && error.code === "output_storage_full") {
+          throw new StorageFullError("Libere espaço para continuar. Arquivos já exportados foram mantidos.");
+        }
         if (typeof error === "object" && error !== null && "code" in error && error.code === "export_conflict" && "conflicts" in error && Array.isArray(error.conflicts) && error.conflicts.every(file => typeof file === "string") && error.conflicts.length) throw new ExportConflictsError(error.conflicts);
         if (isCancelledExportError(error)) {
           return {

@@ -123,6 +123,10 @@ impl BatchRunner {
             }
             let roots = bindings.clone();
             let (returned, planned) = tauri::async_runtime::spawn_blocking(move || {
+                self.storage_volume = roots
+                    .resolve(&self.items[index].destination)
+                    .ok()
+                    .and_then(|path| myalbuns_paths::StorageVolume::containing(&path));
                 let planned = self.prepare_item(index, &roots, policy);
                 (self, planned)
             })

@@ -76,6 +76,8 @@ pub(crate) async fn export_project(
     let _operation =
         crate::project_ui_operations::begin(&app).map_err(ExportCommandError::failed)?;
     require_owner(&window).map_err(ExportCommandError::failed)?;
+    let recoveries = app.state::<crate::storage_recovery::StorageRecoveries>();
+    recoveries.finish("export");
     options
         .format
         .validate()
@@ -132,6 +134,7 @@ pub(crate) async fn export_project(
         return Err(ExportCommandError::failed("Escolha uma pasta de destino absoluta.").into());
     }
     let conflict_policy = options.conflict_policy;
+    let destination_volume = myalbuns_paths::StorageVolume::containing(&destination);
     let plan = tauri::async_runtime::spawn_blocking(move || {
         let mut plan = export_pipeline::plan_album(
             snapshot,
@@ -154,8 +157,9 @@ pub(crate) async fn export_project(
         let conflicts = plan.conflicts()?;
         if conflicts.is_empty() || conflict_policy != ExportConflictPolicy::Ask {
             std::fs::create_dir_all(&destination).map_err(|error| {
-                export_pipeline::ExportFailure::new(
+                export_pipeline::ExportFailure::from_path_error(
                     export_pipeline::ExportFailureStage::Prepare,
+                    myalbuns_paths::AppPathsError::export_io(&error),
                     format!("Não foi possível criar a pasta de destino: {error}"),
                 )
             })?;
@@ -166,7 +170,12 @@ pub(crate) async fn export_project(
     })
     .await
     .map_err(|error| ExportCommandError::failed(error.to_string()))?
-    .map_err(ExportCommandError::from_pipeline)?;
+    .map_err(|failure| {
+        if failure.is_storage_full() {
+            recoveries.pause("export", destination_volume);
+        }
+        ExportCommandError::from_pipeline(failure)
+    })?;
     let (plan, conflicts, has_outputs) = plan;
     if !conflicts.is_empty() && conflict_policy == ExportConflictPolicy::Ask {
         let mut error = ExportCommandError::failed("Já existem arquivos no Destino da Exportação.");

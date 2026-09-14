@@ -2,6 +2,7 @@ import {
   forwardRef,
   useImperativeHandle,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -25,6 +26,7 @@ import "./ExportPreviewControl.css";
 import { MediaExportBlockedError, type ExportMediaPort } from "../application/exportMedia";
 import type { EditorProjection } from "../domain/project";
 import { ExportConflictsError, type ExportSheetInfo, type NormalExportOptions } from "../application/normalExport";
+import { StorageFullError, StorageRecoveryController, unavailableStorageRecovery } from "../application/storageRecovery";
 
 interface ExportPreviewControlProps {
   sheets?: ExportSheetInfo[];
@@ -85,6 +87,14 @@ export const ExportPreviewControl = forwardRef<
   );
 
   useImperativeHandle(ref, () => ({ start: startExport }));
+  const storageCallbacks = useRef({ presentDialog, resume: () => startSelectedExport(attemptedSelection.current), cancel: dismissFeedback });
+  storageCallbacks.current = { presentDialog, resume: () => startSelectedExport(attemptedSelection.current), cancel: dismissFeedback };
+  const storageController = useMemo(() => new StorageRecoveryController(
+    exportPipelinePort.storageRecovery ?? unavailableStorageRecovery,
+    state => storageCallbacks.current.presentDialog(state),
+    () => storageCallbacks.current.resume(), () => storageCallbacks.current.cancel(),
+  ), [exportPipelinePort.storageRecovery]);
+  useLayoutEffect(() => () => storageController.dispose(), [storageController, projectId]);
 
   dialogActionListener.current = (action) => {
     if (typeof action !== "string") {
@@ -96,6 +106,8 @@ export const ExportPreviewControl = forwardRef<
       return;
     }
     switch (action) {
+      case "resumeStorage": case "clearStorageCache": case "cancelStorage":
+        void storageController.act(action); break;
       case "confirmExportOverwrite":
       case "skipExportConflicts": {
         const selected = attemptedSelection.current;
@@ -415,6 +427,11 @@ export const ExportPreviewControl = forwardRef<
     if (!finished) return;
 
     const message = messageFromError(error);
+    if (error instanceof StorageFullError) {
+      setPhase("failed");
+      void storageController.open("export", message);
+      return;
+    }
     if (error instanceof ExportConflictsError) {
       setPhase("failed");
       presentDialog({ kind: "exportConflicts", files: error.files });

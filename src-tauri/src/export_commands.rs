@@ -9,7 +9,7 @@ use myalbuns_imaging_protocol::{
 };
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
 use myalbuns_paths::ExportWriteAuthorization;
-use tauri::{AppHandle, State, WebviewWindow, ipc::Channel};
+use tauri::{AppHandle, Manager, State, WebviewWindow, ipc::Channel};
 
 use crate::{
     cache_engine::CacheEngine,
@@ -430,6 +430,9 @@ async fn run_export(
         project_id,
         request_id,
     } = prepared;
+    let storage_recoveries = app.state::<crate::storage_recovery::StorageRecoveries>();
+    storage_recoveries.finish("export");
+    let output_path = operation_paths.first().cloned();
     if on_event
         .send(ExportEvent::started(request_id.clone()))
         .is_err()
@@ -481,6 +484,10 @@ async fn run_export(
     };
     let root_binding_plan_sha256 =
         root_binding_plan_sha256(&root_bindings).map_err(ExportCommandError::failed)?;
+    let storage_volume = output_path
+        .as_ref()
+        .and_then(|path| root_bindings.resolve(path).ok())
+        .and_then(|path| myalbuns_paths::StorageVolume::containing(&path));
     tracing::info!(
         target: "myalbuns.desktop",
         process_role = ProcessRole::DesktopHost.as_str(),
@@ -582,6 +589,9 @@ async fn run_export(
         }
     }
     .map_err(|failure| {
+        if failure.is_storage_full() {
+            storage_recoveries.pause("export", storage_volume);
+        }
         if failure.stage == export_pipeline::ExportFailureStage::Cancelled {
             log_export_cancelled(
                 &request_id,

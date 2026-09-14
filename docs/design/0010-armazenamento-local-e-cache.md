@@ -1,7 +1,7 @@
 ---
 status: accepted
 document: design
-updated: 2026-09-13
+updated: 2026-09-14
 ---
 
 # Armazenamento local e Cache
@@ -320,7 +320,20 @@ A importação combina a validação inicial dos JPEGs e o preparo da prévia no
 
 Não existe limite rígido, expiração automática por idade ou sequência de alertas por tamanho. O aplicativo mostra o total ocupado. Por decisão de 13 de setembro de 2026, não consulta espaço livre nem estima o tamanho da operação para apresentar um aviso preventivo ou impedir seu início. O aviso aparece somente diante de uma falha real de falta de espaço ou de cota na criação, gravação, finalização ou publicação do arquivo. A classificação usa o erro de I/O; não interpreta textos localizados do sistema.
 
-No Cache, falha somente a preparação afetada; Projeto, Original e geração anterior válida permanecem intactos, e outras imagens do lote podem continuar. A falta de espaço não é queda do Processador nem torna o Original ausente. Na Exportação, valem as regras de preparação integral e Publicação por arquivo do [fluxo normal](0004-exportacao-normal.md). A mensagem orienta a liberar espaço no volume correspondente e tentar novamente. Avisos não se repetem a cada miniatura no mesmo Projeto aberto.
+No Cache, Projeto, Original e geração anterior válida permanecem intactos. Depois da falta de espaço, a preparação deixa de iniciar novas imagens daquela tentativa e aguarda a conclusão dos trabalhos já admitidos. A falta de espaço não é queda do Processador nem torna o Original ausente. Na Exportação, valem as regras de preparação integral e Publicação por arquivo do [fluxo normal](0004-exportacao-normal.md). Avisos não se repetem a cada miniatura no mesmo Projeto aberto.
+
+### Retomada após falta de espaço
+
+Cache, Exportação normal e Exportação em lote compartilham o modal `Espaço insuficiente`, com dois estados:
+
+- Havendo Cache de Projetos fechados removível no volume afetado, apresenta `Limpar cache e retomar`, `Retomar` e `Cancelar`.
+- Sem Cache removível naquele volume, apresenta `Retomar` e `Cancelar`, aguardando a pessoa liberar espaço manualmente.
+
+A limpeza é uma ação explícita, sem uma segunda confirmação. O mesmo modal permanece aberto com os botões bloqueados até terminar a remoção. Só depois de liberar bytes a operação tenta continuar uma vez. Se nada puder ser removido, ou se a limpeza falhar, permanece no estado de espera manual. Nova falta de espaço exige nova ação: não há repetição automática da limpeza ou da gravação.
+
+A limpeza preserva todos os namespaces ativos. Não agenda a limpeza para outra inicialização e não limpa Cache em outro volume. No Windows, a identidade usa o GUID do volume após resolver pontos de montagem e junções, por meio de `GetVolumePathNameW` e `GetVolumeNameForVolumeMountPointW` (`windows-sys` 0.61). Volumes desconhecidos ou remotos não autorizam limpeza local. O volume da falha de gravação do registro de retomada do lote pode ser diferente do destino das imagens. Referências: [resolução do volume](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getvolumepathnamew) e [identidade do volume](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getvolumenameforvolumemountpointw).
+
+Ao retomar, a Exportação usa seu fluxo normal e preserva os álbuns já concluídos; conflitos ou problemas novos seguem os diálogos existentes. A preparação do Cache volta ao progresso determinado das imagens. Cancelar mantém os arquivos e o Cache válido existentes.
 
 `Liberar espaço`, capacidade interna de manutenção:
 

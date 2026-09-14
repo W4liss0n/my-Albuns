@@ -5,6 +5,9 @@
       "description": "Allows only the application commands used by local Janelas de Projeto.",
       "commands": {
         "allow": [
+          "storage_recovery_status",
+          "clear_storage_recovery_cache",
+          "resume_cache_images",
           "frontend_log",
           "project_ui_ready",
           "prepare_project_startup_images",

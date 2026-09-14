@@ -171,6 +171,8 @@ async fn run_attempt(
     let logging = app.state::<LoggingState>();
     let mut transport = TauriImagingTransport::new(app, &logging, lease.processor_reservation());
     let batch = runner.take().ok_or("Lote indisponível.")?;
+    app.state::<crate::storage_recovery::StorageRecoveries>()
+        .finish(&batch.view().id);
     let outcome = batch
         .run(&mut transport, cancel, policy, &|progress| {
             *state
@@ -184,6 +186,12 @@ async fn run_attempt(
     drop(mode);
     let batch = outcome?;
     let view = batch.view();
+    let recoveries = app.state::<crate::storage_recovery::StorageRecoveries>();
+    if view.phase == crate::ipc_contract::BatchPhase::StorageFull {
+        recoveries.pause(&view.id, batch.storage_volume());
+    } else {
+        recoveries.finish(&view.id);
+    }
     *runner = Some(batch);
     let (sender, ready) = tokio::sync::oneshot::channel();
     *state

@@ -60,6 +60,7 @@ mod recent_projects;
 mod runtime_role;
 mod settings_preferences;
 mod settings_window;
+mod storage_recovery;
 #[cfg(windows)]
 mod webview_recovery;
 mod workspace_preferences;

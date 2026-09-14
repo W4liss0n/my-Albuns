@@ -9225,6 +9225,125 @@
           "selector": "[role=\"menuitem\"][aria-label=\"Abrir no Photoshop\"]"
         }
       ]
+    },
+    {
+      "id": "batch-export-storage-full-cache",
+      "title": "Exportação em lote — limpar cache e retomar",
+      "implementationPath": "/batch-export-preview.html?scenario=storage-full-cache",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "batch-export-window",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "Design 0010, decisão aceita em 14/09/2026: mesmo modal para espera manual e limpeza explícita de cache no volume afetado; botões bloqueados durante a remoção, sem linha temporária."
+      },
+      "viewport": {
+        "width": 520,
+        "height": 340
+      },
+      "readySelector": ".ui-action-button--primary:not(:disabled)",
+      "actions": []
+    },
+    {
+      "id": "storage-full-cache-manual",
+      "title": "Cache — falta de espaço (manual)",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22storageFull%22%2C%22message%22%3A%22Libere%20espa%C3%A7o%20para%20continuar%20preparando%20as%20imagens.%22%2C%22canClearCache%22%3Afalse%2C%22busy%22%3Afalse%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "batch-export-window",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "Design 0010, decisão aceita em 14/09/2026: mesmo modal para espera manual e limpeza explícita de cache no volume afetado; botões bloqueados durante a remoção, sem linha temporária."
+      },
+      "viewport": {
+        "width": 520,
+        "height": 340
+      },
+      "readySelector": ".ui-standard-message",
+      "actions": []
+    },
+    {
+      "id": "storage-full-cache-cleanup",
+      "title": "Cache — falta de espaço (cleanup)",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22storageFull%22%2C%22message%22%3A%22Libere%20espa%C3%A7o%20para%20continuar%20preparando%20as%20imagens.%22%2C%22canClearCache%22%3Atrue%2C%22busy%22%3Afalse%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "batch-export-window",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "Design 0010, decisão aceita em 14/09/2026: mesmo modal para espera manual e limpeza explícita de cache no volume afetado; botões bloqueados durante a remoção, sem linha temporária."
+      },
+      "viewport": {
+        "width": 520,
+        "height": 340
+      },
+      "readySelector": ".ui-standard-message",
+      "actions": []
+    },
+    {
+      "id": "storage-full-cache-busy",
+      "title": "Cache — falta de espaço (busy)",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22storageFull%22%2C%22message%22%3A%22Libere%20espa%C3%A7o%20para%20continuar%20preparando%20as%20imagens.%22%2C%22canClearCache%22%3Atrue%2C%22busy%22%3Atrue%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "batch-export-window",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "Design 0010, decisão aceita em 14/09/2026: mesmo modal para espera manual e limpeza explícita de cache no volume afetado; botões bloqueados durante a remoção, sem linha temporária."
+      },
+      "viewport": {
+        "width": 520,
+        "height": 340
+      },
+      "readySelector": ".ui-standard-message",
+      "actions": []
+    },
+    {
+      "id": "storage-full-export-manual",
+      "title": "Exportação — falta de espaço (manual)",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22storageFull%22%2C%22message%22%3A%22Libere%20espa%C3%A7o%20para%20continuar.%20Arquivos%20j%C3%A1%20exportados%20foram%20mantidos.%22%2C%22canClearCache%22%3Afalse%2C%22busy%22%3Afalse%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "batch-export-window",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "Design 0010, decisão aceita em 14/09/2026: mesmo modal para espera manual e limpeza explícita de cache no volume afetado; botões bloqueados durante a remoção, sem linha temporária."
+      },
+      "viewport": {
+        "width": 520,
+        "height": 340
+      },
+      "readySelector": ".ui-standard-message",
+      "actions": []
+    },
+    {
+      "id": "storage-full-export-cleanup",
+      "title": "Exportação — falta de espaço (cleanup)",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22storageFull%22%2C%22message%22%3A%22Libere%20espa%C3%A7o%20para%20continuar.%20Arquivos%20j%C3%A1%20exportados%20foram%20mantidos.%22%2C%22canClearCache%22%3Atrue%2C%22busy%22%3Afalse%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "batch-export-window",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "Design 0010, decisão aceita em 14/09/2026: mesmo modal para espera manual e limpeza explícita de cache no volume afetado; botões bloqueados durante a remoção, sem linha temporária."
+      },
+      "viewport": {
+        "width": 520,
+        "height": 340
+      },
+      "readySelector": ".ui-standard-message",
+      "actions": []
+    },
+    {
+      "id": "storage-full-export-busy",
+      "title": "Exportação — falta de espaço (busy)",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22storageFull%22%2C%22message%22%3A%22Libere%20espa%C3%A7o%20para%20continuar.%20Arquivos%20j%C3%A1%20exportados%20foram%20mantidos.%22%2C%22canClearCache%22%3Atrue%2C%22busy%22%3Atrue%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "batch-export-window",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "Design 0010, decisão aceita em 14/09/2026: mesmo modal para espera manual e limpeza explícita de cache no volume afetado; botões bloqueados durante a remoção, sem linha temporária."
+      },
+      "viewport": {
+        "width": 520,
+        "height": 340
+      },
+      "readySelector": ".ui-standard-message",
+      "actions": []
     }
   ]
 }

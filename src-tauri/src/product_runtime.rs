@@ -159,6 +159,7 @@ pub(crate) fn run(
         .manage(cache_previews)
         .manage(ActiveCacheNamespace::new(cache_namespace_owner))
         .manage(cache_service)
+        .manage(crate::storage_recovery::StorageRecoveries::default())
         .manage(recovery)
         .manage(webview_authority)
         .manage(engine)
@@ -236,6 +237,9 @@ pub(crate) fn run(
         })
         .setup(move |app| setup_host(app, setup_paths, initial_window_title))
         .invoke_handler(tauri::generate_handler![
+            crate::storage_recovery::storage_recovery_status,
+            crate::storage_recovery::clear_storage_recovery_cache,
+            crate::storage_recovery::resume_cache_images,
             crate::logging::frontend_log,
             crate::native_dialog_window::owned_window_content_ready,
             crate::native_dialog_window::fit_owned_window,

@@ -24,10 +24,11 @@ const view: BatchExportView | null = scenario === "configuration" || !scenario |
   : scenario === "result" ? { ...ready, phase: "finished", items: ready.items.map((item, index) => ({ ...item,
     status: index === 0 ? "completed" : index === 1 ? "ignored" : "failed",
     problems: index === 2 ? [{ kind: "failed", mediaId: null, message: "O Projeto mudou depois da verificação. Verifique novamente antes de exportar." }] : [],
-  })) } : scenario === "storage-full" || scenario === "storage-full-partial" ? { ...ready, phase: "storageFull", canContinue: false, partialPublication: scenario === "storage-full-partial",
+  })) } : scenario.startsWith("storage-full") ? { ...ready, phase: "storageFull", canContinue: false, partialPublication: scenario === "storage-full-partial",
     items: ready.items.map((item, index) => ({ ...item, status: index === 0 ? "completed" : "pending" })) }
   : scenario === "success" ? { ...ready, phase: "finished", items: ready.items.map(item => ({ ...item, status: "completed" })) } : ready;
 const port: BatchExportPort = {
+  storageRecovery: { status: async () => ({ id: "pause", canClearCache: scenario === "storage-full-cache" }), clear: async () => false },
   current: async () => view,
   recoveries: async () => scenario === "recovery" ? [{ id: "preview", sourceFolder: ready.options.sourceFolder, total: 18, remaining: 7 }] : [],
   chooseFolder: async () => ready.options.sourceFolder, countProjects: async () => 18,

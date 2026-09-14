@@ -1978,6 +1978,7 @@ pub(crate) fn run(
         ))
         .manage(crate::photoshop::PhotoshopStateStore::new(&app_paths))
         .manage(cache_service)
+        .manage(crate::storage_recovery::StorageRecoveries::default())
         .manage(provisional_decoratives)
         .setup(move |app| {
             logging::initialize(app, &app_paths, ProcessRole::Global);
@@ -2046,6 +2047,8 @@ pub(crate) fn run(
             crate::cache_service::cache_service_status,
             crate::cache_service::free_closed_project_cache,
             crate::cache_service::clear_all_cache,
+            crate::storage_recovery::storage_recovery_status,
+            crate::storage_recovery::clear_storage_recovery_cache,
             validate_project_configuration,
             crate::provisional_decoratives::choose_provisional_decorative,
             crate::provisional_decoratives::clear_provisional_decoratives,

@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { tauriWindowControls } from "./tauriWindowControls";
 import type { BatchExportPort } from "../application/batchExport";
+import { tauriStorageRecoveryPort } from "./tauriStorageRecoveryPort";
 import type { BatchExportProgress } from "./generated/BatchExportProgress";
 import type { BatchExportView } from "./generated/BatchExportView";
 import type { BatchExportOptions } from "./generated/BatchExportOptions";
@@ -9,6 +10,7 @@ import type { BatchRecoverySummary } from "./generated/BatchRecoverySummary";
 
 export const openBatchExport = () => invoke<void>("open_batch_export");
 export const tauriBatchExportPort: BatchExportPort = {
+  storageRecovery: tauriStorageRecoveryPort,
   current: () => invoke<BatchExportView | null>("batch_current"),
   recoveries: () => invoke<BatchRecoverySummary[]>("batch_recoveries"),
   chooseFolder: () => invoke("batch_choose_folder"),

@@ -72,10 +72,14 @@ pub(crate) struct BatchRunner {
     items: Vec<BatchItem>,
     phase: BatchPhase,
     partial_publication: bool,
+    storage_volume: Option<myalbuns_paths::StorageVolume>,
     current: Option<String>,
 }
 
 impl BatchRunner {
+    pub(crate) fn storage_volume(&self) -> Option<myalbuns_paths::StorageVolume> {
+        self.storage_volume.clone()
+    }
     pub(crate) fn count_projects(source: &Path) -> Result<usize, String> {
         let mut paths = OperationPathContext::new();
         paths.capture(source).map_err(|error| error.to_string())?;
@@ -154,6 +158,7 @@ impl BatchRunner {
             items,
             phase: BatchPhase::Prepared,
             partial_publication: false,
+            storage_volume: None,
             current: None,
         };
         batch.recheck();
@@ -202,6 +207,7 @@ impl BatchRunner {
     pub(crate) fn retry_preflight(&mut self) {
         self.current = None;
         self.partial_publication = false;
+        self.storage_volume = None;
         self.paths = OperationPathContext::new();
         self.recheck();
     }

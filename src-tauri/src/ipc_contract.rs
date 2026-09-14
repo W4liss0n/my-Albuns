@@ -96,6 +96,11 @@ pub struct ProjectDialogDetail {
 )]
 #[ts(tag = "kind")]
 pub enum ProjectDialogState {
+    StorageFull {
+        message: String,
+        can_clear_cache: bool,
+        busy: bool,
+    },
     ExportConfiguration {
         sheets: Vec<ExportSheetInfo>,
         options: NormalExportOptions,
@@ -175,6 +180,9 @@ pub struct ProjectDialogPresentation {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub enum ProjectDialogAction {
+    ResumeStorage,
+    ClearStorageCache,
+    CancelStorage,
     ConfigureExport(NormalExportOptions),
     ChooseExportDestination(NormalExportOptions),
     ConfirmExportOverwrite,
@@ -791,6 +799,13 @@ pub enum CacheProcessorState {
 pub struct CacheProcessorWarning {
     pub(crate) state: CacheProcessorState,
     pub(crate) message: String,
+}
+
+#[derive(Clone, Debug, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct StorageRecovery {
+    pub id: String,
+    pub can_clear_cache: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]

@@ -99,10 +99,8 @@ test("disk full presents a compact pause modal instead of a failed-project table
   expect(api.run).not.toHaveBeenCalled();
   expect(api.resume).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "Retomar" }));
-  await screen.findByText("Pronto para exportar");
-  expect(api.resume).toHaveBeenCalledWith("batch");
-  fireEvent.click(screen.getByRole("button", { name: "Continuar Exportação" }));
   await screen.findByText("Exportação concluída");
+  expect(api.resume).toHaveBeenCalledWith("batch");
   expect(api.run).toHaveBeenCalledOnce();
 });
 
@@ -122,4 +120,31 @@ test("the storage modal discloses a partial publication before the user cancels"
   expect(screen.getByText(/álbum atual foi publicado parcialmente/)).toBeVisible();
   fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
   await waitFor(() => expect(api.end).toHaveBeenCalledWith("batch"));
+});
+
+test("cleanup must finish before retrying, and a second full result waits again", async () => {
+  let finish!: (freed: boolean) => void;
+  const paused: BatchExportView = { ...ready, phase: "storageFull", canContinue: false };
+  const storageRecovery = { status: vi.fn(async () => ({ id: "failure", canClearCache: true })),
+    clear: vi.fn(() => new Promise<boolean>(resolve => { finish = resolve; })) };
+  const api = port({ current: async () => paused, storageRecovery, run: vi.fn(async () => ({ ...paused })) });
+  render(<BatchExportWindow port={api} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Limpar cache e retomar" }));
+  expect(screen.getByRole("button", { name: "Cancelar" })).toBeDisabled();
+  expect(api.resume).not.toHaveBeenCalled();
+  await act(async () => finish(true));
+  await waitFor(() => expect(api.run).toHaveBeenCalledOnce());
+  await waitFor(() => expect(screen.getByRole("button", { name: "Limpar cache e retomar" })).toBeEnabled());
+  expect(storageRecovery.clear).toHaveBeenCalledOnce();
+  expect(api.resume).toHaveBeenCalledOnce();
+});
+
+test("no bytes reclaimed keeps the same modal with manual resume", async () => {
+  const api = port({ current: async () => ({ ...ready, phase: "storageFull", canContinue: false }),
+    storageRecovery: { status: async () => ({ id: "failure", canClearCache: true }), clear: async () => false } });
+  render(<BatchExportWindow port={api} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Limpar cache e retomar" }));
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Limpar cache e retomar" })).not.toBeInTheDocument());
+  expect(screen.getByRole("button", { name: "Retomar" })).toBeEnabled();
+  expect(api.resume).not.toHaveBeenCalled();
 });

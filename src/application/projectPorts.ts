@@ -316,6 +316,8 @@ export interface ProjectCorePort {
 }
 
 export interface MediaPreviewPort {
+  storageRecovery?: import("./storageRecovery").StorageRecoveryPort;
+  resumeCacheImages?(onProgress: (progress: ImageProcessingProgress) => void): Promise<boolean>;
   readMediaFiles(): Promise<MediaFileCatalog>;
   // Completion replaces the presentation snapshot: demanded outcomes plus the
   // native registry's bounded recent residents. Omission revokes a prior URL.
@@ -340,6 +342,7 @@ export interface ExportSheetSelection {
 }
 
 export interface ExportPipelinePort {
+  storageRecovery?: import("./storageRecovery").StorageRecoveryPort;
   defaultDestination(): Promise<string>;
   chooseDestination(): Promise<string | null>;
   startSheet(

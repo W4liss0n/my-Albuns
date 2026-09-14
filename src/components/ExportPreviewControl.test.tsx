@@ -18,6 +18,24 @@ import { ExportPreviewControl } from "./ExportPreviewControl";
 import { MediaExportBlockedError, type ExportMediaPort } from "../application/exportMedia";
 import { representativeProjection } from "../test/projectFixtures";
 import { ExportConflictsError } from "../application/normalExport";
+import { StorageFullError } from "../application/storageRecovery";
+
+test("normal export keeps its dialog and resumes only after cache cleanup", async () => {
+  let finish!: (freed: boolean) => void;
+  const harness = createExportHarness();
+  (harness.port as ExportPipelinePort).storageRecovery = { status: async () => ({ id: "full", canClearCache: true }),
+    clear: vi.fn(() => new Promise<boolean>(resolve => { finish = resolve; })) };
+  const { dialog } = renderControl({ exportHarness: harness });
+  fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  await act(async () => harness.attempts[0].reject(new StorageFullError("Libere espaço.")));
+  await waitFor(() => expect(dialog.present).toHaveBeenLastCalledWith({ kind: "storageFull", message: "Libere espaço.", canClearCache: true, busy: false }));
+  dialog.emit("clearStorageCache");
+  expect(harness.startSheet).toHaveBeenCalledTimes(1);
+  expect(dialog.dismiss).not.toHaveBeenCalled();
+  await act(async () => finish(true));
+  expect(harness.startSheet).toHaveBeenCalledTimes(2);
+  expect(dialog.dismiss).not.toHaveBeenCalled();
+});
 
 test("opens normal export only after the destination is available, without a transient preparation state", async () => {
   const dialog = createDialogHarness();
