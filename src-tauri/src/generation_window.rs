@@ -263,7 +263,7 @@ pub(crate) async fn generation_prepare(
     app: AppHandle,
     window: WebviewWindow,
     options: GenerationOptions,
-) -> Result<GenerationView, String> {
+) -> Result<Option<GenerationView>, String> {
     configuration(&window)?;
     let state = app.state::<GenerationWindowState>();
     let template = state
@@ -303,7 +303,7 @@ pub(crate) async fn generation_decide(
 pub(crate) async fn generation_recheck(
     app: AppHandle,
     window: WebviewWindow,
-) -> Result<GenerationView, String> {
+) -> Result<Option<GenerationView>, String> {
     configuration(&window)?;
     run_request(app, window, GenerationRequest::Recheck).await
 }
@@ -408,7 +408,7 @@ async fn run_request(
     app: AppHandle,
     window: WebviewWindow,
     request: GenerationRequest,
-) -> Result<GenerationView, String> {
+) -> Result<Option<GenerationView>, String> {
     let attempt = Attempt::begin(&app)?;
     tauri::async_runtime::spawn(async move {
         let _attempt = attempt;
@@ -424,7 +424,9 @@ async fn run_request(
             presentation,
         )
         .await?;
-        state.publish(view.clone());
+        if let Some(view) = &view {
+            state.publish(view.clone());
+        }
         Ok(view)
     })
     .await
@@ -435,7 +437,7 @@ async fn run_request(
 pub(crate) async fn generation_run(
     app: AppHandle,
     window: WebviewWindow,
-) -> Result<GenerationView, String> {
+) -> Result<Option<GenerationView>, String> {
     configuration(&window)?;
     run_request(app, window, GenerationRequest::Run).await
 }

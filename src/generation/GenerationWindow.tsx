@@ -4,7 +4,6 @@ import type { GenerationOptions, GenerationView, ProjectGenerationPort } from ".
 import { ActionButton } from "../ui/ActionButton";
 import { AppIcon } from "../ui/AppIcon";
 import { DialogWindowFrame } from "../ui/DialogWindowFrame";
-import { InlineNotice } from "../ui/InlineNotice";
 import { MessageDialog } from "../ui/MessageDialog";
 import { OwnedWindowShell } from "../ui/OwnedWindowShell";
 import { ProblemsDialog } from "../ui/ProblemsDialog";
@@ -34,16 +33,16 @@ export function GenerationWindow({ port }: { port: ProjectGenerationPort }) {
   useEffect(() => {
     if (view) void port.resultReady().catch(report);
   }, [view, port, report]);
-  const perform = async (action: () => Promise<GenerationView>) => {
+  const perform = async (action: () => Promise<GenerationView | null>) => {
     if (busy) return;
     setBusy(true); setError(null);
-    try { setView(await action()); } catch (error) { report(error); }
+    try { const next = await action(); if (next !== null) setView(next); } catch (error) { report(error); }
     finally { setBusy(false); }
   };
   const close = () => { if (!busy) void port.close().catch(report); };
   const issues = view?.items.filter(item => terminal ? item.status !== "completed" : item.conflict || item.problems.length > 0 || item.status === "ignored") ?? [];
-  return <OwnedWindowShell controls="close" context="Gerar Projetos em lote" width={terminal && issues.length === 0 ? 400 : 800}>
-    {error && <InlineNotice tone="error">{error}</InlineNotice>}
+  return <OwnedWindowShell controls="close" context="Gerar Projetos em lote" width={error !== null ? 520 : terminal && issues.length === 0 ? 400 : 800}>
+    <div hidden={error !== null}>
     {!view ? <GenerationConfiguration model={model} port={port} busy={busy} onError={report} onClose={close}
       onSubmit={options => void perform(() => port.prepare(options))} /> : terminal && issues.length === 0 ? <MessageDialog tone="success" title="Geração concluída"
       description={`${view.items.length} ${view.items.length === 1 ? "Projeto gerado" : "Projetos gerados"}.`}
@@ -74,6 +73,9 @@ export function GenerationWindow({ port }: { port: ProjectGenerationPort }) {
         <ActionButton disabled={busy} onClick={() => void perform(() => port.recheck())}>Verificar novamente</ActionButton>
         <ActionButton variant="primary" disabled={busy || !view.canContinue} onClick={() => void perform(() => port.run())}>Continuar Geração</ActionButton>
       </>} />}
+    </div>
+    {error !== null && <MessageDialog tone="error" title="Não foi possível concluir" description={error}
+      primaryAction={{ label: "Voltar", onClick: () => setError(null) }} />}
   </OwnedWindowShell>;
 }
 

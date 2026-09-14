@@ -1,6 +1,6 @@
 //! Coordinates a generation attempt and the lifetime of its progress presentation.
 use crate::{
-    generation_runner::GenerationRunner,
+    generation_runner::{GenerationPreparationError, GenerationRunner},
     ipc_contract::{GenerationOptions, GenerationProgress, GenerationView},
 };
 use myalbuns_core::{ProjectCore, ProjectTemplate};
@@ -35,7 +35,7 @@ pub(crate) async fn execute_generation(
     runner: Arc<Mutex<Option<GenerationRunner>>>,
     cancellation: Arc<AtomicBool>,
     presentation: impl GenerationPresentation,
-) -> Result<GenerationView, String> {
+) -> Result<Option<GenerationView>, String> {
     let mut runner = runner.lock_owned().await;
     let running = matches!(request, GenerationRequest::Run);
     let initial_progress = if running {
@@ -96,12 +96,17 @@ pub(crate) async fn execute_generation(
                     .run(&cancellation, &|progress| updates.progress(progress));
             }
         }
-        Ok::<_, String>(runner.as_ref().ok_or("Geração indisponível.")?.view())
+        Ok::<_, GenerationPreparationError>(runner.as_ref().ok_or("Geração indisponível.")?.view())
     })
     .await
-    .map_err(|error| error.to_string())??;
+    .map_err(|error| error.to_string())?;
+    let view = match view {
+        Ok(view) => view,
+        Err(GenerationPreparationError::Cancelled) => return Ok(None),
+        Err(GenerationPreparationError::Failed(message)) => return Err(message),
+    };
     presentation.finish(&view).await?;
-    Ok(view)
+    Ok(Some(view))
 }
 
 #[cfg(test)]

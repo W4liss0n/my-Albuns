@@ -188,7 +188,7 @@ impl Fixture {
             destination_folder: self.destination.to_string_lossy().into(),
         }
     }
-    fn prepare(&self) -> Result<GenerationRunner, String> {
+    fn prepare(&self) -> Result<GenerationRunner, GenerationPreparationError> {
         GenerationRunner::prepare(
             self.options(),
             self.model.freeze_template().unwrap(),

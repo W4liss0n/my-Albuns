@@ -76,3 +76,12 @@ A janela de progresso tem largura própria. A configuração permanece com suas
 dimensões enquanto a janela de progresso é preparada; o resultado só reaparece
 depois de estar pronto. Cancelar preserva os Projetos já concluídos e identifica
 os itens que não chegaram a ser gerados.
+
+Cancelar a verificação fecha o progresso e devolve a configuração, mantendo as
+pastas escolhidas e sem aviso de cancelamento. Ao cancelar `Verificar novamente`,
+as decisões anteriores são mantidas. Durante a gravação, o Projeto em andamento
+termina antes da interrupção; os concluídos são preservados no resultado.
+
+Cancelamento é um resultado normal, distinto de falha. Falhas reais usam o diálogo
+padrão de mensagem com `Voltar`, preservando os campos. A janela de geração não
+exibe faixas de aviso ou erro acima do formulário.

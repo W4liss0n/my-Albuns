@@ -14,10 +14,11 @@ export interface ProjectGenerationPort {
   chooseFolder(): Promise<string | null>;
   count(source: string): Promise<number>;
   current(): Promise<GenerationView | null>;
-  prepare(options: GenerationOptions): Promise<GenerationView>;
+  /** Null means verification was cancelled; keep the current configuration. */
+  prepare(options: GenerationOptions): Promise<GenerationView | null>;
   decide(id: string | null, decision: GenerationDecision): Promise<GenerationView>;
-  recheck(): Promise<GenerationView>;
-  run(): Promise<GenerationView>;
+  recheck(): Promise<GenerationView | null>;
+  run(): Promise<GenerationView | null>;
   progress(): Promise<GenerationProgress | null>;
   onView(callback: (view: GenerationView) => void): Promise<() => void>;
   onProgress(callback: (progress: GenerationProgress) => void): Promise<() => void>;

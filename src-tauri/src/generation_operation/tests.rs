@@ -94,7 +94,7 @@ async fn verification_waits_for_the_progress_surface_before_touching_the_source(
         .save(source.join("001/foto.png"))
         .unwrap();
     presentation.release.notify_one();
-    let view = attempt.await.unwrap();
+    let view = attempt.await.unwrap().unwrap();
     assert_eq!(view.phase, crate::ipc_contract::GenerationPhase::Finished);
     assert!(destination.join("001.myalbuns").is_file());
     assert_eq!(presentation.opened.load(Ordering::Acquire), 1);
@@ -118,6 +118,7 @@ async fn conflicts_return_to_the_result_before_closing_progress_and_recheck_does
         presentation.clone(),
     )
     .await
+    .unwrap()
     .unwrap();
     assert_eq!(view.phase, crate::ipc_contract::GenerationPhase::Prepared);
     assert!(!view.can_continue);
@@ -128,6 +129,19 @@ async fn conflicts_return_to_the_result_before_closing_progress_and_recheck_does
         ["opened", "result-ready", "closed"]
     );
 
+    presentation.release.notify_one();
+    let cancelled = execute_generation(
+        GenerationRequest::Recheck,
+        runner.clone(),
+        Arc::new(AtomicBool::new(true)),
+        presentation.clone(),
+    )
+    .await
+    .unwrap();
+    assert!(cancelled.is_none());
+    assert_eq!(runner.lock().await.as_ref().unwrap().view().id, view.id);
+    assert_eq!(std::fs::read(&output).unwrap(), b"existing file");
+
     std::fs::remove_file(&output).unwrap();
     presentation.release.notify_one();
     let view = execute_generation(
@@ -137,6 +151,7 @@ async fn conflicts_return_to_the_result_before_closing_progress_and_recheck_does
         presentation.clone(),
     )
     .await
+    .unwrap()
     .unwrap();
     assert!(view.can_continue);
     assert_eq!(view.phase, crate::ipc_contract::GenerationPhase::Prepared);
@@ -153,6 +168,7 @@ async fn conflicts_return_to_the_result_before_closing_progress_and_recheck_does
         presentation,
     )
     .await
+    .unwrap()
     .unwrap();
     assert_eq!(view.phase, crate::ipc_contract::GenerationPhase::Finished);
     assert!(output.is_file());
@@ -170,7 +186,10 @@ async fn cancellation_before_verification_releases_progress_without_writing() {
         presentation.clone(),
     )
     .await;
-    assert!(result.is_err());
+    assert!(
+        result.unwrap().is_none(),
+        "Cancellation returns to the existing configuration"
+    );
     assert_eq!(
         std::fs::read_dir(root.path().join("Projetos"))
             .unwrap()

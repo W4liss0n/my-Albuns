@@ -13,9 +13,34 @@ use myalbuns_paths::{
 };
 use std::{
     collections::HashSet,
+    fmt,
     path::{Path, PathBuf},
     sync::atomic::{AtomicBool, Ordering},
 };
+
+#[derive(Debug)]
+pub(crate) enum GenerationPreparationError {
+    Cancelled,
+    Failed(String),
+}
+impl From<String> for GenerationPreparationError {
+    fn from(message: String) -> Self {
+        Self::Failed(message)
+    }
+}
+impl From<&str> for GenerationPreparationError {
+    fn from(message: &str) -> Self {
+        Self::Failed(message.into())
+    }
+}
+impl fmt::Display for GenerationPreparationError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Cancelled => formatter.write_str("A geração foi cancelada."),
+            Self::Failed(message) => formatter.write_str(message),
+        }
+    }
+}
 
 struct GenerationItem {
     id: String,
@@ -45,7 +70,9 @@ impl GenerationRunner {
     pub(crate) fn count_folders(source: &Path) -> Result<usize, String> {
         let mut paths = OperationPathContext::new();
         paths.capture(source).map_err(|error| error.to_string())?;
-        Ok(discover_folders(source, &mut paths, &AtomicBool::new(false))?.len())
+        discover_folders(source, &mut paths, &AtomicBool::new(false))
+            .map(|folders| folders.len())
+            .map_err(|error| error.to_string())
     }
 
     pub(crate) fn decide(
@@ -83,7 +110,10 @@ impl GenerationRunner {
         Ok(())
     }
 
-    pub(crate) fn recheck(&mut self, cancellation: &AtomicBool) -> Result<(), String> {
+    pub(crate) fn recheck(
+        &mut self,
+        cancellation: &AtomicBool,
+    ) -> Result<(), GenerationPreparationError> {
         if self.phase != GenerationPhase::Prepared {
             return Err("Verifique a geração novamente.".into());
         }
@@ -101,7 +131,7 @@ impl GenerationRunner {
         template: ProjectTemplate,
         core: ProjectCore,
         cancellation: &AtomicBool,
-    ) -> Result<Self, String> {
+    ) -> Result<Self, GenerationPreparationError> {
         ensure_running(cancellation)?;
         let source = Path::new(&options.source_folder);
         let destination = Path::new(&options.destination_folder);
@@ -147,7 +177,7 @@ impl GenerationRunner {
                 return Err(format!(
                     "Mais de uma pasta produziria {}. Escolha outra origem ou ajuste os nomes das pastas.",
                     output.display()
-                ));
+                ).into());
             }
             let proposal = MediaResolver.propose_media_imports_in_plan(
                 myalbuns_core::MediaKind::Photo,
@@ -347,7 +377,7 @@ fn discover_folders(
     root: &Path,
     paths: &mut OperationPathContext,
     cancellation: &AtomicBool,
-) -> Result<Vec<(PathBuf, Vec<PathBuf>)>, String> {
+) -> Result<Vec<(PathBuf, Vec<PathBuf>)>, GenerationPreparationError> {
     let mut pending = vec![root.to_path_buf()];
     let mut seen = HashSet::new();
     let mut folders = Vec::new();
@@ -395,9 +425,9 @@ fn discover_folders(
     Ok(folders)
 }
 
-fn ensure_running(cancellation: &AtomicBool) -> Result<(), String> {
+fn ensure_running(cancellation: &AtomicBool) -> Result<(), GenerationPreparationError> {
     if cancellation.load(Ordering::Acquire) {
-        Err("A geração foi cancelada.".into())
+        Err(GenerationPreparationError::Cancelled)
     } else {
         Ok(())
     }

@@ -52,6 +52,45 @@ test("presents pending cancelled items in the final result", async () => {
   await screen.findByText("Geração cancelada");
   expect(screen.getByText("Não gerado")).toBeVisible();
 });
+
+test("presents real failures in the standard dialog and retains the configuration on return", async () => {
+  const api = port({ prepare: vi.fn(async () => { throw new Error("Pasta indisponível"); }) });
+  render(<GenerationWindow port={api} />);
+  await screen.findByText("Modelo");
+  fireEvent.change(screen.getByRole("textbox", { name: "Pasta de origem" }), { target: { value: ready.options.sourceFolder } });
+  fireEvent.change(screen.getByRole("textbox", { name: "Pasta de destino" }), { target: { value: ready.options.destinationFolder } });
+  fireEvent.click(screen.getByRole("button", { name: "Verificar e gerar" }));
+  await screen.findByRole("dialog", { name: "Não foi possível concluir" });
+  expect(screen.queryByRole("textbox", { name: "Pasta de origem" })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Voltar" }));
+  expect(screen.getByRole("textbox", { name: "Pasta de origem" })).toHaveValue(ready.options.sourceFolder);
+  expect(screen.getByRole("textbox", { name: "Pasta de destino" })).toHaveValue(ready.options.destinationFolder);
+});
+
+test("returns from cancelled verification without a notice and keeps both folders", async () => {
+  const api = port({ prepare: vi.fn(async () => null) });
+  render(<GenerationWindow port={api} />);
+  await screen.findByText("Modelo");
+  fireEvent.change(screen.getByRole("textbox", { name: "Pasta de origem" }), { target: { value: ready.options.sourceFolder } });
+  fireEvent.change(screen.getByRole("textbox", { name: "Pasta de destino" }), { target: { value: ready.options.destinationFolder } });
+  fireEvent.click(screen.getByRole("button", { name: "Verificar e gerar" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Verificar e gerar" })).toBeEnabled());
+  expect(api.prepare).toHaveBeenCalledOnce();
+  expect(api.run).not.toHaveBeenCalled();
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  expect(screen.getByRole("textbox", { name: "Pasta de origem" })).toHaveValue(ready.options.sourceFolder);
+  expect(screen.getByRole("textbox", { name: "Pasta de destino" })).toHaveValue(ready.options.destinationFolder);
+});
+
+test("retains conflict decisions when rechecking is cancelled", async () => {
+  const api = port({ current: async () => ready, recheck: vi.fn(async () => null) });
+  render(<GenerationWindow port={api} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Verificar novamente" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Continuar Geração" })).toBeEnabled());
+  expect(screen.getByText("Será sobrescrito")).toBeVisible();
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  expect(api.run).not.toHaveBeenCalled();
+});
 test("acknowledges a prepared problem result before the native progress closes", async () => {
   const api = port({ current: async () => ({ ...ready, canContinue: false }) });
   render(<GenerationWindow port={api} />);

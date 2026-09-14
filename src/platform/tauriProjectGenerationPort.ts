@@ -8,9 +8,9 @@ import { tauriWindowControls } from "./tauriWindowControls";
 
 export const tauriProjectGenerationPort: ProjectGenerationPort = {
   model: () => invoke("generation_model"), chooseFolder: () => invoke("generation_choose_folder"), count: source => invoke("generation_count", { source }),
-  current: () => invoke<GenerationView | null>("generation_current"), prepare: options => invoke<GenerationView>("generation_prepare", { options: options satisfies GenerationOptions }),
-  decide: (id, decision) => invoke<GenerationView>("generation_decide", { id, decision }), recheck: () => invoke<GenerationView>("generation_recheck"),
-  run: () => invoke<GenerationView>("generation_run"), cancel: () => invoke("generation_cancel"), close: () => invoke("close_project_generation"),
+  current: () => invoke<GenerationView | null>("generation_current"), prepare: options => invoke<GenerationView | null>("generation_prepare", { options: options satisfies GenerationOptions }),
+  decide: (id, decision) => invoke<GenerationView>("generation_decide", { id, decision }), recheck: () => invoke<GenerationView | null>("generation_recheck"),
+  run: () => invoke<GenerationView | null>("generation_run"), cancel: () => invoke("generation_cancel"), close: () => invoke("close_project_generation"),
   progress: () => invoke<GenerationProgress | null>("generation_progress"),
   onView: callback => listen<GenerationView>("myalbuns://generation-view", event => callback(event.payload)),
   onProgress: callback => listen<GenerationProgress>("myalbuns://generation-progress", event => callback(event.payload)),
