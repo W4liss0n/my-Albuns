@@ -77,9 +77,33 @@ impl ProjectCore {
 #[derive(Debug)]
 pub struct LoadedProjectRevision {
     revision: ProjectRevision,
+    project_path: PathBuf,
+    content_sha256: String,
 }
 
 impl LoadedProjectRevision {
+    /// Identifies exactly the bytes decoded by the read-only load, including
+    /// external rewrites that did not advance the creative revision.
+    pub fn content_sha256(&self) -> &str {
+        &self.content_sha256
+    }
+
+    /// Resolves the persisted document through the same composition owner as
+    /// an editor, without an editable identity lease, History or disk writes.
+    pub fn freeze_rendering(&self) -> FrozenProjectRendering {
+        let session = PersistentProjectSession::from_persisted(self.revision.clone(), false);
+        let projection = persistent_projection::editor_projection(
+            &session,
+            false,
+            &project_name_from_path(&self.project_path),
+            &HashMap::new(),
+        );
+        FrozenProjectRendering {
+            projection,
+            sources: self.revision.project.media().to_vec(),
+        }
+    }
+
     pub fn project_id(&self) -> Uuid {
         self.revision.project_id
     }
@@ -1147,6 +1171,8 @@ impl ProjectCore {
         authorize_loaded_identity(self, &loaded)?;
         Ok(LoadedProjectRevision {
             revision: loaded.revision,
+            project_path: loaded.project_path,
+            content_sha256: loaded.content_sha256,
         })
     }
 

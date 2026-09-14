@@ -4,6 +4,7 @@ use myalbuns_imaging_protocol::{AlbumRenderOutput, AlbumRenderRequest, ImagingRe
 
 #[derive(Debug)]
 pub(crate) struct AlbumExportPlan {
+    paths: Option<RootBindingPlan>,
     protected_originals: Vec<PathBuf>,
     obsolete_outputs: Vec<PathBuf>,
     cleanup_confirmed: bool,
@@ -29,6 +30,33 @@ pub(crate) struct AlbumExportOptions {
 pub(crate) fn plan_album(
     snapshot: RenderSnapshot,
     options: AlbumExportOptions,
+) -> Result<AlbumExportPlan, ExportFailure> {
+    plan_album_with_paths(snapshot, options, None)
+}
+
+/// Preflight and execution must observe the same bound destination, including
+/// conflict checks and orphan discovery. Output plans retain their logical paths.
+pub(crate) fn plan_album_in_paths(
+    snapshot: RenderSnapshot,
+    options: AlbumExportOptions,
+    paths: &RootBindingPlan,
+) -> Result<AlbumExportPlan, ExportFailure> {
+    plan_album_with_paths(snapshot, options, Some(paths.clone()))
+}
+
+fn observed_path(
+    paths: Option<&RootBindingPlan>,
+    path: &std::path::Path,
+) -> Result<PathBuf, ExportFailure> {
+    paths
+        .map_or_else(|| Ok(path.to_path_buf()), |paths| paths.resolve(path))
+        .map_err(|error| ExportFailure::new(ExportFailureStage::Plan, error.to_string()))
+}
+
+fn plan_album_with_paths(
+    snapshot: RenderSnapshot,
+    options: AlbumExportOptions,
+    paths: Option<RootBindingPlan>,
 ) -> Result<AlbumExportPlan, ExportFailure> {
     let AlbumExportOptions {
         protected_originals,
@@ -72,8 +100,11 @@ pub(crate) fn plan_album(
         })
         .collect::<Result<Vec<_>, ExportFailure>>()?;
     let mut obsolete_outputs = Vec::new();
-    if whole_album && format != ExportFormat::Pdf && destination.is_dir() {
-        for entry in std::fs::read_dir(&destination).map_err(|error| invalid(error.to_string()))? {
+    let observed_destination = observed_path(paths.as_ref(), &destination)?;
+    if whole_album && format != ExportFormat::Pdf && observed_destination.is_dir() {
+        for entry in
+            std::fs::read_dir(&observed_destination).map_err(|error| invalid(error.to_string()))?
+        {
             let entry = entry.map_err(|error| invalid(error.to_string()))?;
             let file = entry.file_name();
             let Some(file) = file.to_str() else { continue };
@@ -88,14 +119,15 @@ pub(crate) fn plan_album(
                 && file == format!("{name}_{index:03}.{}", format.extension())
                 && !outputs
                     .iter()
-                    .any(|(path, _)| path.output_path() == entry.path())
+                    .any(|(path, _)| path.output_path() == destination.join(file))
             {
-                obsolete_outputs.push(entry.path());
+                obsolete_outputs.push(destination.join(file));
             }
         }
         obsolete_outputs.sort();
     }
     Ok(AlbumExportPlan {
+        paths,
         protected_originals,
         obsolete_outputs,
         cleanup_confirmed: whole_album
@@ -109,6 +141,9 @@ pub(crate) fn plan_album(
 }
 
 impl AlbumExportPlan {
+    pub(crate) fn preparation_directory(&self) -> &std::path::Path {
+        self.outputs[0].0.preparation_directory()
+    }
     /// Keeps original numbering and create-only publication for the remaining files.
     /// A file appearing after this check must never be silently overwritten.
     pub(crate) fn skip_existing_outputs(&mut self) -> Result<bool, ExportFailure> {
@@ -142,11 +177,9 @@ impl AlbumExportPlan {
         &self.request_id
     }
     pub(crate) fn required_paths(&self) -> Vec<PathBuf> {
-        let protects_existing = self
-            .outputs
-            .iter()
-            .any(|(path, _)| path.output_path().exists())
-            || !self.obsolete_outputs.is_empty();
+        let protects_existing = self.outputs.iter().any(|(path, _)| {
+            observed_path(self.paths.as_ref(), path.output_path()).is_ok_and(|path| path.exists())
+        }) || !self.obsolete_outputs.is_empty();
         self.outputs
             .iter()
             .map(|(path, _)| path.output_path().to_path_buf())
@@ -171,7 +204,7 @@ impl AlbumExportPlan {
             .map(|(path, _)| path.output_path())
             .chain(self.obsolete_outputs.iter().map(PathBuf::as_path))
         {
-            match std::fs::symlink_metadata(path) {
+            match std::fs::symlink_metadata(observed_path(self.paths.as_ref(), path)?) {
                 Ok(meta) if meta.is_file() && !meta.file_type().is_symlink() => files.push(
                     path.file_name()
                         .unwrap_or_default()

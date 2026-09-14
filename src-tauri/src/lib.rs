@@ -1,3 +1,7 @@
+mod application_modality;
+mod batch_exclusivity;
+mod batch_runner;
+mod batch_window;
 mod cache_activity_gate;
 mod cache_engine;
 mod cache_previews;
@@ -54,7 +58,6 @@ mod project_window_lifecycle;
 mod provisional_decoratives;
 mod recent_projects;
 mod runtime_role;
-mod settings_modality;
 mod settings_preferences;
 mod settings_window;
 #[cfg(windows)]

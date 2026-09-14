@@ -1,0 +1,10 @@
+{
+  "permission": [{
+    "identifier": "batch-window-commands",
+    "description": "Own batch preflight, execution, cancellation and recovery",
+    "commands": {"allow": ["close_batch_export", "batch_choose_folder", "batch_count_projects",
+      "batch_current", "batch_progress", "batch_prepare", "batch_recheck", "batch_ignore",
+      "batch_relink", "batch_open_project", "batch_recoveries", "batch_resume", "batch_end",
+      "batch_cancel", "batch_result_ready", "batch_run", "fit_owned_window", "owned_window_content_ready"], "deny": []}
+  }]
+}

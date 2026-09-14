@@ -21,7 +21,7 @@ pub(crate) fn request_project_close(
 ) -> Result<ProjectCloseRequestOutcome, SaveProjectCommandError> {
     let _operation = crate::project_ui_operations::begin(window.app_handle())
         .map_err(|_| SaveProjectCommandError::SessionUnavailable)?;
-    if crate::settings_modality::blocks(&window) {
+    if crate::application_modality::blocks(&window) {
         return Err(SaveProjectCommandError::SessionUnavailable);
     }
     tracing::info!(
@@ -66,7 +66,7 @@ pub(crate) async fn resolve_project_close(
 ) -> Result<ProjectCloseResolution, SaveProjectCommandError> {
     let _operation = crate::project_ui_operations::begin(window.app_handle())
         .map_err(|_| SaveProjectCommandError::SessionUnavailable)?;
-    if crate::settings_modality::blocks(&window) {
+    if crate::application_modality::blocks(&window) {
         return Err(SaveProjectCommandError::SessionUnavailable);
     }
     match choice {

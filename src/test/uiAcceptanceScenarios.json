@@ -12,6 +12,81 @@
       "actions": []
     },
     {
+      "id": "batch-export-configuration",
+      "title": "Exportação em lote — configuração",
+      "implementationPath": "/batch-export-preview.html?scenario=configuration",
+      "comparison": { "kind": "implementation-only", "surface": "batch-export-window", "implementationCaptureSelector": ".ui-owned-window-shell", "reason": "Design 0006 e padrão visual aceito da Exportação normal: formulário espaçoso, formato e modo em colunas, Álbum inteiro com JPEG máximo." },
+      "viewport": { "width": 800, "height": 650 },
+      "readySelector": ".batch-configuration",
+      "actions": [
+        { "type": "input", "selector": "input[aria-label='Pasta dos Projetos']", "value": "D:\\Projetos\\Formatura 2026" },
+        { "type": "assert", "selector": ".ui-dialog-window__footer .ui-action-button:last-child:not(:disabled)" }
+      ]
+    },
+    {
+      "id": "batch-export-alternate",
+      "title": "Exportação em lote — destino alternativo",
+      "implementationPath": "/batch-export-preview.html?scenario=configuration",
+      "comparison": { "kind": "implementation-only", "surface": "batch-export-window", "implementationCaptureSelector": ".ui-owned-window-shell", "reason": "Design 0006: raiz alternativa preservando a hierarquia de Projetos, sem intervalo ou qualidade." },
+      "viewport": { "width": 800, "height": 650 },
+      "readySelector": ".batch-configuration",
+      "actions": [
+        { "type": "input", "selector": "input[aria-label='Pasta dos Projetos']", "value": "D:\\Projetos\\Formatura 2026" },
+        { "type": "click", "selector": "input[name='batch-destination']:not(:checked)" },
+        { "type": "input", "selector": "input[aria-label='Pasta de destino']", "value": "E:\\Exportações\\Formatura 2026" },
+        { "type": "assert", "selector": ".ui-dialog-window__footer .ui-action-button:last-child:not(:disabled)" }
+      ]
+    },
+    {
+      "id": "batch-export-problems",
+      "title": "Exportação em lote — problemas antes de iniciar",
+      "implementationPath": "/batch-export-preview.html?scenario=problems",
+      "comparison": { "kind": "implementation-only", "surface": "batch-export-window", "implementationCaptureSelector": ".ui-owned-window-shell", "reason": "Designs 0005 e 0006: tabela Projeto, Problema e Ações, religações temporárias e confirmação manual após correções." },
+      "viewport": { "width": 800, "height": 650 },
+      "readySelector": ".ui-problems-table", "actions": []
+    },
+    {
+      "id": "batch-export-conflicts",
+      "title": "Exportação em lote — conflito genérico",
+      "implementationPath": "/batch-export-preview.html?scenario=conflicts",
+      "comparison": { "kind": "implementation-only", "surface": "batch-export-window", "implementationCaptureSelector": ".ui-owned-window-shell", "reason": "Decisão posterior aceita: conflito sem lista de arquivos, com Ignorar, Substituir e Cancelar, reutilizando a confirmação comum." },
+      "viewport": { "width": 800, "height": 420 },
+      "readySelector": ".ui-standard-message",
+      "actions": [{ "type": "click-text", "text": "Continuar Exportação" }]
+    },
+    {
+      "id": "batch-export-progress",
+      "title": "Exportação em lote — progresso compacto",
+      "implementationPath": "/batch-export-preview.html?scenario=progress",
+      "comparison": { "kind": "implementation-only", "surface": "batch-progress-window", "implementationCaptureSelector": ".ui-owned-window-shell", "reason": "Design 0007 e refinamento aceito: progresso geral determinado e X/Y, Cancelar como única ação, largura própria independente da configuração." },
+      "viewport": { "width": 400, "height": 340 },
+      "readySelector": ".ui-progress-dialog", "actions": []
+    },
+    {
+      "id": "batch-export-result",
+      "title": "Exportação em lote — resultado com falhas e ignorados",
+      "implementationPath": "/batch-export-preview.html?scenario=result",
+      "comparison": { "kind": "implementation-only", "surface": "batch-export-window", "implementationCaptureSelector": ".ui-owned-window-shell", "reason": "Designs 0005 e 0006: apenas itens com falha ou ignorados na tabela de resultado; nova tentativa exige decisão explícita." },
+      "viewport": { "width": 800, "height": 600 },
+      "readySelector": ".ui-problems-table", "actions": []
+    },
+    {
+      "id": "batch-export-recovery",
+      "title": "Exportação em lote — retomada após interrupção",
+      "implementationPath": "/batch-export-preview.html?scenario=recovery",
+      "comparison": { "kind": "implementation-only", "surface": "batch-export-window", "implementationCaptureSelector": ".ui-owned-window-shell", "reason": "Design 0006: oferta explícita de Retomar ou Encerrar, sem executar automaticamente ao reiniciar." },
+      "viewport": { "width": 800, "height": 420 },
+      "readySelector": ".ui-standard-message", "actions": []
+    },
+    {
+      "id": "batch-export-success",
+      "title": "Exportação em lote — sucesso integral",
+      "implementationPath": "/batch-export-preview.html?scenario=success",
+      "comparison": { "kind": "implementation-only", "surface": "batch-export-window", "implementationCaptureSelector": ".ui-owned-window-shell", "reason": "Design 0006: confirmação curta depois de todos os Álbuns publicados, sem lista vazia de problemas." },
+      "viewport": { "width": 800, "height": 420 },
+      "readySelector": ".ui-standard-message", "actions": []
+    },
+    {
       "id": "welcome-narrow",
       "title": "Boas-vindas — controles da janela na largura reduzida",
       "implementationPath": "/welcome-preview.html",
@@ -41,7 +116,7 @@
         "width": 800,
         "height": 650
       },
-      "readySelector": ".export-configuration",
+      "readySelector": ".ui-export-form",
       "actions": []
     },
     {
@@ -58,7 +133,7 @@
         "width": 640,
         "height": 650
       },
-      "readySelector": ".export-configuration",
+      "readySelector": ".ui-export-form",
       "actions": []
     },
     {
@@ -75,7 +150,7 @@
         "width": 800,
         "height": 650
       },
-      "readySelector": ".export-configuration",
+      "readySelector": ".ui-export-form",
       "actions": [
         {
           "type": "focus",
@@ -101,7 +176,7 @@
         "width": 800,
         "height": 650
       },
-      "readySelector": ".export-configuration",
+      "readySelector": ".ui-export-form",
       "actions": []
     },
     {
@@ -118,7 +193,7 @@
         "width": 800,
         "height": 650
       },
-      "readySelector": ".export-configuration",
+      "readySelector": ".ui-export-form",
       "actions": []
     },
     {
@@ -135,11 +210,11 @@
         "width": 800,
         "height": 650
       },
-      "readySelector": ".export-configuration",
+      "readySelector": ".ui-export-form",
       "actions": [
         {
           "type": "click",
-          "selector": ".export-configuration__range input[type=\"radio\"]"
+          "selector": ".ui-export-form__range input[type=\"radio\"]"
         }
       ]
     },
@@ -157,7 +232,7 @@
         "width": 640,
         "height": 650
       },
-      "readySelector": ".export-configuration",
+      "readySelector": ".ui-export-form",
       "actions": [
         {
           "type": "input",
@@ -180,7 +255,7 @@
         "width": 800,
         "height": 650
       },
-      "readySelector": ".export-configuration",
+      "readySelector": ".ui-export-form",
       "actions": [
         {
           "type": "input",
@@ -203,7 +278,7 @@
         "width": 800,
         "height": 650
       },
-      "readySelector": ".export-configuration",
+      "readySelector": ".ui-export-form",
       "actions": []
     },
     {
@@ -237,7 +312,7 @@
         "width": 800,
         "height": 650
       },
-      "readySelector": ".export-configuration",
+      "readySelector": ".ui-export-form",
       "actions": []
     },
     {

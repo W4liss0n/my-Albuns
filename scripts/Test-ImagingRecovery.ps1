@@ -84,6 +84,14 @@ $checks = @(
         )
     },
     [ordered]@{
+        name = 'batch-export-real-processor'
+        arguments = @(
+            'test', '-p', 'myalbuns-desktop', '--lib',
+            'batch_runner::tests::real_processor_exports_persisted_batches_in_every_format',
+            '--', '--ignored', '--exact', '--nocapture'
+        )
+    },
+    [ordered]@{
         name = 'production-recovery-integration'
         arguments = @(
             'test',

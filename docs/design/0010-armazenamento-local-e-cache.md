@@ -118,8 +118,9 @@ Uma Cópia externa recebe nova Identidade antes de consultar Recuperação ou Ca
 - opções e plano ordenado;
 - estado de cada item: pendente, concluído, ignorado ou falho;
 - identificação do item que estava em execução.
+- identificação e caminho nativo da preparação reservada que poderá exigir limpeza após interrupção.
 
-Não contém estado criativo nem preparação parcial. Após interrupção, o item que estava em execução volta a `pendente` e é refeito integralmente; itens já concluídos não são repetidos.
+Não contém estado criativo, mapas de Religação, bindings de raiz ou dados de renderização parcial. O caminho reservado serve somente para descartar a preparação após confirmar o término do escritor. Após interrupção, o item que estava em execução volta a `pendente` e é refeito integralmente; itens já concluídos não são repetidos.
 
 ## Evidência local de Identidade
 

@@ -1126,13 +1126,13 @@ validação das superfícies descritas nesta seção.
 - A Exportação em lote usa exclusivamente o estado persistido dos arquivos, mesmo quando um Projeto está aberto com mudanças não salvas. Correções criativas feitas por `Abrir Projeto` precisam ser salvas antes de uma nova verificação; o mapa temporário de Religação é a única exceção.
 - Imediatamente antes de criar o snapshot imutável de um item, o lote reabre o Projeto pelo núcleo compartilhado, confere sua revisão ou hash persistido contra a versão pré-validada e repete a validação se o arquivo mudou.
 - Durante toda a Exportação em lote, uma concessão global exclusiva permanece ativa e o Cache permanece pausado: todas as janelas de Projeto ficam indisponíveis, trabalhos de Cache são interrompidos em ponto seguro e somente a janela de progresso e cancelamento do lote permanece interativa.
-- O progresso do lote usa a barra geral, o Projeto atual, seu estado, a posição `X/Y` e uma síntese compacta da fila, sem expor a tabela de Projetos, trabalhos simultaneamente ativos ou histórico item a item durante o processamento.
+- O progresso da Exportação em lote mostra somente a barra geral determinada, percentual e posição `X/Y`, com `Cancelar` como única ação. Não expõe a tabela de Projetos, trabalhos simultaneamente ativos ou histórico item a item durante o processamento.
 - Nenhuma Exportação normal, edição, Salvamento, abertura ou fechamento de Projeto pode começar enquanto o Modo de lote exclusivo estiver ativo.
 - Concluir, falhar ou cancelar o lote libera a concessão e a pausa, reabilita todas as janelas e permite retomar os trabalhos de Cache, sem salvar ou alterar automaticamente qualquer Projeto aberto.
 - O MVP processa exatamente um Projeto por vez, em ordem determinística, sem Perfil de desempenho, calibração ou paralelismo entre Álbuns. Paralelismo só pode ser reconsiderado depois de medições representativas.
 - Por padrão, cada Projeto recebe sua pasta de saída com o próprio Nome ao lado de seu arquivo.
 - Em um destino alternativo, a hierarquia relativa dos Projetos é preservada e cada Projeto recebe uma pasta com seu Nome.
-- Conflitos de todo o lote são apresentados antes do início com `Sobrescrever todos` ou `Cancelar`.
+- Conflitos de todo o lote são apresentados antes do início por aviso genérico com `Ignorar`, `Substituir` ou `Cancelar`. `Ignorar` preserva as saídas existentes, exporta somente as faltantes e não limpa órfãos.
 - Um Projeto inválido pode ser explicitamente ignorado na Tela de Problemas, com seus motivos registrados, sem interromper os demais.
 - Cada Álbum usa a mesma preparação e Publicação limitada da Exportação normal. Uma falha pertence ao item corrente e não reverte itens já concluídos.
 - O checkpoint do lote é persistido atomicamente em `%LOCALAPPDATA%\MyAlbuns\Recovery\Batches\{batch-id}.json` e registra apenas plano, opções, estados `pendente`, `concluído`, `ignorado` ou `falho` e o item que estava em execução; não contém estado criativo, saída preparada ou manifesto no Destino.

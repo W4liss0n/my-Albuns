@@ -51,3 +51,17 @@ Correções criativas abertas pelo diagnóstico precisam ser salvas antes de uma
 Quando não houver pendências sem decisão, a operação passa pelos conflitos de destino já definidos e só então adquire um `OperationLease`, entrando no Modo de lote exclusivo com o [Progresso de operação](0007-progresso-de-operacoes.md) compartilhado pelo aplicativo. O mecanismo é o mesmo usado pela Exportação normal, mas a instância do lote permanece única e contínua do início ao terminal de toda a tentativa; ela oferece a mesma garantia de devolver concessão, pausa do Cache e Processador. Seu contrato está em [Propriedade de estado e módulos do núcleo](0012-propriedade-de-estado-e-modulos-do-nucleo.md).
 
 O `BatchRunner` possui descoberta, pré-validação, ordem serial e checkpoint. Para cada item conhecido, ele usa a etapa de planejamento do mesmo `ExportPipeline` da Exportação normal, congela o plano de caminhos depois de reunir as raízes e então executa cada item serialmente. O MVP processa um Projeto por vez, sem calibração ou paralelismo entre Álbuns.
+
+## Conflitos e interrupção
+
+A confirmação de conflitos segue o refinamento aceito para Exportação: aviso genérico com `Ignorar`, `Substituir` ou `Cancelar`, sem listar arquivos. `Ignorar` preserva os arquivos existentes e exporta somente os que faltam. Nesse caso, a limpeza de órfãos não acontece. Um Projeto cujas saídas já existem por completo aparece como ignorado no resultado.
+
+Depois de uma interrupção, `Retomar` reabre os Projetos persistidos, descarta os mapas de Religação anteriores e exige uma nova confirmação para executar. Projetos concluídos ou explicitamente ignorados não são repetidos. Fechar a janela conserva o checkpoint; `Encerrar` remove esse registro e preserva as saídas publicadas. A preparação abandonada é descartada somente quando o encerramento de seu Processador está confirmado.
+
+O checkpoint usa `AppPaths.recovery_dir()/Batches`, respeitando o namespace de desenvolvimento `MyAlbuns2` enquanto essa separação estiver vigente. Conserva apenas opções, estados dos itens e identificação da preparação que poderá precisar de limpeza. Nunca conserva bindings de raiz, mapas de Religação nem imagens parcialmente renderizadas.
+
+## Propriedade da execução
+
+O Global mantém a execução mesmo se a interface deixar de responder. Antes de iniciar, serializa novas aberturas, adquire o `OperationGate` e solicita a pausa aos hosts dos Projetos. Cada host termina comandos já aceitos, pausa seu `CacheEngine`, reserva seu Processador e confirma o bloqueio de suas janelas. A execução só começa depois dessas confirmações, sob um único `OperationLease` do Global.
+
+As reservas entre processos usam posses do sistema operacional. O desaparecimento do proprietário libera o modo exclusivo, e os hosts devolvem a pausa e a interação. A janela de progresso tem largura própria, independente da configuração. Ao terminar, a configuração prepara o resultado antes de reaparecer; não há linha temporária de preparação.

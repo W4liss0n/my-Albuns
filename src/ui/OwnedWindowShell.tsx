@@ -7,6 +7,7 @@ interface OwnedWindowShellProps {
   children: ReactNode;
   controls?: "all" | "close" | "none";
   status?: string;
+  context?: string;
   width?: number;
 }
 
@@ -14,6 +15,7 @@ export function OwnedWindowShell({
   children,
   controls = "none",
   status,
+  context,
   width,
 }: OwnedWindowShellProps) {
   const shellRef = useRef<HTMLDivElement>(null);
@@ -47,7 +49,7 @@ export function OwnedWindowShell({
       ref={shellRef}
       style={width === undefined ? undefined : { width }}
     >
-      <ApplicationHeader controls={controls} status={status} />
+      <ApplicationHeader controls={controls} status={status} context={context} />
       {children}
     </div>
   );

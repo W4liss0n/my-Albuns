@@ -62,6 +62,7 @@ const graphicsDiagnostic =
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <GlobalShell
+      onOpenBatch={async () => { window.location.href = "/batch-export-preview.html?scenario=configuration"; }}
       onOpenSettings={previewParameters.get("graphics") === "unsupported" ? undefined : async () => { window.location.href = "/settings-preview.html?section=performance"; }}
       failureDialogPort={failureDialogPort}
       graphicsDiagnostic={graphicsDiagnostic}

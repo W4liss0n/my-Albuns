@@ -6,7 +6,7 @@ import { ActionButton, AppIcon, FieldValidationAutoTooltip, FieldValidationToolt
 import { DialogWindowFrame } from "../ui/DialogWindowFrame";
 import { DialogFocusScope } from "../ui/DialogFocusScope";
 import { TextInput } from "../ui/TextInput";
-import "./ExportConfigurationDialog.css";
+import "../ui/ExportForm.css";
 
 type State = Extract<ProjectDialogState, { kind: "exportConfiguration" }>;
 
@@ -49,11 +49,11 @@ export function ExportConfigurationDialog({ state, onAction }: {
     : `${count} ${count === 1 ? "arquivo" : "arquivos"}`;
 
   return (
-    <DialogFocusScope className="export-dialog" focusKey={`export-${state.busy}`}
+    <DialogFocusScope className="ui-export-dialog" focusKey={`export-${state.busy}`}
       initialFocusRef={initialFocus} onEscape={() => { if (!state.busy) onAction("dismissExport"); }}>
       <DialogWindowFrame layout="form" title="Exportar" actions={
         <>
-          <div className="export-configuration__summary" aria-live="polite">
+          <div className="ui-export-form__summary" aria-live="polite">
             <span>{summary}</span>{options.format.kind !== "pdf" && <> · {options.format.kind.toUpperCase()}</>}
           </div>
           <ActionButton disabled={state.busy} onClick={() => onAction("dismissExport")}>Cancelar</ActionButton>
@@ -61,27 +61,27 @@ export function ExportConfigurationDialog({ state, onAction }: {
             onClick={() => onAction({ configureExport: request })}>Exportar</ActionButton>
         </>
       }>
-        <form className="export-configuration" aria-busy={state.busy} onSubmit={event => event.preventDefault()}>
-          <fieldset className="export-configuration__section export-configuration__section--destination" disabled={state.busy}>
+        <form className="ui-export-form" aria-busy={state.busy} onSubmit={event => event.preventDefault()}>
+          <fieldset className="ui-export-form__section ui-export-form__section--destination" disabled={state.busy}>
             <legend>Destino da exportação</legend>
-            <div className="export-configuration__destination">
+            <div className="ui-export-form__destination">
               <TextInput ref={initialFocus} className="ui-field-control" aria-label="Pasta de destino" value={options.destination}
                 title={options.destination} onChange={event => setOptions(current => ({ ...current, destination: event.target.value }))} />
               <ActionButton variant="primary" onClick={() => onAction({ chooseExportDestination: { ...request, sheetIds: options.sheetIds } })}>Escolher…</ActionButton>
             </div>
           </fieldset>
 
-          <fieldset className="export-configuration__section" disabled={state.busy}>
+          <fieldset className="ui-export-form__section" disabled={state.busy}>
             <legend>Formato de exportação</legend>
-            <div className="export-configuration__format-row">
-              <div className="export-configuration__format-select">
+            <div className="ui-export-form__format-row">
+              <div className="ui-export-form__format-select">
                 <select className="ui-field-control" aria-label="Formato de exportação" value={options.format.kind}
                   onChange={event => setFormat(event.target.value as ExportFormat["kind"])}>
                   <option value="jpeg">JPEG</option><option value="png">PNG</option><option value="pdf">PDF</option>
                 </select>
                 <AppIcon icon={ChevronDown} size={16} />
               </div>
-              {options.format.kind === "jpeg" && <div className="export-configuration__quality">
+              {options.format.kind === "jpeg" && <div className="ui-export-form__quality">
                 <label htmlFor={`${id}-quality`}>Qualidade:</label>
                 <input id={`${id}-quality`} className="ui-range" aria-label="Qualidade JPEG" type="range"
                   min={1} max={100} step={1} value={quality} onChange={event => setQuality(Number(event.target.value))}
@@ -91,20 +91,20 @@ export function ExportConfigurationDialog({ state, onAction }: {
             </div>
           </fieldset>
 
-          <fieldset className="export-configuration__section" disabled={state.busy}>
+          <fieldset className="ui-export-form__section" disabled={state.busy}>
             <legend>Seleção de lâminas</legend>
-            <div className="export-configuration__selection">
-              <label className="export-configuration__choice">
+            <div className="ui-export-form__selection">
+              <label className="ui-export-form__choice">
                 <input type="radio" name={`${id}-scope`} checked={scope === "album"} onChange={() => setScope("album")} />
                 Todas as lâminas
               </label>
-              <div className="export-configuration__selection-row">
-                <div className="export-configuration__range">
-                  <label className="export-configuration__choice">
+              <div className="ui-export-form__selection-row">
+                <div className="ui-export-form__range">
+                  <label className="ui-export-form__choice">
                     <input type="radio" name={`${id}-scope`} checked={scope === "range"} onChange={() => setScope("range")} />
                     Intervalo personalizado
                   </label>
-                  <span className="export-configuration__range-field">
+                  <span className="ui-export-form__range-field">
                     <TextInput className="ui-field-control" aria-label="Lâminas do intervalo"
                       {...fieldValidationTooltipAttributes("interval", rangeError, rangeTooltip)}
                       disabled={scope !== "range"}
@@ -114,7 +114,7 @@ export function ExportConfigurationDialog({ state, onAction }: {
                     <FieldValidationAutoTooltip field="interval" tooltip={rangeTooltip} />
                   </span>
                 </div>
-                <label className="export-configuration__choice export-configuration__page-mode">
+                <label className="ui-export-form__choice ui-export-form__page-mode">
                   <input type="checkbox" checked={options.mode === "page"}
                     onChange={event => setOptions(current => ({ ...current, mode: event.target.checked ? "page" : "sheet" }))} />
                   Exportar como páginas simples
@@ -123,7 +123,7 @@ export function ExportConfigurationDialog({ state, onAction }: {
             </div>
             <FieldValidationTooltip tooltip={rangeTooltip} />
           </fieldset>
-          {state.message && <p role="alert" className="export-configuration__status export-configuration__error">{state.message}</p>}
+          {state.message && <p role="alert" className="ui-export-form__status ui-export-form__error">{state.message}</p>}
         </form>
       </DialogWindowFrame>
     </DialogFocusScope>

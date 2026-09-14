@@ -1,0 +1,9 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "batch-window",
+  "description": "Dedicated batch preflight and progress windows",
+  "local": true,
+  "windows": ["batch-export", "batch-progress"],
+  "permissions": ["batch-window-commands", "core:window:allow-start-dragging",
+    "core:event:allow-listen", "core:event:allow-unlisten"]
+}

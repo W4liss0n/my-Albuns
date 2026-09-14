@@ -37,6 +37,7 @@ import {
 } from "../ui";
 
 interface GlobalShellProps {
+  onOpenBatch?(): Promise<void>;
   onOpenSettings?(): Promise<void>;
   failureDialogPort: ProjectFailureDialogPort;
   graphicsDiagnostic: GraphicsDiagnostic;
@@ -49,6 +50,7 @@ const portraitCoverIndexes = new Set([1, 4, 6]);
 
 export function GlobalShell({
   onOpenSettings,
+  onOpenBatch,
   failureDialogPort,
   graphicsDiagnostic,
   newProjectPort,
@@ -349,12 +351,10 @@ export function GlobalShell({
             void onOpenSettings?.().catch(() => setSettingsError("Não foi possível abrir Configurações. Tente novamente."));
           }}>Configurações…</button>
           {settingsError && <p role="alert">{settingsError}</p>}
-          {/* PLACEHOLDER UI: ainda não existe uma porta de Exportação em lote. */}
           <button
             aria-label="Exportação em lote"
-            data-placeholder-feature="batch-export"
-            disabled
-            title="A Exportação em lote ainda não está disponível"
+            disabled={isOpening || !onOpenBatch}
+            onClick={() => { void onOpenBatch?.().catch(() => setSettingsError("Não foi possível abrir a exportação em lote.")); }}
             type="button"
           >
             <AppIcon icon={Download} size={14} />

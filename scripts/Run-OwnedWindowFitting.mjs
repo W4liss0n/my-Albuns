@@ -118,7 +118,7 @@ try {
     if (scenario.stableWindow) await execute(`
       window.fitting.fits=[]; window.fitting.lastFit=Date.now();
       const frameWindow=document.querySelector('iframe').contentWindow,doc=frameWindow.document;
-      doc.querySelector('.export-configuration__range input[type="radio"]').click();
+      doc.querySelector('.ui-export-form__range input[type="radio"]').click();
       const input=doc.querySelector('[aria-label="Lâminas do intervalo"]');
       Object.getOwnPropertyDescriptor(frameWindow.HTMLInputElement.prototype,'value').set.call(input,arguments[0]);
       input.dispatchEvent(new frameWindow.Event('input',{bubbles:true}));`, [scenario.interval]);

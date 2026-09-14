@@ -69,7 +69,7 @@ pub(crate) async fn show(app: &AppHandle, section: SettingsSection) -> Result<()
         SettingsSection::Performance => "performance",
     };
     let reservation = app
-        .state::<crate::settings_modality::SettingsModality>()
+        .state::<crate::application_modality::ApplicationModality>()
         .reserve()
         .await?;
     #[cfg(debug_assertions)]

@@ -163,7 +163,10 @@ impl OperationPathContext {
         }
     }
 
-    pub(crate) fn current_plan(&self) -> RootBindingPlan {
+    /// Snapshot of already captured facts for discovery and preflight readers.
+    /// Processors receive only the final plan produced by `freeze` after all
+    /// item roots are known; this method never recaptures a root.
+    pub fn current_plan(&self) -> RootBindingPlan {
         RootBindingPlan {
             bindings: self.bindings.clone(),
         }
