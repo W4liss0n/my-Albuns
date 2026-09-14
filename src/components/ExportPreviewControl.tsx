@@ -546,16 +546,11 @@ function progressDialogState(
   previous: number,
   status: string,
 ) {
-  const fraction = event.units.kind === "measured" && event.units.totalUnits > 0
-    ? Math.min(1, Math.max(0, event.units.completedUnits / event.units.totalUnits)) : 0;
-  const ranges = { preparing: [0, 0], loading_sources: [0, 10], composing: [10, 65],
-    encoding_output: [10, 65], verifying: [75, 10], publishing: [85, 14], completed: [100, 0] };
-  const [start, span] = ranges[event.stage];
   return {
     cancelRequested: false,
     cancellable: event.cancellable,
     kind: "exportProgress" as const,
-    progress: { completed: Math.floor(Math.max(previous, start + span * fraction)), kind: "determinate" as const,
+    progress: { completed: Math.floor(Math.max(previous, event.overallPercent)), kind: "determinate" as const,
       status, total: 100 },
   };
 }

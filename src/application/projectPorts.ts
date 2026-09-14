@@ -117,6 +117,7 @@ export type ExportProgressEvent =
       event: "progress";
       stage: ExportProgressStage;
       units: ExportProgressUnits;
+      overallPercent: number;
       cancellable: boolean;
     };
 

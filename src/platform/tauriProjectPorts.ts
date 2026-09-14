@@ -475,6 +475,7 @@ export const tauriExportPipelinePort: ExportPipelinePort = {
         event: "progress",
         stage: event.data.stage,
         units: event.data.units,
+        overallPercent: event.data.overallPercent,
         cancellable: event.data.cancellable,
       });
     };

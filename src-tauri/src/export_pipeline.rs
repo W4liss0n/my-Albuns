@@ -357,6 +357,29 @@ pub(crate) struct ExportProgress {
 }
 
 impl ExportProgress {
+    /// Overall progress of one export. Consumers own monotonic presentation and
+    /// terminal completion (the batch counts an item after recording its result).
+    pub(crate) fn overall_percent(self) -> f64 {
+        let fraction = match self.units {
+            ExportProgressUnits::Measured {
+                completed_units,
+                total_units,
+            } if total_units > 0 => {
+                f64::from(completed_units.min(total_units)) / f64::from(total_units)
+            }
+            _ => 0.0,
+        };
+        let (start, span) = match self.stage {
+            ExportProgressStage::Preparing => (0.0, 0.0),
+            ExportProgressStage::LoadingSources => (0.0, 10.0),
+            ExportProgressStage::Composing | ExportProgressStage::EncodingOutput => (10.0, 65.0),
+            ExportProgressStage::Verifying => (75.0, 10.0),
+            ExportProgressStage::Publishing => (85.0, 14.0),
+            ExportProgressStage::Completed => (100.0, 0.0),
+        };
+        start + span * fraction
+    }
+
     const fn unmeasured(stage: ExportProgressStage, cancellable: bool) -> Self {
         Self {
             stage,

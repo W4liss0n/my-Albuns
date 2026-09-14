@@ -657,6 +657,7 @@ pub enum ExportEvent {
         operation_id: String,
         stage: ExportProgressStagePayload,
         units: ExportProgressUnitsPayload,
+        overall_percent: f64,
         cancellable: bool,
     },
 }

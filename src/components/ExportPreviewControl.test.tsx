@@ -34,10 +34,10 @@ test("normal export keeps its dialog and resumes only after cache cleanup", asyn
 });
 
 test.each([
-  ["sheet", "png", ["opening", "middle", "closing"], 3, "lâmina"],
-  ["page", "png", ["opening", "middle", "closing"], 4, "página"],
-  ["page", "pdf", ["opening", "closing"], 2, "página"],
-] as const)("counts %s units in %s exports, including single-page ends", async (mode, format, sheetIds, total, unit) => {
+  ["sheet", "png", ["opening", "middle", "closing"], 3, "lâmina", 31.666666666666668],
+  ["page", "png", ["opening", "middle", "closing"], 4, "página", 26.25],
+  ["page", "pdf", ["opening", "closing"], 2, "página", 42.5],
+] as const)("counts %s units in %s exports, including single-page ends", async (mode, format, sheetIds, total, unit, composingPercent) => {
   const harness = createExportHarness();
   const dialog = createDialogHarness();
   render(<ExportPreviewControl dialogPort={dialog.port} exportPipelinePort={harness.port} projectId="project-a"
@@ -53,16 +53,16 @@ test.each([
   }));
   await act(async () => harness.attempts[0].emit({ event: "started", cancellable: true }));
   expectCount(0);
-  await act(async () => harness.attempts[0].emit({ event: "progress", stage: "loading_sources",
+  await act(async () => harness.attempts[0].emit({ event: "progress", stage: "loading_sources", overallPercent: 5,
     units: { kind: "measured", completedUnits: 7, totalUnits: 14 }, cancellable: true }));
   expectCount(0);
-  await act(async () => harness.attempts[0].emit({ event: "progress", stage: "composing",
+  await act(async () => harness.attempts[0].emit({ event: "progress", stage: "composing", overallPercent: composingPercent,
     units: { kind: "measured", completedUnits: 1, totalUnits: total }, cancellable: true }));
   expectCount(1);
-  await act(async () => harness.attempts[0].emit({ event: "progress", stage: "encoding_output",
+  await act(async () => harness.attempts[0].emit({ event: "progress", stage: "encoding_output", overallPercent: 75,
     units: { kind: "measured", completedUnits: total, totalUnits: total }, cancellable: true }));
   expectCount(total);
-  await act(async () => harness.attempts[0].emit({ event: "progress", stage: "publishing",
+  await act(async () => harness.attempts[0].emit({ event: "progress", stage: "publishing", overallPercent: 85,
     units: { kind: "measured", completedUnits: 0, totalUnits: format === "pdf" ? 1 : total }, cancellable: false }));
   expectCount(total);
 });
@@ -82,20 +82,20 @@ test("uses the effective export total after conflicts and retains counts across 
     format: { kind: "png" }, destination: "C:/Exportados", conflictPolicy: "skip" } });
   await act(async () => {
     harness.attempts[0].emit({ event: "started", cancellable: true });
-    harness.attempts[0].emit({ event: "progress", stage: "preparing",
+    harness.attempts[0].emit({ event: "progress", stage: "preparing", overallPercent: 0,
       units: { kind: "measured", completedUnits: 0, totalUnits: 3 }, cancellable: true });
   });
   expect(dialog.present).toHaveBeenLastCalledWith(expect.objectContaining({ progress: expect.objectContaining({ status: "0 páginas de 3" }) }));
-  await act(async () => harness.attempts[0].emit({ event: "progress", stage: "composing",
+  await act(async () => harness.attempts[0].emit({ event: "progress", stage: "composing", overallPercent: 53.33333333333333,
     units: { kind: "measured", completedUnits: 2, totalUnits: 3 }, cancellable: true }));
   await act(async () => harness.attempts[0].reject(new StorageFullError("Libere espaço.")));
   await waitFor(() => expect(dialog.present).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "storageFull" })));
   dialog.emit("resumeStorage");
   await act(async () => {
     harness.attempts[1].emit({ event: "started", cancellable: true });
-    harness.attempts[1].emit({ event: "progress", stage: "preparing",
+    harness.attempts[1].emit({ event: "progress", stage: "preparing", overallPercent: 0,
       units: { kind: "measured", completedUnits: 2, totalUnits: 3 }, cancellable: true });
-    harness.attempts[1].emit({ event: "progress", stage: "loading_sources",
+    harness.attempts[1].emit({ event: "progress", stage: "loading_sources", overallPercent: 0,
       units: { kind: "measured", completedUnits: 0, totalUnits: 1 }, cancellable: true });
   });
   expect(dialog.present).toHaveBeenLastCalledWith(expect.objectContaining({ progress: expect.objectContaining({ status: "2 páginas de 3", completed: 53 }) }));
@@ -446,7 +446,7 @@ test("waits for the backend started event before opening the native progress win
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 });
 
-test("projects measured and unmeasured progress through the dialog port", async () => {
+test("displays the native overall percentage independently of stage units", async () => {
   const user = userEvent.setup();
   const { dialog, exportHarness } = renderControl();
   await user.click(screen.getByRole("button", { name: "Exportar" }));
@@ -455,12 +455,14 @@ test("projects measured and unmeasured progress through the dialog port", async 
     exportHarness.attempts[0].emit({
       event: "progress",
       stage: "preparing",
+      overallPercent: 0,
       units: { kind: "unmeasured" },
       cancellable: true,
     });
     exportHarness.attempts[0].emit({
       event: "progress",
       stage: "composing",
+      overallPercent: 37.75,
       units: { kind: "measured", completedUnits: 2, totalUnits: 5 },
       cancellable: true,
     });
@@ -480,7 +482,7 @@ test("projects measured and unmeasured progress through the dialog port", async 
     cancellable: true,
     kind: "exportProgress",
     progress: {
-      completed: 36,
+      completed: 37,
       kind: "determinate",
       status: "0 lâminas de 1",
       total: 100,

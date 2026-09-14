@@ -38,9 +38,9 @@ test.each([
   await act(async () => harness.attempts[0].emit({ event: "started", cancellable: true }));
   native.mockClear();
 
-  // Replay the logged loading sequence through the real dialog adapter and IPC decoder.
+  // Fractional pipeline percentages must remain integer values at the native dialog boundary.
   for (let completedUnits = 0; completedUnits <= totalUnits; completedUnits++) {
-    await act(async () => harness.attempts[0].emit({ event: "progress", stage,
+    await act(async () => harness.attempts[0].emit({ event: "progress", stage, overallPercent: 100 * completedUnits / totalUnits,
       units: { kind: "measured", completedUnits, totalUnits }, cancellable: stage !== "publishing" }));
   }
 

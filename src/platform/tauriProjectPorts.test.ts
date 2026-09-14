@@ -223,6 +223,7 @@ test("forwards Export events without exposing the backend operation id", () => {
     data: {
       operationId: "export-42",
       stage: "loading_sources",
+      overallPercent: 4,
       units: {
         kind: "measured",
         completedUnits: 2,
@@ -239,6 +240,7 @@ test("forwards Export events without exposing the backend operation id", () => {
   expect(onEvent).toHaveBeenNthCalledWith(2, {
     event: "progress",
     stage: "loading_sources",
+    overallPercent: 4,
     units: {
       kind: "measured",
       completedUnits: 2,
