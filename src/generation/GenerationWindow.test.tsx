@@ -28,21 +28,36 @@ test("requires an explicit Continue after the last conflict decision", async () 
   await screen.findByText("Geração concluída");
   expect(api.run).toHaveBeenCalledOnce();
 });
-test("keeps configuration while an operation opens its separate progress surface", async () => {
-  const api = port({ prepare: vi.fn(async () => ({ ...ready, items: [{ ...ready.items[0], conflict: false }] })), run: vi.fn(() => new Promise<GenerationView>(() => {})) });
+
+test("uses the standard close control in the configuration header", async () => {
+  render(<GenerationWindow port={port()} />);
+  await screen.findByText("Modelo");
+  expect(screen.getByRole("button", { name: "Fechar janela" })).toBeVisible();
+});
+test("keeps configuration while the native attempt owns verification and generation", async () => {
+  const api = port({ prepare: vi.fn(() => new Promise<GenerationView>(() => {})) });
   render(<GenerationWindow port={api} />);
   await screen.findByText("Modelo");
   fireEvent.change(screen.getByRole("textbox", { name: "Pasta de origem" }), { target: { value: ready.options.sourceFolder } });
   fireEvent.change(screen.getByRole("textbox", { name: "Pasta de destino" }), { target: { value: ready.options.destinationFolder } });
   fireEvent.click(screen.getByRole("button", { name: "Verificar e gerar" }));
-  await waitFor(() => expect(api.run).toHaveBeenCalledOnce());
+  await waitFor(() => expect(api.prepare).toHaveBeenCalledOnce());
+  expect(api.run).not.toHaveBeenCalled();
   expect(screen.getByRole("textbox", { name: "Pasta de origem" })).toHaveValue(ready.options.sourceFolder);
+  expect(screen.getByRole("button", { name: "Verificar e gerar" })).toBeDisabled();
   expect(screen.queryByText("Preparando geração…")).not.toBeInTheDocument();
 });
 test("presents pending cancelled items in the final result", async () => {
   render(<GenerationWindow port={port({ current: async () => ({ ...ready, phase: "cancelled" }) })} />);
   await screen.findByText("Geração cancelada");
   expect(screen.getByText("Não gerado")).toBeVisible();
+});
+test("acknowledges a prepared problem result before the native progress closes", async () => {
+  const api = port({ current: async () => ({ ...ready, canContinue: false }) });
+  render(<GenerationWindow port={api} />);
+  await screen.findByText("Problemas na Geração");
+  await waitFor(() => expect(api.resultReady).toHaveBeenCalled());
+  expect(api.run).not.toHaveBeenCalled();
 });
 test("distinguishes ignored projects from failures even when both retain a reason", async () => {
   render(<GenerationWindow port={port({ current: async () => ({ ...ready, phase: "finished", items: [

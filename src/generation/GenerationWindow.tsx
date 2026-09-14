@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
+import { PanelsTopLeft } from "lucide-react";
 import type { GenerationOptions, GenerationView, ProjectGenerationPort } from "../application/projectGeneration";
 import { ActionButton } from "../ui/ActionButton";
+import { AppIcon } from "../ui/AppIcon";
 import { DialogWindowFrame } from "../ui/DialogWindowFrame";
 import { InlineNotice } from "../ui/InlineNotice";
 import { MessageDialog } from "../ui/MessageDialog";
@@ -30,8 +32,8 @@ export function GenerationWindow({ port }: { port: ProjectGenerationPort }) {
   }, [port, report]);
   const terminal = view?.phase === "finished" || view?.phase === "cancelled";
   useEffect(() => {
-    if (terminal) void port.resultReady().catch(report);
-  }, [view, terminal, port, report]);
+    if (view) void port.resultReady().catch(report);
+  }, [view, port, report]);
   const perform = async (action: () => Promise<GenerationView>) => {
     if (busy) return;
     setBusy(true); setError(null);
@@ -40,14 +42,10 @@ export function GenerationWindow({ port }: { port: ProjectGenerationPort }) {
   };
   const close = () => { if (!busy) void port.close().catch(report); };
   const issues = view?.items.filter(item => terminal ? item.status !== "completed" : item.conflict || item.problems.length > 0 || item.status === "ignored") ?? [];
-  return <OwnedWindowShell context="Gerar Projetos em lote" width={terminal && issues.length === 0 ? 400 : 760}>
+  return <OwnedWindowShell controls="close" context="Gerar Projetos em lote" width={terminal && issues.length === 0 ? 400 : 800}>
     {error && <InlineNotice tone="error">{error}</InlineNotice>}
     {!view ? <GenerationConfiguration model={model} port={port} busy={busy} onError={report} onClose={close}
-      onSubmit={options => void perform(async () => {
-        const prepared = await port.prepare(options);
-        if (prepared.canContinue && prepared.items.every(item => !item.conflict && item.problems.length === 0)) return port.run();
-        return prepared;
-      })} /> : terminal && issues.length === 0 ? <MessageDialog tone="success" title="Geração concluída"
+      onSubmit={options => void perform(() => port.prepare(options))} /> : terminal && issues.length === 0 ? <MessageDialog tone="success" title="Geração concluída"
       description={`${view.items.length} ${view.items.length === 1 ? "Projeto gerado" : "Projetos gerados"}.`}
       primaryAction={{ label: "Fechar", disabled: busy, onClick: close }} /> : !terminal && issues.length === 0 ? <MessageDialog tone="success" title="Pronto para gerar"
       description="Pastas verificadas. Confirme para iniciar."
@@ -97,17 +95,20 @@ function GenerationConfiguration({ model, port, busy, onSubmit, onError, onClose
     catch (error) { onError(error); }
   };
   return <div className="ui-operation-dialog"><DialogWindowFrame title="Gerar Projetos em lote" layout="form" actions={<>
-    <span className="ui-operation-form__summary" aria-live="polite">{count === null ? "" : `${count} ${count === 1 ? "Projeto será gerado" : "Projetos serão gerados"}`}</span>
+    <span className="ui-operation-form__summary" aria-live="polite">{count === null ? "" : `${count} ${count === 1 ? "Projeto" : "Projetos"}`}</span>
     <ActionButton disabled={busy} onClick={onClose}>Cancelar</ActionButton>
     <ActionButton variant="primary" disabled={busy || !model || !source.trim() || !destination.trim()} onClick={() => onSubmit({ sourceFolder: source.trim(), destinationFolder: destination.trim() })}>Verificar e gerar</ActionButton>
   </>}>
     <form className="ui-operation-form" onSubmit={event => event.preventDefault()} aria-busy={busy}>
-      <div className="generation-model" title="Inclui as alterações ainda não salvas. O modelo permanece inalterado."><span>Projeto modelo</span><strong>{model}</strong></div>
+      <div className="generation-model" aria-label="Projeto modelo" title="Inclui as alterações ainda não salvas. O modelo permanece inalterado.">
+        <span className="generation-model__icon"><AppIcon icon={PanelsTopLeft} size={18} /></span>
+        <div className="generation-model__identity"><span>Projeto modelo</span><strong title={model}>{model || "\u00a0"}</strong></div>
+      </div>
       <fieldset className="ui-operation-form__section" disabled={busy}><legend title="Cada pasta com fotos gera um Projeto, incluindo subpastas. As novas fotos entram somente no Painel.">Pasta de origem</legend>
-        <div className="ui-operation-form__destination"><TextInput className="ui-field-control" aria-label="Pasta de origem" value={source} title={source} onChange={event => setSource(event.target.value)} /><ActionButton onClick={() => void choose("source")}>Escolher…</ActionButton></div>
+        <div className="ui-operation-form__destination"><TextInput className="ui-field-control" aria-label="Pasta de origem" placeholder="Selecione a pasta com as fotos" value={source} title={source} onChange={event => setSource(event.target.value)} /><ActionButton variant="primary" onClick={() => void choose("source")}>Escolher…</ActionButton></div>
       </fieldset>
       <fieldset className="ui-operation-form__section" disabled={busy}><legend title="A hierarquia da origem será mantida. Escolha um destino fora da origem.">Pasta de destino</legend>
-        <div className="ui-operation-form__destination"><TextInput className="ui-field-control" aria-label="Pasta de destino" value={destination} title={destination} onChange={event => setDestination(event.target.value)} /><ActionButton onClick={() => void choose("destination")}>Escolher…</ActionButton></div>
+        <div className="ui-operation-form__destination"><TextInput className="ui-field-control" aria-label="Pasta de destino" placeholder="Selecione onde salvar os projetos" value={destination} title={destination} onChange={event => setDestination(event.target.value)} /><ActionButton variant="primary" onClick={() => void choose("destination")}>Escolher…</ActionButton></div>
       </fieldset>
     </form>
   </DialogWindowFrame></div>;

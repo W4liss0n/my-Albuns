@@ -1,6 +1,6 @@
 export type GenerationDecision = "replace" | "ignore";
 export interface GenerationOptions { sourceFolder: string; destinationFolder: string; }
-export interface GenerationProgress { completed: number; total: number; }
+export interface GenerationProgress { completed: number; total: number | null; }
 export interface GenerationView {
   id: string; options: GenerationOptions;
   phase: "prepared" | "running" | "finished" | "cancelled";

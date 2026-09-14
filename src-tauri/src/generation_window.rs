@@ -1,5 +1,6 @@
 //! Project-owned generation. Native state, rather than the invoking WebView, owns each attempt.
 use crate::{
+    generation_operation::{GenerationPresentation, GenerationRequest, execute_generation},
     generation_runner::GenerationRunner,
     ipc_contract::{GenerationDecision, GenerationOptions, GenerationProgress, GenerationView},
     native_dialog_window::{self, HiddenOwnedWindowConfig},
@@ -137,7 +138,7 @@ pub(crate) async fn open_project_generation(
         template,
         _pause: pause,
     });
-    let result = build(&app, &window, LABEL, "generation.html", 760.0, 390.0).await;
+    let result = build(&app, &window, LABEL, "generation.html", 800.0, 478.0).await;
     match result {
         Ok(dialog) => {
             if let Err(error) = native_dialog_window::display_owned_dialog(&window, &dialog) {
@@ -264,39 +265,30 @@ pub(crate) async fn generation_prepare(
     options: GenerationOptions,
 ) -> Result<GenerationView, String> {
     configuration(&window)?;
-    let attempt = Attempt::begin(&app)?;
-    tauri::async_runtime::spawn(async move {
-        let _attempt = attempt;
-        let state = app.state::<GenerationWindowState>();
-        let mut runner = state.runner.clone().lock_owned().await;
-        let template = state
-            .template
-            .lock()
-            .map_err(|_| "Modelo indisponível.")?
-            .as_ref()
-            .ok_or("Modelo indisponível.")?
-            .template
-            .clone();
-        let core = ProjectCore::new().with_identity_storage_roots(
-            state.paths.project_identity_leases_dir(),
-            state.paths.project_identities_dir(),
-        );
-        let cancellation = state.cancel.clone();
-        let view = tauri::async_runtime::spawn_blocking(move || {
-            let next = GenerationRunner::prepare(options, template, core, &cancellation)?;
-            let view = next.view();
-            *runner = Some(next);
-            Ok::<_, String>(view)
-        })
-        .await
-        .map_err(|error| error.to_string())??;
-        state.publish(view.clone());
-        Ok(view)
-    })
+    let state = app.state::<GenerationWindowState>();
+    let template = state
+        .template
+        .lock()
+        .map_err(|_| "Modelo indisponível.")?
+        .as_ref()
+        .ok_or("Modelo indisponível.")?
+        .template
+        .clone();
+    let core = ProjectCore::new().with_identity_storage_roots(
+        state.paths.project_identity_leases_dir(),
+        state.paths.project_identities_dir(),
+    );
+    run_request(
+        app,
+        window,
+        GenerationRequest::Prepare {
+            options,
+            template: Box::new(template),
+            core,
+        },
+    )
     .await
-    .map_err(|error| error.to_string())?
 }
-
 #[tauri::command]
 pub(crate) async fn generation_decide(
     app: AppHandle,
@@ -313,8 +305,7 @@ pub(crate) async fn generation_recheck(
     window: WebviewWindow,
 ) -> Result<GenerationView, String> {
     configuration(&window)?;
-    let cancellation = app.state::<GenerationWindowState>().cancel.clone();
-    update(app, move |runner| runner.recheck(&cancellation)).await
+    run_request(app, window, GenerationRequest::Recheck).await
 }
 async fn update(
     app: AppHandle,
@@ -346,84 +337,107 @@ struct ProgressSurface {
 impl Drop for ProgressSurface {
     fn drop(&mut self) {
         let _ = self.window.destroy();
-        native_dialog_window::restore_owner(&self.owner);
+        if !self
+            .owner
+            .app_handle()
+            .state::<GenerationWindowState>()
+            .close_requested
+            .load(Ordering::Acquire)
+        {
+            native_dialog_window::restore_owner(&self.owner);
+        }
     }
 }
-#[tauri::command]
-pub(crate) async fn generation_run(
+#[derive(Clone)]
+struct NativeGenerationPresentation {
     app: AppHandle,
-    window: WebviewWindow,
-) -> Result<GenerationView, String> {
-    configuration(&window)?;
-    let attempt = Attempt::begin(&app)?;
-    tauri::async_runtime::spawn(async move {
-        let _attempt = attempt;
-        let state = app.state::<GenerationWindowState>();
-        let mut runner = state.runner.clone().lock_owned().await;
-        let initial = runner
-            .as_ref()
-            .ok_or("Verifique as pastas primeiro.")?
-            .view();
-        if !initial.can_continue {
-            return Err("Resolva ou ignore os problemas antes de gerar.".into());
-        }
-        *state
-            .progress
-            .lock()
-            .map_err(|_| "Progresso indisponível.")? = Some(GenerationProgress {
-            completed: 0,
-            total: initial.items.len() as u32,
-        });
+    owner: WebviewWindow,
+}
+impl GenerationPresentation for NativeGenerationPresentation {
+    type Surface = ProgressSurface;
+    async fn open(&self, progress: GenerationProgress) -> Result<ProgressSurface, String> {
+        self.progress(progress);
         let dialog = build(
-            &app,
-            &window,
+            &self.app,
+            &self.owner,
             PROGRESS,
             "generation.html?surface=progress",
             400.0,
             185.0,
         )
         .await?;
-        native_dialog_window::display_transition_dialog(&window, &dialog)
+        native_dialog_window::display_transition_dialog(&self.owner, &dialog)
             .map_err(|error| error.to_string())?;
-        let _surface = ProgressSurface {
+        Ok(ProgressSurface {
             window: dialog,
-            owner: window,
-        };
-        let cancel = state.cancel.clone();
-        let progress_app = app.clone();
-        let view = tauri::async_runtime::spawn_blocking(move || {
-            let batch = runner
-                .as_mut()
-                .expect("the prepared runner is retained by this attempt");
-            batch.run(&cancel, &|progress| {
-                *progress_app
-                    .state::<GenerationWindowState>()
-                    .progress
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(progress.clone());
-                let _ = progress_app.emit_to(PROGRESS, PROGRESS_EVENT, progress);
-            });
-            batch.view()
+            owner: self.owner.clone(),
         })
-        .await
-        .map_err(|error| error.to_string())?;
+    }
+    fn progress(&self, progress: GenerationProgress) {
+        *self
+            .app
+            .state::<GenerationWindowState>()
+            .progress
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(progress.clone());
+        let _ = self.app.emit_to(PROGRESS, PROGRESS_EVENT, progress);
+    }
+    async fn finish(&self, view: &GenerationView) -> Result<(), String> {
+        let state = self.app.state::<GenerationWindowState>();
+        if state.close_requested.load(Ordering::Acquire) {
+            return Ok(());
+        }
         let (sender, receiver) = tokio::sync::oneshot::channel();
         *state
             .result_ready
             .lock()
             .map_err(|_| "Geração indisponível.")? = Some(sender);
         state.publish(view.clone());
-        let _ = app.emit_to(LABEL, VIEW_EVENT, &view);
+        let _ = self.app.emit_to(LABEL, VIEW_EVENT, view);
         let _ = tokio::time::timeout(Duration::from_secs(5), receiver).await;
         state
             .result_ready
             .lock()
             .map_err(|_| "Geração indisponível.")?
             .take();
+        Ok(())
+    }
+}
+
+async fn run_request(
+    app: AppHandle,
+    window: WebviewWindow,
+    request: GenerationRequest,
+) -> Result<GenerationView, String> {
+    let attempt = Attempt::begin(&app)?;
+    tauri::async_runtime::spawn(async move {
+        let _attempt = attempt;
+        let state = app.state::<GenerationWindowState>();
+        let presentation = NativeGenerationPresentation {
+            app: app.clone(),
+            owner: window,
+        };
+        let view = execute_generation(
+            request,
+            state.runner.clone(),
+            state.cancel.clone(),
+            presentation,
+        )
+        .await?;
+        state.publish(view.clone());
         Ok(view)
     })
     .await
     .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+pub(crate) async fn generation_run(
+    app: AppHandle,
+    window: WebviewWindow,
+) -> Result<GenerationView, String> {
+    configuration(&window)?;
+    run_request(app, window, GenerationRequest::Run).await
 }
 #[tauri::command]
 pub(crate) fn generation_result_ready(app: AppHandle, window: WebviewWindow) -> Result<(), String> {

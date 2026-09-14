@@ -11,4 +11,5 @@ import "../ui/ui.css";
 
 installDesktopWebViewPolicy(document);
 const progress = new URLSearchParams(window.location.search).get("surface") === "progress";
-ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(<React.StrictMode><WindowControlsProvider controls={tauriWindowControls}>{progress ? <GenerationProgressWindow port={tauriProjectGenerationPort} /> : <GenerationWindow port={tauriProjectGenerationPort} />}</WindowControlsProvider></React.StrictMode>);
+const controls = { ...tauriWindowControls, close: progress ? tauriProjectGenerationPort.cancel : tauriProjectGenerationPort.close };
+ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(<React.StrictMode><WindowControlsProvider controls={controls}>{progress ? <GenerationProgressWindow port={tauriProjectGenerationPort} /> : <GenerationWindow port={tauriProjectGenerationPort} />}</WindowControlsProvider></React.StrictMode>);

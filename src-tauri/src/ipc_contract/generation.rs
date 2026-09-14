@@ -59,5 +59,5 @@ pub struct GenerationView {
 #[serde(rename_all = "camelCase")]
 pub struct GenerationProgress {
     pub completed: u32,
-    pub total: u32,
+    pub total: Option<u32>,
 }

@@ -259,7 +259,7 @@ impl GenerationRunner {
         let total = self.items.len() as u32;
         progress(GenerationProgress {
             completed: 0,
-            total,
+            total: Some(total),
         });
         for (index, item) in self.items.iter_mut().enumerate() {
             if cancellation.load(Ordering::Acquire) {
@@ -277,7 +277,7 @@ impl GenerationRunner {
             }
             progress(GenerationProgress {
                 completed: index as u32 + 1,
-                total,
+                total: Some(total),
             });
         }
         self.phase = GenerationPhase::Finished;

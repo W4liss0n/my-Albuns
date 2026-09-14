@@ -42,9 +42,21 @@ Origem e Destino aceitam os caminhos totalmente qualificados da [política de ca
 
 O Projeto modelo exibido é o estado visível da sessão, inclusive mudanças ainda não salvas. A geração não salva nem modifica esse Projeto.
 
+A configuração segue o formulário de Exportação: largura de 800 px, cabeçalho
+com fechar à direita, seções espaçadas e campos de 36 px. O modelo aparece em
+um resumo compacto, com ícone de Lâmina, nome e fundo neutro; origem e destino
+têm botões `Escolher…`. A contagem
+fica à esquerda no rodapé, com `Cancelar` e `Verificar e gerar` à direita.
+
 ## Verificação
 
 `Verificar e gerar` executa a descoberta recursiva, valida origem e destino e identifica conflitos antes de criar ou sobrescrever qualquer arquivo.
+
+O diálogo de progresso abre **antes** da descoberta e da leitura das Fotos.
+Enquanto o total é desconhecido, usa a barra indeterminada com o título
+`Gerando Projetos`, sem mensagens temporárias no formulário. Se a verificação
+não encontrar pendências, a mesma tentativa inicia a geração e a mesma janela
+passa ao progresso determinado, com porcentagem e `X Projetos de Y`.
 
 A hierarquia relativa é calculada por componentes sob a raiz validada. Caminhos absolutos, `..` ou qualquer sufixo que escaparia do Destino são rejeitados.
 
@@ -53,6 +65,10 @@ Quando existirem pendências, a [Tela de Problemas](0005-tela-de-problemas.md) �
 Cada Projeto de destino já existente aparece em uma linha própria. O usuário pode escolher `Sobrescrever` ou `Ignorar` por linha, ou usar `Sobrescrever todos` e `Ignorar todos`. Um Projeto aberto nunca entra em uma sobrescrita individual ou global: enquanto continuar aberto, `Sobrescrever` fica indisponível e o item só pode ser ignorado.
 
 Depois que todos os conflitos recebem uma decisão, `Continuar Geração` é habilitado. A geração não começa automaticamente ao resolver a última linha.
+
+`Verificar novamente` também abre o progresso durante a análise e retorna às
+decisões. Mesmo sem pendências restantes, mantém a confirmação explícita em
+`Continuar Geração`.
 
 Durante a execução, a operação usa o [Progresso de operação](0007-progresso-de-operacoes.md). Sucesso integral recebe confirmação curta; itens ignorados ou com falha são apresentados depois na Tela de Problemas.
 

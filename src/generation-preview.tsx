@@ -20,6 +20,6 @@ const view: GenerationView | null = scenario === "configuration" ? null : scenar
 const port: ProjectGenerationPort = {
   model: async () => "Modelo Formatura 2026", chooseFolder: async () => null, count: async () => 18, current: async () => view,
   prepare: async () => base, decide: async () => base, recheck: async () => base, run: async () => base,
-  progress: async () => ({ completed: 7, total: 18 }), onView: async () => () => {}, onProgress: async () => () => {}, resultReady: async () => {}, cancel: async () => {}, close: async () => {},
+  progress: async () => scenario === "preparing" ? ({ completed: 0, total: null }) : ({ completed: 7, total: 18 }), onView: async () => () => {}, onProgress: async () => () => {}, resultReady: async () => {}, cancel: async () => {}, close: async () => {},
 };
-ReactDOM.createRoot(document.getElementById("root")!).render(scenario === "progress" ? <GenerationProgressWindow port={port} /> : <GenerationWindow port={port} />);
+ReactDOM.createRoot(document.getElementById("root")!).render(scenario === "progress" || scenario === "preparing" ? <GenerationProgressWindow port={port} /> : <GenerationWindow port={port} />);

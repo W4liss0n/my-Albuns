@@ -4,7 +4,7 @@ import { MessageDialog } from "../ui/MessageDialog";
 import { OwnedWindowShell } from "../ui/OwnedWindowShell";
 import { ProgressDialog } from "../ui/ProgressDialog";
 
-export function GenerationProgressWindow({ port }: { port: ProjectGenerationPort }) {
+export function GenerationProgressWindow({ port }: { port: Pick<ProjectGenerationPort, "progress" | "onProgress" | "cancel"> }) {
   const [progress, setProgress] = useState<GenerationProgress | null>(null);
   const [failed, setFailed] = useState(false);
   const [cancelled, setCancelled] = useState(false);
@@ -15,6 +15,13 @@ export function GenerationProgressWindow({ port }: { port: ProjectGenerationPort
     return () => { active = false; release?.(); };
   }, [port]);
   const cancel = () => { setCancelled(true); void port.cancel().catch(() => setCancelled(false)); };
-  if (!progress && !failed) return null;
-  return <OwnedWindowShell width={400}>{failed ? <MessageDialog tone="error" title="Progresso indisponível" description="Cancele a geração e tente novamente." primaryAction={{ label: "Cancelar", disabled: cancelled, onClick: cancel }} /> : progress && <ProgressDialog title="Gerando Projetos" progress={{ kind: "determinate", completed: progress.completed, total: progress.total, countLabel: `${progress.completed} ${progress.completed === 1 ? "Projeto" : "Projetos"} de ${progress.total}` }} cancelAction={{ label: "Cancelar", disabled: cancelled, onClick: cancel }} />}</OwnedWindowShell>;
+  return <OwnedWindowShell width={400}>{failed ? <MessageDialog tone="error" title="Progresso indisponível" description="Cancele a geração e tente novamente." primaryAction={{ label: "Cancelar", disabled: cancelled, onClick: cancel }} /> : <ProgressDialog
+    title="Gerando Projetos"
+    reserveProgressMeta
+    progress={progress?.total == null ? { kind: "indeterminate", status: null } : {
+      kind: "determinate", completed: progress.completed, total: progress.total,
+      countLabel: `${progress.completed} ${progress.completed === 1 ? "Projeto" : "Projetos"} de ${progress.total}`,
+    }}
+    cancelAction={{ label: "Cancelar", disabled: cancelled, onClick: cancel }}
+  />}</OwnedWindowShell>;
 }
