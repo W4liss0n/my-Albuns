@@ -1096,14 +1096,15 @@ validação das superfícies descritas nesta seção.
 - Comparações entre origem e Destino consideram raízes resolvidas e identidade física quando disponível, impedindo que uma unidade mapeada esconda um Destino igual ou interno à origem.
 - A Geração de Projetos em lote parte do estado visível integral de um Projeto modelo, inclusive mudanças não salvas, sem salvar ou modificar o modelo.
 - A Janela do Projeto modelo abre uma janela dedicada com Projeto modelo somente para consulta, pasta de origem, pasta de destino, quantidade de pastas geradoras e `Cancelar`/`Verificar e gerar`.
-- `Verificar e gerar` analisa conflitos e problemas antes de qualquer gravação e abre a Tela de Problemas quando houver pendências.
+- `Verificar e gerar` analisa pastas, destino e conflitos antes de qualquer gravação e abre a Tela de Problemas quando houver pendências.
 - Cada Projeto gerado é uma Cópia de Projeto completa e independente, com nova Identidade.
 - Todas as Lâminas, composições, Frames, Fotos existentes, padrões, personalizações, travamentos, favoritos e referências do modelo são copiados.
-- Uma árvore de pastas de origem é examinada recursivamente. Toda pasta que contenha ao menos uma imagem importável diretamente gera um Projeto com seu próprio nome.
+- Uma árvore de pastas de origem é examinada recursivamente. Toda pasta que contenha diretamente ao menos um arquivo com extensão de Foto aceita (`JPG`, `JPEG`, `PNG`, `TIF` ou `TIFF`, sem distinguir maiúsculas de minúsculas) gera um Projeto com seu próprio nome.
 - A busca continua em subpastas mesmo quando a pasta atual gera um Projeto.
 - A hierarquia relativa da origem é recriada no destino.
 - O arquivo gerado fica diretamente no espelho da pasta-pai e recebe o nome da Pasta de Fotos: `origem/Turma 1/001` produz o Projeto `001` em `destino/Turma 1`, não em uma pasta duplicada `destino/Turma 1/001/001`.
 - As imagens diretamente presentes na pasta geradora são acrescentadas à aba `Fotos` do novo Projeto, vinculadas aos originais e não colocadas em Lâminas.
+- A geração registra os vínculos sem ler ou validar o conteúdo das Fotos e sem gerar Cache. A leitura e a validação ocorrem na abertura do Projeto e na preparação de seu Cache, pelo fluxo compartilhado de imagens. Fotos corrompidas, sem acesso de leitura ou removidas depois da descoberta permanecem vinculadas para tratamento nesse momento; as verificações de pastas, destino e conflitos continuam obrigatórias na geração.
 - O destino não pode ser igual à origem nem estar dentro de sua árvore.
 - Conflitos de geração são pré-calculados e apresentados na Tela de Problemas, uma linha por Projeto de destino existente.
 - Cada conflito oferece `Sobrescrever` ou `Ignorar`; a tela também oferece `Sobrescrever todos` e `Ignorar todos`.

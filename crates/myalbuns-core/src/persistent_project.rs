@@ -1259,14 +1259,15 @@ impl ProjectCore {
         self.create_document(location, project, authorization)
     }
 
-    /// Publishes the complete frozen model and the inspected Photo links in one write.
+    /// Publishes the complete frozen model and deferred Photo links in one write.
+    /// Original inspection belongs to project opening and Cache preparation, not generation.
     /// The source Session is never adopted, saved or edited by this operation.
     pub fn create_from_template(
         &self,
         template: &ProjectTemplate,
         location: ProjectLocation,
         authorization: CreateAuthorization,
-        photos: Vec<ImportPhoto>,
+        photo_paths: Vec<PathBuf>,
     ) -> Result<EditableProject, CreateProjectError> {
         let mut known = template
             .project
@@ -1276,12 +1277,9 @@ impl ProjectCore {
             .map(|media| media.path().to_path_buf())
             .collect::<HashSet<_>>();
         let mut links = Vec::new();
-        for photo in photos {
-            if known.insert(photo.path.clone()) {
-                if photo.source_metadata.is_none() {
-                    return Err(CreateProjectError::InvalidInitialProject);
-                }
-                links.push((Uuid::new_v4(), photo.path));
+        for path in photo_paths {
+            if known.insert(path.clone()) {
+                links.push((Uuid::new_v4(), path));
             }
         }
         let project = if links.is_empty() {

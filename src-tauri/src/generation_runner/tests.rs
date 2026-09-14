@@ -199,44 +199,102 @@ impl Fixture {
 }
 
 #[test]
-fn invalid_images_are_reported_before_writes_and_ignoring_problems_preserves_valid_items() {
+fn image_content_is_validated_only_when_opening_the_generated_project() {
     let fixture = Fixture::new();
     let invalid = fixture.photo("001");
-    std::fs::write(invalid, "not an image").unwrap();
+    std::fs::write(&invalid, "not an image").unwrap();
     fixture.photo("002");
     let mut runner = fixture.prepare().unwrap();
-    assert!(!runner.view().can_continue);
-    assert!(!runner.view().items[0].problems.is_empty());
-    runner.run(&AtomicBool::new(false), &|_| {
-        panic!("unresolved preflight cannot start")
-    });
+    assert!(runner.view().can_continue);
+    assert!(
+        runner
+            .view()
+            .items
+            .iter()
+            .all(|item| item.problems.is_empty())
+    );
     assert_eq!(std::fs::read_dir(&fixture.destination).unwrap().count(), 0);
-    runner.decide(None, GenerationDecision::Ignore).unwrap();
-    assert_eq!(runner.view().items[1].status, GenerationItemStatus::Pending);
     runner.run(&AtomicBool::new(false), &|_| {});
-    assert_eq!(runner.view().items[0].status, GenerationItemStatus::Ignored);
-    assert_eq!(
-        runner.view().items[1].status,
-        GenerationItemStatus::Completed
+    assert!(
+        runner
+            .view()
+            .items
+            .iter()
+            .all(|item| item.status == GenerationItemStatus::Completed)
+    );
+    let generated = fixture
+        .core
+        .load_persisted_revision(LoadProjectRequest::new(location(
+            &fixture.destination.join("001.myalbuns"),
+        )))
+        .unwrap();
+    let media = &generated.project().media()[0];
+    assert_eq!(media.path(), invalid);
+    let mut paths = OperationPathContext::new();
+    paths.capture(media.path()).unwrap();
+    let binding = crate::media_runtime::MediaBinding {
+        media_id: media.id().to_string(),
+        kind: media.kind(),
+        logical_path: media.path().to_path_buf(),
+    };
+    // This is the same inspector used by project opening and Cache preparation.
+    assert!(
+        crate::media_runtime::MediaResolver
+            .inspect_media_binding_in_plan(&binding, &paths.freeze())
+            .is_err()
     );
 }
 
 #[test]
-fn a_source_changed_after_preflight_fails_only_its_project() {
+fn a_source_removed_after_discovery_remains_linked_for_opening_to_resolve() {
     let fixture = Fixture::new();
     let photo = fixture.photo("001");
     fixture.photo("002");
     let mut runner = fixture.prepare().unwrap();
-    std::fs::remove_file(photo).unwrap();
+    std::fs::remove_file(&photo).unwrap();
     runner.run(&AtomicBool::new(false), &|_| {});
     assert_eq!(runner.view().phase, GenerationPhase::Finished);
-    assert_eq!(runner.view().items[0].status, GenerationItemStatus::Failed);
+    assert_eq!(
+        runner.view().items[0].status,
+        GenerationItemStatus::Completed
+    );
     assert_eq!(
         runner.view().items[1].status,
         GenerationItemStatus::Completed
     );
-    assert!(!fixture.destination.join("001.myalbuns").exists());
+    let generated = fixture
+        .core
+        .load_persisted_revision(LoadProjectRequest::new(location(
+            &fixture.destination.join("001.myalbuns"),
+        )))
+        .unwrap();
+    assert_eq!(generated.project().media()[0].path(), photo);
     assert!(fixture.destination.join("002.myalbuns").is_file());
+}
+
+#[cfg(windows)]
+#[test]
+fn generation_does_not_require_read_access_to_the_photo_contents() {
+    use std::os::windows::fs::OpenOptionsExt;
+    let fixture = Fixture::new();
+    let photo = fixture.photo("001");
+    let _locked = std::fs::OpenOptions::new()
+        .read(true)
+        .share_mode(0x2 | 0x4)
+        .open(&photo)
+        .unwrap();
+    assert!(
+        std::fs::File::open(&photo).is_err(),
+        "The fixture must deny other content readers"
+    );
+    let mut runner = fixture.prepare().unwrap();
+    assert!(runner.view().can_continue);
+    runner.run(&AtomicBool::new(false), &|_| {});
+    assert_eq!(
+        runner.view().items[0].status,
+        GenerationItemStatus::Completed
+    );
+    assert!(fixture.destination.join("001.myalbuns").is_file());
 }
 
 #[test]

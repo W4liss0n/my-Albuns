@@ -1,8 +1,8 @@
 #![cfg(windows)]
 
 use myalbuns_core::{
-    CreateAuthorization, CreateProjectRequest, ImportPhoto, InitialProject, LoadProjectRequest,
-    PhotoSourceMetadata, ProjectCore, ProjectIntent, ProjectLocation,
+    CreateAuthorization, CreateProjectRequest, InitialProject, LoadProjectRequest, ProjectCore,
+    ProjectIntent, ProjectLocation,
 };
 use myalbuns_paths::OperationPathContext;
 use std::path::Path;
@@ -36,15 +36,7 @@ fn generated_projects_copy_unsaved_template_without_changing_the_model() {
             &template,
             location(&destination),
             CreateAuthorization::CreateOnly,
-            vec![ImportPhoto::new(
-                photo.clone(),
-                PhotoSourceMetadata::new(
-                    600,
-                    400,
-                    ["#FFFFFF".into(), "#808080".into(), "#000000".into()],
-                )
-                .unwrap(),
-            )],
+            vec![photo.clone(), photo.clone()],
         )
         .unwrap();
     assert_ne!(generated.project_id(), model.project_id());
@@ -60,8 +52,57 @@ fn generated_projects_copy_unsaved_template_without_changing_the_model() {
         .load_persisted_revision(LoadProjectRequest::new(location(&destination)))
         .unwrap();
     assert_eq!(reopened.project().document().dpi(), 420);
+    assert_eq!(reopened.project().media()[0].path(), photo);
+    assert!(
+        !photo.exists(),
+        "Generation only records the link; opening resolves the Original"
+    );
     model.apply(ProjectIntent::SetDpi { dpi: 240 }).unwrap();
     assert_eq!(reopened.project().document().dpi(), 420);
+}
+
+#[test]
+fn deferred_links_keep_path_validation_and_deduplicate_photos_already_in_the_model() {
+    use myalbuns_core::CreateProjectError;
+    let root = tempfile::tempdir().unwrap();
+    let core = ProjectCore::new()
+        .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"));
+    let empty = core
+        .create_editable(CreateProjectRequest::new(
+            location(&root.path().join("Vazio.myalbuns")),
+            InitialProject::neutral(),
+            CreateAuthorization::CreateOnly,
+        ))
+        .unwrap();
+    let invalid_output = root.path().join("Invalido.myalbuns");
+    assert!(matches!(
+        core.create_from_template(
+            &empty.freeze_template().unwrap(),
+            location(&invalid_output),
+            CreateAuthorization::CreateOnly,
+            vec!["relative.jpg".into()]
+        ),
+        Err(CreateProjectError::InvalidInitialProject)
+    ));
+    assert!(!invalid_output.exists());
+    let photo = root.path().join("foto.png");
+    let model = core
+        .create_from_template(
+            &empty.freeze_template().unwrap(),
+            location(&root.path().join("Modelo.myalbuns")),
+            CreateAuthorization::CreateOnly,
+            vec![photo.clone()],
+        )
+        .unwrap();
+    let copy = core
+        .create_from_template(
+            &model.freeze_template().unwrap(),
+            location(&root.path().join("Copia.myalbuns")),
+            CreateAuthorization::CreateOnly,
+            vec![photo],
+        )
+        .unwrap();
+    assert_eq!(copy.project().media(), model.project().media());
 }
 
 #[test]

@@ -52,7 +52,20 @@ fica à esquerda no rodapé, com `Cancelar` e `Verificar e gerar` à direita.
 
 `Verificar e gerar` executa a descoberta recursiva, valida origem e destino e identifica conflitos antes de criar ou sobrescrever qualquer arquivo.
 
-O diálogo de progresso abre **antes** da descoberta e da leitura das Fotos.
+A descoberta reconhece Fotos pela extensão (`JPG`, `JPEG`, `PNG`, `TIF` ou `TIFF`,
+sem distinguir maiúsculas de minúsculas) e registra os caminhos dos arquivos
+diretamente presentes em cada pasta geradora. A geração não lê o conteúdo das
+Fotos nem prepara Cache. A leitura e a validação dos originais ocorrem na abertura
+do Projeto e na preparação de seu Cache, pelo fluxo compartilhado de imagens.
+Assim, uma Foto corrompida, sem acesso de leitura ou removida após a descoberta
+permanece vinculada no Projeto gerado e será tratada nesse fluxo posterior.
+
+As verificações antecipadas continuam cobrindo acesso às pastas, hierarquia do
+destino, conflitos e proteção dos Projetos abertos. Falhas nesses pontos podem
+impedir a geração; a disponibilidade do conteúdo de cada Foto não é um requisito
+para gravar seus vínculos.
+
+O diálogo de progresso abre **antes** da descoberta das pastas e dos arquivos.
 Enquanto o total é desconhecido, usa a barra indeterminada com o título
 `Gerando Projetos`, sem mensagens temporárias no formulário. Se a verificação
 não encontrar pendências, a mesma tentativa inicia a geração e a mesma janela

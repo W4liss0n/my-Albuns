@@ -3,10 +3,7 @@ use crate::ipc_contract::{
     GenerationDecision, GenerationItemStatus, GenerationItemView, GenerationOptions,
     GenerationPhase, GenerationProgress, GenerationView,
 };
-use crate::media_runtime::{MediaBinding, MediaObservation, MediaResolver};
-use myalbuns_core::{
-    CreateAuthorization, ImportPhoto, ProjectCore, ProjectLocation, ProjectTemplate,
-};
+use myalbuns_core::{CreateAuthorization, ProjectCore, ProjectLocation, ProjectTemplate};
 use myalbuns_paths::{
     ExpectedObject, MirroredDestination, OperationPathContext, PhysicalFileIdentity, ResolveError,
     RootBindingPlan,
@@ -47,8 +44,7 @@ struct GenerationItem {
     name: String,
     destination: PathBuf,
     parent: PathBuf,
-    photos: Vec<ImportPhoto>,
-    observations: Vec<MediaObservation>,
+    photo_paths: Vec<PathBuf>,
     problems: Vec<String>,
     conflict: Option<PhysicalFileIdentity>,
     exists: bool,
@@ -147,15 +143,6 @@ impl GenerationRunner {
             return Err("Nenhuma pasta com fotos encontrada na origem.".into());
         }
         let roots = paths.freeze();
-        let bindings = template
-            .media()
-            .iter()
-            .map(|media| MediaBinding {
-                media_id: media.id().to_string(),
-                kind: media.kind(),
-                logical_path: media.path().to_path_buf(),
-            })
-            .collect::<Vec<_>>();
         let mut items = Vec::new();
         let mut destinations = HashSet::new();
         for (folder, photos) in folders {
@@ -179,18 +166,7 @@ impl GenerationRunner {
                     output.display()
                 ).into());
             }
-            let proposal = MediaResolver.propose_media_imports_in_plan(
-                myalbuns_core::MediaKind::Photo,
-                photos,
-                &bindings,
-                &roots,
-                |_| {},
-            );
-            let mut problems = proposal
-                .problems
-                .into_iter()
-                .map(|problem| format!("{}: {}", problem.file_name, problem.reason))
-                .collect::<Vec<_>>();
+            let mut problems = Vec::new();
             if let Err(error) = guard.inspect_parent(&parent) {
                 problems.push(error.to_string());
             }
@@ -220,12 +196,7 @@ impl GenerationRunner {
                 name,
                 destination: output,
                 parent,
-                photos: proposal.commands,
-                observations: proposal
-                    .inspections
-                    .into_iter()
-                    .map(|inspection| inspection.observation)
-                    .collect(),
+                photo_paths: photos,
                 problems,
                 conflict,
                 exists,
@@ -321,20 +292,6 @@ fn generate_item(
     options: &GenerationOptions,
     item: &mut GenerationItem,
 ) -> Result<(), String> {
-    for previous in &item.observations {
-        let binding = MediaBinding {
-            media_id: previous.media_id.clone(),
-            kind: previous.kind,
-            logical_path: previous.logical_path().to_path_buf(),
-        };
-        let current = MediaResolver.observe_in_plan(roots, &binding);
-        if !previous.same_source(&current) {
-            return Err(format!(
-                "A foto {} mudou ou ficou indisponível. Verifique novamente.",
-                previous.logical_path().display()
-            ));
-        }
-    }
     let destination = MirroredDestination::open(
         roots,
         Path::new(&options.source_folder),
@@ -352,7 +309,7 @@ fn generate_item(
         template,
         ProjectLocation::new(item.destination.clone(), roots.clone()),
         authorization,
-        item.photos.clone(),
+        item.photo_paths.clone(),
     )
     .map_err(creation_error)?;
     Ok(())
