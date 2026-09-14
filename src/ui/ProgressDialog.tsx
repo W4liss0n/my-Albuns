@@ -36,7 +36,6 @@ interface ProgressDialogProps {
   progress: ProgressDialogState;
   title: string;
   reserveProgressMeta?: boolean;
-  hideStatus?: boolean;
 }
 
 export function ProgressDialog({
@@ -44,7 +43,6 @@ export function ProgressDialog({
   progress,
   title,
   reserveProgressMeta = false,
-  hideStatus = false,
 }: ProgressDialogProps) {
   const measured = progress.kind !== "indeterminate";
   const total = measured ? Math.max(1, progress.total) : undefined;
@@ -104,13 +102,13 @@ export function ProgressDialog({
           </>
         ) : (
           <>
-            {!hideStatus && <p
+            <p
               aria-live="polite"
               className="ui-progress-dialog__status"
               role="status"
             >
               {progress.status}
-            </p>}
+            </p>
             <ProgressBar
               completed={completed}
               indicatorStyle={indicatorStyle}

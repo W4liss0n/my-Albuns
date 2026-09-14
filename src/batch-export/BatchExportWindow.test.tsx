@@ -80,12 +80,23 @@ test("restart offers explicit Resume or End and never resumes automatically", as
 test("progress has an independent compact width and only Cancel", async () => {
   const api = port();
   const { container } = render(<BatchProgressWindow port={api} />);
-  await screen.findByText("1/4 Álbuns");
+  await screen.findByText("1 álbum de 4");
   expect(container.querySelector(".ui-owned-window-shell")).toHaveStyle({ width: "400px" });
   expect(screen.getAllByRole("button")).toHaveLength(1);
   fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
   expect(api.cancel).toHaveBeenCalledOnce();
   expect(screen.getByRole("button", { name: "Cancelar" })).toBeDisabled();
+});
+
+test("updates the batch album count separately from its overall percentage", async () => {
+  let report!: Parameters<BatchExportPort["onProgress"]>[0];
+  const api = port({ progress: async () => ({ completed: 0, total: 18, percent: 0 }),
+    onProgress: async listener => { report = listener; return () => undefined; } });
+  render(<BatchProgressWindow port={api} />);
+  await screen.findByText("0 álbuns de 18");
+  act(() => report({ completed: 7, total: 18, percent: 43 }));
+  expect(screen.getByText("7 álbuns de 18")).toBeVisible();
+  expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "43");
 });
 
 test("disk full presents a compact pause modal instead of a failed-project table", async () => {

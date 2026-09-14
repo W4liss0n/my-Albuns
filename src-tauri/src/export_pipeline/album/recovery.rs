@@ -37,6 +37,23 @@ impl AlbumExportRecovery {
         ensure_not_cancelled(control)?;
         let plan = &self.plan;
         let roots = &self.roots;
+        let total_units = plan
+            .outputs
+            .iter()
+            .map(|(_, units)| units.len() as u32)
+            .sum();
+        let prepared_units = plan
+            .outputs
+            .iter()
+            .take(self.receipts.len())
+            .map(|(_, units)| units.len() as u32)
+            .sum();
+        progress(ExportProgress::measured(
+            ExportProgressStage::Preparing,
+            prepared_units,
+            total_units,
+            true,
+        ));
         // Freeze originals across pauses with the same read-only capture used by
         // the Processor. No decode or image-sized allocation is added here.
         if self.sources.is_empty() {

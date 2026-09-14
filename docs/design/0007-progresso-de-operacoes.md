@@ -35,11 +35,13 @@ A linha de estado pode usar `X/Y` para a unidade própria da operação, como
 `Lâmina 18 de 42`. A janela não inventa tempo restante quando o produtor de
 progresso não consegue estimá-lo.
 
-Na Exportação, o refinamento vigente mostra somente `Exportando`, barra geral,
-porcentagem e cancelamento quando disponível. Não apresenta carregamento dos
+Na Exportação, o refinamento vigente mostra `Exportando`, a contagem
+`X lâminas de Y` ou `X páginas de Y`, barra geral, porcentagem e cancelamento
+quando disponível. A contagem acompanha as unidades preparadas, inclusive as
+páginas internas de um PDF. Não apresenta carregamento dos
 Originais, composição, codificação, verificação ou publicação como etapas visíveis.
 A porcentagem é contínua entre essas etapas e ao retomar uma tentativa viva.
-O lote conserva também sua posição compacta `X/Y`.
+O lote conserva a contagem compacta `X álbuns de Y`.
 
 O processamento de imagens usa `Processando Imagens` e `X de Y` em qualquer
 ação explícita que precise preparar imagens do Projeto. Uma unidade inclui a
@@ -95,7 +97,7 @@ todo o catálogo decodificado na memória.
 
 ## Progresso em lote
 
-Na Exportação em lote do MVP, o refinamento específico mostra somente a barra geral determinada, o percentual e a posição `X/Y`. Não lista o Projeto atual, estado individual ou fila. `Cancelar` é a única ação.
+Na Exportação em lote do MVP, o refinamento específico mostra `Exportando`, a barra geral determinada, o percentual e a contagem `X álbuns de Y`. Não lista o Projeto atual, estado individual ou fila. `Cancelar` é a única ação.
 
 O lote reutiliza a mesma barra geral e acrescenta somente um resumo compacto do
 conjunto: item atual, estado desse item, posição `X/Y` e uma síntese da fila. Não

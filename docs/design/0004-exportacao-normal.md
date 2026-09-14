@@ -100,7 +100,7 @@ Enquanto a tentativa estiver aberta, o `ExportPipeline` conserva a composição 
 
 Essa retomada é válida durante a tentativa viva. Cancelar, encerrar ou fechar o aplicativo descarta a preparação quando for seguro e preserva os arquivos já publicados. Após uma queda, continuam valendo as regras de recuperação persistida. A política de conflitos confirmada é mantida na retomada viva; um novo arquivo concorrente não autoriza sobrescrita quando a política era criar somente.
 
-O progresso mostra apenas `Exportando`, a barra geral, a porcentagem e o cancelamento quando disponível. As etapas internas não aparecem como linhas de estado, e a barra não volta a zero entre etapas ou ao retomar a mesma tentativa.
+O progresso mostra `Exportando`, a contagem `X lâminas de Y` ou `X páginas de Y`, a barra geral, a porcentagem e o cancelamento quando disponível. A contagem acompanha as unidades preparadas no escopo efetivo da exportação, considerando somente os lados ativos no modo de páginas e as saídas pendentes após ignorar conflitos. Ela permanece visível durante a publicação; um PDF conta suas unidades internas, mesmo sendo um único arquivo. As etapas internas não aparecem como linhas de estado, e a barra não volta a zero entre etapas ou ao retomar a mesma tentativa.
 
 Depois da preparação integral, o `Publisher` promove cada arquivo separadamente ao nome final com atomicidade por arquivo quando o Destino suportar. Não há rollback do conjunto: uma falha durante a Publicação pode deixar mistura entre saídas anteriores e novas, deve informar essa condição e não remove Saídas órfãs.
 

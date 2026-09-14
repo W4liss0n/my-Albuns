@@ -161,7 +161,7 @@ test("projects export progress and cancellation through the standard progress di
         progress: {
           completed: 2,
           kind: "determinate",
-          status: "Compondo a Exportação",
+          status: "2 lâminas de 5",
           total: 5,
         },
       }}
@@ -176,7 +176,7 @@ test("projects export progress and cancellation through the standard progress di
     screen.getByRole("button", { name: "Cancelar Exportação" }),
   );
   expect(onAction).toHaveBeenCalledWith("cancelExport");
-  expect(screen.queryByText("Compondo a Exportação")).not.toBeInTheDocument();
+  expect(screen.getByText("2 lâminas de 5")).toBeVisible();
   expect(screen.getByText("Exportando")).toBeInTheDocument();
 });
 

@@ -65,6 +65,7 @@ export const ExportPreviewControl = forwardRef<
   >("idle");
   const nextAttemptId = useRef(0);
   const exportPercent = useRef(0);
+  const exportUnits = useRef({ completed: 0, total: 1 });
   const recoveryGeneration = useRef(0);
   const recoveryPending = useRef(false);
   const attemptedSelection = useRef<ExportSheetSelection | null>(null);
@@ -202,7 +203,15 @@ export const ExportPreviewControl = forwardRef<
 
     // A native recovery token is consumed by this call, never by a later fresh retry.
     attemptedSelection.current = { ...selected, recoveryId: undefined };
-    if (!selected.recoveryId) exportPercent.current = 0;
+    if (!selected.recoveryId) {
+      exportPercent.current = 0;
+      const options = selected.options;
+      const total = options && sheets
+        ? sheets.filter(sheet => options.sheetIds.includes(sheet.sheetId))
+          .reduce((count, sheet) => count + (options.mode === "page" ? sheet.pageCount : 1), 0)
+        : 1;
+      exportUnits.current = { completed: 0, total };
+    }
     if (lastDialogState.current?.kind === "exportConfiguration") presentDialog({ ...lastDialogState.current, options: selected.options ?? lastDialogState.current.options, busy: true, message: "" });
     const attemptId = ++nextAttemptId.current;
     currentAttemptId.current = attemptId;
@@ -226,13 +235,15 @@ export const ExportPreviewControl = forwardRef<
             kind: "exportProgress",
             progress: {
               kind: "determinate", completed: exportPercent.current, total: 100,
-              status: "Exportando",
+              status: exportCountStatus(exportUnits.current, selected.options?.mode),
             },
           });
           return;
         }
 
-        const state = progressDialogState(event, exportPercent.current);
+        exportUnits.current = exportUnitProgress(event, exportUnits.current, Boolean(selected.options));
+        const state = progressDialogState(event, exportPercent.current,
+          exportCountStatus(exportUnits.current, selected.options?.mode));
         exportPercent.current = state.progress.completed;
         presentDialog(state);
       });
@@ -533,6 +544,7 @@ export const ExportPreviewControl = forwardRef<
 function progressDialogState(
   event: Extract<ExportProgressEvent, { event: "progress" }>,
   previous: number,
+  status: string,
 ) {
   const fraction = event.units.kind === "measured" && event.units.totalUnits > 0
     ? Math.min(1, Math.max(0, event.units.completedUnits / event.units.totalUnits)) : 0;
@@ -544,8 +556,28 @@ function progressDialogState(
     cancellable: event.cancellable,
     kind: "exportProgress" as const,
     progress: { completed: Math.floor(Math.max(previous, start + span * fraction)), kind: "determinate" as const,
-      status: "Exportando", total: 100 },
+      status, total: 100 },
   };
+}
+
+function exportCountStatus(units: { completed: number; total: number }, mode?: "sheet" | "page") {
+  const unit = mode === "page" ? "página" : "lâmina";
+  return `${units.completed} ${unit}${units.completed === 1 ? "" : "s"} de ${units.total}`;
+}
+
+function exportUnitProgress(
+  event: Extract<ExportProgressEvent, { event: "progress" }>,
+  previous: { completed: number; total: number },
+  album: boolean,
+) {
+  if (album && event.units.kind === "measured" &&
+      (event.stage === "preparing" || event.stage === "composing" || event.stage === "encoding_output")) {
+    return { completed: event.units.completedUnits, total: event.units.totalUnits };
+  }
+  if (event.stage === "verifying" || event.stage === "publishing" || event.stage === "completed") {
+    return { ...previous, completed: previous.total };
+  }
+  return previous;
 }
 
 function messageFromError(error: unknown) {

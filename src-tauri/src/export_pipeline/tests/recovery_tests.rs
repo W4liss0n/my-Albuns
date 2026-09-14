@@ -95,13 +95,19 @@ fn storage_recovery_restarts_only_unfinished_files_and_preserves_the_snapshot() 
             ..Default::default()
         };
         let runtime = tokio::runtime::Runtime::new().unwrap();
+        let prepared_counts = Mutex::new(Vec::new());
+        let progress = |event: super::super::ExportProgress| {
+            if event.stage == ExportProgressStage::Preparing {
+                prepared_counts.lock().unwrap().push(event.units);
+            }
+        };
         let mut failure = runtime
             .block_on(super::super::execute_album(
                 &mut transport,
                 plan,
                 &paths.freeze(),
                 &ExportExecutionControl::default(),
-                &|_| {},
+                &progress,
                 &context("skip-existing"),
             ))
             .unwrap_err();
@@ -117,7 +123,7 @@ fn storage_recovery_restarts_only_unfinished_files_and_preserves_the_snapshot() 
                 &mut transport,
                 repeated,
                 &ExportExecutionControl::default(),
-                &|_| {},
+                &progress,
                 &context("skip-existing"),
             ))
             .unwrap_err();
@@ -131,7 +137,7 @@ fn storage_recovery_restarts_only_unfinished_files_and_preserves_the_snapshot() 
                 &mut transport,
                 failure.recovery.take().unwrap(),
                 &ExportExecutionControl::default(),
-                &|_| {},
+                &progress,
                 &context("skip-existing"),
             ))
             .unwrap();
@@ -143,6 +149,19 @@ fn storage_recovery_restarts_only_unfinished_files_and_preserves_the_snapshot() 
                 vec![vec![1, 2], vec![2], vec![2]]
             }
         );
+        let retained = u32::from(format != ExportFormat::Pdf);
+        let counts = prepared_counts.into_inner().unwrap();
+        assert_eq!(counts.len(), 3);
+        for (actual, completed) in counts.iter().zip([0, retained, retained]) {
+            assert_eq!(
+                *actual,
+                ExportProgressUnits::Measured {
+                    completed_units: completed,
+                    total_units: 2,
+                },
+                "count logical sheets even when the output is a single PDF"
+            );
+        }
         if let Some(prior) = prior {
             assert_eq!(
                 std::fs::read(

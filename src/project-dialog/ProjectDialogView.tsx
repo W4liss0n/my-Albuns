@@ -210,7 +210,6 @@ export function ProjectDialogView({
           }
           progress={state.progress}
           title="Exportando"
-          hideStatus
           reserveProgressMeta
         />
       );

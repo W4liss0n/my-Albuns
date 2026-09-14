@@ -80,6 +80,74 @@ test("normal export keeps its dialog and resumes only after cache cleanup", asyn
   expect(dialog.dismiss).not.toHaveBeenCalled();
 });
 
+test.each([
+  ["sheet", "png", ["opening", "middle", "closing"], 3, "lâmina"],
+  ["page", "png", ["opening", "middle", "closing"], 4, "página"],
+  ["page", "pdf", ["opening", "closing"], 2, "página"],
+] as const)("counts %s units in %s exports, including single-page ends", async (mode, format, sheetIds, total, unit) => {
+  const harness = createExportHarness();
+  const dialog = createDialogHarness();
+  render(<ExportPreviewControl dialogPort={dialog.port} exportPipelinePort={harness.port} projectId="project-a"
+    selection={{ projectName: "Album", sheetId: "opening", sheetNumber: 1 }}
+    sheets={[{ sheetId: "opening", number: 1, pageCount: 1 }, { sheetId: "middle", number: 2, pageCount: 2 },
+      { sheetId: "closing", number: 3, pageCount: 1 }]} />);
+  fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  await waitFor(() => expect(dialog.present).toHaveBeenCalled());
+  dialog.emit({ configureExport: { scope: "range", sheetIds: [...sheetIds], mode, format: { kind: format },
+    destination: "C:/Exportados", conflictPolicy: "skip" } });
+  const expectCount = (count: number) => expect(dialog.present).toHaveBeenLastCalledWith(expect.objectContaining({
+    kind: "exportProgress", progress: expect.objectContaining({ status: `${count} ${unit}${count === 1 ? "" : "s"} de ${total}` }),
+  }));
+  await act(async () => harness.attempts[0].emit({ event: "started", cancellable: true }));
+  expectCount(0);
+  await act(async () => harness.attempts[0].emit({ event: "progress", stage: "loading_sources",
+    units: { kind: "measured", completedUnits: 7, totalUnits: 14 }, cancellable: true }));
+  expectCount(0);
+  await act(async () => harness.attempts[0].emit({ event: "progress", stage: "composing",
+    units: { kind: "measured", completedUnits: 1, totalUnits: total }, cancellable: true }));
+  expectCount(1);
+  await act(async () => harness.attempts[0].emit({ event: "progress", stage: "encoding_output",
+    units: { kind: "measured", completedUnits: total, totalUnits: total }, cancellable: true }));
+  expectCount(total);
+  await act(async () => harness.attempts[0].emit({ event: "progress", stage: "publishing",
+    units: { kind: "measured", completedUnits: 0, totalUnits: format === "pdf" ? 1 : total }, cancellable: false }));
+  expectCount(total);
+});
+
+test("uses the effective export total after conflicts and retains counts across a storage pause", async () => {
+  const harness = createExportHarness();
+  (harness.port as ExportPipelinePort).storageRecovery = {
+    status: async () => ({ id: "paused", canClearCache: false }), clear: async () => false,
+  };
+  const dialog = createDialogHarness();
+  render(<ExportPreviewControl dialogPort={dialog.port} exportPipelinePort={harness.port} projectId="project-a"
+    selection={{ projectName: "Album", sheetId: "first", sheetNumber: 1 }}
+    sheets={[{ sheetId: "first", number: 1, pageCount: 2 }, { sheetId: "last", number: 2, pageCount: 2 }]} />);
+  fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  await waitFor(() => expect(dialog.present).toHaveBeenCalled());
+  dialog.emit({ configureExport: { scope: "album", sheetIds: ["first", "last"], mode: "page",
+    format: { kind: "png" }, destination: "C:/Exportados", conflictPolicy: "skip" } });
+  await act(async () => {
+    harness.attempts[0].emit({ event: "started", cancellable: true });
+    harness.attempts[0].emit({ event: "progress", stage: "preparing",
+      units: { kind: "measured", completedUnits: 0, totalUnits: 3 }, cancellable: true });
+  });
+  expect(dialog.present).toHaveBeenLastCalledWith(expect.objectContaining({ progress: expect.objectContaining({ status: "0 páginas de 3" }) }));
+  await act(async () => harness.attempts[0].emit({ event: "progress", stage: "composing",
+    units: { kind: "measured", completedUnits: 2, totalUnits: 3 }, cancellable: true }));
+  await act(async () => harness.attempts[0].reject(new StorageFullError("Libere espaço.")));
+  await waitFor(() => expect(dialog.present).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "storageFull" })));
+  dialog.emit("resumeStorage");
+  await act(async () => {
+    harness.attempts[1].emit({ event: "started", cancellable: true });
+    harness.attempts[1].emit({ event: "progress", stage: "preparing",
+      units: { kind: "measured", completedUnits: 2, totalUnits: 3 }, cancellable: true });
+    harness.attempts[1].emit({ event: "progress", stage: "loading_sources",
+      units: { kind: "measured", completedUnits: 0, totalUnits: 1 }, cancellable: true });
+  });
+  expect(dialog.present).toHaveBeenLastCalledWith(expect.objectContaining({ progress: expect.objectContaining({ status: "2 páginas de 3", completed: 53 }) }));
+});
+
 test("retrying after cancelling a resumed export does not reuse its consumed native token", async () => {
   const harness = createExportHarness();
   (harness.port as ExportPipelinePort).storageRecovery = {
@@ -448,7 +516,7 @@ test("waits for the backend started event before opening the native progress win
     kind: "exportProgress",
     progress: {
       kind: "determinate", completed: 0, total: 100,
-      status: "Exportando",
+      status: "0 lâminas de 1",
     },
   });
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -480,7 +548,7 @@ test("projects measured and unmeasured progress through the dialog port", async 
     kind: "exportProgress",
     progress: {
       kind: "determinate", completed: 0, total: 100,
-      status: "Exportando",
+      status: "0 lâminas de 1",
     },
   });
   expect(dialog.present).toHaveBeenNthCalledWith(3, {
@@ -490,7 +558,7 @@ test("projects measured and unmeasured progress through the dialog port", async 
     progress: {
       completed: 36,
       kind: "determinate",
-      status: "Exportando",
+      status: "0 lâminas de 1",
       total: 100,
     },
   });
@@ -512,7 +580,7 @@ test("handles cancellation actions from the child window and keeps feedback ther
     cancelRequested: true,
     cancellable: true,
     kind: "exportProgress",
-    progress: expect.objectContaining({ kind: "determinate", status: "Exportando" }),
+    progress: expect.objectContaining({ kind: "determinate", status: "0 lâminas de 1" }),
   });
 
   await act(async () => {

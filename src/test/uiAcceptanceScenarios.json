@@ -677,9 +677,43 @@
       "actions": []
     },
     {
+      "id": "export-progress-starting",
+      "title": "Exportação — contagem inicial de lâminas",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportProgress%22%2C%22cancelRequested%22%3Afalse%2C%22cancellable%22%3Atrue%2C%22progress%22%3A%7B%22kind%22%3A%22determinate%22%2C%22completed%22%3A0%2C%22total%22%3A100%2C%22status%22%3A%220%20l%C3%A2minas%20de%2018%22%7D%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-progress-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "A Exportação usa progresso pertencente à Janela conforme as decisões aceitas posteriores."
+      },
+      "viewport": {
+        "width": 440,
+        "height": 320
+      },
+      "readySelector": ".ui-progress-dialog__track[role=\"progressbar\"]",
+      "actions": []
+    },
+    {
+      "id": "export-progress-pages",
+      "title": "Exportação — contagem de páginas",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportProgress%22%2C%22cancelRequested%22%3Afalse%2C%22cancellable%22%3Atrue%2C%22progress%22%3A%7B%22kind%22%3A%22determinate%22%2C%22completed%22%3A38%2C%22total%22%3A100%2C%22status%22%3A%2216%20p%C3%A1ginas%20de%2036%22%7D%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-progress-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "A Exportação usa progresso pertencente à Janela conforme as decisões aceitas posteriores."
+      },
+      "viewport": {
+        "width": 440,
+        "height": 320
+      },
+      "readySelector": ".ui-progress-dialog__track[role=\"progressbar\"]",
+      "actions": []
+    },
+    {
       "id": "export-progress-determinate",
       "title": "Diálogo de Exportação — progresso determinado",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportProgress%22%2C%22cancelRequested%22%3Afalse%2C%22cancellable%22%3Atrue%2C%22progress%22%3A%7B%22kind%22%3A%22determinate%22%2C%22completed%22%3A38%2C%22total%22%3A100%2C%22status%22%3A%22Exportando%22%7D%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportProgress%22%2C%22cancelRequested%22%3Afalse%2C%22cancellable%22%3Atrue%2C%22progress%22%3A%7B%22kind%22%3A%22determinate%22%2C%22completed%22%3A38%2C%22total%22%3A100%2C%22status%22%3A%228%20l%C3%A2minas%20de%2018%22%7D%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-progress-dialog",
@@ -693,7 +727,7 @@
     {
       "id": "export-progress-cancel-requested",
       "title": "Diálogo de Exportação — cancelamento solicitado",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportProgress%22%2C%22cancelRequested%22%3Atrue%2C%22cancellable%22%3Atrue%2C%22progress%22%3A%7B%22kind%22%3A%22determinate%22%2C%22completed%22%3A38%2C%22total%22%3A100%2C%22status%22%3A%22Exportando%22%7D%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportProgress%22%2C%22cancelRequested%22%3Atrue%2C%22cancellable%22%3Atrue%2C%22progress%22%3A%7B%22kind%22%3A%22determinate%22%2C%22completed%22%3A38%2C%22total%22%3A100%2C%22status%22%3A%228%20l%C3%A2minas%20de%2018%22%7D%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-progress-dialog",
@@ -707,7 +741,7 @@
     {
       "id": "export-progress-non-cancellable",
       "title": "Diálogo de Exportação — publicação não cancelável",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportProgress%22%2C%22cancelRequested%22%3Afalse%2C%22cancellable%22%3Afalse%2C%22progress%22%3A%7B%22kind%22%3A%22determinate%22%2C%22completed%22%3A92%2C%22total%22%3A100%2C%22status%22%3A%22Exportando%22%7D%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportProgress%22%2C%22cancelRequested%22%3Afalse%2C%22cancellable%22%3Afalse%2C%22progress%22%3A%7B%22kind%22%3A%22determinate%22%2C%22completed%22%3A92%2C%22total%22%3A100%2C%22status%22%3A%2218%20l%C3%A2minas%20de%2018%22%7D%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-progress-dialog",
