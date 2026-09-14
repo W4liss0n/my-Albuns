@@ -166,9 +166,7 @@ fn disk_full_during_album_publication_reports_real_failure_and_preserves_remaini
             "publication must preserve the typed cause"
         );
         assert!(
-            failure
-                .message
-                .contains("Libere espaço"),
+            failure.message.contains("Libere espaço"),
             "{}",
             failure.message
         );
