@@ -2,6 +2,16 @@
   "schemaVersion": 3,
   "scenarios": [
     {
+      "id": "welcome",
+      "title": "Tela de Boas-vindas",
+      "implementationPath": "/welcome-preview.html",
+      "referencePath": "/docs/references/ui-programa-diagramacao/Boas-vindas.dc.html",
+      "comparison": { "kind": "paired", "surface": "welcome-window" },
+      "viewport": { "width": 1280, "height": 720 },
+      "readySelector": "[aria-label=\"Ações principais\"]",
+      "actions": []
+    },
+    {
       "id": "generation-configuration", "title": "Geração de Projetos — configuração",
       "implementationPath": "/generation-preview.html?scenario=configuration",
       "comparison": { "kind": "implementation-only", "surface": "generation-window", "implementationCaptureSelector": ".ui-owned-window-shell", "reason": "Design 0008 e formulário de exportação aceito: modelo somente leitura, origem, destino, contagem e ações à direita." },
@@ -47,16 +57,6 @@
       "implementationPath": "/generation-preview.html?scenario=cancelled",
       "comparison": { "kind": "implementation-only", "surface": "generation-window", "implementationCaptureSelector": ".ui-owned-window-shell", "reason": "Resultado do cancelamento com itens não gerados e preservação dos concluídos." },
       "viewport": { "width": 760, "height": 500 }, "readySelector": ".ui-problems-table", "actions": []
-    },
-    {
-      "id": "welcome",
-      "title": "Tela de Boas-vindas",
-      "implementationPath": "/welcome-preview.html",
-      "referencePath": "/docs/references/ui-programa-diagramacao/Boas-vindas.dc.html",
-      "comparison": { "kind": "paired", "surface": "welcome-window" },
-      "viewport": { "width": 1280, "height": 720 },
-      "readySelector": "[aria-label=\"Ações principais\"]",
-      "actions": []
     },
     {
       "id": "batch-export-configuration",
