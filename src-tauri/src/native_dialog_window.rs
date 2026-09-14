@@ -932,6 +932,10 @@ impl DialogSurface for WebviewWindow {
     }
 
     fn set_dialog_taskbar_visible(&self, visible: bool) -> io::Result<()> {
+        #[cfg(windows)]
+        if visible {
+            return crate::native_dialog_taskbar::show_owned_window(self);
+        }
         self.set_skip_taskbar(!visible).map_err(io::Error::other)
     }
 

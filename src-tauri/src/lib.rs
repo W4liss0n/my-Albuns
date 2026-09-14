@@ -39,6 +39,8 @@ mod media_import_selection;
 mod media_preview_commands;
 mod media_runtime;
 mod named_mutex;
+#[cfg(windows)]
+mod native_dialog_taskbar;
 mod native_dialog_window;
 mod native_project_dialog;
 mod opaque_image_protocol;
