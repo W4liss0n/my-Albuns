@@ -301,7 +301,9 @@ pub(crate) async fn execute_album<T: ImagingTransport>(
                 .prepare()
                 .map(PreparedExportStorage::into_shared_preparation),
         }
-        .map_err(|error| ExportFailure::new(ExportFailureStage::Prepare, error.to_string()))?;
+        .map_err(|error| {
+            ExportFailure::from_path_error(ExportFailureStage::Prepare, error, error.to_string())
+        })?;
         preparations.push(ExportPreparationGuard::new(storage, context));
         operational.push(bound);
     }
@@ -404,13 +406,13 @@ pub(crate) async fn execute_album<T: ImagingTransport>(
             total,
             false,
         ));
-        preparation.publish().map_err(|error| ExportFailure::new(ExportFailureStage::Publish { promoted_outputs: index as u32, total_outputs: total },
+        preparation.publish().map_err(|error| ExportFailure::from_path_error(ExportFailureStage::Publish { promoted_outputs: index as u32, total_outputs: total }, error,
             format!("Não foi possível concluir a publicação ({index} de {total} arquivos confirmados): {error}. O Destino pode conter saídas anteriores e novas. Faça uma nova Exportação integral.")))?;
     }
     if plan.cleanup_confirmed && !obsolete_outputs.is_empty() {
         PreparedExportStorage::remove_obsolete_outputs(
             operational[0].output_path().parent().expect("planned destination"), &obsolete_outputs,
-        ).map_err(|error| ExportFailure::new(ExportFailureStage::Publish { promoted_outputs: total, total_outputs: total },
+        ).map_err(|error| ExportFailure::from_path_error(ExportFailureStage::Publish { promoted_outputs: total, total_outputs: total }, error,
             format!("As novas saídas foram publicadas, mas a limpeza das saídas antigas falhou: {error}. Faça uma nova Exportação integral.")))?;
     }
     progress(ExportProgress::measured(

@@ -25,7 +25,7 @@ export const tauriBatchExportPort: BatchExportPort = {
   close: () => invoke("close_batch_export"),
   resultReady: async () => {
     const shell = document.querySelector(".ui-owned-window-shell");
-    if (shell) await tauriWindowControls.fitContent(() => shell.getBoundingClientRect().height, 800);
+    if (shell) await tauriWindowControls.fitContent(() => shell.getBoundingClientRect().height, shell.getBoundingClientRect().width);
     await invoke("batch_result_ready");
   },
   progress: () => invoke<BatchExportProgress | null>("batch_progress"),

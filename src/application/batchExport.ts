@@ -12,7 +12,7 @@ export interface BatchRecoverySummary { id: string; sourceFolder: string; total:
 export interface BatchExportView {
   id: string;
   options: BatchExportOptions;
-  phase: "prepared" | "running" | "interrupted" | "finished";
+  phase: "prepared" | "running" | "interrupted" | "storageFull" | "finished";
   items: {
     id: string;
     name: string;

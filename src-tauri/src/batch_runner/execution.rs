@@ -11,6 +11,18 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 
+#[derive(Debug)]
+enum PreparationFailure {
+    Problems(Vec<BatchProblem>),
+    StorageFull,
+}
+
+impl From<Vec<BatchProblem>> for PreparationFailure {
+    fn from(problems: Vec<BatchProblem>) -> Self {
+        Self::Problems(problems)
+    }
+}
+
 #[derive(Default)]
 pub(crate) struct BatchCancellation {
     requested: AtomicBool,
@@ -72,13 +84,16 @@ impl BatchRunner {
         let bindings = std::mem::take(&mut self.paths).freeze();
         self.phase = BatchPhase::Running;
         self = tauri::async_runtime::spawn_blocking(move || {
-            self.save_checkpoint()?;
+            self.checkpoint_or_pause()?;
             Ok::<_, String>(self)
         })
         .await
         .map_err(|error| error.to_string())??;
         let total = self.items.len() as u32;
         for index in 0..self.items.len() {
+            if self.phase == BatchPhase::StorageFull {
+                break;
+            }
             if cancellation.is_requested() {
                 self.phase = BatchPhase::Interrupted;
                 break;
@@ -98,7 +113,7 @@ impl BatchRunner {
                                     vec![problem(BatchProblemKind::Unavailable, error)];
                             }
                         }
-                        self.save_checkpoint()?;
+                        self.checkpoint_or_pause()?;
                     }
                     Ok::<_, String>(self)
                 })
@@ -116,7 +131,12 @@ impl BatchRunner {
             self = returned;
             let mut plan = match planned {
                 Ok(plan) => plan,
-                Err(problems) => {
+                Err(PreparationFailure::StorageFull) => {
+                    self.phase = BatchPhase::StorageFull;
+                    self.current = Some(self.items[index].id.clone());
+                    break;
+                }
+                Err(PreparationFailure::Problems(problems)) => {
                     self.items[index].status = BatchItemStatus::Failed;
                     self.items[index].problems = problems;
                     self = self.persist().await?;
@@ -162,6 +182,9 @@ impl BatchRunner {
                     .into(),
             });
             self = self.persist().await?;
+            if self.phase == BatchPhase::StorageFull {
+                break;
+            }
             let item_control = cancellation.begin_item();
             let completed = self
                 .items
@@ -229,6 +252,10 @@ impl BatchRunner {
                     self.items[index].preparation = None;
                 }
                 Err(error) => {
+                    if error.is_storage_full() {
+                        self.phase = BatchPhase::StorageFull;
+                        break;
+                    }
                     if matches!(error.stage, ExportFailureStage::Processor(crate::imaging_processor::InvocationFailureStage::TerminationUnconfirmed)) {
                         self.phase = BatchPhase::Interrupted;
                         self.items[index].problems = vec![problem(BatchProblemKind::Failed, error.message)];
@@ -261,11 +288,16 @@ impl BatchRunner {
                 percent: f64::from(completed) / f64::from(total) * 100.0,
             });
         }
-        if self.phase != BatchPhase::Interrupted {
+        if !matches!(
+            self.phase,
+            BatchPhase::Interrupted | BatchPhase::StorageFull
+        ) {
             self.phase = BatchPhase::Finished;
         }
-        for item in &mut self.items {
-            item.relinks = ItemRelinks::default();
+        if self.phase != BatchPhase::StorageFull {
+            for item in &mut self.items {
+                item.relinks = ItemRelinks::default();
+            }
         }
         tauri::async_runtime::spawn_blocking(move || {
             if self.items.iter().all(|item| {
@@ -277,7 +309,7 @@ impl BatchRunner {
             {
                 self.remove_checkpoint()?;
             } else {
-                self.save_checkpoint()?;
+                self.checkpoint_or_pause()?;
             }
             Ok(self)
         })
@@ -285,9 +317,9 @@ impl BatchRunner {
         .map_err(|error| error.to_string())?
     }
 
-    async fn persist(self) -> Result<Self, String> {
+    async fn persist(mut self) -> Result<Self, String> {
         tauri::async_runtime::spawn_blocking(move || {
-            self.save_checkpoint()?;
+            self.checkpoint_or_pause()?;
             Ok(self)
         })
         .await
@@ -299,7 +331,7 @@ impl BatchRunner {
         index: usize,
         paths: &RootBindingPlan,
         policy: ExportConflictPolicy,
-    ) -> Result<AlbumExportPlan, Vec<BatchProblem>> {
+    ) -> Result<AlbumExportPlan, PreparationFailure> {
         if let Some(preparation) = &self.items[index].preparation {
             preparation
                 .discard(paths)
@@ -323,7 +355,8 @@ impl BatchRunner {
             return Err(vec![problem(
                 BatchProblemKind::Changed,
                 "O Projeto mudou depois da verificação. Verifique novamente antes de exportar.",
-            )]);
+            )]
+            .into());
         }
         checked?;
         let current = load_in_plan(&self.core, paths, item).map_err(|error| vec![error])?;
@@ -331,7 +364,8 @@ impl BatchRunner {
             return Err(vec![problem(
                 BatchProblemKind::Changed,
                 "O Projeto mudou durante a verificação. Tente novamente.",
-            )]);
+            )]
+            .into());
         }
         let plan = inspect_and_plan(
             &current,
@@ -344,12 +378,58 @@ impl BatchRunner {
         let destination = paths
             .resolve(&item.destination)
             .map_err(|error| vec![problem(BatchProblemKind::Unavailable, error.to_string())])?;
-        std::fs::create_dir_all(destination).map_err(|error| {
-            vec![problem(
+        create_destination(&destination).map_err(|error| {
+            if myalbuns_paths::AppPathsError::is_storage_full(&error) {
+                return PreparationFailure::StorageFull;
+            }
+            PreparationFailure::Problems(vec![problem(
                 BatchProblemKind::Failed,
                 format!("Não foi possível preparar o destino: {error}"),
-            )]
+            )])
         })?;
         Ok(plan)
+    }
+}
+
+fn create_destination(path: &Path) -> std::io::Result<()> {
+    #[cfg(test)]
+    myalbuns_paths::test_support::create(path)?;
+    std::fs::create_dir_all(path)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn disk_full_while_creating_the_destination_is_a_pause_not_an_item_problem() {
+        let root = tempfile::tempdir().unwrap();
+        let (core, _editor) = crate::batch_runner::tests::fixture(root.path(), "source/A.myalbuns");
+        let mut batch = BatchRunner::discover(
+            BatchConfiguration {
+                source: root.path().join("source"),
+                destination: None,
+                format: ExportFormat::Png,
+                mode: ExportMode::Sheet,
+            },
+            core,
+            root.path().join("checkpoints"),
+        )
+        .unwrap();
+        let roots = batch.paths.current_plan();
+        let destination = batch.items[0].destination.clone();
+        let fault = myalbuns_paths::test_support::DiskFull::on_create(&destination);
+        assert!(matches!(
+            batch.prepare_item(0, &roots, ExportConflictPolicy::Ask),
+            Err(PreparationFailure::StorageFull)
+        ));
+        assert_eq!(fault.failure_count(), 1);
+        assert!(!destination.exists());
+        drop(fault);
+        assert!(
+            batch
+                .prepare_item(0, &roots, ExportConflictPolicy::Ask)
+                .is_ok()
+        );
     }
 }

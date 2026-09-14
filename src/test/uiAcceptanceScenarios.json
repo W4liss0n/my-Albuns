@@ -63,6 +63,14 @@
       "readySelector": ".ui-progress-dialog", "actions": []
     },
     {
+      "id": "batch-export-storage-full",
+      "title": "Exportação em lote — pausa por falta real de espaço",
+      "implementationPath": "/batch-export-preview.html?scenario=storage-full",
+      "comparison": { "kind": "implementation-only", "surface": "batch-export-window", "implementationCaptureSelector": ".ui-owned-window-shell", "reason": "Decisão aceita em 14/09/2026: falta real de espaço pausa o lote e abre um modal compacto com Retomar e Cancelar, sem registrar falha na tabela nem avançar para outro Álbum." },
+      "viewport": { "width": 520, "height": 340 },
+      "readySelector": ".ui-standard-message", "actions": []
+    },
+    {
       "id": "batch-export-result",
       "title": "Exportação em lote — resultado com falhas e ignorados",
       "implementationPath": "/batch-export-preview.html?scenario=result",

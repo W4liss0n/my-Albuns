@@ -1,7 +1,7 @@
 use super::*;
 use myalbuns_core::{CreateAuthorization, CreateProjectRequest, InitialProject, ProjectLocation};
 
-fn fixture(
+pub(super) fn fixture(
     root: &std::path::Path,
     relative: &str,
 ) -> (ProjectCore, myalbuns_core::EditableProject) {
@@ -67,6 +67,7 @@ struct RecordingTransport {
     crash_during_preparation: bool,
     sources: Vec<Vec<PathBuf>>,
     dpis: Vec<u32>,
+    storage_full_for: Option<String>,
 }
 
 #[test]
@@ -210,12 +211,190 @@ impl crate::imaging_processor::ImagingTransport for RecordingTransport {
         if self.crash_during_preparation {
             std::process::exit(91);
         }
-        let response = ImagingResponse::AlbumCompleted {
-            request_id: request.request_id.clone(),
-            completion: AlbumRenderCompletion { outputs },
+        let response = if self.storage_full_for.as_deref() == Some(&request.snapshot.project_name) {
+            self.prior_outputs.clear();
+            ImagingResponse::failed(
+                request.request_id.clone(),
+                myalbuns_imaging_protocol::ImagingFailureCode::OutputStorageFull,
+                None::<String>,
+                None,
+            )
+        } else {
+            ImagingResponse::AlbumCompleted {
+                request_id: request.request_id.clone(),
+                completion: AlbumRenderCompletion { outputs },
+            }
         };
         Box::pin(async move { Ok(response) })
     }
+}
+
+#[test]
+fn disk_full_pauses_batch_before_the_next_project_and_preserves_completed_items() {
+    for publication_index in [None, Some(0), Some(1)] {
+        let root = tempfile::tempdir().unwrap();
+        let (core, _first) = fixture(root.path(), "source/A.myalbuns");
+        let (_, _second) = fixture(root.path(), "source/B.myalbuns");
+        let (_, _third) = fixture(root.path(), "source/C.myalbuns");
+        let checkpoints = root.path().join("checkpoints");
+        let batch = BatchRunner::discover(
+            BatchConfiguration {
+                source: root.path().join("source"),
+                destination: None,
+                format: ExportFormat::Png,
+                mode: ExportMode::Sheet,
+            },
+            core.clone(),
+            checkpoints.clone(),
+        )
+        .unwrap();
+        let id = batch.view().id;
+        let mut transport = RecordingTransport {
+            storage_full_for: publication_index.is_none().then(|| "B".into()),
+            ..Default::default()
+        };
+        let fault = publication_index.map(|index| {
+            myalbuns_paths::test_support::DiskFull::on_rename(
+                &root.path().join(format!("source/B/B_{:03}.png", index + 1)),
+            )
+        });
+        let paused = tauri::async_runtime::block_on(batch.run(
+            &mut transport,
+            &BatchCancellation::default(),
+            ExportConflictPolicy::Ask,
+            &|_| {},
+        ))
+        .unwrap();
+        assert_eq!(transport.names, ["A", "B"], "disk full must stop before C");
+        assert_eq!(paused.view().phase, BatchPhase::StorageFull);
+        assert_eq!(paused.view().items[0].status, BatchItemStatus::Completed);
+        assert_eq!(paused.view().items[1].status, BatchItemStatus::Pending);
+        assert_eq!(paused.view().items[2].status, BatchItemStatus::Pending);
+        assert!(
+            paused.view().items[1].problems.is_empty(),
+            "disk full is not an item problem"
+        );
+        if let Some(fault) = &fault {
+            assert_eq!(fault.failure_count(), 1);
+        }
+        drop(fault);
+        assert_eq!(
+            BatchRunner::recoveries(&checkpoints).unwrap()[0].remaining,
+            2
+        );
+        let resumed = BatchRunner::resume(&checkpoints, &id, core).unwrap();
+        let mut transport = RecordingTransport::default();
+        let completed = tauri::async_runtime::block_on(resumed.run(
+            &mut transport,
+            &BatchCancellation::default(),
+            ExportConflictPolicy::Replace,
+            &|_| {},
+        ))
+        .unwrap();
+        assert_eq!(transport.names, ["B", "C"]);
+        assert!(
+            completed
+                .view()
+                .items
+                .iter()
+                .all(|item| item.status == BatchItemStatus::Completed)
+        );
+        assert!(BatchRunner::recoveries(&checkpoints).unwrap().is_empty());
+    }
+}
+
+#[test]
+fn disk_full_checkpoint_keeps_live_progress_and_the_previous_atomic_checkpoint() {
+    let root = tempfile::tempdir().unwrap();
+    let (core, _editor) = fixture(root.path(), "source/A.myalbuns");
+    let checkpoints = root.path().join("checkpoints");
+    let mut batch = BatchRunner::discover(
+        BatchConfiguration {
+            source: root.path().join("source"),
+            destination: None,
+            format: ExportFormat::Png,
+            mode: ExportMode::Sheet,
+        },
+        core,
+        checkpoints.clone(),
+    )
+    .unwrap();
+    batch.save_checkpoint().unwrap();
+    let path = checkpoints.join(format!("{}.json", batch.id));
+    let before = std::fs::read(&path).unwrap();
+    batch.items[0].status = BatchItemStatus::Completed;
+    let fault = myalbuns_paths::test_support::DiskFull::on_create(&path);
+    batch.checkpoint_or_pause().unwrap();
+    assert_eq!(fault.failure_count(), 1);
+    assert_eq!(batch.view().phase, BatchPhase::StorageFull);
+    assert_eq!(batch.view().items[0].status, BatchItemStatus::Completed);
+    assert_eq!(std::fs::read(&path).unwrap(), before);
+    drop(fault);
+    batch.retry_preflight();
+    let mut transport = RecordingTransport::default();
+    let finished = tauri::async_runtime::block_on(batch.run(
+        &mut transport,
+        &BatchCancellation::default(),
+        ExportConflictPolicy::Ask,
+        &|_| {},
+    ))
+    .unwrap();
+    assert!(
+        transport.names.is_empty(),
+        "retaking the live runner must not export completed items again"
+    );
+    assert_eq!(finished.view().phase, BatchPhase::Finished);
+    assert!(!path.exists());
+}
+
+#[test]
+fn disk_full_pause_keeps_temporary_relinks_for_an_explicit_live_retry() {
+    let root = tempfile::tempdir().unwrap();
+    let (core, editor, original) = background_fixture(root.path(), "A");
+    let before = std::fs::read(editor.project_path()).unwrap();
+    let replacement = root.path().join("relocated");
+    std::fs::create_dir_all(&replacement).unwrap();
+    std::fs::rename(&original, replacement.join("001.jpg")).unwrap();
+    let mut batch = BatchRunner::discover(
+        BatchConfiguration {
+            source: root.path().join("source"),
+            destination: None,
+            format: ExportFormat::Png,
+            mode: ExportMode::Sheet,
+        },
+        core,
+        root.path().join("checkpoints"),
+    )
+    .unwrap();
+    batch
+        .relink(&batch.items[0].id.clone(), &replacement)
+        .unwrap();
+    let mut full = RecordingTransport {
+        storage_full_for: Some("A".into()),
+        ..Default::default()
+    };
+    let mut paused = tauri::async_runtime::block_on(batch.run(
+        &mut full,
+        &BatchCancellation::default(),
+        ExportConflictPolicy::Ask,
+        &|_| {},
+    ))
+    .unwrap();
+    paused.retry_preflight();
+    assert!(
+        paused.view().can_continue,
+        "a live pause preserves temporary relinks"
+    );
+    let mut transport = RecordingTransport::default();
+    tauri::async_runtime::block_on(paused.run(
+        &mut transport,
+        &BatchCancellation::default(),
+        ExportConflictPolicy::Replace,
+        &|_| {},
+    ))
+    .unwrap();
+    assert_eq!(transport.sources, [vec![replacement.join("001.jpg")]]);
+    assert_eq!(std::fs::read(editor.project_path()).unwrap(), before);
 }
 
 #[test]

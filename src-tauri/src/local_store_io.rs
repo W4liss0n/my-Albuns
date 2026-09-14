@@ -17,6 +17,8 @@ use {
 };
 
 pub(crate) fn write_atomically(target: &Path, bytes: &[u8], fallback_name: &str) -> io::Result<()> {
+    #[cfg(test)]
+    myalbuns_paths::test_support::create(target)?;
     let parent = target.parent().ok_or_else(|| {
         io::Error::new(
             io::ErrorKind::InvalidInput,

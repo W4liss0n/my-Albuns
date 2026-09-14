@@ -54,6 +54,7 @@ pub enum BatchPhase {
     Prepared,
     Running,
     Interrupted,
+    StorageFull,
     Finished,
 }
 

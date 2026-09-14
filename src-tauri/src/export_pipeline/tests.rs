@@ -161,6 +161,10 @@ fn disk_full_during_album_publication_reports_real_failure_and_preserves_remaini
             .unwrap_err();
         assert_eq!(fault.failure_count(), 1);
         assert!(
+            failure.is_storage_full(),
+            "publication must preserve the typed cause"
+        );
+        assert!(
             failure
                 .message
                 .contains("Não há espaço no destino para concluir a exportação"),

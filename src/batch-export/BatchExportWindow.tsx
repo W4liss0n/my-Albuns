@@ -26,7 +26,7 @@ export function BatchExportWindow({ port }: { port: BatchExportPort }) {
     return () => { active = false; release?.(); };
   }, [port, report]);
   useLayoutEffect(() => {
-    if (view?.phase === "finished" || view?.phase === "interrupted") {
+    if (view?.phase === "finished" || view?.phase === "interrupted" || view?.phase === "storageFull") {
       void port.resultReady().catch(report);
     }
   }, [view, port, report]);
@@ -75,6 +75,11 @@ export function BatchExportWindow({ port }: { port: BatchExportPort }) {
     content = <ConfirmationDialog title="Lote interrompido" description="Os arquivos já exportados foram mantidos."
       cancelAction={{ label: "Encerrar", disabled: busy, onClick: () => end(view.id) }}
       confirmAction={{ label: "Retomar", disabled: busy, onClick: () => refresh(() => port.resume(view.id)) }} />;
+  } else if (view?.phase === "storageFull") {
+    content = <ConfirmationDialog title="Espaço insuficiente" tone="neutral"
+      description="Libere espaço para continuar. Os álbuns já exportados foram mantidos."
+      cancelAction={{ label: "Cancelar", disabled: busy, onClick: () => end(view.id) }}
+      confirmAction={{ label: "Retomar", disabled: busy, onClick: () => refresh(() => port.resume(view.id)) }} />;
   } else if (terminal && problems.length === 0) {
     content = <MessageDialog title="Exportação concluída" description="Todos os Álbuns foram exportados." tone="success"
       primaryAction={{ label: "Fechar", disabled: busy, onClick: close }} />;
@@ -113,7 +118,7 @@ export function BatchExportWindow({ port }: { port: BatchExportPort }) {
       confirmAction={{ label: "Continuar Exportação", disabled: busy || !view.canContinue,
         onClick: () => void act(() => continueBatch(view)) }} />;
   }
-  return <OwnedWindowShell controls={busy ? "none" : "close"} context="Exportação em lote" width={800}>
+  return <OwnedWindowShell controls={busy ? "none" : "close"} context="Exportação em lote" width={view?.phase === "storageFull" ? 520 : 800}>
     <div className="batch-export" hidden={error !== null}>
       {!view && !recovery && !conflicts ? <BatchConfiguration port={port} busy={busy} onError={report} onClose={close}
         onSubmit={options => void act(async () => {

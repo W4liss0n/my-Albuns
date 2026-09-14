@@ -60,6 +60,14 @@ Depois de uma interrupção, `Retomar` reabre os Projetos persistidos, descarta 
 
 O checkpoint usa `AppPaths.recovery_dir()/Batches`, respeitando o namespace de desenvolvimento `MyAlbuns2` enquanto essa separação estiver vigente. Conserva apenas opções, estados dos itens e identificação da preparação que poderá precisar de limpeza. Nunca conserva bindings de raiz, mapas de Religação nem imagens parcialmente renderizadas.
 
+### Falta real de espaço
+
+A falta real de espaço durante a preparação, gravação ou publicação pausa o lote antes do próximo Projeto. Não é registrada como falha de um item na Tela de Problemas, e não há bloqueio por estimativa de espaço necessário.
+
+O progresso dá lugar a um modal compacto de `Espaço insuficiente`, com `Retomar` e `Cancelar`. O Álbum interrompido permanece pendente; os Álbuns concluídos não são repetidos. Depois de liberar espaço, `Retomar` faz nova verificação e exige confirmação para executar, incluindo o tratamento de conflitos de saídas que já existam. A publicação continua atômica por arquivo; a retomada não pressupõe desfazer arquivos já publicados.
+
+Durante essa pausa, a janela mantém o estado e as Religações temporárias em memória. A retomada recaptura os bindings. Se o disco cheio também impedir atualizar o checkpoint, o registro anterior permanece íntegro e a janela conserva o progresso mais recente. Após fechar o aplicativo, valem o último checkpoint gravado e as regras de recuperação acima. `Cancelar` encerra esse lote e preserva as saídas já publicadas.
+
 ## Propriedade da execução
 
 O Global mantém a execução mesmo se a interface deixar de responder. Antes de iniciar, serializa novas aberturas, adquire o `OperationGate` e solicita a pausa aos hosts dos Projetos. Cada host termina comandos já aceitos, pausa seu `CacheEngine`, reserva seu Processador e confirma o bloqueio de suas janelas. A execução só começa depois dessas confirmações, sob um único `OperationLease` do Global.

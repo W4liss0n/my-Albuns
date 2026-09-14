@@ -87,3 +87,29 @@ test("progress has an independent compact width and only Cancel", async () => {
   expect(api.cancel).toHaveBeenCalledOnce();
   expect(screen.getByRole("button", { name: "Cancelar" })).toBeDisabled();
 });
+
+test("disk full presents a compact pause modal instead of a failed-project table", async () => {
+  const api = port({ current: async () => ({ ...ready, phase: "storageFull", canContinue: false }) });
+  const { container } = render(<BatchExportWindow port={api} />);
+  await screen.findByText("Espaço insuficiente");
+  expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  expect(container.querySelector(".ui-owned-window-shell")).toHaveStyle({ width: "520px" });
+  expect(api.resultReady).toHaveBeenCalled();
+  expect(api.run).not.toHaveBeenCalled();
+  expect(api.resume).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Retomar" }));
+  await screen.findByText("Pronto para exportar");
+  expect(api.resume).toHaveBeenCalledWith("batch");
+  fireEvent.click(screen.getByRole("button", { name: "Continuar Exportação" }));
+  await screen.findByText("Exportação concluída");
+  expect(api.run).toHaveBeenCalledOnce();
+});
+
+test("the user can cancel a batch paused for disk space without starting another project", async () => {
+  const api = port({ current: async () => ({ ...ready, phase: "storageFull", canContinue: false }) });
+  render(<BatchExportWindow port={api} />);
+  await screen.findByText("Espaço insuficiente");
+  fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+  await waitFor(() => expect(api.end).toHaveBeenCalledWith("batch"));
+  expect(api.run).not.toHaveBeenCalled();
+});

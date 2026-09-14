@@ -23,8 +23,10 @@ const view: BatchExportView | null = scenario === "configuration" || !scenario |
   })) }
   : scenario === "result" ? { ...ready, phase: "finished", items: ready.items.map((item, index) => ({ ...item,
     status: index === 0 ? "completed" : index === 1 ? "ignored" : "failed",
-    problems: index === 2 ? [{ kind: "failed", mediaId: null, message: "Não foi possível gravar: espaço insuficiente no destino." }] : [],
-  })) } : scenario === "success" ? { ...ready, phase: "finished", items: ready.items.map(item => ({ ...item, status: "completed" })) } : ready;
+    problems: index === 2 ? [{ kind: "failed", mediaId: null, message: "O Projeto mudou depois da verificação. Verifique novamente antes de exportar." }] : [],
+  })) } : scenario === "storage-full" ? { ...ready, phase: "storageFull", canContinue: false,
+    items: ready.items.map((item, index) => ({ ...item, status: index === 0 ? "completed" : "pending" })) }
+  : scenario === "success" ? { ...ready, phase: "finished", items: ready.items.map(item => ({ ...item, status: "completed" })) } : ready;
 const port: BatchExportPort = {
   current: async () => view,
   recoveries: async () => scenario === "recovery" ? [{ id: "preview", sourceFolder: ready.options.sourceFolder, total: 18, remaining: 7 }] : [],

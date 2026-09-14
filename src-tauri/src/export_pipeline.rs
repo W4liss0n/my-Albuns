@@ -170,6 +170,7 @@ pub(crate) struct ExportFailure {
     pub(crate) exit_code: Option<i32>,
     pub(crate) message: String,
     pub(crate) processor_failure: Option<ImagingFailure>,
+    pub(crate) path_failure: Option<AppPathsError>,
 }
 
 impl ExportFailure {
@@ -179,7 +180,33 @@ impl ExportFailure {
             exit_code: None,
             message: message.into(),
             processor_failure: None,
+            path_failure: None,
         }
+    }
+
+    pub(crate) fn from_path_error(
+        stage: ExportFailureStage,
+        error: AppPathsError,
+        message: impl Into<String>,
+    ) -> Self {
+        Self {
+            path_failure: Some(error),
+            ..Self::new(stage, message)
+        }
+    }
+
+    pub(crate) fn is_storage_full(&self) -> bool {
+        self.path_failure == Some(AppPathsError::ExportStorageFull)
+            || matches!(
+                self.stage,
+                ExportFailureStage::Processor(InvocationFailureStage::Processor(
+                    myalbuns_imaging_protocol::ImagingFailureStage::OutputStorageFull
+                ))
+            )
+            || self
+                .processor_failure
+                .as_ref()
+                .is_some_and(|failure| failure.code == ImagingFailureCode::OutputStorageFull)
     }
 
     fn from_invocation(
@@ -191,6 +218,7 @@ impl ExportFailure {
             exit_code: failure.exit_code,
             message: failure.message,
             processor_failure: None,
+            path_failure: None,
         }
     }
 
@@ -204,6 +232,7 @@ impl ExportFailure {
             exit_code: None,
             message: message.into(),
             processor_failure: Some(failure),
+            path_failure: None,
         }
     }
 }
@@ -468,7 +497,7 @@ pub(crate) async fn execute_group<T: ImagingTransport>(
                     total_outputs: total_units,
                 }
             };
-            return Err(ExportFailure::new(stage, message));
+            return Err(ExportFailure::from_path_error(stage, error, message));
         }
         published.push(PublishedExport { completion });
     }
@@ -534,8 +563,9 @@ async fn prepare_export<T: ImagingTransport>(
     ));
     let preparation = ExportPreparationGuard::new(
         execution_path_plan.prepare().map_err(|error| {
-            ExportFailure::new(
+            ExportFailure::from_path_error(
                 ExportFailureStage::Prepare,
+                error,
                 format!("Não foi possível preparar a Exportação: {error}"),
             )
         })?,

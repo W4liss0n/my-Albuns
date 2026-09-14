@@ -152,6 +152,16 @@ impl ExportCommandError {
     }
 
     fn from_pipeline(failure: export_pipeline::ExportFailure) -> Self {
+        if failure.is_storage_full() {
+            return Self {
+                code: ExportCommandErrorCode::OutputStorageFull,
+                message: failure.message,
+                media_id: None,
+                path_code: None,
+                media_problems: None,
+                layout_problems: None,
+            };
+        }
         if let Some(processor) = failure.processor_failure {
             return Self {
                 code: processor.code.into(),
@@ -875,6 +885,7 @@ mod tests {
             ),
             exit_code: None,
             message: "O original não está mais disponível.".into(),
+            path_failure: None,
             processor_failure: Some(ImagingFailure {
                 code: ImagingFailureCode::SourceUnavailable,
                 media_id: Some("media-cover".into()),
@@ -891,6 +902,19 @@ mod tests {
                 "pathCode": "not_found",
             })
         );
+    }
+
+    #[test]
+    fn native_publication_disk_full_keeps_the_shared_export_error_code() {
+        let failure = ExportCommandError::from_pipeline(ExportFailure::from_path_error(
+            ExportFailureStage::Publish {
+                promoted_outputs: 1,
+                total_outputs: 2,
+            },
+            myalbuns_paths::AppPathsError::ExportStorageFull,
+            myalbuns_paths::AppPathsError::EXPORT_STORAGE_FULL_MESSAGE,
+        ));
+        assert_eq!(failure.code, ExportCommandErrorCode::OutputStorageFull);
     }
 
     #[test]

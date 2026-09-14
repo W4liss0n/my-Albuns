@@ -317,6 +317,15 @@ pub(crate) async fn batch_resume(
     let root = state.recovery_root();
     let core = state.core();
     let view = tauri::async_runtime::spawn_blocking(move || {
+        if let Some(batch) = runner.as_mut()
+            && batch.view().id == id
+            && batch.view().phase == crate::ipc_contract::BatchPhase::StorageFull
+        {
+            // Disk exhaustion may have prevented the last checkpoint write.
+            // The live runner retains completed items and temporary relinks.
+            batch.retry_preflight();
+            return Ok(batch.view());
+        }
         let batch = BatchRunner::resume(&root, &id, core)?;
         let view = batch.view();
         *runner = Some(batch);
