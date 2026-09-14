@@ -352,6 +352,20 @@ impl ProjectHost {
         state.session()?.projection()
     }
 
+    pub(crate) fn generation_template(
+        &self,
+    ) -> Result<(String, myalbuns_core::ProjectTemplate), String> {
+        let state = self.state.lock().map_err(|_| SESSION_UNAVAILABLE_MESSAGE)?;
+        let project = state.active_project()?;
+        let template = project
+            .freeze_template()
+            .map_err(|_| SESSION_UNAVAILABLE_MESSAGE)?;
+        Ok((
+            myalbuns_core::project_name_from_path(project.project_path()),
+            template,
+        ))
+    }
+
     pub(crate) fn apply_with_outcome(
         &self,
         intent: ProjectIntent,

@@ -1,0 +1,7 @@
+{
+  "permission": [{
+    "identifier": "generation-window-commands",
+    "description": "Project generation preflight, decisions, execution and cancellation",
+    "commands": { "allow": ["generation_model", "generation_current", "generation_progress", "generation_choose_folder", "generation_count", "generation_prepare", "generation_decide", "generation_recheck", "generation_run", "generation_cancel", "generation_result_ready", "close_project_generation", "fit_owned_window", "owned_window_content_ready"], "deny": [] }
+  }]
+}

@@ -72,6 +72,7 @@ import {
 interface ProjectWorkspaceProps {
   exportMediaPort?: import("../application/exportMedia").ExportMediaPort;
   photoshopPort?: import("../application/photoshop").PhotoshopPort;
+  generationLauncher?: import("../application/projectGeneration").ProjectGenerationLauncher;
   mediaDropPort?: import("../application/projectPorts").MediaDropPort;
   projection: EditorProjection;
   projectDialogPort: ProjectDialogPort;
@@ -96,6 +97,7 @@ interface ProjectWorkspaceProps {
 const SHEET_EDITING_MEDIA_PANEL_HEIGHT = 120;
 
 export function ProjectWorkspace({
+  generationLauncher,
   exportMediaPort,
   photoshopPort,
   mediaDropPort,
@@ -598,6 +600,7 @@ export function ProjectWorkspace({
     undo: controller.undo,
   });
   const applicationMenus = createProjectApplicationMenus({
+    generateProjects: generationLauncher && !structuralCommandsBlocked ? () => { void generationLauncher.open().catch(error => reportCloseError(String(error))); } : undefined,
     openSettings: photoshopPort ? () => void photoshop.openSettings("performance") : undefined,
     saveLayout: controller.saveLayout,
     canSaveLayout: controller.canSaveLayout,

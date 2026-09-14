@@ -9,6 +9,11 @@ document: design
 
 A Geração de Projetos em lote é iniciada dentro da Janela do Projeto que servirá como modelo. Sua janela de configuração reúne origem, destino e análise antes de qualquer arquivo ser criado.
 
+O comando fica em `Ferramentas → Gerar Projetos em lote…`. A janela pertence ao
+Projeto modelo e bloqueia sua edição e seu fechamento enquanto estiver aberta.
+As operações já iniciadas na sessão terminam antes de capturar o modelo; o
+cancelamento devolve o controle à mesma sessão, sem salvá-la.
+
 ## Campos
 
 A janela mostra:
@@ -50,3 +55,8 @@ Cada Projeto de destino já existente aparece em uma linha própria. O usuário 
 Depois que todos os conflitos recebem uma decisão, `Continuar Geração` é habilitado. A geração não começa automaticamente ao resolver a última linha.
 
 Durante a execução, a operação usa o [Progresso de operação](0007-progresso-de-operacoes.md). Sucesso integral recebe confirmação curta; itens ignorados ou com falha são apresentados depois na Tela de Problemas.
+
+A janela de progresso tem largura própria. A configuração permanece com suas
+dimensões enquanto a janela de progresso é preparada; o resultado só reaparece
+depois de estar pronto. Cancelar preserva os Projetos já concluídos e identifica
+os itens que não chegaram a ser gerados.

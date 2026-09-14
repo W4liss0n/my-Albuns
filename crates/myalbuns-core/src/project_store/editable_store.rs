@@ -456,6 +456,32 @@ pub(crate) fn prepare_replacement_excluding(
 }
 
 #[cfg(windows)]
+pub(crate) fn prepare_replacement_confirmed(
+    location: ProjectLocation,
+    revision: &ProjectRevision,
+    transition_root: &Path,
+    confirmed_target: PhysicalFileIdentity,
+) -> Result<PreparedReplacement, CreateStoreError> {
+    prepare_replacement_inner(
+        location,
+        revision,
+        transition_root,
+        None,
+        Some(confirmed_target),
+    )
+}
+
+#[cfg(not(windows))]
+pub(crate) fn prepare_replacement_confirmed(
+    _location: ProjectLocation,
+    _revision: &ProjectRevision,
+    _transition_root: &Path,
+    _confirmed_target: myalbuns_paths::PhysicalFileIdentity,
+) -> Result<PreparedReplacement, CreateStoreError> {
+    Err(CreateStoreError::Path(PathFailure::IoFailure))
+}
+
+#[cfg(windows)]
 fn prepare_replacement_inner(
     location: ProjectLocation,
     revision: &ProjectRevision,

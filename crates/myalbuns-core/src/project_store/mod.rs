@@ -16,7 +16,7 @@ use crate::project_document::ProjectRevision;
 
 pub(crate) use editable_store::{
     CreateStoreError, OpenStoreError, OpenedProject, ProjectStore, SaveStoreError, SaveStoreResult,
-    create_only, open_editable, prepare_replacement,
+    create_only, open_editable, prepare_replacement, prepare_replacement_confirmed,
 };
 #[cfg(windows)]
 pub(crate) use editable_store::{create_only_excluding, prepare_replacement_excluding};

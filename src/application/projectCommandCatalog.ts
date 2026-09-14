@@ -403,6 +403,12 @@ const DEFINITIONS = [
     shortcuts: [],
   }),
   command({
+    id: "generate-projects",
+    label: "Gerar Projetos em lote…",
+    description: "Cria Projetos independentes usando o estado atual como modelo.",
+    kind: "application", contexts: ["project-window"], availability: "implemented", shortcuts: [],
+  }),
+  command({
     id: "settings",
     label: "Configurações…",
     description: "Abre as Configurações globais do aplicativo.",

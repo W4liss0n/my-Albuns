@@ -19,6 +19,8 @@ mod export_attempts;
 mod export_commands;
 mod export_media;
 mod export_pipeline;
+mod generation_runner;
+mod generation_window;
 mod global_activation;
 mod global_runtime;
 mod graphics_launch_gate;

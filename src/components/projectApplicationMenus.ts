@@ -13,6 +13,7 @@ import type {
 } from "./ApplicationMenuBar";
 
 interface ProjectApplicationMenuOptions {
+  generateProjects?(): void;
   openSettings?(): void;
   saveLayout(): void;
   canSaveLayout: boolean;
@@ -52,6 +53,7 @@ interface ProjectApplicationMenuOptions {
 }
 
 export function createProjectApplicationMenus({
+  generateProjects,
   openSettings,
   saveLayout,
   canSaveLayout,
@@ -185,7 +187,11 @@ export function createProjectApplicationMenus({
     {
       id: "tools",
       label: "Ferramentas",
-      items: [implemented("settings", "project-window", () => openSettings?.(), !openSettings)],
+      items: [
+        implemented("generate-projects", "project-window", () => generateProjects?.(), !generateProjects),
+        separator("tools-settings-separator"),
+        implemented("settings", "project-window", () => openSettings?.(), !openSettings),
+      ],
     },
     {
       id: "help",

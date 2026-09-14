@@ -2,6 +2,53 @@
   "schemaVersion": 3,
   "scenarios": [
     {
+      "id": "generation-configuration", "title": "Geração de Projetos — configuração",
+      "implementationPath": "/generation-preview.html?scenario=configuration",
+      "comparison": { "kind": "implementation-only", "surface": "generation-window", "implementationCaptureSelector": ".ui-owned-window-shell", "reason": "Design 0008 e formulário de exportação aceito: modelo somente leitura, origem, destino, contagem e ações à direita." },
+      "viewport": { "width": 760, "height": 650 }, "readySelector": ".generation-model strong",
+      "actions": [
+        { "type": "input", "selector": "input[aria-label='Pasta de origem']", "value": "D:\\Fotos\\Formatura 2026" },
+        { "type": "input", "selector": "input[aria-label='Pasta de destino']", "value": "E:\\Álbuns\\Formatura 2026" },
+        { "type": "assert", "selector": ".ui-dialog-window__footer .ui-action-button:last-child:not(:disabled)" }
+      ]
+    },
+    {
+      "id": "generation-conflicts", "title": "Geração de Projetos — conflitos",
+      "implementationPath": "/generation-preview.html?scenario=conflicts",
+      "comparison": { "kind": "implementation-only", "surface": "generation-window", "implementationCaptureSelector": ".ui-owned-window-shell", "reason": "Designs 0005 e 0008: conflitos individuais, ações globais e confirmação explícita; Projeto aberto sem sobrescrita." },
+      "viewport": { "width": 760, "height": 650 }, "readySelector": ".generation-global-actions", "actions": []
+    },
+    {
+      "id": "generation-ready", "title": "Geração de Projetos — pendências resolvidas",
+      "implementationPath": "/generation-preview.html?scenario=ready",
+      "comparison": { "kind": "implementation-only", "surface": "generation-window", "implementationCaptureSelector": ".ui-owned-window-shell", "reason": "Confirmação explícita após rever os conflitos, sem tabela vazia." },
+      "viewport": { "width": 760, "height": 400 }, "readySelector": ".ui-dialog-window__footer", "actions": []
+    },
+    {
+      "id": "generation-progress", "title": "Geração de Projetos — progresso",
+      "implementationPath": "/generation-preview.html?scenario=progress",
+      "comparison": { "kind": "implementation-only", "surface": "generation-progress-window", "implementationCaptureSelector": ".ui-owned-window-shell", "reason": "Design 0007: componente comum de progresso determinado, porcentagem e X Projetos de Y em largura independente." },
+      "viewport": { "width": 400, "height": 350 }, "readySelector": "[role='progressbar']", "actions": []
+    },
+    {
+      "id": "generation-result", "title": "Geração de Projetos — resultado parcial",
+      "implementationPath": "/generation-preview.html?scenario=result",
+      "comparison": { "kind": "implementation-only", "surface": "generation-window", "implementationCaptureSelector": ".ui-owned-window-shell", "reason": "Designs 0005 e 0008: resumo dos Projetos gerados e tabela com ignorados e falhas reais." },
+      "viewport": { "width": 760, "height": 500 }, "readySelector": ".ui-problems-table", "actions": []
+    },
+    {
+      "id": "generation-success", "title": "Geração de Projetos — sucesso",
+      "implementationPath": "/generation-preview.html?scenario=success",
+      "comparison": { "kind": "implementation-only", "surface": "generation-window", "implementationCaptureSelector": ".ui-owned-window-shell", "reason": "Design 0008: confirmação curta no componente comum, sem tabela vazia." },
+      "viewport": { "width": 400, "height": 350 }, "readySelector": ".ui-dialog-window__footer", "actions": []
+    },
+    {
+      "id": "generation-cancelled", "title": "Geração de Projetos — cancelamento",
+      "implementationPath": "/generation-preview.html?scenario=cancelled",
+      "comparison": { "kind": "implementation-only", "surface": "generation-window", "implementationCaptureSelector": ".ui-owned-window-shell", "reason": "Resultado do cancelamento com itens não gerados e preservação dos concluídos." },
+      "viewport": { "width": 760, "height": 500 }, "readySelector": ".ui-problems-table", "actions": []
+    },
+    {
       "id": "welcome",
       "title": "Tela de Boas-vindas",
       "implementationPath": "/welcome-preview.html",

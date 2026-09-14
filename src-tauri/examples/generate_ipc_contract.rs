@@ -25,6 +25,10 @@ fn main() {
     let config = Config::new()
         .with_out_dir(output_dir)
         .with_large_int("number");
+    myalbuns_desktop_lib::ipc_contract::GenerationView::export_all(&config)
+        .expect("generation view bindings");
+    myalbuns_desktop_lib::ipc_contract::GenerationProgress::export_all(&config)
+        .expect("generation progress bindings");
     myalbuns_desktop_lib::ipc_contract::BatchExportView::export_all(&config)
         .expect("batch bindings");
     myalbuns_desktop_lib::ipc_contract::BatchExportProgress::export_all(&config)

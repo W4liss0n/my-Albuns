@@ -14,6 +14,7 @@ interface ProblemsDialogProps {
   closeDisabled?: boolean;
   closeLabel?: string;
   actions?: ReactNode;
+  toolbar?: ReactNode;
 }
 
 export function ProblemsDialog({
@@ -25,6 +26,7 @@ export function ProblemsDialog({
   closeDisabled = false,
   closeLabel = "Fechar",
   actions,
+  toolbar,
 }: ProblemsDialogProps) {
   const closeRef = useRef<HTMLButtonElement>(null);
   return (
@@ -39,6 +41,7 @@ export function ProblemsDialog({
         actions={<>{actions}<ActionButton ref={closeRef} disabled={closeDisabled} onClick={onClose}>{closeLabel}</ActionButton></>}
       >
         <p className="ui-problems-description">{description}</p>
+        {toolbar}
         <div
           className="ui-problems-scroll"
           tabIndex={0}

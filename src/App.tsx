@@ -47,6 +47,7 @@ import "./components/StartupSurface.css";
 import "./App.css";
 
 type AppProps = {
+  generationLauncher?: import("./application/projectGeneration").ProjectGenerationLauncher;
   exportMediaPort?: import("./application/exportMedia").ExportMediaPort;
   photoshopPort?: import("./application/photoshop").PhotoshopPort;
   exportPipelinePort: ExportPipelinePort;
@@ -83,6 +84,7 @@ interface ImportPresentation {
 }
 
 function App({
+  generationLauncher,
   exportMediaPort,
   photoshopPort,
   exportPipelinePort,
@@ -772,6 +774,7 @@ function App({
       >
         <ProjectWorkspace
           photoshopPort={photoshopPort}
+          generationLauncher={generationLauncher}
           mediaDropPort={mediaDropPort}
           projection={projection}
           exportMediaPort={exportMediaPort}

@@ -130,7 +130,7 @@ para essas superfícies não criam um owner global compartilhado.
 | Modo normal | duplo clique na Lâmina ou `Enter` | Modo de edição | isola a Lâmina, fecha/suspende Barra e Layouts e inicia em `Ajustar Lâmina` | `Esc` descarta `ViewportTransform`, restaura painéis e centraliza a Lâmina |
 | Modo normal | arrastar pela Barra ou Grade | prévia local de reordenação | somente a superfície originadora mostra placeholder, ghost e deslocamento | `Esc` ou drop inválido restaura; drop válido comita uma ação e sincroniza a outra superfície |
 | Modo normal | `Exportar` | Exportação | pertence à Janela do Projeto | cancelar/fechar retorna ao mesmo Projeto |
-| Modo normal | Geração em lote | Configuração de lote | exige Projeto modelo e exclusividade | cancelar retorna ao mesmo Projeto |
+| Modo normal | `Ferramentas → Gerar Projetos em lote…` | Configuração de lote | captura o modelo visível e bloqueia sua Janela do Projeto | cancelar retorna à mesma sessão sem salvá-la |
 | operação | início mensurável | Progresso | pertence e bloqueia somente a proprietária prevista | sucesso fecha; falhas/ignorados seguem para Problemas |
 | Problemas | corrigir/repetir | nova tentativa ou Progresso | usa o mesmo owner da operação | fechar retorna à proprietária |
 

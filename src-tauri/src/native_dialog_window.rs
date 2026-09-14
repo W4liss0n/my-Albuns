@@ -216,6 +216,8 @@ pub(crate) async fn fit_owned_window(
         "project-dialog"
             | "batch-export"
             | "batch-progress"
+            | "generation"
+            | "generation-progress"
             | OPENING_PROGRESS_LABEL
             | PROJECT_FAILURE_LABEL
     ) {

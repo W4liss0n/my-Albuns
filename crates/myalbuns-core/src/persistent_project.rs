@@ -81,6 +81,18 @@ pub struct LoadedProjectRevision {
     content_sha256: String,
 }
 
+/// Frozen creative state for independent Projects; it contains no live lease or History.
+#[derive(Clone, Debug)]
+pub struct ProjectTemplate {
+    project: ProjectDocument,
+}
+
+impl ProjectTemplate {
+    pub fn media(&self) -> &[MediaRef] {
+        self.project.media()
+    }
+}
+
 impl LoadedProjectRevision {
     /// Identifies exactly the bytes decoded by the read-only load, including
     /// external rewrites that did not advance the creative revision.
@@ -121,6 +133,7 @@ impl LoadedProjectRevision {
 pub enum CreateAuthorization {
     CreateOnly,
     ReplaceConfirmed,
+    ReplaceTargetConfirmed(PhysicalFileIdentity),
 }
 
 #[derive(Clone, Debug)]
@@ -503,6 +516,15 @@ impl EditableProject {
 
     pub fn project(&self) -> &ProjectDocument {
         self.session.project()
+    }
+
+    pub fn freeze_template(&self) -> Result<ProjectTemplate, CoreError> {
+        if !self.session_valid {
+            return Err(CoreError::EditableSessionInvalidated);
+        }
+        Ok(ProjectTemplate {
+            project: self.session.project().clone(),
+        })
     }
 
     pub fn project_path(&self) -> &Path {
@@ -1163,6 +1185,52 @@ impl EditableProject {
 }
 
 impl ProjectCore {
+    #[cfg(windows)]
+    pub fn inspect_creation_destination(
+        &self,
+        location: &ProjectLocation,
+    ) -> Result<Option<PhysicalFileIdentity>, CreateProjectError> {
+        use myalbuns_paths::{ProjectFileLock, ProjectFileLockError};
+        let destination = location
+            .prepare_file_destination()
+            .map_err(CreateProjectError::Path)?;
+        let Some(target) = destination
+            .resolve_existing()
+            .map_err(|error| CreateProjectError::Path(project_store::map_path_failure(error)))?
+        else {
+            return Ok(None);
+        };
+        let identity = target
+            .physical_identity()
+            .ok_or(CreateProjectError::IdentityIndeterminate)?;
+        let lock =
+            ProjectFileLock::try_acquire(target.operational_path()).map_err(
+                |error| match error {
+                    ProjectFileLockError::Conflict => CreateProjectError::ProjectInUse,
+                    ProjectFileLockError::Unavailable { .. } => {
+                        CreateProjectError::Path(PathFailure::IoFailure)
+                    }
+                },
+            )?;
+        if lock.compare_physical(&target) != PhysicalIdentityEvidence::Same {
+            return Err(CreateProjectError::IdentityIndeterminate);
+        }
+        let bytes = lock
+            .read_to_string()
+            .map_err(|_| CreateProjectError::Path(PathFailure::IoFailure))?;
+        if let Ok(revision) = project_store::decode(bytes.as_bytes()) {
+            let root = self
+                .identity_lease_root()
+                .ok_or(CreateProjectError::IdentityIndeterminate)?;
+            match ProjectIdentityLease::observe(root, revision.project_id, Some(identity)) {
+                Ok(IdentityLeaseObservation::Inactive) => {}
+                Ok(_) => return Err(CreateProjectError::ProjectInUse),
+                Err(_) => return Err(CreateProjectError::IdentityIndeterminate),
+            }
+        }
+        Ok(Some(identity))
+    }
+
     pub fn load_persisted_revision(
         &self,
         request: project_store::LoadProjectRequest,
@@ -1188,6 +1256,51 @@ impl ProjectCore {
         let project = initial_project
             .into_project()
             .map_err(|_| CreateProjectError::InvalidInitialProject)?;
+        self.create_document(location, project, authorization)
+    }
+
+    /// Publishes the complete frozen model and the inspected Photo links in one write.
+    /// The source Session is never adopted, saved or edited by this operation.
+    pub fn create_from_template(
+        &self,
+        template: &ProjectTemplate,
+        location: ProjectLocation,
+        authorization: CreateAuthorization,
+        photos: Vec<ImportPhoto>,
+    ) -> Result<EditableProject, CreateProjectError> {
+        let mut known = template
+            .project
+            .media()
+            .iter()
+            .filter(|media| media.kind() == crate::MediaKind::Photo)
+            .map(|media| media.path().to_path_buf())
+            .collect::<HashSet<_>>();
+        let mut links = Vec::new();
+        for photo in photos {
+            if known.insert(photo.path.clone()) {
+                if photo.source_metadata.is_none() {
+                    return Err(CreateProjectError::InvalidInitialProject);
+                }
+                links.push((Uuid::new_v4(), photo.path));
+            }
+        }
+        let project = if links.is_empty() {
+            template.project.clone()
+        } else {
+            template
+                .project
+                .with_imported_media(crate::MediaKind::Photo, links)
+                .map_err(|()| CreateProjectError::InvalidInitialProject)?
+        };
+        self.create_document(location, project, authorization)
+    }
+
+    fn create_document(
+        &self,
+        location: ProjectLocation,
+        project: ProjectDocument,
+        authorization: CreateAuthorization,
+    ) -> Result<EditableProject, CreateProjectError> {
         let lease_root = self
             .identity_lease_root()
             .ok_or(CreateProjectError::Path(PathFailure::IoFailure))?;
@@ -1200,8 +1313,17 @@ impl ProjectCore {
                 project_store::create_only(location, &revision, lease_root)
                     .map_err(map_create_store_error)
             }
-            CreateAuthorization::ReplaceConfirmed => {
-                project_store::prepare_replacement(location, &revision, lease_root)
+            CreateAuthorization::ReplaceConfirmed
+            | CreateAuthorization::ReplaceTargetConfirmed(_) => {
+                let prepared = match authorization {
+                    CreateAuthorization::ReplaceTargetConfirmed(identity) => {
+                        project_store::prepare_replacement_confirmed(
+                            location, &revision, lease_root, identity,
+                        )
+                    }
+                    _ => project_store::prepare_replacement(location, &revision, lease_root),
+                };
+                prepared
                     .map_err(map_create_store_error)
                     .and_then(|prepared| {
                         let _replaced_identity_lease = prepared
@@ -1598,8 +1720,20 @@ impl ProjectCore {
                 project_store::create_only(destination, &revision, lease_root)
                     .map_err(map_save_copy_store_error)
             }
-            CreateAuthorization::ReplaceConfirmed => {
-                project_store::prepare_replacement(destination, &revision, lease_root)
+            CreateAuthorization::ReplaceConfirmed
+            | CreateAuthorization::ReplaceTargetConfirmed(_) => {
+                let prepared = match authorization {
+                    CreateAuthorization::ReplaceTargetConfirmed(identity) => {
+                        project_store::prepare_replacement_confirmed(
+                            destination,
+                            &revision,
+                            lease_root,
+                            identity,
+                        )
+                    }
+                    _ => project_store::prepare_replacement(destination, &revision, lease_root),
+                };
+                prepared
                     .map_err(map_save_copy_store_error)
                     .and_then(|prepared| {
                         let _replaced_identity_lease = prepared
