@@ -668,6 +668,7 @@ pub enum MediaPreviewState {
     Absent,
     Unavailable,
     CacheUnavailable,
+    CachePaused,
 }
 
 #[derive(Deserialize, TS)]

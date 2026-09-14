@@ -2278,7 +2278,7 @@ test("keeps a completed Save authoritative when a monitor read finishes during s
   await waitFor(() => expect(screen.queryByText("alterações não salvas")).not.toBeInTheDocument());
 });
 
-test.each(["ready", "decode_failed", "native_unavailable"] as const)("delivers imported cards together after visible preview preparation: %s", async (outcome) => {
+test.each(["ready", "decode_failed", "native_unavailable", "storage_paused"] as const)("delivers imported cards together after visible preview preparation: %s", async (outcome) => {
   const dialog = projectDialogHarness();
   const photos = [1, 2].map((number) => ({
     ...representativeProjection.state.album.media[0],
@@ -2294,6 +2294,8 @@ test.each(["ready", "decode_failed", "native_unavailable"] as const)("delivers i
   };
   let finishPreviews!: (previews: readonly MediaPreview[]) => void;
   let finishImport!: () => void;
+  let warn: Parameters<MediaPreviewPort["onCacheProcessorWarning"]>[0] | undefined;
+  let storagePaused = false;
   const close = vi.fn(projectWindowPort.requestClose);
   let publishPreview: ((preview: MediaPreview) => void) | undefined;
   const decodeReady = new Map<string, () => void>();
@@ -2323,11 +2325,22 @@ test.each(["ready", "decode_failed", "native_unavailable"] as const)("delivers i
         importMedia: async (publish) => {
           publish?.({ completedFiles: 2, totalFiles: 2 });
           await new Promise<void>((resolve) => { finishImport = resolve; });
+          if (outcome === "storage_paused") {
+            storagePaused = true;
+            warn?.({ state: "storage_full", message: "Libere espaço para continuar preparando as imagens." });
+          }
           return { kind: "completed", projection: imported,
             mediaIds: photos.map(({ id }) => id), importedCount: 2, problems: [] };
         },
       }}
-      mediaPreviewPort={{ ...mediaPreviewPort, prepareMediaPreviews: prepare }}
+      mediaPreviewPort={{ ...mediaPreviewPort, prepareMediaPreviews: prepare,
+        ...(outcome === "storage_paused" ? {
+          storageRecovery: { status: async () => storagePaused ? { id: "paused", canClearCache: true } : null,
+            clear: async () => false },
+          resumeCacheImages: async () => false,
+          onCacheProcessorWarning: async listener => { warn = listener; return () => {}; },
+        } satisfies Partial<MediaPreviewPort> : {}),
+      }}
       graphicsProbe={canvasGraphicsDiagnosticProbe}
       canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe} logger={silentLogger}
     />);
@@ -2348,24 +2361,26 @@ test.each(["ready", "decode_failed", "native_unavailable"] as const)("delivers i
       mediaId: id, state: "ready", url: `https://preview.test/${id}.jpg`,
     }));
     if (outcome === "native_unavailable") previews[1] = { mediaId: "batch-2", state: "unavailable", url: null };
+    if (outcome === "storage_paused") previews[1] = { mediaId: "batch-2", state: "cache_paused", url: null };
     await act(async () => publishPreview?.(previews[0]));
     expect(screen.queryByRole("button", { name: "Batch 1.jpg" })).not.toBeInTheDocument();
     await act(async () => finishPreviews(previews));
-    await waitFor(() => expect(decodeReady.size).toBe(outcome === "native_unavailable" ? 1 : 2));
+    const secondHasPreview = outcome !== "native_unavailable" && outcome !== "storage_paused";
+    await waitFor(() => expect(decodeReady.size).toBe(secondHasPreview ? 2 : 1));
     fireEvent.click(screen.getByRole("menuitem", { name: "Arquivo" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Fechar Projeto" }));
     expect(close).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: "Batch 1.jpg" })).not.toBeInTheDocument();
     expect(dialog.dismiss).not.toHaveBeenCalled();
     await act(async () => decodeReady.get(previews[0].url!)!());
-    if (outcome !== "native_unavailable") {
+    if (secondHasPreview) {
       expect(screen.queryByRole("button", { name: "Batch 1.jpg" })).not.toBeInTheDocument();
       expect(dialog.dismiss).not.toHaveBeenCalled();
       await act(async () => decodeReady.get(previews[1].url!)!());
     }
     for (const photo of photos) {
       if (outcome !== "ready" && photo.id === "batch-2") {
-        const status = outcome === "native_unavailable" ? "Indisponível" : "Prévia indisponível";
+        const status = outcome === "native_unavailable" ? "Indisponível" : outcome === "storage_paused" ? "Prévia aguardando espaço" : "Prévia indisponível";
         expect((await screen.findByRole("button", { name: `${photo.name}. ${status}` }))
           .querySelector("img")).toBeNull();
       } else {
@@ -2377,7 +2392,10 @@ test.each(["ready", "decode_failed", "native_unavailable"] as const)("delivers i
     await waitFor(() => expect(close).toHaveBeenCalledOnce());
     expect(prepare.mock.calls.filter(([demand]) => demand.visibleMediaIds.includes("batch-1")))
       .toHaveLength(1);
-    if (outcome !== "ready") {
+    if (outcome === "storage_paused") {
+      expect(dialog.present).toHaveBeenCalledWith(expect.objectContaining({ kind: "storageFull", canClearCache: true }));
+      expect(dialog.present).not.toHaveBeenCalledWith(expect.objectContaining({ kind: "imageProcessingProblems" }));
+    } else if (outcome !== "ready") {
       expect(dialog.present).toHaveBeenCalledWith(expect.objectContaining({
         kind: "imageProcessingProblems", problems: [expect.objectContaining({ fileName: "Batch 2.jpg" })],
       }));

@@ -418,7 +418,14 @@ fn prepare_proposal_with_inspection(
         let outcome = outcomes.remove(&source.candidate.source_id);
         let deferred =
             stage_full || matches!(outcome, Some(PhotoImportOutcome::DeferredForStorage));
-        storage_full |= deferred;
+        storage_full |= deferred
+            || matches!(
+                outcome,
+                Some(PhotoImportOutcome::Validated {
+                    preview: ImportedPhotoPreview::StorageFull,
+                    ..
+                })
+            );
         if let Some(PhotoImportOutcome::Validated {
             dimensions,
             fingerprint,
@@ -1001,6 +1008,25 @@ mod tests {
                 reason: "Cache indisponível".into(),
             },
         }
+    }
+
+    #[test]
+    fn changed_original_does_not_erase_the_storage_pause() {
+        let fixture = Fixture::new();
+        let path = fixture.photo("alterada.jpg");
+        let attempt = fixture.attempt(vec![path.clone()]);
+        let mut outcome = validated(&attempt.sources[0]);
+        if let PhotoImportOutcome::Validated { preview, .. } = &mut outcome {
+            *preview = ImportedPhotoPreview::StorageFull;
+        }
+        let outcomes = HashMap::from([(attempt.sources[0].candidate.source_id.clone(), outcome)]);
+        RgbImage::from_pixel(40, 25, Rgb([30, 50, 90]))
+            .save_with_format(&path, ImageFormat::Jpeg)
+            .unwrap();
+        let prepared =
+            prepare_proposal(attempt, None, outcomes, HashMap::new(), None, Vec::new()).unwrap();
+        assert!(prepared.storage_full);
+        assert_eq!(prepared.accepted_paths, [path]);
     }
 
     #[test]

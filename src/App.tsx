@@ -367,6 +367,7 @@ function App({
       const prepared = new Map(previews.map((preview) => [preview.mediaId, preview]));
       await Promise.all(demand.visibleMediaIds.map(async (mediaId) => {
         const preview = prepared.get(mediaId);
+        if (preview?.state === "cache_paused") return;
         if (preview && preview.state !== "ready") {
           reportUnavailablePreview(mediaId);
           return;

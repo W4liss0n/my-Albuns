@@ -491,7 +491,7 @@ impl DemandedPreviewPreparation<'_> {
                 namespace,
                 demand_revision,
                 &source,
-                cache_failure_state(),
+                MediaPreviewState::CachePaused,
             )));
         }
         let work = match works.get(media_id) {
@@ -612,7 +612,11 @@ impl DemandedPreviewPreparation<'_> {
                     namespace,
                     demand_revision,
                     &source,
-                    cache_failure_state(),
+                    if failure.stage == CacheFailureStage::StorageFull {
+                        MediaPreviewState::CachePaused
+                    } else {
+                        cache_failure_state()
+                    },
                 )))
             }
         }

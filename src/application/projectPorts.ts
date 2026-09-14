@@ -27,7 +27,8 @@ export type MediaPreviewState =
   | "ready"
   | "absent"
   | "unavailable"
-  | "cache_unavailable";
+  | "cache_unavailable"
+  | "cache_paused";
 
 export interface MediaPreview {
   mediaId: string;
