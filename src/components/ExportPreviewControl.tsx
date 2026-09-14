@@ -543,7 +543,7 @@ function progressDialogState(
     cancelRequested: false,
     cancellable: event.cancellable,
     kind: "exportProgress" as const,
-    progress: { completed: Math.max(previous, start + span * fraction), kind: "determinate" as const,
+    progress: { completed: Math.floor(Math.max(previous, start + span * fraction)), kind: "determinate" as const,
       status: "Exportando", total: 100 },
   };
 }
