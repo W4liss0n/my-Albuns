@@ -162,8 +162,8 @@ test("clipboard commands respect blocked interactions, an empty selection and an
   expect(h.applyWithOutcome).not.toHaveBeenCalled();
 });
 
-test("normal Copy/Paste targets the selected Frame's Sheet even when another Sheet is centered", async () => {
-  const h = harness("same-single", "normal");
+test("normal Copy uses the selection and Paste targets the centered Sheet", async () => {
+  const h = harness("normal-other-single", "normal");
   act(() => useEditorView.getState().centerSheet("sheet-003"));
   expect(h.view.result.current.canCopyFrames).toBe(true);
   await act(async () => {
@@ -177,7 +177,8 @@ test("normal Copy/Paste targets the selected Frame's Sheet even when another She
     h.pendingPaste.resolve({ projection: h.pasted, affectedFrameId: null, affectedSheetId: null, affectedFrameIds: h.scenario.pastedFrameIds });
     await pasted;
   });
-  expect(h.applyWithOutcome.mock.calls[0][0]).toMatchObject({ sheetId: "sheet-002", mode: "normal" });
+  expect(h.apply.mock.calls[0][0]).toEqual({ kind: "copyFrames", frameIds: h.scenario.selectedFrameIds });
+  expect(h.applyWithOutcome.mock.calls[0][0]).toMatchObject({ sheetId: "sheet-003", mode: "normal" });
   expect(useEditorView.getState().selectedFrameIds).toEqual(["pasted-frame-0"]);
   expect(useEditorView.getState().editingSheetId).toBeNull();
 });
@@ -204,6 +205,27 @@ test("a group copied in Edit Mode can be pasted into the centered Sheet in Norma
   expect(useEditorView.getState().selectedFrameIds).toEqual(["pasted-frame-1"]);
   expect(h.view.result.current.projection.state.album).toEqual(h.pasted.state.album);
   expect(useEditorView.getState().editingSheetId).toBeNull();
+});
+
+test.each([false, true])("normal Paste follows the Canvas center after scrolling, with cleared selection: %s", async (clearSelection) => {
+  const h = harness("normal-other-single", "normal");
+  await act(async () => {
+    const copied = h.view.result.current.copyFrames();
+    h.pendingCopy.resolve(h.copied);
+    await copied;
+  });
+  act(() => {
+    if (clearSelection) useEditorView.getState().selectFrame(null);
+    h.view.result.current.canvasProps.onCenteredSheetChange(h.scenario.targetSheetId);
+  });
+  expect(useEditorView.getState().focusedSheetId).toBe(h.scenario.sourceSheetId);
+  expect(useEditorView.getState().centeredSheetId).toBe(h.scenario.targetSheetId);
+  await act(async () => {
+    const pasted = h.view.result.current.pasteFrames();
+    h.pendingPaste.resolve({ projection: h.pasted, affectedFrameId: null, affectedSheetId: null, affectedFrameIds: h.scenario.pastedFrameIds });
+    await pasted;
+  });
+  expect(h.applyWithOutcome.mock.calls[0][0]).toMatchObject({ sheetId: h.scenario.targetSheetId, mode: "normal" });
 });
 
 test.each(["selection", "navigation", "mode"])("pending normal Paste preserves a later %s change", async (change) => {

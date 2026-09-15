@@ -488,6 +488,7 @@ fn clipboard_preview_corpus_matches_the_public_core() {
         ("same-no-offset", 1, 1, false),
         ("normal-same-single", 1, 1, true),
         ("normal-other-double", 1, 2, false),
+        ("normal-other-single", 1, 2, true),
         ("normal-double-right", 1, 0, false),
         ("normal-right-double", 0, 1, false),
     ] {

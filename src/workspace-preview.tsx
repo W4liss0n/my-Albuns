@@ -921,6 +921,7 @@ function exposeFrameClipboardState() {
   document.body.dataset.clipboardCount = String(projection.state.album.sheets.reduce((count, sheet) => count + sheet.frames.length, 0));
   document.body.dataset.clipboardAvailable = String(projection.canPasteFrames);
   document.body.dataset.clipboardEditingSheet = view.editingSheetId ?? "none";
+  document.body.dataset.clipboardCenteredSheet = view.centeredSheetId ?? "none";
 }
 
 function exposeSheetSideSwapState() {

@@ -190,9 +190,7 @@ export function useProjectEditorController({
   const canDeleteFrames = selectedFrames.length > 0 && !interactionBlocked;
   const automaticPasteSelectionRef = useRef<readonly string[] | null>(null);
   const canCopyFrames = selectedFrames.length > 0 && !interactionBlocked;
-  const pasteSheet = (canvasMode.kind === "normal" && selectedFrame
-    ? projection.state.album.sheets.find((sheet) => sheet.frames.some((frame) => frame.id === selectedFrame.id))
-    : undefined) ?? projection.state.album.sheets.find((sheet) => sheet.id === navigation.implicitSheetId);
+  const pasteSheet = projection.state.album.sheets.find((sheet) => sheet.id === navigation.implicitSheetId);
   const canPasteIntoSheet = pasteSheet !== undefined && !pasteSheet.layoutLocked && !interactionBlocked;
   const canPasteFrames = canPasteIntoSheet && (projection.canPasteFrames || mutations.frameCopyPending);
   const copyFrames = () => {

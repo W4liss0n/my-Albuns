@@ -10260,6 +10260,69 @@
       ]
     },
     {
+      "id": "workspace-frame-clipboard-normal-scroll",
+      "title": "Copiar e colar Frames — rolagem usa a Lâmina centralizada com seleção anterior",
+      "implementationPath": "/workspace-preview.html?frame=clipboard&clipboard=normal-other-single",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-clipboard",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Correção aceita: no Modo normal, Colar segue a Lâmina centralizada após rolagem, mesmo com um Frame da Lâmina anterior selecionado. A nova ocorrência reorganiza o Layout de destino."
+      },
+      "viewport": {
+        "width": 1567,
+        "height": 900
+      },
+      "readySelector": "body[data-clipboard-count=\"9\"][data-clipboard-selection=\"pasted-frame-0\"][data-clipboard-editing-sheet=\"none\"][data-clipboard-centered-sheet=\"sheet-003\"]",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "Escape"
+        },
+        {
+          "type": "pointer-click",
+          "selector": ".canvas-host canvas",
+          "offsetX": -200,
+          "offsetY": 0
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-clipboard-selection=\"clipboard-frame-1-0\"][data-clipboard-editing-sheet=\"none\"]"
+        },
+        {
+          "type": "key",
+          "key": "KeyC",
+          "modifiers": [
+            "Control"
+          ]
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-clipboard-available=\"true\"]"
+        },
+        {
+          "type": "wheel",
+          "selector": ".canvas-host canvas",
+          "deltaY": 1200
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-clipboard-centered-sheet=\"sheet-003\"][data-clipboard-selection=\"clipboard-frame-1-0\"]"
+        },
+        {
+          "type": "key",
+          "key": "KeyV",
+          "modifiers": [
+            "Control"
+          ]
+        }
+      ]
+    },
+    {
       "id": "workspace-frame-clipboard-normal-to-edit",
       "title": "Copiar e colar Frames — cópia no Modo normal e colagem no Modo de edição",
       "implementationPath": "/workspace-preview.html?frame=clipboard&clipboard=same-single&mode=normal",
