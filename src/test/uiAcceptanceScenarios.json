@@ -10381,6 +10381,258 @@
           "selector": "[role=\"menuitem\"][aria-label=\"Colar\"]"
         }
       ]
+    },
+    {
+      "id": "workspace-frame-area-all",
+      "title": "Ctrl+A seleciona todos os Frames da Lâmina isolada",
+      "implementationPath": "/workspace-preview.html?frame=clipboard&clipboard=same-single",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-area-selection",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Decisão aceita do usuário: Ctrl+A e seleção por Caixa no Modo de edição; usar os contornos azuis existentes. A Caixa confirma ao soltar, Ctrl acrescenta e Esc cancela sem sair da edição."
+      },
+      "viewport": {
+        "width": 1567,
+        "height": 900
+      },
+      "readySelector": "[role=\"menu\"][aria-label=\"Editar\"] [aria-label=\"Selecionar tudo\"]:not([disabled])",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "pointer-click",
+          "selector": ".canvas-host canvas",
+          "offsetX": -500,
+          "offsetY": -230
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-clipboard-selection=\"\"][data-clipboard-editing-sheet=\"sheet-002\"]"
+        },
+        {
+          "type": "key",
+          "key": "KeyA",
+          "modifiers": [
+            "Control"
+          ]
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-clipboard-selection=\"clipboard-frame-1-0,clipboard-frame-1-1\"][data-clipboard-editing-sheet=\"sheet-002\"]"
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-area-preview",
+      "title": "Caixa translúcida e seleção parcial durante o arraste",
+      "implementationPath": "/workspace-preview.html?frame=clipboard&clipboard=same-group",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-area-selection",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Decisão aceita do usuário: Ctrl+A e seleção por Caixa no Modo de edição; usar os contornos azuis existentes. A Caixa confirma ao soltar, Ctrl acrescenta e Esc cancela sem sair da edição."
+      },
+      "viewport": {
+        "width": 1567,
+        "height": 900
+      },
+      "readySelector": ".canvas-host canvas",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": ".canvas-host canvas",
+          "targetSelector": ".canvas-host canvas",
+          "sourceOffsetX": -500,
+          "sourceOffsetY": -230,
+          "targetOffsetX": -200,
+          "targetOffsetY": 0,
+          "phase": "preview"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-area-drop",
+      "title": "Soltar a caixa confirma somente o Frame tocado",
+      "implementationPath": "/workspace-preview.html?frame=clipboard&clipboard=same-group",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-area-selection",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Decisão aceita do usuário: Ctrl+A e seleção por Caixa no Modo de edição; usar os contornos azuis existentes. A Caixa confirma ao soltar, Ctrl acrescenta e Esc cancela sem sair da edição."
+      },
+      "viewport": {
+        "width": 1567,
+        "height": 900
+      },
+      "readySelector": "body[data-clipboard-selection=\"clipboard-frame-1-0\"][data-clipboard-editing-sheet=\"sheet-002\"]",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": ".canvas-host canvas",
+          "targetSelector": ".canvas-host canvas",
+          "sourceOffsetX": -500,
+          "sourceOffsetY": -230,
+          "targetOffsetX": -200,
+          "targetOffsetY": 0,
+          "phase": "drop"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-area-add",
+      "title": "Ctrl acrescenta Frames à seleção por área",
+      "implementationPath": "/workspace-preview.html?frame=clipboard&clipboard=same-single",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-area-selection",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Decisão aceita do usuário: Ctrl+A e seleção por Caixa no Modo de edição; usar os contornos azuis existentes. A Caixa confirma ao soltar, Ctrl acrescenta e Esc cancela sem sair da edição."
+      },
+      "viewport": {
+        "width": 1567,
+        "height": 900
+      },
+      "readySelector": "body[data-clipboard-selection=\"clipboard-frame-1-0,clipboard-frame-1-1\"][data-clipboard-editing-sheet=\"sheet-002\"]",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": ".canvas-host canvas",
+          "targetSelector": ".canvas-host canvas",
+          "sourceOffsetX": 400,
+          "sourceOffsetY": -230,
+          "targetOffsetX": 220,
+          "targetOffsetY": 0,
+          "phase": "drop",
+          "modifiers": [
+            "Control"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-area-escape",
+      "title": "Esc cancela a caixa e mantém a seleção anterior",
+      "implementationPath": "/workspace-preview.html?frame=clipboard&clipboard=same-group",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-area-selection",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Decisão aceita do usuário: Ctrl+A e seleção por Caixa no Modo de edição; usar os contornos azuis existentes. A Caixa confirma ao soltar, Ctrl acrescenta e Esc cancela sem sair da edição."
+      },
+      "viewport": {
+        "width": 1567,
+        "height": 900
+      },
+      "readySelector": "body[data-clipboard-selection=\"clipboard-frame-1-0,clipboard-frame-1-1\"][data-clipboard-editing-sheet=\"sheet-002\"]",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": ".canvas-host canvas",
+          "targetSelector": ".canvas-host canvas",
+          "sourceOffsetX": -500,
+          "sourceOffsetY": -230,
+          "targetOffsetX": -200,
+          "targetOffsetY": 0,
+          "phase": "preview"
+        },
+        {
+          "type": "key",
+          "key": "Escape"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-area-right-page",
+      "title": "Caixa de seleção respeita a Página única direita",
+      "implementationPath": "/workspace-preview.html?frame=clipboard&clipboard=right-double",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-area-selection",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Decisão aceita do usuário: Ctrl+A e seleção por Caixa no Modo de edição; usar os contornos azuis existentes. A Caixa confirma ao soltar, Ctrl acrescenta e Esc cancela sem sair da edição."
+      },
+      "viewport": {
+        "width": 1567,
+        "height": 900
+      },
+      "readySelector": "body[data-clipboard-selection=\"clipboard-frame-0-0,clipboard-frame-0-1\"][data-clipboard-editing-sheet=\"sheet-001\"]",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": ".canvas-host canvas",
+          "targetSelector": ".canvas-host canvas",
+          "sourceOffsetX": -600,
+          "sourceOffsetY": -300,
+          "targetOffsetX": 600,
+          "targetOffsetY": 300,
+          "phase": "drop"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-area-left-page",
+      "title": "Caixa de seleção respeita a Página única esquerda",
+      "implementationPath": "/workspace-preview.html?frame=clipboard&clipboard=left-double",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-area-selection",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Decisão aceita do usuário: Ctrl+A e seleção por Caixa no Modo de edição; usar os contornos azuis existentes. A Caixa confirma ao soltar, Ctrl acrescenta e Esc cancela sem sair da edição."
+      },
+      "viewport": {
+        "width": 1567,
+        "height": 900
+      },
+      "readySelector": "body[data-clipboard-selection=\"clipboard-frame-3-0,clipboard-frame-3-1\"][data-clipboard-editing-sheet=\"sheet-004\"]",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": ".canvas-host canvas",
+          "targetSelector": ".canvas-host canvas",
+          "sourceOffsetX": -600,
+          "sourceOffsetY": -300,
+          "targetOffsetX": 600,
+          "targetOffsetY": 300,
+          "phase": "drop"
+        }
+      ]
     }
   ]
 }

@@ -126,6 +126,7 @@ export interface AlbumCanvasProps {
   frameGeometry?: CanvasFrameGeometry;
   frameContentSwap?: CanvasFrameContentSwap;
   onSelectFrame(frameId: string | null, toggle?: boolean): void;
+  onSelectFrames?(frameIds: readonly string[]): void;
   onEditSheet(sheetId: string): void;
   onFocusSheet(sheetId: string): void;
   onCenteredSheetChange(sheetId: string): void;

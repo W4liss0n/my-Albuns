@@ -11,6 +11,25 @@ import { useProjectMutationRunner } from "./useProjectMutationRunner";
 
 afterEach(() => useEditorView.setState(useEditorView.getInitialState(), true));
 
+test("select all and area selection stay in the edited Sheet, include placeholders and do not mutate the Project", async () => {
+  const h = harness("same-group", "edit", true);
+  const sheetId = useEditorView.getState().editingSheetId!;
+  const ids = h.initial.state.album.sheets.find((sheet) => sheet.id === sheetId)!.frames.map((frame) => frame.id);
+  act(() => useEditorView.getState().selectFrames([]));
+  expect(h.view.result.current.canSelectAllFrames).toBe(true);
+  act(() => h.view.result.current.selectAllFrames());
+  expect(useEditorView.getState().selectedFrameIds).toEqual(ids);
+  act(() => h.view.result.current.canvasProps.onSelectFrames?.([ids[0], "outside-sheet"]));
+  expect(useEditorView.getState().selectedFrameIds).toEqual([ids[0]]);
+  expect(h.apply).not.toHaveBeenCalled();
+  expect(h.applyWithOutcome).not.toHaveBeenCalled();
+  expect(h.view.result.current.projection.state).toEqual(h.initial.state);
+  act(() => useEditorView.getState().exitSheetEdit());
+  act(() => h.view.result.current.selectAllFrames());
+  expect(useEditorView.getState().selectedFrameIds).toEqual([]);
+  await act(async () => undefined);
+});
+
 function deferred<T>() {
   let resolve!: (value: T) => void;
   let reject!: (error: Error) => void;

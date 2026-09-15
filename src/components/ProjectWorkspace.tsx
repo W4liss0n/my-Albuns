@@ -573,6 +573,8 @@ export function ProjectWorkspace({
     setFrameContextMenu({ kind: "empty", position });
   };
   useProjectCommandShortcuts({
+    selectAllFrames: controller.selectAllFrames,
+    frameSelectionActive: sheetEditing && mediaDrag === null && sheetContextMenu === null && frameContextMenu === null,
     openPhotoInPhotoshop: openFrameInPhotoshop,
     photoCommandActive: selectedPhotoFrame !== null && mediaDrag === null && sheetContextMenu === null && frameContextMenu === null,
     copyFrames: () => { void controller.copyFrames(); },
@@ -601,6 +603,8 @@ export function ProjectWorkspace({
     undo: controller.undo,
   });
   const applicationMenus = createProjectApplicationMenus({
+    selectAllFrames: controller.selectAllFrames,
+    canSelectAllFrames: controller.canSelectAllFrames,
     generateProjects: generationLauncher && !structuralCommandsBlocked ? () => { void openProjectGeneration(generationLauncher, runProjectMutation, changeSessionBarrier).catch(error => reportCloseError(String(error))); } : undefined,
     openSettings: photoshopPort ? () => void photoshop.openSettings("performance") : undefined,
     saveLayout: controller.saveLayout,
