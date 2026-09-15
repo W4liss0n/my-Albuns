@@ -33,6 +33,7 @@ interface ProjectApplicationMenuOptions {
   canAddBefore: boolean;
   canConvertEdge: boolean;
   canDelete: boolean;
+  canDuplicate: boolean;
   canExport: boolean;
   canRedo: boolean;
   canUndo: boolean;
@@ -40,6 +41,7 @@ interface ProjectApplicationMenuOptions {
   closeProject(): void;
   convertEdge(): void;
   deleteSheet(): void;
+  duplicateSheet(): void;
   exportSheet(): void;
   exportAlbum(): void;
   mediaPanelVisible: boolean;
@@ -73,6 +75,7 @@ export function createProjectApplicationMenus({
   canAddBefore,
   canConvertEdge,
   canDelete,
+  canDuplicate,
   canExport,
   canRedo,
   canUndo,
@@ -80,6 +83,7 @@ export function createProjectApplicationMenus({
   closeProject,
   convertEdge,
   deleteSheet,
+  duplicateSheet,
   exportSheet,
   exportAlbum,
   mediaPanelVisible,
@@ -146,7 +150,8 @@ export function createProjectApplicationMenus({
           addSheetAfter,
           structuralCommandsDisabled || !canAddAfter,
         ),
-        placeholder("duplicate-sheet", "sheet"),
+        implemented("duplicate-sheet", "sheet", duplicateSheet,
+          structuralCommandsDisabled || !canDuplicate),
         implemented(
           "delete-sheet",
           "sheet",

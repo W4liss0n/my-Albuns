@@ -80,6 +80,7 @@ pub(crate) async fn apply_project_intent(
         ProjectIntent::SetAlbumDesign { .. } => "set_album_design",
         ProjectIntent::SetDpi { .. } => "set_dpi",
         ProjectIntent::AddSheet { .. } => "add_sheet",
+        ProjectIntent::DuplicateSheet { .. } => "duplicate_sheet",
         ProjectIntent::DeleteSheet { .. } => "delete_sheet",
         ProjectIntent::ConvertEdgeSheet { .. } => "convert_edge_sheet",
         ProjectIntent::ReorderSheet { .. } => "reorder_sheet",

@@ -948,6 +948,9 @@ pub enum ProjectIntent {
         anchor_sheet_id: String,
         position: SheetInsertionPosition,
     },
+    DuplicateSheet {
+        sheet_id: String,
+    },
     DeleteSheet {
         sheet_id: String,
     },
@@ -1111,6 +1114,8 @@ pub enum CoreError {
     SheetNotFound(String),
     #[error("A nova Lâmina não pode ser inserida nessa posição")]
     InvalidSheetInsertion,
+    #[error("Somente Lâminas duplas podem ser duplicadas")]
+    InvalidSheetDuplication,
     #[error("O Álbum precisa manter ao menos duas Lâminas")]
     MinimumSheetCount,
     #[error("Esta Lâmina não é uma extremidade compatível com a conversão")]

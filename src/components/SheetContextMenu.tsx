@@ -21,6 +21,7 @@ interface SheetContextMenuProps {
   onAddBefore(): void;
   onConvertEdge(): void;
   onDelete(): void;
+  onDuplicate(): void;
   onDismiss(): void;
 }
 
@@ -32,6 +33,7 @@ export function SheetContextMenu({
   onAddBefore,
   onConvertEdge,
   onDelete,
+  onDuplicate,
   onDismiss,
 }: SheetContextMenuProps) {
   function invoke(action: () => void) {
@@ -59,10 +61,10 @@ export function SheetContextMenu({
           {sheetCommandLabels.addAfter}
         </button>
         <button
-          disabled
+          disabled={!availability.canDuplicate}
           role="menuitem"
-          title="Ainda não disponível nesta versão"
           type="button"
+          onClick={() => invoke(onDuplicate)}
         >
           {sheetCommandLabels.duplicateSheet}
         </button>

@@ -1545,6 +1545,160 @@ fn processor_exports_local_color_removal_and_restoration_from_reopened_core_proj
 }
 
 #[test]
+fn duplicated_sheet_exports_the_same_pixels_after_reopening_and_shares_originals() {
+    use myalbuns_core::{
+        DecorativeScope, FrameStyleChange, FrameStyleEdit, OpenProjectRequest, PhotoAngleEdit,
+        PhotoOrientationAction, SheetVisualChange,
+    };
+    let root = tempfile::tempdir().unwrap();
+    let photo = root.path().join("photo.png");
+    RgbImage::from_fn(60, 40, |x, y| Rgb([(x * 4) as u8, (y * 6) as u8, 160]))
+        .save(&photo)
+        .unwrap();
+    let decoration = root.path().join("overlay.png");
+    RgbaImage::from_fn(60, 40, |x, y| {
+        Rgba([20, 120, 220, if x < 8 || y < 8 { 90 } else { 0 }])
+    })
+    .save(&decoration)
+    .unwrap();
+    let bytes = [
+        std::fs::read(&photo).unwrap(),
+        std::fs::read(&decoration).unwrap(),
+    ];
+    let path = root.path().join("Duplicado.myalbuns");
+    let location = || {
+        let mut context = OperationPathContext::new();
+        context.capture(&path).unwrap();
+        ProjectLocation::new(path.clone(), context.freeze())
+    };
+    let initial =
+        small_initial_project(100).with_personalization(InitialProjectPersonalization::new(
+            InitialBackground::BothSides {
+                both: InitialBackgroundContent::Color {
+                    rgb: ProjectRgb::parse_canonical("#EEEEDD").unwrap(),
+                },
+            },
+            InitialOverlay::BothSides {
+                both: Some(InitialOverlayContent::Media {
+                    path: decoration.clone(),
+                }),
+            },
+            InitialFrameBorder::None,
+        ));
+    let core = ProjectCore::new()
+        .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"));
+    let mut project = core
+        .create_editable(CreateProjectRequest::new(
+            location(),
+            initial,
+            CreateAuthorization::CreateOnly,
+        ))
+        .unwrap();
+    let imported = project
+        .import_photo(ImportPhoto::new(
+            photo.clone(),
+            PhotoSourceMetadata::new(60, 40, ["#111111", "#888888", "#EEEEEE"].map(String::from))
+                .unwrap(),
+        ))
+        .unwrap();
+    let sheet_id = imported.projection.state.album.sheets[0].id.clone();
+    project
+        .apply(ProjectIntent::AddPhoto {
+            sheet_id: sheet_id.clone(),
+            media_id: imported.media_id,
+            mode: PhotoPlacementMode::Edit,
+        })
+        .unwrap();
+    let frame_id = project.projection().state.album.sheets[0].frames[0]
+        .id
+        .clone();
+    project
+        .apply(ProjectIntent::OrientPhotos {
+            frame_ids: vec![frame_id.clone()],
+            action: PhotoOrientationAction::ToggleHorizontalMirror,
+        })
+        .unwrap();
+    project
+        .apply(ProjectIntent::SetPhotoAngle {
+            edit: PhotoAngleEdit {
+                frame_ids: vec![frame_id.clone()],
+                angle_tenths: 125,
+            },
+        })
+        .unwrap();
+    project
+        .apply(ProjectIntent::SetFrameStyle {
+            edit: FrameStyleEdit {
+                frame_ids: vec![frame_id],
+                change: FrameStyleChange::Opacity {
+                    opacity_percent: 65,
+                },
+            },
+        })
+        .unwrap();
+    project
+        .apply(ProjectIntent::EditSheetVisual {
+            sheet_id: sheet_id.clone(),
+            scope: DecorativeScope::Left,
+            change: SheetVisualChange::BackgroundColor {
+                rgb: "#BBAA88".into(),
+            },
+        })
+        .unwrap();
+    let media = project.projection().state.album.media;
+    let copy_id = project
+        .apply_with_outcome(ProjectIntent::DuplicateSheet {
+            sheet_id: sheet_id.clone(),
+        })
+        .unwrap()
+        .affected_sheet_id
+        .unwrap();
+    project.save(project.revision()).unwrap();
+    drop(project);
+    let project = core
+        .open_editable(OpenProjectRequest::new(location()))
+        .unwrap();
+    assert_eq!(project.projection().state.album.media.len(), media.len());
+    let snapshot = project.render_snapshot();
+    let mut rendered = Vec::new();
+    for (index, id) in [sheet_id, copy_id].iter().enumerate() {
+        let sources = media
+            .iter()
+            .map(|m| {
+                RenderSource::new(
+                    m.id,
+                    if m.kind == MediaKind::Photo {
+                        photo.clone()
+                    } else {
+                        decoration.clone()
+                    },
+                )
+                .unwrap()
+            })
+            .collect();
+        let output = root.path().join(format!("sheet-{index}.jpg"));
+        let request = render_request_for_sheet(
+            snapshot.clone(),
+            id,
+            output.clone(),
+            "duplicate-export",
+            100,
+            sources,
+        );
+        let result = invoke_render_request(&request, None);
+        assert!(
+            result.status.success(),
+            "{}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+        rendered.push(image::open(output).unwrap().to_rgb8());
+    }
+    assert_eq!(rendered[0], rendered[1]);
+    assert_eq!(std::fs::read(photo).unwrap(), bytes[0]);
+    assert_eq!(std::fs::read(decoration).unwrap(), bytes[1]);
+}
+
+#[test]
 fn processor_opens_the_current_original_once_and_classifies_its_content() {
     let source_dir = tempfile::tempdir().expect("temporary source directory");
     let output_dir = tempfile::tempdir().expect("temporary output directory");

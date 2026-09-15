@@ -297,6 +297,45 @@ test.each([true, false])("queues a scoped restoration after pending History with
   expect(apply).toHaveBeenCalledExactlyOnceWith(intent, expect.any(Function));
 });
 
+test.each(["unchanged", "removed", "converted", "failure"] as const)(
+  "revalidates duplication against preceding History (%s)", async (change) => {
+    const initial = createThreeSheetProjection();
+    const target = initial.state.album.sheets[1].id;
+    const afterHistory = structuredClone(initial);
+    afterHistory.state.revision += 1;
+    if (change === "removed") {
+      afterHistory.state.album.sheets.splice(1, 1);
+      afterHistory.composition.sheets.splice(1, 1);
+    } else if (change === "converted") {
+      // A queued history result may restore this identity as a single-page edge.
+      afterHistory.state.album.sheets.splice(2, 1);
+      afterHistory.state.album.sheets[1].activeSides = "left";
+      afterHistory.state.album.sheets[1].role = "final";
+    }
+    const pending = deferredProjection();
+    const apply = vi.fn<ProjectCorePort["apply"]>(async () => afterHistory);
+    const undo = vi.fn<ProjectCorePort["undo"]>(() => pending.promise);
+    const port = projectSessionPort(apply, undo);
+    const view = renderHook(() => {
+      const runner = useProjectMutationRunner(initial.state.projectId, port);
+      return useProjectMutations({ projection: initial, runProjectMutation: runner,
+        onProjectionChange: vi.fn(), onAffectedFrame: vi.fn(), onAffectedSheet: vi.fn() });
+    });
+    act(() => { view.result.current.undo(); });
+    await waitFor(() => expect(undo).toHaveBeenCalledOnce());
+    await act(async () => {
+      const completion = view.result.current.applyWithOutcome({ kind: "duplicateSheet", sheetId: target });
+      expect(apply).not.toHaveBeenCalled();
+      if (change === "failure") pending.reject(new Error("History failed"));
+      else pending.resolve(afterHistory);
+      expect(await completion).toBe(change === "unchanged" || change === "failure");
+    });
+    if (change === "unchanged" || change === "failure") {
+      expect(apply).toHaveBeenCalledExactlyOnceWith({ kind: "duplicateSheet", sheetId: target }, expect.any(Function));
+    } else expect(apply).not.toHaveBeenCalled();
+  },
+);
+
 test("preserves Redo when preceding History already materialized the Album Design target", async () => {
   const pendingUndo = deferredProjection();
   const target = {

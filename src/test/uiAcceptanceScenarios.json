@@ -9767,6 +9767,276 @@
           "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
         }
       ]
+    },
+    {
+      "id": "workspace-sheet-duplication-menu",
+      "title": "Duplicar Lâmina — comando no menu superior",
+      "implementationPath": "/workspace-preview.html?frame=duplication",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-duplication",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A SPEC e o design 0001 definem a duplicação completa, seus alvos, bloqueios e histórico. As composições são geradas pelo comando público do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "#application-menu-sheet [aria-label='Duplicar Lâmina']:not(:disabled)",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "[aria-controls='application-menu-sheet']"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-duplication-bar-menu",
+      "title": "Duplicar Lâmina — menu da Barra",
+      "implementationPath": "/workspace-preview.html?frame=duplication",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-duplication",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A SPEC e o design 0001 definem a duplicação completa, seus alvos, bloqueios e histórico. As composições são geradas pelo comando público do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 600
+      },
+      "readySelector": "[role='menu'][aria-label='Ações da Lâmina 01']",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "context-click",
+          "selector": "[data-reorder-surface='bar'] [data-sheet-id='dup-sheet-1']",
+          "offsetX": -40
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-duplication-upper",
+      "title": "Duplicar Lâmina — cópia centralizada pelo menu superior",
+      "implementationPath": "/workspace-preview.html?frame=duplication",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-duplication",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A SPEC e o design 0001 definem a duplicação completa, seus alvos, bloqueios e histórico. As composições são geradas pelo comando público do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "body[data-duplication-count='3'] .canvas-host[data-centered-sheet-id='dup-sheet-2']",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "[aria-controls='application-menu-sheet']"
+        },
+        {
+          "type": "click",
+          "selector": "#application-menu-sheet [aria-label='Duplicar Lâmina']"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-duplication-bar",
+      "title": "Duplicar Lâmina — cópia pelo alvo da Barra",
+      "implementationPath": "/workspace-preview.html?frame=duplication",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-duplication",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A SPEC e o design 0001 definem a duplicação completa, seus alvos, bloqueios e histórico. As composições são geradas pelo comando público do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 600
+      },
+      "readySelector": "body[data-duplication-count='3'] .canvas-host[data-centered-sheet-id='dup-sheet-2']",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "context-click",
+          "selector": "[data-reorder-surface='bar'] [data-sheet-id='dup-sheet-1']",
+          "offsetX": -40
+        },
+        {
+          "type": "click-text",
+          "text": "Duplicar Lâmina"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-duplication-surface-menu",
+      "title": "Duplicar Lâmina — menu da superfície",
+      "implementationPath": "/workspace-preview.html?frame=duplication",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-duplication",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A SPEC e o design 0001 definem a duplicação completa, seus alvos, bloqueios e histórico. As composições são geradas pelo comando público do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "[role='menu'][aria-label='Ações da Lâmina 01']",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "context-click",
+          "selector": ".canvas-host canvas",
+          "offsetX": -350,
+            "offsetY": 0
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-duplication-single",
+      "title": "Duplicar Lâmina — indisponível na extremidade simples",
+      "implementationPath": "/workspace-preview.html?frame=duplication&duplication-state=single",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-duplication",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A SPEC e o design 0001 definem a duplicação completa, seus alvos, bloqueios e histórico. As composições são geradas pelo comando público do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "#application-menu-sheet [aria-label='Duplicar Lâmina']:disabled",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "[aria-controls='application-menu-sheet']"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-duplication-editing",
+      "title": "Duplicar Lâmina — indisponível durante edição",
+      "implementationPath": "/workspace-preview.html?frame=duplication&mode=edit",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-duplication",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A SPEC e o design 0001 definem a duplicação completa, seus alvos, bloqueios e histórico. As composições são geradas pelo comando público do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "#application-menu-sheet [aria-label='Duplicar Lâmina']:disabled",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "[aria-controls='application-menu-sheet']"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-duplication-history",
+      "title": "Duplicar Lâmina — Desfazer e Refazer",
+      "implementationPath": "/workspace-preview.html?frame=duplication",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-duplication",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A SPEC e o design 0001 definem a duplicação completa, seus alvos, bloqueios e histórico. As composições são geradas pelo comando público do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "body[data-duplication-count='3']",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "[aria-controls='application-menu-sheet']"
+        },
+        {
+          "type": "click",
+          "selector": "#application-menu-sheet [aria-label='Duplicar Lâmina']"
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-duplication-count='3']"
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[aria-label='Desfazer'][role='menuitem']"
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-duplication-count='2']"
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[aria-label='Refazer'][role='menuitem']"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-duplication-reopened",
+      "title": "Duplicar Lâmina — composição reaberta",
+      "implementationPath": "/workspace-preview.html?frame=duplication&duplication-state=reopened",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-duplication",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A SPEC e o design 0001 definem a duplicação completa, seus alvos, bloqueios e histórico. As composições são geradas pelo comando público do Core."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "readySelector": "body[data-duplication-count='3'] .canvas-host canvas",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        }
+      ]
     }
   ]
 }

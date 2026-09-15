@@ -295,11 +295,13 @@ test("maps Sheet structure commands to explicit intents and falls back to the im
   await act(async () => {
     outcomes.push(await view.result.current.addSheetBefore());
     outcomes.push(await view.result.current.addSheetAfter("sheet-002"));
+    outcomes.push(await view.result.current.duplicateSheet());
+    outcomes.push(await view.result.current.duplicateSheet("sheet-002"));
     outcomes.push(await view.result.current.deleteSheet());
     outcomes.push(await view.result.current.reorderSheet("sheet-002", 0));
   });
 
-  expect(outcomes).toEqual([true, true, true, true]);
+  expect(outcomes).toEqual([true, true, true, true, true, true]);
   expect(applyWithOutcome.mock.calls.map(([intent]) => intent)).toEqual([
     {
       kind: "addSheet",
@@ -311,6 +313,8 @@ test("maps Sheet structure commands to explicit intents and falls back to the im
       anchorSheetId: "sheet-002",
       position: "after",
     },
+    { kind: "duplicateSheet", sheetId: "sheet-001" },
+    { kind: "duplicateSheet", sheetId: "sheet-002" },
     { kind: "deleteSheet", sheetId: "sheet-001" },
     { kind: "reorderSheet", sheetId: "sheet-002", targetIndex: 0 },
   ]);
@@ -353,7 +357,7 @@ test.each(["completed", "failed"] as const)(
     let adjacent!: Promise<boolean>;
     act(() => {
       predecessor = view.result.current.deleteSheet("sheet-001");
-      adjacent = view.result.current.addSheetAfter("sheet-001");
+      adjacent = view.result.current.duplicateSheet("sheet-001");
     });
 
     expect(await adjacent).toBe(false);
@@ -380,7 +384,7 @@ test.each(["completed", "failed"] as const)(
   },
 );
 
-test("navigates to a newly affected Sheet after its projection becomes visible", async () => {
+test.each(["addSheetAfter", "duplicateSheet"] as const)("navigates to the affected Sheet after %s becomes visible", async (command) => {
   const projection = createTwoSheetProjection();
   const port = projectCorePort();
   vi.spyOn(port, "applyWithOutcome").mockResolvedValue({
@@ -408,7 +412,7 @@ test("navigates to a newly affected Sheet after its projection becomes visible",
   );
 
   await act(async () => {
-    expect(await view.result.current.addSheetAfter()).toBe(true);
+    expect(await view.result.current[command]()).toBe(true);
   });
   expect(onProjectionChange).toHaveBeenCalledWith(projection);
   expect(useEditorView.getState().centeredSheetId).toBe("sheet-001");
@@ -444,6 +448,7 @@ test("disables structural commands while a Sheet is being edited", async () => {
   await act(async () => {
     expect(await view.result.current.addSheetBefore()).toBe(false);
     expect(await view.result.current.addSheetAfter()).toBe(false);
+    expect(await view.result.current.duplicateSheet()).toBe(false);
     expect(await view.result.current.deleteSheet()).toBe(false);
     expect(await view.result.current.reorderSheet("sheet-001", 0)).toBe(false);
   });

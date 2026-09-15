@@ -42,6 +42,7 @@ import { frameDeletionCorpus } from "./test/frameDeletionPreview";
 import { frameContentSwapCorpus } from "./test/frameContentSwapPreview";
 import { frameClipboardCorpus } from "./test/frameClipboardPreview";
 import { sheetSideSwapCorpus } from "./test/sheetSideSwapPreview";
+import { sheetDuplicationCorpus } from "./test/sheetDuplicationPreview";
 import { photoOrientationCorpus } from "./test/photoOrientationPreview";
 import { frameStyleCorpus } from "./test/frameStylePreview";
 import { decorativeCorpus, decorativePreview, decorativeStateName } from "./test/decorativePreview";
@@ -71,6 +72,7 @@ if ([1, 1.25, 1.5].includes(previewScale)) {
   document.documentElement.dataset.previewScale = String(previewScale);
 }
 const structureContext = previewParameters.get("structure");
+const duplicationStage = previewParameters.get("duplication-state") ?? "before";
 const unavailableDecorativeId = "decorative-preview-unavailable";
 let projection = createPreviewProjection(
   frameContext,
@@ -171,6 +173,13 @@ if (frameContext === "style") {
       : selection === "placeholders" ? frameStyleCorpus.placeholders : frameStyleCorpus.single });
   exposeFrameStyleState();
   useEditorView.subscribe(exposeFrameStyleState);
+}
+if (frameContext === "duplication") {
+  const sheetId = projection.state.album.sheets[0].id;
+  useEditorView.setState({ projectId: projection.state.projectId,
+    editingSheetId: previewParameters.get("mode") === "edit" ? sheetId : null,
+    centeredSheetId: sheetId, focusedSheetId: sheetId, selectedFrameIds: [] });
+  exposeSheetDuplicationState();
 }
 
 const projectCorePort: ProjectCorePort = {
@@ -284,9 +293,9 @@ const mediaPreviewPort: MediaPreviewPort = {
       mediaId: projection.state.album.media[0].id, state: "absent" as const,
       url: previewParameters.get("cache") === "retained" ? retainedPhotoPreview : null,
     }] :
-    frameContext === "decorations" ? projection.state.album.media.map((media, index) => ({
+    frameContext === "decorations" || frameContext === "duplication" ? projection.state.album.media.map((media, index) => ({
       mediaId: media.id, state: "ready" as const,
-      url: `data:image/svg+xml,${encodeURIComponent(index === 2
+      url: `data:image/svg+xml,${encodeURIComponent(index === 2 || (frameContext === "duplication" && media.kind === "decorative")
         ? '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="300"><path fill="#dbad45" fill-opacity=".65" d="M0 0h600v24H0zM0 276h600v24H0zM0 0h24v300H0zM576 0h24v300h-24z"/><circle cx="300" cy="150" r="75" fill="#247580" fill-opacity=".4"/></svg>'
         : '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="300"><path fill="#d97e63" d="M0 0h300v300H0z"/><path fill="#557f98" d="M300 0h300v300H300z"/><circle cx="150" cy="150" r="85" fill="#f7c988"/><path fill="#b2d6cd" d="m450 55 95 190H355z"/></svg>')}`,
     })) :
@@ -404,6 +413,11 @@ function createPreviewProjection(
   decorativeMode: string | null,
   structureMode: string | null,
 ): EditorProjection {
+  if (frameMode === "duplication") {
+    const sample = duplicationStage === "single" ? sheetDuplicationCorpus.single
+      : duplicationStage === "reopened" ? sheetDuplicationCorpus.reopened : sheetDuplicationCorpus.before;
+    return structuredClone(sample);
+  }
   if (frameMode === "decorations") return structuredClone(decorativeCorpus.states[previewParameters.get("decoration-state") ?? "whole"]);
   if (frameMode === "layouts") {
     const stage = previewParameters.get("layout-state");
@@ -544,6 +558,15 @@ function configurePhysicalPreview(
 }
 
 function applyPreviewIntent(intent: ProjectIntent): ProjectMutationOutcome {
+  if (intent.kind === "duplicateSheet") {
+    if (frameContext !== "duplication" || intent.sheetId !== sheetDuplicationCorpus.before.state.album.sheets[0].id ||
+      JSON.stringify(projection.state.album) !== JSON.stringify(sheetDuplicationCorpus.before.state.album)) {
+      throw new Error("Duplicação fora do corpus do Core.");
+    }
+    projection = finalizePhysicalPreviewMutation(structuredClone(sheetDuplicationCorpus.after), structuredClone(projection));
+    exposeSheetDuplicationState();
+    return { ...sheetDuplicationCorpus.outcome, projection };
+  }
   if (intent.kind === "editSheetVisual") {
     const sample = decorativeCorpus.transitions.find((item) => item.from === decorativeStateName(projection) &&
       item.intent.kind === intent.kind && item.intent.sheetId === intent.sheetId && item.intent.scope === intent.scope &&
@@ -872,7 +895,12 @@ function restorePreviewHistory(
   if (frameContext === "side-swap") exposeSheetSideSwapState();
   if (frameContext === "orientation") exposePhotoOrientationState();
   if (frameContext === "style") exposeFrameStyleState();
+  if (frameContext === "duplication") exposeSheetDuplicationState();
   return projection;
+}
+
+function exposeSheetDuplicationState() {
+  document.body.dataset.duplicationCount = String(projection.state.album.sheets.length);
 }
 
 function exposeManualFrameState() {

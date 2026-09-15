@@ -6,7 +6,7 @@ import type {
 export type SheetStructureIntent = Extract<
   ProjectIntent,
   {
-    kind: "addSheet" | "convertEdgeSheet" | "deleteSheet" | "reorderSheet";
+    kind: "addSheet" | "duplicateSheet" | "convertEdgeSheet" | "deleteSheet" | "reorderSheet";
   }
 >;
 
@@ -15,6 +15,7 @@ export interface SheetStructureAvailability {
   canAddBefore: boolean;
   canConvertEdge: boolean;
   canDelete: boolean;
+  canDuplicate: boolean;
 }
 
 export interface SheetReorderPlan {
@@ -36,6 +37,7 @@ export function sheetStructureAvailability(
       canAddBefore: false,
       canConvertEdge: false,
       canDelete: false,
+      canDuplicate: false,
     };
   }
   const sheet = sheets[index];
@@ -46,6 +48,7 @@ export function sheetStructureAvailability(
     canConvertEdge:
       index === 0 || index === sheets.length - 1,
     canDelete: sheets.length > 2,
+    canDuplicate: sheet.activeSides === "both",
   };
 }
 
@@ -98,6 +101,7 @@ export function isSheetStructureIntent(
 ): intent is SheetStructureIntent {
   return (
     intent.kind === "addSheet" ||
+    intent.kind === "duplicateSheet" ||
     intent.kind === "convertEdgeSheet" ||
     intent.kind === "deleteSheet" ||
     intent.kind === "reorderSheet"
@@ -137,6 +141,9 @@ export function materializeSheetStructureIntent(
   }
   if (intent.kind === "deleteSheet") {
     return availability.canDelete ? intent : null;
+  }
+  if (intent.kind === "duplicateSheet") {
+    return availability.canDuplicate ? intent : null;
   }
   return availability.canConvertEdge ? intent : null;
 }

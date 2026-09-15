@@ -668,6 +668,28 @@ impl ProjectDocument {
         Ok((candidate, sheet_id))
     }
 
+    pub(crate) fn with_duplicated_sheet(&self, sheet_id: Uuid) -> Result<(Self, Uuid), ()> {
+        let index = self
+            .sheets
+            .iter()
+            .position(|sheet| sheet.id == sheet_id)
+            .ok_or(())?;
+        let source = &self.sheets[index];
+        if source.active_sides != ActiveSides::Both {
+            return Err(());
+        }
+        let mut copy = source.clone();
+        copy.id = Uuid::new_v4();
+        for frame in &mut copy.frames {
+            frame.id = Uuid::new_v4();
+        }
+        let copy_id = copy.id;
+        let mut candidate = self.clone();
+        candidate.sheets.insert(index + 1, copy);
+        validate_project_state(&candidate)?;
+        Ok((candidate, copy_id))
+    }
+
     pub(crate) fn with_deleted_sheet(&self, sheet_id: Uuid) -> Result<(Self, Uuid), ()> {
         let mut candidate = self.clone();
         if candidate.sheets.len() <= 2 {
