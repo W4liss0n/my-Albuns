@@ -1620,7 +1620,11 @@ async fn listen_for_forwarded_activations(app: AppHandle, state: GlobalRuntimeSt
         if batch.new_project {
             state.cancel_requested_exit();
             let sequence = state.new_project_requests.fetch_add(1, Ordering::AcqRel) + 1;
-            let _ = app.emit_to(GLOBAL_WINDOW_LABEL, "myalbuns://new-project-requested", sequence);
+            let _ = app.emit_to(
+                GLOBAL_WINDOW_LABEL,
+                "myalbuns://new-project-requested",
+                sequence,
+            );
             show_existing_global_window(&app);
         }
         let outcome = if batch.projects.is_empty() {

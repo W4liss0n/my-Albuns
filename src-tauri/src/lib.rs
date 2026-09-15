@@ -15,6 +15,7 @@ mod dev_host_registration;
 mod dev_job;
 #[cfg(debug_assertions)]
 mod dev_supervisor_protocol;
+mod editor_project_launcher;
 mod export_attempts;
 mod export_commands;
 mod export_media;
@@ -22,7 +23,6 @@ mod export_pipeline;
 mod generation_operation;
 mod generation_runner;
 mod generation_window;
-mod editor_project_launcher;
 mod global_activation;
 mod global_runtime;
 mod graphics_launch_gate;
