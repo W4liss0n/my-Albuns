@@ -5,6 +5,8 @@
       "description": "Allows only the application commands used by local Janelas de Projeto.",
       "commands": {
         "allow": [
+          "new_project_from_editor",
+          "open_project_from_editor",
           "open_project_generation",
           "storage_recovery_status",
           "clear_storage_recovery_cache",

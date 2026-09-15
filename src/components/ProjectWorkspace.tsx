@@ -39,6 +39,7 @@ import {
 } from "./InspectorPanel";
 import { MediaPanel, type MediaPanelHandle } from "./MediaPanel";
 import { createProjectApplicationMenus } from "./projectApplicationMenus";
+import { useProjectLauncher } from "./useProjectLauncher";
 import { useProjectCommandShortcuts } from "./useProjectCommandShortcuts";
 import { useProjectCloseController } from "./useProjectCloseController";
 import { useProjectEditorController } from "./useProjectEditorController";
@@ -73,6 +74,7 @@ import {
 interface ProjectWorkspaceProps {
   exportMediaPort?: import("../application/exportMedia").ExportMediaPort;
   photoshopPort?: import("../application/photoshop").PhotoshopPort;
+  projectLauncher?: import("../application/projectLauncher").ProjectLauncher;
   generationLauncher?: import("../application/projectGeneration").ProjectGenerationLauncher;
   mediaDropPort?: import("../application/projectPorts").MediaDropPort;
   projection: EditorProjection;
@@ -98,6 +100,7 @@ interface ProjectWorkspaceProps {
 const SHEET_EDITING_MEDIA_PANEL_HEIGHT = 120;
 
 export function ProjectWorkspace({
+  projectLauncher,
   generationLauncher,
   exportMediaPort,
   photoshopPort,
@@ -572,7 +575,9 @@ export function ProjectWorkspace({
     if (!controller.canAddFrame || commandsBlocked || canvasMode.kind !== "sheet-editing" || canvasMode.sheetId !== sheetId) return;
     setFrameContextMenu({ kind: "empty", position });
   };
+  const launchProject = useProjectLauncher(projectLauncher, commandsBlocked || mediaDrag !== null, reportCloseError);
   useProjectCommandShortcuts({
+    ...launchProject,
     selectAllFrames: controller.selectAllFrames,
     frameSelectionActive: sheetEditing && mediaDrag === null && sheetContextMenu === null && frameContextMenu === null,
     openPhotoInPhotoshop: openFrameInPhotoshop,
@@ -603,6 +608,7 @@ export function ProjectWorkspace({
     undo: controller.undo,
   });
   const applicationMenus = createProjectApplicationMenus({
+    ...launchProject,
     selectAllFrames: controller.selectAllFrames,
     canSelectAllFrames: controller.canSelectAllFrames,
     generateProjects: generationLauncher && !structuralCommandsBlocked ? () => { void openProjectGeneration(generationLauncher, runProjectMutation, changeSessionBarrier).catch(error => reportCloseError(String(error))); } : undefined,

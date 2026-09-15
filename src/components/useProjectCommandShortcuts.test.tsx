@@ -502,3 +502,21 @@ test("keeps blocked and unavailable Project commands inactive", () => {
   expect(blockedActions.undo).not.toHaveBeenCalled();
   expect(blockedActions.redo).not.toHaveBeenCalled();
 });
+
+
+test.each([["n", "newProject"], ["o", "openProject"]] as const)("routes Ctrl+%s only once and respects focused controls and modal barriers", (key, name) => {
+  const actions = { ...handlers(), newProject: vi.fn(), openProject: vi.fn() };
+  const { rerender } = renderHook(({ disabled }) => useProjectCommandShortcuts({ ...actions, canUndo: true, canRedo: true, disabled }), { initialProps: { disabled: false } });
+  expect(dispatchShortcut(key).defaultPrevented).toBe(true);
+  dispatchShortcut(key, { repeat: true });
+  for (const role of ["input", "dialog", "menu", "listbox"]) {
+    const target = document.createElement(role === "input" ? "input" : "div");
+    if (role !== "input") target.setAttribute("role", role);
+    document.body.appendChild(target);
+    expect(dispatchShortcut(key, {}, target).defaultPrevented).toBe(false);
+    target.remove();
+  }
+  rerender({ disabled: true });
+  dispatchShortcut(key);
+  expect(actions[name]).toHaveBeenCalledOnce();
+});

@@ -384,6 +384,10 @@ const workspacePreferencesPort = createPreviewWorkspacePreferencesPort(
 );
 
 const appProps = {
+  projectLauncher: {
+    newProject: async () => { document.documentElement.dataset.projectLaunch = "new"; },
+    openProject: async () => { document.documentElement.dataset.projectLaunch = "open"; },
+  },
   photoshopPort: previewParameters.has("photoshop") ? photoshopProjectPreview(previewParameters.get("photoshop")) : undefined,
   canvasGraphicsDiagnosticProbe,
   exportPipelinePort,

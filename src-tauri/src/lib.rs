@@ -22,6 +22,7 @@ mod export_pipeline;
 mod generation_operation;
 mod generation_runner;
 mod generation_window;
+mod editor_project_launcher;
 mod global_activation;
 mod global_runtime;
 mod graphics_launch_gate;
@@ -118,6 +119,7 @@ fn run_selected_runtime_role() -> Result<(), Box<dyn std::error::Error>> {
         runtime_role::RuntimeRole::Global { direct_projects } => global_runtime::run(
             direct_projects,
             runtime_role::settings_request(std::env::args_os()),
+            runtime_role::new_project_request(std::env::args_os()),
         ),
         runtime_role::RuntimeRole::ProjectHost => run_project_host(),
     }
@@ -371,6 +373,12 @@ mod tests {
         );
         let global_commands = allowed_commands(&global_permission);
         let project_commands = allowed_commands(&project_permission);
+        for command in ["new_project_from_editor", "open_project_from_editor"] {
+            assert!(project_commands.contains(command));
+            assert!(!global_commands.contains(command));
+        }
+        assert!(global_commands.contains("latest_new_project_request"));
+        assert!(!project_commands.contains("latest_new_project_request"));
         for command in [
             "create_project",
             "validate_project_configuration",

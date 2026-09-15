@@ -2,7 +2,7 @@ use std::{
     path::PathBuf,
     sync::{
         Arc, Mutex,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
     time::Duration,
 };
@@ -20,7 +20,7 @@ use crate::{
     desktop_webview_policy,
     global_activation::{
         GlobalActivationEntry, PrimaryGlobalActivation, enter_global_activation,
-        enter_global_activation_with_settings,
+        enter_global_activation_with_request, enter_global_activation_with_settings,
     },
     graphics_launch_gate::{
         GRAPHICS_GATE_TIMEOUT, GraphicsGateCompletion, GraphicsGateReport, GraphicsLaunchGate,
@@ -164,6 +164,7 @@ struct GlobalRuntimeState {
     recent_projects: RecentProjectsStore,
     startup_failure: Arc<Mutex<Option<ProjectLaunchFailure>>>,
     activation_terminals: GlobalActivationTerminalStore,
+    new_project_requests: Arc<AtomicU64>,
     scheduled_cleanup: ScheduledCleanupGate,
     global_activation: Option<Arc<PrimaryGlobalActivation>>,
     project_launches: GlobalProjectLaunchCoordinator,
@@ -191,6 +192,7 @@ impl GlobalRuntimeState {
             startup_failure: Arc::new(Mutex::new(None)),
             activation_terminals: GlobalActivationTerminalStore::default(),
             scheduled_cleanup: ScheduledCleanupGate::default(),
+            new_project_requests: Arc::new(AtomicU64::new(0)),
             global_activation,
             project_launches: GlobalProjectLaunchCoordinator::default(),
             exit_requested: Arc::new(AtomicBool::new(false)),
@@ -408,6 +410,16 @@ async fn complete_graphics_gate(
         }
         GraphicsGateCompletion::Ready(_) | GraphicsGateCompletion::AlreadyFinal => None,
     }
+}
+
+#[tauri::command]
+fn latest_new_project_request(app: AppHandle, window: WebviewWindow) -> u64 {
+    if window.label() != GLOBAL_WINDOW_LABEL {
+        return 0;
+    }
+    app.state::<GlobalRuntimeState>()
+        .new_project_requests
+        .load(Ordering::Acquire)
 }
 
 #[tauri::command]
@@ -1483,6 +1495,7 @@ fn staged_failure(
 fn build_global_window(
     app: &AppHandle,
     webview_data_directory: PathBuf,
+    new_project: bool,
 ) -> Result<
     (
         WebviewWindow,
@@ -1497,13 +1510,17 @@ fn build_global_window(
         .iter()
         .find(|window| window.label == GLOBAL_WINDOW_LABEL)
         .ok_or_else(|| std::io::Error::other("the Global window configuration does not exist"))?;
+    let mut config = config.clone();
+    if new_project {
+        config.url = tauri::WebviewUrl::App("global.html?surface=newProject".into());
+    }
     #[cfg(debug_assertions)]
     let arguments = desktop_webview_policy::global_webview_debug_arguments()?;
     #[cfg(not(debug_assertions))]
     let arguments: Option<String> = None;
     let (policy_signal, policy_readiness) =
         desktop_webview_policy::page_load_handshake(arguments.as_deref());
-    let builder = WebviewWindowBuilder::from_config(app, config)
+    let builder = WebviewWindowBuilder::from_config(app, &config)
         .map_err(std::io::Error::other)?
         .data_directory(webview_data_directory);
     #[cfg(debug_assertions)]
@@ -1522,6 +1539,7 @@ fn build_global_window(
 
 fn show_existing_global_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(GLOBAL_WINDOW_LABEL) {
+        let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();
     }
@@ -1598,6 +1616,12 @@ async fn listen_for_forwarded_activations(app: AppHandle, state: GlobalRuntimeSt
                 primary.complete_activation();
                 continue;
             }
+        }
+        if batch.new_project {
+            state.cancel_requested_exit();
+            let sequence = state.new_project_requests.fetch_add(1, Ordering::AcqRel) + 1;
+            let _ = app.emit_to(GLOBAL_WINDOW_LABEL, "myalbuns://new-project-requested", sequence);
+            show_existing_global_window(&app);
         }
         let outcome = if batch.projects.is_empty() {
             None
@@ -1931,9 +1955,12 @@ pub(crate) fn webdriver_automation_project() -> Option<PathBuf> {
 pub(crate) fn run(
     direct_projects: Vec<PathBuf>,
     settings: Option<crate::ipc_contract::SettingsSection>,
+    new_project: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let app_paths = AppPaths::discover()?;
-    let activation = if settings.is_some() {
+    let activation = if new_project {
+        enter_global_activation_with_request(&app_paths, direct_projects, settings, true)
+    } else if settings.is_some() {
         enter_global_activation_with_settings(&app_paths, direct_projects, settings)
     } else {
         enter_global_activation(&app_paths, direct_projects)
@@ -1990,6 +2017,10 @@ pub(crate) fn run(
             let (window, policy_readiness) = build_global_window(
                 &app_handle,
                 setup_state.global_webview_data_directory.clone(),
+                setup_state
+                    .global_activation
+                    .as_ref()
+                    .is_some_and(|activation| activation.initial_new_project()),
             )?;
             #[cfg(debug_assertions)]
             desktop_webview_policy::retire_inherited_debug_arguments_before_replacement()?;
@@ -2026,6 +2057,7 @@ pub(crate) fn run(
             crate::batch_window::batch_result_ready,
             crate::batch_window::execution::batch_run,
             complete_graphics_gate,
+            latest_new_project_request,
             crate::settings_window::open_application_settings,
             crate::settings_window::close_application_settings,
             crate::photoshop::commands::photoshop_status,

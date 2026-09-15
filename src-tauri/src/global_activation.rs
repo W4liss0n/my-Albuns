@@ -42,11 +42,13 @@ pub(crate) struct GlobalActivationBatch {
     pub(crate) client: ProcessInstanceId,
     pub(crate) projects: Vec<PathBuf>,
     pub(crate) settings: Option<SettingsSection>,
+    pub(crate) new_project: bool,
 }
 
 pub(crate) struct PrimaryGlobalActivation {
     initial_projects: Vec<PathBuf>,
     initial_settings: Option<SettingsSection>,
+    initial_new_project: bool,
     receiver: Mutex<Receiver<GlobalActivationBatch>>,
     flow: Arc<ActivationFlow>,
     _server: ActivationServer,
@@ -54,6 +56,10 @@ pub(crate) struct PrimaryGlobalActivation {
 }
 
 impl PrimaryGlobalActivation {
+    pub(crate) fn initial_new_project(&self) -> bool {
+        self.initial_new_project
+    }
+
     pub(crate) fn initial_settings(&self) -> Option<SettingsSection> {
         self.initial_settings
     }
@@ -100,6 +106,8 @@ struct ActivationRequest {
     projects: Vec<NativePathDto>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     settings: Option<SettingsSection>,
+    #[serde(default)]
+    new_project: bool,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -208,6 +216,15 @@ pub(crate) fn enter_global_activation_with_settings(
     projects: Vec<PathBuf>,
     settings: Option<SettingsSection>,
 ) -> io::Result<GlobalActivationEntry> {
+    enter_global_activation_with_request(app_paths, projects, settings, false)
+}
+
+pub(crate) fn enter_global_activation_with_request(
+    app_paths: &AppPaths,
+    projects: Vec<PathBuf>,
+    settings: Option<SettingsSection>,
+    new_project: bool,
+) -> io::Result<GlobalActivationEntry> {
     validate_projects(&projects)?;
     let pipe_name = pipe_name(app_paths)?;
     let mutex = NamedMutex::scoped(
@@ -227,6 +244,7 @@ pub(crate) fn enter_global_activation_with_settings(
                 return Ok(GlobalActivationEntry::Primary(PrimaryGlobalActivation {
                     initial_projects: projects,
                     initial_settings: settings,
+                    initial_new_project: new_project,
                     receiver: Mutex::new(receiver),
                     flow,
                     _server: server,
@@ -241,7 +259,7 @@ pub(crate) fn enter_global_activation_with_settings(
                         "a instância primária não concluiu a ativação no prazo",
                     ));
                 }
-                match forward_activation(&pipe_name, &projects, settings, remaining) {
+                match forward_activation(&pipe_name, &projects, settings, new_project, remaining) {
                     Ok(true) => return Ok(GlobalActivationEntry::Forwarded),
                     Ok(false) | Err(_) if Instant::now() < deadline => {
                         thread::sleep(Duration::from_millis(10));
@@ -427,6 +445,7 @@ fn receive_verified_batch(pipe: &File) -> io::Result<VerifiedActivation> {
             client: request.client,
             projects,
             settings: request.settings,
+            new_project: request.new_project,
         },
         _client_guard: client_guard,
     })
@@ -436,6 +455,7 @@ fn forward_activation(
     pipe_name: &[u16],
     projects: &[PathBuf],
     settings: Option<SettingsSection>,
+    new_project: bool,
     timeout: Duration,
 ) -> io::Result<bool> {
     let pipe = connect_pipe(pipe_name, timeout)?;
@@ -449,6 +469,7 @@ fn forward_activation(
         version: PROTOCOL_VERSION,
         client: ProcessInstanceId::current()?,
         settings,
+        new_project,
         projects: projects
             .iter()
             .map(|path| NativePathDto::from(path.as_path()))
@@ -772,6 +793,31 @@ mod tests {
     }
 
     #[test]
+    fn new_project_activation_survives_startup_and_forwarding_without_project_paths() {
+        let root = tempfile::tempdir().unwrap();
+        let paths = AppPaths::from_roots(&root.path().join("roaming"), &root.path().join("local"));
+        let GlobalActivationEntry::Primary(primary) =
+            super::enter_global_activation_with_request(&paths, vec![], None, true).unwrap()
+        else {
+            panic!("first global");
+        };
+        assert!(primary.initial_new_project());
+        assert!(primary.initial_projects().is_empty());
+        let forwarded = std::thread::spawn(move || {
+            super::enter_global_activation_with_request(&paths, vec![], None, true)
+        });
+        let batch = primary.receive_timeout(Duration::from_secs(5)).unwrap();
+        assert!(batch.new_project);
+        assert!(batch.projects.is_empty());
+        assert_eq!(batch.settings, None);
+        assert!(matches!(
+            forwarded.join().unwrap().unwrap(),
+            GlobalActivationEntry::Forwarded
+        ));
+        assert!(!primary.complete_activation());
+    }
+
+    #[test]
     fn settings_activation_reuses_the_global_and_preserves_the_requested_section() {
         use super::enter_global_activation_with_settings;
         use crate::ipc_contract::SettingsSection;
@@ -799,6 +845,7 @@ mod tests {
         });
         let batch = primary.receive_timeout(Duration::from_secs(5)).unwrap();
         assert_eq!(batch.settings, Some(SettingsSection::Photoshop));
+        assert!(!batch.new_project);
         assert!(batch.projects.is_empty());
         assert!(matches!(
             forwarder.join().unwrap().unwrap(),

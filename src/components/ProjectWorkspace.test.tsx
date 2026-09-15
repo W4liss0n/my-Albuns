@@ -882,10 +882,7 @@ test("presents the canonical desktop menus and marks unfinished commands", () =>
   expect(getApplicationCommand("Arquivo", "Salvar")).toBeEnabled();
   const newProject = getApplicationCommand("Arquivo", "Novo Projeto…");
   expect(newProject).toBeDisabled();
-  expect(newProject).toHaveAttribute(
-    "data-placeholder-feature",
-    "new-project-from-project-window",
-  );
+  expect(newProject).not.toHaveAttribute("data-placeholder-feature");
 
   expect(getApplicationCommand("Editar", "Adicionar Frame")).toBeDisabled();
   expect(getApplicationCommand("Editar", "Copiar")).toBeDisabled();
@@ -6964,4 +6961,23 @@ test.each([
   await waitFor(() => expect(dialog.dismiss).toHaveBeenCalled());
   expect(onProjectionChange).toHaveBeenCalledExactlyOnceWith(projection);
   expect(port.save).toHaveBeenCalledOnce();
+});
+
+
+test.each(["menu", "shortcut"])("New and Open from %s preserve the active Project and editor selection", async (source) => {
+  const launch = { newProject: vi.fn(async () => undefined), openProject: vi.fn(async () => undefined) };
+  const apply = vi.fn(async () => projection);
+  const update = vi.fn();
+  render(<ProjectWorkspace projection={projection} projectCorePort={projectCorePortWithApply(apply)}
+    projectLauncher={launch} onProjectionChange={update} />);
+  const view = useEditorView.getState();
+  for (const [key, label, method] of [["n", "Novo Projeto…", "newProject"], ["o", "Abrir Projeto…", "openProject"]] as const) {
+    if (source === "menu") fireEvent.click(getApplicationCommand("Arquivo", label));
+    else fireEvent.keyDown(window, { key, ctrlKey: true });
+    await waitFor(() => expect(launch[method]).toHaveBeenCalledOnce());
+  }
+  expect(apply).not.toHaveBeenCalled();
+  expect(update).not.toHaveBeenCalled();
+  expect(useEditorView.getState().focusedSheetId).toBe(view.focusedSheetId);
+  expect(useEditorView.getState().selectedFrameIds).toEqual(view.selectedFrameIds);
 });

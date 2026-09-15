@@ -37,6 +37,8 @@ import {
 } from "../ui";
 
 interface GlobalShellProps {
+  initialSurface?: "welcome" | "newProject";
+  onNewProjectRequest?(listener: () => void): Promise<() => void>;
   onOpenBatch?(): Promise<void>;
   onOpenSettings?(): Promise<void>;
   failureDialogPort: ProjectFailureDialogPort;
@@ -49,6 +51,8 @@ const recentCoverVariants = [1, 2, 1, 3, 4, 1, 2] as const;
 const portraitCoverIndexes = new Set([1, 4, 6]);
 
 export function GlobalShell({
+  initialSurface = "welcome",
+  onNewProjectRequest,
   onOpenSettings,
   onOpenBatch,
   failureDialogPort,
@@ -59,7 +63,7 @@ export function GlobalShell({
   const [isOpening, setIsOpening] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [surface, setSurface] = useState<"welcome" | "newProject">(
-    "welcome",
+    initialSurface,
   );
   const [recentProjects, setRecentProjects] = useState<
     readonly RecentProjectSummary[]
@@ -174,6 +178,22 @@ export function GlobalShell({
     openingAttempt.current += 1;
     setSurface("newProject");
   }, []);
+
+  useEffect(() => {
+    if (!onNewProjectRequest) return;
+    let active = true;
+    let unlisten: (() => void) | undefined;
+    void onNewProjectRequest(() => { if (active) startCreation(); })
+      .then((release) => { if (active) unlisten = release; else release(); })
+      .catch(() => {
+        if (active) void failureDialogPort.present({ context: "projectCreation", error: {
+          code: "new_project_activation_unavailable",
+          message: "Não foi possível receber o pedido de Novo Projeto.",
+          action: "Use Novo Projeto nesta janela ou tente novamente.",
+        } });
+      });
+    return () => { active = false; unlisten?.(); };
+  }, [onNewProjectRequest, startCreation, failureDialogPort]);
 
   const cancelCreation = useCallback(() => {
     void newProjectPort.clearProvisionalDecoratives();

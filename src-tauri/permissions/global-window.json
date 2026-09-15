@@ -6,6 +6,7 @@
       "commands": {
         "allow": [
           "complete_graphics_gate",
+          "latest_new_project_request",
           "open_batch_export",
           "batch_recoveries",
           "open_application_settings",
