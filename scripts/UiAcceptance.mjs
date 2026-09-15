@@ -14,6 +14,7 @@ const supportedKeys = new Set([
   "Space",
   "Tab",
   "Digit0",
+  "KeyA",
   "KeyC",
   "KeyV",
   "Minus",

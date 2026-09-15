@@ -251,7 +251,7 @@ Encaixe assistido que iguala a distância entre Frames a uma distância de refer
 Distância física padrão entre Frames adotada por um Projeto.
 
 **Caixa de seleção**:
-Gesto de arrastar sobre a área vazia de uma superfície para selecionar todos os elementos contidos no retângulo resultante.
+Gesto de arrastar sobre a área vazia do Canvas no Modo de edição para selecionar os Frames tocados pelo retângulo resultante. Inclui interseções parciais; `Ctrl` acrescenta à seleção anterior. Não se aplica ao modo normal nem ao Painel de imagens.
 _Evitar_: Seleção por arrasto, laço
 
 **Troca de lados**:

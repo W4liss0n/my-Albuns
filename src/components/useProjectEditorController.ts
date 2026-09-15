@@ -135,6 +135,17 @@ export function useProjectEditorController({
   const editingSheetLocked = canvasMode.kind === "sheet-editing" &&
     projection.state.album.sheets.find((sheet) => sheet.id === canvasMode.sheetId)?.layoutLocked === true;
   const canAddFrame = canvasMode.kind === "sheet-editing" && !editingSheetLocked && !interactionBlocked;
+  const canSelectAllFrames = canvasMode.kind === "sheet-editing" && !interactionBlocked &&
+    projection.state.album.sheets.some((sheet) => sheet.id === canvasMode.sheetId && sheet.frames.length > 0);
+  const selectFrames = (frameIds: readonly string[]) => {
+    if (canvasMode.kind !== "sheet-editing" || interactionBlocked) return;
+    const sheet = projection.state.album.sheets.find((item) => item.id === canvasMode.sheetId);
+    useEditorView.getState().selectFrames(sheet?.frames.filter((frame) => frameIds.includes(frame.id)).map((frame) => frame.id) ?? []);
+  };
+  const selectAllFrames = () => {
+    if (!canSelectAllFrames || canvasMode.kind !== "sheet-editing") return;
+    selectFrames(projection.state.album.sheets.find((sheet) => sheet.id === canvasMode.sheetId)!.frames.map((frame) => frame.id));
+  };
   const addFrame = () => {
     if (!canAddFrame || canvasMode.kind !== "sheet-editing") return Promise.resolve(false);
     return mutations.applyWithOutcome({ kind: "addFrame", sheetId: canvasMode.sheetId });
@@ -345,6 +356,7 @@ export function useProjectEditorController({
       onError: reportInteractionError,
     },
     onSelectFrame: navigation.selectFrame,
+    onSelectFrames: selectFrames,
     onEditSheet: enterSheetEditing,
     onFocusSheet: navigation.focusSheet,
     onCenteredSheetChange: navigation.centerSheet,
@@ -458,6 +470,8 @@ export function useProjectEditorController({
     togglePhotoBlackAndWhite,
     addFrame,
     canAddFrame,
+    canSelectAllFrames,
+    selectAllFrames,
     canDeleteFrames,
     canCopyFrames,
     canPasteFrames,
