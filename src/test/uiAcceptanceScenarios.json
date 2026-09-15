@@ -10174,8 +10174,12 @@
         {
           "type": "pointer-click",
           "selector": ".canvas-host canvas",
-          "offsetX": 800,
-          "offsetY": 100
+          "offsetX": 0,
+          "offsetY": -200
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-clipboard-selection=\"\"]"
         },
         {
           "type": "key",
@@ -10184,6 +10188,10 @@
         {
           "type": "key",
           "key": "Enter"
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-clipboard-editing-sheet=\"sheet-002\"]"
         },
         {
           "type": "click-text",
