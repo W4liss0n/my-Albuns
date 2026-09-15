@@ -10086,12 +10086,12 @@
     {
       "id": "workspace-frame-clipboard-normal-paste",
       "title": "Copiar e colar Frames — grupo colado em outra Lâmina no Modo normal",
-      "implementationPath": "/workspace-preview.html?frame=clipboard&clipboard=other-double",
+      "implementationPath": "/workspace-preview.html?frame=clipboard&clipboard=normal-other-double",
       "comparison": {
         "kind": "implementation-only",
         "surface": "frame-clipboard",
         "implementationCaptureSelector": ".app-shell",
-        "reason": "Decisão do usuário: a área de transferência continua disponível entre os modos. O Modo normal cola o grupo na Lâmina centralizada sem seleção anterior e seleciona somente o último Frame criado."
+        "reason": "Decisão do usuário: a área de transferência continua disponível entre os modos. O Modo normal cola o grupo na Lâmina centralizada sem seleção anterior e reorganiza seu Layout automaticamente, selecionando somente o último Frame criado."
       },
       "viewport": {
         "width": 1567,
@@ -10125,6 +10125,122 @@
         {
           "type": "key",
           "key": "ArrowRight"
+        },
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "KeyV",
+          "modifiers": [
+            "Control"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-clipboard-normal-same",
+      "title": "Copiar e colar Frames — reorganização na mesma Lâmina no Modo normal",
+      "implementationPath": "/workspace-preview.html?frame=clipboard&clipboard=normal-same-single",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-clipboard",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Decisão do usuário: a colagem no Modo normal adiciona o Frame e reorganiza todos os Frames da Lâmina, sem conservar a posição da cópia."
+      },
+      "viewport": {
+        "width": 1567,
+        "height": 900
+      },
+      "readySelector": "body[data-clipboard-count=\"9\"][data-clipboard-selection=\"pasted-frame-0\"][data-clipboard-editing-sheet=\"none\"]",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "KeyC",
+          "modifiers": [
+            "Control"
+          ]
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-clipboard-available=\"true\"]"
+        },
+        {
+          "type": "key",
+          "key": "Escape"
+        },
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "KeyV",
+          "modifiers": [
+            "Control"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-clipboard-normal-single-page",
+      "title": "Copiar e colar Frames — Layout reorganizado em Página única no Modo normal",
+      "implementationPath": "/workspace-preview.html?frame=clipboard&clipboard=normal-double-right",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-clipboard",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Decisão do usuário: colar um grupo no Modo normal reorganiza todos os Frames dentro da Página ativa, preservando Fotos e placeholders."
+      },
+      "viewport": {
+        "width": 1567,
+        "height": 900
+      },
+      "readySelector": "body[data-clipboard-count=\"10\"][data-clipboard-selection=\"pasted-frame-1\"][data-clipboard-editing-sheet=\"none\"]",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "KeyC",
+          "modifiers": [
+            "Control"
+          ]
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-clipboard-available=\"true\"]"
+        },
+        {
+          "type": "key",
+          "key": "Escape"
+        },
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "ArrowLeft"
         },
         {
           "type": "focus",

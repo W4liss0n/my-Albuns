@@ -685,7 +685,7 @@ function applyPreviewIntent(intent: ProjectIntent): ProjectMutationOutcome {
     return { projection, affectedFrameId: null, affectedSheetId: null };
   }
   if (intent.kind === "pasteFrames") {
-    if (frameContext !== "clipboard" || !projection.canPasteFrames || intent.sheetId !== frameClipboardCase.targetSheetId ||
+    if (frameContext !== "clipboard" || !projection.canPasteFrames || intent.sheetId !== frameClipboardCase.targetSheetId || intent.mode !== frameClipboardCase.mode ||
         (frameClipboardCase.sourceSheetId === frameClipboardCase.targetSheetId && intent.desiredOffsetUm !== frameClipboardCase.desiredOffsetUm)) {
       throw new Error("Destino fora do cenário de colagem desta prévia.");
     }

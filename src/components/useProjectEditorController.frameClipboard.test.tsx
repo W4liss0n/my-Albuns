@@ -21,7 +21,8 @@ function deferred<T>() {
 function harness(name = "same-group", mode: "edit" | "normal" = "edit", locked = false) {
   const initial = structuredClone(corpus.before);
   const copied = structuredClone(corpus.copied);
-  const scenario = corpus.cases.find((item) => item.name === name)!;
+  const caseName = mode === "normal" && name === "same-single" ? "normal-same-single" : name;
+  const scenario = corpus.cases.find((item) => item.name === caseName)!;
   initial.state.album.sheets.find((sheet) => sheet.id === scenario.sourceSheetId)!.layoutLocked = locked;
   copied.state.album.sheets.find((sheet) => sheet.id === scenario.sourceSheetId)!.layoutLocked = locked;
   const pasted = structuredClone(scenario.after);
@@ -78,7 +79,7 @@ test.each((["edit", "normal"] as const).flatMap((mode) =>
   });
   expect(h.apply.mock.calls[0][0]).toEqual({ kind: "copyFrames", frameIds: h.scenario.selectedFrameIds });
   if (result !== "copy-failure") {
-    expect(h.applyWithOutcome.mock.calls[0][0]).toEqual({ kind: "pasteFrames", sheetId: h.scenario.targetSheetId, desiredOffsetUm: 8000 });
+    expect(h.applyWithOutcome.mock.calls[0][0]).toEqual({ kind: "pasteFrames", sheetId: h.scenario.targetSheetId, desiredOffsetUm: mode === "edit" ? 8000 : 0, mode });
     expect(h.view.result.current.projection.state).toEqual(h.initial.state);
     expect(h.view.result.current.canPasteFrames).toBe(true);
   }
@@ -176,13 +177,13 @@ test("normal Copy/Paste targets the selected Frame's Sheet even when another She
     h.pendingPaste.resolve({ projection: h.pasted, affectedFrameId: null, affectedSheetId: null, affectedFrameIds: h.scenario.pastedFrameIds });
     await pasted;
   });
-  expect(h.applyWithOutcome.mock.calls[0][0]).toMatchObject({ sheetId: "sheet-002" });
+  expect(h.applyWithOutcome.mock.calls[0][0]).toMatchObject({ sheetId: "sheet-002", mode: "normal" });
   expect(useEditorView.getState().selectedFrameIds).toEqual(["pasted-frame-0"]);
   expect(useEditorView.getState().editingSheetId).toBeNull();
 });
 
 test("a group copied in Edit Mode can be pasted into the centered Sheet in Normal Mode with single selection", async () => {
-  const h = harness("other-double");
+  const h = harness("normal-other-double");
   await act(async () => {
     const copied = h.view.result.current.copyFrames();
     h.pendingCopy.resolve(h.copied);
@@ -199,7 +200,7 @@ test("a group copied in Edit Mode can be pasted into the centered Sheet in Norma
     h.pendingPaste.resolve({ projection: h.pasted, affectedFrameId: null, affectedSheetId: null, affectedFrameIds: h.scenario.pastedFrameIds });
     await pasted;
   });
-  expect(h.applyWithOutcome.mock.calls[0][0]).toMatchObject({ sheetId: "sheet-003" });
+  expect(h.applyWithOutcome.mock.calls[0][0]).toMatchObject({ sheetId: "sheet-003", mode: "normal" });
   expect(useEditorView.getState().selectedFrameIds).toEqual(["pasted-frame-1"]);
   expect(h.view.result.current.projection.state.album).toEqual(h.pasted.state.album);
   expect(useEditorView.getState().editingSheetId).toBeNull();

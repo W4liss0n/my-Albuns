@@ -10,6 +10,7 @@ import type {
   EditorProjection,
   FrameGeometryEdit,
   PhotoOrientationAction,
+  PhotoPlacementMode,
   PhotoAngleEdit,
   FrameStyleEdit,
   ProjectIntent,
@@ -188,12 +189,12 @@ export function useProjectMutations({
     }
   }
 
-  function pasteFrames(sheetId: string, desiredOffsetUm: number, selectPasted: (ids: string[], next: EditorProjection) => void) {
+  function pasteFrames(sheetId: string, desiredOffsetUm: number, mode: PhotoPlacementMode, selectPasted: (ids: string[], next: EditorProjection) => void) {
     let ids: string[] = [];
     return runWithErrorFeedback(async (port, latestProjection) => {
       const current = latestProjection ?? projection;
       if (!current.canPasteFrames) return current;
-      const result = await imageProcessing.run((publish) => port.applyWithOutcome({ kind: "pasteFrames", sheetId, desiredOffsetUm }, publish));
+      const result = await imageProcessing.run((publish) => port.applyWithOutcome({ kind: "pasteFrames", sheetId, desiredOffsetUm, mode }, publish));
       ids = result.affectedFrameIds ?? [];
       return result.projection;
     }, true, (next) => { if (ids.length > 0) selectPasted(ids, next); });

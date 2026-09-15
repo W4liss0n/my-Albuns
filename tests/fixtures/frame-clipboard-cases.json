@@ -1786,6 +1786,7 @@
         }
       },
       "desiredOffsetUm": 8000,
+      "mode": "edit",
       "name": "same-group",
       "pastedFrameIds": [
         "pasted-frame-0",
@@ -2729,6 +2730,7 @@
         }
       },
       "desiredOffsetUm": 8000,
+      "mode": "edit",
       "name": "same-single",
       "pastedFrameIds": [
         "pasted-frame-0"
@@ -3703,6 +3705,7 @@
         }
       },
       "desiredOffsetUm": 8000,
+      "mode": "edit",
       "name": "other-double",
       "pastedFrameIds": [
         "pasted-frame-0",
@@ -4679,6 +4682,7 @@
         }
       },
       "desiredOffsetUm": 8000,
+      "mode": "edit",
       "name": "double-right",
       "pastedFrameIds": [
         "pasted-frame-0",
@@ -5655,6 +5659,7 @@
         }
       },
       "desiredOffsetUm": 8000,
+      "mode": "edit",
       "name": "double-left",
       "pastedFrameIds": [
         "pasted-frame-0",
@@ -6631,6 +6636,7 @@
         }
       },
       "desiredOffsetUm": 8000,
+      "mode": "edit",
       "name": "right-double",
       "pastedFrameIds": [
         "pasted-frame-0",
@@ -7607,6 +7613,7 @@
         }
       },
       "desiredOffsetUm": 8000,
+      "mode": "edit",
       "name": "left-double",
       "pastedFrameIds": [
         "pasted-frame-0",
@@ -10227,6 +10234,7 @@
         }
       },
       "desiredOffsetUm": 8000,
+      "mode": "edit",
       "name": "same-no-offset",
       "pastedFrameIds": [
         "pasted-frame-0",
@@ -10237,6 +10245,3879 @@
         "clipboard-frame-1-1"
       ],
       "sourceSheetId": "sheet-002",
+      "targetSheetId": "sheet-002"
+    },
+    {
+      "after": {
+        "canPasteFrames": true,
+        "composition": {
+          "frameBorder": {
+            "kind": "none"
+          },
+          "sheets": [
+            {
+              "activeSides": "right",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 300000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 300000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 80000,
+                    "width": 120000,
+                    "x": 45000,
+                    "y": 110000
+                  },
+                  "frameId": "clipboard-frame-0-0",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 120000,
+                      "width": 180000,
+                      "x": 21000,
+                      "y": 88000
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000001",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#173B4B",
+                      "#84AAA7",
+                      "#E7C58B"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 200.0,
+                      "current": {
+                        "center": {
+                          "x": 66000.00008940697,
+                          "y": 37999.99997019768
+                        },
+                        "size": {
+                          "height": 120000.0,
+                          "width": 180000.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.20000000298023224,
+                        "y": -0.10000000149011612
+                      },
+                      "currentZoom": 1.5,
+                      "panOrigin": {
+                        "x": 60000.0,
+                        "y": 40000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 30000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 20000.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 60000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 40000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 80000.0,
+                        "width": 120000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 80000,
+                    "width": 120000,
+                    "x": 135000,
+                    "y": 110000
+                  },
+                  "frameId": "clipboard-frame-0-1",
+                  "opacityByte": 255,
+                  "photo": null,
+                  "zIndex": 1
+                }
+              ],
+              "heightUm": 300000,
+              "number": 1,
+              "overlays": [],
+              "sheetId": "sheet-001",
+              "widthUm": 300000
+            },
+            {
+              "activeSides": "both",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 270000,
+                    "width": 376667,
+                    "x": 208333,
+                    "y": 15000
+                  },
+                  "frameId": "clipboard-frame-1-0",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 405000,
+                      "width": 607500,
+                      "x": 116000,
+                      "y": -59250
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000001",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#173B4B",
+                      "#84AAA7",
+                      "#E7C58B"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 675.0,
+                      "current": {
+                        "center": {
+                          "x": 211416.80034396797,
+                          "y": 128249.99989941716
+                        },
+                        "size": {
+                          "height": 405000.0,
+                          "width": 607500.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.20000000298023224,
+                        "y": -0.10000000149011612
+                      },
+                      "currentZoom": 1.5,
+                      "panOrigin": {
+                        "x": 188333.5,
+                        "y": 135000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 115416.5,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 67500.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 202500.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 135000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 270000.0,
+                        "width": 405000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 132500,
+                    "width": 188333,
+                    "x": 15000,
+                    "y": 15000
+                  },
+                  "frameId": "clipboard-frame-1-1",
+                  "opacityByte": 255,
+                  "photo": null,
+                  "zIndex": 1
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 132500,
+                    "width": 188333,
+                    "x": 15000,
+                    "y": 152500
+                  },
+                  "frameId": "pasted-frame-0",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 198750,
+                      "width": 298125,
+                      "x": -28917,
+                      "y": 116062
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000001",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#173B4B",
+                      "#84AAA7",
+                      "#E7C58B"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 331.25,
+                      "current": {
+                        "center": {
+                          "x": 105145.70016360284,
+                          "y": 62937.4999506399
+                        },
+                        "size": {
+                          "height": 198750.0,
+                          "width": 298125.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.20000000298023224,
+                        "y": -0.10000000149011612
+                      },
+                      "currentZoom": 1.5,
+                      "panOrigin": {
+                        "x": 94166.5,
+                        "y": 66250.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 54896.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 33125.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 99375.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 66250.0
+                      },
+                      "sizePerZoom": {
+                        "height": 132500.0,
+                        "width": 198750.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 2
+                }
+              ],
+              "heightUm": 300000,
+              "number": 2,
+              "overlays": [],
+              "sheetId": "sheet-002",
+              "widthUm": 600000
+            },
+            {
+              "activeSides": "both",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 160000,
+                    "width": 240000,
+                    "x": 135000,
+                    "y": 70000
+                  },
+                  "frameId": "clipboard-frame-2-0",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 240000,
+                      "width": 360000,
+                      "x": 87000,
+                      "y": 26000
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000001",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#173B4B",
+                      "#84AAA7",
+                      "#E7C58B"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 400.0,
+                      "current": {
+                        "center": {
+                          "x": 132000.00017881393,
+                          "y": 75999.99994039536
+                        },
+                        "size": {
+                          "height": 240000.0,
+                          "width": 360000.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.20000000298023224,
+                        "y": -0.10000000149011612
+                      },
+                      "currentZoom": 1.5,
+                      "panOrigin": {
+                        "x": 120000.0,
+                        "y": 80000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 60000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 40000.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 120000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 80000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 160000.0,
+                        "width": 240000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 160000,
+                    "width": 240000,
+                    "x": 225000,
+                    "y": 70000
+                  },
+                  "frameId": "clipboard-frame-2-1",
+                  "opacityByte": 255,
+                  "photo": null,
+                  "zIndex": 1
+                }
+              ],
+              "heightUm": 300000,
+              "number": 3,
+              "overlays": [],
+              "sheetId": "sheet-003",
+              "widthUm": 600000
+            },
+            {
+              "activeSides": "left",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 300000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 300000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 80000,
+                    "width": 120000,
+                    "x": 45000,
+                    "y": 110000
+                  },
+                  "frameId": "clipboard-frame-3-0",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 120000,
+                      "width": 180000,
+                      "x": 21000,
+                      "y": 88000
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000001",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#173B4B",
+                      "#84AAA7",
+                      "#E7C58B"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 200.0,
+                      "current": {
+                        "center": {
+                          "x": 66000.00008940697,
+                          "y": 37999.99997019768
+                        },
+                        "size": {
+                          "height": 120000.0,
+                          "width": 180000.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.20000000298023224,
+                        "y": -0.10000000149011612
+                      },
+                      "currentZoom": 1.5,
+                      "panOrigin": {
+                        "x": 60000.0,
+                        "y": 40000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 30000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 20000.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 60000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 40000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 80000.0,
+                        "width": 120000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 80000,
+                    "width": 120000,
+                    "x": 135000,
+                    "y": 110000
+                  },
+                  "frameId": "clipboard-frame-3-1",
+                  "opacityByte": 255,
+                  "photo": null,
+                  "zIndex": 1
+                }
+              ],
+              "heightUm": 300000,
+              "number": 4,
+              "overlays": [],
+              "sheetId": "sheet-004",
+              "widthUm": 300000
+            }
+          ]
+        },
+        "mediaUsage": [
+          {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 0,
+              "backgrounds": 0,
+              "frames": 5,
+              "overlays": 0
+            },
+            "count": 5,
+            "mediaId": "00000000-0000-4000-8000-000000000001"
+          }
+        ],
+        "state": {
+          "album": {
+            "media": [
+              {
+                "id": "00000000-0000-4000-8000-000000000001",
+                "kind": "photo",
+                "name": "Foto.jpg",
+                "palette": [
+                  "#173B4B",
+                  "#84AAA7",
+                  "#E7C58B"
+                ],
+                "sourceHeightPx": 400,
+                "sourceWidthPx": 600
+              }
+            ],
+            "sheets": [
+              {
+                "activeSides": "right",
+                "frames": [
+                  {
+                    "id": "clipboard-frame-0-0",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000001",
+                      "transform": {
+                        "blackAndWhite": false,
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": 0.20000000298023224,
+                        "panY": -0.10000000149011612,
+                        "quarterTurns": 0,
+                        "userZoom": 1.5
+                      }
+                    },
+                    "rect": {
+                      "height": 80000,
+                      "width": 120000,
+                      "x": 45000,
+                      "y": 110000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 0
+                  },
+                  {
+                    "id": "clipboard-frame-0-1",
+                    "photo": null,
+                    "rect": {
+                      "height": 80000,
+                      "width": 120000,
+                      "x": 135000,
+                      "y": 110000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 1
+                  }
+                ],
+                "heightUm": 300000,
+                "id": "sheet-001",
+                "layoutLocked": false,
+                "number": 1,
+                "pageNumbers": [
+                  1
+                ],
+                "role": "initial",
+                "widthUm": 600000
+              },
+              {
+                "activeSides": "both",
+                "frames": [
+                  {
+                    "id": "clipboard-frame-1-0",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000001",
+                      "transform": {
+                        "blackAndWhite": false,
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": 0.20000000298023224,
+                        "panY": -0.10000000149011612,
+                        "quarterTurns": 0,
+                        "userZoom": 1.5
+                      }
+                    },
+                    "rect": {
+                      "height": 270000,
+                      "width": 376667,
+                      "x": 208333,
+                      "y": 15000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 0
+                  },
+                  {
+                    "id": "clipboard-frame-1-1",
+                    "photo": null,
+                    "rect": {
+                      "height": 132500,
+                      "width": 188333,
+                      "x": 15000,
+                      "y": 15000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 1
+                  },
+                  {
+                    "id": "pasted-frame-0",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000001",
+                      "transform": {
+                        "blackAndWhite": false,
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": 0.20000000298023224,
+                        "panY": -0.10000000149011612,
+                        "quarterTurns": 0,
+                        "userZoom": 1.5
+                      }
+                    },
+                    "rect": {
+                      "height": 132500,
+                      "width": 188333,
+                      "x": 15000,
+                      "y": 152500
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 2
+                  }
+                ],
+                "heightUm": 300000,
+                "id": "sheet-002",
+                "layoutLocked": false,
+                "number": 2,
+                "pageNumbers": [
+                  2,
+                  3
+                ],
+                "role": "internal",
+                "widthUm": 600000
+              },
+              {
+                "activeSides": "both",
+                "frames": [
+                  {
+                    "id": "clipboard-frame-2-0",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000001",
+                      "transform": {
+                        "blackAndWhite": false,
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": 0.20000000298023224,
+                        "panY": -0.10000000149011612,
+                        "quarterTurns": 0,
+                        "userZoom": 1.5
+                      }
+                    },
+                    "rect": {
+                      "height": 160000,
+                      "width": 240000,
+                      "x": 135000,
+                      "y": 70000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 0
+                  },
+                  {
+                    "id": "clipboard-frame-2-1",
+                    "photo": null,
+                    "rect": {
+                      "height": 160000,
+                      "width": 240000,
+                      "x": 225000,
+                      "y": 70000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 1
+                  }
+                ],
+                "heightUm": 300000,
+                "id": "sheet-003",
+                "layoutLocked": false,
+                "number": 3,
+                "pageNumbers": [
+                  4,
+                  5
+                ],
+                "role": "internal",
+                "widthUm": 600000
+              },
+              {
+                "activeSides": "left",
+                "frames": [
+                  {
+                    "id": "clipboard-frame-3-0",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000001",
+                      "transform": {
+                        "blackAndWhite": false,
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": 0.20000000298023224,
+                        "panY": -0.10000000149011612,
+                        "quarterTurns": 0,
+                        "userZoom": 1.5
+                      }
+                    },
+                    "rect": {
+                      "height": 80000,
+                      "width": 120000,
+                      "x": 45000,
+                      "y": 110000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 0
+                  },
+                  {
+                    "id": "clipboard-frame-3-1",
+                    "photo": null,
+                    "rect": {
+                      "height": 80000,
+                      "width": 120000,
+                      "x": 135000,
+                      "y": 110000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 1
+                  }
+                ],
+                "heightUm": 300000,
+                "id": "sheet-004",
+                "layoutLocked": false,
+                "number": 4,
+                "pageNumbers": [
+                  6
+                ],
+                "role": "final",
+                "widthUm": 600000
+              }
+            ],
+            "visualDefaults": {
+              "background": {
+                "both": {
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                },
+                "scope": "bothSides"
+              },
+              "frameBorder": {
+                "kind": "none"
+              },
+              "overlay": {
+                "both": null,
+                "scope": "bothSides"
+              }
+            }
+          },
+          "canRedo": false,
+          "canUndo": true,
+          "dirty": true,
+          "document": {
+            "bleedUm": 3000,
+            "displayUnit": "mm",
+            "dpi": 300,
+            "safetyUm": 3000,
+            "sheetHeightUm": 300000,
+            "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
+          "projectId": "frame-clipboard-project",
+          "projectName": "Clipboard",
+          "revision": 26,
+          "savedRevision": 25
+        }
+      },
+      "desiredOffsetUm": 0,
+      "mode": "normal",
+      "name": "normal-same-single",
+      "pastedFrameIds": [
+        "pasted-frame-0"
+      ],
+      "selectedFrameIds": [
+        "clipboard-frame-1-0"
+      ],
+      "sourceSheetId": "sheet-002",
+      "targetSheetId": "sheet-002"
+    },
+    {
+      "after": {
+        "canPasteFrames": true,
+        "composition": {
+          "frameBorder": {
+            "kind": "none"
+          },
+          "sheets": [
+            {
+              "activeSides": "right",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 300000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 300000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 80000,
+                    "width": 120000,
+                    "x": 45000,
+                    "y": 110000
+                  },
+                  "frameId": "clipboard-frame-0-0",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 120000,
+                      "width": 180000,
+                      "x": 21000,
+                      "y": 88000
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000001",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#173B4B",
+                      "#84AAA7",
+                      "#E7C58B"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 200.0,
+                      "current": {
+                        "center": {
+                          "x": 66000.00008940697,
+                          "y": 37999.99997019768
+                        },
+                        "size": {
+                          "height": 120000.0,
+                          "width": 180000.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.20000000298023224,
+                        "y": -0.10000000149011612
+                      },
+                      "currentZoom": 1.5,
+                      "panOrigin": {
+                        "x": 60000.0,
+                        "y": 40000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 30000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 20000.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 60000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 40000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 80000.0,
+                        "width": 120000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 80000,
+                    "width": 120000,
+                    "x": 135000,
+                    "y": 110000
+                  },
+                  "frameId": "clipboard-frame-0-1",
+                  "opacityByte": 255,
+                  "photo": null,
+                  "zIndex": 1
+                }
+              ],
+              "heightUm": 300000,
+              "number": 1,
+              "overlays": [],
+              "sheetId": "sheet-001",
+              "widthUm": 300000
+            },
+            {
+              "activeSides": "both",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 160000,
+                    "width": 240000,
+                    "x": 135000,
+                    "y": 70000
+                  },
+                  "frameId": "clipboard-frame-1-0",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 240000,
+                      "width": 360000,
+                      "x": 87000,
+                      "y": 26000
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000001",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#173B4B",
+                      "#84AAA7",
+                      "#E7C58B"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 400.0,
+                      "current": {
+                        "center": {
+                          "x": 132000.00017881393,
+                          "y": 75999.99994039536
+                        },
+                        "size": {
+                          "height": 240000.0,
+                          "width": 360000.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.20000000298023224,
+                        "y": -0.10000000149011612
+                      },
+                      "currentZoom": 1.5,
+                      "panOrigin": {
+                        "x": 120000.0,
+                        "y": 80000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 60000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 40000.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 120000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 80000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 160000.0,
+                        "width": 240000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 160000,
+                    "width": 240000,
+                    "x": 225000,
+                    "y": 70000
+                  },
+                  "frameId": "clipboard-frame-1-1",
+                  "opacityByte": 255,
+                  "photo": null,
+                  "zIndex": 1
+                }
+              ],
+              "heightUm": 300000,
+              "number": 2,
+              "overlays": [],
+              "sheetId": "sheet-002",
+              "widthUm": 600000
+            },
+            {
+              "activeSides": "both",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 180000,
+                    "width": 270000,
+                    "x": 15000,
+                    "y": 60000
+                  },
+                  "frameId": "clipboard-frame-2-0",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 270000,
+                      "width": 405000,
+                      "x": -39000,
+                      "y": 10500
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000001",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#173B4B",
+                      "#84AAA7",
+                      "#E7C58B"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 450.0,
+                      "current": {
+                        "center": {
+                          "x": 148500.00020116568,
+                          "y": 85499.99993294477
+                        },
+                        "size": {
+                          "height": 270000.0,
+                          "width": 405000.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.20000000298023224,
+                        "y": -0.10000000149011612
+                      },
+                      "currentZoom": 1.5,
+                      "panOrigin": {
+                        "x": 135000.0,
+                        "y": 90000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 67500.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 45000.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 135000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 90000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 180000.0,
+                        "width": 270000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 176667,
+                    "width": 270000,
+                    "x": 315000,
+                    "y": 108333
+                  },
+                  "frameId": "clipboard-frame-2-1",
+                  "opacityByte": 255,
+                  "photo": null,
+                  "zIndex": 1
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 88333,
+                    "width": 132500,
+                    "x": 315000,
+                    "y": 15000
+                  },
+                  "frameId": "pasted-frame-0",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 132500,
+                      "width": 198750,
+                      "x": 288500,
+                      "y": -9292
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000001",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#173B4B",
+                      "#84AAA7",
+                      "#E7C58B"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 220.83333333333337,
+                      "current": {
+                        "center": {
+                          "x": 72875.0000987202,
+                          "y": 41958.14996709302
+                        },
+                        "size": {
+                          "height": 132500.0,
+                          "width": 198750.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.20000000298023224,
+                        "y": -0.10000000149011612
+                      },
+                      "currentZoom": 1.5,
+                      "panOrigin": {
+                        "x": 66250.0,
+                        "y": 44166.5
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 33125.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 22083.5
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 66250.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 44166.66666666667
+                      },
+                      "sizePerZoom": {
+                        "height": 88333.33333333334,
+                        "width": 132500.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 2
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 88333,
+                    "width": 132500,
+                    "x": 452500,
+                    "y": 15000
+                  },
+                  "frameId": "pasted-frame-1",
+                  "opacityByte": 255,
+                  "photo": null,
+                  "zIndex": 3
+                }
+              ],
+              "heightUm": 300000,
+              "number": 3,
+              "overlays": [],
+              "sheetId": "sheet-003",
+              "widthUm": 600000
+            },
+            {
+              "activeSides": "left",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 300000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 300000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 80000,
+                    "width": 120000,
+                    "x": 45000,
+                    "y": 110000
+                  },
+                  "frameId": "clipboard-frame-3-0",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 120000,
+                      "width": 180000,
+                      "x": 21000,
+                      "y": 88000
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000001",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#173B4B",
+                      "#84AAA7",
+                      "#E7C58B"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 200.0,
+                      "current": {
+                        "center": {
+                          "x": 66000.00008940697,
+                          "y": 37999.99997019768
+                        },
+                        "size": {
+                          "height": 120000.0,
+                          "width": 180000.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.20000000298023224,
+                        "y": -0.10000000149011612
+                      },
+                      "currentZoom": 1.5,
+                      "panOrigin": {
+                        "x": 60000.0,
+                        "y": 40000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 30000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 20000.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 60000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 40000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 80000.0,
+                        "width": 120000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 80000,
+                    "width": 120000,
+                    "x": 135000,
+                    "y": 110000
+                  },
+                  "frameId": "clipboard-frame-3-1",
+                  "opacityByte": 255,
+                  "photo": null,
+                  "zIndex": 1
+                }
+              ],
+              "heightUm": 300000,
+              "number": 4,
+              "overlays": [],
+              "sheetId": "sheet-004",
+              "widthUm": 300000
+            }
+          ]
+        },
+        "mediaUsage": [
+          {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 0,
+              "backgrounds": 0,
+              "frames": 5,
+              "overlays": 0
+            },
+            "count": 5,
+            "mediaId": "00000000-0000-4000-8000-000000000001"
+          }
+        ],
+        "state": {
+          "album": {
+            "media": [
+              {
+                "id": "00000000-0000-4000-8000-000000000001",
+                "kind": "photo",
+                "name": "Foto.jpg",
+                "palette": [
+                  "#173B4B",
+                  "#84AAA7",
+                  "#E7C58B"
+                ],
+                "sourceHeightPx": 400,
+                "sourceWidthPx": 600
+              }
+            ],
+            "sheets": [
+              {
+                "activeSides": "right",
+                "frames": [
+                  {
+                    "id": "clipboard-frame-0-0",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000001",
+                      "transform": {
+                        "blackAndWhite": false,
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": 0.20000000298023224,
+                        "panY": -0.10000000149011612,
+                        "quarterTurns": 0,
+                        "userZoom": 1.5
+                      }
+                    },
+                    "rect": {
+                      "height": 80000,
+                      "width": 120000,
+                      "x": 45000,
+                      "y": 110000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 0
+                  },
+                  {
+                    "id": "clipboard-frame-0-1",
+                    "photo": null,
+                    "rect": {
+                      "height": 80000,
+                      "width": 120000,
+                      "x": 135000,
+                      "y": 110000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 1
+                  }
+                ],
+                "heightUm": 300000,
+                "id": "sheet-001",
+                "layoutLocked": false,
+                "number": 1,
+                "pageNumbers": [
+                  1
+                ],
+                "role": "initial",
+                "widthUm": 600000
+              },
+              {
+                "activeSides": "both",
+                "frames": [
+                  {
+                    "id": "clipboard-frame-1-0",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000001",
+                      "transform": {
+                        "blackAndWhite": false,
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": 0.20000000298023224,
+                        "panY": -0.10000000149011612,
+                        "quarterTurns": 0,
+                        "userZoom": 1.5
+                      }
+                    },
+                    "rect": {
+                      "height": 160000,
+                      "width": 240000,
+                      "x": 135000,
+                      "y": 70000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 0
+                  },
+                  {
+                    "id": "clipboard-frame-1-1",
+                    "photo": null,
+                    "rect": {
+                      "height": 160000,
+                      "width": 240000,
+                      "x": 225000,
+                      "y": 70000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 1
+                  }
+                ],
+                "heightUm": 300000,
+                "id": "sheet-002",
+                "layoutLocked": false,
+                "number": 2,
+                "pageNumbers": [
+                  2,
+                  3
+                ],
+                "role": "internal",
+                "widthUm": 600000
+              },
+              {
+                "activeSides": "both",
+                "frames": [
+                  {
+                    "id": "clipboard-frame-2-0",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000001",
+                      "transform": {
+                        "blackAndWhite": false,
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": 0.20000000298023224,
+                        "panY": -0.10000000149011612,
+                        "quarterTurns": 0,
+                        "userZoom": 1.5
+                      }
+                    },
+                    "rect": {
+                      "height": 180000,
+                      "width": 270000,
+                      "x": 15000,
+                      "y": 60000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 0
+                  },
+                  {
+                    "id": "clipboard-frame-2-1",
+                    "photo": null,
+                    "rect": {
+                      "height": 176667,
+                      "width": 270000,
+                      "x": 315000,
+                      "y": 108333
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 1
+                  },
+                  {
+                    "id": "pasted-frame-0",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000001",
+                      "transform": {
+                        "blackAndWhite": false,
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": 0.20000000298023224,
+                        "panY": -0.10000000149011612,
+                        "quarterTurns": 0,
+                        "userZoom": 1.5
+                      }
+                    },
+                    "rect": {
+                      "height": 88333,
+                      "width": 132500,
+                      "x": 315000,
+                      "y": 15000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 2
+                  },
+                  {
+                    "id": "pasted-frame-1",
+                    "photo": null,
+                    "rect": {
+                      "height": 88333,
+                      "width": 132500,
+                      "x": 452500,
+                      "y": 15000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 3
+                  }
+                ],
+                "heightUm": 300000,
+                "id": "sheet-003",
+                "layoutLocked": false,
+                "number": 3,
+                "pageNumbers": [
+                  4,
+                  5
+                ],
+                "role": "internal",
+                "widthUm": 600000
+              },
+              {
+                "activeSides": "left",
+                "frames": [
+                  {
+                    "id": "clipboard-frame-3-0",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000001",
+                      "transform": {
+                        "blackAndWhite": false,
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": 0.20000000298023224,
+                        "panY": -0.10000000149011612,
+                        "quarterTurns": 0,
+                        "userZoom": 1.5
+                      }
+                    },
+                    "rect": {
+                      "height": 80000,
+                      "width": 120000,
+                      "x": 45000,
+                      "y": 110000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 0
+                  },
+                  {
+                    "id": "clipboard-frame-3-1",
+                    "photo": null,
+                    "rect": {
+                      "height": 80000,
+                      "width": 120000,
+                      "x": 135000,
+                      "y": 110000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 1
+                  }
+                ],
+                "heightUm": 300000,
+                "id": "sheet-004",
+                "layoutLocked": false,
+                "number": 4,
+                "pageNumbers": [
+                  6
+                ],
+                "role": "final",
+                "widthUm": 600000
+              }
+            ],
+            "visualDefaults": {
+              "background": {
+                "both": {
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                },
+                "scope": "bothSides"
+              },
+              "frameBorder": {
+                "kind": "none"
+              },
+              "overlay": {
+                "both": null,
+                "scope": "bothSides"
+              }
+            }
+          },
+          "canRedo": false,
+          "canUndo": true,
+          "dirty": true,
+          "document": {
+            "bleedUm": 3000,
+            "displayUnit": "mm",
+            "dpi": 300,
+            "safetyUm": 3000,
+            "sheetHeightUm": 300000,
+            "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
+          "projectId": "frame-clipboard-project",
+          "projectName": "Clipboard",
+          "revision": 26,
+          "savedRevision": 25
+        }
+      },
+      "desiredOffsetUm": 0,
+      "mode": "normal",
+      "name": "normal-other-double",
+      "pastedFrameIds": [
+        "pasted-frame-0",
+        "pasted-frame-1"
+      ],
+      "selectedFrameIds": [
+        "clipboard-frame-1-0",
+        "clipboard-frame-1-1"
+      ],
+      "sourceSheetId": "sheet-002",
+      "targetSheetId": "sheet-003"
+    },
+    {
+      "after": {
+        "canPasteFrames": true,
+        "composition": {
+          "frameBorder": {
+            "kind": "none"
+          },
+          "sheets": [
+            {
+              "activeSides": "right",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 300000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 300000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 135000,
+                    "width": 135000,
+                    "x": 10000,
+                    "y": 10000
+                  },
+                  "frameId": "clipboard-frame-0-0",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 202500,
+                      "width": 303750,
+                      "x": -57500,
+                      "y": -27125
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000001",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#173B4B",
+                      "#84AAA7",
+                      "#E7C58B"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 337.5,
+                      "current": {
+                        "center": {
+                          "x": 84375.0002514571,
+                          "y": 64124.99994970858
+                        },
+                        "size": {
+                          "height": 202500.0,
+                          "width": 303750.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.20000000298023224,
+                        "y": -0.10000000149011612
+                      },
+                      "currentZoom": 1.5,
+                      "panOrigin": {
+                        "x": 67500.0,
+                        "y": 67500.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 84375.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 33750.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 101250.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 67500.0
+                      },
+                      "sizePerZoom": {
+                        "height": 135000.0,
+                        "width": 202500.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 135000,
+                    "width": 135000,
+                    "x": 155000,
+                    "y": 10000
+                  },
+                  "frameId": "clipboard-frame-0-1",
+                  "opacityByte": 255,
+                  "photo": null,
+                  "zIndex": 1
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 135000,
+                    "width": 135000,
+                    "x": 10000,
+                    "y": 155000
+                  },
+                  "frameId": "pasted-frame-0",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 202500,
+                      "width": 303750,
+                      "x": -57500,
+                      "y": 117875
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000001",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#173B4B",
+                      "#84AAA7",
+                      "#E7C58B"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 337.5,
+                      "current": {
+                        "center": {
+                          "x": 84375.0002514571,
+                          "y": 64124.99994970858
+                        },
+                        "size": {
+                          "height": 202500.0,
+                          "width": 303750.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.20000000298023224,
+                        "y": -0.10000000149011612
+                      },
+                      "currentZoom": 1.5,
+                      "panOrigin": {
+                        "x": 67500.0,
+                        "y": 67500.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 84375.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 33750.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 101250.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 67500.0
+                      },
+                      "sizePerZoom": {
+                        "height": 135000.0,
+                        "width": 202500.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 2
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 135000,
+                    "width": 135000,
+                    "x": 155000,
+                    "y": 155000
+                  },
+                  "frameId": "pasted-frame-1",
+                  "opacityByte": 255,
+                  "photo": null,
+                  "zIndex": 3
+                }
+              ],
+              "heightUm": 300000,
+              "number": 1,
+              "overlays": [],
+              "sheetId": "sheet-001",
+              "widthUm": 300000
+            },
+            {
+              "activeSides": "both",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 160000,
+                    "width": 240000,
+                    "x": 135000,
+                    "y": 70000
+                  },
+                  "frameId": "clipboard-frame-1-0",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 240000,
+                      "width": 360000,
+                      "x": 87000,
+                      "y": 26000
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000001",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#173B4B",
+                      "#84AAA7",
+                      "#E7C58B"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 400.0,
+                      "current": {
+                        "center": {
+                          "x": 132000.00017881393,
+                          "y": 75999.99994039536
+                        },
+                        "size": {
+                          "height": 240000.0,
+                          "width": 360000.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.20000000298023224,
+                        "y": -0.10000000149011612
+                      },
+                      "currentZoom": 1.5,
+                      "panOrigin": {
+                        "x": 120000.0,
+                        "y": 80000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 60000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 40000.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 120000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 80000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 160000.0,
+                        "width": 240000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 160000,
+                    "width": 240000,
+                    "x": 225000,
+                    "y": 70000
+                  },
+                  "frameId": "clipboard-frame-1-1",
+                  "opacityByte": 255,
+                  "photo": null,
+                  "zIndex": 1
+                }
+              ],
+              "heightUm": 300000,
+              "number": 2,
+              "overlays": [],
+              "sheetId": "sheet-002",
+              "widthUm": 600000
+            },
+            {
+              "activeSides": "both",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 160000,
+                    "width": 240000,
+                    "x": 135000,
+                    "y": 70000
+                  },
+                  "frameId": "clipboard-frame-2-0",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 240000,
+                      "width": 360000,
+                      "x": 87000,
+                      "y": 26000
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000001",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#173B4B",
+                      "#84AAA7",
+                      "#E7C58B"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 400.0,
+                      "current": {
+                        "center": {
+                          "x": 132000.00017881393,
+                          "y": 75999.99994039536
+                        },
+                        "size": {
+                          "height": 240000.0,
+                          "width": 360000.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.20000000298023224,
+                        "y": -0.10000000149011612
+                      },
+                      "currentZoom": 1.5,
+                      "panOrigin": {
+                        "x": 120000.0,
+                        "y": 80000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 60000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 40000.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 120000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 80000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 160000.0,
+                        "width": 240000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 160000,
+                    "width": 240000,
+                    "x": 225000,
+                    "y": 70000
+                  },
+                  "frameId": "clipboard-frame-2-1",
+                  "opacityByte": 255,
+                  "photo": null,
+                  "zIndex": 1
+                }
+              ],
+              "heightUm": 300000,
+              "number": 3,
+              "overlays": [],
+              "sheetId": "sheet-003",
+              "widthUm": 600000
+            },
+            {
+              "activeSides": "left",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 300000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 300000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 80000,
+                    "width": 120000,
+                    "x": 45000,
+                    "y": 110000
+                  },
+                  "frameId": "clipboard-frame-3-0",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 120000,
+                      "width": 180000,
+                      "x": 21000,
+                      "y": 88000
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000001",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#173B4B",
+                      "#84AAA7",
+                      "#E7C58B"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 200.0,
+                      "current": {
+                        "center": {
+                          "x": 66000.00008940697,
+                          "y": 37999.99997019768
+                        },
+                        "size": {
+                          "height": 120000.0,
+                          "width": 180000.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.20000000298023224,
+                        "y": -0.10000000149011612
+                      },
+                      "currentZoom": 1.5,
+                      "panOrigin": {
+                        "x": 60000.0,
+                        "y": 40000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 30000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 20000.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 60000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 40000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 80000.0,
+                        "width": 120000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 80000,
+                    "width": 120000,
+                    "x": 135000,
+                    "y": 110000
+                  },
+                  "frameId": "clipboard-frame-3-1",
+                  "opacityByte": 255,
+                  "photo": null,
+                  "zIndex": 1
+                }
+              ],
+              "heightUm": 300000,
+              "number": 4,
+              "overlays": [],
+              "sheetId": "sheet-004",
+              "widthUm": 300000
+            }
+          ]
+        },
+        "mediaUsage": [
+          {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 0,
+              "backgrounds": 0,
+              "frames": 5,
+              "overlays": 0
+            },
+            "count": 5,
+            "mediaId": "00000000-0000-4000-8000-000000000001"
+          }
+        ],
+        "state": {
+          "album": {
+            "media": [
+              {
+                "id": "00000000-0000-4000-8000-000000000001",
+                "kind": "photo",
+                "name": "Foto.jpg",
+                "palette": [
+                  "#173B4B",
+                  "#84AAA7",
+                  "#E7C58B"
+                ],
+                "sourceHeightPx": 400,
+                "sourceWidthPx": 600
+              }
+            ],
+            "sheets": [
+              {
+                "activeSides": "right",
+                "frames": [
+                  {
+                    "id": "clipboard-frame-0-0",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000001",
+                      "transform": {
+                        "blackAndWhite": false,
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": 0.20000000298023224,
+                        "panY": -0.10000000149011612,
+                        "quarterTurns": 0,
+                        "userZoom": 1.5
+                      }
+                    },
+                    "rect": {
+                      "height": 135000,
+                      "width": 135000,
+                      "x": 10000,
+                      "y": 10000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 0
+                  },
+                  {
+                    "id": "clipboard-frame-0-1",
+                    "photo": null,
+                    "rect": {
+                      "height": 135000,
+                      "width": 135000,
+                      "x": 155000,
+                      "y": 10000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 1
+                  },
+                  {
+                    "id": "pasted-frame-0",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000001",
+                      "transform": {
+                        "blackAndWhite": false,
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": 0.20000000298023224,
+                        "panY": -0.10000000149011612,
+                        "quarterTurns": 0,
+                        "userZoom": 1.5
+                      }
+                    },
+                    "rect": {
+                      "height": 135000,
+                      "width": 135000,
+                      "x": 10000,
+                      "y": 155000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 2
+                  },
+                  {
+                    "id": "pasted-frame-1",
+                    "photo": null,
+                    "rect": {
+                      "height": 135000,
+                      "width": 135000,
+                      "x": 155000,
+                      "y": 155000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 3
+                  }
+                ],
+                "heightUm": 300000,
+                "id": "sheet-001",
+                "layoutLocked": false,
+                "number": 1,
+                "pageNumbers": [
+                  1
+                ],
+                "role": "initial",
+                "widthUm": 600000
+              },
+              {
+                "activeSides": "both",
+                "frames": [
+                  {
+                    "id": "clipboard-frame-1-0",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000001",
+                      "transform": {
+                        "blackAndWhite": false,
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": 0.20000000298023224,
+                        "panY": -0.10000000149011612,
+                        "quarterTurns": 0,
+                        "userZoom": 1.5
+                      }
+                    },
+                    "rect": {
+                      "height": 160000,
+                      "width": 240000,
+                      "x": 135000,
+                      "y": 70000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 0
+                  },
+                  {
+                    "id": "clipboard-frame-1-1",
+                    "photo": null,
+                    "rect": {
+                      "height": 160000,
+                      "width": 240000,
+                      "x": 225000,
+                      "y": 70000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 1
+                  }
+                ],
+                "heightUm": 300000,
+                "id": "sheet-002",
+                "layoutLocked": false,
+                "number": 2,
+                "pageNumbers": [
+                  2,
+                  3
+                ],
+                "role": "internal",
+                "widthUm": 600000
+              },
+              {
+                "activeSides": "both",
+                "frames": [
+                  {
+                    "id": "clipboard-frame-2-0",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000001",
+                      "transform": {
+                        "blackAndWhite": false,
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": 0.20000000298023224,
+                        "panY": -0.10000000149011612,
+                        "quarterTurns": 0,
+                        "userZoom": 1.5
+                      }
+                    },
+                    "rect": {
+                      "height": 160000,
+                      "width": 240000,
+                      "x": 135000,
+                      "y": 70000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 0
+                  },
+                  {
+                    "id": "clipboard-frame-2-1",
+                    "photo": null,
+                    "rect": {
+                      "height": 160000,
+                      "width": 240000,
+                      "x": 225000,
+                      "y": 70000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 1
+                  }
+                ],
+                "heightUm": 300000,
+                "id": "sheet-003",
+                "layoutLocked": false,
+                "number": 3,
+                "pageNumbers": [
+                  4,
+                  5
+                ],
+                "role": "internal",
+                "widthUm": 600000
+              },
+              {
+                "activeSides": "left",
+                "frames": [
+                  {
+                    "id": "clipboard-frame-3-0",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000001",
+                      "transform": {
+                        "blackAndWhite": false,
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": 0.20000000298023224,
+                        "panY": -0.10000000149011612,
+                        "quarterTurns": 0,
+                        "userZoom": 1.5
+                      }
+                    },
+                    "rect": {
+                      "height": 80000,
+                      "width": 120000,
+                      "x": 45000,
+                      "y": 110000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 0
+                  },
+                  {
+                    "id": "clipboard-frame-3-1",
+                    "photo": null,
+                    "rect": {
+                      "height": 80000,
+                      "width": 120000,
+                      "x": 135000,
+                      "y": 110000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 1
+                  }
+                ],
+                "heightUm": 300000,
+                "id": "sheet-004",
+                "layoutLocked": false,
+                "number": 4,
+                "pageNumbers": [
+                  6
+                ],
+                "role": "final",
+                "widthUm": 600000
+              }
+            ],
+            "visualDefaults": {
+              "background": {
+                "both": {
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                },
+                "scope": "bothSides"
+              },
+              "frameBorder": {
+                "kind": "none"
+              },
+              "overlay": {
+                "both": null,
+                "scope": "bothSides"
+              }
+            }
+          },
+          "canRedo": false,
+          "canUndo": true,
+          "dirty": true,
+          "document": {
+            "bleedUm": 3000,
+            "displayUnit": "mm",
+            "dpi": 300,
+            "safetyUm": 3000,
+            "sheetHeightUm": 300000,
+            "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
+          "projectId": "frame-clipboard-project",
+          "projectName": "Clipboard",
+          "revision": 26,
+          "savedRevision": 25
+        }
+      },
+      "desiredOffsetUm": 0,
+      "mode": "normal",
+      "name": "normal-double-right",
+      "pastedFrameIds": [
+        "pasted-frame-0",
+        "pasted-frame-1"
+      ],
+      "selectedFrameIds": [
+        "clipboard-frame-1-0",
+        "clipboard-frame-1-1"
+      ],
+      "sourceSheetId": "sheet-002",
+      "targetSheetId": "sheet-001"
+    },
+    {
+      "after": {
+        "canPasteFrames": true,
+        "composition": {
+          "frameBorder": {
+            "kind": "none"
+          },
+          "sheets": [
+            {
+              "activeSides": "right",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 300000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 300000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 80000,
+                    "width": 120000,
+                    "x": 45000,
+                    "y": 110000
+                  },
+                  "frameId": "clipboard-frame-0-0",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 120000,
+                      "width": 180000,
+                      "x": 21000,
+                      "y": 88000
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000001",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#173B4B",
+                      "#84AAA7",
+                      "#E7C58B"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 200.0,
+                      "current": {
+                        "center": {
+                          "x": 66000.00008940697,
+                          "y": 37999.99997019768
+                        },
+                        "size": {
+                          "height": 120000.0,
+                          "width": 180000.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.20000000298023224,
+                        "y": -0.10000000149011612
+                      },
+                      "currentZoom": 1.5,
+                      "panOrigin": {
+                        "x": 60000.0,
+                        "y": 40000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 30000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 20000.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 60000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 40000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 80000.0,
+                        "width": 120000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 80000,
+                    "width": 120000,
+                    "x": 135000,
+                    "y": 110000
+                  },
+                  "frameId": "clipboard-frame-0-1",
+                  "opacityByte": 255,
+                  "photo": null,
+                  "zIndex": 1
+                }
+              ],
+              "heightUm": 300000,
+              "number": 1,
+              "overlays": [],
+              "sheetId": "sheet-001",
+              "widthUm": 300000
+            },
+            {
+              "activeSides": "both",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 180000,
+                    "width": 270000,
+                    "x": 15000,
+                    "y": 60000
+                  },
+                  "frameId": "clipboard-frame-1-0",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 270000,
+                      "width": 405000,
+                      "x": -39000,
+                      "y": 10500
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000001",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#173B4B",
+                      "#84AAA7",
+                      "#E7C58B"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 450.0,
+                      "current": {
+                        "center": {
+                          "x": 148500.00020116568,
+                          "y": 85499.99993294477
+                        },
+                        "size": {
+                          "height": 270000.0,
+                          "width": 405000.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.20000000298023224,
+                        "y": -0.10000000149011612
+                      },
+                      "currentZoom": 1.5,
+                      "panOrigin": {
+                        "x": 135000.0,
+                        "y": 90000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 67500.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 45000.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 135000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 90000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 180000.0,
+                        "width": 270000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 176667,
+                    "width": 270000,
+                    "x": 315000,
+                    "y": 108333
+                  },
+                  "frameId": "clipboard-frame-1-1",
+                  "opacityByte": 255,
+                  "photo": null,
+                  "zIndex": 1
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 88333,
+                    "width": 132500,
+                    "x": 315000,
+                    "y": 15000
+                  },
+                  "frameId": "pasted-frame-0",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 132500,
+                      "width": 198750,
+                      "x": 288500,
+                      "y": -9292
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000001",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#173B4B",
+                      "#84AAA7",
+                      "#E7C58B"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 220.83333333333337,
+                      "current": {
+                        "center": {
+                          "x": 72875.0000987202,
+                          "y": 41958.14996709302
+                        },
+                        "size": {
+                          "height": 132500.0,
+                          "width": 198750.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.20000000298023224,
+                        "y": -0.10000000149011612
+                      },
+                      "currentZoom": 1.5,
+                      "panOrigin": {
+                        "x": 66250.0,
+                        "y": 44166.5
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 33125.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 22083.5
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 66250.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 44166.66666666667
+                      },
+                      "sizePerZoom": {
+                        "height": 88333.33333333334,
+                        "width": 132500.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 2
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 88333,
+                    "width": 132500,
+                    "x": 452500,
+                    "y": 15000
+                  },
+                  "frameId": "pasted-frame-1",
+                  "opacityByte": 255,
+                  "photo": null,
+                  "zIndex": 3
+                }
+              ],
+              "heightUm": 300000,
+              "number": 2,
+              "overlays": [],
+              "sheetId": "sheet-002",
+              "widthUm": 600000
+            },
+            {
+              "activeSides": "both",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 160000,
+                    "width": 240000,
+                    "x": 135000,
+                    "y": 70000
+                  },
+                  "frameId": "clipboard-frame-2-0",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 240000,
+                      "width": 360000,
+                      "x": 87000,
+                      "y": 26000
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000001",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#173B4B",
+                      "#84AAA7",
+                      "#E7C58B"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 400.0,
+                      "current": {
+                        "center": {
+                          "x": 132000.00017881393,
+                          "y": 75999.99994039536
+                        },
+                        "size": {
+                          "height": 240000.0,
+                          "width": 360000.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.20000000298023224,
+                        "y": -0.10000000149011612
+                      },
+                      "currentZoom": 1.5,
+                      "panOrigin": {
+                        "x": 120000.0,
+                        "y": 80000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 60000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 40000.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 120000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 80000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 160000.0,
+                        "width": 240000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 160000,
+                    "width": 240000,
+                    "x": 225000,
+                    "y": 70000
+                  },
+                  "frameId": "clipboard-frame-2-1",
+                  "opacityByte": 255,
+                  "photo": null,
+                  "zIndex": 1
+                }
+              ],
+              "heightUm": 300000,
+              "number": 3,
+              "overlays": [],
+              "sheetId": "sheet-003",
+              "widthUm": 600000
+            },
+            {
+              "activeSides": "left",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 300000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 300000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 80000,
+                    "width": 120000,
+                    "x": 45000,
+                    "y": 110000
+                  },
+                  "frameId": "clipboard-frame-3-0",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 120000,
+                      "width": 180000,
+                      "x": 21000,
+                      "y": 88000
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000001",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#173B4B",
+                      "#84AAA7",
+                      "#E7C58B"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 200.0,
+                      "current": {
+                        "center": {
+                          "x": 66000.00008940697,
+                          "y": 37999.99997019768
+                        },
+                        "size": {
+                          "height": 120000.0,
+                          "width": 180000.0
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.20000000298023224,
+                        "y": -0.10000000149011612
+                      },
+                      "currentZoom": 1.5,
+                      "panOrigin": {
+                        "x": 60000.0,
+                        "y": 40000.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 30000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 20000.0
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 60000.0,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 40000.0
+                      },
+                      "sizePerZoom": {
+                        "height": 80000.0,
+                        "width": 120000.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 80000,
+                    "width": 120000,
+                    "x": 135000,
+                    "y": 110000
+                  },
+                  "frameId": "clipboard-frame-3-1",
+                  "opacityByte": 255,
+                  "photo": null,
+                  "zIndex": 1
+                }
+              ],
+              "heightUm": 300000,
+              "number": 4,
+              "overlays": [],
+              "sheetId": "sheet-004",
+              "widthUm": 300000
+            }
+          ]
+        },
+        "mediaUsage": [
+          {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 0,
+              "backgrounds": 0,
+              "frames": 5,
+              "overlays": 0
+            },
+            "count": 5,
+            "mediaId": "00000000-0000-4000-8000-000000000001"
+          }
+        ],
+        "state": {
+          "album": {
+            "media": [
+              {
+                "id": "00000000-0000-4000-8000-000000000001",
+                "kind": "photo",
+                "name": "Foto.jpg",
+                "palette": [
+                  "#173B4B",
+                  "#84AAA7",
+                  "#E7C58B"
+                ],
+                "sourceHeightPx": 400,
+                "sourceWidthPx": 600
+              }
+            ],
+            "sheets": [
+              {
+                "activeSides": "right",
+                "frames": [
+                  {
+                    "id": "clipboard-frame-0-0",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000001",
+                      "transform": {
+                        "blackAndWhite": false,
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": 0.20000000298023224,
+                        "panY": -0.10000000149011612,
+                        "quarterTurns": 0,
+                        "userZoom": 1.5
+                      }
+                    },
+                    "rect": {
+                      "height": 80000,
+                      "width": 120000,
+                      "x": 45000,
+                      "y": 110000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 0
+                  },
+                  {
+                    "id": "clipboard-frame-0-1",
+                    "photo": null,
+                    "rect": {
+                      "height": 80000,
+                      "width": 120000,
+                      "x": 135000,
+                      "y": 110000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 1
+                  }
+                ],
+                "heightUm": 300000,
+                "id": "sheet-001",
+                "layoutLocked": false,
+                "number": 1,
+                "pageNumbers": [
+                  1
+                ],
+                "role": "initial",
+                "widthUm": 600000
+              },
+              {
+                "activeSides": "both",
+                "frames": [
+                  {
+                    "id": "clipboard-frame-1-0",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000001",
+                      "transform": {
+                        "blackAndWhite": false,
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": 0.20000000298023224,
+                        "panY": -0.10000000149011612,
+                        "quarterTurns": 0,
+                        "userZoom": 1.5
+                      }
+                    },
+                    "rect": {
+                      "height": 180000,
+                      "width": 270000,
+                      "x": 15000,
+                      "y": 60000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 0
+                  },
+                  {
+                    "id": "clipboard-frame-1-1",
+                    "photo": null,
+                    "rect": {
+                      "height": 176667,
+                      "width": 270000,
+                      "x": 315000,
+                      "y": 108333
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 1
+                  },
+                  {
+                    "id": "pasted-frame-0",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000001",
+                      "transform": {
+                        "blackAndWhite": false,
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": 0.20000000298023224,
+                        "panY": -0.10000000149011612,
+                        "quarterTurns": 0,
+                        "userZoom": 1.5
+                      }
+                    },
+                    "rect": {
+                      "height": 88333,
+                      "width": 132500,
+                      "x": 315000,
+                      "y": 15000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 2
+                  },
+                  {
+                    "id": "pasted-frame-1",
+                    "photo": null,
+                    "rect": {
+                      "height": 88333,
+                      "width": 132500,
+                      "x": 452500,
+                      "y": 15000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 3
+                  }
+                ],
+                "heightUm": 300000,
+                "id": "sheet-002",
+                "layoutLocked": false,
+                "number": 2,
+                "pageNumbers": [
+                  2,
+                  3
+                ],
+                "role": "internal",
+                "widthUm": 600000
+              },
+              {
+                "activeSides": "both",
+                "frames": [
+                  {
+                    "id": "clipboard-frame-2-0",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000001",
+                      "transform": {
+                        "blackAndWhite": false,
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": 0.20000000298023224,
+                        "panY": -0.10000000149011612,
+                        "quarterTurns": 0,
+                        "userZoom": 1.5
+                      }
+                    },
+                    "rect": {
+                      "height": 160000,
+                      "width": 240000,
+                      "x": 135000,
+                      "y": 70000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 0
+                  },
+                  {
+                    "id": "clipboard-frame-2-1",
+                    "photo": null,
+                    "rect": {
+                      "height": 160000,
+                      "width": 240000,
+                      "x": 225000,
+                      "y": 70000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 1
+                  }
+                ],
+                "heightUm": 300000,
+                "id": "sheet-003",
+                "layoutLocked": false,
+                "number": 3,
+                "pageNumbers": [
+                  4,
+                  5
+                ],
+                "role": "internal",
+                "widthUm": 600000
+              },
+              {
+                "activeSides": "left",
+                "frames": [
+                  {
+                    "id": "clipboard-frame-3-0",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000001",
+                      "transform": {
+                        "blackAndWhite": false,
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": 0.20000000298023224,
+                        "panY": -0.10000000149011612,
+                        "quarterTurns": 0,
+                        "userZoom": 1.5
+                      }
+                    },
+                    "rect": {
+                      "height": 80000,
+                      "width": 120000,
+                      "x": 45000,
+                      "y": 110000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 0
+                  },
+                  {
+                    "id": "clipboard-frame-3-1",
+                    "photo": null,
+                    "rect": {
+                      "height": 80000,
+                      "width": 120000,
+                      "x": 135000,
+                      "y": 110000
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 1
+                  }
+                ],
+                "heightUm": 300000,
+                "id": "sheet-004",
+                "layoutLocked": false,
+                "number": 4,
+                "pageNumbers": [
+                  6
+                ],
+                "role": "final",
+                "widthUm": 600000
+              }
+            ],
+            "visualDefaults": {
+              "background": {
+                "both": {
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                },
+                "scope": "bothSides"
+              },
+              "frameBorder": {
+                "kind": "none"
+              },
+              "overlay": {
+                "both": null,
+                "scope": "bothSides"
+              }
+            }
+          },
+          "canRedo": false,
+          "canUndo": true,
+          "dirty": true,
+          "document": {
+            "bleedUm": 3000,
+            "displayUnit": "mm",
+            "dpi": 300,
+            "safetyUm": 3000,
+            "sheetHeightUm": 300000,
+            "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
+          "projectId": "frame-clipboard-project",
+          "projectName": "Clipboard",
+          "revision": 26,
+          "savedRevision": 25
+        }
+      },
+      "desiredOffsetUm": 0,
+      "mode": "normal",
+      "name": "normal-right-double",
+      "pastedFrameIds": [
+        "pasted-frame-0",
+        "pasted-frame-1"
+      ],
+      "selectedFrameIds": [
+        "clipboard-frame-0-0",
+        "clipboard-frame-0-1"
+      ],
+      "sourceSheetId": "sheet-001",
       "targetSheetId": "sheet-002"
     }
   ],

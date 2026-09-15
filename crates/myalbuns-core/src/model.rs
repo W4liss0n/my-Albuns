@@ -910,6 +910,7 @@ pub enum ProjectIntent {
     PasteFrames {
         sheet_id: String,
         desired_offset_um: u64,
+        mode: PhotoPlacementMode,
     },
     AddFrame {
         sheet_id: String,

@@ -205,8 +205,9 @@ export function useProjectEditorController({
     if (!canPasteIntoSheet || !pasteSheet) return Promise.resolve(false);
     const sheetId = pasteSheet.id;
     const selection = navigation.selectedFrameIds;
-    const desiredOffsetUm = navigation.canvasScale ? Math.round(16 * CANVAS_MICROMETERS_PER_PIXEL / navigation.canvasScale) : 0;
-    return mutations.pasteFrames(sheetId, desiredOffsetUm, (ids, next) => {
+    const mode = canvasMode.kind === "sheet-editing" ? "edit" : "normal";
+    const desiredOffsetUm = mode === "edit" && navigation.canvasScale ? Math.round(16 * CANVAS_MICROMETERS_PER_PIXEL / navigation.canvasScale) : 0;
+    return mutations.pasteFrames(sheetId, desiredOffsetUm, mode, (ids, next) => {
       const view = useEditorView.getState();
       if (view.projectId !== next.state.projectId || view.editingSheetId !== navigation.editingSheetId ||
           view.centeredSheetId !== navigation.centeredSheetId ||

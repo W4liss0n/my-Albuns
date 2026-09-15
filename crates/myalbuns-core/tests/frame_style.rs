@@ -102,6 +102,7 @@ fn copying_preserves_frame_style_while_swapping_content_leaves_it_with_each_fram
         .apply(ProjectIntent::PasteFrames {
             sheet_id: initial.state.album.sheets[1].id.clone(),
             desired_offset_um: 0,
+            mode: myalbuns_core::PhotoPlacementMode::Edit,
         })
         .unwrap();
     let pasted = project.projection();
