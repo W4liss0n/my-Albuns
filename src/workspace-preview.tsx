@@ -544,6 +544,15 @@ function configurePhysicalPreview(
 }
 
 function applyPreviewIntent(intent: ProjectIntent): ProjectMutationOutcome {
+  if (intent.kind === "editSheetVisual") {
+    const sample = decorativeCorpus.transitions.find((item) => item.from === decorativeStateName(projection) &&
+      item.intent.kind === intent.kind && item.intent.sheetId === intent.sheetId && item.intent.scope === intent.scope &&
+      JSON.stringify(item.intent.change) === JSON.stringify(intent.change));
+    if (frameContext !== "decorations" || !sample) throw new Error("Edição fora do corpus de Decorativos.");
+    projection = finalizePhysicalPreviewMutation(structuredClone(sample.projection), structuredClone(projection));
+    document.body.dataset.sheetDesignApplied = intent.change.kind;
+    return { projection, affectedFrameId: null, affectedSheetId: intent.sheetId };
+  }
   if (intent.kind === "applyDecorative" || intent.kind === "dropDecorative") {
     const preview = intent.kind === "dropDecorative" ? decorativePreview(projection, intent.request) : null;
     const edit = intent.kind === "applyDecorative" ? intent : preview ? {
@@ -551,11 +560,11 @@ function applyPreviewIntent(intent: ProjectIntent): ProjectMutationOutcome {
       role: intent.request.role, scope: preview.scope,
     } : null;
     const sample = decorativeCorpus.transitions.find((item) => item.from === decorativeStateName(projection) &&
-      edit && item.intent.sheetId === edit.sheetId && item.intent.mediaId === edit.mediaId &&
+      edit && item.intent.kind === "applyDecorative" && item.intent.sheetId === edit.sheetId && item.intent.mediaId === edit.mediaId &&
       item.intent.role === edit.role && item.intent.scope === edit.scope);
     if (frameContext !== "decorations" || !sample) throw new Error("Aplicação fora do corpus de Decorativos.");
     projection = finalizePhysicalPreviewMutation(structuredClone(sample.projection), structuredClone(projection));
-    document.body.dataset.decorativeApplied = `${sample.intent.role}-${sample.intent.scope}`;
+    document.body.dataset.decorativeApplied = `${edit!.role}-${edit!.scope}`;
     return { projection, affectedFrameId: null, affectedSheetId: sample.intent.sheetId };
   }
   if (intent.kind === "toggleLayoutFavorite") {

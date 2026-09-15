@@ -1,17 +1,25 @@
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import type { VisualScope } from "../application/scopedValues";
 import type {
-  ComposedSheet,
+  ComposedSheet, DecorativeScope, SheetVisualChange, SheetVisuals,
 } from "../domain/project";
 import { ActionButton } from "../ui";
+import { ColorPropertyControl } from "../ui/ColorPropertyControl";
 import { SheetPreview } from "./SheetPreview";
 import { SHEET_VISUAL_STYLE } from "./sheetVisualStyle";
 import "./SheetDesignInspector.css";
 
 export type SheetDesignScope = VisualScope;
 
+export interface SheetDesignActions {
+  disabled: boolean;
+  onChange(sheetId: string, scope: DecorativeScope, change: SheetVisualChange): Promise<boolean>;
+}
+
 interface SheetDesignInspectorProps {
+  actions?: SheetDesignActions;
+  visuals?: SheetVisuals;
   saveLayout?: { enabled: boolean; onSave(): void; feedback?: ReactNode };
   mediaPreviewUrls: Readonly<Record<string, string>>;
   scope: SheetDesignScope;
@@ -20,6 +28,8 @@ interface SheetDesignInspectorProps {
 }
 
 export function SheetDesignInspector({
+  actions,
+  visuals,
   saveLayout,
   mediaPreviewUrls,
   scope,
@@ -29,8 +39,22 @@ export function SheetDesignInspector({
   const [hoveredScope, setHoveredScope] = useState<SheetDesignScope | null>(
     null,
   );
-  const backgroundValues = visualValues(sheet, scope, "background");
-  const overlayValues = visualValues(sheet, scope, "overlay");
+  const [pending, setPending] = useState(false);
+  const pendingRef = useRef(false);
+  const disabled = !actions || actions.disabled || pending;
+  const backgroundValues = visualValues(sheet, scope, "background", visuals);
+  const overlayValues = visualValues(sheet, scope, "overlay", visuals);
+  const apply = async (change: SheetVisualChange) => {
+    if (!actions || disabled || pendingRef.current) return;
+    pendingRef.current = true;
+    setPending(true);
+    try {
+      await actions.onChange(sheet.sheetId, scope === "both" ? "bothSides" : scope, change);
+    } finally {
+      pendingRef.current = false;
+      setPending(false);
+    }
+  };
 
   return (
     <div className="sheet-design-inspector">
@@ -47,13 +71,16 @@ export function SheetDesignInspector({
       </p>
 
       <SheetVisualRole
-        placeholderFeature="edit-sheet-background"
+        key={`background:${sheet.sheetId}:${scope}`}
+        disabled={disabled}
+        onChange={(change) => { void apply(change); }}
         role="Background"
         values={backgroundValues}
         mediaPreviewUrls={mediaPreviewUrls}
       />
       <SheetVisualRole
-        placeholderFeature="edit-sheet-overlay"
+        disabled={disabled}
+        onChange={(change) => { void apply(change); }}
         role="Overlay"
         values={overlayValues}
         mediaPreviewUrls={mediaPreviewUrls}
@@ -163,67 +190,55 @@ function SheetScopePreview({
   );
 }
 
-type VisualValue =
-  | { kind: "color"; label: string; rgb: string; side?: string }
-  | { kind: "media"; label: string; mediaId: string; side?: string }
-  | { kind: "none"; label: string; side?: string };
+type VisualValue = (
+  | { kind: "color"; label: string; rgb: string }
+  | { kind: "media"; label: string; mediaId: string }
+  | { kind: "none"; label: string }
+) & { custom: boolean; side?: string };
 
-function SheetVisualRole({
-  mediaPreviewUrls,
-  placeholderFeature,
-  role,
-  values,
-}: {
+function SheetVisualRole({ mediaPreviewUrls, disabled, role, values, onChange }: {
   mediaPreviewUrls: Readonly<Record<string, string>>;
-  placeholderFeature: string;
+  disabled: boolean;
   role: "Background" | "Overlay";
   values: readonly VisualValue[];
+  onChange(change: SheetVisualChange): void;
 }) {
+  const decorativeRole = role === "Background" ? "background" : "overlay";
   return (
-    <section className="sheet-design-role">
+    <section className="sheet-design-role" aria-label={role}>
       <h3>{role}</h3>
       <div className="sheet-design-role__values">
         {values.map((value, index) => (
-          <div
-            className="sheet-design-value"
-            key={`${value.side ?? "both"}-${index}`}
-          >
+          <div className="sheet-design-value" key={value.side ?? index}>
             <VisualSwatch mediaPreviewUrls={mediaPreviewUrls} value={value} />
             <span className="sheet-design-value__copy">
               {value.side ? <small>{value.side}</small> : null}
               <strong>{value.label}</strong>
-              <small data-placeholder-feature="sheet-design-origin">
-                Origem ainda não disponível
-              </small>
+              <small>{value.custom ? "Definido nesta lâmina" : "Usando o design do álbum"}</small>
             </span>
           </div>
         ))}
       </div>
       <div className="sheet-design-role__actions">
         {role === "Background" ? (
-          <label className="sheet-design-color-placeholder">
+          <div className="sheet-design-color">
             <span>Cor</span>
-            <input
-              aria-label="Cor do Background da Lâmina"
-              data-placeholder-feature={placeholderFeature}
-              disabled
-              type="color"
-              value={firstBackgroundColor(values)}
-              readOnly
-            />
-          </label>
+            <ColorPropertyControl label="do Background da Lâmina" defaultRgb="#FFFFFF"
+              disabled={disabled} rgb={sharedBackgroundColor(values)}
+              onCommit={(rgb) => onChange({ kind: "backgroundColor", rgb })} />
+          </div>
         ) : null}
-        <ActionButton
-          data-placeholder-feature={placeholderFeature}
-          density="compact"
-          disabled
-          title={`${role} da Lâmina ainda não pode ser alterado nesta versão.`}
-          type="button"
-          variant="quiet"
-        >
+        <ActionButton density="compact" disabled={disabled} type="button" variant="quiet"
+          onClick={() => onChange({ kind: "remove", role: decorativeRole })}>
           Remover
         </ActionButton>
       </div>
+      {values.some((value) => value.custom) && (
+        <ActionButton className="sheet-design-role__restore" density="compact" disabled={disabled}
+          type="button" variant="quiet" onClick={() => onChange({ kind: "restoreAlbum", role: decorativeRole })}>
+          Voltar ao design do álbum
+        </ActionButton>
+      )}
     </section>
   );
 }
@@ -263,12 +278,13 @@ function visualValues(
   sheet: ComposedSheet,
   scope: SheetDesignScope,
   role: "background" | "overlay",
+  visuals?: SheetVisuals,
 ): VisualValue[] {
   if (scope !== "both") {
-    return [visualValueAtSide(sheet, scope, role)];
+    return [visualValueAtSide(sheet, scope, role, visuals)];
   }
-  const left = visualValueAtSide(sheet, "left", role);
-  const right = visualValueAtSide(sheet, "right", role);
+  const left = visualValueAtSide(sheet, "left", role, visuals);
+  const right = visualValueAtSide(sheet, "right", role, visuals);
   if (sameVisualValue(left, right)) return [left];
   return [
     { ...left, side: "Esquerda" },
@@ -280,26 +296,30 @@ function visualValueAtSide(
   sheet: ComposedSheet,
   side: "left" | "right",
   role: "background" | "overlay",
+  visuals?: SheetVisuals,
 ): VisualValue {
+  const visual = visuals?.[role];
+  const custom = visual?.kind === "bothSides" || (visual?.kind === "perSide" && visual[side].kind === "custom");
   const sampleX = sheet.widthUm * (side === "left" ? 0.25 : 0.75);
   if (role === "overlay") {
     const overlay = [...sheet.overlays]
       .reverse()
       .find(({ drawRect, clipRect }) => containsX(clipRect ?? drawRect, sampleX));
     return overlay
-      ? { kind: "media", label: overlay.name, mediaId: overlay.mediaId }
-      : { kind: "none", label: "Sem overlay" };
+      ? { custom, kind: "media", label: overlay.name, mediaId: overlay.mediaId }
+      : { custom, kind: "none", label: "Sem overlay" };
   }
 
   const background = [...sheet.backgrounds]
     .reverse()
     .find((background) => containsX(background.kind === "media" ? background.clipRect ?? background.drawRect : background.drawRect, sampleX));
   if (!background) {
-    return { kind: "color", label: sheet.base.rgb, rgb: sheet.base.rgb };
+    return { custom, kind: "color", label: sheet.base.rgb, rgb: sheet.base.rgb };
   }
   return background.kind === "color"
-    ? { kind: "color", label: background.rgb, rgb: background.rgb }
+    ? { custom, kind: "color", label: background.rgb, rgb: background.rgb }
     : {
+        custom,
         kind: "media",
         label: background.name,
         mediaId: background.mediaId,
@@ -311,7 +331,7 @@ function containsX(rect: { x: number; width: number }, sampleX: number) {
 }
 
 function sameVisualValue(left: VisualValue, right: VisualValue) {
-  if (left.kind !== right.kind) return false;
+  if (left.kind !== right.kind || left.custom !== right.custom) return false;
   if (left.kind === "color" && right.kind === "color") {
     return left.rgb === right.rgb;
   }
@@ -321,8 +341,10 @@ function sameVisualValue(left: VisualValue, right: VisualValue) {
   return left.kind === "none" && right.kind === "none";
 }
 
-function firstBackgroundColor(values: readonly VisualValue[]) {
-  return values.find((value) => value.kind === "color")?.rgb ?? "#FFFFFF";
+function sharedBackgroundColor(values: readonly VisualValue[]) {
+  const first = values[0];
+  return first?.kind === "color" && values.every((value) => value.kind === "color" && value.rgb === first.rgb)
+    ? first.rgb : null;
 }
 
 function scopeLabel(scope: SheetDesignScope) {

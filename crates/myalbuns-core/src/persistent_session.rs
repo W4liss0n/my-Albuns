@@ -231,6 +231,20 @@ impl PersistentProjectSession {
                 return Ok(outcome);
             }
         }
+        if let ProjectIntent::EditSheetVisual {
+            sheet_id,
+            scope,
+            change,
+        } = &intent
+        {
+            let next = self
+                .project()
+                .with_edited_sheet_visual(sheet_id, *scope, change)?;
+            if next != *self.project() {
+                self.commit_edit(|_| Ok(next))?;
+            }
+            return Ok(outcome);
+        }
         if let ProjectIntent::DropDecorative { request } = &intent {
             let next = self.project().with_dropped_decorative(request)?;
             if next != *self.project() {
@@ -328,6 +342,7 @@ impl PersistentProjectSession {
                 project.with_swapped_frame_contents(&frame_ids)
             }
             ProjectIntent::DropDecorative { .. }
+            | ProjectIntent::EditSheetVisual { .. }
             | ProjectIntent::ApplyDecorative { .. }
             | ProjectIntent::RemoveMedia { .. }
             | ProjectIntent::DeleteFrames { .. } => {

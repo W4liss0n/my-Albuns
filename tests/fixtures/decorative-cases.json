@@ -8858,6 +8858,1939 @@
     }
   ],
   "states": {
+    "background-restored": {
+      "canPasteFrames": false,
+      "composition": {
+        "frameBorder": {
+          "kind": "none"
+        },
+        "sheets": [
+          {
+            "activeSides": "both",
+            "backgrounds": [
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "kind": "color",
+                "rgb": "#FFFFFF"
+              }
+            ],
+            "base": {
+              "drawRect": {
+                "height": 300000,
+                "width": 600000,
+                "x": 0,
+                "y": 0
+              },
+              "rgb": "#FFFFFF"
+            },
+            "frames": [
+              {
+                "border": {
+                  "kind": "none"
+                },
+                "borderFillRects": [],
+                "clipRect": {
+                  "height": 260770,
+                  "width": 391154,
+                  "x": 15000,
+                  "y": 19615
+                },
+                "frameId": "00000000-0000-4000-8000-000000000101",
+                "opacityByte": 255,
+                "photo": {
+                  "blackAndWhite": false,
+                  "drawRect": {
+                    "height": 456348,
+                    "width": 684522,
+                    "x": -95013,
+                    "y": -127068
+                  },
+                  "mediaId": "00000000-0000-4000-8000-000000000010",
+                  "mirrorX": false,
+                  "name": "Foto.jpg",
+                  "palette": [
+                    "#C22C24",
+                    "#248044",
+                    "#2454C2"
+                  ],
+                  "placement": {
+                    "baseFillZoom": 651.925,
+                    "current": {
+                      "center": {
+                        "x": 232247.90625,
+                        "y": 81490.62500000001
+                      },
+                      "size": {
+                        "height": 456347.49999999994,
+                        "width": 684521.25
+                      }
+                    },
+                    "currentPan": {
+                      "x": 0.25,
+                      "y": -0.5
+                    },
+                    "currentZoom": 1.75,
+                    "panOrigin": {
+                      "x": 195577.0,
+                      "y": 130385.0
+                    },
+                    "panRange": {
+                      "maximum": 1.0,
+                      "minimum": -1.0
+                    },
+                    "panToCenter": {
+                      "xx": 146683.625,
+                      "xy": -0.0,
+                      "yx": 0.0,
+                      "yy": 97788.74999999997
+                    },
+                    "panToCenterPerZoom": {
+                      "xx": 195577.5,
+                      "xy": -0.0,
+                      "yx": 0.0,
+                      "yy": 130384.99999999999
+                    },
+                    "sizePerZoom": {
+                      "height": 260769.99999999997,
+                      "width": 391155.0
+                    },
+                    "zoomRange": {
+                      "maximum": 4.0,
+                      "minimum": 1.0
+                    }
+                  },
+                  "rotationDegrees": 0.0
+                },
+                "zIndex": 0
+              },
+              {
+                "border": {
+                  "kind": "none"
+                },
+                "borderFillRects": [],
+                "clipRect": {
+                  "height": 260770,
+                  "width": 173846,
+                  "x": 411154,
+                  "y": 19615
+                },
+                "frameId": "00000000-0000-4000-8000-000000000102",
+                "opacityByte": 255,
+                "photo": null,
+                "zIndex": 1
+              }
+            ],
+            "heightUm": 300000,
+            "number": 1,
+            "overlays": [],
+            "sheetId": "00000000-0000-4000-8000-000000000001",
+            "widthUm": 600000
+          },
+          {
+            "activeSides": "both",
+            "backgrounds": [
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "kind": "color",
+                "rgb": "#FFFFFF"
+              }
+            ],
+            "base": {
+              "drawRect": {
+                "height": 300000,
+                "width": 600000,
+                "x": 0,
+                "y": 0
+              },
+              "rgb": "#FFFFFF"
+            },
+            "frames": [],
+            "heightUm": 300000,
+            "number": 2,
+            "overlays": [
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "mediaId": "00000000-0000-4000-8000-000000000030",
+                "name": "Overlay.png"
+              }
+            ],
+            "sheetId": "00000000-0000-4000-8000-000000000002",
+            "widthUm": 600000
+          }
+        ]
+      },
+      "mediaUsage": [
+        {
+          "breakdown": {
+            "albumBackgrounds": 0,
+            "albumOverlays": 0,
+            "backgrounds": 0,
+            "frames": 1,
+            "overlays": 0
+          },
+          "count": 1,
+          "mediaId": "00000000-0000-4000-8000-000000000010"
+        },
+        {
+          "breakdown": {
+            "albumBackgrounds": 0,
+            "albumOverlays": 0,
+            "backgrounds": 0,
+            "frames": 0,
+            "overlays": 0
+          },
+          "count": 0,
+          "mediaId": "00000000-0000-4000-8000-000000000020"
+        },
+        {
+          "breakdown": {
+            "albumBackgrounds": 0,
+            "albumOverlays": 1,
+            "backgrounds": 0,
+            "frames": 0,
+            "overlays": 1
+          },
+          "count": 2,
+          "mediaId": "00000000-0000-4000-8000-000000000030"
+        }
+      ],
+      "state": {
+        "album": {
+          "media": [
+            {
+              "id": "00000000-0000-4000-8000-000000000010",
+              "kind": "photo",
+              "name": "Foto.jpg",
+              "palette": [
+                "#C22C24",
+                "#248044",
+                "#2454C2"
+              ],
+              "sourceHeightPx": 400,
+              "sourceWidthPx": 600
+            },
+            {
+              "id": "00000000-0000-4000-8000-000000000020",
+              "kind": "decorative",
+              "name": "Textura.png",
+              "palette": null,
+              "sourceHeightPx": null,
+              "sourceWidthPx": null
+            },
+            {
+              "id": "00000000-0000-4000-8000-000000000030",
+              "kind": "decorative",
+              "name": "Overlay.png",
+              "palette": null,
+              "sourceHeightPx": null,
+              "sourceWidthPx": null
+            }
+          ],
+          "sheets": [
+            {
+              "activeSides": "both",
+              "frames": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000101",
+                  "photo": {
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "transform": {
+                      "blackAndWhite": false,
+                      "fineRotationDegrees": 0.0,
+                      "mirrorX": false,
+                      "panX": 0.25,
+                      "panY": -0.5,
+                      "quarterTurns": 0,
+                      "userZoom": 1.75
+                    }
+                  },
+                  "rect": {
+                    "height": 260770,
+                    "width": 391154,
+                    "x": 15000,
+                    "y": 19615
+                  },
+                  "style": {
+                    "borderRgb": "#000000",
+                    "borderWidthUm": 0,
+                    "opacityPercent": 100,
+                    "source": "album"
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "id": "00000000-0000-4000-8000-000000000102",
+                  "photo": null,
+                  "rect": {
+                    "height": 260770,
+                    "width": 173846,
+                    "x": 411154,
+                    "y": 19615
+                  },
+                  "style": {
+                    "borderRgb": "#000000",
+                    "borderWidthUm": 0,
+                    "opacityPercent": 100,
+                    "source": "album"
+                  },
+                  "zIndex": 1
+                }
+              ],
+              "heightUm": 300000,
+              "id": "00000000-0000-4000-8000-000000000001",
+              "layoutLocked": false,
+              "number": 1,
+              "pageNumbers": [
+                1,
+                2
+              ],
+              "role": "initial",
+              "visuals": {
+                "background": {
+                  "kind": "default"
+                },
+                "overlay": {
+                  "content": null,
+                  "kind": "bothSides"
+                }
+              },
+              "widthUm": 600000
+            },
+            {
+              "activeSides": "both",
+              "frames": [],
+              "heightUm": 300000,
+              "id": "00000000-0000-4000-8000-000000000002",
+              "layoutLocked": false,
+              "number": 2,
+              "pageNumbers": [
+                3,
+                4
+              ],
+              "role": "final",
+              "widthUm": 600000
+            }
+          ],
+          "visualDefaults": {
+            "background": {
+              "both": {
+                "kind": "color",
+                "rgb": "#FFFFFF"
+              },
+              "scope": "bothSides"
+            },
+            "frameBorder": {
+              "kind": "none"
+            },
+            "overlay": {
+              "both": {
+                "kind": "media",
+                "mediaId": "00000000-0000-4000-8000-000000000030"
+              },
+              "scope": "bothSides"
+            }
+          }
+        },
+        "canRedo": false,
+        "canUndo": true,
+        "dirty": true,
+        "document": {
+          "bleedUm": 3000,
+          "displayUnit": "mm",
+          "dpi": 300,
+          "safetyUm": 3000,
+          "sheetHeightUm": 300000,
+          "sheetWidthUm": 600000
+        },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
+        },
+        "projectId": "550e8400-e29b-41d4-a716-446655440000",
+        "projectName": "Decorativos",
+        "revision": 73,
+        "savedRevision": 9
+      }
+    },
+    "half-restored": {
+      "canPasteFrames": false,
+      "composition": {
+        "frameBorder": {
+          "kind": "none"
+        },
+        "sheets": [
+          {
+            "activeSides": "both",
+            "backgrounds": [
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 300000,
+                  "x": 0,
+                  "y": 0
+                },
+                "kind": "color",
+                "rgb": "#FFFFFF"
+              },
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 300000,
+                  "x": 300000,
+                  "y": 0
+                },
+                "kind": "color",
+                "rgb": "#E7D6C4"
+              }
+            ],
+            "base": {
+              "drawRect": {
+                "height": 300000,
+                "width": 600000,
+                "x": 0,
+                "y": 0
+              },
+              "rgb": "#FFFFFF"
+            },
+            "frames": [
+              {
+                "border": {
+                  "kind": "none"
+                },
+                "borderFillRects": [],
+                "clipRect": {
+                  "height": 260770,
+                  "width": 391154,
+                  "x": 15000,
+                  "y": 19615
+                },
+                "frameId": "00000000-0000-4000-8000-000000000101",
+                "opacityByte": 255,
+                "photo": {
+                  "blackAndWhite": false,
+                  "drawRect": {
+                    "height": 456348,
+                    "width": 684522,
+                    "x": -95013,
+                    "y": -127068
+                  },
+                  "mediaId": "00000000-0000-4000-8000-000000000010",
+                  "mirrorX": false,
+                  "name": "Foto.jpg",
+                  "palette": [
+                    "#C22C24",
+                    "#248044",
+                    "#2454C2"
+                  ],
+                  "placement": {
+                    "baseFillZoom": 651.925,
+                    "current": {
+                      "center": {
+                        "x": 232247.90625,
+                        "y": 81490.62500000001
+                      },
+                      "size": {
+                        "height": 456347.49999999994,
+                        "width": 684521.25
+                      }
+                    },
+                    "currentPan": {
+                      "x": 0.25,
+                      "y": -0.5
+                    },
+                    "currentZoom": 1.75,
+                    "panOrigin": {
+                      "x": 195577.0,
+                      "y": 130385.0
+                    },
+                    "panRange": {
+                      "maximum": 1.0,
+                      "minimum": -1.0
+                    },
+                    "panToCenter": {
+                      "xx": 146683.625,
+                      "xy": -0.0,
+                      "yx": 0.0,
+                      "yy": 97788.74999999997
+                    },
+                    "panToCenterPerZoom": {
+                      "xx": 195577.5,
+                      "xy": -0.0,
+                      "yx": 0.0,
+                      "yy": 130384.99999999999
+                    },
+                    "sizePerZoom": {
+                      "height": 260769.99999999997,
+                      "width": 391155.0
+                    },
+                    "zoomRange": {
+                      "maximum": 4.0,
+                      "minimum": 1.0
+                    }
+                  },
+                  "rotationDegrees": 0.0
+                },
+                "zIndex": 0
+              },
+              {
+                "border": {
+                  "kind": "none"
+                },
+                "borderFillRects": [],
+                "clipRect": {
+                  "height": 260770,
+                  "width": 173846,
+                  "x": 411154,
+                  "y": 19615
+                },
+                "frameId": "00000000-0000-4000-8000-000000000102",
+                "opacityByte": 255,
+                "photo": null,
+                "zIndex": 1
+              }
+            ],
+            "heightUm": 300000,
+            "number": 1,
+            "overlays": [
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "mediaId": "00000000-0000-4000-8000-000000000030",
+                "name": "Overlay.png"
+              }
+            ],
+            "sheetId": "00000000-0000-4000-8000-000000000001",
+            "widthUm": 600000
+          },
+          {
+            "activeSides": "both",
+            "backgrounds": [
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "kind": "color",
+                "rgb": "#FFFFFF"
+              }
+            ],
+            "base": {
+              "drawRect": {
+                "height": 300000,
+                "width": 600000,
+                "x": 0,
+                "y": 0
+              },
+              "rgb": "#FFFFFF"
+            },
+            "frames": [],
+            "heightUm": 300000,
+            "number": 2,
+            "overlays": [
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "mediaId": "00000000-0000-4000-8000-000000000030",
+                "name": "Overlay.png"
+              }
+            ],
+            "sheetId": "00000000-0000-4000-8000-000000000002",
+            "widthUm": 600000
+          }
+        ]
+      },
+      "mediaUsage": [
+        {
+          "breakdown": {
+            "albumBackgrounds": 0,
+            "albumOverlays": 0,
+            "backgrounds": 0,
+            "frames": 1,
+            "overlays": 0
+          },
+          "count": 1,
+          "mediaId": "00000000-0000-4000-8000-000000000010"
+        },
+        {
+          "breakdown": {
+            "albumBackgrounds": 0,
+            "albumOverlays": 0,
+            "backgrounds": 0,
+            "frames": 0,
+            "overlays": 0
+          },
+          "count": 0,
+          "mediaId": "00000000-0000-4000-8000-000000000020"
+        },
+        {
+          "breakdown": {
+            "albumBackgrounds": 0,
+            "albumOverlays": 1,
+            "backgrounds": 0,
+            "frames": 0,
+            "overlays": 2
+          },
+          "count": 3,
+          "mediaId": "00000000-0000-4000-8000-000000000030"
+        }
+      ],
+      "state": {
+        "album": {
+          "media": [
+            {
+              "id": "00000000-0000-4000-8000-000000000010",
+              "kind": "photo",
+              "name": "Foto.jpg",
+              "palette": [
+                "#C22C24",
+                "#248044",
+                "#2454C2"
+              ],
+              "sourceHeightPx": 400,
+              "sourceWidthPx": 600
+            },
+            {
+              "id": "00000000-0000-4000-8000-000000000020",
+              "kind": "decorative",
+              "name": "Textura.png",
+              "palette": null,
+              "sourceHeightPx": null,
+              "sourceWidthPx": null
+            },
+            {
+              "id": "00000000-0000-4000-8000-000000000030",
+              "kind": "decorative",
+              "name": "Overlay.png",
+              "palette": null,
+              "sourceHeightPx": null,
+              "sourceWidthPx": null
+            }
+          ],
+          "sheets": [
+            {
+              "activeSides": "both",
+              "frames": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000101",
+                  "photo": {
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "transform": {
+                      "blackAndWhite": false,
+                      "fineRotationDegrees": 0.0,
+                      "mirrorX": false,
+                      "panX": 0.25,
+                      "panY": -0.5,
+                      "quarterTurns": 0,
+                      "userZoom": 1.75
+                    }
+                  },
+                  "rect": {
+                    "height": 260770,
+                    "width": 391154,
+                    "x": 15000,
+                    "y": 19615
+                  },
+                  "style": {
+                    "borderRgb": "#000000",
+                    "borderWidthUm": 0,
+                    "opacityPercent": 100,
+                    "source": "album"
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "id": "00000000-0000-4000-8000-000000000102",
+                  "photo": null,
+                  "rect": {
+                    "height": 260770,
+                    "width": 173846,
+                    "x": 411154,
+                    "y": 19615
+                  },
+                  "style": {
+                    "borderRgb": "#000000",
+                    "borderWidthUm": 0,
+                    "opacityPercent": 100,
+                    "source": "album"
+                  },
+                  "zIndex": 1
+                }
+              ],
+              "heightUm": 300000,
+              "id": "00000000-0000-4000-8000-000000000001",
+              "layoutLocked": false,
+              "number": 1,
+              "pageNumbers": [
+                1,
+                2
+              ],
+              "role": "initial",
+              "visuals": {
+                "background": {
+                  "kind": "perSide",
+                  "left": {
+                    "kind": "default"
+                  },
+                  "right": {
+                    "content": {
+                      "kind": "color",
+                      "rgb": "#E7D6C4"
+                    },
+                    "kind": "custom",
+                    "mapping": "bothSides"
+                  }
+                },
+                "overlay": {
+                  "kind": "default"
+                }
+              },
+              "widthUm": 600000
+            },
+            {
+              "activeSides": "both",
+              "frames": [],
+              "heightUm": 300000,
+              "id": "00000000-0000-4000-8000-000000000002",
+              "layoutLocked": false,
+              "number": 2,
+              "pageNumbers": [
+                3,
+                4
+              ],
+              "role": "final",
+              "widthUm": 600000
+            }
+          ],
+          "visualDefaults": {
+            "background": {
+              "both": {
+                "kind": "color",
+                "rgb": "#FFFFFF"
+              },
+              "scope": "bothSides"
+            },
+            "frameBorder": {
+              "kind": "none"
+            },
+            "overlay": {
+              "both": {
+                "kind": "media",
+                "mediaId": "00000000-0000-4000-8000-000000000030"
+              },
+              "scope": "bothSides"
+            }
+          }
+        },
+        "canRedo": false,
+        "canUndo": true,
+        "dirty": true,
+        "document": {
+          "bleedUm": 3000,
+          "displayUnit": "mm",
+          "dpi": 300,
+          "safetyUm": 3000,
+          "sheetHeightUm": 300000,
+          "sheetWidthUm": 600000
+        },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
+        },
+        "projectId": "550e8400-e29b-41d4-a716-446655440000",
+        "projectName": "Decorativos",
+        "revision": 71,
+        "savedRevision": 9
+      }
+    },
+    "inherited": {
+      "canPasteFrames": false,
+      "composition": {
+        "frameBorder": {
+          "kind": "none"
+        },
+        "sheets": [
+          {
+            "activeSides": "both",
+            "backgrounds": [
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "kind": "color",
+                "rgb": "#FFFFFF"
+              }
+            ],
+            "base": {
+              "drawRect": {
+                "height": 300000,
+                "width": 600000,
+                "x": 0,
+                "y": 0
+              },
+              "rgb": "#FFFFFF"
+            },
+            "frames": [
+              {
+                "border": {
+                  "kind": "none"
+                },
+                "borderFillRects": [],
+                "clipRect": {
+                  "height": 260770,
+                  "width": 391154,
+                  "x": 15000,
+                  "y": 19615
+                },
+                "frameId": "00000000-0000-4000-8000-000000000101",
+                "opacityByte": 255,
+                "photo": {
+                  "blackAndWhite": false,
+                  "drawRect": {
+                    "height": 456348,
+                    "width": 684522,
+                    "x": -95013,
+                    "y": -127068
+                  },
+                  "mediaId": "00000000-0000-4000-8000-000000000010",
+                  "mirrorX": false,
+                  "name": "Foto.jpg",
+                  "palette": [
+                    "#C22C24",
+                    "#248044",
+                    "#2454C2"
+                  ],
+                  "placement": {
+                    "baseFillZoom": 651.925,
+                    "current": {
+                      "center": {
+                        "x": 232247.90625,
+                        "y": 81490.62500000001
+                      },
+                      "size": {
+                        "height": 456347.49999999994,
+                        "width": 684521.25
+                      }
+                    },
+                    "currentPan": {
+                      "x": 0.25,
+                      "y": -0.5
+                    },
+                    "currentZoom": 1.75,
+                    "panOrigin": {
+                      "x": 195577.0,
+                      "y": 130385.0
+                    },
+                    "panRange": {
+                      "maximum": 1.0,
+                      "minimum": -1.0
+                    },
+                    "panToCenter": {
+                      "xx": 146683.625,
+                      "xy": -0.0,
+                      "yx": 0.0,
+                      "yy": 97788.74999999997
+                    },
+                    "panToCenterPerZoom": {
+                      "xx": 195577.5,
+                      "xy": -0.0,
+                      "yx": 0.0,
+                      "yy": 130384.99999999999
+                    },
+                    "sizePerZoom": {
+                      "height": 260769.99999999997,
+                      "width": 391155.0
+                    },
+                    "zoomRange": {
+                      "maximum": 4.0,
+                      "minimum": 1.0
+                    }
+                  },
+                  "rotationDegrees": 0.0
+                },
+                "zIndex": 0
+              },
+              {
+                "border": {
+                  "kind": "none"
+                },
+                "borderFillRects": [],
+                "clipRect": {
+                  "height": 260770,
+                  "width": 173846,
+                  "x": 411154,
+                  "y": 19615
+                },
+                "frameId": "00000000-0000-4000-8000-000000000102",
+                "opacityByte": 255,
+                "photo": null,
+                "zIndex": 1
+              }
+            ],
+            "heightUm": 300000,
+            "number": 1,
+            "overlays": [
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "mediaId": "00000000-0000-4000-8000-000000000030",
+                "name": "Overlay.png"
+              }
+            ],
+            "sheetId": "00000000-0000-4000-8000-000000000001",
+            "widthUm": 600000
+          },
+          {
+            "activeSides": "both",
+            "backgrounds": [
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "kind": "color",
+                "rgb": "#FFFFFF"
+              }
+            ],
+            "base": {
+              "drawRect": {
+                "height": 300000,
+                "width": 600000,
+                "x": 0,
+                "y": 0
+              },
+              "rgb": "#FFFFFF"
+            },
+            "frames": [],
+            "heightUm": 300000,
+            "number": 2,
+            "overlays": [
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "mediaId": "00000000-0000-4000-8000-000000000030",
+                "name": "Overlay.png"
+              }
+            ],
+            "sheetId": "00000000-0000-4000-8000-000000000002",
+            "widthUm": 600000
+          }
+        ]
+      },
+      "mediaUsage": [
+        {
+          "breakdown": {
+            "albumBackgrounds": 0,
+            "albumOverlays": 0,
+            "backgrounds": 0,
+            "frames": 1,
+            "overlays": 0
+          },
+          "count": 1,
+          "mediaId": "00000000-0000-4000-8000-000000000010"
+        },
+        {
+          "breakdown": {
+            "albumBackgrounds": 0,
+            "albumOverlays": 0,
+            "backgrounds": 0,
+            "frames": 0,
+            "overlays": 0
+          },
+          "count": 0,
+          "mediaId": "00000000-0000-4000-8000-000000000020"
+        },
+        {
+          "breakdown": {
+            "albumBackgrounds": 0,
+            "albumOverlays": 1,
+            "backgrounds": 0,
+            "frames": 0,
+            "overlays": 2
+          },
+          "count": 3,
+          "mediaId": "00000000-0000-4000-8000-000000000030"
+        }
+      ],
+      "state": {
+        "album": {
+          "media": [
+            {
+              "id": "00000000-0000-4000-8000-000000000010",
+              "kind": "photo",
+              "name": "Foto.jpg",
+              "palette": [
+                "#C22C24",
+                "#248044",
+                "#2454C2"
+              ],
+              "sourceHeightPx": 400,
+              "sourceWidthPx": 600
+            },
+            {
+              "id": "00000000-0000-4000-8000-000000000020",
+              "kind": "decorative",
+              "name": "Textura.png",
+              "palette": null,
+              "sourceHeightPx": null,
+              "sourceWidthPx": null
+            },
+            {
+              "id": "00000000-0000-4000-8000-000000000030",
+              "kind": "decorative",
+              "name": "Overlay.png",
+              "palette": null,
+              "sourceHeightPx": null,
+              "sourceWidthPx": null
+            }
+          ],
+          "sheets": [
+            {
+              "activeSides": "both",
+              "frames": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000101",
+                  "photo": {
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "transform": {
+                      "blackAndWhite": false,
+                      "fineRotationDegrees": 0.0,
+                      "mirrorX": false,
+                      "panX": 0.25,
+                      "panY": -0.5,
+                      "quarterTurns": 0,
+                      "userZoom": 1.75
+                    }
+                  },
+                  "rect": {
+                    "height": 260770,
+                    "width": 391154,
+                    "x": 15000,
+                    "y": 19615
+                  },
+                  "style": {
+                    "borderRgb": "#000000",
+                    "borderWidthUm": 0,
+                    "opacityPercent": 100,
+                    "source": "album"
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "id": "00000000-0000-4000-8000-000000000102",
+                  "photo": null,
+                  "rect": {
+                    "height": 260770,
+                    "width": 173846,
+                    "x": 411154,
+                    "y": 19615
+                  },
+                  "style": {
+                    "borderRgb": "#000000",
+                    "borderWidthUm": 0,
+                    "opacityPercent": 100,
+                    "source": "album"
+                  },
+                  "zIndex": 1
+                }
+              ],
+              "heightUm": 300000,
+              "id": "00000000-0000-4000-8000-000000000001",
+              "layoutLocked": false,
+              "number": 1,
+              "pageNumbers": [
+                1,
+                2
+              ],
+              "role": "initial",
+              "widthUm": 600000
+            },
+            {
+              "activeSides": "both",
+              "frames": [],
+              "heightUm": 300000,
+              "id": "00000000-0000-4000-8000-000000000002",
+              "layoutLocked": false,
+              "number": 2,
+              "pageNumbers": [
+                3,
+                4
+              ],
+              "role": "final",
+              "widthUm": 600000
+            }
+          ],
+          "visualDefaults": {
+            "background": {
+              "both": {
+                "kind": "color",
+                "rgb": "#FFFFFF"
+              },
+              "scope": "bothSides"
+            },
+            "frameBorder": {
+              "kind": "none"
+            },
+            "overlay": {
+              "both": {
+                "kind": "media",
+                "mediaId": "00000000-0000-4000-8000-000000000030"
+              },
+              "scope": "bothSides"
+            }
+          }
+        },
+        "canRedo": false,
+        "canUndo": true,
+        "dirty": true,
+        "document": {
+          "bleedUm": 3000,
+          "displayUnit": "mm",
+          "dpi": 300,
+          "safetyUm": 3000,
+          "sheetHeightUm": 300000,
+          "sheetWidthUm": 600000
+        },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
+        },
+        "projectId": "550e8400-e29b-41d4-a716-446655440000",
+        "projectName": "Decorativos",
+        "revision": 68,
+        "savedRevision": 9
+      }
+    },
+    "local-color": {
+      "canPasteFrames": false,
+      "composition": {
+        "frameBorder": {
+          "kind": "none"
+        },
+        "sheets": [
+          {
+            "activeSides": "both",
+            "backgrounds": [
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "kind": "color",
+                "rgb": "#E7D6C4"
+              }
+            ],
+            "base": {
+              "drawRect": {
+                "height": 300000,
+                "width": 600000,
+                "x": 0,
+                "y": 0
+              },
+              "rgb": "#FFFFFF"
+            },
+            "frames": [
+              {
+                "border": {
+                  "kind": "none"
+                },
+                "borderFillRects": [],
+                "clipRect": {
+                  "height": 260770,
+                  "width": 391154,
+                  "x": 15000,
+                  "y": 19615
+                },
+                "frameId": "00000000-0000-4000-8000-000000000101",
+                "opacityByte": 255,
+                "photo": {
+                  "blackAndWhite": false,
+                  "drawRect": {
+                    "height": 456348,
+                    "width": 684522,
+                    "x": -95013,
+                    "y": -127068
+                  },
+                  "mediaId": "00000000-0000-4000-8000-000000000010",
+                  "mirrorX": false,
+                  "name": "Foto.jpg",
+                  "palette": [
+                    "#C22C24",
+                    "#248044",
+                    "#2454C2"
+                  ],
+                  "placement": {
+                    "baseFillZoom": 651.925,
+                    "current": {
+                      "center": {
+                        "x": 232247.90625,
+                        "y": 81490.62500000001
+                      },
+                      "size": {
+                        "height": 456347.49999999994,
+                        "width": 684521.25
+                      }
+                    },
+                    "currentPan": {
+                      "x": 0.25,
+                      "y": -0.5
+                    },
+                    "currentZoom": 1.75,
+                    "panOrigin": {
+                      "x": 195577.0,
+                      "y": 130385.0
+                    },
+                    "panRange": {
+                      "maximum": 1.0,
+                      "minimum": -1.0
+                    },
+                    "panToCenter": {
+                      "xx": 146683.625,
+                      "xy": -0.0,
+                      "yx": 0.0,
+                      "yy": 97788.74999999997
+                    },
+                    "panToCenterPerZoom": {
+                      "xx": 195577.5,
+                      "xy": -0.0,
+                      "yx": 0.0,
+                      "yy": 130384.99999999999
+                    },
+                    "sizePerZoom": {
+                      "height": 260769.99999999997,
+                      "width": 391155.0
+                    },
+                    "zoomRange": {
+                      "maximum": 4.0,
+                      "minimum": 1.0
+                    }
+                  },
+                  "rotationDegrees": 0.0
+                },
+                "zIndex": 0
+              },
+              {
+                "border": {
+                  "kind": "none"
+                },
+                "borderFillRects": [],
+                "clipRect": {
+                  "height": 260770,
+                  "width": 173846,
+                  "x": 411154,
+                  "y": 19615
+                },
+                "frameId": "00000000-0000-4000-8000-000000000102",
+                "opacityByte": 255,
+                "photo": null,
+                "zIndex": 1
+              }
+            ],
+            "heightUm": 300000,
+            "number": 1,
+            "overlays": [
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "mediaId": "00000000-0000-4000-8000-000000000030",
+                "name": "Overlay.png"
+              }
+            ],
+            "sheetId": "00000000-0000-4000-8000-000000000001",
+            "widthUm": 600000
+          },
+          {
+            "activeSides": "both",
+            "backgrounds": [
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "kind": "color",
+                "rgb": "#FFFFFF"
+              }
+            ],
+            "base": {
+              "drawRect": {
+                "height": 300000,
+                "width": 600000,
+                "x": 0,
+                "y": 0
+              },
+              "rgb": "#FFFFFF"
+            },
+            "frames": [],
+            "heightUm": 300000,
+            "number": 2,
+            "overlays": [
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "mediaId": "00000000-0000-4000-8000-000000000030",
+                "name": "Overlay.png"
+              }
+            ],
+            "sheetId": "00000000-0000-4000-8000-000000000002",
+            "widthUm": 600000
+          }
+        ]
+      },
+      "mediaUsage": [
+        {
+          "breakdown": {
+            "albumBackgrounds": 0,
+            "albumOverlays": 0,
+            "backgrounds": 0,
+            "frames": 1,
+            "overlays": 0
+          },
+          "count": 1,
+          "mediaId": "00000000-0000-4000-8000-000000000010"
+        },
+        {
+          "breakdown": {
+            "albumBackgrounds": 0,
+            "albumOverlays": 0,
+            "backgrounds": 0,
+            "frames": 0,
+            "overlays": 0
+          },
+          "count": 0,
+          "mediaId": "00000000-0000-4000-8000-000000000020"
+        },
+        {
+          "breakdown": {
+            "albumBackgrounds": 0,
+            "albumOverlays": 1,
+            "backgrounds": 0,
+            "frames": 0,
+            "overlays": 2
+          },
+          "count": 3,
+          "mediaId": "00000000-0000-4000-8000-000000000030"
+        }
+      ],
+      "state": {
+        "album": {
+          "media": [
+            {
+              "id": "00000000-0000-4000-8000-000000000010",
+              "kind": "photo",
+              "name": "Foto.jpg",
+              "palette": [
+                "#C22C24",
+                "#248044",
+                "#2454C2"
+              ],
+              "sourceHeightPx": 400,
+              "sourceWidthPx": 600
+            },
+            {
+              "id": "00000000-0000-4000-8000-000000000020",
+              "kind": "decorative",
+              "name": "Textura.png",
+              "palette": null,
+              "sourceHeightPx": null,
+              "sourceWidthPx": null
+            },
+            {
+              "id": "00000000-0000-4000-8000-000000000030",
+              "kind": "decorative",
+              "name": "Overlay.png",
+              "palette": null,
+              "sourceHeightPx": null,
+              "sourceWidthPx": null
+            }
+          ],
+          "sheets": [
+            {
+              "activeSides": "both",
+              "frames": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000101",
+                  "photo": {
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "transform": {
+                      "blackAndWhite": false,
+                      "fineRotationDegrees": 0.0,
+                      "mirrorX": false,
+                      "panX": 0.25,
+                      "panY": -0.5,
+                      "quarterTurns": 0,
+                      "userZoom": 1.75
+                    }
+                  },
+                  "rect": {
+                    "height": 260770,
+                    "width": 391154,
+                    "x": 15000,
+                    "y": 19615
+                  },
+                  "style": {
+                    "borderRgb": "#000000",
+                    "borderWidthUm": 0,
+                    "opacityPercent": 100,
+                    "source": "album"
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "id": "00000000-0000-4000-8000-000000000102",
+                  "photo": null,
+                  "rect": {
+                    "height": 260770,
+                    "width": 173846,
+                    "x": 411154,
+                    "y": 19615
+                  },
+                  "style": {
+                    "borderRgb": "#000000",
+                    "borderWidthUm": 0,
+                    "opacityPercent": 100,
+                    "source": "album"
+                  },
+                  "zIndex": 1
+                }
+              ],
+              "heightUm": 300000,
+              "id": "00000000-0000-4000-8000-000000000001",
+              "layoutLocked": false,
+              "number": 1,
+              "pageNumbers": [
+                1,
+                2
+              ],
+              "role": "initial",
+              "visuals": {
+                "background": {
+                  "content": {
+                    "kind": "color",
+                    "rgb": "#E7D6C4"
+                  },
+                  "kind": "bothSides"
+                },
+                "overlay": {
+                  "kind": "default"
+                }
+              },
+              "widthUm": 600000
+            },
+            {
+              "activeSides": "both",
+              "frames": [],
+              "heightUm": 300000,
+              "id": "00000000-0000-4000-8000-000000000002",
+              "layoutLocked": false,
+              "number": 2,
+              "pageNumbers": [
+                3,
+                4
+              ],
+              "role": "final",
+              "widthUm": 600000
+            }
+          ],
+          "visualDefaults": {
+            "background": {
+              "both": {
+                "kind": "color",
+                "rgb": "#FFFFFF"
+              },
+              "scope": "bothSides"
+            },
+            "frameBorder": {
+              "kind": "none"
+            },
+            "overlay": {
+              "both": {
+                "kind": "media",
+                "mediaId": "00000000-0000-4000-8000-000000000030"
+              },
+              "scope": "bothSides"
+            }
+          }
+        },
+        "canRedo": false,
+        "canUndo": true,
+        "dirty": true,
+        "document": {
+          "bleedUm": 3000,
+          "displayUnit": "mm",
+          "dpi": 300,
+          "safetyUm": 3000,
+          "sheetHeightUm": 300000,
+          "sheetWidthUm": 600000
+        },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
+        },
+        "projectId": "550e8400-e29b-41d4-a716-446655440000",
+        "projectName": "Decorativos",
+        "revision": 70,
+        "savedRevision": 9
+      }
+    },
+    "mixed-origin": {
+      "canPasteFrames": false,
+      "composition": {
+        "frameBorder": {
+          "kind": "none"
+        },
+        "sheets": [
+          {
+            "activeSides": "both",
+            "backgrounds": [
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 300000,
+                  "x": 0,
+                  "y": 0
+                },
+                "kind": "color",
+                "rgb": "#FFFFFF"
+              },
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 300000,
+                  "x": 300000,
+                  "y": 0
+                },
+                "kind": "color",
+                "rgb": "#FFFFFF"
+              }
+            ],
+            "base": {
+              "drawRect": {
+                "height": 300000,
+                "width": 600000,
+                "x": 0,
+                "y": 0
+              },
+              "rgb": "#FFFFFF"
+            },
+            "frames": [
+              {
+                "border": {
+                  "kind": "none"
+                },
+                "borderFillRects": [],
+                "clipRect": {
+                  "height": 260770,
+                  "width": 391154,
+                  "x": 15000,
+                  "y": 19615
+                },
+                "frameId": "00000000-0000-4000-8000-000000000101",
+                "opacityByte": 255,
+                "photo": {
+                  "blackAndWhite": false,
+                  "drawRect": {
+                    "height": 456348,
+                    "width": 684522,
+                    "x": -95013,
+                    "y": -127068
+                  },
+                  "mediaId": "00000000-0000-4000-8000-000000000010",
+                  "mirrorX": false,
+                  "name": "Foto.jpg",
+                  "palette": [
+                    "#C22C24",
+                    "#248044",
+                    "#2454C2"
+                  ],
+                  "placement": {
+                    "baseFillZoom": 651.925,
+                    "current": {
+                      "center": {
+                        "x": 232247.90625,
+                        "y": 81490.62500000001
+                      },
+                      "size": {
+                        "height": 456347.49999999994,
+                        "width": 684521.25
+                      }
+                    },
+                    "currentPan": {
+                      "x": 0.25,
+                      "y": -0.5
+                    },
+                    "currentZoom": 1.75,
+                    "panOrigin": {
+                      "x": 195577.0,
+                      "y": 130385.0
+                    },
+                    "panRange": {
+                      "maximum": 1.0,
+                      "minimum": -1.0
+                    },
+                    "panToCenter": {
+                      "xx": 146683.625,
+                      "xy": -0.0,
+                      "yx": 0.0,
+                      "yy": 97788.74999999997
+                    },
+                    "panToCenterPerZoom": {
+                      "xx": 195577.5,
+                      "xy": -0.0,
+                      "yx": 0.0,
+                      "yy": 130384.99999999999
+                    },
+                    "sizePerZoom": {
+                      "height": 260769.99999999997,
+                      "width": 391155.0
+                    },
+                    "zoomRange": {
+                      "maximum": 4.0,
+                      "minimum": 1.0
+                    }
+                  },
+                  "rotationDegrees": 0.0
+                },
+                "zIndex": 0
+              },
+              {
+                "border": {
+                  "kind": "none"
+                },
+                "borderFillRects": [],
+                "clipRect": {
+                  "height": 260770,
+                  "width": 173846,
+                  "x": 411154,
+                  "y": 19615
+                },
+                "frameId": "00000000-0000-4000-8000-000000000102",
+                "opacityByte": 255,
+                "photo": null,
+                "zIndex": 1
+              }
+            ],
+            "heightUm": 300000,
+            "number": 1,
+            "overlays": [
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "mediaId": "00000000-0000-4000-8000-000000000030",
+                "name": "Overlay.png"
+              }
+            ],
+            "sheetId": "00000000-0000-4000-8000-000000000001",
+            "widthUm": 600000
+          },
+          {
+            "activeSides": "both",
+            "backgrounds": [
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "kind": "color",
+                "rgb": "#FFFFFF"
+              }
+            ],
+            "base": {
+              "drawRect": {
+                "height": 300000,
+                "width": 600000,
+                "x": 0,
+                "y": 0
+              },
+              "rgb": "#FFFFFF"
+            },
+            "frames": [],
+            "heightUm": 300000,
+            "number": 2,
+            "overlays": [
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "mediaId": "00000000-0000-4000-8000-000000000030",
+                "name": "Overlay.png"
+              }
+            ],
+            "sheetId": "00000000-0000-4000-8000-000000000002",
+            "widthUm": 600000
+          }
+        ]
+      },
+      "mediaUsage": [
+        {
+          "breakdown": {
+            "albumBackgrounds": 0,
+            "albumOverlays": 0,
+            "backgrounds": 0,
+            "frames": 1,
+            "overlays": 0
+          },
+          "count": 1,
+          "mediaId": "00000000-0000-4000-8000-000000000010"
+        },
+        {
+          "breakdown": {
+            "albumBackgrounds": 0,
+            "albumOverlays": 0,
+            "backgrounds": 0,
+            "frames": 0,
+            "overlays": 0
+          },
+          "count": 0,
+          "mediaId": "00000000-0000-4000-8000-000000000020"
+        },
+        {
+          "breakdown": {
+            "albumBackgrounds": 0,
+            "albumOverlays": 1,
+            "backgrounds": 0,
+            "frames": 0,
+            "overlays": 2
+          },
+          "count": 3,
+          "mediaId": "00000000-0000-4000-8000-000000000030"
+        }
+      ],
+      "state": {
+        "album": {
+          "media": [
+            {
+              "id": "00000000-0000-4000-8000-000000000010",
+              "kind": "photo",
+              "name": "Foto.jpg",
+              "palette": [
+                "#C22C24",
+                "#248044",
+                "#2454C2"
+              ],
+              "sourceHeightPx": 400,
+              "sourceWidthPx": 600
+            },
+            {
+              "id": "00000000-0000-4000-8000-000000000020",
+              "kind": "decorative",
+              "name": "Textura.png",
+              "palette": null,
+              "sourceHeightPx": null,
+              "sourceWidthPx": null
+            },
+            {
+              "id": "00000000-0000-4000-8000-000000000030",
+              "kind": "decorative",
+              "name": "Overlay.png",
+              "palette": null,
+              "sourceHeightPx": null,
+              "sourceWidthPx": null
+            }
+          ],
+          "sheets": [
+            {
+              "activeSides": "both",
+              "frames": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000101",
+                  "photo": {
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "transform": {
+                      "blackAndWhite": false,
+                      "fineRotationDegrees": 0.0,
+                      "mirrorX": false,
+                      "panX": 0.25,
+                      "panY": -0.5,
+                      "quarterTurns": 0,
+                      "userZoom": 1.75
+                    }
+                  },
+                  "rect": {
+                    "height": 260770,
+                    "width": 391154,
+                    "x": 15000,
+                    "y": 19615
+                  },
+                  "style": {
+                    "borderRgb": "#000000",
+                    "borderWidthUm": 0,
+                    "opacityPercent": 100,
+                    "source": "album"
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "id": "00000000-0000-4000-8000-000000000102",
+                  "photo": null,
+                  "rect": {
+                    "height": 260770,
+                    "width": 173846,
+                    "x": 411154,
+                    "y": 19615
+                  },
+                  "style": {
+                    "borderRgb": "#000000",
+                    "borderWidthUm": 0,
+                    "opacityPercent": 100,
+                    "source": "album"
+                  },
+                  "zIndex": 1
+                }
+              ],
+              "heightUm": 300000,
+              "id": "00000000-0000-4000-8000-000000000001",
+              "layoutLocked": false,
+              "number": 1,
+              "pageNumbers": [
+                1,
+                2
+              ],
+              "role": "initial",
+              "visuals": {
+                "background": {
+                  "kind": "perSide",
+                  "left": {
+                    "content": {
+                      "kind": "color",
+                      "rgb": "#FFFFFF"
+                    },
+                    "kind": "custom",
+                    "mapping": "side"
+                  },
+                  "right": {
+                    "kind": "default"
+                  }
+                },
+                "overlay": {
+                  "kind": "default"
+                }
+              },
+              "widthUm": 600000
+            },
+            {
+              "activeSides": "both",
+              "frames": [],
+              "heightUm": 300000,
+              "id": "00000000-0000-4000-8000-000000000002",
+              "layoutLocked": false,
+              "number": 2,
+              "pageNumbers": [
+                3,
+                4
+              ],
+              "role": "final",
+              "widthUm": 600000
+            }
+          ],
+          "visualDefaults": {
+            "background": {
+              "both": {
+                "kind": "color",
+                "rgb": "#FFFFFF"
+              },
+              "scope": "bothSides"
+            },
+            "frameBorder": {
+              "kind": "none"
+            },
+            "overlay": {
+              "both": {
+                "kind": "media",
+                "mediaId": "00000000-0000-4000-8000-000000000030"
+              },
+              "scope": "bothSides"
+            }
+          }
+        },
+        "canRedo": false,
+        "canUndo": true,
+        "dirty": true,
+        "document": {
+          "bleedUm": 3000,
+          "displayUnit": "mm",
+          "dpi": 300,
+          "safetyUm": 3000,
+          "sheetHeightUm": 300000,
+          "sheetWidthUm": 600000
+        },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
+        },
+        "projectId": "550e8400-e29b-41d4-a716-446655440000",
+        "projectName": "Decorativos",
+        "revision": 69,
+        "savedRevision": 9
+      }
+    },
     "neutral": {
       "canPasteFrames": false,
       "composition": {
@@ -9608,6 +11541,771 @@
         "projectId": "550e8400-e29b-41d4-a716-446655440000",
         "projectName": "Decorativos",
         "revision": 46,
+        "savedRevision": 9
+      }
+    },
+    "removed-overlay": {
+      "canPasteFrames": false,
+      "composition": {
+        "frameBorder": {
+          "kind": "none"
+        },
+        "sheets": [
+          {
+            "activeSides": "both",
+            "backgrounds": [
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 300000,
+                  "x": 0,
+                  "y": 0
+                },
+                "kind": "color",
+                "rgb": "#FFFFFF"
+              },
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 300000,
+                  "x": 300000,
+                  "y": 0
+                },
+                "kind": "color",
+                "rgb": "#E7D6C4"
+              }
+            ],
+            "base": {
+              "drawRect": {
+                "height": 300000,
+                "width": 600000,
+                "x": 0,
+                "y": 0
+              },
+              "rgb": "#FFFFFF"
+            },
+            "frames": [
+              {
+                "border": {
+                  "kind": "none"
+                },
+                "borderFillRects": [],
+                "clipRect": {
+                  "height": 260770,
+                  "width": 391154,
+                  "x": 15000,
+                  "y": 19615
+                },
+                "frameId": "00000000-0000-4000-8000-000000000101",
+                "opacityByte": 255,
+                "photo": {
+                  "blackAndWhite": false,
+                  "drawRect": {
+                    "height": 456348,
+                    "width": 684522,
+                    "x": -95013,
+                    "y": -127068
+                  },
+                  "mediaId": "00000000-0000-4000-8000-000000000010",
+                  "mirrorX": false,
+                  "name": "Foto.jpg",
+                  "palette": [
+                    "#C22C24",
+                    "#248044",
+                    "#2454C2"
+                  ],
+                  "placement": {
+                    "baseFillZoom": 651.925,
+                    "current": {
+                      "center": {
+                        "x": 232247.90625,
+                        "y": 81490.62500000001
+                      },
+                      "size": {
+                        "height": 456347.49999999994,
+                        "width": 684521.25
+                      }
+                    },
+                    "currentPan": {
+                      "x": 0.25,
+                      "y": -0.5
+                    },
+                    "currentZoom": 1.75,
+                    "panOrigin": {
+                      "x": 195577.0,
+                      "y": 130385.0
+                    },
+                    "panRange": {
+                      "maximum": 1.0,
+                      "minimum": -1.0
+                    },
+                    "panToCenter": {
+                      "xx": 146683.625,
+                      "xy": -0.0,
+                      "yx": 0.0,
+                      "yy": 97788.74999999997
+                    },
+                    "panToCenterPerZoom": {
+                      "xx": 195577.5,
+                      "xy": -0.0,
+                      "yx": 0.0,
+                      "yy": 130384.99999999999
+                    },
+                    "sizePerZoom": {
+                      "height": 260769.99999999997,
+                      "width": 391155.0
+                    },
+                    "zoomRange": {
+                      "maximum": 4.0,
+                      "minimum": 1.0
+                    }
+                  },
+                  "rotationDegrees": 0.0
+                },
+                "zIndex": 0
+              },
+              {
+                "border": {
+                  "kind": "none"
+                },
+                "borderFillRects": [],
+                "clipRect": {
+                  "height": 260770,
+                  "width": 173846,
+                  "x": 411154,
+                  "y": 19615
+                },
+                "frameId": "00000000-0000-4000-8000-000000000102",
+                "opacityByte": 255,
+                "photo": null,
+                "zIndex": 1
+              }
+            ],
+            "heightUm": 300000,
+            "number": 1,
+            "overlays": [],
+            "sheetId": "00000000-0000-4000-8000-000000000001",
+            "widthUm": 600000
+          },
+          {
+            "activeSides": "both",
+            "backgrounds": [
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "kind": "color",
+                "rgb": "#FFFFFF"
+              }
+            ],
+            "base": {
+              "drawRect": {
+                "height": 300000,
+                "width": 600000,
+                "x": 0,
+                "y": 0
+              },
+              "rgb": "#FFFFFF"
+            },
+            "frames": [],
+            "heightUm": 300000,
+            "number": 2,
+            "overlays": [
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "mediaId": "00000000-0000-4000-8000-000000000030",
+                "name": "Overlay.png"
+              }
+            ],
+            "sheetId": "00000000-0000-4000-8000-000000000002",
+            "widthUm": 600000
+          }
+        ]
+      },
+      "mediaUsage": [
+        {
+          "breakdown": {
+            "albumBackgrounds": 0,
+            "albumOverlays": 0,
+            "backgrounds": 0,
+            "frames": 1,
+            "overlays": 0
+          },
+          "count": 1,
+          "mediaId": "00000000-0000-4000-8000-000000000010"
+        },
+        {
+          "breakdown": {
+            "albumBackgrounds": 0,
+            "albumOverlays": 0,
+            "backgrounds": 0,
+            "frames": 0,
+            "overlays": 0
+          },
+          "count": 0,
+          "mediaId": "00000000-0000-4000-8000-000000000020"
+        },
+        {
+          "breakdown": {
+            "albumBackgrounds": 0,
+            "albumOverlays": 1,
+            "backgrounds": 0,
+            "frames": 0,
+            "overlays": 1
+          },
+          "count": 2,
+          "mediaId": "00000000-0000-4000-8000-000000000030"
+        }
+      ],
+      "state": {
+        "album": {
+          "media": [
+            {
+              "id": "00000000-0000-4000-8000-000000000010",
+              "kind": "photo",
+              "name": "Foto.jpg",
+              "palette": [
+                "#C22C24",
+                "#248044",
+                "#2454C2"
+              ],
+              "sourceHeightPx": 400,
+              "sourceWidthPx": 600
+            },
+            {
+              "id": "00000000-0000-4000-8000-000000000020",
+              "kind": "decorative",
+              "name": "Textura.png",
+              "palette": null,
+              "sourceHeightPx": null,
+              "sourceWidthPx": null
+            },
+            {
+              "id": "00000000-0000-4000-8000-000000000030",
+              "kind": "decorative",
+              "name": "Overlay.png",
+              "palette": null,
+              "sourceHeightPx": null,
+              "sourceWidthPx": null
+            }
+          ],
+          "sheets": [
+            {
+              "activeSides": "both",
+              "frames": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000101",
+                  "photo": {
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "transform": {
+                      "blackAndWhite": false,
+                      "fineRotationDegrees": 0.0,
+                      "mirrorX": false,
+                      "panX": 0.25,
+                      "panY": -0.5,
+                      "quarterTurns": 0,
+                      "userZoom": 1.75
+                    }
+                  },
+                  "rect": {
+                    "height": 260770,
+                    "width": 391154,
+                    "x": 15000,
+                    "y": 19615
+                  },
+                  "style": {
+                    "borderRgb": "#000000",
+                    "borderWidthUm": 0,
+                    "opacityPercent": 100,
+                    "source": "album"
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "id": "00000000-0000-4000-8000-000000000102",
+                  "photo": null,
+                  "rect": {
+                    "height": 260770,
+                    "width": 173846,
+                    "x": 411154,
+                    "y": 19615
+                  },
+                  "style": {
+                    "borderRgb": "#000000",
+                    "borderWidthUm": 0,
+                    "opacityPercent": 100,
+                    "source": "album"
+                  },
+                  "zIndex": 1
+                }
+              ],
+              "heightUm": 300000,
+              "id": "00000000-0000-4000-8000-000000000001",
+              "layoutLocked": false,
+              "number": 1,
+              "pageNumbers": [
+                1,
+                2
+              ],
+              "role": "initial",
+              "visuals": {
+                "background": {
+                  "kind": "perSide",
+                  "left": {
+                    "kind": "default"
+                  },
+                  "right": {
+                    "content": {
+                      "kind": "color",
+                      "rgb": "#E7D6C4"
+                    },
+                    "kind": "custom",
+                    "mapping": "bothSides"
+                  }
+                },
+                "overlay": {
+                  "content": null,
+                  "kind": "bothSides"
+                }
+              },
+              "widthUm": 600000
+            },
+            {
+              "activeSides": "both",
+              "frames": [],
+              "heightUm": 300000,
+              "id": "00000000-0000-4000-8000-000000000002",
+              "layoutLocked": false,
+              "number": 2,
+              "pageNumbers": [
+                3,
+                4
+              ],
+              "role": "final",
+              "widthUm": 600000
+            }
+          ],
+          "visualDefaults": {
+            "background": {
+              "both": {
+                "kind": "color",
+                "rgb": "#FFFFFF"
+              },
+              "scope": "bothSides"
+            },
+            "frameBorder": {
+              "kind": "none"
+            },
+            "overlay": {
+              "both": {
+                "kind": "media",
+                "mediaId": "00000000-0000-4000-8000-000000000030"
+              },
+              "scope": "bothSides"
+            }
+          }
+        },
+        "canRedo": false,
+        "canUndo": true,
+        "dirty": true,
+        "document": {
+          "bleedUm": 3000,
+          "displayUnit": "mm",
+          "dpi": 300,
+          "safetyUm": 3000,
+          "sheetHeightUm": 300000,
+          "sheetWidthUm": 600000
+        },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
+        },
+        "projectId": "550e8400-e29b-41d4-a716-446655440000",
+        "projectName": "Decorativos",
+        "revision": 72,
+        "savedRevision": 9
+      }
+    },
+    "restored": {
+      "canPasteFrames": false,
+      "composition": {
+        "frameBorder": {
+          "kind": "none"
+        },
+        "sheets": [
+          {
+            "activeSides": "both",
+            "backgrounds": [
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "kind": "color",
+                "rgb": "#FFFFFF"
+              }
+            ],
+            "base": {
+              "drawRect": {
+                "height": 300000,
+                "width": 600000,
+                "x": 0,
+                "y": 0
+              },
+              "rgb": "#FFFFFF"
+            },
+            "frames": [
+              {
+                "border": {
+                  "kind": "none"
+                },
+                "borderFillRects": [],
+                "clipRect": {
+                  "height": 260770,
+                  "width": 391154,
+                  "x": 15000,
+                  "y": 19615
+                },
+                "frameId": "00000000-0000-4000-8000-000000000101",
+                "opacityByte": 255,
+                "photo": {
+                  "blackAndWhite": false,
+                  "drawRect": {
+                    "height": 456348,
+                    "width": 684522,
+                    "x": -95013,
+                    "y": -127068
+                  },
+                  "mediaId": "00000000-0000-4000-8000-000000000010",
+                  "mirrorX": false,
+                  "name": "Foto.jpg",
+                  "palette": [
+                    "#C22C24",
+                    "#248044",
+                    "#2454C2"
+                  ],
+                  "placement": {
+                    "baseFillZoom": 651.925,
+                    "current": {
+                      "center": {
+                        "x": 232247.90625,
+                        "y": 81490.62500000001
+                      },
+                      "size": {
+                        "height": 456347.49999999994,
+                        "width": 684521.25
+                      }
+                    },
+                    "currentPan": {
+                      "x": 0.25,
+                      "y": -0.5
+                    },
+                    "currentZoom": 1.75,
+                    "panOrigin": {
+                      "x": 195577.0,
+                      "y": 130385.0
+                    },
+                    "panRange": {
+                      "maximum": 1.0,
+                      "minimum": -1.0
+                    },
+                    "panToCenter": {
+                      "xx": 146683.625,
+                      "xy": -0.0,
+                      "yx": 0.0,
+                      "yy": 97788.74999999997
+                    },
+                    "panToCenterPerZoom": {
+                      "xx": 195577.5,
+                      "xy": -0.0,
+                      "yx": 0.0,
+                      "yy": 130384.99999999999
+                    },
+                    "sizePerZoom": {
+                      "height": 260769.99999999997,
+                      "width": 391155.0
+                    },
+                    "zoomRange": {
+                      "maximum": 4.0,
+                      "minimum": 1.0
+                    }
+                  },
+                  "rotationDegrees": 0.0
+                },
+                "zIndex": 0
+              },
+              {
+                "border": {
+                  "kind": "none"
+                },
+                "borderFillRects": [],
+                "clipRect": {
+                  "height": 260770,
+                  "width": 173846,
+                  "x": 411154,
+                  "y": 19615
+                },
+                "frameId": "00000000-0000-4000-8000-000000000102",
+                "opacityByte": 255,
+                "photo": null,
+                "zIndex": 1
+              }
+            ],
+            "heightUm": 300000,
+            "number": 1,
+            "overlays": [
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "mediaId": "00000000-0000-4000-8000-000000000030",
+                "name": "Overlay.png"
+              }
+            ],
+            "sheetId": "00000000-0000-4000-8000-000000000001",
+            "widthUm": 600000
+          },
+          {
+            "activeSides": "both",
+            "backgrounds": [
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "kind": "color",
+                "rgb": "#FFFFFF"
+              }
+            ],
+            "base": {
+              "drawRect": {
+                "height": 300000,
+                "width": 600000,
+                "x": 0,
+                "y": 0
+              },
+              "rgb": "#FFFFFF"
+            },
+            "frames": [],
+            "heightUm": 300000,
+            "number": 2,
+            "overlays": [
+              {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "mediaId": "00000000-0000-4000-8000-000000000030",
+                "name": "Overlay.png"
+              }
+            ],
+            "sheetId": "00000000-0000-4000-8000-000000000002",
+            "widthUm": 600000
+          }
+        ]
+      },
+      "mediaUsage": [
+        {
+          "breakdown": {
+            "albumBackgrounds": 0,
+            "albumOverlays": 0,
+            "backgrounds": 0,
+            "frames": 1,
+            "overlays": 0
+          },
+          "count": 1,
+          "mediaId": "00000000-0000-4000-8000-000000000010"
+        },
+        {
+          "breakdown": {
+            "albumBackgrounds": 0,
+            "albumOverlays": 0,
+            "backgrounds": 0,
+            "frames": 0,
+            "overlays": 0
+          },
+          "count": 0,
+          "mediaId": "00000000-0000-4000-8000-000000000020"
+        },
+        {
+          "breakdown": {
+            "albumBackgrounds": 0,
+            "albumOverlays": 1,
+            "backgrounds": 0,
+            "frames": 0,
+            "overlays": 2
+          },
+          "count": 3,
+          "mediaId": "00000000-0000-4000-8000-000000000030"
+        }
+      ],
+      "state": {
+        "album": {
+          "media": [
+            {
+              "id": "00000000-0000-4000-8000-000000000010",
+              "kind": "photo",
+              "name": "Foto.jpg",
+              "palette": [
+                "#C22C24",
+                "#248044",
+                "#2454C2"
+              ],
+              "sourceHeightPx": 400,
+              "sourceWidthPx": 600
+            },
+            {
+              "id": "00000000-0000-4000-8000-000000000020",
+              "kind": "decorative",
+              "name": "Textura.png",
+              "palette": null,
+              "sourceHeightPx": null,
+              "sourceWidthPx": null
+            },
+            {
+              "id": "00000000-0000-4000-8000-000000000030",
+              "kind": "decorative",
+              "name": "Overlay.png",
+              "palette": null,
+              "sourceHeightPx": null,
+              "sourceWidthPx": null
+            }
+          ],
+          "sheets": [
+            {
+              "activeSides": "both",
+              "frames": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000101",
+                  "photo": {
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "transform": {
+                      "blackAndWhite": false,
+                      "fineRotationDegrees": 0.0,
+                      "mirrorX": false,
+                      "panX": 0.25,
+                      "panY": -0.5,
+                      "quarterTurns": 0,
+                      "userZoom": 1.75
+                    }
+                  },
+                  "rect": {
+                    "height": 260770,
+                    "width": 391154,
+                    "x": 15000,
+                    "y": 19615
+                  },
+                  "style": {
+                    "borderRgb": "#000000",
+                    "borderWidthUm": 0,
+                    "opacityPercent": 100,
+                    "source": "album"
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "id": "00000000-0000-4000-8000-000000000102",
+                  "photo": null,
+                  "rect": {
+                    "height": 260770,
+                    "width": 173846,
+                    "x": 411154,
+                    "y": 19615
+                  },
+                  "style": {
+                    "borderRgb": "#000000",
+                    "borderWidthUm": 0,
+                    "opacityPercent": 100,
+                    "source": "album"
+                  },
+                  "zIndex": 1
+                }
+              ],
+              "heightUm": 300000,
+              "id": "00000000-0000-4000-8000-000000000001",
+              "layoutLocked": false,
+              "number": 1,
+              "pageNumbers": [
+                1,
+                2
+              ],
+              "role": "initial",
+              "widthUm": 600000
+            },
+            {
+              "activeSides": "both",
+              "frames": [],
+              "heightUm": 300000,
+              "id": "00000000-0000-4000-8000-000000000002",
+              "layoutLocked": false,
+              "number": 2,
+              "pageNumbers": [
+                3,
+                4
+              ],
+              "role": "final",
+              "widthUm": 600000
+            }
+          ],
+          "visualDefaults": {
+            "background": {
+              "both": {
+                "kind": "color",
+                "rgb": "#FFFFFF"
+              },
+              "scope": "bothSides"
+            },
+            "frameBorder": {
+              "kind": "none"
+            },
+            "overlay": {
+              "both": {
+                "kind": "media",
+                "mediaId": "00000000-0000-4000-8000-000000000030"
+              },
+              "scope": "bothSides"
+            }
+          }
+        },
+        "canRedo": false,
+        "canUndo": true,
+        "dirty": true,
+        "document": {
+          "bleedUm": 3000,
+          "displayUnit": "mm",
+          "dpi": 300,
+          "safetyUm": 3000,
+          "sheetHeightUm": 300000,
+          "sheetWidthUm": 600000
+        },
+        "layoutSettings": {
+          "gapUm": 5000,
+          "marginUm": 15000,
+          "minimumSideUm": 20000,
+          "permission": "pagesAndSheet"
+        },
+        "projectId": "550e8400-e29b-41d4-a716-446655440000",
+        "projectName": "Decorativos",
+        "revision": 74,
         "savedRevision": 9
       }
     },
@@ -33072,6 +35770,2403 @@
           "projectId": "550e8400-e29b-41d4-a716-446655440000",
           "projectName": "Decorativos",
           "revision": 64,
+          "savedRevision": 9
+        }
+      }
+    },
+    {
+      "from": "inherited",
+      "intent": {
+        "change": {
+          "kind": "remove",
+          "role": "background"
+        },
+        "kind": "editSheetVisual",
+        "scope": "left",
+        "sheetId": "00000000-0000-4000-8000-000000000001"
+      },
+      "projection": {
+        "canPasteFrames": false,
+        "composition": {
+          "frameBorder": {
+            "kind": "none"
+          },
+          "sheets": [
+            {
+              "activeSides": "both",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 300000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                },
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 300000,
+                    "x": 300000,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 260770,
+                    "width": 391154,
+                    "x": 15000,
+                    "y": 19615
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000101",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 456348,
+                      "width": 684522,
+                      "x": -95013,
+                      "y": -127068
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#C22C24",
+                      "#248044",
+                      "#2454C2"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 651.925,
+                      "current": {
+                        "center": {
+                          "x": 232247.90625,
+                          "y": 81490.62500000001
+                        },
+                        "size": {
+                          "height": 456347.49999999994,
+                          "width": 684521.25
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.25,
+                        "y": -0.5
+                      },
+                      "currentZoom": 1.75,
+                      "panOrigin": {
+                        "x": 195577.0,
+                        "y": 130385.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 146683.625,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 97788.74999999997
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 195577.5,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 130384.99999999999
+                      },
+                      "sizePerZoom": {
+                        "height": 260769.99999999997,
+                        "width": 391155.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 260770,
+                    "width": 173846,
+                    "x": 411154,
+                    "y": 19615
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000102",
+                  "opacityByte": 255,
+                  "photo": null,
+                  "zIndex": 1
+                }
+              ],
+              "heightUm": 300000,
+              "number": 1,
+              "overlays": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "mediaId": "00000000-0000-4000-8000-000000000030",
+                  "name": "Overlay.png"
+                }
+              ],
+              "sheetId": "00000000-0000-4000-8000-000000000001",
+              "widthUm": 600000
+            },
+            {
+              "activeSides": "both",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [],
+              "heightUm": 300000,
+              "number": 2,
+              "overlays": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "mediaId": "00000000-0000-4000-8000-000000000030",
+                  "name": "Overlay.png"
+                }
+              ],
+              "sheetId": "00000000-0000-4000-8000-000000000002",
+              "widthUm": 600000
+            }
+          ]
+        },
+        "mediaUsage": [
+          {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 0,
+              "backgrounds": 0,
+              "frames": 1,
+              "overlays": 0
+            },
+            "count": 1,
+            "mediaId": "00000000-0000-4000-8000-000000000010"
+          },
+          {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 0,
+              "backgrounds": 0,
+              "frames": 0,
+              "overlays": 0
+            },
+            "count": 0,
+            "mediaId": "00000000-0000-4000-8000-000000000020"
+          },
+          {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 1,
+              "backgrounds": 0,
+              "frames": 0,
+              "overlays": 2
+            },
+            "count": 3,
+            "mediaId": "00000000-0000-4000-8000-000000000030"
+          }
+        ],
+        "state": {
+          "album": {
+            "media": [
+              {
+                "id": "00000000-0000-4000-8000-000000000010",
+                "kind": "photo",
+                "name": "Foto.jpg",
+                "palette": [
+                  "#C22C24",
+                  "#248044",
+                  "#2454C2"
+                ],
+                "sourceHeightPx": 400,
+                "sourceWidthPx": 600
+              },
+              {
+                "id": "00000000-0000-4000-8000-000000000020",
+                "kind": "decorative",
+                "name": "Textura.png",
+                "palette": null,
+                "sourceHeightPx": null,
+                "sourceWidthPx": null
+              },
+              {
+                "id": "00000000-0000-4000-8000-000000000030",
+                "kind": "decorative",
+                "name": "Overlay.png",
+                "palette": null,
+                "sourceHeightPx": null,
+                "sourceWidthPx": null
+              }
+            ],
+            "sheets": [
+              {
+                "activeSides": "both",
+                "frames": [
+                  {
+                    "id": "00000000-0000-4000-8000-000000000101",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000010",
+                      "transform": {
+                        "blackAndWhite": false,
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": 0.25,
+                        "panY": -0.5,
+                        "quarterTurns": 0,
+                        "userZoom": 1.75
+                      }
+                    },
+                    "rect": {
+                      "height": 260770,
+                      "width": 391154,
+                      "x": 15000,
+                      "y": 19615
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 0
+                  },
+                  {
+                    "id": "00000000-0000-4000-8000-000000000102",
+                    "photo": null,
+                    "rect": {
+                      "height": 260770,
+                      "width": 173846,
+                      "x": 411154,
+                      "y": 19615
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 1
+                  }
+                ],
+                "heightUm": 300000,
+                "id": "00000000-0000-4000-8000-000000000001",
+                "layoutLocked": false,
+                "number": 1,
+                "pageNumbers": [
+                  1,
+                  2
+                ],
+                "role": "initial",
+                "visuals": {
+                  "background": {
+                    "kind": "perSide",
+                    "left": {
+                      "content": {
+                        "kind": "color",
+                        "rgb": "#FFFFFF"
+                      },
+                      "kind": "custom",
+                      "mapping": "side"
+                    },
+                    "right": {
+                      "kind": "default"
+                    }
+                  },
+                  "overlay": {
+                    "kind": "default"
+                  }
+                },
+                "widthUm": 600000
+              },
+              {
+                "activeSides": "both",
+                "frames": [],
+                "heightUm": 300000,
+                "id": "00000000-0000-4000-8000-000000000002",
+                "layoutLocked": false,
+                "number": 2,
+                "pageNumbers": [
+                  3,
+                  4
+                ],
+                "role": "final",
+                "widthUm": 600000
+              }
+            ],
+            "visualDefaults": {
+              "background": {
+                "both": {
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                },
+                "scope": "bothSides"
+              },
+              "frameBorder": {
+                "kind": "none"
+              },
+              "overlay": {
+                "both": {
+                  "kind": "media",
+                  "mediaId": "00000000-0000-4000-8000-000000000030"
+                },
+                "scope": "bothSides"
+              }
+            }
+          },
+          "canRedo": false,
+          "canUndo": true,
+          "dirty": true,
+          "document": {
+            "bleedUm": 3000,
+            "displayUnit": "mm",
+            "dpi": 300,
+            "safetyUm": 3000,
+            "sheetHeightUm": 300000,
+            "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
+          "projectId": "550e8400-e29b-41d4-a716-446655440000",
+          "projectName": "Decorativos",
+          "revision": 69,
+          "savedRevision": 9
+        }
+      }
+    },
+    {
+      "from": "mixed-origin",
+      "intent": {
+        "change": {
+          "kind": "backgroundColor",
+          "rgb": "#E7D6C4"
+        },
+        "kind": "editSheetVisual",
+        "scope": "bothSides",
+        "sheetId": "00000000-0000-4000-8000-000000000001"
+      },
+      "projection": {
+        "canPasteFrames": false,
+        "composition": {
+          "frameBorder": {
+            "kind": "none"
+          },
+          "sheets": [
+            {
+              "activeSides": "both",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#E7D6C4"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 260770,
+                    "width": 391154,
+                    "x": 15000,
+                    "y": 19615
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000101",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 456348,
+                      "width": 684522,
+                      "x": -95013,
+                      "y": -127068
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#C22C24",
+                      "#248044",
+                      "#2454C2"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 651.925,
+                      "current": {
+                        "center": {
+                          "x": 232247.90625,
+                          "y": 81490.62500000001
+                        },
+                        "size": {
+                          "height": 456347.49999999994,
+                          "width": 684521.25
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.25,
+                        "y": -0.5
+                      },
+                      "currentZoom": 1.75,
+                      "panOrigin": {
+                        "x": 195577.0,
+                        "y": 130385.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 146683.625,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 97788.74999999997
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 195577.5,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 130384.99999999999
+                      },
+                      "sizePerZoom": {
+                        "height": 260769.99999999997,
+                        "width": 391155.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 260770,
+                    "width": 173846,
+                    "x": 411154,
+                    "y": 19615
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000102",
+                  "opacityByte": 255,
+                  "photo": null,
+                  "zIndex": 1
+                }
+              ],
+              "heightUm": 300000,
+              "number": 1,
+              "overlays": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "mediaId": "00000000-0000-4000-8000-000000000030",
+                  "name": "Overlay.png"
+                }
+              ],
+              "sheetId": "00000000-0000-4000-8000-000000000001",
+              "widthUm": 600000
+            },
+            {
+              "activeSides": "both",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [],
+              "heightUm": 300000,
+              "number": 2,
+              "overlays": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "mediaId": "00000000-0000-4000-8000-000000000030",
+                  "name": "Overlay.png"
+                }
+              ],
+              "sheetId": "00000000-0000-4000-8000-000000000002",
+              "widthUm": 600000
+            }
+          ]
+        },
+        "mediaUsage": [
+          {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 0,
+              "backgrounds": 0,
+              "frames": 1,
+              "overlays": 0
+            },
+            "count": 1,
+            "mediaId": "00000000-0000-4000-8000-000000000010"
+          },
+          {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 0,
+              "backgrounds": 0,
+              "frames": 0,
+              "overlays": 0
+            },
+            "count": 0,
+            "mediaId": "00000000-0000-4000-8000-000000000020"
+          },
+          {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 1,
+              "backgrounds": 0,
+              "frames": 0,
+              "overlays": 2
+            },
+            "count": 3,
+            "mediaId": "00000000-0000-4000-8000-000000000030"
+          }
+        ],
+        "state": {
+          "album": {
+            "media": [
+              {
+                "id": "00000000-0000-4000-8000-000000000010",
+                "kind": "photo",
+                "name": "Foto.jpg",
+                "palette": [
+                  "#C22C24",
+                  "#248044",
+                  "#2454C2"
+                ],
+                "sourceHeightPx": 400,
+                "sourceWidthPx": 600
+              },
+              {
+                "id": "00000000-0000-4000-8000-000000000020",
+                "kind": "decorative",
+                "name": "Textura.png",
+                "palette": null,
+                "sourceHeightPx": null,
+                "sourceWidthPx": null
+              },
+              {
+                "id": "00000000-0000-4000-8000-000000000030",
+                "kind": "decorative",
+                "name": "Overlay.png",
+                "palette": null,
+                "sourceHeightPx": null,
+                "sourceWidthPx": null
+              }
+            ],
+            "sheets": [
+              {
+                "activeSides": "both",
+                "frames": [
+                  {
+                    "id": "00000000-0000-4000-8000-000000000101",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000010",
+                      "transform": {
+                        "blackAndWhite": false,
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": 0.25,
+                        "panY": -0.5,
+                        "quarterTurns": 0,
+                        "userZoom": 1.75
+                      }
+                    },
+                    "rect": {
+                      "height": 260770,
+                      "width": 391154,
+                      "x": 15000,
+                      "y": 19615
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 0
+                  },
+                  {
+                    "id": "00000000-0000-4000-8000-000000000102",
+                    "photo": null,
+                    "rect": {
+                      "height": 260770,
+                      "width": 173846,
+                      "x": 411154,
+                      "y": 19615
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 1
+                  }
+                ],
+                "heightUm": 300000,
+                "id": "00000000-0000-4000-8000-000000000001",
+                "layoutLocked": false,
+                "number": 1,
+                "pageNumbers": [
+                  1,
+                  2
+                ],
+                "role": "initial",
+                "visuals": {
+                  "background": {
+                    "content": {
+                      "kind": "color",
+                      "rgb": "#E7D6C4"
+                    },
+                    "kind": "bothSides"
+                  },
+                  "overlay": {
+                    "kind": "default"
+                  }
+                },
+                "widthUm": 600000
+              },
+              {
+                "activeSides": "both",
+                "frames": [],
+                "heightUm": 300000,
+                "id": "00000000-0000-4000-8000-000000000002",
+                "layoutLocked": false,
+                "number": 2,
+                "pageNumbers": [
+                  3,
+                  4
+                ],
+                "role": "final",
+                "widthUm": 600000
+              }
+            ],
+            "visualDefaults": {
+              "background": {
+                "both": {
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                },
+                "scope": "bothSides"
+              },
+              "frameBorder": {
+                "kind": "none"
+              },
+              "overlay": {
+                "both": {
+                  "kind": "media",
+                  "mediaId": "00000000-0000-4000-8000-000000000030"
+                },
+                "scope": "bothSides"
+              }
+            }
+          },
+          "canRedo": false,
+          "canUndo": true,
+          "dirty": true,
+          "document": {
+            "bleedUm": 3000,
+            "displayUnit": "mm",
+            "dpi": 300,
+            "safetyUm": 3000,
+            "sheetHeightUm": 300000,
+            "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
+          "projectId": "550e8400-e29b-41d4-a716-446655440000",
+          "projectName": "Decorativos",
+          "revision": 70,
+          "savedRevision": 9
+        }
+      }
+    },
+    {
+      "from": "local-color",
+      "intent": {
+        "change": {
+          "kind": "restoreAlbum",
+          "role": "background"
+        },
+        "kind": "editSheetVisual",
+        "scope": "left",
+        "sheetId": "00000000-0000-4000-8000-000000000001"
+      },
+      "projection": {
+        "canPasteFrames": false,
+        "composition": {
+          "frameBorder": {
+            "kind": "none"
+          },
+          "sheets": [
+            {
+              "activeSides": "both",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 300000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                },
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 300000,
+                    "x": 300000,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#E7D6C4"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 260770,
+                    "width": 391154,
+                    "x": 15000,
+                    "y": 19615
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000101",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 456348,
+                      "width": 684522,
+                      "x": -95013,
+                      "y": -127068
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#C22C24",
+                      "#248044",
+                      "#2454C2"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 651.925,
+                      "current": {
+                        "center": {
+                          "x": 232247.90625,
+                          "y": 81490.62500000001
+                        },
+                        "size": {
+                          "height": 456347.49999999994,
+                          "width": 684521.25
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.25,
+                        "y": -0.5
+                      },
+                      "currentZoom": 1.75,
+                      "panOrigin": {
+                        "x": 195577.0,
+                        "y": 130385.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 146683.625,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 97788.74999999997
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 195577.5,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 130384.99999999999
+                      },
+                      "sizePerZoom": {
+                        "height": 260769.99999999997,
+                        "width": 391155.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 260770,
+                    "width": 173846,
+                    "x": 411154,
+                    "y": 19615
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000102",
+                  "opacityByte": 255,
+                  "photo": null,
+                  "zIndex": 1
+                }
+              ],
+              "heightUm": 300000,
+              "number": 1,
+              "overlays": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "mediaId": "00000000-0000-4000-8000-000000000030",
+                  "name": "Overlay.png"
+                }
+              ],
+              "sheetId": "00000000-0000-4000-8000-000000000001",
+              "widthUm": 600000
+            },
+            {
+              "activeSides": "both",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [],
+              "heightUm": 300000,
+              "number": 2,
+              "overlays": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "mediaId": "00000000-0000-4000-8000-000000000030",
+                  "name": "Overlay.png"
+                }
+              ],
+              "sheetId": "00000000-0000-4000-8000-000000000002",
+              "widthUm": 600000
+            }
+          ]
+        },
+        "mediaUsage": [
+          {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 0,
+              "backgrounds": 0,
+              "frames": 1,
+              "overlays": 0
+            },
+            "count": 1,
+            "mediaId": "00000000-0000-4000-8000-000000000010"
+          },
+          {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 0,
+              "backgrounds": 0,
+              "frames": 0,
+              "overlays": 0
+            },
+            "count": 0,
+            "mediaId": "00000000-0000-4000-8000-000000000020"
+          },
+          {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 1,
+              "backgrounds": 0,
+              "frames": 0,
+              "overlays": 2
+            },
+            "count": 3,
+            "mediaId": "00000000-0000-4000-8000-000000000030"
+          }
+        ],
+        "state": {
+          "album": {
+            "media": [
+              {
+                "id": "00000000-0000-4000-8000-000000000010",
+                "kind": "photo",
+                "name": "Foto.jpg",
+                "palette": [
+                  "#C22C24",
+                  "#248044",
+                  "#2454C2"
+                ],
+                "sourceHeightPx": 400,
+                "sourceWidthPx": 600
+              },
+              {
+                "id": "00000000-0000-4000-8000-000000000020",
+                "kind": "decorative",
+                "name": "Textura.png",
+                "palette": null,
+                "sourceHeightPx": null,
+                "sourceWidthPx": null
+              },
+              {
+                "id": "00000000-0000-4000-8000-000000000030",
+                "kind": "decorative",
+                "name": "Overlay.png",
+                "palette": null,
+                "sourceHeightPx": null,
+                "sourceWidthPx": null
+              }
+            ],
+            "sheets": [
+              {
+                "activeSides": "both",
+                "frames": [
+                  {
+                    "id": "00000000-0000-4000-8000-000000000101",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000010",
+                      "transform": {
+                        "blackAndWhite": false,
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": 0.25,
+                        "panY": -0.5,
+                        "quarterTurns": 0,
+                        "userZoom": 1.75
+                      }
+                    },
+                    "rect": {
+                      "height": 260770,
+                      "width": 391154,
+                      "x": 15000,
+                      "y": 19615
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 0
+                  },
+                  {
+                    "id": "00000000-0000-4000-8000-000000000102",
+                    "photo": null,
+                    "rect": {
+                      "height": 260770,
+                      "width": 173846,
+                      "x": 411154,
+                      "y": 19615
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 1
+                  }
+                ],
+                "heightUm": 300000,
+                "id": "00000000-0000-4000-8000-000000000001",
+                "layoutLocked": false,
+                "number": 1,
+                "pageNumbers": [
+                  1,
+                  2
+                ],
+                "role": "initial",
+                "visuals": {
+                  "background": {
+                    "kind": "perSide",
+                    "left": {
+                      "kind": "default"
+                    },
+                    "right": {
+                      "content": {
+                        "kind": "color",
+                        "rgb": "#E7D6C4"
+                      },
+                      "kind": "custom",
+                      "mapping": "bothSides"
+                    }
+                  },
+                  "overlay": {
+                    "kind": "default"
+                  }
+                },
+                "widthUm": 600000
+              },
+              {
+                "activeSides": "both",
+                "frames": [],
+                "heightUm": 300000,
+                "id": "00000000-0000-4000-8000-000000000002",
+                "layoutLocked": false,
+                "number": 2,
+                "pageNumbers": [
+                  3,
+                  4
+                ],
+                "role": "final",
+                "widthUm": 600000
+              }
+            ],
+            "visualDefaults": {
+              "background": {
+                "both": {
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                },
+                "scope": "bothSides"
+              },
+              "frameBorder": {
+                "kind": "none"
+              },
+              "overlay": {
+                "both": {
+                  "kind": "media",
+                  "mediaId": "00000000-0000-4000-8000-000000000030"
+                },
+                "scope": "bothSides"
+              }
+            }
+          },
+          "canRedo": false,
+          "canUndo": true,
+          "dirty": true,
+          "document": {
+            "bleedUm": 3000,
+            "displayUnit": "mm",
+            "dpi": 300,
+            "safetyUm": 3000,
+            "sheetHeightUm": 300000,
+            "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
+          "projectId": "550e8400-e29b-41d4-a716-446655440000",
+          "projectName": "Decorativos",
+          "revision": 71,
+          "savedRevision": 9
+        }
+      }
+    },
+    {
+      "from": "half-restored",
+      "intent": {
+        "change": {
+          "kind": "remove",
+          "role": "overlay"
+        },
+        "kind": "editSheetVisual",
+        "scope": "bothSides",
+        "sheetId": "00000000-0000-4000-8000-000000000001"
+      },
+      "projection": {
+        "canPasteFrames": false,
+        "composition": {
+          "frameBorder": {
+            "kind": "none"
+          },
+          "sheets": [
+            {
+              "activeSides": "both",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 300000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                },
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 300000,
+                    "x": 300000,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#E7D6C4"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 260770,
+                    "width": 391154,
+                    "x": 15000,
+                    "y": 19615
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000101",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 456348,
+                      "width": 684522,
+                      "x": -95013,
+                      "y": -127068
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#C22C24",
+                      "#248044",
+                      "#2454C2"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 651.925,
+                      "current": {
+                        "center": {
+                          "x": 232247.90625,
+                          "y": 81490.62500000001
+                        },
+                        "size": {
+                          "height": 456347.49999999994,
+                          "width": 684521.25
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.25,
+                        "y": -0.5
+                      },
+                      "currentZoom": 1.75,
+                      "panOrigin": {
+                        "x": 195577.0,
+                        "y": 130385.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 146683.625,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 97788.74999999997
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 195577.5,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 130384.99999999999
+                      },
+                      "sizePerZoom": {
+                        "height": 260769.99999999997,
+                        "width": 391155.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 260770,
+                    "width": 173846,
+                    "x": 411154,
+                    "y": 19615
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000102",
+                  "opacityByte": 255,
+                  "photo": null,
+                  "zIndex": 1
+                }
+              ],
+              "heightUm": 300000,
+              "number": 1,
+              "overlays": [],
+              "sheetId": "00000000-0000-4000-8000-000000000001",
+              "widthUm": 600000
+            },
+            {
+              "activeSides": "both",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [],
+              "heightUm": 300000,
+              "number": 2,
+              "overlays": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "mediaId": "00000000-0000-4000-8000-000000000030",
+                  "name": "Overlay.png"
+                }
+              ],
+              "sheetId": "00000000-0000-4000-8000-000000000002",
+              "widthUm": 600000
+            }
+          ]
+        },
+        "mediaUsage": [
+          {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 0,
+              "backgrounds": 0,
+              "frames": 1,
+              "overlays": 0
+            },
+            "count": 1,
+            "mediaId": "00000000-0000-4000-8000-000000000010"
+          },
+          {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 0,
+              "backgrounds": 0,
+              "frames": 0,
+              "overlays": 0
+            },
+            "count": 0,
+            "mediaId": "00000000-0000-4000-8000-000000000020"
+          },
+          {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 1,
+              "backgrounds": 0,
+              "frames": 0,
+              "overlays": 1
+            },
+            "count": 2,
+            "mediaId": "00000000-0000-4000-8000-000000000030"
+          }
+        ],
+        "state": {
+          "album": {
+            "media": [
+              {
+                "id": "00000000-0000-4000-8000-000000000010",
+                "kind": "photo",
+                "name": "Foto.jpg",
+                "palette": [
+                  "#C22C24",
+                  "#248044",
+                  "#2454C2"
+                ],
+                "sourceHeightPx": 400,
+                "sourceWidthPx": 600
+              },
+              {
+                "id": "00000000-0000-4000-8000-000000000020",
+                "kind": "decorative",
+                "name": "Textura.png",
+                "palette": null,
+                "sourceHeightPx": null,
+                "sourceWidthPx": null
+              },
+              {
+                "id": "00000000-0000-4000-8000-000000000030",
+                "kind": "decorative",
+                "name": "Overlay.png",
+                "palette": null,
+                "sourceHeightPx": null,
+                "sourceWidthPx": null
+              }
+            ],
+            "sheets": [
+              {
+                "activeSides": "both",
+                "frames": [
+                  {
+                    "id": "00000000-0000-4000-8000-000000000101",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000010",
+                      "transform": {
+                        "blackAndWhite": false,
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": 0.25,
+                        "panY": -0.5,
+                        "quarterTurns": 0,
+                        "userZoom": 1.75
+                      }
+                    },
+                    "rect": {
+                      "height": 260770,
+                      "width": 391154,
+                      "x": 15000,
+                      "y": 19615
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 0
+                  },
+                  {
+                    "id": "00000000-0000-4000-8000-000000000102",
+                    "photo": null,
+                    "rect": {
+                      "height": 260770,
+                      "width": 173846,
+                      "x": 411154,
+                      "y": 19615
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 1
+                  }
+                ],
+                "heightUm": 300000,
+                "id": "00000000-0000-4000-8000-000000000001",
+                "layoutLocked": false,
+                "number": 1,
+                "pageNumbers": [
+                  1,
+                  2
+                ],
+                "role": "initial",
+                "visuals": {
+                  "background": {
+                    "kind": "perSide",
+                    "left": {
+                      "kind": "default"
+                    },
+                    "right": {
+                      "content": {
+                        "kind": "color",
+                        "rgb": "#E7D6C4"
+                      },
+                      "kind": "custom",
+                      "mapping": "bothSides"
+                    }
+                  },
+                  "overlay": {
+                    "content": null,
+                    "kind": "bothSides"
+                  }
+                },
+                "widthUm": 600000
+              },
+              {
+                "activeSides": "both",
+                "frames": [],
+                "heightUm": 300000,
+                "id": "00000000-0000-4000-8000-000000000002",
+                "layoutLocked": false,
+                "number": 2,
+                "pageNumbers": [
+                  3,
+                  4
+                ],
+                "role": "final",
+                "widthUm": 600000
+              }
+            ],
+            "visualDefaults": {
+              "background": {
+                "both": {
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                },
+                "scope": "bothSides"
+              },
+              "frameBorder": {
+                "kind": "none"
+              },
+              "overlay": {
+                "both": {
+                  "kind": "media",
+                  "mediaId": "00000000-0000-4000-8000-000000000030"
+                },
+                "scope": "bothSides"
+              }
+            }
+          },
+          "canRedo": false,
+          "canUndo": true,
+          "dirty": true,
+          "document": {
+            "bleedUm": 3000,
+            "displayUnit": "mm",
+            "dpi": 300,
+            "safetyUm": 3000,
+            "sheetHeightUm": 300000,
+            "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
+          "projectId": "550e8400-e29b-41d4-a716-446655440000",
+          "projectName": "Decorativos",
+          "revision": 72,
+          "savedRevision": 9
+        }
+      }
+    },
+    {
+      "from": "removed-overlay",
+      "intent": {
+        "change": {
+          "kind": "restoreAlbum",
+          "role": "background"
+        },
+        "kind": "editSheetVisual",
+        "scope": "bothSides",
+        "sheetId": "00000000-0000-4000-8000-000000000001"
+      },
+      "projection": {
+        "canPasteFrames": false,
+        "composition": {
+          "frameBorder": {
+            "kind": "none"
+          },
+          "sheets": [
+            {
+              "activeSides": "both",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 260770,
+                    "width": 391154,
+                    "x": 15000,
+                    "y": 19615
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000101",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 456348,
+                      "width": 684522,
+                      "x": -95013,
+                      "y": -127068
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#C22C24",
+                      "#248044",
+                      "#2454C2"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 651.925,
+                      "current": {
+                        "center": {
+                          "x": 232247.90625,
+                          "y": 81490.62500000001
+                        },
+                        "size": {
+                          "height": 456347.49999999994,
+                          "width": 684521.25
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.25,
+                        "y": -0.5
+                      },
+                      "currentZoom": 1.75,
+                      "panOrigin": {
+                        "x": 195577.0,
+                        "y": 130385.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 146683.625,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 97788.74999999997
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 195577.5,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 130384.99999999999
+                      },
+                      "sizePerZoom": {
+                        "height": 260769.99999999997,
+                        "width": 391155.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 260770,
+                    "width": 173846,
+                    "x": 411154,
+                    "y": 19615
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000102",
+                  "opacityByte": 255,
+                  "photo": null,
+                  "zIndex": 1
+                }
+              ],
+              "heightUm": 300000,
+              "number": 1,
+              "overlays": [],
+              "sheetId": "00000000-0000-4000-8000-000000000001",
+              "widthUm": 600000
+            },
+            {
+              "activeSides": "both",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [],
+              "heightUm": 300000,
+              "number": 2,
+              "overlays": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "mediaId": "00000000-0000-4000-8000-000000000030",
+                  "name": "Overlay.png"
+                }
+              ],
+              "sheetId": "00000000-0000-4000-8000-000000000002",
+              "widthUm": 600000
+            }
+          ]
+        },
+        "mediaUsage": [
+          {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 0,
+              "backgrounds": 0,
+              "frames": 1,
+              "overlays": 0
+            },
+            "count": 1,
+            "mediaId": "00000000-0000-4000-8000-000000000010"
+          },
+          {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 0,
+              "backgrounds": 0,
+              "frames": 0,
+              "overlays": 0
+            },
+            "count": 0,
+            "mediaId": "00000000-0000-4000-8000-000000000020"
+          },
+          {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 1,
+              "backgrounds": 0,
+              "frames": 0,
+              "overlays": 1
+            },
+            "count": 2,
+            "mediaId": "00000000-0000-4000-8000-000000000030"
+          }
+        ],
+        "state": {
+          "album": {
+            "media": [
+              {
+                "id": "00000000-0000-4000-8000-000000000010",
+                "kind": "photo",
+                "name": "Foto.jpg",
+                "palette": [
+                  "#C22C24",
+                  "#248044",
+                  "#2454C2"
+                ],
+                "sourceHeightPx": 400,
+                "sourceWidthPx": 600
+              },
+              {
+                "id": "00000000-0000-4000-8000-000000000020",
+                "kind": "decorative",
+                "name": "Textura.png",
+                "palette": null,
+                "sourceHeightPx": null,
+                "sourceWidthPx": null
+              },
+              {
+                "id": "00000000-0000-4000-8000-000000000030",
+                "kind": "decorative",
+                "name": "Overlay.png",
+                "palette": null,
+                "sourceHeightPx": null,
+                "sourceWidthPx": null
+              }
+            ],
+            "sheets": [
+              {
+                "activeSides": "both",
+                "frames": [
+                  {
+                    "id": "00000000-0000-4000-8000-000000000101",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000010",
+                      "transform": {
+                        "blackAndWhite": false,
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": 0.25,
+                        "panY": -0.5,
+                        "quarterTurns": 0,
+                        "userZoom": 1.75
+                      }
+                    },
+                    "rect": {
+                      "height": 260770,
+                      "width": 391154,
+                      "x": 15000,
+                      "y": 19615
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 0
+                  },
+                  {
+                    "id": "00000000-0000-4000-8000-000000000102",
+                    "photo": null,
+                    "rect": {
+                      "height": 260770,
+                      "width": 173846,
+                      "x": 411154,
+                      "y": 19615
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 1
+                  }
+                ],
+                "heightUm": 300000,
+                "id": "00000000-0000-4000-8000-000000000001",
+                "layoutLocked": false,
+                "number": 1,
+                "pageNumbers": [
+                  1,
+                  2
+                ],
+                "role": "initial",
+                "visuals": {
+                  "background": {
+                    "kind": "default"
+                  },
+                  "overlay": {
+                    "content": null,
+                    "kind": "bothSides"
+                  }
+                },
+                "widthUm": 600000
+              },
+              {
+                "activeSides": "both",
+                "frames": [],
+                "heightUm": 300000,
+                "id": "00000000-0000-4000-8000-000000000002",
+                "layoutLocked": false,
+                "number": 2,
+                "pageNumbers": [
+                  3,
+                  4
+                ],
+                "role": "final",
+                "widthUm": 600000
+              }
+            ],
+            "visualDefaults": {
+              "background": {
+                "both": {
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                },
+                "scope": "bothSides"
+              },
+              "frameBorder": {
+                "kind": "none"
+              },
+              "overlay": {
+                "both": {
+                  "kind": "media",
+                  "mediaId": "00000000-0000-4000-8000-000000000030"
+                },
+                "scope": "bothSides"
+              }
+            }
+          },
+          "canRedo": false,
+          "canUndo": true,
+          "dirty": true,
+          "document": {
+            "bleedUm": 3000,
+            "displayUnit": "mm",
+            "dpi": 300,
+            "safetyUm": 3000,
+            "sheetHeightUm": 300000,
+            "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
+          "projectId": "550e8400-e29b-41d4-a716-446655440000",
+          "projectName": "Decorativos",
+          "revision": 73,
+          "savedRevision": 9
+        }
+      }
+    },
+    {
+      "from": "background-restored",
+      "intent": {
+        "change": {
+          "kind": "restoreAlbum",
+          "role": "overlay"
+        },
+        "kind": "editSheetVisual",
+        "scope": "bothSides",
+        "sheetId": "00000000-0000-4000-8000-000000000001"
+      },
+      "projection": {
+        "canPasteFrames": false,
+        "composition": {
+          "frameBorder": {
+            "kind": "none"
+          },
+          "sheets": [
+            {
+              "activeSides": "both",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 260770,
+                    "width": 391154,
+                    "x": 15000,
+                    "y": 19615
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000101",
+                  "opacityByte": 255,
+                  "photo": {
+                    "blackAndWhite": false,
+                    "drawRect": {
+                      "height": 456348,
+                      "width": 684522,
+                      "x": -95013,
+                      "y": -127068
+                    },
+                    "mediaId": "00000000-0000-4000-8000-000000000010",
+                    "mirrorX": false,
+                    "name": "Foto.jpg",
+                    "palette": [
+                      "#C22C24",
+                      "#248044",
+                      "#2454C2"
+                    ],
+                    "placement": {
+                      "baseFillZoom": 651.925,
+                      "current": {
+                        "center": {
+                          "x": 232247.90625,
+                          "y": 81490.62500000001
+                        },
+                        "size": {
+                          "height": 456347.49999999994,
+                          "width": 684521.25
+                        }
+                      },
+                      "currentPan": {
+                        "x": 0.25,
+                        "y": -0.5
+                      },
+                      "currentZoom": 1.75,
+                      "panOrigin": {
+                        "x": 195577.0,
+                        "y": 130385.0
+                      },
+                      "panRange": {
+                        "maximum": 1.0,
+                        "minimum": -1.0
+                      },
+                      "panToCenter": {
+                        "xx": 146683.625,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 97788.74999999997
+                      },
+                      "panToCenterPerZoom": {
+                        "xx": 195577.5,
+                        "xy": -0.0,
+                        "yx": 0.0,
+                        "yy": 130384.99999999999
+                      },
+                      "sizePerZoom": {
+                        "height": 260769.99999999997,
+                        "width": 391155.0
+                      },
+                      "zoomRange": {
+                        "maximum": 4.0,
+                        "minimum": 1.0
+                      }
+                    },
+                    "rotationDegrees": 0.0
+                  },
+                  "zIndex": 0
+                },
+                {
+                  "border": {
+                    "kind": "none"
+                  },
+                  "borderFillRects": [],
+                  "clipRect": {
+                    "height": 260770,
+                    "width": 173846,
+                    "x": 411154,
+                    "y": 19615
+                  },
+                  "frameId": "00000000-0000-4000-8000-000000000102",
+                  "opacityByte": 255,
+                  "photo": null,
+                  "zIndex": 1
+                }
+              ],
+              "heightUm": 300000,
+              "number": 1,
+              "overlays": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "mediaId": "00000000-0000-4000-8000-000000000030",
+                  "name": "Overlay.png"
+                }
+              ],
+              "sheetId": "00000000-0000-4000-8000-000000000001",
+              "widthUm": 600000
+            },
+            {
+              "activeSides": "both",
+              "backgrounds": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                }
+              ],
+              "base": {
+                "drawRect": {
+                  "height": 300000,
+                  "width": 600000,
+                  "x": 0,
+                  "y": 0
+                },
+                "rgb": "#FFFFFF"
+              },
+              "frames": [],
+              "heightUm": 300000,
+              "number": 2,
+              "overlays": [
+                {
+                  "drawRect": {
+                    "height": 300000,
+                    "width": 600000,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "mediaId": "00000000-0000-4000-8000-000000000030",
+                  "name": "Overlay.png"
+                }
+              ],
+              "sheetId": "00000000-0000-4000-8000-000000000002",
+              "widthUm": 600000
+            }
+          ]
+        },
+        "mediaUsage": [
+          {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 0,
+              "backgrounds": 0,
+              "frames": 1,
+              "overlays": 0
+            },
+            "count": 1,
+            "mediaId": "00000000-0000-4000-8000-000000000010"
+          },
+          {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 0,
+              "backgrounds": 0,
+              "frames": 0,
+              "overlays": 0
+            },
+            "count": 0,
+            "mediaId": "00000000-0000-4000-8000-000000000020"
+          },
+          {
+            "breakdown": {
+              "albumBackgrounds": 0,
+              "albumOverlays": 1,
+              "backgrounds": 0,
+              "frames": 0,
+              "overlays": 2
+            },
+            "count": 3,
+            "mediaId": "00000000-0000-4000-8000-000000000030"
+          }
+        ],
+        "state": {
+          "album": {
+            "media": [
+              {
+                "id": "00000000-0000-4000-8000-000000000010",
+                "kind": "photo",
+                "name": "Foto.jpg",
+                "palette": [
+                  "#C22C24",
+                  "#248044",
+                  "#2454C2"
+                ],
+                "sourceHeightPx": 400,
+                "sourceWidthPx": 600
+              },
+              {
+                "id": "00000000-0000-4000-8000-000000000020",
+                "kind": "decorative",
+                "name": "Textura.png",
+                "palette": null,
+                "sourceHeightPx": null,
+                "sourceWidthPx": null
+              },
+              {
+                "id": "00000000-0000-4000-8000-000000000030",
+                "kind": "decorative",
+                "name": "Overlay.png",
+                "palette": null,
+                "sourceHeightPx": null,
+                "sourceWidthPx": null
+              }
+            ],
+            "sheets": [
+              {
+                "activeSides": "both",
+                "frames": [
+                  {
+                    "id": "00000000-0000-4000-8000-000000000101",
+                    "photo": {
+                      "mediaId": "00000000-0000-4000-8000-000000000010",
+                      "transform": {
+                        "blackAndWhite": false,
+                        "fineRotationDegrees": 0.0,
+                        "mirrorX": false,
+                        "panX": 0.25,
+                        "panY": -0.5,
+                        "quarterTurns": 0,
+                        "userZoom": 1.75
+                      }
+                    },
+                    "rect": {
+                      "height": 260770,
+                      "width": 391154,
+                      "x": 15000,
+                      "y": 19615
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 0
+                  },
+                  {
+                    "id": "00000000-0000-4000-8000-000000000102",
+                    "photo": null,
+                    "rect": {
+                      "height": 260770,
+                      "width": 173846,
+                      "x": 411154,
+                      "y": 19615
+                    },
+                    "style": {
+                      "borderRgb": "#000000",
+                      "borderWidthUm": 0,
+                      "opacityPercent": 100,
+                      "source": "album"
+                    },
+                    "zIndex": 1
+                  }
+                ],
+                "heightUm": 300000,
+                "id": "00000000-0000-4000-8000-000000000001",
+                "layoutLocked": false,
+                "number": 1,
+                "pageNumbers": [
+                  1,
+                  2
+                ],
+                "role": "initial",
+                "widthUm": 600000
+              },
+              {
+                "activeSides": "both",
+                "frames": [],
+                "heightUm": 300000,
+                "id": "00000000-0000-4000-8000-000000000002",
+                "layoutLocked": false,
+                "number": 2,
+                "pageNumbers": [
+                  3,
+                  4
+                ],
+                "role": "final",
+                "widthUm": 600000
+              }
+            ],
+            "visualDefaults": {
+              "background": {
+                "both": {
+                  "kind": "color",
+                  "rgb": "#FFFFFF"
+                },
+                "scope": "bothSides"
+              },
+              "frameBorder": {
+                "kind": "none"
+              },
+              "overlay": {
+                "both": {
+                  "kind": "media",
+                  "mediaId": "00000000-0000-4000-8000-000000000030"
+                },
+                "scope": "bothSides"
+              }
+            }
+          },
+          "canRedo": false,
+          "canUndo": true,
+          "dirty": true,
+          "document": {
+            "bleedUm": 3000,
+            "displayUnit": "mm",
+            "dpi": 300,
+            "safetyUm": 3000,
+            "sheetHeightUm": 300000,
+            "sheetWidthUm": 600000
+          },
+          "layoutSettings": {
+            "gapUm": 5000,
+            "marginUm": 15000,
+            "minimumSideUm": 20000,
+            "permission": "pagesAndSheet"
+          },
+          "projectId": "550e8400-e29b-41d4-a716-446655440000",
+          "projectName": "Decorativos",
+          "revision": 74,
           "savedRevision": 9
         }
       }

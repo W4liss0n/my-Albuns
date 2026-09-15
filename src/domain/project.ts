@@ -17,6 +17,8 @@ export type { DecorativeDropPreview } from "./generated/DecorativeDropPreview";
 export type { DecorativeDropRequest } from "./generated/DecorativeDropRequest";
 export type { DecorativeRole } from "./generated/DecorativeRole";
 export type { DecorativeScope } from "./generated/DecorativeScope";
+export type { SheetVisualChange } from "./generated/SheetVisualChange";
+export type { SheetVisuals } from "./generated/SheetVisuals";
 export type { MediaUsageBreakdown } from "./generated/MediaUsageBreakdown";
 export type { ComposedColor } from "./generated/ComposedColor";
 export type { ComposedDecorative } from "./generated/ComposedDecorative";

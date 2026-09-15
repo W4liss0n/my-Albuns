@@ -299,7 +299,7 @@ test("reads and publishes accordion preferences through the shared workspace sta
   expect(trigger).toHaveAttribute("aria-expanded", "false");
 });
 
-test("marks unavailable Sheet-design mutations as explicit placeholders", () => {
+test("shows Sheet-design origin and local controls without placeholders", () => {
   render(<InspectorPanel {...inspectorProps(sheetContext())} />);
 
   const section = screen
@@ -309,12 +309,11 @@ test("marks unavailable Sheet-design mutations as explicit placeholders", () => 
 
   expect(design.getByText("Background")).toBeInTheDocument();
   expect(design.getByText("Overlay")).toBeInTheDocument();
-  expect(
-    section.querySelector('[data-placeholder-feature="edit-sheet-background"]'),
-  ).toBeDisabled();
-  expect(
-    section.querySelector('[data-placeholder-feature="edit-sheet-overlay"]'),
-  ).toBeDisabled();
+  expect(design.getAllByText("Usando o design do álbum")).toHaveLength(2);
+  expect(design.getByRole("button", { name: "Cor do Background da Lâmina" })).toBeInTheDocument();
+  expect(design.queryByText("Origem ainda não disponível")).not.toBeInTheDocument();
+  expect(section.querySelector('[data-placeholder-feature="edit-sheet-background"]')).toBeNull();
+  expect(section.querySelector('[data-placeholder-feature="edit-sheet-overlay"]')).toBeNull();
   expect(design.getByRole("button", { name: "Salvar disposição como Layout" })).toBeDisabled();
   expect(section.querySelector('[data-placeholder-feature="save-sheet-layout"]')).toBeNull();
 });
