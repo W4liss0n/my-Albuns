@@ -8,6 +8,60 @@ impl ProjectSheet {
 }
 
 impl ProjectDocument {
+    pub(crate) fn with_edited_sheet_visual(
+        &self,
+        sheet_id: &str,
+        scope: DecorativeScope,
+        change: &crate::SheetVisualChange,
+    ) -> Result<Self, CoreError> {
+        let mut next = self.clone();
+        let sheet = next
+            .sheets
+            .iter_mut()
+            .find(|sheet| sheet.id.to_string() == sheet_id)
+            .ok_or_else(|| CoreError::SheetNotFound(sheet_id.into()))?;
+        if matches!(
+            (sheet.active_sides, scope),
+            (ActiveSides::Left, DecorativeScope::Right)
+                | (ActiveSides::Right, DecorativeScope::Left)
+        ) {
+            return Err(CoreError::InvalidProject(
+                "Este lado da Lâmina está desativado.".into(),
+            ));
+        }
+        match change {
+            crate::SheetVisualChange::Remove { role } => match role {
+                DecorativeRole::Background => sheet.visuals.background.apply(
+                    scope,
+                    ProjectedBackgroundContent::Color {
+                        rgb: "#FFFFFF".into(),
+                    },
+                    sheet.active_sides,
+                ),
+                DecorativeRole::Overlay => {
+                    sheet.visuals.overlay.apply(scope, None, sheet.active_sides)
+                }
+            },
+            crate::SheetVisualChange::BackgroundColor { rgb } => {
+                if Rgb::parse_canonical(rgb).is_none() {
+                    return Err(CoreError::InvalidVisualDefaults);
+                }
+                sheet.visuals.background.apply(
+                    scope,
+                    ProjectedBackgroundContent::Color { rgb: rgb.clone() },
+                    sheet.active_sides,
+                );
+            }
+            crate::SheetVisualChange::RestoreAlbum { role } => match role {
+                DecorativeRole::Background => {
+                    sheet.visuals.background.restore(scope, sheet.active_sides)
+                }
+                DecorativeRole::Overlay => sheet.visuals.overlay.restore(scope, sheet.active_sides),
+            },
+        }
+        Ok(next)
+    }
+
     pub(crate) fn decorative_drop_zone(
         &self,
         request: &crate::DecorativeDropRequest,

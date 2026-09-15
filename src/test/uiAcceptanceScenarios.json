@@ -9489,6 +9489,284 @@
       },
       "readySelector": ".ui-standard-message",
       "actions": []
+    },
+    {
+      "id": "workspace-sheet-design-mixed-origin",
+      "title": "Design da Lâmina — Origens diferentes com a mesma cor",
+      "implementationPath": "/workspace-preview.html?frame=decorations&decoration-state=mixed-origin&context=sheet",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-design",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A SPEC, seção 16, e o design 0001 definem cor local, remoção, restauração e origem por lado. As composições e transições deste cenário são geradas pelo ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".sheet-design-inspector",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-design-color-picker",
+      "title": "Design da Lâmina — Seletor de cor local",
+      "implementationPath": "/workspace-preview.html?frame=decorations&decoration-state=mixed-origin&context=sheet",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-design",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A SPEC, seção 16, e o design 0001 definem cor local, remoção, restauração e origem por lado. As composições e transições deste cenário são geradas pelo ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "[role=\"dialog\"][aria-label=\"Escolher cor do Background da Lâmina\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Cor do Background da Lâmina\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-design-color-apply",
+      "title": "Design da Lâmina — Aplicar cor aos dois lados",
+      "implementationPath": "/workspace-preview.html?frame=decorations&decoration-state=mixed-origin&context=sheet",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-design",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A SPEC, seção 16, e o design 0001 definem cor local, remoção, restauração e origem por lado. As composições e transições deste cenário são geradas pelo ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-sheet-design-applied=\"backgroundColor\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Cor do Background da Lâmina\"]"
+        },
+        {
+          "type": "input",
+          "selector": "[aria-label=\"Cor hexadecimal do Background da Lâmina\"]",
+          "value": "#E7D6C4"
+        },
+        {
+          "type": "click-text",
+          "text": "Aplicar cor"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-design-color-cancel",
+      "title": "Design da Lâmina — Cancelar cor sem alterar a Lâmina",
+      "implementationPath": "/workspace-preview.html?frame=decorations&decoration-state=mixed-origin&context=sheet",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-design",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A SPEC, seção 16, e o design 0001 definem cor local, remoção, restauração e origem por lado. As composições e transições deste cenário são geradas pelo ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".sheet-design-inspector:not(:has([role=\"dialog\"]))",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Cor do Background da Lâmina\"]"
+        },
+        {
+          "type": "input",
+          "selector": "[aria-label=\"Cor hexadecimal do Background da Lâmina\"]",
+          "value": "#E7D6C4"
+        },
+        {
+          "type": "key",
+          "key": "Escape"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-design-remove",
+      "title": "Design da Lâmina — Remover Background apenas à esquerda",
+      "implementationPath": "/workspace-preview.html?frame=decorations&decoration-state=inherited&context=sheet",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-design",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A SPEC, seção 16, e o design 0001 definem cor local, remoção, restauração e origem por lado. As composições e transições deste cenário são geradas pelo ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-sheet-design-applied=\"remove\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": ".sheet-design-preview [aria-label=\"Página esquerda\"]"
+        },
+        {
+          "type": "click",
+          "selector": ".sheet-design-role[aria-label=\"Background\"] .sheet-design-role__actions > button"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-design-restore-side",
+      "title": "Design da Lâmina — Restaurar Background apenas à esquerda",
+      "implementationPath": "/workspace-preview.html?frame=decorations&decoration-state=local-color&context=sheet",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-design",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A SPEC, seção 16, e o design 0001 definem cor local, remoção, restauração e origem por lado. As composições e transições deste cenário são geradas pelo ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-sheet-design-applied=\"restoreAlbum\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": ".sheet-design-preview [aria-label=\"Página esquerda\"]"
+        },
+        {
+          "type": "click",
+          "selector": ".sheet-design-role[aria-label=\"Background\"] .sheet-design-role__restore"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-design-remove-overlay",
+      "title": "Design da Lâmina — Remover Overlay dos dois lados",
+      "implementationPath": "/workspace-preview.html?frame=decorations&decoration-state=half-restored&context=sheet",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-design",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A SPEC, seção 16, e o design 0001 definem cor local, remoção, restauração e origem por lado. As composições e transições deste cenário são geradas pelo ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-sheet-design-applied=\"remove\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": ".sheet-design-role[aria-label=\"Overlay\"] .sheet-design-role__actions > button"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-design-restore-background",
+      "title": "Design da Lâmina — Restaurar Background preservando Overlay local",
+      "implementationPath": "/workspace-preview.html?frame=decorations&decoration-state=removed-overlay&context=sheet",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-design",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A SPEC, seção 16, e o design 0001 definem cor local, remoção, restauração e origem por lado. As composições e transições deste cenário são geradas pelo ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-sheet-design-applied=\"restoreAlbum\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": ".sheet-design-role[aria-label=\"Background\"] .sheet-design-role__restore"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-design-restore-overlay",
+      "title": "Design da Lâmina — Retomar o Overlay do álbum",
+      "implementationPath": "/workspace-preview.html?frame=decorations&decoration-state=background-restored&context=sheet",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-design",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A SPEC, seção 16, e o design 0001 definem cor local, remoção, restauração e origem por lado. As composições e transições deste cenário são geradas pelo ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": "body[data-sheet-design-applied=\"restoreAlbum\"]",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": ".sheet-design-role[aria-label=\"Overlay\"] .sheet-design-role__restore"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-design-single",
+      "title": "Design da Lâmina — Controles somente para a página ativa",
+      "implementationPath": "/workspace-preview.html?frame=decorations&decoration-state=single&context=sheet",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-design",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A SPEC, seção 16, e o design 0001 definem cor local, remoção, restauração e origem por lado. As composições e transições deste cenário são geradas pelo ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".sheet-design-inspector",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        }
+      ]
     }
   ]
 }

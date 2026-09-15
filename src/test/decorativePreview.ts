@@ -5,7 +5,7 @@ import corpus from "../../tests/fixtures/decorative-cases.json";
 export const decorativeCorpus = corpus as unknown as {
   states: Record<string, EditorProjection>;
   previews: { from: string; request: DecorativeDropRequest; preview: DecorativeDropPreview }[];
-  transitions: { from: string; intent: Extract<ProjectIntent, { kind: "applyDecorative" }>; projection: EditorProjection }[];
+  transitions: { from: string; intent: Extract<ProjectIntent, { kind: "applyDecorative" | "editSheetVisual" }>; projection: EditorProjection }[];
 };
 
 export function decorativeStateName(projection: EditorProjection) {

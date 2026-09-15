@@ -204,6 +204,7 @@
 }
 
 .sheet-design-role__actions {
+  position: relative;
   display: flex;
   min-width: 0;
   align-items: center;
@@ -211,20 +212,12 @@
   gap: var(--ui-space-2);
 }
 
-.sheet-design-color-placeholder {
-  position: relative;
+.sheet-design-color {
   display: flex;
   align-items: center;
   color: var(--ui-text-muted);
   font-size: var(--ui-font-size-caption);
   gap: var(--ui-space-2);
 }
-
-.sheet-design-color-placeholder input {
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  overflow: hidden;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius-small);
-}
+.sheet-design-color .ui-color-property-trigger { margin-top: 0; }
+.sheet-design-role__restore { justify-self: start; }

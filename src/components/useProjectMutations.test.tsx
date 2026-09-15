@@ -271,6 +271,32 @@ test("keeps a queued reorder valid when the preceding History command fails", as
   }, expect.any(Function));
 });
 
+test.each([true, false])("queues a scoped restoration after pending History without replacing adjacent album state (%s)", async (success) => {
+  const pending = deferredProjection();
+  const afterHistory = structuredClone(representativeProjection);
+  afterHistory.state.revision += 1;
+  afterHistory.state.album.visualDefaults.background = { scope: "bothSides", both: { kind: "color", rgb: "#AABBCC" } };
+  const apply = vi.fn<ProjectCorePort["apply"]>(async () => afterHistory);
+  const undo = vi.fn<ProjectCorePort["undo"]>(() => pending.promise);
+  const port = projectSessionPort(apply, undo);
+  const view = renderHook(() => {
+    const runner = useProjectMutationRunner(representativeProjection.state.projectId, port);
+    return useProjectMutations({ projection: representativeProjection, runProjectMutation: runner,
+      onProjectionChange: vi.fn(), onAffectedFrame: vi.fn(), onAffectedSheet: vi.fn() });
+  });
+  act(() => { void view.result.current.undo(); });
+  await waitFor(() => expect(undo).toHaveBeenCalledOnce());
+  const intent = { kind: "editSheetVisual" as const, sheetId: representativeProjection.state.album.sheets[0].id,
+    scope: "left" as const, change: { kind: "restoreAlbum" as const, role: "background" as const } };
+  await act(async () => {
+    const completion = view.result.current.applyIntent(intent);
+    expect(apply).not.toHaveBeenCalled();
+    if (success) pending.resolve(afterHistory); else pending.reject(new Error("History unavailable"));
+    expect(await completion).toBe(true);
+  });
+  expect(apply).toHaveBeenCalledExactlyOnceWith(intent, expect.any(Function));
+});
+
 test("preserves Redo when preceding History already materialized the Album Design target", async () => {
   const pendingUndo = deferredProjection();
   const target = {

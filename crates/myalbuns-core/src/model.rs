@@ -869,6 +869,11 @@ pub enum FrameStackAction {
 )]
 #[ts(tag = "kind")]
 pub enum ProjectIntent {
+    EditSheetVisual {
+        sheet_id: String,
+        scope: crate::DecorativeScope,
+        change: crate::SheetVisualChange,
+    },
     DropDecorative {
         request: crate::DecorativeDropRequest,
     },

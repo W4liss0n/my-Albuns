@@ -60,6 +60,7 @@ pub(crate) async fn apply_project_intent(
     let intent_kind = match &intent {
         ProjectIntent::RemoveMedia { .. } => "remove_media",
         ProjectIntent::ApplyDecorative { .. } => "apply_decorative",
+        ProjectIntent::EditSheetVisual { .. } => "edit_sheet_visual",
         ProjectIntent::DropDecorative { .. } => "drop_decorative",
         ProjectIntent::CopyFrames { .. } => "copy_frames",
         ProjectIntent::ApplyLayout { .. } => "apply_layout",

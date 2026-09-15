@@ -1419,6 +1419,132 @@ fn processor_clips_decorative_media_without_stretching_the_retained_half() {
 }
 
 #[test]
+fn processor_exports_local_color_removal_and_restoration_from_reopened_core_projects() {
+    use myalbuns_core::{DecorativeRole, DecorativeScope, OpenProjectRequest, SheetVisualChange};
+    let root = tempfile::tempdir().unwrap();
+    let original_path = root.path().join("Decorativo.png");
+    RgbaImage::from_fn(100, 25, |x, _| {
+        if x < 50 {
+            Rgba([240, 0, 0, 255])
+        } else {
+            Rgba([0, 0, 240, 255])
+        }
+    })
+    .save_with_format(&original_path, ImageFormat::Png)
+    .unwrap();
+    let original_bytes = std::fs::read(&original_path).unwrap();
+    let project_path = root.path().join("Design local.myalbuns");
+    let location = || {
+        let mut context = OperationPathContext::new();
+        context.capture(&project_path).unwrap();
+        ProjectLocation::new(project_path.clone(), context.freeze())
+    };
+    let initial =
+        small_initial_project(100).with_personalization(InitialProjectPersonalization::new(
+            InitialBackground::BothSides {
+                both: InitialBackgroundContent::Media {
+                    path: original_path.clone(),
+                },
+            },
+            InitialOverlay::BothSides {
+                both: Some(InitialOverlayContent::Media {
+                    path: original_path.clone(),
+                }),
+            },
+            InitialFrameBorder::None,
+        ));
+    let core = ProjectCore::new()
+        .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"));
+    let mut project = core
+        .create_editable(CreateProjectRequest::new(
+            location(),
+            initial,
+            CreateAuthorization::CreateOnly,
+        ))
+        .unwrap();
+    let sheet_id = project.projection().state.album.sheets[0].id.clone();
+    project
+        .apply(ProjectIntent::EditSheetVisual {
+            sheet_id: sheet_id.clone(),
+            scope: DecorativeScope::Left,
+            change: SheetVisualChange::Remove {
+                role: DecorativeRole::Overlay,
+            },
+        })
+        .unwrap();
+    for (index, change, expected) in [
+        (
+            0,
+            SheetVisualChange::BackgroundColor {
+                rgb: "#20A040".into(),
+            },
+            [32, 160, 64],
+        ),
+        (
+            1,
+            SheetVisualChange::Remove {
+                role: DecorativeRole::Background,
+            },
+            [255, 255, 255],
+        ),
+        (
+            2,
+            SheetVisualChange::RestoreAlbum {
+                role: DecorativeRole::Background,
+            },
+            [240, 0, 0],
+        ),
+    ] {
+        let before = project.projection();
+        let edited = project
+            .apply(ProjectIntent::EditSheetVisual {
+                sheet_id: sheet_id.clone(),
+                scope: DecorativeScope::Left,
+                change,
+            })
+            .unwrap();
+        assert_eq!(project.undo().unwrap().composition, before.composition);
+        assert_eq!(project.redo().unwrap().composition, edited.composition);
+        project.save(project.revision()).unwrap();
+        drop(project);
+        project = core
+            .open_editable(OpenProjectRequest::new(location()))
+            .unwrap();
+        assert_eq!(project.projection().composition, edited.composition);
+        let snapshot = project.render_snapshot();
+        let sources = snapshot.composition.sheets[0]
+            .referenced_media_ids()
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .map(|id| RenderSource::new(id, original_path.clone()).unwrap())
+            .collect();
+        let output = root.path().join(format!("local-{index}.jpg"));
+        let result = invoke_real_processor(snapshot, &output, "local-sheet-design", 100, sources);
+        assert!(
+            result.status.success(),
+            "{}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+        let rendered = image::open(output).unwrap().to_rgb8();
+        for (fraction, expected) in [(0.25, expected), (0.75, [0, 0, 240])] {
+            let actual = rendered.get_pixel(
+                (rendered.width() as f64 * fraction) as u32,
+                rendered.height() / 2,
+            );
+            assert!(
+                actual
+                    .0
+                    .iter()
+                    .zip(expected)
+                    .all(|(value, expected)| value.abs_diff(expected) < 12),
+                "stage {index}, side {fraction}: {actual:?}, expected {expected:?}"
+            );
+        }
+    }
+    assert_eq!(std::fs::read(original_path).unwrap(), original_bytes);
+}
+
+#[test]
 fn processor_opens_the_current_original_once_and_classifies_its_content() {
     let source_dir = tempfile::tempdir().expect("temporary source directory");
     let output_dir = tempfile::tempdir().expect("temporary output directory");

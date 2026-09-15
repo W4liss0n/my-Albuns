@@ -17,6 +17,14 @@ pub enum DecorativeScope {
     Right,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
+pub enum SheetVisualChange {
+    BackgroundColor { rgb: String },
+    Remove { role: DecorativeRole },
+    RestoreAlbum { role: DecorativeRole },
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub enum VisualMapping {
@@ -50,6 +58,30 @@ pub enum SheetVisual<T> {
 }
 
 impl<T: Clone> SheetVisual<T> {
+    pub(crate) fn restore(&mut self, scope: DecorativeScope, active: crate::ActiveSides) {
+        if scope == DecorativeScope::BothSides {
+            *self = Self::Default;
+            return;
+        }
+        let (mut left, mut right) = match self {
+            Self::Default => return,
+            Self::BothSides { content } => {
+                let side = SideVisual::Custom {
+                    content: content.clone(),
+                    mapping: VisualMapping::BothSides,
+                };
+                (side.clone(), side)
+            }
+            Self::PerSide { left, right } => (left.clone(), right.clone()),
+        };
+        if scope == DecorativeScope::Left {
+            left = SideVisual::Default;
+        } else {
+            right = SideVisual::Default;
+        }
+        *self = Self::PerSide { left, right };
+        self.retain_active_sides(active);
+    }
     pub(crate) fn retain_active_sides(&mut self, active: crate::ActiveSides) {
         if let Self::PerSide { left, right } = self {
             match active {

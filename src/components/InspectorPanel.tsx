@@ -87,6 +87,7 @@ export type InspectorSectionState =
   | { kind: "local" };
 
 export interface InspectorPanelProps {
+  sheetDesign?: import("./SheetDesignInspector").SheetDesignActions;
   saveLayout?: { enabled: boolean; onSave(): void; feedback?: ReactNode };
   frameStyle?: FrameStyleControlActions;
   photoEffects?: PhotoEffectsControlActions;
@@ -136,6 +137,7 @@ export interface InspectorPanelProps {
 }
 
 export function InspectorPanel({
+  sheetDesign,
   saveLayout,
   frameStyle,
   photoOrientation,
@@ -450,6 +452,9 @@ export function InspectorPanel({
             defaultOpen
           >
             <SheetDesignInspector
+              key={context.sheet.sheetId}
+              actions={sheetDesign}
+              visuals={sheetStateById.get(context.sheet.sheetId)?.visuals}
               saveLayout={saveLayout}
               mediaPreviewUrls={mediaPreviewUrls}
               scope={selectedSheetScope}

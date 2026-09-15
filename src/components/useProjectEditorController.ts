@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PointerDragThreshold, ProjectCorePort } from "../application/projectPorts";
 import type { PrepareImportedMedia } from "../application/mediaPreviews";
 import type { SheetStructureIntent } from "../application/sheetStructure";
-import type { EditorProjection, FrameStackAction, FrameStyleChange, PhotoOrientationAction } from "../domain/project";
+import type { DecorativeScope, EditorProjection, FrameStackAction, FrameStyleChange, PhotoOrientationAction, SheetVisualChange } from "../domain/project";
 import { useEditorView } from "../state/editorView";
 import { CANVAS_MICROMETERS_PER_PIXEL } from "./canvasGeometry";
 import type {
@@ -510,6 +510,15 @@ export function useProjectEditorController({
       if (!interactionBlocked && navigation.implicitSheetId) {
         void mutations.applyIntent({ kind: "applyDecorative", sheetId: navigation.implicitSheetId, mediaId, role, scope: "bothSides" });
       }
+    },
+    sheetDesign: {
+      disabled: interactionBlocked || canvasMode.kind !== "sheet-editing",
+      onChange: (sheetId: string, scope: DecorativeScope, change: SheetVisualChange) => {
+        if (interactionBlocked || canvasMode.kind !== "sheet-editing" || canvasMode.sheetId !== sheetId) {
+          return Promise.resolve(false);
+        }
+        return mutations.applyIntent({ kind: "editSheetVisual", sheetId, scope, change });
+      },
     },
     dismissFeedback: mutations.dismissFeedback,
   };

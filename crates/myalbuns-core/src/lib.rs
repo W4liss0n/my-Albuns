@@ -16,7 +16,7 @@ mod validation;
 
 pub use sheet_visuals::{
     DecorativeDropPreview, DecorativeDropRequest, DecorativeRole, DecorativeScope, SheetVisual,
-    SheetVisuals, SideVisual, VisualMapping,
+    SheetVisualChange, SheetVisuals, SideVisual, VisualMapping,
 };
 
 pub use frame_geometry::{

@@ -11,6 +11,79 @@ fn location(path: &Path) -> ProjectLocation {
 }
 
 #[test]
+fn local_background_color_is_one_undoable_edit_and_restores_live_album_defaults() {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("Cor local.myalbuns");
+    let core = ProjectCore::new()
+        .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"));
+    let mut project = core
+        .create_editable(CreateProjectRequest::new(
+            location(&path),
+            InitialProject::neutral(),
+            CreateAuthorization::CreateOnly,
+        ))
+        .unwrap();
+    let before = project.projection();
+    let sheet_id = before.state.album.sheets[0].id.clone();
+    let edit = |change| {
+        serde_json::from_value::<ProjectIntent>(serde_json::json!({
+            "kind": "editSheetVisual", "sheetId": sheet_id, "scope": "left", "change": change,
+        }))
+        .unwrap()
+    };
+    let local = project
+        .apply(edit(
+            serde_json::json!({"kind":"backgroundColor", "rgb":"#123456"}),
+        ))
+        .unwrap();
+    assert_eq!(local.state.revision, before.state.revision + 1);
+    assert!(
+        matches!(&local.composition.sheets[0].backgrounds[0], ComposedBackground::Color { rgb, .. } if rgb == "#123456")
+    );
+    assert!(
+        matches!(&local.composition.sheets[0].backgrounds[1], ComposedBackground::Color { rgb, .. } if rgb == "#FFFFFF")
+    );
+    assert_eq!(project.undo().unwrap().composition, before.composition);
+    assert_eq!(project.redo().unwrap().composition, local.composition);
+    let defaults = ProjectedVisualDefaults {
+        background: ProjectedBackground::BothSides {
+            both: ProjectedBackgroundContent::Color {
+                rgb: "#ABCDEF".into(),
+            },
+        },
+        ..ProjectedVisualDefaults::default()
+    };
+    let changed = project
+        .apply(ProjectIntent::SetVisualDefaults {
+            visual_defaults: defaults,
+        })
+        .unwrap();
+    assert!(
+        matches!(&changed.composition.sheets[0].backgrounds[0], ComposedBackground::Color { rgb, .. } if rgb == "#123456")
+    );
+    assert!(
+        matches!(&changed.composition.sheets[0].backgrounds[1], ComposedBackground::Color { rgb, .. } if rgb == "#ABCDEF")
+    );
+    let restored = project
+        .apply(edit(
+            serde_json::json!({"kind":"restoreAlbum", "role":"background"}),
+        ))
+        .unwrap();
+    assert!(restored.state.album.sheets[0].visuals.is_none());
+    assert!(
+        matches!(&restored.composition.sheets[0].backgrounds[0], ComposedBackground::Color { rgb, .. } if rgb == "#ABCDEF")
+    );
+    assert_eq!(project.undo().unwrap().composition, changed.composition);
+    project.redo().unwrap();
+    project.save(project.projection().state.revision).unwrap();
+    drop(project);
+    let reopened = core
+        .open_editable(OpenProjectRequest::new(location(&path)))
+        .unwrap();
+    assert_eq!(reopened.projection().composition, restored.composition);
+}
+
+#[test]
 fn v10_migrates_without_local_visuals_and_explicit_save_matches_the_v11_fixtures() {
     let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
     for name in [
@@ -52,6 +125,228 @@ fn v10_migrates_without_local_visuals_and_explicit_save_matches_the_v11_fixtures
         }
         assert_eq!(output, std::fs::read(expected).unwrap());
     }
+}
+
+#[test]
+fn removing_a_local_application_keeps_media_and_the_other_side_then_restores_current_defaults() {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("Remover aplicação.myalbuns");
+    let core = ProjectCore::new()
+        .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"));
+    let mut project = core
+        .create_editable(CreateProjectRequest::new(
+            location(&path),
+            InitialProject::neutral(),
+            CreateAuthorization::CreateOnly,
+        ))
+        .unwrap();
+    let original = root.path().join("Decorativo.png");
+    std::fs::write(&original, b"original preserved").unwrap();
+    let imported = project
+        .import_media(
+            MediaKind::Decorative,
+            vec![ImportMedia::new(
+                original.clone(),
+                PhotoSourceMetadata::new(600, 300, std::array::from_fn(|_| "#FFFFFF".into()))
+                    .unwrap(),
+            )],
+        )
+        .unwrap();
+    let id = imported.projection.state.album.media[0].id;
+    let sheet_id = imported.projection.state.album.sheets[0].id.clone();
+    let defaults = ProjectedVisualDefaults {
+        background: ProjectedBackground::BothSides {
+            both: ProjectedBackgroundContent::Media { media_id: id },
+        },
+        overlay: ProjectedOverlay::BothSides {
+            both: Some(ProjectedOverlayContent::Media { media_id: id }),
+        },
+        ..ProjectedVisualDefaults::default()
+    };
+    project
+        .apply(ProjectIntent::SetVisualDefaults {
+            visual_defaults: defaults,
+        })
+        .unwrap();
+    let before = project.projection();
+    for role in ["background", "overlay"] {
+        let intent = serde_json::from_value(serde_json::json!({
+            "kind":"editSheetVisual", "sheetId":sheet_id, "scope":"left", "change":{"kind":"remove", "role":role}
+        })).unwrap();
+        let removed = project.apply(intent).unwrap();
+        assert_eq!(removed.state.album.media, before.state.album.media);
+        let sheet = &removed.composition.sheets[0];
+        if role == "background" {
+            assert!(
+                matches!(&sheet.backgrounds[0], ComposedBackground::Color { rgb, .. } if rgb == "#FFFFFF")
+            );
+            assert!(
+                matches!(&sheet.backgrounds[1], ComposedBackground::Media { draw_rect, clip_rect: Some(clip), .. }
+                if draw_rect.width == 600_000 && clip.x == 300_000 && clip.width == 300_000)
+            );
+        } else {
+            assert_eq!(sheet.overlays.len(), 1);
+            assert_eq!(sheet.overlays[0].draw_rect.width, 600_000);
+            assert_eq!(sheet.overlays[0].clip_rect.as_ref().unwrap().x, 300_000);
+        }
+    }
+    let removed = project.projection();
+    let changed = project
+        .apply(ProjectIntent::SetVisualDefaults {
+            visual_defaults: ProjectedVisualDefaults {
+                background: ProjectedBackground::BothSides {
+                    both: ProjectedBackgroundContent::Color {
+                        rgb: "#AABBCC".into(),
+                    },
+                },
+                ..before.state.album.visual_defaults.clone()
+            },
+        })
+        .unwrap();
+    assert!(
+        matches!(&changed.composition.sheets[0].backgrounds[0], ComposedBackground::Color { rgb, .. } if rgb == "#FFFFFF")
+    );
+    assert!(
+        matches!(&changed.composition.sheets[0].backgrounds[1], ComposedBackground::Color { rgb, .. } if rgb == "#AABBCC")
+    );
+    assert_eq!(
+        changed.composition.sheets[0].overlays,
+        removed.composition.sheets[0].overlays
+    );
+    project.save(project.projection().state.revision).unwrap();
+    drop(project);
+    let mut project = core
+        .open_editable(OpenProjectRequest::new(location(&path)))
+        .unwrap();
+    assert_eq!(project.projection().composition, changed.composition);
+    for role in [DecorativeRole::Background, DecorativeRole::Overlay] {
+        let before_restore = project.projection();
+        let restored = project
+            .apply(ProjectIntent::EditSheetVisual {
+                sheet_id: sheet_id.clone(),
+                scope: DecorativeScope::BothSides,
+                change: SheetVisualChange::RestoreAlbum { role },
+            })
+            .unwrap();
+        assert_eq!(restored.state.revision, before_restore.state.revision + 1);
+        assert_eq!(
+            project.undo().unwrap().composition,
+            before_restore.composition
+        );
+        assert_eq!(project.redo().unwrap().composition, restored.composition);
+    }
+    assert!(project.projection().state.album.sheets[0].visuals.is_none());
+    assert_eq!(std::fs::read(original).unwrap(), b"original preserved");
+}
+
+#[test]
+fn restoring_half_of_a_local_whole_keeps_its_crop_and_rejects_inactive_edits_without_history() {
+    let root = tempfile::tempdir().unwrap();
+    let core = ProjectCore::new()
+        .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"));
+    let mut project = core
+        .create_editable(CreateProjectRequest::new(
+            location(&root.path().join("Restaurar.myalbuns")),
+            InitialProject::neutral(),
+            CreateAuthorization::CreateOnly,
+        ))
+        .unwrap();
+    let original = root.path().join("Decorativo.png");
+    std::fs::write(&original, b"original").unwrap();
+    let imported = project
+        .import_media(
+            MediaKind::Decorative,
+            vec![ImportMedia::new(
+                original,
+                PhotoSourceMetadata::new(600, 300, std::array::from_fn(|_| "#FFFFFF".into()))
+                    .unwrap(),
+            )],
+        )
+        .unwrap();
+    let id = imported.projection.state.album.media[0].id;
+    let sheet_id = imported.projection.state.album.sheets[0].id.clone();
+    for role in [DecorativeRole::Background, DecorativeRole::Overlay] {
+        let whole = project
+            .apply(ProjectIntent::ApplyDecorative {
+                sheet_id: sheet_id.clone(),
+                media_id: id,
+                role,
+                scope: DecorativeScope::BothSides,
+            })
+            .unwrap();
+        let restore = ProjectIntent::EditSheetVisual {
+            sheet_id: sheet_id.clone(),
+            scope: DecorativeScope::Left,
+            change: SheetVisualChange::RestoreAlbum { role },
+        };
+        let half = project.apply(restore.clone()).unwrap();
+        assert_eq!(half.state.revision, whole.state.revision + 1);
+        let sheet = &half.composition.sheets[0];
+        if role == DecorativeRole::Background {
+            assert!(
+                matches!(&sheet.backgrounds[0], ComposedBackground::Color { rgb, .. } if rgb == "#FFFFFF")
+            );
+            assert!(
+                matches!(&sheet.backgrounds[1], ComposedBackground::Media { draw_rect, clip_rect:Some(clip), .. }
+                if draw_rect.width == 600_000 && clip.x == 300_000)
+            );
+        } else {
+            assert_eq!(sheet.overlays.len(), 1);
+            assert_eq!(sheet.overlays[0].draw_rect.width, 600_000);
+            assert_eq!(sheet.overlays[0].clip_rect.as_ref().unwrap().x, 300_000);
+        }
+        assert_eq!(project.apply(restore).unwrap(), half);
+        assert_eq!(project.undo().unwrap().composition, whole.composition);
+        assert_eq!(project.redo().unwrap().composition, half.composition);
+    }
+    project
+        .apply(ProjectIntent::ConvertEdgeSheet {
+            sheet_id: sheet_id.clone(),
+        })
+        .unwrap();
+    let single = project.projection();
+    for (target, scope, change) in [
+        (
+            sheet_id.clone(),
+            DecorativeScope::Left,
+            SheetVisualChange::Remove {
+                role: DecorativeRole::Background,
+            },
+        ),
+        (
+            sheet_id.clone(),
+            DecorativeScope::Right,
+            SheetVisualChange::BackgroundColor { rgb: "#bad".into() },
+        ),
+        (
+            "missing".into(),
+            DecorativeScope::BothSides,
+            SheetVisualChange::RestoreAlbum {
+                role: DecorativeRole::Overlay,
+            },
+        ),
+    ] {
+        assert!(
+            project
+                .apply(ProjectIntent::EditSheetVisual {
+                    sheet_id: target,
+                    scope,
+                    change
+                })
+                .is_err()
+        );
+        assert_eq!(project.projection(), single);
+    }
+    for role in [DecorativeRole::Background, DecorativeRole::Overlay] {
+        project
+            .apply(ProjectIntent::EditSheetVisual {
+                sheet_id: sheet_id.clone(),
+                scope: DecorativeScope::Right,
+                change: SheetVisualChange::RestoreAlbum { role },
+            })
+            .unwrap();
+    }
+    assert!(project.projection().state.album.sheets[0].visuals.is_none());
 }
 
 #[test]
@@ -427,9 +722,15 @@ fn decorative_drop_preview_uses_sheet_zones_and_single_page_scope_without_histor
         y_um: 150_000,
     };
     for (x, scope) in [
+        (0, DecorativeScope::Left),
         (100_000, DecorativeScope::Left),
+        (239_999, DecorativeScope::Left),
+        (240_000, DecorativeScope::BothSides),
         (300_000, DecorativeScope::BothSides),
+        (359_999, DecorativeScope::BothSides),
+        (360_000, DecorativeScope::Right),
         (500_000, DecorativeScope::Right),
+        (599_999, DecorativeScope::Right),
     ] {
         request.x_um = x;
         let preview = project.preview_decorative_drop(&request).unwrap().unwrap();
@@ -439,8 +740,18 @@ fn decorative_drop_preview_uses_sheet_zones_and_single_page_scope_without_histor
         assert_eq!(preview.sheet.overlays.len(), 1);
         assert_eq!(project.projection(), before);
     }
-    request.x_um = -1;
-    assert!(project.preview_decorative_drop(&request).unwrap().is_none());
+    for (x, y) in [
+        (-1, 150_000),
+        (600_000, 150_000),
+        (300_000, -1),
+        (300_000, 300_000),
+    ] {
+        request.x_um = x;
+        request.y_um = y;
+        assert!(project.preview_decorative_drop(&request).unwrap().is_none());
+        assert_eq!(project.projection(), before);
+    }
+    request.y_um = 150_000;
     request.x_um = 500_000;
     let preview = project.preview_decorative_drop(&request).unwrap().unwrap();
     let committed = project
@@ -601,6 +912,92 @@ fn public_decorative_projections_match_the_visual_corpus() {
                 }
             }
         }
+    }
+    project
+        .apply(ProjectIntent::ConvertEdgeSheet {
+            sheet_id: sheet_id.clone(),
+        })
+        .unwrap();
+    for role in [DecorativeRole::Background, DecorativeRole::Overlay] {
+        project
+            .apply(ProjectIntent::EditSheetVisual {
+                sheet_id: sheet_id.clone(),
+                scope: DecorativeScope::BothSides,
+                change: SheetVisualChange::RestoreAlbum { role },
+            })
+            .unwrap();
+    }
+    project
+        .apply(ProjectIntent::SetVisualDefaults {
+            visual_defaults: ProjectedVisualDefaults {
+                overlay: ProjectedOverlay::BothSides {
+                    both: Some(ProjectedOverlayContent::Media {
+                        media_id: media_ids[1],
+                    }),
+                },
+                ..ProjectedVisualDefaults::default()
+            },
+        })
+        .unwrap();
+    states.insert(
+        "inherited".into(),
+        serde_json::to_value(project.projection()).unwrap(),
+    );
+    let mut from = "inherited";
+    for (to, scope, change) in [
+        (
+            "mixed-origin",
+            DecorativeScope::Left,
+            SheetVisualChange::Remove {
+                role: DecorativeRole::Background,
+            },
+        ),
+        (
+            "local-color",
+            DecorativeScope::BothSides,
+            SheetVisualChange::BackgroundColor {
+                rgb: "#E7D6C4".into(),
+            },
+        ),
+        (
+            "half-restored",
+            DecorativeScope::Left,
+            SheetVisualChange::RestoreAlbum {
+                role: DecorativeRole::Background,
+            },
+        ),
+        (
+            "removed-overlay",
+            DecorativeScope::BothSides,
+            SheetVisualChange::Remove {
+                role: DecorativeRole::Overlay,
+            },
+        ),
+        (
+            "background-restored",
+            DecorativeScope::BothSides,
+            SheetVisualChange::RestoreAlbum {
+                role: DecorativeRole::Background,
+            },
+        ),
+        (
+            "restored",
+            DecorativeScope::BothSides,
+            SheetVisualChange::RestoreAlbum {
+                role: DecorativeRole::Overlay,
+            },
+        ),
+    ] {
+        let intent = ProjectIntent::EditSheetVisual {
+            sheet_id: sheet_id.clone(),
+            scope,
+            change,
+        };
+        let projection = project.apply(intent.clone()).unwrap();
+        states.insert(to.into(), serde_json::to_value(&projection).unwrap());
+        transitions
+            .push(serde_json::json!({ "from":from, "intent":intent, "projection":projection }));
+        from = to;
     }
     let serialized = format!("{}\n", serde_json::to_string_pretty(&serde_json::json!({ "states": states, "previews": previews, "transitions": transitions })).unwrap());
     let fixture =
