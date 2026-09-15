@@ -861,8 +861,11 @@
       "id": "editor-new-project-entry",
       "title": "Novo Projeto iniciado pelo editor — formulário existente",
       "implementationPath": "/welcome-preview.html?surface=newProject",
-      "referencePath": "/docs/references/ui-programa-diagramacao/Criar%20projeto.dc.html",
-      "comparison": { "kind": "paired", "surface": "new-project-window" },
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "editor-new-project-entry",
+        "reason": "A entrada direta pelo editor foi aceita depois da referência. O mesmo formulário é comparado com a referência no cenário new-project-configuration."
+      },
       "viewport": { "width": 1440, "height": 900 },
       "readySelector": ".global-shell--new-project [aria-label=\"Continuar\"]",
       "actions": []
