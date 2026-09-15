@@ -38,18 +38,21 @@ describe("physical Album structure projection", () => {
       canAddBefore: false,
       canConvertEdge: true,
       canDelete: true,
+      canDuplicate: false,
     });
     expect(sheetStructureAvailability(physicalAlbum, "third")).toEqual({
       canAddAfter: true,
       canAddBefore: true,
       canConvertEdge: false,
       canDelete: true,
+      canDuplicate: true,
     });
     expect(sheetStructureAvailability(physicalAlbum, "final")).toEqual({
       canAddAfter: false,
       canAddBefore: true,
       canConvertEdge: true,
       canDelete: true,
+      canDuplicate: false,
     });
     expect(
       sheetStructureAvailability(physicalAlbum.slice(0, 2), "initial"),

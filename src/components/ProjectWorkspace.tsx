@@ -622,6 +622,8 @@ export function ProjectWorkspace({
       void controller.addSheetBefore();
     },
     canAddAfter: implicitSheetAvailability.canAddAfter,
+    canDuplicate: implicitSheetAvailability.canDuplicate,
+    duplicateSheet: () => { void controller.duplicateSheet(); },
     canAddBefore: implicitSheetAvailability.canAddBefore,
     canConvertEdge: implicitSheetAvailability.canConvertEdge,
     canDelete: implicitSheetAvailability.canDelete,
@@ -927,6 +929,9 @@ export function ProjectWorkspace({
           }
           onAddAfter={() => {
             void controller.addSheetAfter(sheetContextMenu.sheetId);
+          }}
+          onDuplicate={() => {
+            void controller.duplicateSheet(sheetContextMenu.sheetId);
           }}
           onAddBefore={() => {
             void controller.addSheetBefore(sheetContextMenu.sheetId);

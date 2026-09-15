@@ -352,8 +352,7 @@ const DEFINITIONS = [
     description: "Duplica a Lâmina ativa.",
     kind: "domain",
     contexts: ["sheet"],
-    availability: "placeholder",
-    placeholderFeature: "duplicate-sheet",
+    availability: "implemented",
     shortcuts: [],
   }),
   command({

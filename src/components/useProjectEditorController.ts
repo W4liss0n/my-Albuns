@@ -397,6 +397,11 @@ export function useProjectEditorController({
     });
   };
 
+  const duplicateSheet = (sheetId = navigation.implicitSheetId) => {
+    if (!sheetId) return Promise.resolve(false);
+    return applyStructuralIntent({ kind: "duplicateSheet", sheetId });
+  };
+
   const deleteSheet = (sheetId = navigation.implicitSheetId) => {
     if (!sheetId) return Promise.resolve(false);
     return applyStructuralIntent({ kind: "deleteSheet", sheetId });
@@ -489,6 +494,7 @@ export function useProjectEditorController({
     importMedia: mutations.importMedia,
     addSheetBefore,
     addSheetAfter,
+    duplicateSheet,
     convertEdge,
     deleteSheet,
     reorderSheet,

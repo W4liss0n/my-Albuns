@@ -4,6 +4,19 @@ import { describe, expect, test, vi } from "vitest";
 import { SheetContextMenu } from "./SheetContextMenu";
 
 describe("SheetContextMenu", () => {
+  test("duplicates an eligible target and dismisses the menu", () => {
+    const duplicate = vi.fn();
+    const dismiss = vi.fn();
+    render(<SheetContextMenu availability={{ canAddAfter: true, canAddBefore: true,
+      canConvertEdge: false, canDelete: true, canDuplicate: true }}
+      position={{ x: 20, y: 30 }} sheetNumber={2} onAddAfter={vi.fn()}
+      onAddBefore={vi.fn()} onConvertEdge={vi.fn()} onDelete={vi.fn()}
+      onDuplicate={duplicate} onDismiss={dismiss} />);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Duplicar Lâmina" }));
+    expect(duplicate).toHaveBeenCalledOnce();
+    expect(dismiss).toHaveBeenCalledOnce();
+  });
+
   test("converts an eligible explicit edge target", () => {
     const convertEdge = vi.fn();
     const dismiss = vi.fn();
@@ -14,12 +27,14 @@ describe("SheetContextMenu", () => {
           canAddBefore: true,
           canConvertEdge: true,
           canDelete: true,
+          canDuplicate: false,
         }}
         position={{ x: 20, y: 30 }}
         sheetNumber={1}
         onAddAfter={vi.fn()}
         onAddBefore={vi.fn()}
         onConvertEdge={convertEdge}
+        onDuplicate={vi.fn()}
         onDelete={vi.fn()}
         onDismiss={dismiss}
       />,
@@ -46,12 +61,14 @@ describe("SheetContextMenu", () => {
           canAddBefore: false,
           canConvertEdge: false,
           canDelete: true,
+          canDuplicate: false,
         }}
         position={{ x: 140, y: 220 }}
         sheetNumber={4}
         onAddAfter={addAfter}
         onAddBefore={addBefore}
         onConvertEdge={vi.fn()}
+        onDuplicate={vi.fn()}
         onDelete={deleteSheet}
         onDismiss={dismiss}
       />,
@@ -91,12 +108,14 @@ describe("SheetContextMenu", () => {
           canAddBefore: true,
           canConvertEdge: false,
           canDelete: false,
+          canDuplicate: false,
         }}
         position={{ x: 0, y: 0 }}
         sheetNumber={1}
         onAddAfter={vi.fn()}
         onAddBefore={vi.fn()}
         onConvertEdge={vi.fn()}
+        onDuplicate={vi.fn()}
         onDelete={deleteSheet}
         onDismiss={dismiss}
       />,
@@ -110,12 +129,14 @@ describe("SheetContextMenu", () => {
           canAddBefore: true,
           canConvertEdge: false,
           canDelete: true,
+          canDuplicate: false,
         }}
         position={{ x: 0, y: 0 }}
         sheetNumber={1}
         onAddAfter={vi.fn()}
         onAddBefore={vi.fn()}
         onConvertEdge={vi.fn()}
+        onDuplicate={vi.fn()}
         onDelete={deleteSheet}
         onDismiss={dismiss}
       />,
@@ -134,12 +155,14 @@ describe("SheetContextMenu", () => {
           canAddBefore: true,
           canConvertEdge: false,
           canDelete: true,
+          canDuplicate: false,
         }}
         position={{ x: 4, y: 8 }}
         sheetNumber={2}
         onAddAfter={vi.fn()}
         onAddBefore={vi.fn()}
         onConvertEdge={vi.fn()}
+        onDuplicate={vi.fn()}
         onDelete={deleteSheet}
         onDismiss={dismiss}
       />,
@@ -179,12 +202,14 @@ describe("SheetContextMenu", () => {
         canAddBefore: true,
         canConvertEdge: true,
         canDelete: true,
+        canDuplicate: false,
       },
       sheetNumber: 2,
       onAddAfter: vi.fn(),
       onAddBefore: vi.fn(),
       onConvertEdge: vi.fn(),
       onDelete: vi.fn(),
+      onDuplicate: vi.fn(),
       onDismiss: vi.fn(),
     };
 

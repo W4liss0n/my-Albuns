@@ -64,6 +64,8 @@ test("feeds the canonical shortcuts into the Project application menu", () => {
     addSheetAfter: () => undefined,
     addSheetBefore: () => undefined,
     canAddAfter: true,
+    canDuplicate: true,
+    duplicateSheet: vi.fn(),
     canAddBefore: true,
     canConvertEdge: true,
     canDelete: true,
@@ -208,7 +210,7 @@ test("owns the available Sheet structure commands without claiming later owners"
     context: "sheet",
   });
   expect(projectCommandBinding("duplicate-sheet", "sheet")).toMatchObject({
-    availability: "placeholder",
+    availability: "implemented",
   });
   expect(projectCommandBinding("convert-edge", "sheet")).toMatchObject({
     availability: "implemented",
@@ -231,6 +233,8 @@ test("projects each Sheet structure command with its own availability and owner"
     addSheetAfter,
     addSheetBefore,
     canAddAfter: true,
+    canDuplicate: true,
+    duplicateSheet: vi.fn(),
     canAddBefore: false,
     canConvertEdge: true,
     canDelete: true,
@@ -269,7 +273,8 @@ test("projects each Sheet structure command with its own availability and owner"
     disabled: false,
   });
   expect(command("duplicate-sheet")).toMatchObject({
-    availability: "placeholder",
+    availability: "implemented",
+    disabled: false,
   });
   expect(command("convert-edge")).toMatchObject({
     availability: "implemented",
@@ -315,6 +320,8 @@ test("disables Sheet structure commands during editing without disabling global 
     addSheetAfter: () => undefined,
     addSheetBefore: () => undefined,
     canAddAfter: true,
+    canDuplicate: true,
+    duplicateSheet: vi.fn(),
     canAddBefore: true,
     canConvertEdge: true,
     canDelete: true,
@@ -346,6 +353,7 @@ test("disables Sheet structure commands during editing without disabling global 
   expect(command("sheet", "add-before")).toMatchObject({ disabled: true });
   expect(command("sheet", "add-after")).toMatchObject({ disabled: true });
   expect(command("sheet", "delete-sheet")).toMatchObject({ disabled: true });
+  expect(command("sheet", "duplicate-sheet")).toMatchObject({ disabled: true });
   expect(command("edit", "undo")).toMatchObject({ disabled: false });
   expect(command("file", "save")).not.toMatchObject({ disabled: true });
 });
@@ -378,6 +386,8 @@ test("projects every application-menu command from its canonical descriptor", ()
     addSheetAfter: () => undefined,
     addSheetBefore: () => undefined,
     canAddAfter: true,
+    canDuplicate: true,
+    duplicateSheet: vi.fn(),
     canAddBefore: true,
     canConvertEdge: true,
     canDelete: true,

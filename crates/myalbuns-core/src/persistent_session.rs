@@ -376,6 +376,18 @@ impl PersistentProjectSession {
                 outcome.affected_sheet_id = Some(sheet_id);
                 Ok(next)
             }
+            ProjectIntent::DuplicateSheet { sheet_id } => {
+                let parsed = parse_uuid(&sheet_id)
+                    .map_err(|()| CoreError::SheetNotFound(sheet_id.clone()))?;
+                if !project.sheets().iter().any(|sheet| sheet.id() == parsed) {
+                    return Err(CoreError::SheetNotFound(sheet_id));
+                }
+                let (next, copy_id) = project
+                    .with_duplicated_sheet(parsed)
+                    .map_err(|()| CoreError::InvalidSheetDuplication)?;
+                outcome.affected_sheet_id = Some(copy_id);
+                Ok(next)
+            }
             ProjectIntent::DeleteSheet { sheet_id } => {
                 let parsed = parse_uuid(&sheet_id)
                     .map_err(|()| CoreError::SheetNotFound(sheet_id.clone()))?;
