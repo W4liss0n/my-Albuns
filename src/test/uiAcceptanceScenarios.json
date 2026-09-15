@@ -864,7 +864,8 @@
       "referencePath": "/docs/references/ui-programa-diagramacao/Criar%20projeto.dc.html",
       "comparison": { "kind": "paired", "surface": "new-project-window" },
       "viewport": { "width": 1440, "height": 900 },
-      "readySelector": ".global-shell--new-project [aria-label=\"Continuar\"]"
+      "readySelector": ".global-shell--new-project [aria-label=\"Continuar\"]",
+      "actions": []
     },
     {
       "id": "new-project-configuration",
