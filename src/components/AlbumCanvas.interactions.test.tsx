@@ -34,7 +34,7 @@ test("reveals the dimmed Photo overflow and thirds guides only during Pan", asyn
   });
   await finishPixiInitialization();
 
-  const frame = displayWithHandler("pointerdown");
+  const frame = displayWithLabel("canvas-frame-frame-001");
   expect(frame.cursor).toBe("default");
   const outsidePreview = displayWithLabel(
     "photo-pan-outside-preview",
@@ -112,7 +112,7 @@ test("keeps the photo inside a stationary frame mask throughout pan", async () =
   });
   await finishPixiInitialization();
 
-  const frame = displayWithHandler("pointerdown");
+  const frame = displayWithLabel("canvas-frame-frame-001");
   const maskedViewport = displayWithLabel(
     frame.label.replace("canvas-frame-", "frame-content-"),
   ).children.find(
@@ -169,7 +169,7 @@ test("reports the live Photo transform while Pan is moving", async () => {
   });
   await finishPixiInitialization();
 
-  const frame = displayWithHandler("pointerdown");
+  const frame = displayWithLabel("canvas-frame-frame-001");
   frame.emit("pointerdown", {
     altKey: true,
     global: { x: 0, y: 0 },
@@ -205,7 +205,7 @@ test("keeps a crash-interrupted continuous gesture in memory without committing 
   });
   await finishPixiInitialization();
 
-  displayWithHandler("pointerdown").emit("pointerdown", {
+  displayWithLabel("canvas-frame-frame-001").emit("pointerdown", {
     altKey: true,
     global: { x: 0, y: 0 },
     stopPropagation: vi.fn(),
@@ -231,7 +231,7 @@ test("keeps every frame corner covered while panning a rotated photo", async () 
   });
   await finishPixiInitialization();
 
-  const frame = displayWithHandler("pointerdown");
+  const frame = displayWithLabel("canvas-frame-frame-001");
   const maskedViewport = displayWithLabel(
     frame.label.replace("canvas-frame-", "frame-content-"),
   ).children.find(
@@ -304,7 +304,7 @@ test("does not reset an active Pan preview when wheel Zoom starts", async () => 
   });
   await finishPixiInitialization();
 
-  const frame = displayWithHandler("pointerdown");
+  const frame = displayWithLabel("canvas-frame-frame-001");
   const maskedViewport = displayWithLabel(
     frame.label.replace("canvas-frame-", "frame-content-"),
   ).children.find(
@@ -452,7 +452,7 @@ test("rolls the Pixi preview back when the Project rejects a transform", async (
   });
   await finishPixiInitialization();
 
-  const frame = displayWithHandler("pointerdown");
+  const frame = displayWithLabel("canvas-frame-frame-001");
   const insidePreview = displayWithLabel(
     "photo-pan-inside-preview",
   );

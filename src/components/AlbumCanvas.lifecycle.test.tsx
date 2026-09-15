@@ -183,9 +183,11 @@ test("does not let an abandoned StrictMode initialization destroy the active Can
 
   expect(pixiLifecycle.instances[0].destroyCount).toBe(1);
   expect(pixiLifecycle.instances[1].destroyCount).toBe(0);
-  expect(pixiLifecycle.instances[1].stage.children).toHaveLength(1);
-  const activeWorld = pixiLifecycle.instances[1].stage
-    .children[0] as { children: unknown[] };
+  const worlds = pixiLifecycle.instances[1].stage.children.filter(
+    (child) => (child as { label: string }).label === "album-world",
+  );
+  expect(worlds).toHaveLength(1);
+  const activeWorld = worlds[0] as { children: unknown[] };
   expect(activeWorld.children).toHaveLength(1);
   expect(view.container.querySelectorAll("canvas")).toHaveLength(1);
 
