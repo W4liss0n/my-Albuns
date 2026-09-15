@@ -708,6 +708,12 @@ fn locked_structure_rejects_geometry_creation_and_paste_but_keeps_selection_orde
         ProjectIntent::PasteFrames {
             sheet_id: sheet.clone(),
             desired_offset_um: 5_000,
+            mode: myalbuns_core::PhotoPlacementMode::Edit,
+        },
+        ProjectIntent::PasteFrames {
+            sheet_id: sheet.clone(),
+            desired_offset_um: 0,
+            mode: myalbuns_core::PhotoPlacementMode::Normal,
         },
     ] {
         assert_eq!(project.apply(intent), Err(CoreError::LayoutLocked));

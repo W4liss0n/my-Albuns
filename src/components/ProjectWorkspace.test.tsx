@@ -833,6 +833,27 @@ test("opens Frame context actions for the clicked selection and preserves it aft
   expect(screen.queryByRole("menu", { name: "Organizar Frames" })).not.toBeInTheDocument();
 });
 
+test.each(["menu", "shortcut"])("normal-mode Frame clipboard commands are reachable through the %s", async (source) => {
+  const current = structuredClone(projection);
+  current.canPasteFrames = true;
+  useEditorView.setState({ projectId: current.state.projectId, editingSheetId: null,
+    selectedFrameIds: ["frame-001"], centeredSheetId: "sheet-001" });
+  const apply = vi.fn(async (_intent: ProjectIntent) => current);
+  render(<ProjectWorkspace projection={current} projectCorePort={projectCorePortWithApply(apply)}
+    onProjectionChange={vi.fn()} />);
+  if (source === "menu") {
+    fireEvent.click(getApplicationCommand("Editar", "Copiar"));
+    await waitFor(() => expect(apply).toHaveBeenCalledWith({ kind: "copyFrames", frameIds: ["frame-001"] }));
+    fireEvent.click(getApplicationCommand("Editar", "Colar"));
+  } else {
+    fireEvent.keyDown(window, { key: "c", ctrlKey: true });
+    fireEvent.keyDown(window, { key: "v", ctrlKey: true });
+  }
+  await waitFor(() => expect(apply.mock.calls.map(([intent]) => intent.kind)).toEqual(["copyFrames", "pasteFrames"]));
+  expect(apply.mock.calls[1][0]).toMatchObject({ sheetId: "sheet-001" });
+  expect(useEditorView.getState().editingSheetId).toBeNull();
+});
+
 test("presents the canonical desktop menus and marks unfinished commands", () => {
   render(
     <ProjectWorkspace

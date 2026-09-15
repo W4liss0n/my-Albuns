@@ -577,7 +577,7 @@ export function ProjectWorkspace({
     photoCommandActive: selectedPhotoFrame !== null && mediaDrag === null && sheetContextMenu === null && frameContextMenu === null,
     copyFrames: () => { void controller.copyFrames(); },
     pasteFrames: () => { void controller.pasteFrames(); },
-    frameClipboardActive: canvasMode.kind === "sheet-editing" && mediaDrag === null && sheetContextMenu === null && frameContextMenu === null,
+    frameClipboardActive: mediaDrag === null && sheetContextMenu === null && frameContextMenu === null,
     deleteFrames: () => { void controller.deleteFrames(); },
     arrangeFrames: (action) => { void controller.arrangeFrames(action); },
     frameCommandsActive: controller.canDeleteFrames && mediaDrag === null && sheetContextMenu === null && frameContextMenu === null,

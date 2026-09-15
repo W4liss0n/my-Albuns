@@ -211,18 +211,22 @@ impl PersistentProjectSession {
         if let ProjectIntent::PasteFrames {
             sheet_id,
             desired_offset_um,
+            mode,
         } = &intent
         {
             let clipboard = self
                 .frame_clipboard
                 .clone()
                 .ok_or(CoreError::FrameClipboardEmpty)?;
-            self.commit_edit(|project| {
-                let (next, ids) =
-                    project.with_pasted_frames(&clipboard, sheet_id, *desired_offset_um)?;
-                outcome.affected_frame_ids = Some(ids);
-                Ok(next)
-            })?;
+            let (next, ids) = self.project().with_pasted_frames(
+                &clipboard,
+                sheet_id,
+                *desired_offset_um,
+                *mode,
+                &self.layout_catalog.entries,
+            )?;
+            self.commit_edit(|_| Ok(next))?;
+            outcome.affected_frame_ids = Some(ids);
             return Ok(outcome);
         }
         if let ProjectIntent::ArrangeFrames { frame_ids, action } = &intent {

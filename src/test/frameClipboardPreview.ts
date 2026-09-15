@@ -6,5 +6,5 @@ export const frameClipboardCorpus = corpus as unknown as {
   before: EditorProjection;
   copied: EditorProjection;
   cases: { name: string; before?: EditorProjection; copied?: EditorProjection; sourceSheetId: string; targetSheetId: string;
-    selectedFrameIds: string[]; pastedFrameIds: string[]; desiredOffsetUm: number; after: EditorProjection }[];
+    selectedFrameIds: string[]; pastedFrameIds: string[]; desiredOffsetUm: number; mode: "edit" | "normal"; after: EditorProjection }[];
 };

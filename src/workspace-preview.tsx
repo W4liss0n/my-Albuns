@@ -138,7 +138,8 @@ if (frameContext === "swap") {
 
 if (frameContext === "clipboard") {
   const sheetId = frameClipboardCase.sourceSheetId;
-  useEditorView.setState({ projectId: projection.state.projectId, editingSheetId: sheetId,
+  const normal = previewParameters.get("mode") === "normal";
+  useEditorView.setState({ projectId: projection.state.projectId, editingSheetId: normal ? null : sheetId,
     focusedSheetId: sheetId, centeredSheetId: sheetId, selectedFrameIds: frameClipboardCase.selectedFrameIds });
   exposeFrameClipboardState();
   useEditorView.subscribe(exposeFrameClipboardState);
@@ -684,7 +685,8 @@ function applyPreviewIntent(intent: ProjectIntent): ProjectMutationOutcome {
     return { projection, affectedFrameId: null, affectedSheetId: null };
   }
   if (intent.kind === "pasteFrames") {
-    if (frameContext !== "clipboard" || !projection.canPasteFrames || intent.sheetId !== frameClipboardCase.targetSheetId || intent.desiredOffsetUm !== frameClipboardCase.desiredOffsetUm) {
+    if (frameContext !== "clipboard" || !projection.canPasteFrames || intent.sheetId !== frameClipboardCase.targetSheetId || intent.mode !== frameClipboardCase.mode ||
+        (frameClipboardCase.sourceSheetId === frameClipboardCase.targetSheetId && intent.desiredOffsetUm !== frameClipboardCase.desiredOffsetUm)) {
       throw new Error("Destino fora do cenário de colagem desta prévia.");
     }
     projection = finalizePhysicalPreviewMutation(structuredClone(frameClipboardCase.after), structuredClone(projection));
@@ -919,6 +921,7 @@ function exposeFrameClipboardState() {
   document.body.dataset.clipboardCount = String(projection.state.album.sheets.reduce((count, sheet) => count + sheet.frames.length, 0));
   document.body.dataset.clipboardAvailable = String(projection.canPasteFrames);
   document.body.dataset.clipboardEditingSheet = view.editingSheetId ?? "none";
+  document.body.dataset.clipboardCenteredSheet = view.centeredSheetId ?? "none";
 }
 
 function exposeSheetSideSwapState() {

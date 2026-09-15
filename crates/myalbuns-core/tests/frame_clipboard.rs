@@ -142,6 +142,7 @@ fn paste(
         .apply_with_outcome(ProjectIntent::PasteFrames {
             sheet_id,
             desired_offset_um: offset,
+            mode: PhotoPlacementMode::Edit,
         })
         .unwrap()
 }
@@ -349,7 +350,8 @@ fn invalid_commands_are_atomic_and_clipboards_are_isolated_between_projects() {
         project
             .apply(ProjectIntent::PasteFrames {
                 sheet_id: "invalid".into(),
-                desired_offset_um: 0
+                desired_offset_um: 0,
+                mode: PhotoPlacementMode::Normal,
             })
             .is_err()
     );
@@ -359,7 +361,8 @@ fn invalid_commands_are_atomic_and_clipboards_are_isolated_between_projects() {
     assert_eq!(
         other.apply(ProjectIntent::PasteFrames {
             sheet_id: before.state.album.sheets[1].id.clone(),
-            desired_offset_um: 0
+            desired_offset_um: 0,
+            mode: PhotoPlacementMode::Normal,
         }),
         Err(CoreError::FrameClipboardEmpty)
     );
@@ -377,6 +380,100 @@ fn invalid_commands_are_atomic_and_clipboards_are_isolated_between_projects() {
 }
 
 #[test]
+fn normal_paste_reorganizes_the_destination_and_undo_restores_the_whole_action() {
+    for (source, target, single) in [(1, 1, true), (1, 2, false), (1, 0, false), (0, 1, false)] {
+        let root = tempfile::tempdir().unwrap();
+        let mut project = project_with_frames(root.path());
+        project
+            .apply(ProjectIntent::SetFrameStyle {
+                edit: myalbuns_core::FrameStyleEdit {
+                    frame_ids: vec![
+                        project.projection().state.album.sheets[source].frames[0]
+                            .id
+                            .clone(),
+                    ],
+                    change: myalbuns_core::FrameStyleChange::Opacity {
+                        opacity_percent: 65,
+                    },
+                },
+            })
+            .unwrap();
+        project.save(project.revision()).unwrap();
+        let before = project.projection();
+        let original = project.project().clone();
+        let source_frames = &before.state.album.sheets[source].frames;
+        let selected: Vec<_> = source_frames
+            .iter()
+            .take(if single { 1 } else { 2 })
+            .collect();
+        project
+            .apply(ProjectIntent::CopyFrames {
+                frame_ids: selected.iter().map(|frame| frame.id.clone()).collect(),
+            })
+            .unwrap();
+        let sheet_id = before.state.album.sheets[target].id.clone();
+        let outcome = project
+            .apply_with_outcome(ProjectIntent::PasteFrames {
+                sheet_id: sheet_id.clone(),
+                desired_offset_um: 8000,
+                mode: PhotoPlacementMode::Normal,
+            })
+            .unwrap();
+        let after = outcome.projection;
+        let frames = &after.state.album.sheets[target].frames;
+        assert_eq!(frames.len(), 2 + selected.len());
+        assert_ne!(
+            frames[0].rect,
+            before.state.album.sheets[target].frames[0].rect
+        );
+        for (index, frame) in frames.iter().enumerate() {
+            assert!(
+                frames[index + 1..].iter().all(|other| {
+                    frame.rect.x + frame.rect.width <= other.rect.x
+                        || other.rect.x + other.rect.width <= frame.rect.x
+                        || frame.rect.y + frame.rect.height <= other.rect.y
+                        || other.rect.y + other.rect.height <= frame.rect.y
+                }),
+                "normal Paste must lay out Frames without overlap"
+            );
+        }
+        assert_eq!(
+            outcome.affected_frame_ids.unwrap(),
+            frames[2..].iter().map(|f| f.id.clone()).collect::<Vec<_>>()
+        );
+        for (copy, source) in frames[2..].iter().zip(selected) {
+            assert_ne!(copy.id, source.id);
+            assert_eq!(copy.photo, source.photo);
+            assert_eq!(copy.style, source.style);
+        }
+        assert_eq!(after.state.album.media, before.state.album.media);
+        for index in 0..4 {
+            if index != target {
+                assert_eq!(
+                    after.state.album.sheets[index],
+                    before.state.album.sheets[index]
+                );
+            }
+        }
+        assert_eq!(after.state.revision, before.state.revision + 1);
+        project.undo().unwrap();
+        assert_eq!(project.project(), &original);
+        assert_eq!(project.redo().unwrap(), after);
+        project.save(project.revision()).unwrap();
+        drop(project);
+        let mut reopened = core(root.path())
+            .open_editable(OpenProjectRequest::new(location(
+                &root.path().join("Clipboard.myalbuns"),
+            )))
+            .unwrap();
+        reopened
+            .observe_photo_source(after.state.album.media[0].id, metadata())
+            .unwrap();
+        assert_eq!(reopened.projection().state.album, after.state.album);
+    }
+}
+
+#[test]
 fn clipboard_preview_corpus_matches_the_public_core() {
     let root = tempfile::tempdir().unwrap();
     let mut cases = Vec::new();
@@ -389,6 +486,11 @@ fn clipboard_preview_corpus_matches_the_public_core() {
         ("right-double", 0, 1, false),
         ("left-double", 3, 1, false),
         ("same-no-offset", 1, 1, false),
+        ("normal-same-single", 1, 1, true),
+        ("normal-other-double", 1, 2, false),
+        ("normal-other-single", 1, 2, true),
+        ("normal-double-right", 1, 0, false),
+        ("normal-right-double", 0, 1, false),
     ] {
         let case_root = root.path().join(name);
         fs::create_dir(&case_root).unwrap();
@@ -424,11 +526,27 @@ fn clipboard_preview_corpus_matches_the_public_core() {
                 frame_ids: selected.clone(),
             })
             .unwrap();
-        let outcome = paste(&mut project, target, 8_000);
+        let mode = if name.starts_with("normal-") {
+            PhotoPlacementMode::Normal
+        } else {
+            PhotoPlacementMode::Edit
+        };
+        let desired_offset_um = if mode == PhotoPlacementMode::Normal {
+            0
+        } else {
+            8_000
+        };
+        let outcome = project
+            .apply_with_outcome(ProjectIntent::PasteFrames {
+                sheet_id: before.state.album.sheets[target].id.clone(),
+                desired_offset_um,
+                mode,
+            })
+            .unwrap();
         let new_ids = outcome.affected_frame_ids.unwrap();
         let mut text = serde_json::to_string(&serde_json::json!({ "name": name, "before": before, "copied": copied,
             "after": outcome.projection, "sourceSheetId": before.state.album.sheets[source].id,
-            "targetSheetId": before.state.album.sheets[target].id, "selectedFrameIds": selected, "pastedFrameIds": new_ids, "desiredOffsetUm": 8_000 })).unwrap();
+            "targetSheetId": before.state.album.sheets[target].id, "selectedFrameIds": selected, "pastedFrameIds": new_ids, "desiredOffsetUm": desired_offset_um, "mode": mode })).unwrap();
         text = text.replace(&before.state.project_id, "frame-clipboard-project");
         for (sheet_index, sheet) in before.state.album.sheets.iter().enumerate() {
             text = text.replace(&sheet.id, &format!("sheet-{:03}", sheet_index + 1));

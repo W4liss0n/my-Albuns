@@ -48,6 +48,8 @@ impl ProjectDocument {
         clipboard: &FrameClipboard,
         sheet_id: &str,
         desired_offset_um: u64,
+        mode: PhotoPlacementMode,
+        custom: &[crate::CustomLayout],
     ) -> Result<(Self, Vec<Uuid>), CoreError> {
         let id =
             Uuid::parse_str(sheet_id).map_err(|_| CoreError::SheetNotFound(sheet_id.into()))?;
@@ -74,15 +76,18 @@ impl ProjectDocument {
         };
         let mut frames = clipboard.frames.clone();
         for frame in &mut frames {
+            frame.id = Uuid::new_v4();
+            if mode == PhotoPlacementMode::Normal {
+                continue;
+            }
             let rect = frame.rect;
             let x = map_coordinate(rect.x, clipboard.width, width);
             let y = map_coordinate(rect.y, clipboard.height, height);
             let right = map_coordinate(rect.x + rect.width, clipboard.width, width);
             let bottom = map_coordinate(rect.y + rect.height, clipboard.height, height);
-            frame.id = Uuid::new_v4();
             frame.rect = ProjectRect::new(origin_x + x, y, right - x, bottom - y);
         }
-        if id == clipboard.sheet_id {
+        if mode == PhotoPlacementMode::Edit && id == clipboard.sheet_id {
             let right = frames
                 .iter()
                 .map(|frame| frame.rect.x + frame.rect.width)
@@ -125,6 +130,9 @@ impl ProjectDocument {
         }
         let ids = frames.iter().map(|frame| frame.id).collect();
         candidate.sheets[index].frames.extend(frames);
+        if mode == PhotoPlacementMode::Normal {
+            candidate.reorganize_sheet(id, custom)?;
+        }
         validate_project_state(&candidate).map_err(|()| CoreError::InvalidFramePaste)?;
         Ok((candidate, ids))
     }
