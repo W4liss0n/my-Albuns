@@ -13,6 +13,8 @@ import type {
 } from "./ApplicationMenuBar";
 
 interface ProjectApplicationMenuOptions {
+  newProject?(): void;
+  openProject?(): void;
   selectAllFrames(): void;
   canSelectAllFrames: boolean;
   generateProjects?(): void;
@@ -57,6 +59,8 @@ interface ProjectApplicationMenuOptions {
 }
 
 export function createProjectApplicationMenus({
+  newProject,
+  openProject,
   selectAllFrames,
   canSelectAllFrames,
   generateProjects,
@@ -106,8 +110,8 @@ export function createProjectApplicationMenus({
       id: "file",
       label: "Arquivo",
       items: [
-        placeholder("new-project", "project-window"),
-        placeholder("open-project", "project-window"),
+        implemented("new-project", "project-window", () => newProject?.(), !newProject),
+        implemented("open-project", "project-window", () => openProject?.(), !openProject),
         separator("file-project-separator"),
         implemented("save", "project-window", save),
         implemented("save-as", "project-window", saveAs),

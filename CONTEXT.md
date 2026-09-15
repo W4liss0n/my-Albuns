@@ -314,6 +314,7 @@ Superfície global de entrada do MyAlbuns, separada das Sessões de Projeto.
 
 **Janela do Projeto**:
 Superfície de trabalho dedicada a uma Sessão do Projeto.
+`Novo Projeto` (`Ctrl+N`) e `Abrir Projeto` (`Ctrl+O`) iniciam outra sessão pelos fluxos globais existentes. A sessão atual permanece aberta, com alterações e seleção preservadas; abrir o mesmo Projeto já ativo focaliza sua janela.
 
 **Canvas contínuo**:
 Área de composição que apresenta as Lâminas do Álbum em uma sequência navegável.

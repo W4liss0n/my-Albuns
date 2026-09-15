@@ -599,3 +599,9 @@ As propriedades em lote respeitam o tipo do elemento:
 ## Decisões ainda abertas
 
 - largura proporcional exata da faixa central de soltura dos Decorativos, a ser calibrada no protótipo;
+
+## Criar ou abrir outro Projeto
+
+O menu `Arquivo` habilita `Novo Projeto…` e `Abrir Projeto…`, com `Ctrl+N` e `Ctrl+O`. O editor delega a criação e a abertura ao processo global existente, sem trocar a Sessão atual. O seletor de abertura pertence à janela que recebeu o comando; depois da escolha, o progresso e eventuais decisões usam o fluxo global já estabelecido. Somente a Tela de Boas-vindas é ocultada durante essa abertura; o editor de origem permanece aberto.
+
+O formulário de Novo Projeto mantém o visual, as duas etapas e as validações existentes. Se já estiver aberto, outro pedido o focaliza sem descartar o preenchimento. Cancelamentos são silenciosos; falhas operacionais usam o diálogo padrão. Os atalhos respeitam campos de texto, menus, diálogos e bloqueios da sessão, sem repetição por tecla mantida.

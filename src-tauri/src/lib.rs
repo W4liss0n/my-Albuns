@@ -15,6 +15,7 @@ mod dev_host_registration;
 mod dev_job;
 #[cfg(debug_assertions)]
 mod dev_supervisor_protocol;
+mod editor_project_launcher;
 mod export_attempts;
 mod export_commands;
 mod export_media;
@@ -118,6 +119,7 @@ fn run_selected_runtime_role() -> Result<(), Box<dyn std::error::Error>> {
         runtime_role::RuntimeRole::Global { direct_projects } => global_runtime::run(
             direct_projects,
             runtime_role::settings_request(std::env::args_os()),
+            runtime_role::new_project_request(std::env::args_os()),
         ),
         runtime_role::RuntimeRole::ProjectHost => run_project_host(),
     }
@@ -371,6 +373,12 @@ mod tests {
         );
         let global_commands = allowed_commands(&global_permission);
         let project_commands = allowed_commands(&project_permission);
+        for command in ["new_project_from_editor", "open_project_from_editor"] {
+            assert!(project_commands.contains(command));
+            assert!(!global_commands.contains(command));
+        }
+        assert!(global_commands.contains("latest_new_project_request"));
+        assert!(!project_commands.contains("latest_new_project_request"));
         for command in [
             "create_project",
             "validate_project_configuration",

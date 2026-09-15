@@ -102,10 +102,7 @@ const DEFINITIONS = [
     kind: "application",
     bindings: [
       implementedBinding("welcome"),
-      placeholderBinding(
-        "project-window",
-        "new-project-from-project-window",
-      ),
+      implementedBinding("project-window"),
     ],
     shortcuts: [shortcut("n", "Ctrl+N", { ctrlKey: true })],
   }),
@@ -116,10 +113,7 @@ const DEFINITIONS = [
     kind: "application",
     bindings: [
       implementedBinding("welcome"),
-      placeholderBinding(
-        "project-window",
-        "open-project-from-project-window",
-      ),
+      implementedBinding("project-window"),
     ],
     shortcuts: [shortcut("o", "Ctrl+O", { ctrlKey: true })],
   }),

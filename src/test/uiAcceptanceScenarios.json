@@ -858,6 +858,19 @@
       "actions": []
     },
     {
+      "id": "editor-new-project-entry",
+      "title": "Novo Projeto iniciado pelo editor — formulário existente",
+      "implementationPath": "/welcome-preview.html?surface=newProject",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "editor-new-project-entry",
+        "reason": "A entrada direta pelo editor foi aceita depois da referência. O mesmo formulário é comparado com a referência no cenário new-project-configuration."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": ".global-shell--new-project [aria-label=\"Continuar\"]",
+      "actions": []
+    },
+    {
       "id": "new-project-configuration",
       "title": "Novo Projeto — Configurações",
       "implementationPath": "/welcome-preview.html",
@@ -10381,7 +10394,7 @@
           "selector": "[role=\"menuitem\"][aria-label=\"Colar\"]"
         }
       ]
-    },
+    },
     {
       "id": "workspace-frame-area-all",
       "title": "Ctrl+A seleciona todos os Frames da Lâmina isolada",

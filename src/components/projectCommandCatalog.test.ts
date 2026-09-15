@@ -163,7 +163,10 @@ test("shares New and Open metadata with the Welcome surface without borrowing th
     context: "welcome",
   });
   expect(projectCommandBinding("new-project", "project-window")).toMatchObject({
-    availability: "placeholder",
+    availability: "implemented",
+  });
+  expect(projectCommandBinding("open-project", "project-window")).toMatchObject({
+    availability: "implemented",
   });
 
   expect(projectCommandShortcutLabel("new-project")).toBe("Ctrl+N");

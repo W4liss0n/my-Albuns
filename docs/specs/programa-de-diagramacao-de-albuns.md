@@ -537,13 +537,15 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 
 ### Estrutura da interface
 
+- Na Janela do Projeto, o menu `Arquivo` também oferece `Novo Projeto…` (`Ctrl+N`) e `Abrir Projeto…` (`Ctrl+O`). Novo reutiliza o formulário global de criação; Abrir usa o seletor de arquivos do Windows e o mesmo fluxo de abertura, Cache, recuperação e progresso usado pela Tela de Boas-vindas. A janela atual permanece visível e preserva sua Sessão, alterações, Histórico e seleção. Não há salvamento ou fechamento implícito. Cancelar o seletor não abre outra janela. Se o Projeto escolhido já estiver aberto, sua janela é focalizada. Pedidos repetidos não sobrepõem seletores nem reiniciam um formulário de criação em andamento.
+
 O [mapa canônico de navegação e interação](../design/0018-mapa-de-navegacao-e-interacao-da-interface.md)
 reúne os IDs estáveis, nomes atuais, transições, ownership e cenários de
 validação das superfícies descritas nesta seção.
 
 - Todo diálogo do aplicativo abre como uma janela nativa separada e pertencente à janela que o solicitou. Fora da abertura de um Projeto existente, a proprietária permanece visível ao fundo, bloqueada para interação enquanto o diálogo estiver aberto, e recupera interação e foco quando ele termina.
 - A largura de cada tipo de diálogo permanece estável, enquanto a altura acompanha seu conteúdo renderizado e é recalculada quando o estado muda; o ajuste recentraliza a janela e respeita a área útil do monitor.
-- `Abrir Projeto`, inclusive por `Projetos recentes`, é a única transição que retira a superfície de origem antes de mostrar o progresso. Se a abertura falhar, a superfície reaparece atrás do diálogo de falha; `Novo Projeto`, confirmações, avisos e demais progressos não usam essa exceção.
+- `Abrir Projeto` iniciado na Tela de Boas-vindas, inclusive por `Projetos recentes`, é a única transição que retira essa superfície de origem antes de mostrar o progresso. Se a abertura falhar, a superfície reaparece atrás do diálogo de falha; `Novo Projeto`, confirmações, avisos e demais progressos não usam essa exceção.
 - Enquanto a origem estiver oculta, o progresso de abertura mantém uma entrada própria na barra de tarefas do Windows para permitir retornar à operação. Essa entrada permanece durante preparação de imagens e decisões de Recuperação ou Cópia externa na mesma janela, e é removida quando o diálogo termina. A abertura direta pelo Windows também segue essa regra.
 - Se a abertura detectar Recuperação, a própria janela externa de progresso, ainda pertencente à Global/Boas-vindas, transiciona para `Recuperar trabalho não salvo?`. A Janela do Projeto não é criada nem exibida enquanto a decisão estiver pendente; a escolha correlacionada volta ao mesmo Host e à mesma tentativa, e somente um terminal válido permite exibir o Projeto e encerrar o diálogo de abertura. Fechar, cancelar, falhar ou escolher `Agora não` recolhe o Host pendente, restaura a Global e preserva o checkpoint quando a semântica não autoriza descartá-lo.
 - Toda operação que precisa de uma janela de progresso usa a mesma representação minimalista.

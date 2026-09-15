@@ -563,3 +563,24 @@ test("does not overwrite a forwarded terminal with a late graphics-gate outcome"
     },
   });
 });
+
+
+test("editor entry opens directly in New Project and repeated activation preserves its draft", async () => {
+  let activate!: () => void;
+  const release = vi.fn();
+  const requests = vi.fn(async (listener: () => void) => { activate = listener; return release; });
+  const { unmount } = render(<GlobalShell initialSurface="newProject" onNewProjectRequest={requests}
+    graphicsDiagnostic={supportedGraphics} projectPort={createProjectPort()} />);
+  expect(screen.queryByRole("heading", { name: "Projetos recentes" })).not.toBeInTheDocument();
+  const count = screen.getByRole("textbox", { name: "Quantidade de Lâminas" });
+  fireEvent.change(count, { target: { value: "23" } });
+  await waitFor(() => expect(requests).toHaveBeenCalledOnce());
+  act(() => activate());
+  expect(count).toHaveValue("23");
+  fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+  expect(screen.getByRole("heading", { name: "Projetos recentes" })).toBeInTheDocument();
+  act(() => activate());
+  expect(screen.getByRole("textbox", { name: "Quantidade de Lâminas" })).toBeVisible();
+  unmount();
+  expect(release).toHaveBeenCalledOnce();
+});

@@ -3,6 +3,15 @@ use std::{
     path::{Path, PathBuf},
 };
 
+pub(crate) const NEW_PROJECT_ARGUMENT: &str = "--myalbuns-new-project";
+
+pub(crate) fn new_project_request(arguments: impl IntoIterator<Item = OsString>) -> bool {
+    arguments
+        .into_iter()
+        .skip(1)
+        .any(|argument| argument == OsStr::new(NEW_PROJECT_ARGUMENT))
+}
+
 pub(crate) const PROJECT_HOST_ROLE_ARGUMENT: &str = "--myalbuns-project-host";
 
 pub(crate) fn settings_request(
@@ -60,6 +69,31 @@ mod tests {
     use std::{ffi::OsString, path::PathBuf};
 
     use super::{RuntimeRole, parse_runtime_role};
+
+    #[test]
+    fn new_project_request_is_explicit_and_keeps_the_global_role() {
+        let arguments = [
+            OsString::from("MyAlbuns.exe"),
+            OsString::from(super::NEW_PROJECT_ARGUMENT),
+        ];
+        assert!(super::new_project_request(arguments.clone()));
+        assert_eq!(
+            parse(arguments),
+            RuntimeRole::Global {
+                direct_projects: vec![]
+            }
+        );
+        for flag in [
+            "--new-project",
+            "--myalbuns-new-project=1",
+            "--myalbuns-settings=performance",
+        ] {
+            assert!(!super::new_project_request([
+                "MyAlbuns.exe".into(),
+                flag.into()
+            ]));
+        }
+    }
 
     fn parse(arguments: impl IntoIterator<Item = OsString>) -> RuntimeRole {
         parse_runtime_role(arguments)

@@ -153,6 +153,7 @@ pub(crate) fn run(
         .plugin(tauri_plugin_shell::init())
         .manage(desktop_webview_policy::WindowWebviewVisibility::default())
         .manage(project_host)
+        .manage(crate::editor_project_launcher::EditorProjectLauncher::default())
         .manage(crate::generation_window::GenerationWindowState::new(
             app_paths.clone(),
         ))
@@ -243,6 +244,8 @@ pub(crate) fn run(
         })
         .setup(move |app| setup_host(app, setup_paths, initial_window_title))
         .invoke_handler(tauri::generate_handler![
+            crate::editor_project_launcher::new_project_from_editor,
+            crate::editor_project_launcher::open_project_from_editor,
             crate::generation_window::open_project_generation,
             crate::generation_window::generation_model,
             crate::generation_window::generation_current,

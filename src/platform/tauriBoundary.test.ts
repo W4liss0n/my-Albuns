@@ -35,6 +35,7 @@ const tauriCommandSources = {
   messageDialog: ["./tauriOwnedDialogControls.ts"],
   openingDialog: ["./tauriOpeningDialogControls.ts", "./tauriOpeningImageProgress.ts"],
   project: [
+    "./tauriProjectLauncher.ts",
     "./tauriProjectGenerationLauncher.ts",
     "./tauriExportMediaPort.ts",
     "./invokeImageProcessing.ts",
@@ -46,6 +47,7 @@ const tauriCommandSources = {
     "../project-dialog/platform/tauriProjectDialogClient.ts",
   ],
   global: [
+    "../global/platform/tauriNewProjectRequest.ts",
     "../global/platform/tauriGlobalProjectPort.ts",
     "../global/platform/tauriNewProjectPort.ts",
     "../global/platform/tauriProjectFailureDialogPort.ts",

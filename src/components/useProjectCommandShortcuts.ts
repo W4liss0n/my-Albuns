@@ -28,6 +28,8 @@ function targetOwnsEditingKeys(target: EventTarget | null) {
 }
 
 interface ProjectCommandShortcutHandlers {
+  newProject?(): void;
+  openProject?(): void;
   selectAllFrames(): void;
   frameSelectionActive: boolean;
   openPhotoInPhotoshop?(): void;
@@ -56,6 +58,8 @@ interface ProjectCommandShortcutHandlers {
 }
 
 export function useProjectCommandShortcuts({
+  newProject,
+  openProject,
   selectAllFrames,
   frameSelectionActive,
   openPhotoInPhotoshop,
@@ -129,6 +133,7 @@ export function useProjectCommandShortcuts({
           ? matchProjectCommandShortcut(event, "sheet")
           : null);
       if (command === null) return;
+      if ((command === "new-project" || command === "open-project") && targetOwnsEditingKeys(event.target)) return;
       if (
         (command === "previous-sheet" || command === "next-sheet") &&
         (!sheetNavigationActive || targetOwnsEditingKeys(event.target))
@@ -145,6 +150,8 @@ export function useProjectCommandShortcuts({
       }
 
       const handledCommand =
+        command === "new-project" ||
+        command === "open-project" ||
         command === "save" ||
         command === "save-as" ||
         command === "close" ||
@@ -159,6 +166,12 @@ export function useProjectCommandShortcuts({
       if (event.repeat || disabled) return;
 
       switch (command) {
+        case "new-project":
+          newProject?.();
+          break;
+        case "open-project":
+          openProject?.();
+          break;
         case "save":
           save();
           break;
@@ -188,6 +201,8 @@ export function useProjectCommandShortcuts({
     window.addEventListener("keydown", handleProjectCommand);
     return () => window.removeEventListener("keydown", handleProjectCommand);
   }, [
+    newProject,
+    openProject,
     selectAllFrames,
     frameSelectionActive,
     openPhotoInPhotoshop,
