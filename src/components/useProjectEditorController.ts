@@ -188,6 +188,7 @@ export function useProjectEditorController({
     return mutations.togglePhotoBlackAndWhite([...navigation.selectedFrameIds]);
   };
   const canDeleteFrames = selectedFrames.length > 0 && !interactionBlocked;
+  const automaticPasteSelectionRef = useRef<readonly string[] | null>(null);
   const canCopyFrames = selectedFrames.length > 0 && !interactionBlocked;
   const pasteSheet = (canvasMode.kind === "normal" && selectedFrame
     ? projection.state.album.sheets.find((sheet) => sheet.frames.some((frame) => frame.id === selectedFrame.id))
@@ -208,9 +209,12 @@ export function useProjectEditorController({
     return mutations.pasteFrames(sheetId, desiredOffsetUm, (ids, next) => {
       const view = useEditorView.getState();
       if (view.projectId !== next.state.projectId || view.editingSheetId !== navigation.editingSheetId ||
-          view.centeredSheetId !== navigation.centeredSheetId || view.selectedFrameIds !== selection) return;
+          view.centeredSheetId !== navigation.centeredSheetId ||
+          (view.selectedFrameIds !== selection && view.selectedFrameIds !== automaticPasteSelectionRef.current)) return;
       if (canvasMode.kind === "sheet-editing") view.selectFrames(ids);
       else view.selectFrame(ids[ids.length - 1]);
+      // A preceding queued Paste may select its result; only subsequent user input wins.
+      automaticPasteSelectionRef.current = useEditorView.getState().selectedFrameIds;
     });
   };
   const canSwapFrameContents = canvasMode.kind === "sheet-editing" &&

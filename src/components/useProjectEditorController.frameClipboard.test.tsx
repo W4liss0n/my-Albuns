@@ -243,6 +243,36 @@ test.each(["edit", "normal"] as const)("a locked Sheet permits Copy and blocks P
   expect(h.applyWithOutcome).not.toHaveBeenCalled();
 });
 
+test.each((["edit", "normal"] as const).flatMap((mode) => [false, true].map((manualSelection) => ({ mode, manualSelection }))))(
+  "two queued Pastes select the most recent copies unless the user selects again: $mode/$manualSelection", async ({ mode, manualSelection }) => {
+  const h = harness("same-single", mode);
+  const second = structuredClone(h.pasted);
+  const sheet = second.state.album.sheets.find((item) => item.id === h.scenario.targetSheetId)!;
+  const composed = second.composition.sheets.find((item) => item.sheetId === sheet.id)!;
+  sheet.frames.push({ ...structuredClone(sheet.frames.at(-1)!), id: "second-pasted-frame", zIndex: sheet.frames.length });
+  composed.frames.push({ ...structuredClone(composed.frames.at(-1)!), frameId: "second-pasted-frame", zIndex: composed.frames.length });
+  second.state.revision += 1;
+  const pendingSecond = deferred<ProjectMutationOutcome>();
+  h.applyWithOutcome.mockImplementationOnce(() => h.pendingPaste.promise).mockImplementationOnce(() => pendingSecond.promise);
+  await act(async () => {
+    const copied = h.view.result.current.copyFrames();
+    h.pendingCopy.resolve(h.copied);
+    await copied;
+  });
+  let pastes!: Promise<unknown>;
+  act(() => { pastes = Promise.all([h.view.result.current.pasteFrames(), h.view.result.current.pasteFrames()]); });
+  await act(async () => {
+    h.pendingPaste.resolve({ projection: h.pasted, affectedFrameId: null, affectedSheetId: null, affectedFrameIds: h.scenario.pastedFrameIds });
+  });
+  expect(useEditorView.getState().selectedFrameIds).toEqual(["pasted-frame-0"]);
+  if (manualSelection) act(() => useEditorView.getState().selectFrame("pasted-frame-0"));
+  await act(async () => {
+    pendingSecond.resolve({ projection: second, affectedFrameId: null, affectedSheetId: null, affectedFrameIds: ["second-pasted-frame"] });
+    await pastes;
+  });
+  expect(useEditorView.getState().selectedFrameIds).toEqual([manualSelection ? "pasted-frame-0" : "second-pasted-frame"]);
+});
+
 test("a replaced Project port discards a pending Copy and its adjacent Paste", async () => {
   const h = harness();
   let commands!: Promise<unknown>;

@@ -10060,6 +10060,14 @@
         },
         {
           "type": "key",
+          "key": "ArrowRight"
+        },
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
           "key": "KeyC",
           "modifiers": [
             "Control"
@@ -10151,6 +10159,14 @@
       },
       "readySelector": "body[data-clipboard-count=\"9\"][data-clipboard-selection=\"pasted-frame-0\"][data-clipboard-editing-sheet=\"sheet-002\"]",
       "actions": [
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "ArrowRight"
+        },
         {
           "type": "click-text",
           "text": "Editar"
