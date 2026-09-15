@@ -188,8 +188,12 @@ export function useProjectEditorController({
     return mutations.togglePhotoBlackAndWhite([...navigation.selectedFrameIds]);
   };
   const canDeleteFrames = selectedFrames.length > 0 && !interactionBlocked;
-  const canCopyFrames = canArrangeFrames;
-  const canPasteFrames = canAddFrame && (projection.canPasteFrames || mutations.frameCopyPending);
+  const canCopyFrames = selectedFrames.length > 0 && !interactionBlocked;
+  const pasteSheet = (canvasMode.kind === "normal" && selectedFrame
+    ? projection.state.album.sheets.find((sheet) => sheet.frames.some((frame) => frame.id === selectedFrame.id))
+    : undefined) ?? projection.state.album.sheets.find((sheet) => sheet.id === navigation.implicitSheetId);
+  const canPasteIntoSheet = pasteSheet !== undefined && !pasteSheet.layoutLocked && !interactionBlocked;
+  const canPasteFrames = canPasteIntoSheet && (projection.canPasteFrames || mutations.frameCopyPending);
   const copyFrames = () => {
     if (!canCopyFrames) return Promise.resolve(false);
     return mutations.copyFrames([...navigation.selectedFrameIds]);
@@ -197,13 +201,16 @@ export function useProjectEditorController({
   const pasteFrames = () => {
     // Queue a rapid Ctrl+V after Ctrl+C even before its projection is rendered.
     // Clipboard availability is checked again against the authoritative queued result.
-    if (!canAddFrame || canvasMode.kind !== "sheet-editing") return Promise.resolve(false);
-    const sheetId = canvasMode.sheetId;
+    if (!canPasteIntoSheet || !pasteSheet) return Promise.resolve(false);
+    const sheetId = pasteSheet.id;
+    const selection = navigation.selectedFrameIds;
     const desiredOffsetUm = navigation.canvasScale ? Math.round(16 * CANVAS_MICROMETERS_PER_PIXEL / navigation.canvasScale) : 0;
     return mutations.pasteFrames(sheetId, desiredOffsetUm, (ids, next) => {
       const view = useEditorView.getState();
-      if (view.projectId !== next.state.projectId || view.editingSheetId !== sheetId) return;
-      view.selectFrames(ids);
+      if (view.projectId !== next.state.projectId || view.editingSheetId !== navigation.editingSheetId ||
+          view.centeredSheetId !== navigation.centeredSheetId || view.selectedFrameIds !== selection) return;
+      if (canvasMode.kind === "sheet-editing") view.selectFrames(ids);
+      else view.selectFrame(ids[ids.length - 1]);
     });
   };
   const canSwapFrameContents = canvasMode.kind === "sheet-editing" &&

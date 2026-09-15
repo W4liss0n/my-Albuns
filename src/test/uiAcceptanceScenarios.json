@@ -10037,6 +10037,145 @@
           "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
         }
       ]
+    },
+    {
+      "id": "workspace-frame-clipboard-normal-menu",
+      "title": "Copiar e colar Frames — comandos disponíveis no Modo normal",
+      "implementationPath": "/workspace-preview.html?frame=clipboard&clipboard=same-single&mode=normal",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-clipboard",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Decisão do usuário: Copiar e Colar também no Modo normal, mantendo seleção simples e o menu existente. A referência vigente antecede essa disponibilidade."
+      },
+      "viewport": {
+        "width": 1567,
+        "height": 900
+      },
+      "readySelector": "[role=\"menu\"][aria-label=\"Editar\"] [role=\"menuitem\"][aria-label=\"Colar\"]:not([disabled])",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "KeyC",
+          "modifiers": [
+            "Control"
+          ]
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-clipboard-available=\"true\"]"
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-clipboard-normal-paste",
+      "title": "Copiar e colar Frames — grupo colado em outra Lâmina no Modo normal",
+      "implementationPath": "/workspace-preview.html?frame=clipboard&clipboard=other-double",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-clipboard",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Decisão do usuário: a área de transferência continua disponível entre os modos. O Modo normal cola o grupo na Lâmina centralizada sem seleção anterior e seleciona somente o último Frame criado."
+      },
+      "viewport": {
+        "width": 1567,
+        "height": 900
+      },
+      "readySelector": "body[data-clipboard-count=\"10\"][data-clipboard-selection=\"pasted-frame-1\"][data-clipboard-editing-sheet=\"none\"]",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "KeyC",
+          "modifiers": [
+            "Control"
+          ]
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-clipboard-available=\"true\"]"
+        },
+        {
+          "type": "key",
+          "key": "Escape"
+        },
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "ArrowRight"
+        },
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "KeyV",
+          "modifiers": [
+            "Control"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "workspace-frame-clipboard-normal-to-edit",
+      "title": "Copiar e colar Frames — cópia no Modo normal e colagem no Modo de edição",
+      "implementationPath": "/workspace-preview.html?frame=clipboard&clipboard=same-single&mode=normal",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "frame-clipboard",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Decisão do usuário: copiar e colar também no Modo normal, preservando a cópia ao alternar os modos do mesmo Projeto."
+      },
+      "viewport": {
+        "width": 1567,
+        "height": 900
+      },
+      "readySelector": "body[data-clipboard-count=\"9\"][data-clipboard-selection=\"pasted-frame-0\"][data-clipboard-editing-sheet=\"sheet-002\"]",
+      "actions": [
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Copiar\"]"
+        },
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Colar\"]"
+        }
+      ]
     }
   ]
 }
