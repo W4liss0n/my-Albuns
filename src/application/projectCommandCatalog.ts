@@ -305,7 +305,7 @@ const DEFINITIONS = [
     description: "Seleciona todos os itens do contexto ativo.",
     kind: "interface",
     bindings: [
-      placeholderBinding("frame", "select-all-in-active-context"),
+      implementedBinding("frame"),
       implementedBinding("media-panel"),
     ],
     shortcuts: [shortcut("a", "Ctrl+A", { ctrlKey: true })],

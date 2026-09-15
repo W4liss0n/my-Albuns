@@ -33,6 +33,7 @@ import {
 import { applySheetBarScale, setSheetBarOverlayHovered, setSheetBarActionFocused } from "./sheetBarRenderNode";
 import { PhotoInteractionSession } from "./photoInteractionSession";
 import { FrameInteractionSession } from "./frameInteractionSession";
+import { FrameAreaSelectionSession } from "./frameAreaSelectionSession";
 import { FrameContentDragSession } from "./frameContentDragSession";
 import { FrameContentDragVisual } from "./frameContentDragVisual";
 import { ViewportTexturePool } from "./viewportTexturePool";
@@ -78,6 +79,7 @@ export class AlbumCanvasScene {
   private presentedPreviewUrls = new Map<string, string>();
   private readonly photoInteractions: PhotoInteractionSession;
   private readonly frameInteractions: FrameInteractionSession;
+  private readonly frameAreaSelection: FrameAreaSelectionSession;
   private readonly frameContentDrag: FrameContentDragSession;
   private readonly frameContentDragVisual: FrameContentDragVisual;
 
@@ -113,6 +115,14 @@ export class AlbumCanvasScene {
     );
     this.world.label = "album-world";
     this.app.stage.addChild(this.world);
+    this.frameAreaSelection = new FrameAreaSelectionSession(app, () => this.input,
+      (x, y) => this.resolveEditingSheetPoint(x, y),
+      () => { if (this.input) this.updateDecorations(this.input.composition.sheets); });
+    this.app.stage.on("pointerdown", (event) => {
+      if (event.target === this.app.stage || [...this.sheetNodes.values()].some((node) => node.container === event.target)) {
+        this.frameAreaSelection.start(event);
+      }
+    });
     this.frameContentDragVisual = new FrameContentDragVisual(app, this.photoNodes);
     this.app.stage.eventMode = "static";
     this.app.stage.hitArea = this.app.screen;
@@ -163,8 +173,9 @@ export class AlbumCanvasScene {
     }
     this.modeSignature = modeSignature;
     this.input = input;
+    this.frameAreaSelection.synchronize(input);
     this.app.canvas.setAttribute("aria-label", input.mode.kind === "sheet-editing"
-      ? "Canvas da Lâmina em edição. Arraste um Frame para mover ou use as alças para redimensionar. Shift preserva a proporção; Alt preserva o centro; Ctrl suspende o snap; Esc cancela o gesto."
+      ? "Canvas da Lâmina em edição. Ctrl+A seleciona todos os Frames. Arraste na área vazia para selecionar por caixa; Ctrl acrescenta à seleção. Arraste um Frame para mover ou use as alças para redimensionar. Shift preserva a proporção; Alt preserva o centro; Ctrl suspende o snap; Esc cancela o gesto."
       : input.mode.isolatedSheetId ? "Canvas da Lâmina no Painel de Layouts. Passe sobre uma miniatura para visualizar o Layout."
       : "Canvas contínuo do Álbum. Arraste uma Foto sobre outro Frame para trocar o conteúdo, inclusive entre Lâminas. Esc cancela. Use a roda para navegar, Alt mais arraste para Pan e Alt mais roda para Zoom.");
     const modePolicy = albumCanvasModePolicy(input.mode);
@@ -295,6 +306,7 @@ export class AlbumCanvasScene {
   destroy() {
     this.resetTransientInteractions();
     this.frameInteractions.destroy();
+    this.frameAreaSelection.destroy();
     this.frameContentDrag.destroy();
     this.frameContentDragVisual.destroy();
     this.app.stage.removeAllListeners();
@@ -371,6 +383,17 @@ export class AlbumCanvasScene {
     };
   }
 
+  private resolveEditingSheetPoint(clientX: number, clientY: number) {
+    if (this.input?.mode.kind !== "sheet-editing") return null;
+    const node = this.sheetNodes.get(this.input.mode.sheetId);
+    const point = this.resolveWorldPoint(clientX, clientY);
+    if (!node || !point) return null;
+    return {
+      x: (point.x - node.container.position.x - node.activeOffsetXPx) / MICROMETER_TO_CANVAS_PIXEL,
+      y: (point.y - node.container.position.y) / MICROMETER_TO_CANVAS_PIXEL,
+    };
+  }
+
   private resetProjectScene() {
     this.resetTransientInteractions();
     this.clearMaterializedSheets();
@@ -387,6 +410,7 @@ export class AlbumCanvasScene {
     this.focusedBarAction = null;
     this.photoInteractions.reset();
     this.frameInteractions.reset();
+    this.frameAreaSelection.reset();
     this.frameContentDrag.reset();
     this.frameContentDragVisual.reset();
     delete this.app.canvas.dataset.frameContentDragTarget;
@@ -691,18 +715,18 @@ export class AlbumCanvasScene {
         isMediaMissing: (mediaId) => this.input?.missingMediaIds?.has(mediaId) ?? false,
         onSheetTap: (sheetId) => {
           if (this.input?.mediaDrag) return;
-          if (!this.input || this.frameInteractions.ignoresTap || this.frameContentDrag.ignoresTap) return;
+          if (!this.input || this.frameInteractions.ignoresTap || this.frameAreaSelection.ignoresTap || this.frameContentDrag.ignoresTap) return;
           this.input.onSelectFrame(null);
           this.input.onFocusSheet(sheetId);
         },
         onSheetDoubleTap: (sheetId) => {
           if (this.input?.mediaDrag) return;
-          if (this.frameInteractions.ignoresTap || this.frameContentDrag.ignoresTap) return;
+          if (this.frameInteractions.ignoresTap || this.frameAreaSelection.ignoresTap || this.frameContentDrag.ignoresTap) return;
           this.input?.onEditSheet(sheetId);
         },
         onFrameTap: (sheetId, frameId, toggle) => {
           if (this.input?.mediaDrag) return;
-          if (!this.input || this.frameInteractions.ignoresTap || this.frameContentDrag.ignoresTap) return;
+          if (!this.input || this.frameInteractions.ignoresTap || this.frameAreaSelection.ignoresTap || this.frameContentDrag.ignoresTap) return;
           if (toggle) this.input.onSelectFrame(frameId, true);
           else this.input.onSelectFrame(frameId);
           this.input.onFocusSheet(sheetId);
@@ -766,6 +790,7 @@ export class AlbumCanvasScene {
 
   private updateDecorations(sheets: readonly ComposedSheet[]) {
     if (!this.input) return;
+    const selectedFrameIds = this.frameAreaSelection.previewSelection ?? this.input.selectedFrameIds;
     this.frameContentDragVisual.update(this.frameContentDrag.preview);
     if (this.frameContentDrag.preview) {
       this.app.canvas.dataset.frameContentDragTarget = this.frameContentDrag.highlight?.kind === "frame"
@@ -783,12 +808,12 @@ export class AlbumCanvasScene {
         this.input.photoDropHighlight?.kind === "sheet" &&
         this.input.photoDropHighlight.sheetId === sheetId;
       for (const [frameId, selection] of node.frameSelections) {
-        selection.container.visible = this.input.selectedFrameIds.includes(frameId);
+        selection.container.visible = selectedFrameIds.includes(frameId);
         for (const handle of selection.resizeHandles) {
-          handle.visible = this.input.selectedFrameIds.length === 1;
+          handle.visible = selectedFrameIds.length === 1 && this.frameAreaSelection.previewSelection === null;
         }
       }
-      this.updateFrameGroupSelection(node, sheets.find((sheet) => sheet.sheetId === sheetId));
+      this.updateFrameGroupSelection(node, sheets.find((sheet) => sheet.sheetId === sheetId), selectedFrameIds);
       for (const [frameId, outline] of node.frameDropOutlines) {
         outline.visible =
           highlight?.kind === "frame" && highlight.frameId === frameId;
@@ -806,10 +831,11 @@ export class AlbumCanvasScene {
     this.input.onOpenEmptyCanvasContextMenu?.(sheetId, position);
   }
 
-  private updateFrameGroupSelection(node: SheetRenderNode, sheet: ComposedSheet | undefined) {
+  private updateFrameGroupSelection(node: SheetRenderNode, sheet: ComposedSheet | undefined, selectedFrameIds: readonly string[]) {
     if (!this.input || !sheet) return;
-    const frames = sheet.frames.filter((frame) => this.input!.selectedFrameIds.includes(frame.frameId));
+    const frames = sheet.frames.filter((frame) => selectedFrameIds.includes(frame.frameId));
     const showHandles = this.input.mode.kind === "sheet-editing" &&
+      this.frameAreaSelection.previewSelection === null &&
       !this.input.sheetBarMetadata.find((item) => item.sheetId === sheet.sheetId)?.layoutLocked;
     const signature = frames.length > 1
       ? JSON.stringify([frames.map((frame) => [frame.frameId, frame.clipRect]), showHandles]) : null;

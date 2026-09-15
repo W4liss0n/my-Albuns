@@ -5,6 +5,8 @@ import { useProjectCommandShortcuts } from "./useProjectCommandShortcuts";
 
 function handlers() {
   return {
+    selectAllFrames: vi.fn(),
+    frameSelectionActive: false,
     copyFrames: vi.fn(),
     pasteFrames: vi.fn(),
     frameClipboardActive: false,
@@ -60,6 +62,29 @@ function dispatchShortcut(
   });
   return event;
 }
+
+test("Ctrl+A selects Frames without an existing selection and respects focus, mode, repeats and barriers", () => {
+  const actions = handlers();
+  const view = renderHook(({ active, disabled }) => useProjectCommandShortcuts({ ...actions,
+    frameSelectionActive: active, canRedo: true, canUndo: true, disabled,
+  }), { initialProps: { active: true, disabled: false } });
+  expect(dispatchShortcut("a").defaultPrevented).toBe(true);
+  dispatchShortcut("a", { repeat: true });
+  for (const kind of ["input", "textarea", "editable", "media-panel", "menu", "dialog"]) {
+    const target = document.createElement(kind === "input" || kind === "textarea" ? kind : "div");
+    if (kind === "editable") target.setAttribute("contenteditable", "true");
+    if (kind === "media-panel") target.dataset.projectCommandContext = kind;
+    if (kind === "menu" || kind === "dialog") target.setAttribute("role", kind);
+    document.body.appendChild(target);
+    expect(dispatchShortcut("a", {}, target).defaultPrevented).toBe(false);
+    target.remove();
+  }
+  view.rerender({ active: true, disabled: true });
+  dispatchShortcut("a");
+  view.rerender({ active: false, disabled: false });
+  expect(dispatchShortcut("a").defaultPrevented).toBe(false);
+  expect(actions.selectAllFrames).toHaveBeenCalledOnce();
+});
 
 test("Ctrl+C/V work with an empty editing selection and preserve text, media and menu clipboard ownership", () => {
   const actions = handlers();

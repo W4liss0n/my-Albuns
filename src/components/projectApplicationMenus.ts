@@ -13,6 +13,8 @@ import type {
 } from "./ApplicationMenuBar";
 
 interface ProjectApplicationMenuOptions {
+  selectAllFrames(): void;
+  canSelectAllFrames: boolean;
   generateProjects?(): void;
   openSettings?(): void;
   saveLayout(): void;
@@ -55,6 +57,8 @@ interface ProjectApplicationMenuOptions {
 }
 
 export function createProjectApplicationMenus({
+  selectAllFrames,
+  canSelectAllFrames,
   generateProjects,
   openSettings,
   saveLayout,
@@ -131,7 +135,7 @@ export function createProjectApplicationMenus({
         separator("edit-layout-separator"),
         { ...implemented("save-frame-arrangement-as-layout", "frame", saveLayout, !canSaveLayout),
           title: canSaveLayout ? "Salvar a disposição dos Frames em Personalizados." : "Entre no Modo de edição de uma Lâmina com ao menos um Frame." },
-        placeholder("select-all", "frame"),
+        implemented("select-all", "frame", selectAllFrames, !canSelectAllFrames),
       ],
     },
     {
