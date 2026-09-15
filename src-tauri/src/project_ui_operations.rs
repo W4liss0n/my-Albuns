@@ -49,6 +49,10 @@ impl ProjectUiOperations {
     }
 
     pub(crate) fn recover(&self) -> Result<ProjectUiRecovery, String> {
+        self.recover_with_owned_pause(0)
+    }
+
+    fn recover_with_owned_pause(&self, owned_pauses: usize) -> Result<ProjectUiRecovery, String> {
         let mut state = self
             .0
             .lock()
@@ -56,7 +60,7 @@ impl ProjectUiOperations {
         if state.recovering {
             return Err("A recuperação da interface já está em andamento.".into());
         }
-        if state.batch_pauses > 0 {
+        if state.batch_pauses > owned_pauses {
             return Err("Aguarde o término da exportação em lote.".into());
         }
         state.recovering = true;
@@ -67,6 +71,14 @@ impl ProjectUiOperations {
 impl ProjectUiRecovery {
     pub(crate) fn is_drained(&self) -> bool {
         self.0.0.lock().is_ok_and(|state| state.active == 0)
+    }
+}
+
+impl ProjectUiBatchPause {
+    // Retain the pause until publications and presentation teardown finish.
+    // Recovery closes admission before that pause is released.
+    pub(crate) fn recover(&self) -> Result<ProjectUiRecovery, String> {
+        self.0.recover_with_owned_pause(1)
     }
 }
 
@@ -107,6 +119,23 @@ pub(crate) fn begin(app: &AppHandle) -> Result<ProjectUiOperation, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn recovery_finishes_before_acknowledging_a_new_batch_pause() {
+        let operations = ProjectUiOperations::default();
+        let recovery = operations.recover().unwrap();
+        let pause = operations.pause_for_batch().unwrap();
+        assert!(!operations.is_idle());
+        assert!(
+            recovery.is_drained(),
+            "The batch is waiting for recovery, not the reverse"
+        );
+        drop(recovery);
+        assert!(operations.is_idle());
+        assert!(operations.begin().is_err());
+        drop(pause);
+        assert!(operations.begin().is_ok());
+    }
 
     #[test]
     fn batch_closes_admission_before_draining_and_reopens_it_when_released() {

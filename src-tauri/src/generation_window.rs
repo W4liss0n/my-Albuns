@@ -1,4 +1,5 @@
 //! Project-owned generation. Native state, rather than the invoking WebView, owns each attempt.
+pub(crate) mod lifetime;
 use crate::{
     generation_operation::{GenerationPresentation, GenerationRequest, execute_generation},
     generation_runner::GenerationRunner,
@@ -7,14 +8,12 @@ use crate::{
     project_host::ProjectHost,
     project_ui_operations::{ProjectUiBatchPause, ProjectUiOperations},
 };
+use lifetime::{Admission, Lifetime};
 use myalbuns_core::{ProjectCore, ProjectTemplate};
 use myalbuns_paths::AppPaths;
 use std::{
     path::Path,
-    sync::{
-        Arc, Mutex,
-        atomic::{AtomicBool, Ordering},
-    },
+    sync::{Arc, Mutex, atomic::Ordering},
     time::Duration,
 };
 use tauri::{AppHandle, Emitter, Manager, WebviewWindow, WindowEvent};
@@ -28,7 +27,7 @@ const PROGRESS_EVENT: &str = "myalbuns://generation-progress";
 struct TemplateOwner {
     name: String,
     template: ProjectTemplate,
-    _pause: ProjectUiBatchPause,
+    pause: ProjectUiBatchPause,
 }
 pub(crate) struct GenerationWindowState {
     paths: AppPaths,
@@ -37,9 +36,7 @@ pub(crate) struct GenerationWindowState {
     runner: Arc<tokio::sync::Mutex<Option<GenerationRunner>>>,
     view: Mutex<Option<GenerationView>>,
     progress: Mutex<Option<GenerationProgress>>,
-    active: AtomicBool,
-    close_requested: AtomicBool,
-    cancel: Arc<AtomicBool>,
+    lifetime: Arc<Lifetime>,
     result_ready: Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
 }
 impl GenerationWindowState {
@@ -51,9 +48,7 @@ impl GenerationWindowState {
             runner: Arc::new(tokio::sync::Mutex::new(None)),
             view: Mutex::new(None),
             progress: Mutex::new(None),
-            active: AtomicBool::new(false),
-            close_requested: AtomicBool::new(false),
-            cancel: Arc::new(AtomicBool::new(false)),
+            lifetime: Arc::new(Lifetime::default()),
             result_ready: Mutex::new(None),
         }
     }
@@ -71,38 +66,33 @@ fn configuration(window: &WebviewWindow) -> Result<(), String> {
         Err("Janela de geração inválida.".into())
     }
 }
-struct Attempt(AppHandle);
+struct Attempt {
+    app: AppHandle,
+    admission: Option<Admission>,
+}
 impl Attempt {
     fn begin(app: &AppHandle) -> Result<Self, String> {
         let state = app.state::<GenerationWindowState>();
-        if state.close_requested.load(Ordering::Acquire) {
-            return Err("A janela de geração está fechando.".into());
-        }
-        state
-            .active
-            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
-            .map_err(|_| "Aguarde a operação atual.")?;
-        state.cancel.store(false, Ordering::Release);
-        let attempt = Self(app.clone());
-        if state.close_requested.load(Ordering::Acquire) {
-            state.cancel.store(true, Ordering::Release);
-            return Err("A janela de geração está fechando.".into());
-        }
-        Ok(attempt)
+        Ok(Self {
+            app: app.clone(),
+            admission: Some(state.lifetime.begin()?),
+        })
     }
 }
 impl Drop for Attempt {
     fn drop(&mut self) {
-        self.0
-            .state::<GenerationWindowState>()
-            .active
-            .store(false, Ordering::Release);
+        self.admission.take();
         if self
-            .0
+            .app
             .state::<GenerationWindowState>()
-            .close_requested
-            .load(Ordering::Acquire)
-            && let Some(window) = self.0.get_webview_window(LABEL)
+            .lifetime
+            .is_closing()
+            && !self
+                .app
+                .state::<GenerationWindowState>()
+                .lifetime
+                .is_active()
+            && let Some(window) = self.app.get_window(LABEL)
         {
             let _ = window.destroy();
         }
@@ -123,8 +113,10 @@ pub(crate) async fn open_project_generation(
         return existing.set_focus().map_err(|error| error.to_string());
     }
     let operations = app.state::<ProjectUiOperations>();
-    state.close_requested.store(false, Ordering::Release);
+    let opening = operations.begin()?;
+    state.lifetime.reopen()?;
     let pause = operations.pause_for_batch()?;
+    drop(opening);
     let deadline = tokio::time::Instant::now() + Duration::from_secs(15);
     while !operations.is_idle() {
         if tokio::time::Instant::now() >= deadline {
@@ -136,7 +128,7 @@ pub(crate) async fn open_project_generation(
     *state.template.lock().map_err(|_| "Modelo indisponível.")? = Some(TemplateOwner {
         name,
         template,
-        _pause: pause,
+        pause,
     });
     let result = build(&app, &window, LABEL, "generation.html", 800.0, 478.0).await;
     match result {
@@ -341,8 +333,8 @@ impl Drop for ProgressSurface {
             .owner
             .app_handle()
             .state::<GenerationWindowState>()
-            .close_requested
-            .load(Ordering::Acquire)
+            .lifetime
+            .is_closing()
         {
             native_dialog_window::restore_owner(&self.owner);
         }
@@ -384,14 +376,17 @@ impl GenerationPresentation for NativeGenerationPresentation {
     }
     async fn finish(&self, view: &GenerationView) -> Result<(), String> {
         let state = self.app.state::<GenerationWindowState>();
-        if state.close_requested.load(Ordering::Acquire) {
-            return Ok(());
-        }
         let (sender, receiver) = tokio::sync::oneshot::channel();
-        *state
-            .result_ready
-            .lock()
-            .map_err(|_| "Geração indisponível.")? = Some(sender);
+        {
+            let mut pending = state
+                .result_ready
+                .lock()
+                .map_err(|_| "Geração indisponível.")?;
+            if state.lifetime.is_closing() {
+                return Ok(());
+            }
+            *pending = Some(sender);
+        }
         state.publish(view.clone());
         let _ = self.app.emit_to(LABEL, VIEW_EVENT, view);
         let _ = tokio::time::timeout(Duration::from_secs(5), receiver).await;
@@ -420,7 +415,7 @@ async fn run_request(
         let view = execute_generation(
             request,
             state.runner.clone(),
-            state.cancel.clone(),
+            state.lifetime.cancel.clone(),
             presentation,
         )
         .await?;
@@ -458,6 +453,7 @@ pub(crate) fn generation_result_ready(app: AppHandle, window: WebviewWindow) -> 
 #[tauri::command]
 pub(crate) fn generation_cancel(app: AppHandle) {
     app.state::<GenerationWindowState>()
+        .lifetime
         .cancel
         .store(true, Ordering::Release);
 }
@@ -468,29 +464,101 @@ pub(crate) fn close_project_generation(
 ) -> Result<(), String> {
     configuration(&window)?;
     let state = app.state::<GenerationWindowState>();
-    state.close_requested.store(true, Ordering::Release);
-    if state.active.load(Ordering::Acquire) {
-        state.cancel.store(true, Ordering::Release);
+    if state.lifetime.close() {
         return Ok(());
     }
     window.destroy().map_err(|error| error.to_string())
 }
+
+pub(crate) fn owns_surface(label: &str) -> bool {
+    matches!(label, LABEL | PROGRESS)
+}
+
+impl GenerationWindowState {
+    /// Serialize renderer replacement with opening and retiring this dialog.
+    #[cfg(windows)]
+    pub(crate) fn lock_presentation_recovery(&self) -> tokio::sync::MutexGuard<'_, ()> {
+        self.serial.blocking_lock()
+    }
+}
+
+/// Runs on the recovery worker, never the dispatcher. Keep editor admission
+/// closed across cancellation, publication drain and native dialog destruction.
+#[cfg(windows)]
+pub(crate) fn retire_for_editor_recovery(
+    app: &AppHandle,
+    timeout: Duration,
+) -> Result<crate::project_ui_operations::ProjectUiRecovery, String> {
+    let state = app.state::<GenerationWindowState>();
+    let _serial = state.serial.blocking_lock();
+    let recovery = {
+        let template = state.template.lock().map_err(|_| "Modelo indisponível.")?;
+        match template.as_ref() {
+            Some(model) => model.pause.recover()?,
+            None => app.state::<ProjectUiOperations>().recover()?,
+        }
+    };
+    state.lifetime.close();
+    for label in [PROGRESS, LABEL] {
+        crate::webview_recovery::forget(label);
+    }
+    state
+        .result_ready
+        .lock()
+        .map_err(|_| "Geração indisponível.")?
+        .take();
+    state.lifetime.wait_until_drained(timeout)?;
+    for label in [PROGRESS, LABEL] {
+        // An accepted attempt may have finished creating its progress surface
+        // during the drain. Its callbacks must also lose recovery authority.
+        crate::webview_recovery::forget(label);
+        if let Some(window) = app.get_window(label) {
+            window.destroy().map_err(|error| error.to_string())?;
+        }
+    }
+    let deadline = std::time::Instant::now() + timeout;
+    while [PROGRESS, LABEL]
+        .iter()
+        .any(|label| app.get_window(label).is_some())
+    {
+        if std::time::Instant::now() >= deadline {
+            return Err("A janela de geração ainda não terminou de fechar.".into());
+        }
+        std::thread::sleep(Duration::from_millis(25));
+    }
+    state
+        .template
+        .lock()
+        .map_err(|_| "Modelo indisponível.")?
+        .take();
+    state.runner.blocking_lock().take();
+    state
+        .view
+        .lock()
+        .map_err(|_| "Geração indisponível.")?
+        .take();
+    state
+        .progress
+        .lock()
+        .map_err(|_| "Geração indisponível.")?
+        .take();
+    Ok(recovery)
+}
+
 pub(crate) fn on_window_event(window: &tauri::Window, event: &WindowEvent) -> bool {
     let app = window.app_handle();
     let state = app.state::<GenerationWindowState>();
     if let WindowEvent::CloseRequested { api, .. } = event {
         if window.label() == LABEL {
-            state.close_requested.store(true, Ordering::Release);
+            state.lifetime.close();
         }
         if window.label() == "project" && state.template.lock().is_ok_and(|model| model.is_some()) {
             api.prevent_close();
             return true;
         }
-        if window.label() == PROGRESS
-            || window.label() == LABEL && state.active.load(Ordering::Acquire)
-        {
+        if window.label() == PROGRESS || window.label() == LABEL && state.lifetime.is_active() {
             api.prevent_close();
-            state.cancel.store(true, Ordering::Release);
+            state.lifetime.cancel.store(true, Ordering::Release);
             return true;
         }
     }

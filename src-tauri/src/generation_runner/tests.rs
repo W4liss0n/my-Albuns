@@ -320,7 +320,11 @@ fn parallel_cancellation_stops_admission_and_waits_for_every_active_publication(
         fixture.photo(&format!("Turma/{index:03}"));
     }
     let mut runner = fixture.prepare().unwrap();
-    let cancellation = AtomicBool::new(false);
+    let operations = crate::project_ui_operations::ProjectUiOperations::default();
+    let pause = operations.pause_for_batch().unwrap();
+    let lifetime = std::sync::Arc::new(crate::generation_window::lifetime::Lifetime::default());
+    let accepted = lifetime.begin().unwrap();
+    let cancellation = lifetime.cancel.clone();
     let (started, starts) = mpsc::channel();
     let (updates, progress) = mpsc::channel();
     let (release, waits): (Vec<_>, Vec<_>) = (0..8)
@@ -332,6 +336,7 @@ fn parallel_cancellation_stops_admission_and_waits_for_every_active_publication(
     let timeout = Duration::from_secs(10);
     std::thread::scope(|scope| {
         let running = scope.spawn(|| {
+            let _accepted = accepted;
             generate_items(
                 &mut runner.items,
                 PROJECT_GENERATION_CONCURRENCY,
@@ -360,7 +365,10 @@ fn parallel_cancellation_stops_admission_and_waits_for_every_active_publication(
         assert_eq!(admitted, [0, 1, 2, 3]);
         assert!(starts.try_recv().is_err());
         assert_eq!(progress.recv_timeout(timeout).unwrap().completed, 0);
-        cancellation.store(true, Ordering::Release);
+        let recovery = pause.recover().unwrap();
+        assert!(lifetime.close());
+        assert!(lifetime.begin().is_err());
+        let retirement_wait = scope.spawn(|| lifetime.wait_until_drained(timeout));
         // Force completion out of discovery order. The remaining admitted item
         // keeps the operation alive even after three results have been reported.
         for (completed, index) in [3, 2, 1].into_iter().enumerate() {
@@ -369,10 +377,20 @@ fn parallel_cancellation_stops_admission_and_waits_for_every_active_publication(
             assert_eq!(update.completed, completed as u32 + 1);
             assert_eq!(update.total, Some(8));
             assert!(!running.is_finished());
+            assert!(!retirement_wait.is_finished());
+            assert!(lifetime.wait_until_drained(Duration::ZERO).is_err());
+            assert!(operations.begin().is_err());
         }
         release[0].send(()).unwrap();
         assert_eq!(progress.recv_timeout(timeout).unwrap().completed, 4);
         assert_eq!(running.join().unwrap(), GenerationPhase::Cancelled);
+        retirement_wait.join().unwrap().unwrap();
+        lifetime.wait_until_drained(Duration::ZERO).unwrap();
+        drop(pause);
+        assert!(recovery.is_drained());
+        assert!(operations.begin().is_err());
+        drop(recovery);
+        assert!(operations.begin().is_ok());
     });
     assert!(
         starts.try_recv().is_err(),
