@@ -249,8 +249,8 @@ test.each((["edit", "normal"] as const).flatMap((mode) => [false, true].map((man
   const second = structuredClone(h.pasted);
   const sheet = second.state.album.sheets.find((item) => item.id === h.scenario.targetSheetId)!;
   const composed = second.composition.sheets.find((item) => item.sheetId === sheet.id)!;
-  sheet.frames.push({ ...structuredClone(sheet.frames.at(-1)!), id: "second-pasted-frame", zIndex: sheet.frames.length });
-  composed.frames.push({ ...structuredClone(composed.frames.at(-1)!), frameId: "second-pasted-frame", zIndex: composed.frames.length });
+  sheet.frames.push({ ...structuredClone(sheet.frames[sheet.frames.length - 1]), id: "second-pasted-frame", zIndex: sheet.frames.length });
+  composed.frames.push({ ...structuredClone(composed.frames[composed.frames.length - 1]), frameId: "second-pasted-frame", zIndex: composed.frames.length });
   second.state.revision += 1;
   const pendingSecond = deferred<ProjectMutationOutcome>();
   h.applyWithOutcome.mockImplementationOnce(() => h.pendingPaste.promise).mockImplementationOnce(() => pendingSecond.promise);
