@@ -10400,7 +10400,7 @@
       "actions": [
         {
           "type": "focus",
-          "selector": ".canvas-host canvas"
+          "selector": "input[aria-label=\"Buscar Fotos\"]"
         },
         {
           "type": "pointer-click",
