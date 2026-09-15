@@ -10160,14 +10160,6 @@
       "readySelector": "body[data-clipboard-count=\"9\"][data-clipboard-selection=\"pasted-frame-0\"][data-clipboard-editing-sheet=\"sheet-002\"]",
       "actions": [
         {
-          "type": "focus",
-          "selector": ".canvas-host canvas"
-        },
-        {
-          "type": "key",
-          "key": "ArrowRight"
-        },
-        {
           "type": "click-text",
           "text": "Editar"
         },
@@ -10178,6 +10170,16 @@
         {
           "type": "focus",
           "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "pointer-click",
+          "selector": ".canvas-host canvas",
+          "offsetX": 800,
+          "offsetY": 100
+        },
+        {
+          "type": "key",
+          "key": "ArrowRight"
         },
         {
           "type": "key",
