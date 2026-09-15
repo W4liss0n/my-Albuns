@@ -9,8 +9,9 @@ import { nativeOwnedWindowState } from "./NativeWindowObservation.mjs";
 
 const [executableArg, fixtureArg, outputArg, mode = "configuration"] = process.argv.slice(2);
 assert.ok(executableArg && fixtureArg && outputArg,
-  "Usage: Run-ProjectDialogRecoveryGate.mjs <application> <disposable-project> <new-output> [configuration|close|progress]");
-assert.ok(["configuration", "close", "progress"].includes(mode));
+  "Usage: Run-ProjectDialogRecoveryGate.mjs <application> <disposable-project> <new-output> [configuration|close|progress|generation|generation-progress]");
+assert.ok(["configuration", "close", "progress", "generation", "generation-progress"].includes(mode));
+const generation = mode.startsWith("generation");
 const executable = path.resolve(executableArg), fixture = path.resolve(fixtureArg), output = path.resolve(outputArg);
 assert.ok(!existsSync(output), "Evidence must have a new directory");
 mkdirSync(output, { recursive: true });
@@ -20,6 +21,13 @@ const env = { ...process.env, MYALBUNS_PROCESS_GATE_DATA_ROOT: root,
   MYALBUNS_DEV_HOST_WEBVIEW_DEBUG_PORT: String(ownerPort),
   MYALBUNS_DEV_PROJECT_DIALOG_WEBVIEW_DEBUG_PORT: String(dialogPort),
   MYALBUNS_DEV_PROJECT_DIALOG_WEBVIEW_DATA_DIRECTORY: path.join(root, "dialog-webview") };
+if (generation) {
+  // Generation shares the editor environment. Preserve its inherited debug
+  // arguments instead of opting into the separate export-dialog environment.
+  for (const key of Object.keys(env)) {
+    if (key.startsWith("MYALBUNS_DEV_") && key !== "MYALBUNS_DEV_HOST_WEBVIEW_DEBUG_PORT") delete env[key];
+  }
+}
 delete env.WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS;
 delete env.TAURI_WEBVIEW_AUTOMATION;
 const sockets = [], instances = [];
@@ -107,11 +115,13 @@ try {
   const expected = await owner.evaluate("window.__TAURI_INTERNALS__.invoke('project_state', {operationId:'dialog-dirty'})");
   assert.equal(expected.state.dirty, true);
   assert.equal(expected.state.canUndo, true);
-  if (mode === "close") await click(owner, "Fechar janela");
+  if (generation) await owner.evaluate("window.__TAURI_INTERNALS__.invoke('open_project_generation')");
+  else if (mode === "close") await click(owner, "Fechar janela");
   else await click(owner, "Exportar");
-  const dialog = await connect(dialogPort, "/project-dialog.html");
-  const current = () => dialog.evaluate("window.__TAURI_INTERNALS__.invoke('current_project_dialog_presentation')");
-  await waitUntil(async () => (await current())?.state.kind === (mode === "close" ? "projectCloseConfirmation" : "exportConfiguration"), "original dialog");
+  const dialog = await connect(generation ? ownerPort : dialogPort, generation ? "/generation.html" : "/project-dialog.html");
+  const current = () => dialog.evaluate(`window.__TAURI_INTERNALS__.invoke('${generation ? "generation_progress" : "current_project_dialog_presentation"}')`);
+  if (generation) await waitUntil(() => dialog.evaluate("document.body.innerText.includes('Projeto modelo')"), "original generation dialog");
+  else await waitUntil(async () => (await current())?.state.kind === (mode === "close" ? "projectCloseConfirmation" : "exportConfiguration"), "original dialog");
   const before = nativeOwnedWindowState(instance);
   assert.equal(before.owner.enabled, false);
   assert.equal(before.dialog.visible, true);
@@ -122,12 +132,24 @@ try {
   const crashSocket = await socketAt(version.webSocketDebuggerUrl);
   if (mode === "progress") {
     const destination = path.join(output, "export"); mkdirSync(destination);
-    await dialog.evaluate("document.querySelector('.ui-export-form input').focus()");
+    await dialog.evaluate("document.querySelector('.ui-operation-form input').focus()");
     await dialog.call("Input.dispatchKeyEvent", { type: "keyDown", key: "a", code: "KeyA", modifiers: 2, windowsVirtualKeyCode: 65 });
     await dialog.call("Input.dispatchKeyEvent", { type: "keyUp", key: "a", code: "KeyA", modifiers: 2, windowsVirtualKeyCode: 65 });
     await dialog.call("Input.insertText", { text: destination });
     await click(dialog, "Exportar");
     await waitUntil(async () => (await current())?.state.kind === "exportProgress", "real Export progress");
+  }
+  const generationDestination = path.join(output, "generated");
+  if (mode === "generation-progress") {
+    const source = path.join(output, "photos"); mkdirSync(source); mkdirSync(generationDestination);
+    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j3ioAAAAASUVORK5CYII=", "base64");
+    for (let index = 0; index < 1024; index++) {
+      const folder = path.join(source, String(index).padStart(4, "0")); mkdirSync(folder);
+      writeFileSync(path.join(folder, "photo.png"), png);
+    }
+    const options = { sourceFolder: source, destinationFolder: generationDestination };
+    await dialog.evaluate(`window.generationAttempt = window.__TAURI_INTERNALS__.invoke('generation_prepare', {options:${JSON.stringify(options)}}).catch(error => {window.generationError=String(error)}); true`);
+    await waitUntil(async () => { const progress = await current(); return progress?.completed > 0 && progress.completed < progress.total; }, "generation has admitted real publications");
   }
   const atFailure = await current();
   const recoveries = records().filter(row => row.event === "webview_recovery_ready" && row.webview_label === "project").length;
@@ -141,14 +163,35 @@ try {
   const recoveredWindow = after.windows.find(window => window.hwnd === before.owner.hwnd);
   assert.ok(recoveredWindow?.enabled && recoveredWindow.visible, "The same Project HWND must respond again");
   assert.deepEqual(await owner.evaluate("window.__TAURI_INTERNALS__.invoke('project_state', {operationId:'dialog-recovered'})"), expected);
-  await click(owner, "Exportar");
-  const replacement = await connect(dialogPort, "/project-dialog.html");
-  await waitUntil(() => replacement.evaluate("document.body.innerText.includes('Destino da exportação')"), "a new export can open");
+  if (generation) {
+    await owner.evaluate("window.__TAURI_INTERNALS__.invoke('undo_project', {onProgress:'__CHANNEL__:'+window.__TAURI_INTERNALS__.transformCallback(()=>{})})");
+    const undone = await owner.evaluate("window.__TAURI_INTERNALS__.invoke('project_state', {operationId:'generation-recovered-undo'})");
+    assert.equal(undone.state.document.dpi, initial.state.document.dpi);
+    assert.equal(undone.state.canRedo, true);
+    await owner.evaluate("window.__TAURI_INTERNALS__.invoke('redo_project', {onProgress:'__CHANNEL__:'+window.__TAURI_INTERNALS__.transformCallback(()=>{})})");
+    const redone = await owner.evaluate("window.__TAURI_INTERNALS__.invoke('project_state', {operationId:'generation-recovered-redo'})");
+    assert.equal(redone.state.document.dpi, dpi);
+    assert.equal(redone.state.dirty, true);
+  }
+  let completedProjects;
+  if (mode === "generation-progress") {
+    completedProjects = readdirSync(generationDestination).filter(name => name.endsWith(".myalbuns"));
+    assert.ok(completedProjects.length >= atFailure.completed);
+    assert.ok(completedProjects.length < atFailure.total, "Recovery stops admitting queued Projects");
+    for (const name of completedProjects) assert.ok(readFileSync(path.join(generationDestination, name)).length > 0);
+  }
+  if (generation) await owner.evaluate("window.__TAURI_INTERNALS__.invoke('open_project_generation')");
+  else await click(owner, "Exportar");
+  const replacement = await connect(generation ? ownerPort : dialogPort, generation ? "/generation.html" : "/project-dialog.html");
+  const expectedHeading = generation ? "Projeto modelo" : "Destino da exportação";
+  await waitUntil(() => replacement.evaluate(`document.body.innerText.includes(${JSON.stringify(expectedHeading)})`), "a new dialog can open");
   await waitUntil(() => nativeOwnedWindowState(instance).dialog?.visible, "the new dialog is visible to its user");
   await click(replacement, "Cancelar");
   await waitUntil(() => owner.evaluate("!document.querySelector('button[aria-label=\"Exportar\"]').disabled"), "new Cancel action finishes");
   assert.equal(nativeOwnedWindowState(instance).dialogCount, 0);
+  if (completedProjects) assert.deepEqual(readdirSync(generationDestination).filter(name => name.endsWith(".myalbuns")), completedProjects, "Retired generation cannot publish more Projects");
   const result = { passed: true, mode, before, after, atFailure, unsavedChangesPreserved: true,
+    completedProjects, undoRedoVerified: generation,
     events: records().filter(row => row.event.startsWith("webview_") || row.event.includes("export") || row.event.includes("retired")) };
   writeFileSync(path.join(output, "result.json"), JSON.stringify(result, null, 2));
   console.log(JSON.stringify({ passed: true, mode, unsavedChangesPreserved: true, newDialogResponds: true }));

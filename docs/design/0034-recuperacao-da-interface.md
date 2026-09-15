@@ -33,6 +33,11 @@ interna do Runtime.
   Exportações em andamento recebem cancelamento cooperativo, respeitando uma
   publicação que já não permita cancelamento. Comandos já aceitos terminam antes
   da nova leitura da Sessão; as alterações concluídas e o histórico permanecem.
+- A Geração de Projetos em lote também é encerrada quando o editor falha.
+  Novos trabalhos deixam de ser admitidos, as gravações já iniciadas terminam
+  e os Projetos concluídos permanecem no destino. A pausa da geração só é
+  liberada sob o bloqueio da recuperação, antes de reconstruir o editor.
+  Sua configuração pode ser aberta novamente depois da recuperação.
 - Tela de Boas-vindas e Configurações usam a mesma recuperação do controle.
 - A política permite até duas tentativas automáticas em 60 segundos por janela.
   Falha da reconstrução ou esgotamento desse limite apresenta uma mensagem

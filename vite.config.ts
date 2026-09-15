@@ -17,6 +17,7 @@ export default defineConfig(() => ({
         global: "global.html",
         project: "index.html",
         projectDialog: "project-dialog.html",
+        generation: "generation.html",
       },
     },
   },

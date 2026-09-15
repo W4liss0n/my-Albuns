@@ -153,6 +153,9 @@ pub(crate) fn run(
         .plugin(tauri_plugin_shell::init())
         .manage(desktop_webview_policy::WindowWebviewVisibility::default())
         .manage(project_host)
+        .manage(crate::generation_window::GenerationWindowState::new(
+            app_paths.clone(),
+        ))
         .manage(crate::media_file_drop::NativeMediaDrops::default())
         .manage(startup_handshake)
         .manage(initial_image_processing)
@@ -173,6 +176,9 @@ pub(crate) fn run(
         .manage(layout_catalog)
         .manage(crate::workspace_preferences::WorkspacePreferencesStore::new(&app_paths))
         .on_window_event(|window, event| {
+            if crate::generation_window::on_window_event(window, event) {
+                return;
+            }
             if crate::application_modality::on_window_event(window, event) {
                 return;
             }
@@ -237,6 +243,19 @@ pub(crate) fn run(
         })
         .setup(move |app| setup_host(app, setup_paths, initial_window_title))
         .invoke_handler(tauri::generate_handler![
+            crate::generation_window::open_project_generation,
+            crate::generation_window::generation_model,
+            crate::generation_window::generation_current,
+            crate::generation_window::generation_progress,
+            crate::generation_window::generation_choose_folder,
+            crate::generation_window::generation_count,
+            crate::generation_window::generation_prepare,
+            crate::generation_window::generation_decide,
+            crate::generation_window::generation_recheck,
+            crate::generation_window::generation_run,
+            crate::generation_window::generation_cancel,
+            crate::generation_window::generation_result_ready,
+            crate::generation_window::close_project_generation,
             crate::storage_recovery::storage_recovery_status,
             crate::storage_recovery::clear_storage_recovery_cache,
             crate::storage_recovery::discard_export_recovery,

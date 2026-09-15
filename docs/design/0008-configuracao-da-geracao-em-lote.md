@@ -9,6 +9,11 @@ document: design
 
 A Geração de Projetos em lote é iniciada dentro da Janela do Projeto que servirá como modelo. Sua janela de configuração reúne origem, destino e análise antes de qualquer arquivo ser criado.
 
+O comando fica em `Ferramentas → Gerar Projetos em lote…`. A janela pertence ao
+Projeto modelo e bloqueia sua edição e seu fechamento enquanto estiver aberta.
+As operações já iniciadas na sessão terminam antes de capturar o modelo; o
+cancelamento devolve o controle à mesma sessão, sem salvá-la.
+
 ## Campos
 
 A janela mostra:
@@ -37,9 +42,34 @@ Origem e Destino aceitam os caminhos totalmente qualificados da [política de ca
 
 O Projeto modelo exibido é o estado visível da sessão, inclusive mudanças ainda não salvas. A geração não salva nem modifica esse Projeto.
 
+A configuração segue o formulário de Exportação: largura de 800 px, cabeçalho
+com fechar à direita, seções espaçadas e campos de 36 px. O modelo aparece em
+um resumo compacto, com ícone de Lâmina, nome e fundo neutro; origem e destino
+têm botões `Escolher…`. A contagem
+fica à esquerda no rodapé, com `Cancelar` e `Verificar e gerar` à direita.
+
 ## Verificação
 
 `Verificar e gerar` executa a descoberta recursiva, valida origem e destino e identifica conflitos antes de criar ou sobrescrever qualquer arquivo.
+
+A descoberta reconhece Fotos pela extensão (`JPG`, `JPEG`, `PNG`, `TIF` ou `TIFF`,
+sem distinguir maiúsculas de minúsculas) e registra os caminhos dos arquivos
+diretamente presentes em cada pasta geradora. A geração não lê o conteúdo das
+Fotos nem prepara Cache. A leitura e a validação dos originais ocorrem na abertura
+do Projeto e na preparação de seu Cache, pelo fluxo compartilhado de imagens.
+Assim, uma Foto corrompida, sem acesso de leitura ou removida após a descoberta
+permanece vinculada no Projeto gerado e será tratada nesse fluxo posterior.
+
+As verificações antecipadas continuam cobrindo acesso às pastas, hierarquia do
+destino, conflitos e proteção dos Projetos abertos. Falhas nesses pontos podem
+impedir a geração; a disponibilidade do conteúdo de cada Foto não é um requisito
+para gravar seus vínculos.
+
+O diálogo de progresso abre **antes** da descoberta das pastas e dos arquivos.
+Enquanto o total é desconhecido, usa a barra indeterminada com o título
+`Gerando Projetos`, sem mensagens temporárias no formulário. Se a verificação
+não encontrar pendências, a mesma tentativa inicia a geração e a mesma janela
+passa ao progresso determinado, com porcentagem e `X Projetos de Y`.
 
 A hierarquia relativa é calculada por componentes sob a raiz validada. Caminhos absolutos, `..` ou qualquer sufixo que escaparia do Destino são rejeitados.
 
@@ -49,4 +79,35 @@ Cada Projeto de destino já existente aparece em uma linha própria. O usuário 
 
 Depois que todos os conflitos recebem uma decisão, `Continuar Geração` é habilitado. A geração não começa automaticamente ao resolver a última linha.
 
+`Verificar novamente` também abre o progresso durante a análise e retorna às
+decisões. Mesmo sem pendências restantes, mantém a confirmação explícita em
+`Continuar Geração`.
+
 Durante a execução, a operação usa o [Progresso de operação](0007-progresso-de-operacoes.md). Sucesso integral recebe confirmação curta; itens ignorados ou com falha são apresentados depois na Tela de Problemas.
+
+A criação usa até quatro Projetos simultâneos, todos baseados no mesmo modelo
+imutável e no mesmo plano de caminhos. Cada Projeto mantém suas próprias proteções
+de destino até terminar a gravação. Uma falha pertence somente ao Projeto afetado;
+os outros continuam. Se o sistema não puder iniciar todos os trabalhadores, a
+operação continua com os disponíveis, podendo executar em sequência.
+
+A fila e o resultado mantêm a ordem da descoberta, mas as gravações podem terminar
+em outra ordem. A barra avança pela quantidade de itens concluídos, ignorados ou
+com falha, sem retroceder e sem apresentar cada trabalhador na interface.
+
+A janela de progresso tem largura própria. A configuração permanece com suas
+dimensões enquanto a janela de progresso é preparada; o resultado só reaparece
+depois de estar pronto. Cancelar preserva os Projetos já concluídos e identifica
+os itens que não chegaram a ser gerados.
+
+Cancelar a verificação fecha o progresso e devolve a configuração, mantendo as
+pastas escolhidas e sem aviso de cancelamento. Ao cancelar `Verificar novamente`,
+as decisões anteriores são mantidas. Durante a gravação, cancelar impede a retirada
+de novos Projetos da fila. Os Projetos já em andamento terminam antes de fechar o
+progresso; os concluídos são preservados, e os não iniciados continuam identificados
+no resultado. Se todos os itens terminarem, o resultado é de conclusão, mesmo que
+o cancelamento tenha sido solicitado durante a última gravação.
+
+Cancelamento é um resultado normal, distinto de falha. Falhas reais usam o diálogo
+padrão de mensagem com `Voltar`, preservando os campos. A janela de geração não
+exibe faixas de aviso ou erro acima do formulário.

@@ -58,6 +58,7 @@ import {
   type SheetReorderSession,
   type SheetReorderSurface,
 } from "./sheetReorderSession";
+import { openProjectGeneration } from "./openProjectGeneration";
 import type { ProjectMutationRunner } from "./useProjectMutationRunner";
 import { useWorkspacePreferences } from "../state/useWorkspacePreferences";
 import { usePhotoshop } from "../state/usePhotoshop";
@@ -72,6 +73,7 @@ import {
 interface ProjectWorkspaceProps {
   exportMediaPort?: import("../application/exportMedia").ExportMediaPort;
   photoshopPort?: import("../application/photoshop").PhotoshopPort;
+  generationLauncher?: import("../application/projectGeneration").ProjectGenerationLauncher;
   mediaDropPort?: import("../application/projectPorts").MediaDropPort;
   projection: EditorProjection;
   projectDialogPort: ProjectDialogPort;
@@ -96,6 +98,7 @@ interface ProjectWorkspaceProps {
 const SHEET_EDITING_MEDIA_PANEL_HEIGHT = 120;
 
 export function ProjectWorkspace({
+  generationLauncher,
   exportMediaPort,
   photoshopPort,
   mediaDropPort,
@@ -141,8 +144,8 @@ export function ProjectWorkspace({
     if (workspacePreferences.ready) onPreferencesReady(projectId);
   }, [onPreferencesReady, projectId, workspacePreferences.ready]);
   const [exportActive, setExportActive] = useState(false);
-  const [saveAsBarrierActive, setSaveAsBarrierActive] = useState(false);
-  const saveAsBarrierRef = useRef(false);
+  const [sessionBarrierActive, setSessionBarrierActive] = useState(false);
+  const sessionBarrierRef = useRef(false);
   const [mediaDrag, setMediaDrag] = useState<import("./useMediaDragGesture").MediaDrag | null>(null);
   const draggedPhotoId = mediaDrag?.kind === "photo" ? mediaDrag.mediaId : null;
   const [mediaSelectionRequest, setMediaSelectionRequest] = useState<{ mediaId: string } | null>(null);
@@ -205,14 +208,14 @@ export function ProjectWorkspace({
   }, []);
   const mediaRemoval = useMediaRemoval({ projection, runner: runProjectMutation, dialogPort: projectDialogPort,
     onProjectionChange, onError: reportCloseError });
-  const changeSaveAsBarrier = useCallback((active: boolean) => {
-    saveAsBarrierRef.current = active;
-    setSaveAsBarrierActive(active);
+  const changeSessionBarrier = useCallback((active: boolean) => {
+    sessionBarrierRef.current = active;
+    setSessionBarrierActive(active);
   }, []);
 
   useEffect(() => {
     const rejectTerminalKeyboardInput = (event: KeyboardEvent) => {
-      if (!saveAsBarrierRef.current) return;
+      if (!sessionBarrierRef.current) return;
       event.preventDefault();
       event.stopImmediatePropagation();
     };
@@ -223,7 +226,7 @@ export function ProjectWorkspace({
   const projectClose = useProjectCloseController({
     projectDialogPort,
     projectWindowPort,
-    requestBlocked: saveAsBarrierActive || mediaRemoval.active,
+    requestBlocked: sessionBarrierActive || mediaRemoval.active,
     waitForPendingMutations: runProjectMutation.waitForIdle,
     onProjectionChange,
     onError: reportCloseError,
@@ -240,13 +243,13 @@ export function ProjectWorkspace({
       mediaRemoval.active ||
       exportActive ||
       projectClose.interactionBlocked ||
-      saveAsBarrierActive ||
+      sessionBarrierActive ||
       graphicsFailure !== null,
     projection,
     runProjectMutation,
     projectCorePort,
     onProjectionChange,
-    onSaveAsBarrierChange: changeSaveAsBarrier,
+    onSaveAsBarrierChange: changeSessionBarrier,
     prepareImportedMedia: prepareMediaPresentation ? async (imported) => {
       const plan = mediaPanelRef.current?.planCatalog(imported.projection.state.album.media, imported.projection.mediaUsage);
       const demand = mergeMediaPreviewDemands(
@@ -372,7 +375,7 @@ export function ProjectWorkspace({
     exportActive ||
     projectClose.interactionBlocked ||
     albumInformationApply.active ||
-    saveAsBarrierActive ||
+    sessionBarrierActive ||
     graphicsFailure !== null;
   const selectedPhotoFrame = controller.selectedFrames.length === 1 && controller.selectedFrames[0].photo
     ? controller.selectedFrames[0] : null;
@@ -381,7 +384,7 @@ export function ProjectWorkspace({
     if (canOpenFrameInPhotoshop && selectedPhotoFrame) void photoshop.open({ kind: "frames", frameIds: [selectedPhotoFrame.id] });
   };
   const workspaceInteractionBlocked =
-    mediaRemoval.active || saveAsBarrierActive || graphicsFailure !== null;
+    mediaRemoval.active || sessionBarrierActive || graphicsFailure !== null;
   const sheetOrderSignature = projection.state.album.sheets
     .map((sheet) => sheet.id)
     .join(",");
@@ -598,6 +601,7 @@ export function ProjectWorkspace({
     undo: controller.undo,
   });
   const applicationMenus = createProjectApplicationMenus({
+    generateProjects: generationLauncher && !structuralCommandsBlocked ? () => { void openProjectGeneration(generationLauncher, runProjectMutation, changeSessionBarrier).catch(error => reportCloseError(String(error))); } : undefined,
     openSettings: photoshopPort ? () => void photoshop.openSettings("performance") : undefined,
     saveLayout: controller.saveLayout,
     canSaveLayout: controller.canSaveLayout,
@@ -687,7 +691,7 @@ export function ProjectWorkspace({
           disabled={
             controller.importPending ||
             projectClose.interactionBlocked ||
-            saveAsBarrierActive ||
+            sessionBarrierActive ||
             graphicsFailure !== null
           }
           exportMediaPort={exportMediaPort}

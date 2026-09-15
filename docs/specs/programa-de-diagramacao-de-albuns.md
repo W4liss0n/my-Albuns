@@ -544,6 +544,7 @@ validação das superfícies descritas nesta seção.
 - Todo diálogo do aplicativo abre como uma janela nativa separada e pertencente à janela que o solicitou. Fora da abertura de um Projeto existente, a proprietária permanece visível ao fundo, bloqueada para interação enquanto o diálogo estiver aberto, e recupera interação e foco quando ele termina.
 - A largura de cada tipo de diálogo permanece estável, enquanto a altura acompanha seu conteúdo renderizado e é recalculada quando o estado muda; o ajuste recentraliza a janela e respeita a área útil do monitor.
 - `Abrir Projeto`, inclusive por `Projetos recentes`, é a única transição que retira a superfície de origem antes de mostrar o progresso. Se a abertura falhar, a superfície reaparece atrás do diálogo de falha; `Novo Projeto`, confirmações, avisos e demais progressos não usam essa exceção.
+- Enquanto a origem estiver oculta, o progresso de abertura mantém uma entrada própria na barra de tarefas do Windows para permitir retornar à operação. Essa entrada permanece durante preparação de imagens e decisões de Recuperação ou Cópia externa na mesma janela, e é removida quando o diálogo termina. A abertura direta pelo Windows também segue essa regra.
 - Se a abertura detectar Recuperação, a própria janela externa de progresso, ainda pertencente à Global/Boas-vindas, transiciona para `Recuperar trabalho não salvo?`. A Janela do Projeto não é criada nem exibida enquanto a decisão estiver pendente; a escolha correlacionada volta ao mesmo Host e à mesma tentativa, e somente um terminal válido permite exibir o Projeto e encerrar o diálogo de abertura. Fechar, cancelar, falhar ou escolher `Agora não` recolhe o Host pendente, restaura a Global e preserva o checkpoint quando a semântica não autoriza descartá-lo.
 - Toda operação que precisa de uma janela de progresso usa a mesma representação minimalista.
 - Com total conhecido, ela mostra uma linha curta de estado, uma barra geral, porcentagem e uma estimativa de tempo somente quando confiável; a própria linha pode expressar a unidade como `X/Y`. Sem total confiável, usa barra animada indeterminada e omite porcentagem, contagem e estimativa.
@@ -1096,20 +1097,23 @@ validação das superfícies descritas nesta seção.
 - Comparações entre origem e Destino consideram raízes resolvidas e identidade física quando disponível, impedindo que uma unidade mapeada esconda um Destino igual ou interno à origem.
 - A Geração de Projetos em lote parte do estado visível integral de um Projeto modelo, inclusive mudanças não salvas, sem salvar ou modificar o modelo.
 - A Janela do Projeto modelo abre uma janela dedicada com Projeto modelo somente para consulta, pasta de origem, pasta de destino, quantidade de pastas geradoras e `Cancelar`/`Verificar e gerar`.
-- `Verificar e gerar` analisa conflitos e problemas antes de qualquer gravação e abre a Tela de Problemas quando houver pendências.
+- `Verificar e gerar` analisa pastas, destino e conflitos antes de qualquer gravação e abre a Tela de Problemas quando houver pendências.
 - Cada Projeto gerado é uma Cópia de Projeto completa e independente, com nova Identidade.
 - Todas as Lâminas, composições, Frames, Fotos existentes, padrões, personalizações, travamentos, favoritos e referências do modelo são copiados.
-- Uma árvore de pastas de origem é examinada recursivamente. Toda pasta que contenha ao menos uma imagem importável diretamente gera um Projeto com seu próprio nome.
+- Uma árvore de pastas de origem é examinada recursivamente. Toda pasta que contenha diretamente ao menos um arquivo com extensão de Foto aceita (`JPG`, `JPEG`, `PNG`, `TIF` ou `TIFF`, sem distinguir maiúsculas de minúsculas) gera um Projeto com seu próprio nome.
 - A busca continua em subpastas mesmo quando a pasta atual gera um Projeto.
 - A hierarquia relativa da origem é recriada no destino.
 - O arquivo gerado fica diretamente no espelho da pasta-pai e recebe o nome da Pasta de Fotos: `origem/Turma 1/001` produz o Projeto `001` em `destino/Turma 1`, não em uma pasta duplicada `destino/Turma 1/001/001`.
 - As imagens diretamente presentes na pasta geradora são acrescentadas à aba `Fotos` do novo Projeto, vinculadas aos originais e não colocadas em Lâminas.
+- A geração registra os vínculos sem ler ou validar o conteúdo das Fotos e sem gerar Cache. A leitura e a validação ocorrem na abertura do Projeto e na preparação de seu Cache, pelo fluxo compartilhado de imagens. Fotos corrompidas, sem acesso de leitura ou removidas depois da descoberta permanecem vinculadas para tratamento nesse momento; as verificações de pastas, destino e conflitos continuam obrigatórias na geração.
 - O destino não pode ser igual à origem nem estar dentro de sua árvore.
 - Conflitos de geração são pré-calculados e apresentados na Tela de Problemas, uma linha por Projeto de destino existente.
 - Cada conflito oferece `Sobrescrever` ou `Ignorar`; a tela também oferece `Sobrescrever todos` e `Ignorar todos`.
 - Um Projeto de destino aberto nunca é incluído em sobrescrita individual ou global. `Sobrescrever` permanece indisponível para sua linha, e ele só pode ser ignorado enquanto continuar aberto.
 - A geração só pode continuar quando todos os conflitos tiverem uma decisão e sempre exige clique explícito em `Continuar Geração`; resolver a última linha não inicia a operação automaticamente.
 - Uma falha de geração não interrompe ou reverte os demais itens. O resumo final separa sucessos, ignorados e falhas.
+- A Geração de Projetos em lote cria até quatro Projetos simultâneos a partir do mesmo modelo imutável e do mesmo plano de caminhos. A fila e o resultado preservam a ordem da descoberta; as gravações podem concluir fora dessa ordem, e o progresso conta itens terminados, ignorados ou com falha. Cada publicação mantém as proteções de destino do núcleo compartilhado.
+- Cancelar a geração impede novos inícios e aguarda todos os Projetos já admitidos terminarem suas gravações. Os concluídos são mantidos e os não iniciados permanecem pendentes no resultado; se todos os itens terminarem, o lote é apresentado como concluído.
 - A Exportação em lote encontra recursivamente Projetos e sempre exporta o Álbum inteiro de cada um.
 - A Tela de Boas-vindas abre uma janela dedicada de configuração do lote com pasta de origem, Formato, Modo e Destino.
 - A janela mostra a quantidade de Projetos descobertos na origem e oferece `Cancelar` e `Verificar e exportar`.
@@ -1129,7 +1133,7 @@ validação das superfícies descritas nesta seção.
 - O progresso da Exportação em lote mostra somente a barra geral determinada, percentual e posição `X/Y`, com `Cancelar` como única ação. Não expõe a tabela de Projetos, trabalhos simultaneamente ativos ou histórico item a item durante o processamento.
 - Nenhuma Exportação normal, edição, Salvamento, abertura ou fechamento de Projeto pode começar enquanto o Modo de lote exclusivo estiver ativo.
 - Concluir, falhar ou cancelar o lote libera a concessão e a pausa, reabilita todas as janelas e permite retomar os trabalhos de Cache, sem salvar ou alterar automaticamente qualquer Projeto aberto.
-- O MVP processa exatamente um Projeto por vez, em ordem determinística, sem Perfil de desempenho, calibração ou paralelismo entre Álbuns. Paralelismo só pode ser reconsiderado depois de medições representativas.
+- A Exportação em lote processa exatamente um Projeto por vez, em ordem determinística, sem Perfil de desempenho, calibração ou paralelismo entre Álbuns. Paralelismo na Exportação só pode ser reconsiderado depois de medições representativas.
 - Por padrão, cada Projeto recebe sua pasta de saída com o próprio Nome ao lado de seu arquivo.
 - Em um destino alternativo, a hierarquia relativa dos Projetos é preservada e cada Projeto recebe uma pasta com seu Nome.
 - Conflitos de todo o lote são apresentados antes do início por aviso genérico com `Ignorar`, `Substituir` ou `Cancelar`. `Ignorar` preserva as saídas existentes, exporta somente as faltantes e não limpa órfãos.
@@ -1164,7 +1168,7 @@ validação das superfícies descritas nesta seção.
 - Conflitos de Exportação e geração devem ser pré-calculados, apresentados em conjunto e nunca resultar em substituição ou renomeação silenciosa.
 - Nenhum teste de Exportação pode obter sucesso apenas por existir Cache quando o original estiver ausente.
 - Publicação deve cobrir falha na preparação, sucesso integral e falha após uma ou mais promoções finais, verificando atomicidade por arquivo quando suportada, aviso de possível mistura, ausência de rollback prometido e proibição de remover órfãos em falha ou intervalo parcial.
-- Operações em lote devem cobrir descoberta recursiva, execução estritamente serial, caminho exato no espelho da árvore, conflitos, proteção de Projeto aberto, relinks individuais e globais estritos, revalidação da revisão persistida antes do snapshot, checkpoint por item, retomada que refaz o item interrompido, isolamento de falhas, cópia integral do estado visível do Projeto modelo e importação das novas imagens somente no Painel.
+- Operações em lote devem cobrir descoberta recursiva, caminho exato no espelho da árvore, conflitos, proteção de Projeto aberto e isolamento de falhas. A Exportação em lote cobre execução estritamente serial, relinks individuais e globais estritos, revalidação da revisão persistida antes do snapshot, checkpoint por item e retomada que refaz o item interrompido. A geração cobre concorrência limitada, cancelamento com espera das gravações ativas, progresso monotônico por item, cópia integral do estado visível do Projeto modelo e inclusão das novas imagens somente no Painel.
 - Namespace, representação reduzida única, metadados, invalidação e políticas de liberação do Cache exigem testes próprios, incluindo a impossibilidade de limpar Cache ativo ao vivo. Formato, resolução, fingerprint e eventual tiling aguardam medições.
 - Álbuns longos devem ser testados com virtualização da cena, margem de pré-carga, descarte e reconstrução de texturas, preservando todo o modelo lógico e a latência de navegação.
 - O spike arquitetural exercitou a pequena interface externa do núcleo e o mesmo conjunto de cenários nas topologias A e B, registrando memória, GPU, processos, abertura, latência do Canvas, propagação de falhas, recuperação e complexidade de IPC/logs. A regressão da topologia adotada deve abrir ao menos dois hosts independentes e provar o isolamento entre Projetos sem acoplar os testes às subdivisões internas.
@@ -1188,7 +1192,7 @@ validação das superfícies descritas nesta seção.
 - Marcas de corte renderizadas na saída.
 - Valores de Sangria ou segurança diferentes por borda.
 - Exportação parcial em lote.
-- Processamento paralelo de Álbuns, calibração automática ou Perfil de desempenho para lote.
+- Exportação paralela de Álbuns, calibração automática ou Perfil de desempenho para lote.
 - Interface de remapeamento de atalhos ou modificadores de gestos.
 - Eleição ou reinício automático do componente global após falha.
 - Rollback integral do conjunto durante a Publicação da Exportação.
@@ -1225,7 +1229,7 @@ As funcionalidades abaixo permanecem no produto, mas seus detalhes foram deliber
 
 - limite numérico da Mudança dimensional segura e eventual ponto focal adicional;
 - formato e resolução da representação visual reduzida, representação concreta dos identificadores de geração/versão, algoritmo de fingerprint e eventual adoção de tiles depois do spike;
-- eventual paralelismo entre itens de lote, somente se medições demonstrarem ganho e preservarem o contrato serial observável;
+- eventual paralelismo entre itens de Exportação em lote, somente se medições demonstrarem ganho e preservarem o contrato serial observável;
 - perfis de hardware mínimo e recomendado e metas quantitativas de desempenho, que serão definidos somente após medições reais do spike;
 - detalhes idiomáticos da implementação de movimentações e Cópias externas, sem alterar a autoridade, a evidência e os estados fechados definidos nos designs aceitos.
 

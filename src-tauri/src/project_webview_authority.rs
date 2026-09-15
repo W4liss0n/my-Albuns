@@ -70,7 +70,6 @@ impl ProjectWebviewAuthority {
             .map(|_| ProjectWebviewRecoveryReservation(self.clone()))
     }
 
-    #[cfg(test)]
     pub(crate) fn current_namespace(&self) -> String {
         self.current_namespace
             .lock()

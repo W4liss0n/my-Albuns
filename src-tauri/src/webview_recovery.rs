@@ -199,7 +199,11 @@ pub(crate) fn install(
                 runtime_version = version, failure_report_directory = report_directory);
                 // GPU and utility failures recover within WebView2. A failed browser or
                 // main renderer requires replacing the presentation owned by this Host.
-                if matches!(kind.0, 0..=2) {
+                // Generation shares the editor's browser. Browser failure reaches
+                // both controls; only the editor retires that abandoned operation.
+                let generation_browser_failure =
+                    kind.0 == 0 && crate::generation_window::owns_surface(&label);
+                if matches!(kind.0, 0..=2) && !generation_browser_failure {
                     request_recovery(
                         app.clone(),
                         label.clone(),
@@ -284,6 +288,14 @@ fn recover(
     controller: usize,
     attempt: u64,
 ) -> io::Result<()> {
+    let generation_state = app.try_state::<crate::generation_window::GenerationWindowState>();
+    let _generation_presentation = if crate::generation_window::owns_surface(label) {
+        generation_state
+            .as_ref()
+            .map(|state| state.lock_presentation_recovery())
+    } else {
+        None
+    };
     let Some(window) = app.get_window(label) else {
         return Ok(());
     };
@@ -293,10 +305,9 @@ fn recover(
     // Drain before reserving Save As authority: an already accepted Save As
     // may still need that reservation after its native file picker returns.
     let _ui_recovery = if label == crate::product_runtime::PROJECT_WINDOW_LABEL {
-        let retirement = app
-            .state::<crate::project_ui_operations::ProjectUiOperations>()
-            .recover()
-            .map_err(io::Error::other)?;
+        let retirement =
+            crate::generation_window::retire_for_editor_recovery(app, RECOVERY_TIMEOUT)
+                .map_err(io::Error::other)?;
         let deadline = Instant::now() + RECOVERY_TIMEOUT;
         while !retirement.is_drained() {
             app.state::<crate::export_attempts::ExportAttempts>()

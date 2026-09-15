@@ -19,6 +19,9 @@ mod export_attempts;
 mod export_commands;
 mod export_media;
 mod export_pipeline;
+mod generation_operation;
+mod generation_runner;
+mod generation_window;
 mod global_activation;
 mod global_runtime;
 mod graphics_launch_gate;
@@ -36,6 +39,8 @@ mod media_import_selection;
 mod media_preview_commands;
 mod media_runtime;
 mod named_mutex;
+#[cfg(windows)]
+mod native_dialog_taskbar;
 mod native_dialog_window;
 mod native_project_dialog;
 mod opaque_image_protocol;

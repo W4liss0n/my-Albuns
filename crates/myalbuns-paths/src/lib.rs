@@ -7,6 +7,7 @@ mod cache_schedule;
 mod error;
 mod export;
 mod guarded_fs;
+mod mirrored_destination;
 mod native_path_serde;
 mod operation;
 mod process_instance;
@@ -31,6 +32,7 @@ pub use cache::{
 pub use cache_schedule::CacheClearScheduleStorage;
 pub use error::AppPathsError;
 pub use export::{ExportPathPlan, ExportWriteAuthorization, PreparedExportStorage};
+pub use mirrored_destination::{MirroredDestination, MirroredDestinationError, MirroredParent};
 pub use native_path_serde::NativePathDto;
 pub use operation::{
     OperationPathContext, PathRootKind, RootBinding, RootBindingPlan, validate_external_path,

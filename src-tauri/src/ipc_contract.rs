@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 mod batch;
 pub use batch::*;
+mod generation;
+pub use generation::*;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
