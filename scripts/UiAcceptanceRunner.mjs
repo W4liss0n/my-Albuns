@@ -27,6 +27,7 @@ const webdriverKeys = Object.freeze({
 });
 
 const webdriverModifiers = Object.freeze({
+  Space: "\uE00D",
   Control: "\uE009",
   Shift: "\uE008",
 });

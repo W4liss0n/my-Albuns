@@ -20,7 +20,7 @@ const supportedKeys = new Set([
   "Minus",
   "Plus",
 ]);
-const supportedModifiers = new Set(["Control", "Shift"]);
+const supportedModifiers = new Set(["Control", "Shift", "Space"]);
 
 function invariant(condition, message) {
   if (!condition) throw new Error(`Invalid UI acceptance manifest: ${message}`);
@@ -172,6 +172,8 @@ export function validateUiAcceptanceManifest(manifest) {
           );
           const seenModifiers = new Set();
           for (const modifier of modifiers) {
+            invariant(modifier !== "Space" || (action.type === "drag" && action.gesture === "pointer"),
+              `${actionLocation}.Space is supported only for pointer drags`);
             invariant(modifier !== "Shift" || ["key", "drag"].includes(action.type),
               `${actionLocation}.Shift is supported for keys and pointer drags`);
             invariant(

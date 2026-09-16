@@ -328,6 +328,8 @@ Quando o Zoom ultrapassa `Ajustar Lâmina`, `Espaço` + arraste com o botão esq
 
 `Ajustar Lâmina` é o limite mínimo: o usuário não pode reduzir a visualização abaixo do enquadramento completo. `4× Ajustar Lâmina` é o teto calibrado; tentativas de ultrapassar mínimo ou máximo são contidas por clamp.
 
+`Exibir > Ajustar Lâmina` executa o mesmo retorno de `Ctrl` + `0` e fica disponível somente no Modo de edição. O Pan preserva a Lâmina alcançável no Canvas, e redimensionar a janela conserva a ampliação relativa ao novo ajuste. `Esc` durante o Pan restaura a posição anterior ao gesto e permanece na edição; perda de foco ou captura também cancela o gesto. Navegar não altera a Seleção de Frames. Campos de texto e outras superfícies de interação conservam seus próprios atalhos.
+
 ## Painel de imagens
 
 - Ocupa a região inferior da coluna de trabalho e termina antes do Painel contextual.

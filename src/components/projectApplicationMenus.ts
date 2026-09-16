@@ -13,6 +13,7 @@ import type {
 } from "./ApplicationMenuBar";
 
 interface ProjectApplicationMenuOptions {
+  fitSheet?(): void;
   newProject?(): void;
   openProject?(): void;
   selectAllFrames(): void;
@@ -59,6 +60,7 @@ interface ProjectApplicationMenuOptions {
 }
 
 export function createProjectApplicationMenus({
+  fitSheet,
   newProject,
   openProject,
   selectAllFrames,
@@ -194,7 +196,7 @@ export function createProjectApplicationMenus({
           contextualPanelVisible,
         ),
         separator("view-canvas-separator"),
-        placeholder("fit-sheet", "sheet"),
+        implemented("fit-sheet", "sheet", () => fitSheet?.(), !fitSheet),
       ],
     },
     {
