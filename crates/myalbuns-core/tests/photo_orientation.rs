@@ -300,7 +300,7 @@ fn v4_angle_migration_preserves_orientation_and_adds_only_neutral_angle_on_save(
     let path = root.path().join("Legado.myalbuns");
     let input = include_bytes!("fixtures/project_document_v4_angle_migration_input.myalbuns");
     let expected: serde_json::Value = serde_json::from_slice(include_bytes!(
-        "fixtures/project_document_v11_angle_migration_expected.myalbuns"
+        "fixtures/project_document_v12_angle_migration_expected.myalbuns"
     ))
     .unwrap();
     fs::write(&path, input).unwrap();
@@ -392,7 +392,7 @@ fn v5_migration_preserves_photo_adjustments_and_v6_requires_a_boolean_effect() {
     let path = root.path().join("Efeito.myalbuns");
     let input = include_bytes!("fixtures/project_document_v5_effect_migration_input.myalbuns");
     let expected: serde_json::Value = serde_json::from_slice(include_bytes!(
-        "fixtures/project_document_v11_effect_migration_expected.myalbuns"
+        "fixtures/project_document_v12_effect_migration_expected.myalbuns"
     ))
     .unwrap();
     fs::write(&path, input).unwrap();
@@ -700,7 +700,7 @@ fn photo_adjustments_survive_pan_zoom_save_reopen_and_export_without_writing_ori
     project.save(project.revision()).unwrap();
     let bytes = fs::read(root.path().join("Orientação.myalbuns")).unwrap();
     let dto: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
-    assert_eq!(dto["schemaVersion"], 11);
+    assert_eq!(dto["schemaVersion"], 12);
     assert_eq!(
         dto["project"]["sheets"][0]["frames"][0]["photo"]["transform"]["blackAndWhite"],
         true
@@ -831,12 +831,12 @@ fn mixed_values_take_one_absolute_orientation_and_invalid_selections_are_atomic(
 }
 
 #[test]
-fn v3_migrates_only_in_memory_and_explicit_save_matches_the_v11_golden_file() {
+fn v3_migrates_only_in_memory_and_explicit_save_matches_the_v12_golden_file() {
     let root = tempfile::tempdir().unwrap();
     let path = root.path().join("Legado.myalbuns");
     let input = include_bytes!("fixtures/project_document_v3_photo_migration_input.myalbuns");
     let expected: serde_json::Value = serde_json::from_slice(include_bytes!(
-        "fixtures/project_document_v11_photo_migration_expected.myalbuns"
+        "fixtures/project_document_v12_photo_migration_expected.myalbuns"
     ))
     .unwrap();
     fs::write(&path, input).unwrap();
@@ -915,7 +915,7 @@ fn v4_rejects_unknown_missing_invalid_orientation_and_future_schemas_without_wri
         assert_eq!(fs::read(path).unwrap(), bytes);
     }
     let mut future = valid.clone();
-    future["schemaVersion"] = serde_json::json!(12);
+    future["schemaVersion"] = serde_json::json!(13);
     let path = root.path().join("future.myalbuns");
     let bytes = serde_json::to_vec(&future).unwrap();
     fs::write(&path, &bytes).unwrap();
@@ -923,7 +923,7 @@ fn v4_rejects_unknown_missing_invalid_orientation_and_future_schemas_without_wri
         core(root.path())
             .load_persisted_revision(LoadProjectRequest::new(location(&path)))
             .unwrap_err(),
-        LoadProjectError::Document(DocumentFailure::UnsupportedFutureSchema { version: 12 })
+        LoadProjectError::Document(DocumentFailure::UnsupportedFutureSchema { version: 13 })
     );
     assert_eq!(fs::read(path).unwrap(), bytes);
 }

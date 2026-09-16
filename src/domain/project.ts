@@ -48,6 +48,8 @@ export type { FrameResizeHandle } from "./generated/FrameResizeHandle";
 export type { Matrix2 } from "./generated/Matrix2";
 export type { ProjectConfigurationValidationError } from "./generated/ProjectConfigurationValidationError";
 export type { MediaCatalogItem } from "./generated/MediaCatalogItem";
+export type { MediaFolder } from "./generated/MediaFolder";
+export type { MediaFolderEdit } from "./generated/MediaFolderEdit";
 export type { MediaKind } from "./generated/MediaKind";
 export type { MediaTransform } from "./generated/MediaTransform";
 export type { MediaUsage } from "./generated/MediaUsage";

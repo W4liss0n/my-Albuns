@@ -10980,6 +10980,402 @@
           "selector": "[role=\"menuitem\"][aria-label=\"Ajustar Lâmina\"]:not([disabled])"
         }
       ]
+    },
+    {
+      "id": "media-folders-all",
+      "title": "Pastas — contagens, nome longo e faixa horizontal",
+      "implementationPath": "/media-panel-preview.html?folders=1",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-folders",
+        "implementationCaptureSelector": "body",
+        "reason": "Design 0035 e barra da referência vigente: chips, menus e formulário compacto ancorado com controles do programa."
+      },
+      "viewport": {
+        "width": 760,
+        "height": 400
+      },
+      "readySelector": ".media-folder-chip[title=\"Retratos\"]",
+      "actions": []
+    },
+    {
+      "id": "media-folders-filter",
+      "title": "Pastas — Fotos filtradas",
+      "implementationPath": "/media-panel-preview.html?folders=1",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-folders",
+        "implementationCaptureSelector": "body",
+        "reason": "Design 0035 e barra da referência vigente: chips, menus e formulário compacto ancorado com controles do programa."
+      },
+      "viewport": {
+        "width": 1100,
+        "height": 400
+      },
+      "readySelector": "[aria-label^=\"Pasta Retratos,\"][aria-pressed=\"true\"]",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label^=\"Pasta Retratos,\"]"
+        }
+      ]
+    },
+    {
+      "id": "media-folders-empty",
+      "title": "Pastas — pasta vazia",
+      "implementationPath": "/media-panel-preview.html?folders=1",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-folders",
+        "implementationCaptureSelector": "body",
+        "reason": "Design 0035 e barra da referência vigente: chips, menus e formulário compacto ancorado com controles do programa."
+      },
+      "viewport": {
+        "width": 1100,
+        "height": 400
+      },
+      "readySelector": "[aria-label^=\"Pasta Famílias,\"][aria-pressed=\"true\"]",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label^=\"Pasta Famílias,\"]"
+        }
+      ]
+    },
+    {
+      "id": "media-folders-create",
+      "title": "Pastas — criar",
+      "implementationPath": "/media-panel-preview.html?folders=1",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-folders",
+        "implementationCaptureSelector": "body",
+        "reason": "Design 0035 e barra da referência vigente: chips, menus e formulário compacto ancorado com controles do programa."
+      },
+      "viewport": {
+        "width": 1100,
+        "height": 400
+      },
+      "readySelector": ".media-folder-popover input",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Nova pasta de organização\"]"
+        }
+      ]
+    },
+    {
+      "id": "media-folders-invalid",
+      "title": "Pastas — nome inválido em tooltip",
+      "implementationPath": "/media-panel-preview.html?folders=1",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-folders",
+        "implementationCaptureSelector": "body",
+        "reason": "Design 0035 e barra da referência vigente: chips, menus e formulário compacto ancorado com controles do programa."
+      },
+      "viewport": {
+        "width": 1100,
+        "height": 400
+      },
+      "readySelector": ".media-folder-popover [role=\"tooltip\"]",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Nova pasta de organização\"]"
+        },
+        {
+          "type": "click",
+          "selector": ".media-folder-popover button[type=\"submit\"]"
+        }
+      ]
+    },
+    {
+      "id": "media-folders-context",
+      "title": "Pastas — menu contextual",
+      "implementationPath": "/media-panel-preview.html?folders=1",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-folders",
+        "implementationCaptureSelector": "body",
+        "reason": "Design 0035 e barra da referência vigente: chips, menus e formulário compacto ancorado com controles do programa."
+      },
+      "viewport": {
+        "width": 1100,
+        "height": 400
+      },
+      "readySelector": "[aria-label=\"Ações da pasta Retratos\"]",
+      "actions": [
+        {
+          "type": "context-click",
+          "selector": "[aria-label^=\"Pasta Retratos,\"]"
+        }
+      ]
+    },
+    {
+      "id": "media-folders-rename",
+      "title": "Pastas — renomear",
+      "implementationPath": "/media-panel-preview.html?folders=1",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-folders",
+        "implementationCaptureSelector": "body",
+        "reason": "Design 0035 e barra da referência vigente: chips, menus e formulário compacto ancorado com controles do programa."
+      },
+      "viewport": {
+        "width": 1100,
+        "height": 400
+      },
+      "readySelector": ".media-folder-popover input",
+      "actions": [
+        {
+          "type": "context-click",
+          "selector": "[aria-label^=\"Pasta Retratos,\"]"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"]:first-child"
+        }
+      ]
+    },
+    {
+      "id": "media-folders-move",
+      "title": "Pastas — mover seleção",
+      "implementationPath": "/media-panel-preview.html?folders=1",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-folders",
+        "implementationCaptureSelector": "body",
+        "reason": "Design 0035 e barra da referência vigente: chips, menus e formulário compacto ancorado com controles do programa."
+      },
+      "viewport": {
+        "width": 1100,
+        "height": 400
+      },
+      "readySelector": ".media-folder-popover select",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[data-media-id=\"test-media-003\"]"
+        },
+        {
+          "type": "context-click",
+          "selector": "[data-media-id=\"test-media-003\"]"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"]:nth-last-child(2)"
+        }
+      ]
+    },
+    {
+      "id": "media-folders-decorative",
+      "title": "Pastas — Decorativos",
+      "implementationPath": "/media-panel-preview.html?folders=1",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-folders",
+        "implementationCaptureSelector": "body",
+        "reason": "Design 0035 e barra da referência vigente: chips, menus e formulário compacto ancorado com controles do programa."
+      },
+      "viewport": {
+        "width": 1100,
+        "height": 400
+      },
+      "readySelector": "[aria-label^=\"Pasta Fundos,\"][aria-pressed=\"true\"]",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Decorativos\"]"
+        },
+        {
+          "type": "click",
+          "selector": "[aria-label^=\"Pasta Fundos,\"]"
+        }
+      ]
+    },
+    {
+      "id": "media-folders-drag-photo",
+      "title": "Pastas — Foto sobre a tag de destino",
+      "implementationPath": "/media-panel-preview.html?folders=1",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-folders",
+        "implementationCaptureSelector": "body",
+        "reason": "Design 0035: destino do arrasto usa destaque azul da interface sem trocar a pasta ativa; Esc remove o destaque. A captura verifica o gesto, sem simular persistência."
+      },
+      "viewport": {
+        "width": 1100,
+        "height": 400
+      },
+      "readySelector": ".media-folder-chip--drop",
+      "actions": [
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": "[data-media-id=\"test-media-001\"]",
+          "targetSelector": "[data-media-folder-id=\"folder-retratos\"]",
+          "phase": "preview"
+        }
+      ]
+    },
+    {
+      "id": "media-folders-drag-decorative",
+      "title": "Pastas — Decorativo sobre a tag de destino",
+      "implementationPath": "/media-panel-preview.html?folders=1",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-folders",
+        "implementationCaptureSelector": "body",
+        "reason": "Design 0035: destino do arrasto usa destaque azul da interface sem trocar a pasta ativa; Esc remove o destaque. A captura verifica o gesto, sem simular persistência."
+      },
+      "viewport": {
+        "width": 1100,
+        "height": 400
+      },
+      "readySelector": ".media-folder-chip--drop",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Decorativos\"]"
+        },
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": "[data-media-id=\"test-decorative-001\"]",
+          "targetSelector": "[data-media-folder-id=\"folder-fundos\"]",
+          "phase": "preview"
+        }
+      ]
+    },
+    {
+      "id": "media-folders-drag-cancel",
+      "title": "Pastas — cancelar arrasto com Esc",
+      "implementationPath": "/media-panel-preview.html?folders=1",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-folders",
+        "implementationCaptureSelector": "body",
+        "reason": "Design 0035: destino do arrasto usa destaque azul da interface sem trocar a pasta ativa; Esc remove o destaque. A captura verifica o gesto, sem simular persistência."
+      },
+      "viewport": {
+        "width": 1100,
+        "height": 400
+      },
+      "readySelector": "[data-media-folder-id=\"folder-retratos\"]:not(.media-folder-chip--drop)",
+      "actions": [
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": "[data-media-id=\"test-media-001\"]",
+          "targetSelector": "[data-media-folder-id=\"folder-retratos\"]",
+          "phase": "escape"
+        }
+      ]
+    },
+    {
+      "id": "media-drag-ghost-missing-cached",
+      "title": "Arrasto do painel — Foto ausente com Cache",
+      "implementationPath": "/media-panel-preview.html?folders=1&files=1",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-folders",
+        "implementationCaptureSelector": "body",
+        "reason": "Design 0035: prévia proporcional da miniatura acompanha o ponteiro sem bloquear o destino. Imagem ausente conserva Cache ou placeholder."
+      },
+      "viewport": {
+        "width": 1100,
+        "height": 400
+      },
+      "readySelector": "[data-media-drag-ghost=\"test-media-003\"]",
+      "actions": [
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": "[data-media-id=\"test-media-003\"]",
+          "targetSelector": "[data-media-folder-id=\"folder-cerimonia\"]",
+          "phase": "preview"
+        }
+      ]
+    },
+    {
+      "id": "media-drag-ghost-missing-placeholder",
+      "title": "Arrasto do painel — Foto ausente sem Cache",
+      "implementationPath": "/media-panel-preview.html?folders=1&files=1&cache=missing",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-folders",
+        "implementationCaptureSelector": "body",
+        "reason": "Design 0035: prévia proporcional da miniatura acompanha o ponteiro sem bloquear o destino. Imagem ausente conserva Cache ou placeholder."
+      },
+      "viewport": {
+        "width": 1100,
+        "height": 400
+      },
+      "readySelector": "[data-media-drag-ghost=\"test-media-003\"]",
+      "actions": [
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": "[data-media-id=\"test-media-003\"]",
+          "targetSelector": "[data-media-folder-id=\"folder-cerimonia\"]",
+          "phase": "preview"
+        }
+      ]
+    },
+    {
+      "id": "media-drag-ghost-decorative-unobserved",
+      "title": "Arrasto do painel — Decorativo com dimensões da prévia",
+      "implementationPath": "/media-panel-preview.html?folders=1&dimensions=unobserved",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-folders",
+        "implementationCaptureSelector": "body",
+        "reason": "Design 0035: destino do arrasto usa destaque azul da interface sem trocar a pasta ativa; Esc remove o destaque. A captura verifica o gesto, sem simular persistência."
+      },
+      "viewport": {
+        "width": 1100,
+        "height": 400
+      },
+      "readySelector": ".media-folder-chip--drop",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Decorativos\"]"
+        },
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": "[data-media-id=\"test-decorative-001\"]",
+          "targetSelector": "[data-media-folder-id=\"folder-fundos\"]",
+          "phase": "preview"
+        }
+      ]
+    },
+    {
+      "id": "media-drag-ghost-missing-unobserved",
+      "title": "Arrasto do painel — Foto ausente sem dimensões observadas",
+      "implementationPath": "/media-panel-preview.html?folders=1&files=1&cache=missing&dimensions=unobserved",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-folders",
+        "implementationCaptureSelector": "body",
+        "reason": "Design 0035: prévia proporcional da miniatura acompanha o ponteiro sem bloquear o destino. Imagem ausente conserva Cache ou placeholder."
+      },
+      "viewport": {
+        "width": 1100,
+        "height": 400
+      },
+      "readySelector": "[data-media-drag-ghost=\"test-media-003\"]",
+      "actions": [
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": "[data-media-id=\"test-media-003\"]",
+          "targetSelector": "[data-media-folder-id=\"folder-cerimonia\"]",
+          "phase": "preview"
+        }
+      ]
     }
   ]
 }

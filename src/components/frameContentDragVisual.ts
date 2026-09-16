@@ -1,7 +1,7 @@
 import { Container, Graphics, Sprite, type Application, type Texture } from "pixi.js";
 import type { PhotoRenderNode } from "./albumCanvasRenderNodes";
 import type { FrameContentDragPreview } from "./frameContentDragSession";
-import { SHEET_VISUAL_STYLE } from "./sheetVisualStyle";
+import { IMAGE_DRAG_GHOST_STYLE, imageDragGhostGeometry, imageDragGhostPosition } from "../ui/imageDragGhostVisual";
 
 /** Owns one bounded snapshot, so the ghost survives source-Sheet virtualization. */
 export class FrameContentDragVisual {
@@ -14,7 +14,7 @@ export class FrameContentDragVisual {
   constructor(private readonly app: Application, private readonly photoNodes: ReadonlyMap<string, PhotoRenderNode>) {
     this.container.label = "frame-content-drag-ghost";
     this.container.eventMode = "none";
-    this.container.alpha = SHEET_VISUAL_STYLE.frameContentDrag.ghostOpacity;
+    this.container.alpha = IMAGE_DRAG_GHOST_STYLE.opacity;
     this.container.visible = false;
   }
 
@@ -24,12 +24,11 @@ export class FrameContentDragVisual {
       this.reset();
       const source = this.photoNodes.get(preview.sourceFrameId);
       if (!source) return;
-      const style = SHEET_VISUAL_STYLE.frameContentDrag;
+      const style = IMAGE_DRAG_GHOST_STYLE;
       const snapshot = source.createDragPreview();
-      const scale = Math.min(1, style.ghostMaxWidthPx / snapshot.bounds.width,
-        style.ghostMaxHeightPx / snapshot.bounds.height);
-      this.width = snapshot.bounds.width * scale;
-      this.height = snapshot.bounds.height * scale;
+      const { width, height, scale, border, shadow } = imageDragGhostGeometry(snapshot.bounds.width, snapshot.bounds.height);
+      this.width = width;
+      this.height = height;
       try {
         this.texture = this.app.renderer.generateTexture({ target: snapshot.container,
           frame: snapshot.bounds, resolution: scale * this.app.renderer.resolution });
@@ -38,21 +37,20 @@ export class FrameContentDragVisual {
       photo.width = this.width;
       photo.height = this.height;
       this.container.addChild(
-        new Graphics().rect(3, 5, this.width + 2, this.height + 2).fill({ color: 0x252525, alpha: 0.2 }),
-        new Graphics().rect(-2, -2, this.width + 4, this.height + 4).fill(0xffffff),
+        new Graphics().rect(shadow.x, shadow.y, shadow.width, shadow.height)
+          .fill({ color: style.shadow.color, alpha: style.shadow.opacity }),
+        new Graphics().rect(border.x, border.y, border.width, border.height).fill(style.border.color),
         photo,
       );
       this.sourceFrameId = preview.sourceFrameId;
       this.app.stage.addChild(this.container);
     }
     const bounds = this.app.canvas.getBoundingClientRect();
-    const offset = SHEET_VISUAL_STYLE.frameContentDrag.ghostPointerOffsetPx;
-    this.container.position.set(
-      Math.max(8, Math.min((preview.clientX - bounds.left) * this.app.screen.width / bounds.width + offset,
-        this.app.screen.width - this.width - 8)),
-      Math.max(8, Math.min((preview.clientY - bounds.top) * this.app.screen.height / bounds.height + offset,
-        this.app.screen.height - this.height - 8)),
-    );
+    const position = imageDragGhostPosition({
+      x: (preview.clientX - bounds.left) * this.app.screen.width / bounds.width,
+      y: (preview.clientY - bounds.top) * this.app.screen.height / bounds.height,
+    }, { width: this.width, height: this.height }, this.app.screen);
+    this.container.position.set(position.x, position.y);
     this.container.visible = true;
     this.app.canvas.dataset.frameContentDragGhost = preview.sourceFrameId;
   }

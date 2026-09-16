@@ -352,7 +352,7 @@ fn saving_and_reopening_preserves_custom_frame_style_in_the_current_schema() {
     let path = project.project_path().to_path_buf();
     let document: serde_json::Value =
         serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
-    assert_eq!(document["schemaVersion"], 11);
+    assert_eq!(document["schemaVersion"], 12);
     assert_eq!(
         document["project"]["sheets"][0]["frames"][0]["style"],
         serde_json::json!({

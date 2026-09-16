@@ -1242,3 +1242,10 @@ O spike executável validou Tauri 2 com React/TypeScript e Rust para a primeira 
 A arquitetura adotada reutiliza um núcleo Rust compartilhado atrás de uma pequena interface externa para carregar, validar, modificar, persistir e criar snapshots do Projeto. Internamente, existe exatamente uma sessão proprietária mutável do estado criativo de cada Projeto, enquanto domínio e persistência conservam responsabilidades próprias. A Janela normal e o lote passam por essa interface; o `RenderSnapshot` validado e imutável é a autoridade criativa e a entrada lógica do `ExportPipeline`, e o componente de imagem o recebe inteiro dentro do envelope operacional junto do plano de bindings, sem interpretar o documento persistido.
 
 `MyAlbuns.exe` hospeda a experiência global e a Tela de Boas-vindas sem possuir estado criativo mutável. PixiJS sobre WebGL2 compõe a prévia interativa, enquanto a Exportação Rust reabre os originais. Windows 10/11 x64 é o escopo inicial, WebGL2 com aceleração de hardware verificável é requisito do editor e WPF/.NET com C# permanece somente como contingência futura, sem implementação paralela. Os controles concretos da interface ainda deverão ser definidos sem alterar os contratos funcionais desta SPEC; o formato do arquivo e a fronteira de persistência já estão fixados pelo ADR 0009 e pelos designs 0013 e 0015.
+
+## Pastas de organização do Painel de imagens
+
+- Fotos e Decorativos possuem pastas independentes, planas, salvas no Projeto; cada mídia pertence a no máximo uma pasta.
+- Criar, renomear, excluir e mover a seleção são ações atômicas com Undo/Redo. Excluir pasta mantém as imagens em `Todas`; `Sem pasta` remove somente a associação.
+- O filtro de pasta cruza Busca, Filtro de uso e Ausentes, conserva a ordenação e permanece transitório. A organização não modifica arquivos originais nem a composição.
+- A interface, validação, migração v1–v11 e o envelope v12 seguem o [design 0035](../design/0035-pastas-de-organizacao-e-schema-v12.md).

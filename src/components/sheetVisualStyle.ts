@@ -87,10 +87,6 @@ export const SHEET_VISUAL_STYLE = {
     targetColor: 0x2f7fba,
     targetFillOpacity: 0.14,
     targetOutlineWidthPx: 3,
-    ghostOpacity: 0.84,
-    ghostMaxWidthPx: 80,
-    ghostMaxHeightPx: 60,
-    ghostPointerOffsetPx: 6,
   },
   overlay: {
     cornerRadiusPx: VISUAL_MEDIA_FALLBACK_STYLE.overlay.cornerRadiusPx,

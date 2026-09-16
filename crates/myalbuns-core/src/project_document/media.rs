@@ -75,6 +75,11 @@ impl ProjectDocument {
             }
         }
         next.media.retain(|media| !selected.contains(&media.id));
+        for folder in &mut next.media_folders {
+            folder
+                .media_ids
+                .retain(|id| !selected.contains(&id.into_uuid()));
+        }
         validate_project_state(&next).map_err(|()| {
             CoreError::InvalidProject(
                 "A remoção deixaria uma referência inválida no Projeto.".into(),

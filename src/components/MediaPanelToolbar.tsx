@@ -8,7 +8,7 @@ import {
   X,
 } from "lucide-react";
 
-import type { MediaKind } from "../domain/project";
+import type { MediaFolder, MediaKind } from "../domain/project";
 import {
   MEDIA_THUMBNAIL_DEFAULT_SIZE,
   MEDIA_THUMBNAIL_MAX_SIZE,
@@ -21,6 +21,13 @@ import { useDismissableSurface } from "../ui/useDismissableSurface";
 
 interface MediaPanelToolbarProps {
   activeMediaKind: MediaKind;
+  folders: readonly MediaFolder[];
+  activeFolderId: string | null;
+  dropFolderId: string | null;
+  foldersDisabled: boolean;
+  onFolderChange(id: string | null): void;
+  onCreateFolder(anchor: HTMLElement): void;
+  onFolderMenu(folder: MediaFolder, anchor: HTMLElement, position: { x: number; y: number }): void;
   missingCounts: Readonly<Record<MediaKind, number>>;
   missingOnly: boolean;
   onMissingOnlyChange(value: boolean): void;
@@ -35,11 +42,10 @@ interface MediaPanelToolbarProps {
   search: string;
 }
 
-const PLACEHOLDER_TITLE = "Ainda não disponível nesta versão";
 type OpenPopup = "import" | "options" | null;
 
 export function MediaPanelToolbar({
-  activeMediaKind,
+  activeMediaKind, folders, activeFolderId, dropFolderId, foldersDisabled, onFolderChange, onCreateFolder, onFolderMenu,
   missingCounts,
   missingOnly,
   onMissingOnlyChange,
@@ -161,10 +167,10 @@ export function MediaPanelToolbar({
         <div className="media-folder-strip">
           <button
             aria-label={`Todas ${itemCount}`}
-            aria-pressed={!missingOnly}
-            className={`media-folder-chip${!missingOnly ? " active" : ""}`}
+            aria-pressed={!missingOnly && !activeFolderId}
+            className={`media-folder-chip${!missingOnly && !activeFolderId ? " active" : ""}`}
             type="button"
-            onClick={() => onMissingOnlyChange(false)}
+            onClick={() => { onFolderChange(null); onMissingOnlyChange(false); }}
           >
             <span>Todas</span>
             <small>{itemCount}</small>
@@ -173,17 +179,32 @@ export function MediaPanelToolbar({
             aria-pressed={missingOnly} onClick={() => onMissingOnlyChange(!missingOnly)}>
             Ausentes<small>{missingCounts[activeMediaKind]}</small>
           </button>
-          {/*
-            PLACEHOLDER UI: organization chips belong here after the Project
-            exposes Media organization folders through an application port.
-          */}
+          {folders.map((folder) => <button key={folder.id} type="button"
+            className={`media-folder-chip${activeFolderId === folder.id ? " active" : ""}${dropFolderId === folder.id ? " media-folder-chip--drop" : ""}`}
+            data-media-folder-id={folder.id}
+            aria-label={`Pasta ${folder.name}, ${folder.mediaIds.length} imagens`}
+            aria-pressed={activeFolderId === folder.id} title={folder.name}
+            onFocus={(event) => event.currentTarget.scrollIntoView?.({ block: "nearest", inline: "nearest" })}
+            onClick={() => { setOpenPopup(null); onFolderChange(folder.id); }}
+            onContextMenu={(event) => {
+              event.preventDefault(); setOpenPopup(null);
+              if (!foldersDisabled) onFolderMenu(folder, event.currentTarget, { x: event.clientX, y: event.clientY });
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "ContextMenu" || event.shiftKey && event.key === "F10") {
+                event.preventDefault(); setOpenPopup(null);
+                const rect = event.currentTarget.getBoundingClientRect();
+                if (!foldersDisabled) onFolderMenu(folder, event.currentTarget, { x: rect.left, y: rect.top });
+              }
+            }}><span className="media-folder-name">{folder.name}</span><small>{folder.mediaIds.length}</small></button>)}
         </div>
         <button
           aria-label="Nova pasta de organização"
           className="media-folder-add"
-          data-placeholder-feature="media-organization-folders"
-          disabled
-          title={PLACEHOLDER_TITLE}
+          disabled={foldersDisabled}
+          title="Nova pasta"
+          aria-haspopup="dialog"
+          onClick={(event) => { setOpenPopup(null); onCreateFolder(event.currentTarget); }}
           type="button"
         >
           <AppIcon icon={Plus} size={12} />

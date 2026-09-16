@@ -443,6 +443,8 @@ export function useProjectEditorController({
   };
 
   return {
+    editMediaFolder: (edit: import("../domain/project").MediaFolderEdit) => interactionBlocked
+      ? Promise.resolve(false) : mutations.editMediaFolder(edit),
     layoutPanel,
     frameStyle: {
       disabled: !canEditFrameStyle,

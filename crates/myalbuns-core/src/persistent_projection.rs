@@ -43,6 +43,8 @@ pub(crate) fn editor_state(
     let last_sheet = project.sheets().len().saturating_sub(1);
     let mut next_page_number = 1;
     let album = AlbumSnapshot {
+        media_folders: (!project.media_folders().is_empty())
+            .then(|| project.media_folders().to_vec()),
         sheets: project
             .sheets()
             .iter()

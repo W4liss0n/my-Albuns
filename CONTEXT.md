@@ -347,6 +347,9 @@ _Evitar_: Painel direito
 **Painel de imagens**:
 Catálogo de Arquivos vinculados do Projeto, separado entre Fotos e Imagens decorativas.
 
+**Pasta de organização**:
+Agrupamento de mídias pertencente ao Projeto e a uma aba do Painel de imagens. Cada mídia pertence a no máximo uma pasta; a organização não corresponde a uma movimentação de arquivos no disco.
+
 **Filtro de uso**:
 Filtro do Painel de imagens que restringe os itens exibidos conforme a mídia esteja ou não referenciada pelo Projeto.
 
