@@ -93,7 +93,9 @@ export function MediaPanelToolbar({
   }
 
   return (
-    <div className="media-toolbar" ref={rootRef}>
+    <div className="media-toolbar" ref={rootRef} onKeyDown={(event) => {
+      if (openPopup !== null && event.key !== "Escape") event.stopPropagation();
+    }}>
       <div aria-label="Tipo de recurso" className="media-tabs" role="group">
         <button
           aria-label="Fotos"

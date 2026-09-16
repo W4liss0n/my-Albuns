@@ -15,7 +15,7 @@ A etapa [Programa 34 — Registro de comandos, atalhos e modificadores do MVP](h
 - `Enter` para editar a Lâmina passou a consultar o catálogo e respeita os modificadores declarados. `Ctrl+Enter`, por exemplo, não é tratado como `Enter` simples.
 - As instruções de teclado do Canvas consultam as mesmas associações de Zoom, Ajustar Lâmina, Selecionar tudo e Editar Lâmina. Modificadores de arraste e roda continuam com os módulos de gestos.
 - `Delete` com um menu de Lâmina aberto não alcança o comando implícito da Lâmina centralizada. Antes, abrir o menu da Lâmina 03 com a 02 centralizada e pressionar `Delete` podia excluir a 02. O clique em Excluir continua usando o alvo explícito do menu.
-- No Painel de imagens, menus e controles conservam as teclas de edição. `Ctrl+A`, `Delete` e `Ctrl+E` não executam ações por trás de um menu aberto. Um evento já consumido também não é reinterpretado pelo Painel.
+- No Painel de imagens, menus e controles conservam as teclas de edição. `Ctrl+A`, `Delete` e `Ctrl+E` não executam ações por trás do menu contextual. Importar e Filtro, ordem e tamanho também conservam o teclado na barra enquanto seus popups estão abertos, inclusive com foco no botão de abertura. `Esc` continua fechando o popup. Um evento já consumido também não é reinterpretado pelo Painel.
 
 `ownsEditingKeys` compartilha apenas a identificação dos controles que possuem essas teclas. Não armazena foco ou seleção e não escolhe comandos. A arbitragem de contextos permanece nos donos atuais.
 

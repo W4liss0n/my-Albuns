@@ -11549,6 +11549,20 @@
         { "type": "key", "key": "KeyA", "modifiers": ["Control"] },
         { "type": "key", "key": "Delete" }
       ]
+    },
+    {
+      "id": "command-import-menu-owns-selection",
+      "title": "Atalhos — Importar preserva a seleção com foco no botão",
+      "implementationPath": "/media-panel-preview.html?acceptance=editor",
+      "comparison": { "kind": "implementation-only", "surface": "command-context", "implementationCaptureSelector": ".media-panel-preview", "reason": "Issue #12: a barra de ferramentas conserva o teclado enquanto o popup está aberto, inclusive quando o foco permanece no botão que o abriu." },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": ".media-panel:has([role='menu'][aria-label='Importar']):has([data-media-id='test-media-001'][aria-pressed='true']):has([data-media-id='test-media-002'][aria-pressed='false'])",
+      "actions": [
+        { "type": "click", "selector": "[data-media-id='test-media-001']" },
+        { "type": "click", "selector": ".media-import-menu > button" },
+        { "type": "key", "key": "KeyA", "modifiers": ["Control"] },
+        { "type": "key", "key": "Delete" }
+      ]
     }
   ]
 }
