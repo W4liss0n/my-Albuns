@@ -1,4 +1,4 @@
-import { createRef } from "react";
+import { createRef, useState } from "react";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
@@ -128,4 +128,38 @@ test("Escape and Cancel close without edits; pending submission is not duplicate
   expect(screen.getByRole("button", { name: "Cancelar" })).toBeDisabled();
   finish(true);
   await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+});
+
+
+test("losing an active folder clears its Ausentes filter and returns to All", async () => {
+  const h = harness(); const user = userEvent.setup();
+  h.view.rerender(<MediaPanel {...h.props} mediaFiles={{ p1: { mediaId: "p1", state: "absent", createdAtMs: null, modifiedAtMs: null } }} />);
+  await user.click(screen.getByRole("button", { name: /Pasta Turma A/ }));
+  await user.click(screen.getByRole("button", { name: /Ausentes/ }));
+  expect(gridItems()).toEqual(["p1"]);
+  h.view.rerender(<MediaPanel {...h.props} mediaFolders={folders.slice(1)}
+    mediaFiles={{ p1: { mediaId: "p1", state: "absent", createdAtMs: null, modifiedAtMs: null } }} />);
+  expect(screen.getByRole("button", { name: "Todas 2" })).toHaveAttribute("aria-pressed", "true");
+  expect(gridItems()).toEqual(["p1", "p2"]);
+});
+
+test("moving the focused thumbnail out of the active folder restores connected panel focus", async () => {
+  const h = harness(); h.view.unmount(); const user = userEvent.setup();
+  function UpdatingPanel() {
+    const [current, setCurrent] = useState(folders);
+    return <MediaPanel {...h.props} mediaFolders={current} onEditMediaFolder={async () => {
+      await Promise.resolve();
+      setCurrent([{ ...folders[0], mediaIds: [] }, { ...folders[1], mediaIds: ["p1", "p2"] }, folders[2]]);
+      return true;
+    }} />;
+  }
+  render(<UpdatingPanel />);
+  await user.click(screen.getByRole("button", { name: /Pasta Turma A/ }));
+  fireEvent.contextMenu(screen.getByRole("button", { name: "001.jpg" }));
+  await user.click(screen.getByRole("menuitem", { name: "Mover para pasta…" }));
+  await user.selectOptions(screen.getByRole("combobox", { name: "Destino" }), "b");
+  await user.click(screen.getByRole("button", { name: "Mover" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  expect(gridItems()).toEqual([]);
+  await waitFor(() => expect(screen.getByRole("region", { name: "Painel de imagens" })).toHaveFocus());
 });

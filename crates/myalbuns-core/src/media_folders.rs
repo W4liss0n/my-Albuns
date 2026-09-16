@@ -65,7 +65,11 @@ impl ProjectDocument {
         let mut ids = HashSet::new();
         let mut names = HashSet::new();
         let mut members = HashSet::new();
-        let media_kinds: HashMap<_, _> = self.media().iter().map(|media| (media.id(), media.kind())).collect();
+        let media_kinds: HashMap<_, _> = self
+            .media()
+            .iter()
+            .map(|media| (media.id(), media.kind()))
+            .collect();
         self.media_folders.iter().all(|folder| {
             Uuid::parse_str(&folder.id)
                 .is_ok_and(|id| id.get_version_num() == 4 && id.to_string() == folder.id)
@@ -73,8 +77,7 @@ impl ProjectDocument {
                 && valid_name(&folder.name)
                 && names.insert((folder.kind, folder.name.to_lowercase()))
                 && folder.media_ids.iter().all(|id| {
-                    members.insert(*id)
-                        && media_kinds.get(&id.into_uuid()) == Some(&folder.kind)
+                    members.insert(*id) && media_kinds.get(&id.into_uuid()) == Some(&folder.kind)
                 })
         })
     }

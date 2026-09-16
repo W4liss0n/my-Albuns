@@ -1,6 +1,7 @@
 import {
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -168,18 +169,23 @@ export function MediaPanel({
   const activeFolder = activeFolders.find((folder) => folder.id === folderIds[activeMediaKind]);
   const activeFolderMembers = useMemo(() => activeFolder ? new Set(activeFolder.mediaIds) : null, [activeFolder]);
   useEffect(() => {
-    setFolderIds((current) => {
-      const valid = (kind: MediaKind) => mediaFolders.some((folder) => folder.id === current[kind] && folder.kind === kind) ? current[kind] : null;
-      const next = { photo: valid("photo"), decorative: valid("decorative") };
-      return next.photo === current.photo && next.decorative === current.decorative ? current : next;
-    });
-  }, [mediaFolders]);
+    const removed = (["photo", "decorative"] as const).filter((kind) => folderIds[kind] !== null &&
+      !mediaFolders.some((folder) => folder.id === folderIds[kind] && folder.kind === kind));
+    if (removed.length === 0) return;
+    setFolderIds((current) => ({ ...current, ...Object.fromEntries(removed.map((kind) => [kind, null])) }));
+    setMissingOnlyByKind((current) => ({ ...current, ...Object.fromEntries(removed.map((kind) => [kind, false])) }));
+  }, [mediaFolders, folderIds]);
+  const restoreFolderFocus = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    if (folderPrompt || !restoreFolderFocus.current) return;
+    const anchor = restoreFolderFocus.current;
+    restoreFolderFocus.current = null;
+    (anchor.isConnected ? anchor : panelHostRef.current)?.focus({ preventScroll: true });
+  }, [folderPrompt, mediaFolders]);
   const foldersDisabled = relinkDisabled || importPending || !onEditMediaFolder;
   function closeFolderPrompt() {
-    const anchor = folderPrompt?.anchor;
+    restoreFolderFocus.current = folderPrompt?.anchor ?? panelHostRef.current;
     setFolderPrompt(null);
-    if (anchor?.isConnected) anchor.focus({ preventScroll: true });
-    else panelHostRef.current?.focus({ preventScroll: true });
   }
   function setActiveMediaKind(activeKind: MediaKind) {
     if (preferenceMode.kind === "controlled") preferenceMode.onActiveKindChange(activeKind);
@@ -237,7 +243,7 @@ export function MediaPanel({
   const search = searchByKind[activeMediaKind];
   const storedPreferences = preferencesByKind[activeMediaKind];
   const preferences = { ...storedPreferences, thumbnailSize };
-  const missingOnly = missingOnlyByKind[activeMediaKind];
+  const missingOnly = folderIds[activeMediaKind] && !activeFolder ? false : missingOnlyByKind[activeMediaKind];
   const { sortKey, sortDirection, usageFilter } = preferences;
   const visibleMediaItems = useMemo(() => filterMediaItems(
     activeMediaItems.filter((media) => !activeFolderMembers || activeFolderMembers.has(media.id)), mediaUsageById, search, sortKey, sortDirection, usageFilter, fileInformation, missingOnly,
