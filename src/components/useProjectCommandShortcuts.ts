@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { FRAME_STACK_COMMANDS, matchProjectCommandShortcut } from "../application/projectCommandCatalog";
 import type { FrameStackAction } from "../domain/project";
 import { isTextEntryTarget } from "./isTextEntryTarget";
+import { ownsEditingKeys } from "./keyboardEventOwnership";
 
 const PROJECT_COMMAND_CONTEXT_ATTRIBUTE = "data-project-command-context";
 
@@ -14,16 +15,6 @@ function targetAllowsCommandShortcut(target: EventTarget | null, context: "sheet
   return (
     owner === null ||
     owner.dataset.projectCommandContext === context
-  );
-}
-
-function targetOwnsEditingKeys(target: EventTarget | null) {
-  if (isTextEntryTarget(target)) return true;
-  return (
-    target instanceof Element &&
-    target.closest(
-      '[role="dialog"], [role="menu"], [role="menubar"], [role="listbox"], [role="scrollbar"]',
-    ) !== null
   );
 }
 
@@ -90,18 +81,18 @@ export function useProjectCommandShortcuts({
     const handleProjectCommand = (event: KeyboardEvent) => {
       if (event.defaultPrevented) return;
       if (frameSelectionActive && targetAllowsCommandShortcut(event.target, "frame") &&
-          !targetOwnsEditingKeys(event.target) && matchProjectCommandShortcut(event, "frame") === "select-all") {
+          !ownsEditingKeys(event.target) && matchProjectCommandShortcut(event, "frame") === "select-all") {
         event.preventDefault();
         if (!event.repeat && !disabled) selectAllFrames();
         return;
       }
-      if (photoCommandActive && targetAllowsCommandShortcut(event.target, "frame") && !targetOwnsEditingKeys(event.target) &&
+      if (photoCommandActive && targetAllowsCommandShortcut(event.target, "frame") && !ownsEditingKeys(event.target) &&
           matchProjectCommandShortcut(event, "frame-photo") === "open-in-photoshop") {
         event.preventDefault();
         if (!disabled && !event.repeat) openPhotoInPhotoshop?.();
         return;
       }
-      if (frameClipboardActive && targetAllowsCommandShortcut(event.target, "frame") && !targetOwnsEditingKeys(event.target)) {
+      if (frameClipboardActive && targetAllowsCommandShortcut(event.target, "frame") && !ownsEditingKeys(event.target)) {
         const command = matchProjectCommandShortcut(event, "frame");
         if (command === "copy-frames" || command === "paste-frames") {
           event.preventDefault();
@@ -113,7 +104,7 @@ export function useProjectCommandShortcuts({
         }
       }
       if (frameCommandsActive && targetAllowsCommandShortcut(event.target, "frame") &&
-          !targetOwnsEditingKeys(event.target)) {
+          !ownsEditingKeys(event.target)) {
         const frameCommand = matchProjectCommandShortcut(event, "frame");
         if (frameCommand === "delete-frames") {
           event.preventDefault();
@@ -133,10 +124,11 @@ export function useProjectCommandShortcuts({
           ? matchProjectCommandShortcut(event, "sheet")
           : null);
       if (command === null) return;
-      if ((command === "new-project" || command === "open-project") && targetOwnsEditingKeys(event.target)) return;
+      if ((command === "new-project" || command === "open-project") && ownsEditingKeys(event.target)) return;
+      if (command === "delete-sheet" && ownsEditingKeys(event.target)) return;
       if (
         (command === "previous-sheet" || command === "next-sheet") &&
-        (!sheetNavigationActive || targetOwnsEditingKeys(event.target))
+        (!sheetNavigationActive || ownsEditingKeys(event.target))
       ) {
         return;
       }

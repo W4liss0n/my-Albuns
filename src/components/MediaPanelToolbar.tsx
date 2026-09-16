@@ -17,6 +17,7 @@ import {
   type MediaUsageFilter,
 } from "../state/mediaPanelPreferences";
 import { AppIcon, TextInput } from "../ui";
+import { projectCommandDescriptor } from "../application/projectCommandCatalog";
 import { useDismissableSurface } from "../ui/useDismissableSurface";
 
 interface MediaPanelToolbarProps {
@@ -131,12 +132,12 @@ export function MediaPanelToolbar({
             )
           }
         >
-          <span>{importPending ? "Processando…" : "Importar"}</span>
+          <span>{importPending ? "Processando…" : projectCommandDescriptor("import-media").label}</span>
           <AppIcon icon={ChevronDown} size={12} />
         </button>
         {openPopup === "import" && (
           <div
-            aria-label="Importar"
+            aria-label={projectCommandDescriptor("import-media").label}
             className="ui-floating-surface media-popup media-import-popup"
             role="menu"
           >
@@ -149,7 +150,7 @@ export function MediaPanelToolbar({
                 onImportMedia("files");
               }}
             >
-              Arquivos…
+              {projectCommandDescriptor("import-media-files").label}
             </button>
             <button
               disabled={importDisabled}
@@ -157,7 +158,7 @@ export function MediaPanelToolbar({
               type="button"
               onClick={() => { setOpenPopup(null); onImportMedia("folder"); }}
             >
-              Pasta…
+              {projectCommandDescriptor("import-media-folder").label}
             </button>
           </div>
         )}
@@ -199,10 +200,10 @@ export function MediaPanelToolbar({
             }}><span className="media-folder-name">{folder.name}</span><small>{folder.mediaIds.length}</small></button>)}
         </div>
         <button
-          aria-label="Nova pasta de organização"
+          aria-label={`${projectCommandDescriptor("create-media-folder").label} de organização`}
           className="media-folder-add"
           disabled={foldersDisabled}
-          title="Nova pasta"
+          title={projectCommandDescriptor("create-media-folder").label}
           aria-haspopup="dialog"
           onClick={(event) => { setOpenPopup(null); onCreateFolder(event.currentTarget); }}
           type="button"

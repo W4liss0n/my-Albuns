@@ -206,6 +206,10 @@ test("enters the centered Sheet Edit Mode with Enter and returns to normal mode 
   fireEvent.keyDown(outsideButton, { key: "Enter" });
   expect(view.result.current.canvasProps.mode).toEqual({ kind: "normal" });
 
+  for (const modifier of ["ctrlKey", "altKey", "metaKey", "shiftKey"]) {
+    fireEvent.keyDown(canvas, { key: "Enter", [modifier]: true });
+    expect(view.result.current.canvasProps.mode).toEqual({ kind: "normal" });
+  }
   fireEvent.keyDown(canvas, { key: "Enter" });
 
   expect(view.result.current.canvasProps.mode).toEqual({

@@ -854,6 +854,27 @@ function renderPanel() {
   );
 }
 
+test("an open media menu keeps selection shortcuts from executing behind it", async () => {
+  const remove = vi.fn();
+  const open = vi.fn();
+  render(<MediaPanel {...mediaPanelInteractions} mediaItems={mediaItems} mediaUsage={mediaUsage}
+    onFillPhoto={vi.fn()} previewSource={{ kind: "static" }} preferences={{ kind: "local" }}
+    onRemoveMedia={remove} photoshopAvailable onOpenInPhotoshop={open} />);
+  const photo = screen.getByRole("button", { name: /Retrato/ });
+  fireEvent.contextMenu(photo);
+  const menu = screen.getByRole("menu", { name: "Ações das imagens" });
+  const target = within(menu).getByRole("menuitem", { name: /Substituir Imagem/ });
+  fireEvent.keyDown(target, { key: "a", ctrlKey: true });
+  expect(screen.getByRole("button", { name: /Álbum 10/ })).toHaveAttribute("aria-pressed", "false");
+  fireEvent.keyDown(target, { key: "Delete" });
+  expect(remove).not.toHaveBeenCalled();
+  fireEvent.keyDown(target, { key: "e", ctrlKey: true });
+  expect(open).not.toHaveBeenCalled();
+  expect(menu).toBeInTheDocument();
+  fireEvent.click(within(menu).getByRole("menuitem", { name: /Remover/ }));
+  expect(remove).toHaveBeenCalledExactlyOnceWith(["photo-retrato"]);
+});
+
 test("Photoshop opens only one contextual Photo and never a multi-selection or Decorative", () => {
   const open = vi.fn();
   render(<MediaPanel {...mediaPanelInteractions} mediaItems={mediaItems} mediaUsage={mediaUsage}

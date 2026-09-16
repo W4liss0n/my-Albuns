@@ -968,6 +968,24 @@ test("routes implicit menu and explicit context actions to their intended Sheets
   ).not.toBeInTheDocument();
 });
 
+test("Delete in an explicit Sheet menu cannot remove the centered Sheet", async () => {
+  const physicalProjection = createThreeSheetProjection();
+  const core = projectCorePortWithApply(async () => physicalProjection);
+  vi.spyOn(core, "applyWithOutcome");
+  render(<ProjectWorkspace exportPipelinePort={exportPipelinePort}
+    projection={physicalProjection} projectCorePort={core} onProjectionChange={() => undefined} />);
+  fireEvent.click(screen.getByRole("button", { name: /Ir para Lâmina 02/u }));
+  act(() => canvasHarness.props?.onOpenSheetContextMenu?.("sheet-003", { x: 240, y: 180 }));
+  const menu = screen.getByRole("menu", { name: "Ações da Lâmina 03" });
+  await act(async () => { fireEvent.keyDown(within(menu).getByRole("menuitem", { name: "Excluir" }), { key: "Delete" }); });
+  expect(core.applyWithOutcome).not.toHaveBeenCalled();
+  expect(menu).toBeInTheDocument();
+  fireEvent.click(within(menu).getByRole("menuitem", { name: "Excluir" }));
+  await waitFor(() => expect(core.applyWithOutcome).toHaveBeenCalledExactlyOnceWith(
+    { kind: "deleteSheet", sheetId: "sheet-003" }, expect.any(Function),
+  ));
+});
+
 test("opens and dismisses an explicit Sheet context menu without navigating the Canvas", () => {
   const physicalProjection = createThreeSheetProjection();
   render(

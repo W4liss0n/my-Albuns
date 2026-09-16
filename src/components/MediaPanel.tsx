@@ -41,6 +41,7 @@ import { MediaDragGhost } from "./MediaDragGhost";
 import { MediaPanelToolbar } from "./MediaPanelToolbar";
 import { MediaPreviewCard } from "./MediaPreviewCard";
 import { isTextEntryTarget } from "./isTextEntryTarget";
+import { ownsEditingKeys } from "./keyboardEventOwnership";
 import { useMediaFileDrop } from "./useMediaFileDrop";
 import { useMediaDragGesture, type MediaDrag } from "./useMediaDragGesture";
 import "./MediaPanel.css";
@@ -529,7 +530,7 @@ export function MediaPanel({
   }
 
   function selectAllVisibleMedia(event: KeyboardEvent<HTMLElement>) {
-    if (folderPrompt || folderMenu || isTextEntryTarget(event.target)) return;
+    if (event.defaultPrevented || folderPrompt || folderMenu || contextMenu || ownsEditingKeys(event.target)) return;
     if (matchProjectCommandShortcut(event, "media-photo") === "open-in-photoshop") {
       event.preventDefault(); event.stopPropagation();
       const selected = selectedMediaIds.size === 1 ? [...selectedMediaIds][0] : null;
@@ -734,7 +735,7 @@ export function MediaPanel({
               panelHostRef.current?.focus({ preventScroll: true });
               onRelinkMedia(mediaId);
             }}>
-            Religar
+            {projectCommandDescriptor("relink-media").label}
           </button>
         )}
         <button type="button" role="menuitem" disabled={relinkDisabled || importPending}
@@ -744,7 +745,7 @@ export function MediaPanel({
             panelHostRef.current?.focus({ preventScroll: true });
             onReplaceMedia(mediaId);
           }}>
-          Substituir Imagem
+          {projectCommandDescriptor("replace-media").label}
         </button>
         {mediaItems.some((media) => selectedMediaIds.has(media.id) && media.kind === "photo") && <button type="button" role="menuitem"
           disabled={!photoshopAvailable || relinkDisabled || importPending || selectedMediaIds.size !== 1}
@@ -758,7 +759,7 @@ export function MediaPanel({
             if (anchor) setFolderPrompt({ kind: "move", mediaKind: activeMediaKind, anchor,
               mediaIds: [...selectedMediaIds], folderId: currentFolder?.id ?? activeFolders[0]?.id ?? null });
             setContextMenu(null);
-          }}>Mover para pasta…</button>}
+          }}>{projectCommandDescriptor("move-media-to-folder").label}</button>}
         <button type="button" role="menuitem" disabled={relinkDisabled || importPending || selectedMediaIds.size === 0}
           onClick={() => { setContextMenu(null); onRemoveMedia([...selectedMediaIds]); panelHostRef.current?.focus({ preventScroll: true }); }}>
           <span>{projectCommandDescriptor("remove-media").label}</span><kbd aria-hidden="true">{projectCommandShortcutLabel("remove-media")}</kbd>
@@ -769,11 +770,11 @@ export function MediaPanel({
         <button type="button" role="menuitem" disabled={foldersDisabled} onClick={() => {
           setFolderPrompt({ kind: "rename", folder: folderMenu.folder, anchor: folderMenu.anchor, mediaKind: activeMediaKind });
           setFolderMenu(null);
-        }}>Renomear…</button>
+        }}>{projectCommandDescriptor("rename-media-folder").label}</button>
         <button type="button" role="menuitem" disabled={foldersDisabled} onClick={() => {
           void onEditMediaFolder?.({ kind: "delete", folderId: folderMenu.folder.id });
           setFolderMenu(null); panelHostRef.current?.focus({ preventScroll: true });
-        }}>Excluir pasta</button>
+        }}>{projectCommandDescriptor("delete-media-folder").label}</button>
       </ContextMenuSurface>}
       {folderPrompt && onEditMediaFolder && <MediaFolderPopover prompt={folderPrompt} folders={mediaFolders}
         onSubmit={(edit) => foldersDisabled ? Promise.resolve(false) : onEditMediaFolder(edit)} onClose={closeFolderPrompt} />}

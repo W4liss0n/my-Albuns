@@ -6,6 +6,7 @@ export type ProjectCommandContext =
   | "sheet"
   | "frame"
   | "media-panel"
+  | "media-folder"
   | "frame-photo"
   | "media-photo";
 
@@ -240,6 +241,60 @@ const DEFINITIONS = [
     shortcuts: [shortcut("delete", "Delete")],
   }),
   command({
+    id: "import-media",
+    label: "Importar",
+    description: "Escolhe como importar imagens para a aba ativa do Painel.",
+    kind: "interface", contexts: ["media-panel"], availability: "implemented", shortcuts: [],
+  }),
+  command({
+    id: "import-media-files",
+    label: "Arquivos…",
+    description: "Importa os arquivos de imagem escolhidos para a aba ativa do Painel.",
+    kind: "application", contexts: ["media-panel"], availability: "implemented", shortcuts: [],
+  }),
+  command({
+    id: "import-media-folder",
+    label: "Pasta…",
+    description: "Importa as imagens da pasta escolhida para a aba ativa do Painel.",
+    kind: "application", contexts: ["media-panel"], availability: "implemented", shortcuts: [],
+  }),
+  command({
+    id: "relink-media",
+    label: "Religar",
+    description: "Religa a imagem ausente na pasta escolhida pelo usuário.",
+    kind: "application", contexts: ["media-panel"], availability: "implemented", shortcuts: [],
+  }),
+  command({
+    id: "replace-media",
+    label: "Substituir Imagem",
+    description: "Substitui o vínculo da imagem contextual por outro arquivo.",
+    kind: "application", contexts: ["media-panel"], availability: "implemented", shortcuts: [],
+  }),
+  command({
+    id: "create-media-folder",
+    label: "Nova pasta",
+    description: "Cria uma pasta de organização na aba ativa do Painel de imagens.",
+    kind: "domain", contexts: ["media-panel"], availability: "implemented", shortcuts: [],
+  }),
+  command({
+    id: "move-media-to-folder",
+    label: "Mover para pasta…",
+    description: "Organiza as imagens selecionadas na pasta escolhida.",
+    kind: "domain", contexts: ["media-panel"], availability: "implemented", shortcuts: [],
+  }),
+  command({
+    id: "rename-media-folder",
+    label: "Renomear…",
+    description: "Altera o nome da pasta de organização contextual.",
+    kind: "domain", contexts: ["media-folder"], availability: "implemented", shortcuts: [],
+  }),
+  command({
+    id: "delete-media-folder",
+    label: "Excluir pasta",
+    description: "Exclui a pasta de organização preservando suas imagens no Projeto.",
+    kind: "domain", contexts: ["media-folder"], availability: "implemented", shortcuts: [],
+  }),
+  command({
     id: "remove-media",
     label: "Remover",
     description: "Remove as imagens selecionadas na aba ativa do Painel.",
@@ -303,6 +358,15 @@ const DEFINITIONS = [
       implementedBinding("media-panel"),
     ],
     shortcuts: [shortcut("a", "Ctrl+A", { ctrlKey: true })],
+  }),
+  command({
+    id: "enter-sheet-editing",
+    label: "Editar Lâmina",
+    description: "Isola a Lâmina centralizada para editar seus Frames e Fotos.",
+    kind: "interface",
+    contexts: ["sheet"],
+    availability: "implemented",
+    shortcuts: [shortcut("enter", "Enter")],
   }),
   command({
     id: "previous-sheet",

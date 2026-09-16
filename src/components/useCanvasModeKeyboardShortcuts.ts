@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 
+import { matchProjectCommandShortcut } from "../application/projectCommandCatalog";
 import type { AlbumCanvasMode } from "./albumCanvasContract";
 import { isTextEntryTarget } from "./isTextEntryTarget";
 
@@ -27,7 +28,7 @@ export function useCanvasModeKeyboardShortcuts({
         return;
       }
       if (
-        event.key === "Enter" &&
+        matchProjectCommandShortcut(event, "sheet") === "enter-sheet-editing" &&
         mode.kind === "normal" &&
         !interactionBlocked &&
         implicitSheetId &&
