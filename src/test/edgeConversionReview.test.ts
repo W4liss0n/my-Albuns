@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
-import { createThreeSheetProjection } from "../test/projectFixtures";
-import { albumInformationConversionLosses, edgeConversionLoss, edgeConversionLossDescription } from "./edgeConversionReview";
-import { createAlbumInformationReview, albumInformationReviewEquals } from "./albumInformationReview";
+import { createThreeSheetProjection } from "./projectFixtures";
+import { albumInformationConversionLosses, edgeConversionLoss, edgeConversionLossDescription } from "../application/edgeConversionReview";
+import { createAlbumInformationReview, albumInformationReviewEquals } from "../application/albumInformationReview";
 
 const background = { kind: "custom", content: { kind: "color", rgb: "#123456" }, mapping: "side" } as const;
 const overlay = { kind: "custom", content: { kind: "media", mediaId: "overlay-1" }, mapping: "side" } as const;

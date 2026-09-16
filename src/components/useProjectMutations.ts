@@ -3,7 +3,7 @@ import type { MediaImportCompletion, MediaImportSelection, ImageProcessingProgre
 import { createLogInstanceId } from "../application/logging";
 import { useImageProcessing } from "./useImageProcessing";
 import { useEdgeConversionConfirmation } from "./useEdgeConversionConfirmation";
-import { edgeConversionLoss } from "../application/edgeConversionReview";
+import { edgeConversionLoss, type EdgeConversionLoss } from "../application/edgeConversionReview";
 import type { ProjectDialogPort } from "../application/projectDialogPort";
 import type { CanvasPhotoDropPoint } from "./albumCanvasContract";
 import type { PrepareImportedMedia } from "../application/mediaPreviews";
@@ -210,45 +210,68 @@ export function useProjectMutations({
 
   async function applyWithOutcome(intent: ProjectIntent) {
     const capturedProjection = projection;
-    let affectedFrameId: string | null = null;
-    let affectedSheetId: string | null = null;
-    let structuralIntentCancelled = false;
-    const completed = await runWithErrorFeedback(
-      async (port, latestProjection) => {
-        const effectiveProjection = latestProjection ?? capturedProjection;
-        let materializedIntent = intent;
-        if (
-          isSheetStructureIntent(intent) &&
-          (latestProjection !== null || intent.kind === "reorderSheet")
-        ) {
-          const materializedStructure = materializeSheetStructureIntent(
-            capturedProjection.state.album.sheets,
-            effectiveProjection.state.album.sheets,
-            intent,
-          );
-          if (materializedStructure === null) {
-            structuralIntentCancelled = true;
-            return effectiveProjection;
+    let confirmedLoss: EdgeConversionLoss | null = null;
+    for (;;) {
+      let affectedFrameId: string | null = null;
+      let affectedSheetId: string | null = null;
+      let structuralIntentCancelled = false;
+      let reviewRequired: EdgeConversionLoss | null = null;
+      const completed = await runWithErrorFeedback(
+        async (port, latestProjection) => {
+          const effectiveProjection = latestProjection ?? capturedProjection;
+          let materializedIntent = intent;
+          if (
+            isSheetStructureIntent(intent) &&
+            (latestProjection !== null || intent.kind === "reorderSheet")
+          ) {
+            const materializedStructure = materializeSheetStructureIntent(
+              capturedProjection.state.album.sheets,
+              effectiveProjection.state.album.sheets,
+              intent,
+            );
+            if (materializedStructure === null) {
+              structuralIntentCancelled = true;
+              return effectiveProjection;
+            }
+            materializedIntent = materializedStructure;
           }
-          materializedIntent = materializedStructure;
-        }
-        if (materializedIntent.kind === "convertEdgeSheet") {
-          const loss = edgeConversionLoss(effectiveProjection.state.album.sheets, materializedIntent.sheetId);
-          if (loss && !await confirmEdgeConversion(loss)) {
-            structuralIntentCancelled = true;
-            return effectiveProjection;
+          if (materializedIntent.kind === "convertEdgeSheet") {
+            const sheets = effectiveProjection.state.album.sheets;
+            const reviewedLoss = confirmedLoss;
+            // A previously reviewed shrink must not become an expansion after History.
+            if (reviewedLoss && sheets.find((sheet) => sheet.id === reviewedLoss.sheetId)?.activeSides !== "both") {
+              structuralIntentCancelled = true;
+              return effectiveProjection;
+            }
+            const loss = edgeConversionLoss(sheets, materializedIntent.sheetId);
+            if (loss && JSON.stringify(loss) !== JSON.stringify(reviewedLoss)) {
+              reviewRequired = loss;
+              return effectiveProjection;
+            }
           }
+          const result = await imageProcessing.run((publish) => port.applyWithOutcome(materializedIntent, publish));
+          affectedFrameId = result.affectedFrameId;
+          affectedSheetId = result.affectedSheetId;
+          return result.projection;
+        },
+      );
+      if (!completed || structuralIntentCancelled) return false;
+      if (reviewRequired) {
+        // Dialog owners can themselves need the mutation queue. Never hold it
+        // while awaiting a decision; revalidate the reviewed loss on reentry.
+        try {
+          if (!await confirmEdgeConversion(reviewRequired)) return false;
+        } catch (error: unknown) {
+          setMessage(messageFromError(error));
+          return false;
         }
-        const result = await imageProcessing.run((publish) => port.applyWithOutcome(materializedIntent, publish));
-        affectedFrameId = result.affectedFrameId;
-        affectedSheetId = result.affectedSheetId;
-        return result.projection;
-      },
-    );
-    if (structuralIntentCancelled) return false;
-    if (completed && affectedFrameId) onAffectedFrame(affectedFrameId);
-    if (completed && affectedSheetId) onAffectedSheet(affectedSheetId);
-    return completed;
+        confirmedLoss = reviewRequired;
+        continue;
+      }
+      if (affectedFrameId) onAffectedFrame(affectedFrameId);
+      if (affectedSheetId) onAffectedSheet(affectedSheetId);
+      return true;
+    }
   }
 
   function saveVisibleRevision() {

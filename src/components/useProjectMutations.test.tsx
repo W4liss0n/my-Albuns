@@ -588,17 +588,17 @@ function decoratedEdgeProjection() {
 const convertFirstEdge = { kind: "convertEdgeSheet", sheetId: "sheet-001" } as const;
 
 test.each(["confirmEdgeConversion", "cancelEdgeConversion"] as const)(
-  "serializes conversion decision %s before adjacent Undo", async (action) => {
+  "keeps the mutation queue free while awaiting conversion decision %s", async (action) => {
     const harness = conversionHarness();
     let completed!: Promise<boolean>;
     act(() => {
       completed = harness.result.current.applyWithOutcome(convertFirstEdge);
       harness.result.current.undo();
     });
-    expect(harness.present).toHaveBeenCalledWith({ kind: "edgeConversionConfirmation",
-      message: "O Background personalizado da página esquerda da Lâmina 1 será removido." });
+    await waitFor(() => expect(harness.present).toHaveBeenCalledWith({ kind: "edgeConversionConfirmation",
+      message: "O Background personalizado da página esquerda da Lâmina 1 será removido." }));
     expect(harness.apply).not.toHaveBeenCalled();
-    expect(harness.undo).not.toHaveBeenCalled();
+    await waitFor(() => expect(harness.undo).toHaveBeenCalledOnce());
     await act(async () => {
       harness.emit(action);
       harness.emit(action);
@@ -639,6 +639,7 @@ test.each(["unmount", "projectChange"])("releases a pending conversion on %s and
   const harness = conversionHarness();
   let completed!: Promise<boolean>;
   act(() => { completed = harness.result.current.applyWithOutcome(convertFirstEdge); });
+  await waitFor(() => expect(harness.present).toHaveBeenCalledOnce());
   if (reason === "unmount") harness.unmount(); else {
     const next = decoratedEdgeProjection(); next.state.projectId = "different-project";
     harness.rerender({ projection: next });
@@ -683,4 +684,36 @@ test("Album information re-reviews newly discarded content after queued Undo, th
   });
   expect(harness.apply).toHaveBeenCalledOnce();
   expect(harness.present).not.toHaveBeenCalled();
+});
+
+test("rechecks changed discarded applications after confirmation without blocking History", async () => {
+  const harness = conversionHarness();
+  const latest = decoratedEdgeProjection();
+  latest.state.album.sheets[0].visuals = { background: { kind: "default" },
+    overlay: { kind: "perSide", left: { kind: "custom", content: { kind: "media", mediaId: "new-overlay" }, mapping: "side" }, right: { kind: "default" } } };
+  harness.undo.mockResolvedValueOnce(latest);
+  let completed!: Promise<boolean>;
+  act(() => { completed = harness.result.current.applyWithOutcome(convertFirstEdge); });
+  await waitFor(() => expect(harness.present).toHaveBeenCalledOnce());
+  await act(async () => { harness.result.current.undo(); });
+  await act(async () => { harness.emit("confirmEdgeConversion"); });
+  await waitFor(() => expect(harness.present).toHaveBeenCalledTimes(2));
+  expect(harness.present).toHaveBeenLastCalledWith({ kind: "edgeConversionConfirmation",
+    message: "O Overlay personalizado da página esquerda da Lâmina 1 será removido." });
+  expect(harness.apply).not.toHaveBeenCalled();
+  await act(async () => { harness.emit("confirmEdgeConversion"); expect(await completed).toBe(true); });
+  expect(harness.apply).toHaveBeenCalledOnce();
+});
+
+test("does not reverse a conversion that another queued action already satisfied", async () => {
+  const harness = conversionHarness();
+  const alreadySingle = decoratedEdgeProjection();
+  alreadySingle.state.album.sheets[0].activeSides = "right";
+  harness.undo.mockResolvedValueOnce(alreadySingle);
+  let completed!: Promise<boolean>;
+  act(() => { completed = harness.result.current.applyWithOutcome(convertFirstEdge); });
+  await waitFor(() => expect(harness.present).toHaveBeenCalledOnce());
+  await act(async () => { harness.result.current.undo(); });
+  await act(async () => { harness.emit("confirmEdgeConversion"); expect(await completed).toBe(false); });
+  expect(harness.apply).not.toHaveBeenCalled();
 });
