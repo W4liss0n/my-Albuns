@@ -287,6 +287,7 @@ function toSaveProjectResult(value: unknown): ApplicationSaveProjectResult {
 export const tauriProjectCorePort: ProjectCorePort = {
   readFrameDragThreshold: () => invoke<PointerDragThreshold>("frame_drag_threshold"),
   readSliderDoubleClickTime: () => invoke<number>("slider_double_click_time"),
+  previewPhotoZoom: (edit) => invoke<ComposedFrame[]>("preview_photo_zoom", { edit }),
   previewPhotoAngle: (edit) => invoke<ComposedFrame[]>("preview_photo_angle", { edit }),
   previewDecorativeDrop: (request) => invoke<import("../domain/project").DecorativeDropPreview | null>("preview_decorative_drop", { request }),
   previewFrameStyle: (edit) => invoke<ComposedFrame[]>("preview_frame_style", { edit }),

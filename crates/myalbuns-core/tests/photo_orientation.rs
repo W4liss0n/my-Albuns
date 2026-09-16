@@ -62,6 +62,149 @@ fn orient(project: &mut EditableProject, frame_ids: Vec<String>, action: PhotoOr
 }
 
 #[test]
+fn batch_zoom_preserves_other_properties_and_shares_preview_history_and_persistence() {
+    use myalbuns_core::PhotoZoomEdit;
+    let root = tempfile::tempdir().unwrap();
+    let mut project = mixed_project(root.path());
+    let ids: Vec<_> = project.projection().state.album.sheets[0]
+        .frames
+        .iter()
+        .map(|frame| frame.id.clone())
+        .collect();
+    orient(
+        &mut project,
+        vec![ids[0].clone()],
+        PhotoOrientationAction::RotateCounterClockwise,
+    );
+    orient(
+        &mut project,
+        vec![ids[0].clone()],
+        PhotoOrientationAction::ToggleHorizontalMirror,
+    );
+    project
+        .apply(ProjectIntent::SetPhotoAngle {
+            edit: myalbuns_core::PhotoAngleEdit {
+                frame_ids: vec![ids[0].clone()],
+                angle_tenths: -123,
+            },
+        })
+        .unwrap();
+    project
+        .apply(ProjectIntent::TogglePhotoBlackAndWhite {
+            frame_ids: vec![ids[0].clone()],
+        })
+        .unwrap();
+    project
+        .apply(ProjectIntent::TransformPhoto {
+            frame_id: ids[0].clone(),
+            delta_pan_x: 0.4,
+            delta_pan_y: -0.3,
+            delta_zoom: 0.5,
+        })
+        .unwrap();
+    let before = project.projection();
+    let edit = PhotoZoomEdit {
+        frame_ids: ids.clone(),
+        user_zoom: 1.75,
+    };
+    let preview = project.preview_photo_zoom(&edit).unwrap();
+    assert_eq!(project.projection(), before);
+    project
+        .apply(ProjectIntent::SetPhotoZoom { edit: edit.clone() })
+        .unwrap();
+    let after = project.projection();
+    assert_eq!(after.state.revision, before.state.revision + 1);
+    assert_eq!(preview, after.composition.sheets[0].frames);
+    for (old, new) in before.state.album.sheets[0]
+        .frames
+        .iter()
+        .zip(&after.state.album.sheets[0].frames)
+    {
+        let mut expected = old.clone();
+        if let Some(photo) = &mut expected.photo {
+            photo.transform.user_zoom = 1.75;
+        }
+        assert_eq!(&expected, new);
+    }
+    assert_eq!(project.undo().unwrap().state.album, before.state.album);
+    assert_eq!(project.redo().unwrap().state.album, after.state.album);
+    project.apply(ProjectIntent::SetPhotoZoom { edit }).unwrap();
+    assert_eq!(project.projection(), after);
+    project.undo().unwrap();
+    let redo_available = project.projection();
+    project
+        .apply(ProjectIntent::SetPhotoZoom {
+            edit: PhotoZoomEdit {
+                frame_ids: vec![ids[2].clone()],
+                user_zoom: 2.0,
+            },
+        })
+        .unwrap();
+    assert_eq!(project.projection(), redo_available);
+    project.redo().unwrap();
+    project.save(project.revision()).unwrap();
+    drop(project);
+    let mut reopened = core(root.path())
+        .open_editable(OpenProjectRequest::new(location(
+            &root.path().join("Orientação.myalbuns"),
+        )))
+        .unwrap();
+    let media = after.state.album.sheets[0].frames[0]
+        .photo
+        .as_ref()
+        .unwrap()
+        .media_id;
+    reopened
+        .observe_photo_source(
+            media,
+            PhotoSourceMetadata::new(
+                600,
+                400,
+                ["#C22C24", "#248044", "#2454C2"].map(String::from),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    assert_eq!(reopened.projection().state.album, after.state.album);
+    assert_eq!(reopened.render_snapshot().composition, after.composition);
+    assert_eq!(
+        fs::read(root.path().join("Foto.jpg")).unwrap(),
+        b"original unchanged"
+    );
+}
+
+#[test]
+fn batch_zoom_rejects_invalid_values_and_selections_atomically() {
+    use myalbuns_core::PhotoZoomEdit;
+    let root = tempfile::tempdir().unwrap();
+    let mut project = mixed_project(root.path());
+    let before = project.projection();
+    let id = before.state.album.sheets[0].frames[0].id.clone();
+    let mut edits: Vec<_> = [f32::NAN, f32::INFINITY, 0.99, 4.01]
+        .into_iter()
+        .map(|user_zoom| PhotoZoomEdit {
+            frame_ids: vec![id.clone()],
+            user_zoom,
+        })
+        .collect();
+    for frame_ids in [
+        vec![],
+        vec![id.clone(), id.clone()],
+        vec![id, "missing".into()],
+    ] {
+        edits.push(PhotoZoomEdit {
+            frame_ids,
+            user_zoom: 2.0,
+        });
+    }
+    for edit in edits {
+        assert!(project.preview_photo_zoom(&edit).is_err());
+        assert!(project.apply(ProjectIntent::SetPhotoZoom { edit }).is_err());
+        assert_eq!(project.projection(), before);
+    }
+}
+
+#[test]
 fn black_and_white_is_per_photo_and_mixed_selection_makes_one_reversible_choice() {
     let root = tempfile::tempdir().unwrap();
     let mut project = mixed_project(root.path());
@@ -1162,9 +1305,50 @@ fn public_orientation_projections_match_the_visual_corpus() {
         effect_transitions
             .push(serde_json::json!({ "from": from, "to": to, "frameIds": selected }));
     }
+    project
+        .apply(ProjectIntent::TogglePhotoBlackAndWhite {
+            frame_ids: ids.clone(),
+        })
+        .unwrap();
+    assert_eq!(
+        serde_json::to_value(project.projection().state.album).unwrap(),
+        states["neutral"]["state"]["album"]
+    );
+    let mut zoom_transitions = Vec::new();
+    let mut zoom_previews = Vec::new();
+    for (from, to, selected, user_zoom) in [
+        ("neutral", "single-zoom", &single, 1.5),
+        ("single-zoom", "group-zoom", &ids, 1.75),
+        ("group-zoom", "group-zoom-two", &ids, 2.0),
+        ("group-zoom-two", "neutral", &ids, 1.0),
+    ] {
+        for value in [1.0, 1.5, 1.75, 2.0, 4.0] {
+            let edit = myalbuns_core::PhotoZoomEdit {
+                frame_ids: ids.clone(),
+                user_zoom: value,
+            };
+            let frames = project.preview_photo_zoom(&edit).unwrap();
+            zoom_previews.push(serde_json::json!({"from": from, "edit": edit, "frames": frames}));
+        }
+        let edit = myalbuns_core::PhotoZoomEdit {
+            frame_ids: selected.clone(),
+            user_zoom,
+        };
+        project
+            .apply(ProjectIntent::SetPhotoZoom { edit: edit.clone() })
+            .unwrap();
+        let next = serde_json::to_value(project.projection()).unwrap();
+        if let Some(existing) = states.get(to) {
+            assert_eq!(existing["state"]["album"], next["state"]["album"]);
+        } else {
+            states.insert(to.into(), next);
+        }
+        zoom_transitions.push(serde_json::json!({"from": from, "to": to, "edit": edit}));
+    }
     let mut text = serde_json::to_string(
         &serde_json::json!({"states": states, "transitions": transitions,
         "angleTransitions": angle_transitions, "anglePreviews": angle_previews,
+        "zoomTransitions": zoom_transitions, "zoomPreviews": zoom_previews,
         "effectTransitions": effect_transitions,
         "single": single, "group": ids, "placeholders": [ids[2]]}),
     )

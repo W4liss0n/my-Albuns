@@ -183,6 +183,13 @@ impl PersistentProjectSession {
             }
             return Ok(outcome);
         }
+        if let ProjectIntent::SetPhotoZoom { edit } = &intent {
+            let next = self.project().with_photo_zoom(edit)?;
+            if next != *self.project() {
+                self.commit_edit(|_| Ok(next))?;
+            }
+            return Ok(outcome);
+        }
         if let ProjectIntent::SetPhotoAngle { edit } = &intent {
             let next = self.project().with_photo_angle(edit)?;
             if next != *self.project() {
@@ -336,6 +343,9 @@ impl PersistentProjectSession {
             }
             ProjectIntent::TogglePhotoBlackAndWhite { .. } => {
                 unreachable!("Photo effects handle unchanged selections before committing")
+            }
+            ProjectIntent::SetPhotoZoom { .. } => {
+                unreachable!("Photo zoom handles unchanged compositions before committing")
             }
             ProjectIntent::SetPhotoAngle { .. } => {
                 unreachable!("Photo angle handles unchanged compositions before committing")

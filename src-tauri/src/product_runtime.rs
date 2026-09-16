@@ -282,6 +282,7 @@ pub(crate) fn run(
             crate::project_commands::preview_decorative_drop,
             crate::project_commands::preview_frame_geometry,
             crate::project_commands::preview_photo_angle,
+            crate::project_commands::preview_photo_zoom,
             crate::project_commands::preview_frame_style,
             crate::project_commands::query_layouts,
             crate::layout_commands::refresh_layout_catalog,

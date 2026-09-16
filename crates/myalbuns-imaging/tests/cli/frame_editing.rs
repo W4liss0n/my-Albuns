@@ -115,6 +115,169 @@ fn assert_color(image: &RgbImage, x: u32, y: u32, expected: [u8; 3]) {
 }
 
 #[test]
+fn batch_photo_zoom_with_styles_and_effects_keeps_jpeg_through_undo_and_reopening() {
+    use myalbuns_core::{FrameStyleChange, FrameStyleEdit, PhotoAngleEdit, PhotoZoomEdit};
+    let root = tempfile::tempdir().unwrap();
+    let source_path = root.path().join("quadrants.png");
+    RgbImage::from_fn(120, 80, |x, y| {
+        Rgb(match (x < 60, y < 40) {
+            (true, true) => [210, 30, 20],
+            (false, true) => [20, 60, 210],
+            (true, false) => [30, 190, 40],
+            (false, false) => [240, 190, 30],
+        })
+    })
+    .save(&source_path)
+    .unwrap();
+    let original = std::fs::read(&source_path).unwrap();
+    let path = root.path().join("Transformacoes.myalbuns");
+    let core = ProjectCore::new()
+        .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"));
+    let mut project = core
+        .create_editable(CreateProjectRequest::new(
+            location(&path),
+            InitialProject::configured(InitialProjectConfiguration::new(
+                DisplayUnit::Mm,
+                101_600,
+                50_800,
+                100,
+                0,
+                0,
+                2,
+                EndSheetFormat::Double,
+                EndSheetFormat::Double,
+            )),
+            CreateAuthorization::CreateOnly,
+        ))
+        .unwrap();
+    let metadata =
+        PhotoSourceMetadata::new(120, 80, ["#D21E14", "#143CD2", "#FFFFFF"].map(String::from))
+            .unwrap();
+    let imported = project
+        .import_photo(ImportPhoto::new(source_path.clone(), metadata.clone()))
+        .unwrap();
+    let sheet_id = imported.projection.state.album.sheets[0].id.clone();
+    for _ in 0..2 {
+        project
+            .apply(ProjectIntent::AddPhoto {
+                sheet_id: sheet_id.clone(),
+                media_id: imported.media_id,
+                mode: PhotoPlacementMode::Normal,
+            })
+            .unwrap();
+    }
+    project.apply(ProjectIntent::AddFrame { sheet_id }).unwrap();
+    let ids: Vec<_> = project.projection().state.album.sheets[0]
+        .frames
+        .iter()
+        .map(|f| f.id.clone())
+        .collect();
+    for change in [
+        FrameStyleChange::BorderWidth { width_um: 2_000 },
+        FrameStyleChange::BorderColor {
+            rgb: "#D21E14".into(),
+        },
+        FrameStyleChange::Opacity {
+            opacity_percent: 65,
+        },
+    ] {
+        project
+            .apply(ProjectIntent::SetFrameStyle {
+                edit: FrameStyleEdit {
+                    frame_ids: ids.clone(),
+                    change,
+                },
+            })
+            .unwrap();
+    }
+    for action in [
+        PhotoOrientationAction::RotateCounterClockwise,
+        PhotoOrientationAction::ToggleHorizontalMirror,
+    ] {
+        project
+            .apply(ProjectIntent::OrientPhotos {
+                frame_ids: ids.clone(),
+                action,
+            })
+            .unwrap();
+    }
+    project
+        .apply(ProjectIntent::SetPhotoAngle {
+            edit: PhotoAngleEdit {
+                frame_ids: ids.clone(),
+                angle_tenths: 123,
+            },
+        })
+        .unwrap();
+    project
+        .apply(ProjectIntent::TogglePhotoBlackAndWhite {
+            frame_ids: ids.clone(),
+        })
+        .unwrap();
+    project
+        .apply(ProjectIntent::TransformPhoto {
+            frame_id: ids[0].clone(),
+            delta_pan_x: 0.4,
+            delta_pan_y: -0.3,
+            delta_zoom: 0.5,
+        })
+        .unwrap();
+    let source = RenderSource::new(imported.media_id, source_path.clone()).unwrap();
+    let before = project.projection();
+    let before_jpeg = export_jpeg(
+        project.render_snapshot(),
+        source.clone(),
+        &root.path().join("before.jpg"),
+    );
+    project
+        .apply(ProjectIntent::SetPhotoZoom {
+            edit: PhotoZoomEdit {
+                frame_ids: ids,
+                user_zoom: 1.75,
+            },
+        })
+        .unwrap();
+    let after = project.projection();
+    let after_jpeg = export_jpeg(
+        project.render_snapshot(),
+        source.clone(),
+        &root.path().join("after.jpg"),
+    );
+    assert_ne!(
+        before_jpeg, after_jpeg,
+        "Zoom must reach the productive JPEG renderer"
+    );
+    assert_eq!(project.undo().unwrap().state.album, before.state.album);
+    assert_eq!(
+        export_jpeg(
+            project.render_snapshot(),
+            source.clone(),
+            &root.path().join("undo.jpg")
+        ),
+        before_jpeg
+    );
+    assert_eq!(project.redo().unwrap().state.album, after.state.album);
+    project.save(project.revision()).unwrap();
+    drop(project);
+    let mut reopened = core
+        .open_editable(OpenProjectRequest::new(location(&path)))
+        .unwrap();
+    reopened
+        .observe_photo_source(imported.media_id, metadata)
+        .unwrap();
+    assert_eq!(reopened.projection().state.album, after.state.album);
+    assert_eq!(
+        export_jpeg(
+            reopened.render_snapshot(),
+            source,
+            &root.path().join("reopened.jpg")
+        ),
+        after_jpeg
+    );
+    assert_eq!(std::fs::read(source_path).unwrap(), original);
+}
+
+#[test]
 fn edited_frames_keep_crop_and_stack_through_history_save_reopen_and_jpeg() {
     let root = tempfile::tempdir().unwrap();
     let source_path = root.path().join("original.png");

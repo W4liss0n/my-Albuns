@@ -290,6 +290,7 @@ export interface ProjectCorePort {
   readFrameDragThreshold(): Promise<PointerDragThreshold>;
   readSliderDoubleClickTime(): Promise<number>;
   previewPhotoAngle(edit: PhotoAngleEdit): Promise<ComposedFrame[]>;
+  previewPhotoZoom(edit: import("../domain/project").PhotoZoomEdit): Promise<ComposedFrame[]>;
   previewFrameStyle(edit: FrameStyleEdit): Promise<ComposedFrame[]>;
   queryLayouts(sheetId: string, frameRequest?: LayoutFrameRequest): Promise<LayoutQueryResult>;
   previewLayout(selection: LayoutSelection): Promise<ComposedFrame[]>;

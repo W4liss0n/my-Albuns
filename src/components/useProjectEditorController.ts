@@ -172,7 +172,14 @@ export function useProjectEditorController({
     commit: (frameIds, change) => mutations.commitFrameStyle({ frameIds, change }),
     onError: reportInteractionError,
   });
-  const flushPropertyDrafts = () => { void photoAngle.commit(); void frameStyle.commit(); };
+  const photoZoom = useFrameCompositionDraft<number>({
+    projection, frameIds: navigation.selectedFrameIds, disabled: !canOrientPhotos,
+    session: projectCorePort, runner: runProjectMutation,
+    resolve: (frameIds, percent) => projectCorePort.previewPhotoZoom({ frameIds, userZoom: percent / 100 }),
+    commit: (frameIds, percent) => mutations.commitPhotoZoom({ frameIds, userZoom: percent / 100 }),
+    onError: reportInteractionError,
+  });
+  const flushPropertyDrafts = () => { void photoAngle.commit(); void frameStyle.commit(); void photoZoom.commit(); };
   const layoutCatalog = useLayoutCatalog({ projection, runner: runProjectMutation,
     port: projectCorePort, dialogPort: projectDialogPort, onError: reportInteractionError });
   const canSaveLayout = canvasMode.kind === "sheet-editing" && !interactionBlocked && !layoutCatalog.busy &&
@@ -320,7 +327,8 @@ export function useProjectEditorController({
     mode: canvasMode.kind === "normal" && layoutPanel.visible && layoutPanel.sheetId
       ? { kind: "normal", isolatedSheetId: layoutPanel.sheetId } : canvasMode,
     composition: layoutPanel.composition !== projection.composition ? layoutPanel.composition
-      : frameStyle.composition !== projection.composition ? frameStyle.composition : photoAngle.composition,
+      : frameStyle.composition !== projection.composition ? frameStyle.composition
+      : photoZoom.composition !== projection.composition ? photoZoom.composition : photoAngle.composition,
     sheetBarMetadata: projection.state.album.sheets.map((sheet) => ({
       sheetId: sheet.id,
       pageNumbers: sheet.pageNumbers,
@@ -453,9 +461,17 @@ export function useProjectEditorController({
       doubleClickTimeMs,
       dragThreshold,
       settlement: frameStyle.settlement,
-      onPreview: (change: FrameStyleChange) => { void photoAngle.commit(); frameStyle.preview(change); },
-      onCommit: (change?: FrameStyleChange) => { void photoAngle.commit(); void frameStyle.commit(change); },
+      onPreview: (change: FrameStyleChange) => { void photoAngle.commit(); void photoZoom.commit(); frameStyle.preview(change); },
+      onCommit: (change?: FrameStyleChange) => { void photoAngle.commit(); void photoZoom.commit(); void frameStyle.commit(change); },
       onCancel: frameStyle.cancel,
+    },
+    photoZoom: {
+      disabled: !canOrientPhotos,
+      scopeKey: photoZoom.scopeKey,
+      doubleClickTimeMs, dragThreshold, settlement: photoZoom.settlement,
+      onPreview: (percent: number) => { void photoAngle.commit(); void frameStyle.commit(); photoZoom.preview(percent); },
+      onCommit: (percent: number) => { void photoAngle.commit(); void frameStyle.commit(); void photoZoom.commit(percent); },
+      onCancel: photoZoom.cancel,
     },
     photoAngle: {
       disabled: !canOrientPhotos,
@@ -463,8 +479,8 @@ export function useProjectEditorController({
       doubleClickTimeMs,
       dragThreshold,
       settlement: photoAngle.settlement,
-      onPreview: (angleTenths: number) => { void frameStyle.commit(); photoAngle.preview(angleTenths); },
-      onCommit: (angleTenths: number) => { void frameStyle.commit(); void photoAngle.commit(angleTenths); },
+      onPreview: (angleTenths: number) => { void frameStyle.commit(); void photoZoom.commit(); photoAngle.preview(angleTenths); },
+      onCommit: (angleTenths: number) => { void frameStyle.commit(); void photoZoom.commit(); void photoAngle.commit(angleTenths); },
       onCancel: photoAngle.cancel,
     },
     canOrientPhotos,

@@ -87,6 +87,7 @@ pub(crate) async fn apply_project_intent(
         ProjectIntent::ReorderSheet { .. } => "reorder_sheet",
         ProjectIntent::TransformPhoto { .. } => "transform_photo",
         ProjectIntent::OrientPhotos { .. } => "orient_photos",
+        ProjectIntent::SetPhotoZoom { .. } => "set_photo_zoom",
         ProjectIntent::SetPhotoAngle { .. } => "set_photo_angle",
         ProjectIntent::SetFrameStyle { .. } => "set_frame_style",
         ProjectIntent::TogglePhotoBlackAndWhite { .. } => "toggle_photo_black_and_white",
@@ -234,6 +235,18 @@ pub(crate) fn photo_drop_target(
         return Err("O alvo da Foto só pode ser consultado na Janela do Projeto.".into());
     }
     state.project_photo_drop_target(&sheet_id, x_um, y_um)
+}
+
+#[tauri::command]
+pub(crate) async fn preview_photo_zoom(
+    edit: myalbuns_core::PhotoZoomEdit,
+    window: WebviewWindow,
+    state: State<'_, ProjectHost>,
+) -> Result<Vec<myalbuns_core::ComposedFrame>, String> {
+    if window.label() != PROJECT_WINDOW_LABEL {
+        return Err("O Zoom da Foto só pode ser consultado na Janela do Projeto.".into());
+    }
+    state.preview_photo_zoom(&edit)
 }
 
 #[tauri::command]

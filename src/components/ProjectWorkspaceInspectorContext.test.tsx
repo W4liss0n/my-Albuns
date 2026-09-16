@@ -68,6 +68,7 @@ const projectCorePort: ProjectCorePort = {
     previewLayout: async () => { throw new Error("Layouts are not configured in this fixture."); },
     previewFrameStyle: async () => { throw new Error("Frame style preview is not configured in this fixture."); },
     previewDecorativeDrop: async () => { throw new Error("Decorative preview is not configured in this fixture."); },
+    previewPhotoZoom: async () => { throw new Error("Photo Zoom preview is not configured in this fixture."); },
     previewPhotoAngle: async () => { throw new Error("Photo angle preview is not configured in this fixture."); },
     previewFrameGeometry: async () => { throw new Error("Frame geometry preview is not configured in this fixture."); },
   resolvePhotoDropTarget: async () => ({ kind: "invalid" }),
@@ -147,7 +148,7 @@ test("derives Album, Sheet and Frame Inspector contexts from the editing state",
   act(() => canvasHarness.props?.onSelectFrame("frame-002", true));
   expect(screen.getByRole("heading", { name: "2 Frames selecionados" })).toBeInTheDocument();
   expect(screen.getByText("1 Foto · 1 placeholder")).toBeInTheDocument();
-  expect(screen.queryByRole("slider", { name: "Zoom da Foto" })).not.toBeInTheDocument();
+  expect(screen.getByRole("slider", { name: "Zoom da Foto" })).toBeEnabled();
   expect(screen.queryByRole("button", { name: "Design da Lâmina" })).not.toBeInTheDocument();
   expect(canvasHarness.props?.selectedFrameIds).toEqual(["frame-001", "frame-002"]);
   act(() => canvasHarness.props?.onSelectFrame("frame-002", true));

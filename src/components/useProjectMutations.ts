@@ -165,6 +165,16 @@ export function useProjectMutations({
     );
   }
 
+  async function commitPhotoZoom(edit: import("../domain/project").PhotoZoomEdit): Promise<EditorProjection | null> {
+    let committed: EditorProjection | null = null;
+    await runWithErrorFeedback(
+      (port) => imageProcessing.run((publish) => port.apply({ kind: "setPhotoZoom", edit }, publish)),
+      true,
+      (next) => { committed = next; },
+    );
+    return committed;
+  }
+
   async function commitPhotoAngle(edit: PhotoAngleEdit): Promise<EditorProjection | null> {
     let committed: EditorProjection | null = null;
     await runWithErrorFeedback(
@@ -492,6 +502,7 @@ export function useProjectMutations({
     orientPhotos,
     togglePhotoBlackAndWhite,
     commitPhotoAngle,
+    commitPhotoZoom,
     commitFrameStyle,
     applyAlbumInformation: commitAlbumInformation,
     applyAlbumDesign: (draft: AlbumDesignProjectDraft) =>

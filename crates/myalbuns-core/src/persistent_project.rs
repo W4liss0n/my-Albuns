@@ -705,6 +705,18 @@ impl EditableProject {
         Ok(self.preview_frame_composition(candidate, &edit.frame_ids))
     }
 
+    /// Resolves absolute Photo Zoom without changing revision, History or originals.
+    pub fn preview_photo_zoom(
+        &self,
+        edit: &crate::PhotoZoomEdit,
+    ) -> Result<Vec<crate::ComposedFrame>, CoreError> {
+        if !self.session_valid {
+            return Err(CoreError::EditableSessionInvalidated);
+        }
+        let candidate = self.project().with_photo_zoom(edit)?;
+        Ok(self.preview_frame_composition(candidate, &edit.frame_ids))
+    }
+
     /// Resolves a Photo-angle draft through the productive document and composer.
     /// No revision, History entry or source file is changed by this preview.
     pub fn preview_photo_angle(

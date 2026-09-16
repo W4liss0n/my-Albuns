@@ -792,6 +792,7 @@ export function ProjectWorkspace({
             feedback: noticeInInspector ? layoutNotice : null }}
           key={projectId}
           frameStyle={controller.frameStyle}
+          photoZoom={controller.photoZoom}
           sheetDesign={controller.sheetDesign}
           photoOrientation={{ disabled: !controller.canOrientPhotos,
             onAction: (action) => { void controller.orientPhotos(action); }, angle: controller.photoAngle }}
