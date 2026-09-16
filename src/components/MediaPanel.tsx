@@ -530,6 +530,12 @@ export function MediaPanel({
   }
 
   function selectAllVisibleMedia(event: KeyboardEvent<HTMLElement>) {
+    if ((folderMenu || contextMenu) && !isTextEntryTarget(event.target) &&
+        (matchProjectCommandShortcut(event, "media-panel") || matchProjectCommandShortcut(event, "media-photo"))) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     if (event.defaultPrevented || folderPrompt || folderMenu || contextMenu || ownsEditingKeys(event.target)) return;
     if (matchProjectCommandShortcut(event, "media-photo") === "open-in-photoshop") {
       event.preventDefault(); event.stopPropagation();

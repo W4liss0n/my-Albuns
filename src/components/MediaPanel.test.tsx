@@ -864,7 +864,7 @@ test("an open media menu keeps selection shortcuts from executing behind it", as
   fireEvent.contextMenu(photo);
   const menu = screen.getByRole("menu", { name: "Ações das imagens" });
   const target = within(menu).getByRole("menuitem", { name: /Substituir Imagem/ });
-  fireEvent.keyDown(target, { key: "a", ctrlKey: true });
+  expect(fireEvent.keyDown(target, { key: "a", ctrlKey: true })).toBe(false);
   expect(screen.getByRole("button", { name: /Álbum 10/ })).toHaveAttribute("aria-pressed", "false");
   fireEvent.keyDown(target, { key: "Delete" });
   expect(remove).not.toHaveBeenCalled();
@@ -886,6 +886,7 @@ test.each(["Importar", "Filtro, ordem e tamanho"])("the open %s popup owns short
   await user.click(photo);
   const trigger = screen.getByRole("button", { name: label });
   await user.click(trigger);
+  expect(fireEvent.keyDown(trigger, { key: "a", ctrlKey: true })).toBe(false);
   await user.keyboard("{Control>}a{/Control}{Delete}{Control>}e{/Control}");
   expect(screen.getByRole("button", { name: /Álbum 10/ })).toHaveAttribute("aria-pressed", "false");
   expect(remove).not.toHaveBeenCalled();

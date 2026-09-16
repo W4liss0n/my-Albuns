@@ -17,7 +17,8 @@ import {
   type MediaUsageFilter,
 } from "../state/mediaPanelPreferences";
 import { AppIcon, TextInput } from "../ui";
-import { projectCommandDescriptor } from "../application/projectCommandCatalog";
+import { matchProjectCommandShortcut, projectCommandDescriptor } from "../application/projectCommandCatalog";
+import { isTextEntryTarget } from "./isTextEntryTarget";
 import { useDismissableSurface } from "../ui/useDismissableSurface";
 
 interface MediaPanelToolbarProps {
@@ -94,7 +95,11 @@ export function MediaPanelToolbar({
 
   return (
     <div className="media-toolbar" ref={rootRef} onKeyDown={(event) => {
-      if (openPopup !== null && event.key !== "Escape") event.stopPropagation();
+      if (openPopup !== null && event.key !== "Escape") {
+        if (!isTextEntryTarget(event.target) &&
+            (matchProjectCommandShortcut(event, "media-panel") || matchProjectCommandShortcut(event, "media-photo"))) event.preventDefault();
+        event.stopPropagation();
+      }
     }}>
       <div aria-label="Tipo de recurso" className="media-tabs" role="group">
         <button
