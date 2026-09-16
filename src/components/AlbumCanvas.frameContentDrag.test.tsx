@@ -60,6 +60,7 @@ test.each(["release", "escape", "projection", "unmount", "zoom-pending"])("the g
 test.each([
   { frameIndex: 0, width: 600, height: 400, ghostWidth: 80, ghostHeight: 80 / 1.5 },
   { frameIndex: 1, width: 300, height: 700, ghostWidth: 60 * 3 / 7, ghostHeight: 60 },
+  { frameIndex: 0, width: 20, height: 30, ghostWidth: 20, ghostHeight: 30 },
 ])("the ghost uses the full cached Photo $width x $height without Frame transforms", async ({ frameIndex, width, height, ghostWidth, ghostHeight }) => {
   const composition = structuredClone(frameContentSwapCorpus.before.composition);
   const frame = composition.sheets[0].frames[frameIndex];

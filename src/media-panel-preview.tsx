@@ -26,6 +26,10 @@ const folders: MediaFolder[] = parameters.has("folders") ? [
 const displayedPreviews = parameters.get("cache") === "missing"
   ? Object.fromEntries(Object.entries(mediaPreviews).filter(([mediaId]) => mediaFiles[mediaId]?.state !== "absent"))
   : mediaPreviews;
+const displayedMediaItems = parameters.get("dimensions") === "unobserved" ? mediaItems.map((media) =>
+  media.kind === "decorative" ? { ...media, sourceWidthPx: null, sourceHeightPx: null }
+    : mediaFiles[media.id]?.state === "absent" && !displayedPreviews[media.id]
+      ? { ...media, sourceWidthPx: 1, sourceHeightPx: 1 } : media) : mediaItems;
 const acceptanceSurface =
   new URLSearchParams(window.location.search).get("acceptance") === "editor"
     ? "editor"
@@ -43,7 +47,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
         onOpenInPhotoshop={() => undefined}
         mediaFolders={folders}
         onEditMediaFolder={async () => true}
-        mediaItems={mediaItems}
+        mediaItems={displayedMediaItems}
         mediaUsage={mediaUsage}
         mediaFiles={mediaFiles}
         onFillPhoto={() => undefined}

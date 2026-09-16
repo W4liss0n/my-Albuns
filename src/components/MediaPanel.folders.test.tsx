@@ -71,6 +71,38 @@ test("the ghost reuses the thumbnail, follows the pointer beyond the panel, and 
   expect(h.props.onMediaDragChange).toHaveBeenLastCalledWith(expect.objectContaining({ phase: "drop" }));
 });
 
+test("a missing photo without observed dimensions keeps a visible placeholder during drag", () => {
+  const h = harness();
+  h.view.rerender(<MediaPanel {...h.props}
+    mediaItems={[{ ...items[0], sourceWidthPx: 1, sourceHeightPx: 1 }, ...items.slice(1)]}
+    mediaFiles={{ p1: { mediaId: "p1", state: "absent", createdAtMs: null, modifiedAtMs: null } }} />);
+  dragHit(null); startDrag(/001.jpg/); moveDrag();
+  expect(dragGhost()).toHaveStyle({ width: "60px", height: "60px" });
+  expect(dragGhost()!.querySelector(".media-preview-thumbnail__missing-symbol")).not.toBeNull();
+  dropDrag();
+});
+
+test.each([true, false])("a Decorative uses its preview dimensions when already loaded: %s", (alreadyLoaded) => {
+  const h = harness();
+  const url = "http://myalbuns-cache.localhost/portrait.png";
+  h.view.rerender(<MediaPanel {...h.props}
+    mediaItems={[...items.slice(0, 2), { ...items[2], sourceWidthPx: null, sourceHeightPx: null }]}
+    previewSource={{ kind: "static", previews: { d1: { mediaId: "d1", state: "ready", url } } }} />);
+  fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
+  const loadPortrait = (image: HTMLImageElement) => {
+    Object.defineProperties(image, {
+      complete: { value: true }, naturalWidth: { value: 400 }, naturalHeight: { value: 600 }, currentSrc: { value: url },
+    });
+    fireEvent.load(image);
+  };
+  if (alreadyLoaded) loadPortrait(screen.getByRole("button", { name: "Fundo.jpg" }).querySelector("img")!);
+  dragHit(null); startDrag("Fundo.jpg"); moveDrag();
+  if (!alreadyLoaded) loadPortrait(dragGhost()!.querySelector("img")!);
+  expect(dragGhost()).toHaveStyle({ width: "40px", height: "60px" });
+  expect(dragGhost()!.querySelector("img")).toHaveAttribute("src", url);
+  dropDrag();
+});
+
 test.each([true, false])("missing photo ghost preserves its cached preview when available: %s", (cached) => {
   const h = harness();
   h.view.rerender(<MediaPanel {...h.props}

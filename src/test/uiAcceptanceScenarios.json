@@ -11322,6 +11322,60 @@
           "phase": "preview"
         }
       ]
+    },
+    {
+      "id": "media-drag-ghost-decorative-unobserved",
+      "title": "Arrasto do painel — Decorativo com dimensões da prévia",
+      "implementationPath": "/media-panel-preview.html?folders=1&dimensions=unobserved",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-folders",
+        "implementationCaptureSelector": "body",
+        "reason": "Design 0035: destino do arrasto usa destaque azul da interface sem trocar a pasta ativa; Esc remove o destaque. A captura verifica o gesto, sem simular persistência."
+      },
+      "viewport": {
+        "width": 1100,
+        "height": 400
+      },
+      "readySelector": ".media-folder-chip--drop",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Decorativos\"]"
+        },
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": "[data-media-id=\"test-decorative-001\"]",
+          "targetSelector": "[data-media-folder-id=\"folder-fundos\"]",
+          "phase": "preview"
+        }
+      ]
+    },
+    {
+      "id": "media-drag-ghost-missing-unobserved",
+      "title": "Arrasto do painel — Foto ausente sem dimensões observadas",
+      "implementationPath": "/media-panel-preview.html?folders=1&files=1&cache=missing&dimensions=unobserved",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-folders",
+        "implementationCaptureSelector": "body",
+        "reason": "Design 0035: prévia proporcional da miniatura acompanha o ponteiro sem bloquear o destino. Imagem ausente conserva Cache ou placeholder."
+      },
+      "viewport": {
+        "width": 1100,
+        "height": 400
+      },
+      "readySelector": "[data-media-drag-ghost=\"test-media-003\"]",
+      "actions": [
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": "[data-media-id=\"test-media-003\"]",
+          "targetSelector": "[data-media-folder-id=\"folder-cerimonia\"]",
+          "phase": "preview"
+        }
+      ]
     }
   ]
 }
