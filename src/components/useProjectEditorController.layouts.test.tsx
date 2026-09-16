@@ -62,6 +62,7 @@ function harness(pendingKind: "applyLayout" | "lockLayout" | "unlockLayout" | "s
       return structuredClone(sample.before.queries[sheetId].previews[selection.candidateIndex]);
     },
     previewDecorativeDrop: async () => { throw new Error("Decorative preview is not configured in this fixture."); },
+    previewPhotoZoom: async () => { throw new Error("Photo Zoom preview is not configured in this fixture."); },
     previewFrameStyle: unsupported, previewPhotoAngle: unsupported, previewFrameGeometry: unsupported,
     saveAs: unsupported, validateAlbumInformation: unsupported, applyWithOutcome: unsupported,
     importMedia: unsupported, resolvePhotoDropTarget: unsupported, replaceImage: unsupported, relink: unsupported,

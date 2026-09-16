@@ -975,6 +975,9 @@ pub enum ProjectIntent {
     SetPhotoAngle {
         edit: PhotoAngleEdit,
     },
+    SetPhotoZoom {
+        edit: PhotoZoomEdit,
+    },
     SetFrameStyle {
         edit: FrameStyleEdit,
     },
@@ -1016,6 +1019,13 @@ pub enum PhotoOrientationAction {
 pub enum MediaRemovalMode {
     RemoveAll,
     KeepFrames,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PhotoZoomEdit {
+    pub frame_ids: Vec<String>,
+    pub user_zoom: f32,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
@@ -1079,6 +1089,10 @@ pub enum CoreError {
     InvalidPhotoEffectSelection,
     #[error("O Ângulo da Foto deve estar entre -45° e +45°, em décimos de grau")]
     InvalidPhotoAngle,
+    #[error("O Zoom da Foto deve estar entre 100% e 400%")]
+    InvalidPhotoZoom,
+    #[error("Selecione Frames distintos de uma única Lâmina para ajustar o Zoom das Fotos")]
+    InvalidPhotoZoomSelection,
     #[error("Selecione Frames distintos de uma única Lâmina para orientar as Fotos")]
     InvalidPhotoOrientationSelection,
     #[error("A Troca de lados exige uma Lâmina dupla")]

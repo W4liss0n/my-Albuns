@@ -55,6 +55,29 @@ function sheetContext(): InspectorContext {
 
 beforeEach(() => localStorage.clear());
 
+test("group Photo Zoom stays mixed until an explicit value and ignores placeholders", () => {
+  const frames = [structuredClone(sheetState.frames[0]), { ...structuredClone(sheetState.frames[0]), id: "second-photo" }];
+  frames[0].photo!.transform.userZoom = 1.5;
+  frames[1].photo!.transform.userZoom = 2;
+  frames.push({ ...structuredClone(frames[0]), id: "placeholder", photo: null });
+  const onCommit = vi.fn();
+  const actions = { disabled: false, scopeKey: "zoom", doubleClickTimeMs: 500,
+    dragThreshold: { x: 5, y: 5 }, onPreview: vi.fn(), onCommit, onCancel: vi.fn() };
+  const props = inspectorProps({ kind: "multiple-frames", frames, editingSheet: composedSheet });
+  const view = render(<InspectorPanel {...props} photoZoom={actions} />);
+  const field = screen.getByRole("spinbutton", { name: "Zoom da Foto em porcentagem" });
+  expect(field).toHaveValue("");
+  expect(field).toHaveAttribute("aria-valuetext", "Múltiplos valores");
+  expect(onCommit).not.toHaveBeenCalled();
+  fireEvent.change(field, { target: { value: "175" } });
+  fireEvent.keyDown(field, { key: "Enter" });
+  expect(onCommit).toHaveBeenCalledExactlyOnceWith(175);
+  view.rerender(<InspectorPanel {...props} context={{ kind: "multiple-frames",
+    frames: frames.map((frame) => ({ ...frame, photo: null })), editingSheet: composedSheet,
+  }} photoZoom={actions} />);
+  expect(screen.queryByRole("slider", { name: "Zoom da Foto" })).not.toBeInTheDocument();
+});
+
 test("Frame style keeps mixed values neutral and lets an explicit color or restoration affect the selection", () => {
   const state = frameStyleCorpus.states["single-custom"];
   const frames = state.state.album.sheets[0].frames;

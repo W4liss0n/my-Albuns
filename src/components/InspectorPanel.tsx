@@ -33,6 +33,7 @@ import { ActionButton, AppIcon, EmptyState } from "../ui";
 import { AlbumDesignForm } from "./AlbumDesignForm";
 import { AlbumInformationForm } from "./AlbumInformationForm";
 import { SheetPreviewShell } from "./SheetPreview";
+import { PhotoZoomControl, type PhotoZoomControlActions } from "./PhotoZoomControl";
 import { PhotoOrientationControls, type PhotoOrientationControlActions } from "./PhotoOrientationControls";
 import { PhotoEffectsControls, type PhotoEffectsControlActions } from "./PhotoEffectsControls";
 import { FrameStyleControls, type FrameStyleControlActions } from "./FrameStyleControls";
@@ -92,6 +93,7 @@ export interface InspectorPanelProps {
   frameStyle?: FrameStyleControlActions;
   photoEffects?: PhotoEffectsControlActions;
   photoOrientation?: PhotoOrientationControlActions;
+  photoZoom?: PhotoZoomControlActions;
   context: InspectorContext;
   displayedPhotoZoom: number;
   displayedPhotoPanX: number;
@@ -141,6 +143,7 @@ export function InspectorPanel({
   saveLayout,
   frameStyle,
   photoOrientation,
+  photoZoom,
   photoEffects,
   context,
   displayedPhotoZoom,
@@ -334,6 +337,13 @@ export function InspectorPanel({
   const selectedPlaceholderCount = context.kind === "multiple-frames"
     ? context.frames.length - selectedPhotoCount : 0;
 
+  const selectedZooms = context.kind === "multiple-frames"
+    ? context.frames.flatMap((frame) => frame.photo ? [frame.photo.transform.userZoom] : []) : [];
+  const commonZoom = selectedZooms.length > 0 && selectedZooms.every((zoom) => zoom === selectedZooms[0])
+    ? Math.round(selectedZooms[0] * 100) : null;
+  const groupZoomRange = context.kind === "multiple-frames"
+    ? context.editingSheet.frames.find((frame) => frame.photo)?.photo?.placement.zoomRange : undefined;
+
   return (
     <aside
       id="contextual-panel"
@@ -352,7 +362,7 @@ export function InspectorPanel({
                 {selectedPlaceholderCount} {selectedPlaceholderCount === 1 ? "placeholder" : "placeholders"}
               </p>
             </div>
-            {(frameStyle || (photoOrientation && selectedPhotoCount > 0)) && (
+            {(frameStyle || ((photoOrientation || photoZoom) && selectedPhotoCount > 0)) && (
               <InspectorSection
                 key="frame-photo-design"
                 title="Design"
@@ -360,6 +370,10 @@ export function InspectorPanel({
                 sectionState={sectionState}
                 defaultOpen
               >
+                {photoZoom && selectedPhotoCount > 0 && groupZoomRange && (
+                  <PhotoZoomControl key={photoZoom.scopeKey} {...photoZoom} value={commonZoom}
+                    minimum={Math.round(groupZoomRange.minimum * 100)} maximum={Math.round(groupZoomRange.maximum * 100)} />
+                )}
                 {photoOrientation && <PhotoOrientationControls frames={context.frames} {...photoOrientation} />}
                 {frameStyle && <FrameStyleControls key={`${frameStyle.scopeKey}:${presentationUnit}`} frames={context.frames} unit={presentationUnit} {...frameStyle} />}
               </InspectorSection>

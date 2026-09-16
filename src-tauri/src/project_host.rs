@@ -513,6 +513,15 @@ impl ProjectHost {
             .map_err(|error| error.to_string())
     }
 
+    pub(crate) fn preview_photo_zoom(
+        &self,
+        edit: &myalbuns_core::PhotoZoomEdit,
+    ) -> Result<Vec<myalbuns_core::ComposedFrame>, String> {
+        self.project()?
+            .preview_photo_zoom(edit)
+            .map_err(|error| error.to_string())
+    }
+
     pub(crate) fn preview_photo_angle(
         &self,
         edit: &myalbuns_core::PhotoAngleEdit,

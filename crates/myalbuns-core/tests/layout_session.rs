@@ -421,6 +421,14 @@ fn locked_photo_content_can_be_filled_replaced_and_cleared_while_export_reports_
             frame_ids: vec![first.id.clone()],
         })
         .unwrap();
+    project
+        .apply(ProjectIntent::SetPhotoZoom {
+            edit: myalbuns_core::PhotoZoomEdit {
+                frame_ids: vec![first.id.clone()],
+                user_zoom: 1.75,
+            },
+        })
+        .unwrap();
     let content = project.projection();
     assert_ne!(content.state.album.sheets[0].frames[0].style, first.style);
     let transform = &content.state.album.sheets[0].frames[0]
@@ -430,6 +438,7 @@ fn locked_photo_content_can_be_filled_replaced_and_cleared_while_export_reports_
         .transform;
     assert!(transform.black_and_white && transform.mirror_x);
     assert_eq!(transform.fine_rotation_degrees, 12.3);
+    assert_eq!(transform.user_zoom, 1.75);
     for (original, current) in before.state.album.sheets[0]
         .frames
         .iter()

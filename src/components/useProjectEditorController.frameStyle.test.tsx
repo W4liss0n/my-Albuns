@@ -42,6 +42,7 @@ function harness() {
     queryLayouts: async () => { throw new Error("Layouts are not configured in this fixture."); },
     previewLayout: async () => { throw new Error("Layouts are not configured in this fixture."); },
     previewDecorativeDrop: async () => { throw new Error("Decorative preview is not configured in this fixture."); },
+    previewPhotoZoom: async () => { throw new Error("Photo Zoom preview is not configured in this fixture."); },
     previewFrameStyle: preview, previewPhotoAngle: unsupported, previewFrameGeometry: unsupported, saveAs: unsupported,
     validateAlbumInformation: unsupported, importMedia: unsupported, resolvePhotoDropTarget: unsupported, replaceImage: unsupported, relink: unsupported,
   };

@@ -1168,6 +1168,27 @@ impl ProjectDocument {
         Ok(candidate)
     }
 
+    pub(crate) fn with_photo_zoom(
+        &self,
+        edit: &crate::PhotoZoomEdit,
+    ) -> Result<Self, crate::CoreError> {
+        let zoom = ProjectPhotoTransform::new(0.0, 0.0, edit.user_zoom)
+            .map_err(|()| crate::CoreError::InvalidPhotoZoom)?;
+        let (sheet_index, selected) = self
+            .frame_selection(&edit.frame_ids)
+            .map_err(|()| crate::CoreError::InvalidPhotoZoomSelection)?;
+        let mut candidate = self.clone();
+        for photo in candidate.sheets[sheet_index]
+            .frames
+            .iter_mut()
+            .filter(|frame| selected.contains(&frame.id))
+            .filter_map(|frame| frame.photo.as_mut())
+        {
+            photo.transform.user_zoom_scaled = zoom.user_zoom_scaled;
+        }
+        Ok(candidate)
+    }
+
     pub(crate) fn with_photo_angle(
         &self,
         edit: &crate::PhotoAngleEdit,

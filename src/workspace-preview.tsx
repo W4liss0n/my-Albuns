@@ -247,6 +247,12 @@ const projectCorePort: ProjectCorePort = {
     document.body.dataset.frameStylePreview = JSON.stringify(edit.change);
     return structuredClone(sample.frames);
   },
+  previewPhotoZoom: async (edit) => {
+    const sample = photoOrientationCorpus.zoomPreviews.find((item) => item.from === photoOrientationStateName() &&
+      item.edit.userZoom === edit.userZoom && [...item.edit.frameIds].sort().join() === [...edit.frameIds].sort().join());
+    if (frameContext !== "orientation" || !sample) throw new Error("Zoom fora do corpus desta prévia.");
+    return structuredClone(sample.frames);
+  },
   previewPhotoAngle: async (edit) => {
     const sample = photoOrientationCorpus.anglePreviews.find((item) =>
       item.from === photoOrientationStateName() && sameAngleEdit(item.edit, edit));
@@ -634,6 +640,20 @@ function applyPreviewIntent(intent: ProjectIntent): ProjectMutationOutcome {
     if (frameContext !== "style" || !transition) throw new Error("Comando fora do corpus de estilo desta prévia.");
     projection = finalizePhysicalPreviewMutation(structuredClone(frameStyleCorpus.states[transition.to]), structuredClone(projection));
     exposeFrameStyleState();
+    return { projection, affectedFrameId: null, affectedSheetId: null };
+  }
+  if (intent.kind === "setPhotoZoom") {
+    const current = photoOrientationStateName();
+    const selected = projection.state.album.sheets.flatMap((sheet) => sheet.frames)
+      .filter((frame) => intent.edit.frameIds.includes(frame.id) && frame.photo);
+    if (selected.every((frame) => frame.photo!.transform.userZoom === intent.edit.userZoom)) {
+      return { projection, affectedFrameId: null, affectedSheetId: null };
+    }
+    const transition = photoOrientationCorpus.zoomTransitions.find((item) =>
+      item.from === current && item.edit.userZoom === intent.edit.userZoom && [...item.edit.frameIds].sort().join() === [...intent.edit.frameIds].sort().join());
+    if (frameContext !== "orientation" || !transition) throw new Error("Comando fora do corpus de Zoom desta prévia.");
+    projection = finalizePhysicalPreviewMutation(structuredClone(photoOrientationCorpus.states[transition.to]), structuredClone(projection));
+    exposePhotoOrientationState();
     return { projection, affectedFrameId: null, affectedSheetId: null };
   }
   if (intent.kind === "setPhotoAngle") {

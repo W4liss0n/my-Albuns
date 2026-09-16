@@ -11410,6 +11410,116 @@
           "phase": "preview"
         }
       ]
+    },
+    {
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-zoom&selection=group",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "photo-zoom",
+        "reason": "O design 0001 e a tarefa #22 exigem Zoom absoluto nas Fotos da seleção múltipla. O controle reutiliza o padrão numérico do Ângulo; estados, prévias e transições vêm do ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "id": "workspace-photo-zoom-mixed",
+      "title": "Zoom — duas Fotos com valores diferentes e um placeholder",
+      "readySelector": "[aria-label=\"Zoom da Foto em porcentagem\"][aria-valuetext=\"Múltiplos valores\"]",
+      "actions": []
+    },
+    {
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-zoom&selection=group",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "photo-zoom",
+        "reason": "O design 0001 e a tarefa #22 exigem Zoom absoluto nas Fotos da seleção múltipla. O controle reutiliza o padrão numérico do Ângulo; estados, prévias e transições vêm do ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "id": "workspace-photo-zoom-group",
+      "title": "Zoom — aplicação de 175% na seleção",
+      "readySelector": "body[data-photo-orientation=\"group-zoom\"][data-photo-orientation-history=\"1,0\"] [aria-label=\"Zoom da Foto em porcentagem\"][value=\"175\"]",
+      "actions": [
+        {
+          "type": "input",
+          "selector": "[aria-label=\"Zoom da Foto em porcentagem\"]",
+          "value": "175"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        }
+      ]
+    },
+    {
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-zoom&selection=group",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "photo-zoom",
+        "reason": "O design 0001 e a tarefa #22 exigem Zoom absoluto nas Fotos da seleção múltipla. O controle reutiliza o padrão numérico do Ângulo; estados, prévias e transições vêm do ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "id": "workspace-photo-zoom-history",
+      "title": "Zoom — Desfazer e Refazer em uma operação",
+      "readySelector": "body[data-photo-orientation=\"group-zoom\"][data-photo-orientation-history=\"1,0\"]",
+      "actions": [
+        {
+          "type": "input",
+          "selector": "[aria-label=\"Zoom da Foto em porcentagem\"]",
+          "value": "175"
+        },
+        {
+          "type": "key",
+          "key": "Enter"
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Desfazer\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-photo-orientation=\"single-zoom\"][data-photo-orientation-history=\"0,1\"] [aria-label=\"Zoom da Foto em porcentagem\"][aria-valuetext=\"Múltiplos valores\"]"
+        },
+        {
+          "type": "click-text",
+          "text": "Editar"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Refazer\"]"
+        }
+      ]
+    },
+    {
+      "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-zoom&selection=group",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "photo-zoom",
+        "reason": "O design 0001 e a tarefa #22 exigem Zoom absoluto nas Fotos da seleção múltipla. O controle reutiliza o padrão numérico do Ângulo; estados, prévias e transições vêm do ProjectCore."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 800
+      },
+      "id": "workspace-photo-zoom-invalid",
+      "title": "Zoom — valor inválido não altera o Projeto",
+      "readySelector": "body[data-photo-orientation=\"single-zoom\"][data-photo-orientation-history=\"0,0\"] [aria-label=\"Zoom da Foto em porcentagem\"][aria-invalid=\"true\"]",
+      "actions": [
+        {
+          "type": "input",
+          "selector": "[aria-label=\"Zoom da Foto em porcentagem\"]",
+          "value": "450"
+        }
+      ]
     }
   ]
 }
