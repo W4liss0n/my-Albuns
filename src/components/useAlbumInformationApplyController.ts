@@ -9,7 +9,9 @@ import type {
 import type {
   AlbumInformation,
   AlbumInformationImpact,
+  SheetSnapshot,
 } from "../domain/project";
+import { edgeConversionLossDescription } from "../application/edgeConversionReview";
 import type { AlbumInformationProjectDraft } from "../application/projectSettingsDraft";
 import {
   createAlbumInformationReview,
@@ -22,6 +24,7 @@ import {
 } from "../application/physicalMeasurements";
 
 interface AlbumInformationApplyControllerOptions {
+  sheets: readonly SheetSnapshot[];
   projectDialogPort: ProjectDialogPort;
   onApply(
     draft: AlbumInformationProjectDraft,
@@ -42,6 +45,7 @@ interface ApplyCompletion {
 }
 
 export function useAlbumInformationApplyController({
+  sheets,
   projectDialogPort,
   onApply,
   onError,
@@ -84,6 +88,7 @@ export function useAlbumInformationApplyController({
         draft.baseline,
         draft.value,
         impact,
+        sheets,
       );
       pendingRef.current = { draft, review };
       setActive(true);
@@ -110,7 +115,7 @@ export function useAlbumInformationApplyController({
       }
       return completion;
     },
-    [onError, projectDialogPort],
+    [onError, projectDialogPort, sheets],
   );
 
   const confirm = useCallback(async () => {
@@ -191,11 +196,14 @@ export function useAlbumInformationApplyController({
 }
 
 function detailsFromReview(review: AlbumInformationReview) {
-  return albumInformationDetails(
+  return [...albumInformationDetails(
     review.information,
     review.baseline,
     review.impact,
-  );
+  ), ...review.conversionLosses.map((loss) => ({
+    label: `Remoção na Lâmina ${loss.sheetNumber}`,
+    value: edgeConversionLossDescription(loss),
+  }))];
 }
 
 export function albumInformationDetails(

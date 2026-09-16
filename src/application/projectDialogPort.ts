@@ -28,6 +28,7 @@ export type ProjectDialogState =
   | { kind: "exportMediaProblems"; projectName: string; problems: readonly ExportMediaProblem[]; busy: boolean; message: string }
   | { kind: "mediaRemovalConfirmation"; mediaKind: "photo" | "decorative"; count: number; usedCount: number; usageCount: number; busy: boolean }
   | { kind: "layoutDeletionConfirmation"; busy: boolean }
+  | { kind: "edgeConversionConfirmation"; message: string }
   | { kind: "exportProblems"; projectName: string; problems: readonly LayoutExportProblem[] }
   | { kind: "imageProcessingProgress"; progress: ProjectDialogProgress }
   | {
@@ -86,6 +87,8 @@ export type ProjectDialogAction =
   | "removeMediaKeepFrames"
   | "cancelLayoutDeletion"
   | "confirmLayoutDeletion"
+  | "cancelEdgeConversion"
+  | "confirmEdgeConversion"
   | "cancelAlbumInformation"
   | "cancelExport"
   | "cancelProjectClose"

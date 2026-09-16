@@ -266,6 +266,7 @@ export function ProjectWorkspace({
     } : undefined,
   });
   const albumInformationApply = useAlbumInformationApplyController({
+    sheets: projection.state.album.sheets,
     projectDialogPort,
     onApply: controller.applyAlbumInformation,
     onError: setCloseMessage,

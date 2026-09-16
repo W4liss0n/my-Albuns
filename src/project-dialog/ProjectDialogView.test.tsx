@@ -362,3 +362,15 @@ test("keeps the operation reason separate from genuine file problems", () => {
   expect(within(dialog).getAllByRole("row")).toHaveLength(2);
   expect(within(dialog).getByRole("row", { name: "quebrada.jpg JPEG corrompido" })).toBeInTheDocument();
 });
+
+test("edge conversion uses the standard confirmation actions and names the discarded application", async () => {
+  const user = userEvent.setup();
+  const onAction = vi.fn();
+  render(<ProjectDialogView onAction={onAction} state={{ kind: "edgeConversionConfirmation",
+    message: "O Overlay personalizado da página direita da Lâmina 3 será removido." }} />);
+  expect(screen.getByRole("heading", { name: "Converter para página única?" })).toBeInTheDocument();
+  expect(screen.getByText(/Overlay personalizado da página direita/)).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Cancelar" }));
+  await user.click(screen.getByRole("button", { name: "Converter" }));
+  expect(onAction.mock.calls).toEqual([["cancelEdgeConversion"], ["confirmEdgeConversion"]]);
+});

@@ -1,12 +1,15 @@
 import type {
   AlbumInformation,
   AlbumInformationImpact,
+  SheetSnapshot,
 } from "../domain/project";
+import { albumInformationConversionLosses, type EdgeConversionLoss } from "./edgeConversionReview";
 
 export interface AlbumInformationReview {
   readonly baseline: Readonly<AlbumInformation>;
   readonly information: Readonly<AlbumInformation>;
   readonly impact: Readonly<AlbumInformationImpact>;
+  readonly conversionLosses: readonly EdgeConversionLoss[];
 }
 
 export type AlbumInformationCommitResult =
@@ -42,8 +45,9 @@ export function createAlbumInformationReview(
   baseline: Readonly<AlbumInformation>,
   information: Readonly<AlbumInformation>,
   impact: Readonly<AlbumInformationImpact>,
+  sheets: readonly SheetSnapshot[] = [],
 ): AlbumInformationReview {
-  return { baseline, information, impact };
+  return { baseline, information, impact, conversionLosses: albumInformationConversionLosses(sheets, information) };
 }
 
 /**
@@ -74,6 +78,7 @@ function reviewFacts(review: AlbumInformationReview) {
   const changedFields = new Set(changes.map(([field]) => field));
   return {
     changes,
+    conversionLosses: review.conversionLosses,
     ...(informationFields.some(
       (field) => physicalFields.has(field) && changedFields.has(field),
     )

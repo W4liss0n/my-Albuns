@@ -128,6 +128,9 @@ pub enum ProjectDialogState {
     LayoutDeletionConfirmation {
         busy: bool,
     },
+    EdgeConversionConfirmation {
+        message: String,
+    },
     ImageProcessingProgress {
         progress: ProjectDialogProgress,
     },
@@ -196,6 +199,8 @@ pub enum ProjectDialogAction {
     RemoveMediaKeepFrames,
     CancelLayoutDeletion,
     ConfirmLayoutDeletion,
+    CancelEdgeConversion,
+    ConfirmEdgeConversion,
     CancelAlbumInformation,
     CancelExport,
     CancelProjectClose,
@@ -323,6 +328,9 @@ mod project_dialog_contract_tests {
                     value: "300 → 240".into(),
                 }],
             },
+            ProjectDialogState::EdgeConversionConfirmation {
+                message: "O Background personalizado será removido.".into(),
+            },
             ProjectDialogState::ProjectCloseConfirmation { busy: true },
             ProjectDialogState::ProjectCloseFailure {
                 message: "Falha ao fechar".into(),
@@ -354,6 +362,7 @@ mod project_dialog_contract_tests {
         let expected_kinds = [
             "imageProcessingProgress",
             "albumInformationConfirmation",
+            "edgeConversionConfirmation",
             "projectCloseConfirmation",
             "projectCloseFailure",
             "projectOperationFailure",
@@ -376,6 +385,24 @@ mod project_dialog_contract_tests {
 
     #[test]
     fn dialog_actions_keep_the_logical_owner_on_the_wire() {
+        for (action, name) in [
+            (
+                ProjectDialogAction::ConfirmEdgeConversion,
+                "confirmEdgeConversion",
+            ),
+            (
+                ProjectDialogAction::CancelEdgeConversion,
+                "cancelEdgeConversion",
+            ),
+        ] {
+            let encoded = serde_json::to_value(&action).expect("conversion action serializes");
+            assert_eq!(encoded, json!(name));
+            assert_eq!(
+                serde_json::from_value::<ProjectDialogAction>(encoded)
+                    .expect("conversion action deserializes"),
+                action
+            );
+        }
         assert_eq!(
             serde_json::to_value(ProjectDialogActionEvent {
                 action: ProjectDialogAction::ConfirmAlbumInformation,

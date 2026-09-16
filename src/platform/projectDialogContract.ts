@@ -30,6 +30,8 @@ const projectDialogActionMap = {
   removeMediaKeepFrames: "removeMediaKeepFrames",
   cancelLayoutDeletion: "cancelLayoutDeletion",
   confirmLayoutDeletion: "confirmLayoutDeletion",
+  cancelEdgeConversion: "cancelEdgeConversion",
+  confirmEdgeConversion: "confirmEdgeConversion",
   cancelAlbumInformation: "cancelAlbumInformation",
   cancelExport: "cancelExport",
   cancelProjectClose: "cancelProjectClose",
@@ -152,6 +154,8 @@ const stateDecoders: Record<
       count: value.count, usedCount: value.usedCount, usageCount: value.usageCount } : null,
   layoutDeletionConfirmation: (value) => typeof value.busy === "boolean"
     ? { kind: "layoutDeletionConfirmation", busy: value.busy } : null,
+  edgeConversionConfirmation: (value) => typeof value.message === "string"
+    ? { kind: "edgeConversionConfirmation", message: value.message } : null,
   imageProcessingProgress: (value) => {
     const progress = decodeProgress(value.progress);
     return progress ? { kind: "imageProcessingProgress", progress } : null;
@@ -337,6 +341,7 @@ export function toIpcProjectDialogState(
     case "projectCloseConfirmation":
       return { busy: state.busy, kind: state.kind };
     case "projectCloseFailure":
+    case "edgeConversionConfirmation":
     case "projectOperationFailure":
     case "exportSuccess":
       return { kind: state.kind, message: state.message };
@@ -385,6 +390,7 @@ function fromIpcProjectDialogState(
     case "projectCloseConfirmation":
       return { busy: state.busy, kind: state.kind };
     case "projectCloseFailure":
+    case "edgeConversionConfirmation":
     case "projectOperationFailure":
     case "exportSuccess":
       return { kind: state.kind, message: state.message };

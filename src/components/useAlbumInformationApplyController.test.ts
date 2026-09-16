@@ -134,7 +134,7 @@ test("completes the Apply request only after the owned confirmation commits", as
   const dialog = dialogHarness();
   const onApply = vi.fn(async () => ({ kind: "completed" as const }));
   const { result } = renderHook(() =>
-    useAlbumInformationApplyController({
+    useAlbumInformationApplyController({ sheets: [],
       projectDialogPort: dialog.port,
       onApply,
       onError: vi.fn(),
@@ -168,7 +168,7 @@ test("keeps commands blocked until the owned confirmation releases its window", 
   );
   const dialog = dialogHarness(dismiss);
   const { result } = renderHook(() =>
-    useAlbumInformationApplyController({
+    useAlbumInformationApplyController({ sheets: [],
       projectDialogPort: dialog.port,
       onApply: vi.fn(async () => ({ kind: "completed" as const })),
       onError: vi.fn(),
@@ -202,7 +202,7 @@ test("resolves cancellation and a rejected commit without orphaning command bloc
   const dialog = dialogHarness();
   const onApply = vi.fn(async () => ({ kind: "rejected" as const }));
   const { result } = renderHook(() =>
-    useAlbumInformationApplyController({
+    useAlbumInformationApplyController({ sheets: [],
       projectDialogPort: dialog.port,
       onApply,
       onError: vi.fn(),
@@ -237,7 +237,7 @@ test("resolves false when confirmation presentation or the commit fails", async 
     throw new Error("Falha ao aplicar a alteração.");
   });
   const { result } = renderHook(() =>
-    useAlbumInformationApplyController({
+    useAlbumInformationApplyController({ sheets: [],
       projectDialogPort: dialog.port,
       onApply,
       onError,
@@ -272,7 +272,7 @@ test("aborts before committing when the owned busy projection fails", async () =
   const onApply = vi.fn(async () => ({ kind: "completed" as const }));
   const onError = vi.fn();
   const { result } = renderHook(() =>
-    useAlbumInformationApplyController({
+    useAlbumInformationApplyController({ sheets: [],
       projectDialogPort: dialog.port,
       onApply,
       onError,
@@ -296,7 +296,7 @@ test("aborts before committing when the owned busy projection fails", async () =
 test("settles an outstanding Apply completion when its controller unmounts", async () => {
   const dialog = dialogHarness();
   const { result, unmount } = renderHook(() =>
-    useAlbumInformationApplyController({
+    useAlbumInformationApplyController({ sheets: [],
       projectDialogPort: dialog.port,
       onApply: vi.fn(async () => ({ kind: "completed" as const })),
       onError: vi.fn(),
@@ -312,4 +312,23 @@ test("settles an outstanding Apply completion when its controller unmounts", asy
 
   await expect(completion).resolves.toBe(false);
   expect(dialog.dismiss).toHaveBeenCalledOnce();
+});
+
+test("includes edge losses in the existing Album information confirmation", async () => {
+  const dialog = dialogHarness();
+  const { createThreeSheetProjection } = await import("../test/projectFixtures");
+  const sheets = createThreeSheetProjection().state.album.sheets;
+  sheets[0].visuals = { background: { kind: "perSide", left: { kind: "custom", content: { kind: "color", rgb: "#123456" }, mapping: "side" }, right: { kind: "default" } }, overlay: { kind: "default" } };
+  const onApply = vi.fn(async () => ({ kind: "completed" as const }));
+  const view = renderHook(() => useAlbumInformationApplyController({ sheets, projectDialogPort: dialog.port, onApply, onError: vi.fn() }));
+  const draft = createAlbumInformationProjectDraft(3, baseline).transition({ ...baseline, firstSheet: "singlePage" });
+  let completion!: Promise<boolean>;
+  await act(async () => { completion = view.result.current.requestApply(draft, impact); });
+  expect(dialog.present).toHaveBeenCalledOnce();
+  expect(dialog.present).toHaveBeenCalledWith({ kind: "albumInformationConfirmation", busy: false, details: [
+    { label: "Primeira Lâmina", value: "Lâmina dupla → Página única" },
+    { label: "Remoção na Lâmina 1", value: "O Background personalizado da página esquerda da Lâmina 1 será removido." },
+  ] });
+  await act(async () => { dialog.emit("cancelAlbumInformation"); expect(await completion).toBe(false); });
+  expect(onApply).not.toHaveBeenCalled();
 });

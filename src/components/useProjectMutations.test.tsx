@@ -1,3 +1,6 @@
+import type { ProjectDialogAction, ProjectDialogPort, ProjectDialogState } from "../application/projectDialogPort";
+import { createAlbumInformationReview } from "../application/albumInformationReview";
+import { createAlbumInformationProjectDraft } from "../application/projectSettingsDraft";
 import { emptyLayoutCatalogPort } from "../test/layoutCatalogPorts";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
@@ -14,6 +17,8 @@ import {
   type ProjectMutationRunner,
 } from "./useProjectMutationRunner";
 import { useProjectMutations } from "./useProjectMutations";
+
+const unusedDialogPort: ProjectDialogPort = { acquire: () => { throw new Error("Unexpected confirmation"); } };
 
 function deferredProjection() {
   let resolve!: (projection: EditorProjection) => void;
@@ -101,7 +106,7 @@ test("applies a structural intent with outcome, returns its status, and forwards
   const onProjectionChange = vi.fn();
   const onAffectedSheet = vi.fn();
   const view = renderHook(() =>
-    useProjectMutations({
+    useProjectMutations({ projectDialogPort: unusedDialogPort,
       projection: representativeProjection,
       runProjectMutation,
       onProjectionChange,
@@ -135,7 +140,7 @@ test.each(["success", "failure"] as const)("Save waits for replacement and respe
   port.replaceImage = vi.fn(() => pending.promise);
   port.save = vi.fn(async (revision) => ({ outcome: { kind: "alreadyCurrent" as const, revision }, projection: replaced }));
   const onProjectionChange = vi.fn();
-  const view = renderHook(() => useProjectMutations({
+  const view = renderHook(() => useProjectMutations({ projectDialogPort: unusedDialogPort,
     projection: representativeProjection,
     runProjectMutation: useProjectMutationRunner(representativeProjection.state.projectId, port),
     onProjectionChange, onAffectedFrame: () => undefined, onAffectedSheet: () => undefined,
@@ -191,7 +196,7 @@ test("materializes a queued reorder beside its intended Sheet after History rest
       capturedProjection.state.projectId,
       port,
     );
-    return useProjectMutations({
+    return useProjectMutations({ projectDialogPort: unusedDialogPort,
       projection: capturedProjection,
       runProjectMutation: runner,
       onProjectionChange: () => undefined,
@@ -241,7 +246,7 @@ test("keeps a queued reorder valid when the preceding History command fails", as
       capturedProjection.state.projectId,
       port,
     );
-    return useProjectMutations({
+    return useProjectMutations({ projectDialogPort: unusedDialogPort,
       projection: capturedProjection,
       runProjectMutation: runner,
       onProjectionChange: () => undefined,
@@ -281,7 +286,7 @@ test.each([true, false])("queues a scoped restoration after pending History with
   const port = projectSessionPort(apply, undo);
   const view = renderHook(() => {
     const runner = useProjectMutationRunner(representativeProjection.state.projectId, port);
-    return useProjectMutations({ projection: representativeProjection, runProjectMutation: runner,
+    return useProjectMutations({ projectDialogPort: unusedDialogPort, projection: representativeProjection, runProjectMutation: runner,
       onProjectionChange: vi.fn(), onAffectedFrame: vi.fn(), onAffectedSheet: vi.fn() });
   });
   act(() => { void view.result.current.undo(); });
@@ -318,7 +323,7 @@ test.each(["unchanged", "removed", "converted", "failure"] as const)(
     const port = projectSessionPort(apply, undo);
     const view = renderHook(() => {
       const runner = useProjectMutationRunner(initial.state.projectId, port);
-      return useProjectMutations({ projection: initial, runProjectMutation: runner,
+      return useProjectMutations({ projectDialogPort: unusedDialogPort, projection: initial, runProjectMutation: runner,
         onProjectionChange: vi.fn(), onAffectedFrame: vi.fn(), onAffectedSheet: vi.fn() });
     });
     act(() => { view.result.current.undo(); });
@@ -381,7 +386,7 @@ test("preserves Redo when preceding History already materialized the Album Desig
       representativeProjection.state.projectId,
       port,
     );
-    return useProjectMutations({
+    return useProjectMutations({ projectDialogPort: unusedDialogPort,
       projection: representativeProjection,
       runProjectMutation: runner,
       onProjectionChange,
@@ -426,7 +431,7 @@ test.each(["completed", "cancelled", "failed"] as const)(
       outcome: { kind: "saved", revision }, projection: revision === initial.state.revision ? initial : imported,
     }));
     const onProjectionChange = vi.fn();
-    const view = renderHook(() => useProjectMutations({
+    const view = renderHook(() => useProjectMutations({ projectDialogPort: unusedDialogPort,
       projection: initial,
       runProjectMutation: useProjectMutationRunner(initial.state.projectId, port),
       onProjectionChange,
@@ -484,7 +489,7 @@ test.each(["file", "operation"] as const)("waits for image cache before Save and
   port.save = vi.fn<ProjectCorePort["save"]>(async (revision) => ({
     projection: imported, outcome: { kind: "saved", revision },
   }));
-  const view = renderHook(() => useProjectMutations({
+  const view = renderHook(() => useProjectMutations({ projectDialogPort: unusedDialogPort,
     projection: representativeProjection,
     runProjectMutation: useProjectMutationRunner(representativeProjection.state.projectId, port),
     onProjectionChange: () => undefined,
@@ -530,7 +535,7 @@ test.each([false, true])("folder edits share the authoritative queue with Save a
   const undo = vi.fn<ProjectCorePort["undo"]>(async () => representativeProjection);
   const port = projectSessionPort(apply, undo);
   port.save = vi.fn<ProjectCorePort["save"]>(async (revision) => ({ outcome: { kind: "saved", revision }, projection: next }));
-  const view = renderHook(() => useProjectMutations({ projection: representativeProjection,
+  const view = renderHook(() => useProjectMutations({ projectDialogPort: unusedDialogPort, projection: representativeProjection,
     runProjectMutation: useProjectMutationRunner(representativeProjection.state.projectId, port),
     onProjectionChange: vi.fn(), onAffectedFrame: vi.fn(), onAffectedSheet: vi.fn() }));
   let first!: Promise<boolean>; let adjacent!: Promise<boolean>;
@@ -552,4 +557,163 @@ test.each([false, true])("folder edits share the authoritative queue with Save a
     await waitFor(() => expect(port.save).toHaveBeenCalledWith(next.state.revision));
     await waitFor(() => expect(undo).toHaveBeenCalledTimes(1));
   }
+});
+
+function conversionHarness(initial = decoratedEdgeProjection()) {
+  let onAction: (action: ProjectDialogAction) => void = () => undefined;
+  const present = vi.fn(async (_state: ProjectDialogState) => undefined);
+  const dismiss = vi.fn(async () => undefined);
+  const dialogPort: ProjectDialogPort = { acquire: (listener) => { onAction = listener; return { present, dismiss }; } };
+  const apply = vi.fn<ProjectCorePort["apply"]>(async () => initial);
+  const undo = vi.fn<ProjectCorePort["undo"]>(async () => initial);
+  const port = projectSessionPort(apply, undo);
+  const onAffectedSheet = vi.fn();
+  const view = renderHook(({ projection }) => useProjectMutations({
+    projection, projectDialogPort: dialogPort,
+    runProjectMutation: useProjectMutationRunner(projection.state.projectId, port),
+    onProjectionChange: vi.fn(), onAffectedFrame: vi.fn(), onAffectedSheet,
+  }), { initialProps: { projection: initial } });
+  return { ...view, apply, undo, present, dismiss, onAffectedSheet, emit: (action: ProjectDialogAction) => onAction(action) };
+}
+
+function decoratedEdgeProjection() {
+  const projection = createThreeSheetProjection();
+  projection.state.album.sheets[0].visuals = {
+    background: { kind: "perSide", left: { kind: "custom", content: { kind: "color", rgb: "#123456" }, mapping: "side" }, right: { kind: "default" } },
+    overlay: { kind: "default" },
+  };
+  return projection;
+}
+
+const convertFirstEdge = { kind: "convertEdgeSheet", sheetId: "sheet-001" } as const;
+
+test.each(["confirmEdgeConversion", "cancelEdgeConversion"] as const)(
+  "keeps the mutation queue free while awaiting conversion decision %s", async (action) => {
+    const harness = conversionHarness();
+    let completed!: Promise<boolean>;
+    act(() => {
+      completed = harness.result.current.applyWithOutcome(convertFirstEdge);
+      harness.result.current.undo();
+    });
+    await waitFor(() => expect(harness.present).toHaveBeenCalledWith({ kind: "edgeConversionConfirmation",
+      message: "O Background personalizado da página esquerda da Lâmina 1 será removido." }));
+    expect(harness.apply).not.toHaveBeenCalled();
+    await waitFor(() => expect(harness.undo).toHaveBeenCalledOnce());
+    await act(async () => {
+      harness.emit(action);
+      harness.emit(action);
+      expect(await completed).toBe(action === "confirmEdgeConversion");
+    });
+    expect(harness.apply).toHaveBeenCalledTimes(action === "confirmEdgeConversion" ? 1 : 0);
+    expect(harness.dismiss).toHaveBeenCalledOnce();
+    await waitFor(() => expect(harness.undo).toHaveBeenCalledOnce());
+    expect(harness.onAffectedSheet).not.toHaveBeenCalled();
+  },
+);
+
+test.each(["added", "removed", "failed"])("uses the authoritative visual after pending Undo (%s)", async (change) => {
+  const initial = change === "added" ? createThreeSheetProjection() : decoratedEdgeProjection();
+  const latest = change === "added" ? decoratedEdgeProjection() : createThreeSheetProjection();
+  const harness = conversionHarness(initial);
+  const pending = deferredProjection();
+  harness.undo.mockReturnValueOnce(pending.promise);
+  let completed!: Promise<boolean>;
+  act(() => { harness.result.current.undo(); completed = harness.result.current.applyWithOutcome(convertFirstEdge); });
+  expect(harness.present).not.toHaveBeenCalled();
+  await act(async () => {
+    if (change === "failed") pending.reject(new Error("Undo failed")); else pending.resolve(latest);
+    await pending.promise.catch(() => undefined);
+  });
+  if (change !== "removed") {
+    await waitFor(() => expect(harness.present).toHaveBeenCalledOnce());
+    expect(harness.apply).not.toHaveBeenCalled();
+    await act(async () => { harness.emit("cancelEdgeConversion"); expect(await completed).toBe(false); });
+  } else {
+    await act(async () => { expect(await completed).toBe(true); });
+    expect(harness.present).not.toHaveBeenCalled();
+    expect(harness.apply).toHaveBeenCalledOnce();
+  }
+});
+
+test.each(["unmount", "projectChange"])("releases a pending conversion on %s and ignores late confirmation", async (reason) => {
+  const harness = conversionHarness();
+  let completed!: Promise<boolean>;
+  act(() => { completed = harness.result.current.applyWithOutcome(convertFirstEdge); });
+  await waitFor(() => expect(harness.present).toHaveBeenCalledOnce());
+  if (reason === "unmount") harness.unmount(); else {
+    const next = decoratedEdgeProjection(); next.state.projectId = "different-project";
+    harness.rerender({ projection: next });
+  }
+  await act(async () => { harness.emit("confirmEdgeConversion"); expect(await completed).toBe(false); });
+  expect(harness.apply).not.toHaveBeenCalled();
+  expect(harness.dismiss).toHaveBeenCalledOnce();
+});
+
+test("a failed confirmation presentation does not convert and releases the queue", async () => {
+  const harness = conversionHarness();
+  harness.present.mockRejectedValueOnce(new Error("Dialog unavailable"));
+  await act(async () => { expect(await harness.result.current.applyWithOutcome(convertFirstEdge)).toBe(false); });
+  expect(harness.result.current.message).toBe("Dialog unavailable");
+  expect(harness.apply).not.toHaveBeenCalled();
+  await act(async () => { harness.result.current.undo(); });
+  expect(harness.undo).toHaveBeenCalledOnce();
+});
+
+test("Album information re-reviews newly discarded content after queued Undo, then applies once", async () => {
+  const initial = createThreeSheetProjection();
+  const latest = decoratedEdgeProjection();
+  const harness = conversionHarness(initial);
+  const pending = deferredProjection();
+  harness.undo.mockReturnValueOnce(pending.promise);
+  const baseline = { ...initial.state.document, firstSheet: "double" as const, lastSheet: "double" as const };
+  const information = { ...baseline, firstSheet: "singlePage" as const };
+  const draft = createAlbumInformationProjectDraft(initial.state.revision, baseline).transition(information);
+  const impact = { sheetWidthPx: 7_087, pageWidthPx: 3_543, heightPx: 3_543 };
+  const review = createAlbumInformationReview(baseline, information, impact, initial.state.album.sheets);
+  let commit!: ReturnType<typeof harness.result.current.applyAlbumInformation>;
+  act(() => { harness.result.current.undo(); commit = harness.result.current.applyAlbumInformation(draft, review); });
+  await act(async () => { pending.resolve(latest); await commit; });
+  const outcome = await commit;
+  expect(outcome.kind).toBe("reviewRequired");
+  expect(harness.apply).not.toHaveBeenCalled();
+  expect(harness.present).not.toHaveBeenCalled();
+  if (outcome.kind !== "reviewRequired") throw new Error("Expected review");
+  expect(outcome.review.conversionLosses).toHaveLength(1);
+  await act(async () => {
+    expect(await harness.result.current.applyAlbumInformation(draft, outcome.review)).toEqual({ kind: "completed" });
+  });
+  expect(harness.apply).toHaveBeenCalledOnce();
+  expect(harness.present).not.toHaveBeenCalled();
+});
+
+test("rechecks changed discarded applications after confirmation without blocking History", async () => {
+  const harness = conversionHarness();
+  const latest = decoratedEdgeProjection();
+  latest.state.album.sheets[0].visuals = { background: { kind: "default" },
+    overlay: { kind: "perSide", left: { kind: "custom", content: { kind: "media", mediaId: "new-overlay" }, mapping: "side" }, right: { kind: "default" } } };
+  harness.undo.mockResolvedValueOnce(latest);
+  let completed!: Promise<boolean>;
+  act(() => { completed = harness.result.current.applyWithOutcome(convertFirstEdge); });
+  await waitFor(() => expect(harness.present).toHaveBeenCalledOnce());
+  await act(async () => { harness.result.current.undo(); });
+  await act(async () => { harness.emit("confirmEdgeConversion"); });
+  await waitFor(() => expect(harness.present).toHaveBeenCalledTimes(2));
+  expect(harness.present).toHaveBeenLastCalledWith({ kind: "edgeConversionConfirmation",
+    message: "O Overlay personalizado da página esquerda da Lâmina 1 será removido." });
+  expect(harness.apply).not.toHaveBeenCalled();
+  await act(async () => { harness.emit("confirmEdgeConversion"); expect(await completed).toBe(true); });
+  expect(harness.apply).toHaveBeenCalledOnce();
+});
+
+test("does not reverse a conversion that another queued action already satisfied", async () => {
+  const harness = conversionHarness();
+  const alreadySingle = decoratedEdgeProjection();
+  alreadySingle.state.album.sheets[0].activeSides = "right";
+  harness.undo.mockResolvedValueOnce(alreadySingle);
+  let completed!: Promise<boolean>;
+  act(() => { completed = harness.result.current.applyWithOutcome(convertFirstEdge); });
+  await waitFor(() => expect(harness.present).toHaveBeenCalledOnce());
+  await act(async () => { harness.result.current.undo(); });
+  await act(async () => { harness.emit("confirmEdgeConversion"); expect(await completed).toBe(false); });
+  expect(harness.apply).not.toHaveBeenCalled();
 });
