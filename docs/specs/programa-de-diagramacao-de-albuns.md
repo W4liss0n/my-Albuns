@@ -928,6 +928,8 @@ validação das superfícies descritas nesta seção.
 - Compatibilidade exige o mesmo tipo de superfície e a mesma proporção. Diferenças de tamanho físico, Unidade ou DPI são acomodadas por escala proporcional.
 - Converter uma Lâmina de extremidade entre dupla e página única preserva Fotos, placeholders e estilos, descarta a geometria anterior e destrava a organização. Se houver Frames, aplica o primeiro Layout compatível; se não houver, mantém a Lâmina sem Layout.
 - Na conversão de Lâmina dupla para Página única, aplicações de Background e Overlay por lado preservam o lado que continua ativo e descartam o lado inativo; aplicações de Ambos os lados são reajustadas à área ativa.
+- A conversão para Página única pede confirmação somente quando remover um Background ou Overlay personalizado da Página desativada. Padrões herdados, aplicações de Ambos os lados e a ausência explícita de Overlay não exigem aviso. O diálogo identifica a Lâmina, o lado e as aplicações removidas; Cancelar preserva o Projeto. A decisão usa o estado mais recente da fila de alterações.
+- Em Informações do Álbum, as remoções aparecem no resumo da confirmação de Aplicar, sem segundo diálogo. Se alterações anteriores na fila mudarem o conteúdo a descartar, o resumo é reapresentado antes de aplicar.
 - Na conversão de Página única para Lâmina dupla, aplicações por lado preservam o lado existente e iniciam o novo lado em `default`; aplicações de Ambos os lados são reajustadas aos dois lados.
 
 ### Painel de imagens e arquivos externos

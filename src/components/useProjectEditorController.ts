@@ -89,6 +89,7 @@ export function useProjectEditorController({
   ]);
 
   const mutations = useProjectMutations({
+    projectDialogPort,
     projection,
     runProjectMutation,
     onProjectionChange: (next) => {

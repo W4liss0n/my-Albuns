@@ -53,6 +53,11 @@ export function ProjectDialogView({
         description="O Layout será removido do catálogo em todas as Janelas. As composições aplicadas e as cópias guardadas nos Projetos serão preservadas."
         cancelAction={{ label: "Cancelar", disabled: state.busy, onClick: () => onAction("cancelLayoutDeletion") }}
         confirmAction={{ label: state.busy ? "Excluindo…" : "Excluir", disabled: state.busy, onClick: () => onAction("confirmLayoutDeletion") }} />;
+    case "edgeConversionConfirmation":
+      return <ConfirmationDialog title="Converter para página única?" tone="danger"
+        description={state.message}
+        cancelAction={{ label: "Cancelar", onClick: () => onAction("cancelEdgeConversion") }}
+        confirmAction={{ label: "Converter", onClick: () => onAction("confirmEdgeConversion") }} />;
     case "exportMediaProblems":
       return <ProblemsDialog title="Problemas na Exportação"
         description={state.message || (state.busy ? "Verificando os Arquivos…" : "Recupere os Arquivos necessários à Lâmina selecionada.")}

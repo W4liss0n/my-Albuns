@@ -6981,3 +6981,28 @@ test.each(["menu", "shortcut"])("New and Open from %s preserve the active Projec
   expect(useEditorView.getState().focusedSheetId).toBe(view.focusedSheetId);
   expect(useEditorView.getState().selectedFrameIds).toEqual(view.selectedFrameIds);
 });
+
+test.each(["menu", "context"])("requires the owned loss confirmation for edge conversion through %s", async (entry) => {
+  const projection = createThreeSheetProjection();
+  projection.state.album.sheets[2].visuals = {
+    background: { kind: "default" },
+    overlay: { kind: "perSide", left: { kind: "default" }, right: { kind: "custom", content: { kind: "media", mediaId: "overlay-1" }, mapping: "side" } },
+  };
+  const apply = vi.fn(async () => projection);
+  const port = projectCorePortWithApply(apply);
+  const dialog = projectDialogHarness();
+  render(<ProjectWorkspace exportPipelinePort={exportPipelinePort} projection={projection}
+    projectCorePort={port} projectDialogPort={dialog.port} onProjectionChange={() => undefined} />);
+  if (entry === "menu") {
+    act(() => canvasHarness.props?.onCenteredSheetChange?.("sheet-003"));
+    fireEvent.click(getApplicationCommand("Lâmina", "Converter extremidade"));
+  } else {
+    act(() => canvasHarness.props?.onOpenSheetContextMenu?.("sheet-003", { x: 240, y: 180 }));
+    fireEvent.click(within(screen.getByRole("menu", { name: "Ações da Lâmina 03" })).getByRole("menuitem", { name: "Converter extremidade" }));
+  }
+  await waitFor(() => expect(dialog.present).toHaveBeenCalledWith({ kind: "edgeConversionConfirmation",
+    message: "O Overlay personalizado da página direita da Lâmina 3 será removido." }));
+  expect(apply).not.toHaveBeenCalled();
+  await act(async () => { dialog.emit("confirmEdgeConversion"); });
+  await waitFor(() => expect(apply).toHaveBeenCalledWith({ kind: "convertEdgeSheet", sheetId: "sheet-003" }, expect.any(Function)));
+});

@@ -16,7 +16,7 @@ pub(crate) const PROJECT_DIALOG_ACTION_EVENT: &str = "myalbuns://project-dialog-
 pub(crate) const PROJECT_DIALOG_PRESENTATION_EVENT: &str = "myalbuns://project-dialog-presentation";
 pub(crate) const PROJECT_DIALOG_LABEL: &str = "project-dialog";
 const MAX_DIALOG_TEXT_CHARS: usize = 800;
-const MAX_DIALOG_DETAILS: usize = 10;
+const MAX_DIALOG_DETAILS: usize = 12;
 const MAX_DIALOG_SESSION_ID_CHARS: usize = 128;
 
 impl ProjectDialogState {
@@ -87,6 +87,9 @@ impl ProjectDialogState {
             Self::ProjectCloseFailure { message } => Self::ProjectCloseFailure {
                 message: bound_text(message),
             },
+            Self::EdgeConversionConfirmation { message } => Self::EdgeConversionConfirmation {
+                message: bound_text(message),
+            },
             Self::ProjectOperationFailure { message } => Self::ProjectOperationFailure {
                 message: bound_text(message),
             },
@@ -153,7 +156,9 @@ impl ProjectDialogState {
                 520.0,
                 280.0 + native_dialog_window::OWNED_WINDOW_TITLEBAR_HEIGHT,
             ),
-            Self::LayoutDeletionConfirmation { .. } | Self::ProjectCloseConfirmation { .. } => (
+            Self::LayoutDeletionConfirmation { .. }
+            | Self::EdgeConversionConfirmation { .. }
+            | Self::ProjectCloseConfirmation { .. } => (
                 520.0,
                 214.0 + native_dialog_window::OWNED_WINDOW_TITLEBAR_HEIGHT,
             ),
@@ -477,7 +482,23 @@ mod tests {
         let ProjectDialogState::AlbumInformationConfirmation { details, .. } = state else {
             panic!("the variant is preserved")
         };
-        assert_eq!(details.len(), 10);
+        assert_eq!(details.len(), 12);
+    }
+
+    #[test]
+    fn edge_conversion_uses_the_compact_confirmation_dimensions_and_bounds_copy() {
+        let state = ProjectDialogState::EdgeConversionConfirmation {
+            message: "x".repeat(MAX_DIALOG_TEXT_CHARS + 20),
+        }
+        .sanitized();
+        assert_eq!(
+            state.initial_dimensions(),
+            ProjectDialogState::LayoutDeletionConfirmation { busy: false }.initial_dimensions()
+        );
+        let ProjectDialogState::EdgeConversionConfirmation { message } = state else {
+            panic!("the variant is preserved")
+        };
+        assert_eq!(message.chars().count(), MAX_DIALOG_TEXT_CHARS);
     }
 
     #[test]

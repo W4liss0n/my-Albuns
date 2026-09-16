@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import type { MediaImportCompletion, MediaImportSelection, ImageProcessingProgress } from "../application/projectPorts";
 import { createLogInstanceId } from "../application/logging";
 import { useImageProcessing } from "./useImageProcessing";
+import { useEdgeConversionConfirmation } from "./useEdgeConversionConfirmation";
+import { edgeConversionLoss } from "../application/edgeConversionReview";
+import type { ProjectDialogPort } from "../application/projectDialogPort";
 import type { CanvasPhotoDropPoint } from "./albumCanvasContract";
 import type { PrepareImportedMedia } from "../application/mediaPreviews";
 
@@ -38,6 +41,7 @@ import type {
 } from "./useProjectMutationRunner";
 
 interface ProjectMutationsInput {
+  projectDialogPort: ProjectDialogPort;
   projection: EditorProjection;
   runProjectMutation: ProjectMutationRunner;
   onProjectionChange(projection: EditorProjection): void;
@@ -52,6 +56,7 @@ function messageFromError(error: unknown) {
 }
 
 export function useProjectMutations({
+  projectDialogPort,
   projection,
   runProjectMutation,
   onProjectionChange,
@@ -63,6 +68,9 @@ export function useProjectMutations({
   const [message, setMessage] = useState<string | null>(null);
   const [importPending, setImportPending] = useState(false);
   const imageProcessing = useImageProcessing(projection.state.projectId, runProjectMutation);
+  const confirmEdgeConversion = useEdgeConversionConfirmation(
+    projection.state.projectId, runProjectMutation, projectDialogPort,
+  );
   const importAttemptRef = useRef({ pending: false });
   const [photoImportResult, setPhotoImportResult] = useState<MediaImportCompletion | null>(null);
   const feedbackTokenRef = useRef(0);
@@ -224,6 +232,13 @@ export function useProjectMutations({
           }
           materializedIntent = materializedStructure;
         }
+        if (materializedIntent.kind === "convertEdgeSheet") {
+          const loss = edgeConversionLoss(effectiveProjection.state.album.sheets, materializedIntent.sheetId);
+          if (loss && !await confirmEdgeConversion(loss)) {
+            structuralIntentCancelled = true;
+            return effectiveProjection;
+          }
+        }
         const result = await imageProcessing.run((publish) => port.applyWithOutcome(materializedIntent, publish));
         affectedFrameId = result.affectedFrameId;
         affectedSheetId = result.affectedSheetId;
@@ -384,6 +399,7 @@ export function useProjectMutations({
           materialized.baseline,
           materialized.value,
           validation.impact,
+          effectiveProjection.state.album.sheets,
         );
         if (!albumInformationReviewHasChanges(currentReview)) {
           intentAlreadySatisfied = true;
