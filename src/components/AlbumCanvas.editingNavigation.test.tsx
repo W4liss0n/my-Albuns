@@ -49,9 +49,9 @@ test("keyboard zoom uses the Canvas center, clamps at 4x and returns to fit thro
   expect(view.onViewportChange).not.toHaveBeenCalled();
 });
 
-test("wheel keeps the Sheet point under the cursor and cancels browser zoom", async () => {
+test.each([false, true])("wheel keeps the Sheet point under the cursor, including the first zoom (alreadyZoomed=%s)", async (alreadyZoomed) => {
   const view = await harness();
-  view.wheel(-500);
+  if (alreadyZoomed) view.wheel(-500);
   const initial = view.camera();
   const sheetPoint = { x: (700 - initial.x) / initial.scale, y: (290 - initial.y) / initial.scale };
   const event = new WheelEvent("wheel", { bubbles: true, cancelable: true, ctrlKey: true,
@@ -142,11 +142,11 @@ test("resize preserves the magnification and Pan never loses the entire Sheet", 
   expect(view.app.canvas.dataset.editingZoom).toBe(zoom);
   view.pan();
   fireEvent.pointerMove(window, { pointerId: 19, clientX: 50_000, clientY: 50_000 });
-  expect(view.world.position.x).toBe(28);
-  expect(view.world.position.y).toBe(28);
+  expect(view.world.position.x).toBe(700 - 28);
+  expect(view.world.position.y).toBe(500 - 28);
   fireEvent.pointerMove(window, { pointerId: 19, clientX: -50_000, clientY: -50_000 });
-  expect(view.world.position.x + 600 * view.world.scale.x).toBeCloseTo(700 - 28);
-  expect(view.world.position.y + 300 * view.world.scale.y).toBeCloseTo(500 - 28);
+  expect(view.world.position.x + 600 * view.world.scale.x).toBeCloseTo(28);
+  expect(view.world.position.y + 300 * view.world.scale.y).toBeCloseTo(28);
 });
 
 test("area selection uses the zoomed coordinates and zoom cancels an unfinished area", async () => {

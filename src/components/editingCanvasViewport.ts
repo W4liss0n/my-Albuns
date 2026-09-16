@@ -21,8 +21,8 @@ export function boundedEditingTransform(fit: EditingCanvasFit, transform: Editin
   if (zoom === 1) return fittedEditingTransform(fit);
   const bound = (offset: number, available: number, content: number) => {
     const margin = CANVAS_VERTICAL_MARGIN_PX;
-    if (content <= available - 2 * margin) return (available - content) / 2;
-    return Math.max(available - margin - content, Math.min(margin, offset));
+    // Keep an edge reachable without forcing a smaller axis back to its center.
+    return Math.max(margin - content, Math.min(available - margin, offset));
   };
   return { zoom, x: bound(transform.x, fit.width, fit.sheetWidth * fit.scale * zoom),
     y: bound(transform.y, fit.height, fit.sheetHeight * fit.scale * zoom) };
@@ -31,10 +31,13 @@ export function boundedEditingTransform(fit: EditingCanvasFit, transform: Editin
 export function zoomEditingTransform(fit: EditingCanvasFit, transform: EditingCanvasTransform,
   factor: number, anchor: ViewPoint): EditingCanvasTransform {
   const zoom = Math.max(1, Math.min(4, transform.zoom * factor));
+  if (zoom === 1) return fittedEditingTransform(fit);
   const ratio = zoom / transform.zoom;
-  return boundedEditingTransform(fit, { zoom,
+  // Position clamping here would move the point under the cursor. Only Pan and
+  // viewport resize bound translation; returning to minimum restores full fit.
+  return { zoom,
     x: anchor.x - (anchor.x - transform.x) * ratio,
-    y: anchor.y - (anchor.y - transform.y) * ratio });
+    y: anchor.y - (anchor.y - transform.y) * ratio };
 }
 
 export function resizedEditingTransform(previous: EditingCanvasFit, fit: EditingCanvasFit,
