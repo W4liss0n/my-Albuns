@@ -132,6 +132,19 @@ test("keeps stable command metadata complete and conflict-free by context", () =
   }
 });
 
+test("reserves Escape for the local owner and keeps keyboard commands in their declared contexts", () => {
+  const contexts = new Set(PROJECT_COMMAND_CATALOG.flatMap(command => command.bindings.map(binding => binding.context)));
+  for (const context of contexts) {
+    expect(matchProjectCommandShortcut(keyboardShortcut("Escape"), context)).toBeNull();
+  }
+  expect(matchProjectCommandShortcut(keyboardShortcut("Enter"), "sheet")).toBe("enter-sheet-editing");
+  expect(matchProjectCommandShortcut(keyboardShortcut("Enter"), "media-panel")).toBeNull();
+  expect(matchProjectCommandShortcut(keyboardShortcut("Delete"), "sheet")).toBe("delete-sheet");
+  expect(matchProjectCommandShortcut(keyboardShortcut("Delete"), "frame")).toBe("delete-frames");
+  expect(matchProjectCommandShortcut(keyboardShortcut("Delete"), "media-panel")).toBe("remove-media");
+  expect(matchProjectCommandShortcut(keyboardShortcut("Delete"), "media-folder")).toBeNull();
+});
+
 test("registers Photoshop and its fixed shortcut in both Photo contexts", () => {
   const photoshop = PROJECT_COMMAND_CATALOG.find(
     (command) => command.id === "open-in-photoshop",

@@ -11520,6 +11520,49 @@
           "value": "450"
         }
       ]
+    },
+    {
+      "id": "command-sheet-menu-owns-delete",
+      "title": "Atalhos — Delete preserva a Lâmina com menu aberto",
+      "implementationPath": "/workspace-preview.html?structure=physical",
+      "comparison": { "kind": "implementation-only", "surface": "command-context", "implementationCaptureSelector": ".app-shell", "reason": "Issue #12: menus preservam a elegibilidade local. Delete não alcança a Lâmina centralizada por trás do menu; nomes e visual seguem o editor vigente." },
+      "viewport": { "width": 1440, "height": 600 },
+      "readySelector": ".app-shell:has(.canvas-host[data-centered-sheet-id='sheet-002']):has([role='menu'][aria-label='Ações da Lâmina 02'])",
+      "actions": [
+        { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id='sheet-002']" },
+        { "type": "context-click", "selector": ".canvas-host canvas" },
+        { "type": "focus", "selector": "[role='menu'][aria-label='Ações da Lâmina 02'] button" },
+        { "type": "key", "key": "Delete" },
+        { "type": "assert", "selector": "[data-reorder-surface='bar'] [data-sheet-id='sheet-002']" }
+      ]
+    },
+    {
+      "id": "command-media-menu-owns-selection",
+      "title": "Atalhos — menu de imagens preserva a seleção",
+      "implementationPath": "/media-panel-preview.html?acceptance=editor",
+      "comparison": { "kind": "implementation-only", "surface": "command-context", "implementationCaptureSelector": ".media-panel-preview", "reason": "Issue #12: Ctrl+A e Delete não alteram a seleção por trás do menu. O clique no comando continua pertencendo ao Painel de imagens." },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": ".media-panel:has([role='menu']):has([data-media-id='test-media-001'][aria-pressed='true']):has([data-media-id='test-media-002'][aria-pressed='false'])",
+      "actions": [
+        { "type": "context-click", "selector": "[data-media-id='test-media-001']" },
+        { "type": "focus", "selector": "[role='menu'] button" },
+        { "type": "key", "key": "KeyA", "modifiers": ["Control"] },
+        { "type": "key", "key": "Delete" }
+      ]
+    },
+    {
+      "id": "command-import-menu-owns-selection",
+      "title": "Atalhos — Importar preserva a seleção com foco no botão",
+      "implementationPath": "/media-panel-preview.html?acceptance=editor",
+      "comparison": { "kind": "implementation-only", "surface": "command-context", "implementationCaptureSelector": ".media-panel-preview", "reason": "Issue #12: a barra de ferramentas conserva o teclado enquanto o popup está aberto, inclusive quando o foco permanece no botão que o abriu." },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": ".media-panel:has([role='menu'][aria-label='Importar']):has([data-media-id='test-media-001'][aria-pressed='true']):has([data-media-id='test-media-002'][aria-pressed='false'])",
+      "actions": [
+        { "type": "click", "selector": "[data-media-id='test-media-001']" },
+        { "type": "click", "selector": ".media-import-menu > button" },
+        { "type": "key", "key": "KeyA", "modifiers": ["Control"] },
+        { "type": "key", "key": "Delete" }
+      ]
     }
   ]
 }

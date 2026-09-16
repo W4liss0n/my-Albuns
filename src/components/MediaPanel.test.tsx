@@ -854,6 +854,51 @@ function renderPanel() {
   );
 }
 
+test("an open media menu keeps selection shortcuts from executing behind it", async () => {
+  const remove = vi.fn();
+  const open = vi.fn();
+  render(<MediaPanel {...mediaPanelInteractions} mediaItems={mediaItems} mediaUsage={mediaUsage}
+    onFillPhoto={vi.fn()} previewSource={{ kind: "static" }} preferences={{ kind: "local" }}
+    onRemoveMedia={remove} photoshopAvailable onOpenInPhotoshop={open} />);
+  const photo = screen.getByRole("button", { name: /Retrato/ });
+  fireEvent.contextMenu(photo);
+  const menu = screen.getByRole("menu", { name: "Ações das imagens" });
+  const target = within(menu).getByRole("menuitem", { name: /Substituir Imagem/ });
+  expect(fireEvent.keyDown(target, { key: "a", ctrlKey: true })).toBe(false);
+  expect(screen.getByRole("button", { name: /Álbum 10/ })).toHaveAttribute("aria-pressed", "false");
+  fireEvent.keyDown(target, { key: "Delete" });
+  expect(remove).not.toHaveBeenCalled();
+  fireEvent.keyDown(target, { key: "e", ctrlKey: true });
+  expect(open).not.toHaveBeenCalled();
+  expect(menu).toBeInTheDocument();
+  fireEvent.click(within(menu).getByRole("menuitem", { name: /Remover/ }));
+  expect(remove).toHaveBeenCalledExactlyOnceWith(["photo-retrato"]);
+});
+
+test.each(["Importar", "Filtro, ordem e tamanho"])("the open %s popup owns shortcuts from its trigger", async (label) => {
+  const user = userEvent.setup();
+  const remove = vi.fn();
+  const open = vi.fn();
+  render(<MediaPanel {...mediaPanelInteractions} mediaItems={mediaItems} mediaUsage={mediaUsage}
+    onFillPhoto={vi.fn()} previewSource={{ kind: "static" }} preferences={{ kind: "local" }}
+    onRemoveMedia={remove} photoshopAvailable onOpenInPhotoshop={open} />);
+  const photo = screen.getByRole("button", { name: /Retrato/ });
+  await user.click(photo);
+  const trigger = screen.getByRole("button", { name: label });
+  await user.click(trigger);
+  expect(fireEvent.keyDown(trigger, { key: "a", ctrlKey: true })).toBe(false);
+  await user.keyboard("{Control>}a{/Control}{Delete}{Control>}e{/Control}");
+  expect(screen.getByRole("button", { name: /Álbum 10/ })).toHaveAttribute("aria-pressed", "false");
+  expect(remove).not.toHaveBeenCalled();
+  expect(open).not.toHaveBeenCalled();
+  expect(trigger).toHaveAttribute("aria-expanded", "true");
+  await user.keyboard("{Escape}");
+  expect(trigger).toHaveAttribute("aria-expanded", "false");
+  await user.click(photo);
+  await user.keyboard("{Delete}");
+  expect(remove).toHaveBeenCalledExactlyOnceWith(["photo-retrato"]);
+});
+
 test("Photoshop opens only one contextual Photo and never a multi-selection or Decorative", () => {
   const open = vi.fn();
   render(<MediaPanel {...mediaPanelInteractions} mediaItems={mediaItems} mediaUsage={mediaUsage}

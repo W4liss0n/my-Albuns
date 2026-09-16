@@ -17,6 +17,8 @@ import {
   type MediaUsageFilter,
 } from "../state/mediaPanelPreferences";
 import { AppIcon, TextInput } from "../ui";
+import { matchProjectCommandShortcut, projectCommandDescriptor } from "../application/projectCommandCatalog";
+import { isTextEntryTarget } from "./isTextEntryTarget";
 import { useDismissableSurface } from "../ui/useDismissableSurface";
 
 interface MediaPanelToolbarProps {
@@ -92,7 +94,13 @@ export function MediaPanelToolbar({
   }
 
   return (
-    <div className="media-toolbar" ref={rootRef}>
+    <div className="media-toolbar" ref={rootRef} onKeyDown={(event) => {
+      if (openPopup !== null && event.key !== "Escape") {
+        if (!isTextEntryTarget(event.target) &&
+            (matchProjectCommandShortcut(event, "media-panel") || matchProjectCommandShortcut(event, "media-photo"))) event.preventDefault();
+        event.stopPropagation();
+      }
+    }}>
       <div aria-label="Tipo de recurso" className="media-tabs" role="group">
         <button
           aria-label="Fotos"
@@ -131,12 +139,12 @@ export function MediaPanelToolbar({
             )
           }
         >
-          <span>{importPending ? "Processando…" : "Importar"}</span>
+          <span>{importPending ? "Processando…" : projectCommandDescriptor("import-media").label}</span>
           <AppIcon icon={ChevronDown} size={12} />
         </button>
         {openPopup === "import" && (
           <div
-            aria-label="Importar"
+            aria-label={projectCommandDescriptor("import-media").label}
             className="ui-floating-surface media-popup media-import-popup"
             role="menu"
           >
@@ -149,7 +157,7 @@ export function MediaPanelToolbar({
                 onImportMedia("files");
               }}
             >
-              Arquivos…
+              {projectCommandDescriptor("import-media-files").label}
             </button>
             <button
               disabled={importDisabled}
@@ -157,7 +165,7 @@ export function MediaPanelToolbar({
               type="button"
               onClick={() => { setOpenPopup(null); onImportMedia("folder"); }}
             >
-              Pasta…
+              {projectCommandDescriptor("import-media-folder").label}
             </button>
           </div>
         )}
@@ -199,10 +207,10 @@ export function MediaPanelToolbar({
             }}><span className="media-folder-name">{folder.name}</span><small>{folder.mediaIds.length}</small></button>)}
         </div>
         <button
-          aria-label="Nova pasta de organização"
+          aria-label={`${projectCommandDescriptor("create-media-folder").label} de organização`}
           className="media-folder-add"
           disabled={foldersDisabled}
-          title="Nova pasta"
+          title={projectCommandDescriptor("create-media-folder").label}
           aria-haspopup="dialog"
           onClick={(event) => { setOpenPopup(null); onCreateFolder(event.currentTarget); }}
           type="button"
