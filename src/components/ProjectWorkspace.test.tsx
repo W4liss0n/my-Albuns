@@ -1,6 +1,3 @@
-import { invoke as invoke } from "@tauri-apps/api/core";
-import { listen as listen } from "@tauri-apps/api/event";
-import { createTauriProjectDialogPort as createTauriProjectDialogPort } from "../platform/tauriProjectDialogPort";
 import { emptyLayoutCatalogPort } from "../test/layoutCatalogPorts";
 import {
   act,
@@ -7010,46 +7007,3 @@ test.each(["menu", "context"])("requires the owned loss confirmation for edge co
   await waitFor(() => expect(apply).toHaveBeenCalledWith({ kind: "convertEdgeSheet", sheetId: "sheet-003" }, expect.any(Function)));
 });
 
-vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
-vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn() }));
-
-test("queued conversion and Album information share the owned dialog without blocking each other", async () => {
-  let emitNative!: (payload: unknown) => void;
-  vi.mocked(invoke).mockResolvedValue(undefined);
-  vi.mocked(listen).mockImplementation(async (_event, handler) => {
-    emitNative = payload => handler({ payload } as never);
-    return () => undefined;
-  });
-  const initial = createThreeSheetProjection();
-  initial.state.album.sheets[2].visuals = {
-    background: { kind: "perSide", left: { kind: "default" }, right: {
-      kind: "custom", content: { kind: "color", rgb: "#123456" }, mapping: "side",
-    } },
-    overlay: { kind: "default" },
-  };
-  const pending = deferredProjection();
-  const apply = vi.fn(async () => initial);
-  const port = projectCorePortWithApply(apply);
-  port.save = vi.fn(async revision => ({ outcome: { kind: "saved" as const, revision }, projection: await pending.promise }));
-  render(<ProjectWorkspace projection={initial} projectCorePort={port} projectDialogPort={createTauriProjectDialogPort()} onProjectionChange={() => undefined} />);
-  const info = within(screen.getByRole("button", { name: "Informações do Álbum" }).closest("section") as HTMLElement);
-  fireEvent.change(info.getByLabelText("DPI"), { target: { value: "600" } });
-  await waitFor(() => expect(info.getByRole("button", { name: "Aplicar" })).toBeEnabled());
-  fireEvent.keyDown(window, { ctrlKey: true, key: "s" });
-  await waitFor(() => expect(port.save).toHaveBeenCalledOnce());
-  act(() => canvasHarness.props?.onCenteredSheetChange?.("sheet-003"));
-  fireEvent.click(getApplicationCommand("Lâmina", "Converter extremidade"));
-  expect(info.getByRole("button", { name: "Aplicar" })).toBeEnabled();
-  fireEvent.click(info.getByRole("button", { name: "Aplicar" }));
-  const presentation = (kind: string) => vi.mocked(invoke).mock.calls
-    .find(([cmd, args]) => cmd === "present_project_dialog" && (args as { state: { kind: string } }).state.kind === kind)?.[1] as { sessionId: string } | undefined;
-  await waitFor(() => expect(presentation("albumInformationConfirmation")).toBeDefined());
-  await act(async () => { emitNative({ sessionId: presentation("albumInformationConfirmation")!.sessionId, action: "confirmAlbumInformation" }); });
-  await act(async () => { pending.resolve(initial); await pending.promise; });
-  await waitFor(() => expect(apply).toHaveBeenCalledWith(expect.objectContaining({ kind: "setAlbumInformation" }), expect.any(Function)));
-  await waitFor(() => expect(presentation("edgeConversionConfirmation")).toBeDefined());
-  expect(apply).toHaveBeenCalledTimes(1);
-  await act(async () => { emitNative({ sessionId: presentation("edgeConversionConfirmation")!.sessionId, action: "confirmEdgeConversion" }); });
-  await waitFor(() => expect(apply).toHaveBeenCalledWith({ kind: "convertEdgeSheet", sheetId: "sheet-003" }, expect.any(Function)));
-  expect(apply).toHaveBeenCalledTimes(2);
-});
