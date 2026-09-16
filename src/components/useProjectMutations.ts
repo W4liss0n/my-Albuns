@@ -444,6 +444,8 @@ export function useProjectMutations({
     dismissImageProcessingProblems: imageProcessing.dismissProblems,
     photoImportResult,
     applyIntent,
+    editMediaFolder: (edit: import("../domain/project").MediaFolderEdit) =>
+      runWithErrorFeedback((port) => port.apply({ kind: "editMediaFolder", edit }), true),
     commitInteraction,
     commitFrameGeometry,
     swapFrameContentsAtPoint,

@@ -5,17 +5,17 @@ use crate::SheetVisuals;
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct ProjectDocumentV11 {
-    document_type: String,
-    schema_version: u32,
+    pub(super) document_type: String,
+    pub(super) schema_version: u32,
     pub(super) project_id: String,
-    revision: u64,
-    project: ProjectPayloadV10,
-    sheet_visuals: Vec<SheetVisualsV11>,
+    pub(super) revision: u64,
+    pub(super) project: ProjectPayloadV10,
+    pub(super) sheet_visuals: Vec<SheetVisualsV11>,
 }
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct SheetVisualsV11 {
+pub(super) struct SheetVisualsV11 {
     sheet_id: String,
     visuals: SheetVisuals,
 }

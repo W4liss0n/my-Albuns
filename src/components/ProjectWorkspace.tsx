@@ -254,7 +254,7 @@ export function ProjectWorkspace({
     onProjectionChange,
     onSaveAsBarrierChange: changeSessionBarrier,
     prepareImportedMedia: prepareMediaPresentation ? async (imported) => {
-      const plan = mediaPanelRef.current?.planCatalog(imported.projection.state.album.media, imported.projection.mediaUsage);
+      const plan = mediaPanelRef.current?.planCatalog(imported.projection.state.album.media, imported.projection.mediaUsage, imported.projection.state.album.mediaFolders);
       const demand = mergeMediaPreviewDemands(
         canvasMediaDemand,
         plan?.demand ?? { visibleMediaIds: [], preloadMediaIds: [] },
@@ -851,6 +851,8 @@ export function ProjectWorkspace({
           mediaFiles={mediaFiles}
           hidden={!workspacePanels.panels.media.visible || controller.layoutPanel.visible}
           ref={mediaPanelRef}
+          mediaFolders={projection.state.album.mediaFolders}
+          onEditMediaFolder={controller.editMediaFolder}
           mediaItems={projection.state.album.media}
           mediaUsage={projection.mediaUsage}
           onFillPhoto={controller.fillMedia}

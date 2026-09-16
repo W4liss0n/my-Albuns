@@ -409,6 +409,9 @@ pub struct MediaCatalogItem {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct AlbumSnapshot {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub media_folders: Option<Vec<crate::MediaFolder>>,
     pub sheets: Vec<SheetSnapshot>,
     pub media: Vec<MediaCatalogItem>,
     pub visual_defaults: ProjectedVisualDefaults,
@@ -869,6 +872,9 @@ pub enum FrameStackAction {
 )]
 #[ts(tag = "kind")]
 pub enum ProjectIntent {
+    EditMediaFolder {
+        edit: crate::MediaFolderEdit,
+    },
     EditSheetVisual {
         sheet_id: String,
         scope: crate::DecorativeScope,

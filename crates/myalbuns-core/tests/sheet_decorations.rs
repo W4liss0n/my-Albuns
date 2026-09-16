@@ -84,7 +84,7 @@ fn local_background_color_is_one_undoable_edit_and_restores_live_album_defaults(
 }
 
 #[test]
-fn v10_migrates_without_local_visuals_and_explicit_save_matches_the_v11_fixtures() {
+fn v10_migrates_without_local_visuals_and_explicit_save_matches_the_v12_fixtures() {
     let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
     for name in [
         "migration",
@@ -119,8 +119,8 @@ fn v10_migrates_without_local_visuals_and_explicit_save_matches_the_v11_fixtures
         project.save(project.revision()).unwrap();
         assert_eq!(project.projection(), before);
         let output = std::fs::read(&path).unwrap();
-        let expected = fixtures.join(format!("project_document_v11_{name}_expected.myalbuns"));
-        if std::env::var_os("MYALBUNS_UPDATE_PROJECT_V11_FIXTURES").is_some() {
+        let expected = fixtures.join(format!("project_document_v12_{name}_expected.myalbuns"));
+        if std::env::var_os("MYALBUNS_UPDATE_PROJECT_V12_FIXTURES").is_some() {
             std::fs::write(&expected, &output).unwrap();
         }
         assert_eq!(output, std::fs::read(expected).unwrap());

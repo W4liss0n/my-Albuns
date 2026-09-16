@@ -568,6 +568,7 @@ pub struct ProjectDocument {
     sheets: Vec<ProjectSheet>,
     layout_settings: crate::LayoutSettings,
     favorite_layouts: Vec<crate::FavoriteLayout>,
+    pub(crate) media_folders: Vec<crate::MediaFolder>,
 }
 
 impl ProjectDocument {
@@ -600,6 +601,7 @@ impl ProjectDocument {
             sheets,
             layout_settings: crate::LayoutSettings::default(),
             favorite_layouts: Vec::new(),
+            media_folders: Vec::new(),
         }
     }
 
@@ -2039,7 +2041,10 @@ impl ProjectRevision {
 }
 
 pub(crate) fn validate_project_state(project: &ProjectDocument) -> Result<(), ()> {
-    if !project.layout_state_is_valid() || !project.sheet_visuals_are_valid() {
+    if !project.layout_state_is_valid()
+        || !project.sheet_visuals_are_valid()
+        || !project.media_folders_are_valid()
+    {
         return Err(());
     }
     let settings = project.document();

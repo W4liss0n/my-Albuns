@@ -6,6 +6,7 @@ import "./ui/ui.css";
 import { MediaPanel } from "./components/MediaPanel";
 import { mediaPanelPreviewFixture } from "./test/mediaPanelPreviewFixtures";
 import "./media-panel-preview.css";
+import type { MediaFolder } from "./domain/project";
 import type { MediaFileInfo } from "./application/projectPorts";
 
 const { mediaItems, mediaPreviews, mediaUsage } = mediaPanelPreviewFixture;
@@ -15,6 +16,13 @@ const mediaFiles: Record<string, MediaFileInfo> = parameters.has("files") ? Obje
   createdAtMs: index === 5 ? null : 1_780_000_000_000 + (mediaItems.length - index) * 1000,
   modifiedAtMs: index === 5 ? null : 1_780_000_000_000 + index * 1000,
 }])) : {};
+const folders: MediaFolder[] = parameters.has("folders") ? [
+  { id: "folder-retratos", kind: "photo", name: "Retratos", mediaIds: ["test-media-003", "test-media-006"] },
+  { id: "folder-cerimonia", kind: "photo", name: "Cerimônia", mediaIds: ["test-media-001", "test-media-002", "test-media-007"] },
+  { id: "folder-externas", kind: "photo", name: "Fotos externas da turma de formandos", mediaIds: ["test-media-004", "test-media-005"] },
+  { id: "folder-familias", kind: "photo", name: "Famílias", mediaIds: [] },
+  { id: "folder-fundos", kind: "decorative", name: "Fundos", mediaIds: ["test-decorative-001"] },
+] : [];
 const displayedPreviews = parameters.get("cache") === "missing"
   ? Object.fromEntries(Object.entries(mediaPreviews).filter(([mediaId]) => mediaFiles[mediaId]?.state !== "absent"))
   : mediaPreviews;
@@ -33,6 +41,8 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
       <MediaPanel
         photoshopAvailable={parameters.get("photoshop") === "available"}
         onOpenInPhotoshop={() => undefined}
+        mediaFolders={folders}
+        onEditMediaFolder={async () => true}
         mediaItems={mediaItems}
         mediaUsage={mediaUsage}
         mediaFiles={mediaFiles}

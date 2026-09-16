@@ -59,6 +59,7 @@ pub(crate) async fn apply_project_intent(
     let previous_bindings = state.authorized_media_catalog()?.bindings;
     let intent_kind = match &intent {
         ProjectIntent::RemoveMedia { .. } => "remove_media",
+        ProjectIntent::EditMediaFolder { .. } => "edit_media_folder",
         ProjectIntent::ApplyDecorative { .. } => "apply_decorative",
         ProjectIntent::EditSheetVisual { .. } => "edit_sheet_visual",
         ProjectIntent::DropDecorative { .. } => "drop_decorative",

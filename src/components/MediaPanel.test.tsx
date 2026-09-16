@@ -131,7 +131,7 @@ test("prepares only the future viewport with the panel's active ordering and fil
   expect(ref.current!.planCatalog(photos, []).demand).toEqual({ visibleMediaIds: [], preloadMediaIds: [] });
 });
 
-test("matches the reference toolbar and marks only unavailable import actions as placeholders", async () => {
+test("matches the reference toolbar and disables folders when no mutation port is provided", async () => {
   const user = userEvent.setup();
   renderPanel();
 
@@ -155,7 +155,7 @@ test("matches the reference toolbar and marks only unavailable import actions as
   );
   expect(
     screen.getByRole("button", { name: "Nova pasta de organização" }),
-  ).toHaveAttribute("data-placeholder-feature", "media-organization-folders");
+  ).toBeDisabled();
   expect(
     screen.getByRole("button", { name: "Filtro, ordem e tamanho" }),
   ).toBeVisible();

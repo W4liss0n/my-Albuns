@@ -519,3 +519,37 @@ test.each(["file", "operation"] as const)("waits for image cache before Save and
   expect(view.result.current.imageProcessingProblems).toEqual([]);
   expect(view.result.current.imageProcessingOperationProblem).toBeNull();
 });
+
+
+test.each([false, true])("folder edits share the authoritative queue with Save and Undo (failure=%s)", async (fail) => {
+  const pending = deferredProjection();
+  const next = structuredClone(representativeProjection);
+  next.state.revision += 1; next.state.dirty = true; next.state.canUndo = true;
+  next.state.album.mediaFolders = [{ id: "folder-a", kind: "photo", name: "Turma", mediaIds: [] }];
+  const apply = vi.fn<ProjectCorePort["apply"]>(() => pending.promise);
+  const undo = vi.fn<ProjectCorePort["undo"]>(async () => representativeProjection);
+  const port = projectSessionPort(apply, undo);
+  port.save = vi.fn<ProjectCorePort["save"]>(async (revision) => ({ outcome: { kind: "saved", revision }, projection: next }));
+  const view = renderHook(() => useProjectMutations({ projection: representativeProjection,
+    runProjectMutation: useProjectMutationRunner(representativeProjection.state.projectId, port),
+    onProjectionChange: vi.fn(), onAffectedFrame: vi.fn(), onAffectedSheet: vi.fn() }));
+  let first!: Promise<boolean>; let adjacent!: Promise<boolean>;
+  act(() => {
+    first = view.result.current.editMediaFolder({ kind: "create", mediaKind: "photo", name: "Turma" });
+    adjacent = view.result.current.editMediaFolder({ kind: "rename", folderId: "folder-a", name: "Formandos" });
+    view.result.current.save(); view.result.current.undo();
+  });
+  expect(apply).toHaveBeenCalledTimes(1); expect(port.save).not.toHaveBeenCalled(); expect(undo).not.toHaveBeenCalled();
+  await act(async () => {
+    if (fail) pending.reject(new Error("Não foi possível criar a pasta.")); else pending.resolve(next);
+    await Promise.all([first, adjacent]);
+  });
+  if (fail) {
+    expect(apply).toHaveBeenCalledTimes(1);
+    expect(view.result.current.message).toBe("Não foi possível criar a pasta.");
+  } else {
+    expect(apply).toHaveBeenNthCalledWith(2, { kind: "editMediaFolder", edit: { kind: "rename", folderId: "folder-a", name: "Formandos" } });
+    await waitFor(() => expect(port.save).toHaveBeenCalledWith(next.state.revision));
+    await waitFor(() => expect(undo).toHaveBeenCalledTimes(1));
+  }
+});

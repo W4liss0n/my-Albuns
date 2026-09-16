@@ -3,7 +3,7 @@ import { EmptyState } from "../ui";
 
 interface MediaPanelEmptyStateProps {
   kind: MediaKind;
-  reason: "catalog" | "filtered";
+  reason: "catalog" | "filtered" | "folder";
 }
 
 interface EmptyStateContent {
@@ -31,7 +31,8 @@ export function MediaPanelEmptyState({
   kind,
   reason,
 }: MediaPanelEmptyStateProps) {
-  const content = reason === "catalog" ? catalogContent[kind] : filteredContent;
+  const content = reason === "catalog" ? catalogContent[kind] : reason === "folder"
+    ? { title: "Pasta vazia", description: "Use Mover para pasta… no menu das imagens." } : filteredContent;
 
   return (
     <EmptyState

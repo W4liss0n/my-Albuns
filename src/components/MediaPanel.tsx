@@ -22,6 +22,8 @@ import { AppIcon } from "../ui/AppIcon";
 import type { MediaPanelPersistentPreference } from "../application/workspacePreferences";
 
 import type {
+  MediaFolder,
+  MediaFolderEdit,
   MediaCatalogItem,
   MediaKind,
   MediaUsage,
@@ -33,6 +35,7 @@ import {
   type MediaUsageFilter,
 } from "../state/mediaPanelPreferences";
 import { MediaPanelEmptyState } from "./MediaPanelEmptyState";
+import { MediaFolderPopover, type MediaFolderPrompt } from "./MediaFolderPopover";
 import { MediaPanelToolbar } from "./MediaPanelToolbar";
 import { MediaPreviewCard } from "./MediaPreviewCard";
 import { isTextEntryTarget } from "./isTextEntryTarget";
@@ -42,7 +45,7 @@ import "./MediaPanel.css";
 import { MEDIA_PANEL_PRELOAD_MARGIN, mediaPanelViewportDemand } from "./mediaPanelViewport";
 
 export interface MediaPanelHandle {
-  planCatalog(mediaItems: readonly MediaCatalogItem[], mediaUsage: readonly MediaUsage[]): {
+  planCatalog(mediaItems: readonly MediaCatalogItem[], mediaUsage: readonly MediaUsage[], folders?: readonly MediaFolder[]): {
     demand: MediaPreviewDemand;
     commit(): void;
   };
@@ -84,6 +87,8 @@ type MediaPanelPreviewSource =
     };
 
 interface MediaPanelProps {
+  mediaFolders?: readonly MediaFolder[];
+  onEditMediaFolder?(edit: MediaFolderEdit): Promise<boolean>;
   photoshopAvailable?: boolean;
   onOpenInPhotoshop?(mediaId: string): void;
   ref?: Ref<MediaPanelHandle>;
@@ -112,9 +117,12 @@ const naturalNameCollator = new Intl.Collator("pt-BR", {
   numeric: true,
   sensitivity: "base",
 });
+const EMPTY_FOLDERS: readonly MediaFolder[] = [];
 const EMPTY_MEDIA_FILES: Readonly<Record<string, MediaFileInfo>> = {};
 
 export function MediaPanel({
+  mediaFolders = EMPTY_FOLDERS,
+  onEditMediaFolder,
   photoshopAvailable = false,
   onOpenInPhotoshop,
   ref,
@@ -139,6 +147,9 @@ export function MediaPanel({
   previewSource,
 }: MediaPanelProps) {
   const mediaPreviews = previewSource.previews ?? {};
+  const [folderIds, setFolderIds] = useState<Record<MediaKind, string | null>>({ photo: null, decorative: null });
+  const [folderPrompt, setFolderPrompt] = useState<MediaFolderPrompt | null>(null);
+  const [folderMenu, setFolderMenu] = useState<{ folder: MediaFolder; anchor: HTMLElement; x: number; y: number } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; mediaId: string } | null>(null);
   const onMediaDemandChange =
     previewSource.kind === "connected" ? previewSource.onDemandChange : null;
@@ -152,7 +163,24 @@ export function MediaPanel({
   const [localActiveMediaKind, setLocalActiveMediaKind] =
     useState<MediaKind>("photo");
   const activeMediaKind = preferenceMode.kind === "controlled" ? preferenceMode.activeKind : localActiveMediaKind;
-  useEffect(() => { setContextMenu(null); }, [activeMediaKind, hidden]);
+  useEffect(() => { setContextMenu(null); setFolderMenu(null); setFolderPrompt(null); }, [activeMediaKind, hidden]);
+  const activeFolders = useMemo(() => mediaFolders.filter((folder) => folder.kind === activeMediaKind), [mediaFolders, activeMediaKind]);
+  const activeFolder = activeFolders.find((folder) => folder.id === folderIds[activeMediaKind]);
+  const activeFolderMembers = useMemo(() => activeFolder ? new Set(activeFolder.mediaIds) : null, [activeFolder]);
+  useEffect(() => {
+    setFolderIds((current) => {
+      const valid = (kind: MediaKind) => mediaFolders.some((folder) => folder.id === current[kind] && folder.kind === kind) ? current[kind] : null;
+      const next = { photo: valid("photo"), decorative: valid("decorative") };
+      return next.photo === current.photo && next.decorative === current.decorative ? current : next;
+    });
+  }, [mediaFolders]);
+  const foldersDisabled = relinkDisabled || importPending || !onEditMediaFolder;
+  function closeFolderPrompt() {
+    const anchor = folderPrompt?.anchor;
+    setFolderPrompt(null);
+    if (anchor?.isConnected) anchor.focus({ preventScroll: true });
+    else panelHostRef.current?.focus({ preventScroll: true });
+  }
   function setActiveMediaKind(activeKind: MediaKind) {
     if (preferenceMode.kind === "controlled") preferenceMode.onActiveKindChange(activeKind);
     else setLocalActiveMediaKind(activeKind);
@@ -212,8 +240,8 @@ export function MediaPanel({
   const missingOnly = missingOnlyByKind[activeMediaKind];
   const { sortKey, sortDirection, usageFilter } = preferences;
   const visibleMediaItems = useMemo(() => filterMediaItems(
-    activeMediaItems, mediaUsageById, search, sortKey, sortDirection, usageFilter, fileInformation, missingOnly,
-  ), [activeMediaItems, mediaUsageById, search, sortKey, sortDirection, usageFilter, fileInformation, missingOnly]);
+    activeMediaItems.filter((media) => !activeFolderMembers || activeFolderMembers.has(media.id)), mediaUsageById, search, sortKey, sortDirection, usageFilter, fileInformation, missingOnly,
+  ), [activeMediaItems, activeFolderMembers, mediaUsageById, search, sortKey, sortDirection, usageFilter, fileInformation, missingOnly]);
   const visibleMediaIds = useMemo(
     () => visibleMediaItems.map(({ id }) => id),
     [visibleMediaItems],
@@ -222,7 +250,7 @@ export function MediaPanel({
     () => new Set(visibleMediaIds),
     [visibleMediaIds],
   );
-  const emptyStateReason =
+  const emptyStateReason = activeFolder?.mediaIds.length === 0 ? "folder" :
     activeMediaItems.length === 0
       ? "catalog"
       : visibleMediaItems.length === 0
@@ -240,9 +268,11 @@ export function MediaPanel({
   });
 
   useImperativeHandle(ref, () => ({
-    planCatalog(nextItems, nextUsage) {
+    planCatalog(nextItems, nextUsage, folders = mediaFolders) {
+      const folder = folders.find((item) => item.id === activeFolder?.id);
+      const members = folder ? new Set(folder.mediaIds) : null;
       const ordered = filterMediaItems(
-        nextItems.filter((media) => media.kind === activeMediaKind),
+        nextItems.filter((media) => media.kind === activeMediaKind && (!members || members.has(media.id))),
         new Map(nextUsage.map((usage) => [usage.mediaId, usage.count])),
         search, sortKey, sortDirection, usageFilter, fileInformation, missingOnly,
       );
@@ -472,7 +502,7 @@ export function MediaPanel({
   }
 
   function selectAllVisibleMedia(event: KeyboardEvent<HTMLElement>) {
-    if (isTextEntryTarget(event.target)) return;
+    if (folderPrompt || folderMenu || isTextEntryTarget(event.target)) return;
     if (matchProjectCommandShortcut(event, "media-photo") === "open-in-photoshop") {
       event.preventDefault(); event.stopPropagation();
       const selected = selectedMediaIds.size === 1 ? [...selectedMediaIds][0] : null;
@@ -533,6 +563,12 @@ export function MediaPanel({
       {fileDrop.error && <div className="media-file-drop-error" role="status">{fileDrop.error}</div>}
       <MediaPanelToolbar
         activeMediaKind={activeMediaKind}
+        folders={activeFolders}
+        activeFolderId={activeFolder?.id ?? null}
+        foldersDisabled={foldersDisabled}
+        onFolderChange={(id) => { setContextMenu(null); setFolderIds((current) => ({ ...current, [activeMediaKind]: id })); }}
+        onCreateFolder={(anchor) => { setContextMenu(null); setFolderPrompt({ kind: "create", mediaKind: activeMediaKind, anchor }); }}
+        onFolderMenu={(folder, anchor, position) => { setContextMenu(null); setFolderMenu({ folder, anchor, ...position }); }}
         missingCounts={missingCounts}
         missingOnly={missingOnly}
         onMissingOnlyChange={(value) => {
@@ -680,11 +716,32 @@ export function MediaPanel({
           onClick={() => { const id = [...selectedMediaIds][0]; if (id) onOpenInPhotoshop?.(id); setContextMenu(null); panelHostRef.current?.focus({ preventScroll: true }); }}>
           <span>{projectCommandDescriptor("open-in-photoshop").label}</span><kbd aria-hidden="true">{projectCommandShortcutLabel("open-in-photoshop")}</kbd>
         </button>}
+        {onEditMediaFolder && <button type="button" role="menuitem" disabled={foldersDisabled || selectedMediaIds.size === 0}
+          onClick={() => {
+            const anchor = panelHostRef.current?.querySelector<HTMLElement>(`[data-media-id="${contextMenu.mediaId}"]`) ?? panelHostRef.current;
+            const currentFolder = activeFolders.find((folder) => folder.mediaIds.includes(contextMenu.mediaId));
+            if (anchor) setFolderPrompt({ kind: "move", mediaKind: activeMediaKind, anchor,
+              mediaIds: [...selectedMediaIds], folderId: currentFolder?.id ?? activeFolders[0]?.id ?? null });
+            setContextMenu(null);
+          }}>Mover para pasta…</button>}
         <button type="button" role="menuitem" disabled={relinkDisabled || importPending || selectedMediaIds.size === 0}
           onClick={() => { setContextMenu(null); onRemoveMedia([...selectedMediaIds]); panelHostRef.current?.focus({ preventScroll: true }); }}>
           <span>{projectCommandDescriptor("remove-media").label}</span><kbd aria-hidden="true">{projectCommandShortcutLabel("remove-media")}</kbd>
         </button>
       </ContextMenuSurface>}
+      {folderMenu && <ContextMenuSurface label={`Ações da pasta ${folderMenu.folder.name}`} position={folderMenu}
+        onDismiss={() => { folderMenu.anchor.focus({ preventScroll: true }); setFolderMenu(null); }}>
+        <button type="button" role="menuitem" disabled={foldersDisabled} onClick={() => {
+          setFolderPrompt({ kind: "rename", folder: folderMenu.folder, anchor: folderMenu.anchor, mediaKind: activeMediaKind });
+          setFolderMenu(null);
+        }}>Renomear…</button>
+        <button type="button" role="menuitem" disabled={foldersDisabled} onClick={() => {
+          void onEditMediaFolder?.({ kind: "delete", folderId: folderMenu.folder.id });
+          setFolderMenu(null); panelHostRef.current?.focus({ preventScroll: true });
+        }}>Excluir pasta</button>
+      </ContextMenuSurface>}
+      {folderPrompt && onEditMediaFolder && <MediaFolderPopover prompt={folderPrompt} folders={mediaFolders}
+        onSubmit={(edit) => foldersDisabled ? Promise.resolve(false) : onEditMediaFolder(edit)} onClose={closeFolderPrompt} />}
     </section>
   );
 }

@@ -271,6 +271,13 @@ impl PersistentProjectSession {
             }
             return Ok(outcome);
         }
+        if let ProjectIntent::EditMediaFolder { edit } = &intent {
+            let next = self.project().with_media_folder_edit(edit)?;
+            if next != *self.project() {
+                self.commit_edit(|_| Ok(next))?;
+            }
+            return Ok(outcome);
+        }
         if let ProjectIntent::RemoveMedia { media_ids, mode } = &intent {
             let next = self.project().with_removed_media(media_ids, *mode)?;
             if next != *self.project() {
@@ -348,6 +355,7 @@ impl PersistentProjectSession {
             ProjectIntent::DropDecorative { .. }
             | ProjectIntent::EditSheetVisual { .. }
             | ProjectIntent::ApplyDecorative { .. }
+            | ProjectIntent::EditMediaFolder { .. }
             | ProjectIntent::RemoveMedia { .. }
             | ProjectIntent::DeleteFrames { .. } => {
                 unreachable!("Frame deletion commits its prepared document once")
