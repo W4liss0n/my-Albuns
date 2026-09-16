@@ -26,7 +26,7 @@ testes executáveis; a tabela não substitui a execução dessas verificações.
 | Critérios | Comportamento | Verificação principal |
 | --- | --- | --- |
 | 1, 26–27 | Criar Frames vazios e com Foto, centralização e superfície ativa | `crates/myalbuns-core/tests/manual_frame.rs`; `src/components/useProjectEditorController.manualFrame.test.tsx` |
-| 2–3 | Trocar lados preservando numeração, ajustes e Travessias centrais; bloquear Página única | `crates/myalbuns-core/tests/sheet_side_swap.rs`; `src/components/ProjectWorkspace.test.tsx` |
+| 2–3 | Trocar lados preservando numeração, ajustes e Travessias centrais; bloquear Página única | `crates/myalbuns-core/tests/sheet_side_swap.rs`; `src/components/useProjectEditorController.sheetSideSwap.test.tsx`; `src/components/AlbumCanvas.rendering.test.tsx` |
 | 4–6, 11–12 | Seleção transitória, entrada/saída da edição, Ctrl, sobreposição e Histórico | `src/state/editorView.test.ts`; `src/components/AlbumCanvas.frameGroup.test.tsx`; `src/components/useProjectEditorController.frameDeletion.test.tsx` |
 | 7–9 | Selecionar tudo e Caixa de seleção, cancelamento, foco e Layout travado | `src/components/AlbumCanvas.areaSelection.test.tsx`; `src/components/ProjectWorkspace.test.tsx` |
 | 10, 13–18 | Limiar, movimento/redimensionamento de grupo, oito alças, modificadores, limites e uma ação por gesto | `crates/myalbuns-core/tests/frame_geometry.rs`; `src/components/AlbumCanvas.frameGeometry.test.tsx`; `src/components/AlbumCanvas.frameGroup.test.tsx`; `src/components/AlbumCanvas.frameHistory.test.tsx` |
@@ -60,6 +60,12 @@ bytes do Original também são conferidos ao final.
 As dimensões e cores esperadas são definidas pelo cenário, sem editar diretamente
 o documento persistido nem a composição projetada. Assim, a igualdade entre
 dois resultados não consegue, sozinha, aprovar uma saída vazia ou sem as edições.
+
+O teste de substituição em `photo_composition_v3.rs` também foi ampliado: uma
+ocorrência recebe Pan, Zoom, Giro, Ângulo, espelhamento e preto e branco, além de
+Borda e Opacidade próprias. Substituí-la deve zerar todos os ajustes da Foto,
+preservar geometria, estilo e Pilha do Frame e não tocar no Frame sobreposto
+inferior. Undo/Redo deve restaurar cada estado em uma única ação.
 
 ## Reprodução e limites
 
