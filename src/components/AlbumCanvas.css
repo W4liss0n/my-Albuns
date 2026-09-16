@@ -54,6 +54,9 @@
   cursor: var(--frame-gesture-cursor) !important;
 }
 
+.pixi-canvas--navigation-ready { cursor: grab !important; }
+.pixi-canvas--navigation-pan { cursor: grabbing !important; }
+
 /* O foco espacial é desenhado na Lâmina pelo renderer; um contorno em torno
    do Canvas confundiria o alvo atual com o viewport inteiro. */
 .pixi-canvas:focus-visible {

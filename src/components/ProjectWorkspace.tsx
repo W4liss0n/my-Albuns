@@ -576,6 +576,8 @@ export function ProjectWorkspace({
     setFrameContextMenu({ kind: "empty", position });
   };
   const launchProject = useProjectLauncher(projectLauncher, commandsBlocked || mediaDrag !== null, reportCloseError);
+  const [fitSheetRequest, setFitSheetRequest] = useState(0);
+  const canvasNavigationBlocked = commandsBlocked || mediaDrag !== null || sheetContextMenu !== null || frameContextMenu !== null;
   useProjectCommandShortcuts({
     ...launchProject,
     selectAllFrames: controller.selectAllFrames,
@@ -608,6 +610,7 @@ export function ProjectWorkspace({
     undo: controller.undo,
   });
   const applicationMenus = createProjectApplicationMenus({
+    fitSheet: sheetEditing && !canvasNavigationBlocked ? () => setFitSheetRequest((request) => request + 1) : undefined,
     ...launchProject,
     selectAllFrames: controller.selectAllFrames,
     canSelectAllFrames: controller.canSelectAllFrames,
@@ -733,6 +736,7 @@ export function ProjectWorkspace({
             sheet={projection.composition.sheets.find((sheet) => sheet.sheetId === controller.layoutPanel.sheetId)!} />}
           <AlbumCanvas
             {...controller.canvasProps}
+            editingNavigation={{ disabled: canvasNavigationBlocked, fitRequest: fitSheetRequest }}
             onOpenFrameContextMenu={openFrameContextMenu}
             onOpenEmptyCanvasContextMenu={openEmptyCanvasContextMenu}
             draggedPhotoId={draggedPhotoId}

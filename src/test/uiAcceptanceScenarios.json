@@ -10646,6 +10646,340 @@
           "phase": "drop"
         }
       ]
+    },
+    {
+      "implementationPath": "/workspace-preview.html?frame=clipboard&clipboard=same-group",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "editing-canvas-navigation",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Navegação do Modo de edição aceita em docs/design/0001-estrutura-da-janela-do-projeto.md: Zoom até 4×, Pan, Ajustar Lâmina e manutenção da Seleção. Preservar o visual do editor vigente, sem controles permanentes de Zoom."
+      },
+      "viewport": {
+        "width": 1567,
+        "height": 900
+      },
+      "readySelector": "body[data-clipboard-editing-sheet=\"sheet-002\"] .canvas-host canvas[data-editing-zoom=\"1\"]",
+      "id": "workspace-editing-zoom",
+      "title": "Zoom por teclado no Canvas real",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "Plus",
+          "modifiers": [
+            "Control"
+          ]
+        },
+        {
+          "type": "key",
+          "key": "Plus",
+          "modifiers": [
+            "Control"
+          ]
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-clipboard-selection=\"clipboard-frame-1-0,clipboard-frame-1-1\"][data-clipboard-editing-sheet=\"sheet-002\"]"
+        }
+      ]
+    },
+    {
+      "implementationPath": "/workspace-preview.html?frame=clipboard&clipboard=same-group",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "editing-canvas-navigation",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Navegação do Modo de edição aceita em docs/design/0001-estrutura-da-janela-do-projeto.md: Zoom até 4×, Pan, Ajustar Lâmina e manutenção da Seleção. Preservar o visual do editor vigente, sem controles permanentes de Zoom."
+      },
+      "viewport": {
+        "width": 1567,
+        "height": 900
+      },
+      "readySelector": "body[data-clipboard-editing-sheet=\"sheet-002\"] .canvas-host canvas[data-editing-zoom=\"1\"]",
+      "id": "workspace-editing-pan-preview",
+      "title": "Pan com Espaço sobre Frames ampliados",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "wheel",
+          "selector": ".canvas-host canvas",
+          "deltaY": -400,
+          "modifiers": [
+            "Control"
+          ]
+        },
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": ".canvas-host canvas",
+          "targetSelector": ".canvas-host canvas",
+          "sourceOffsetX": 0,
+          "sourceOffsetY": 0,
+          "targetOffsetX": 140,
+          "targetOffsetY": 70,
+          "phase": "preview",
+          "modifiers": [
+            "Space"
+          ]
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-clipboard-selection=\"clipboard-frame-1-0,clipboard-frame-1-1\"][data-clipboard-editing-sheet=\"sheet-002\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "canvas.pixi-canvas--navigation-pan"
+        }
+      ]
+    },
+    {
+      "implementationPath": "/workspace-preview.html?frame=clipboard&clipboard=same-group",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "editing-canvas-navigation",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Navegação do Modo de edição aceita em docs/design/0001-estrutura-da-janela-do-projeto.md: Zoom até 4×, Pan, Ajustar Lâmina e manutenção da Seleção. Preservar o visual do editor vigente, sem controles permanentes de Zoom."
+      },
+      "viewport": {
+        "width": 1567,
+        "height": 900
+      },
+      "readySelector": "body[data-clipboard-editing-sheet=\"sheet-002\"] .canvas-host canvas[data-editing-zoom=\"1\"]",
+      "id": "workspace-editing-pan-drop",
+      "title": "Pan confirma sem alterar Frames ou seleção",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "wheel",
+          "selector": ".canvas-host canvas",
+          "deltaY": -400,
+          "modifiers": [
+            "Control"
+          ]
+        },
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": ".canvas-host canvas",
+          "targetSelector": ".canvas-host canvas",
+          "sourceOffsetX": 0,
+          "sourceOffsetY": 0,
+          "targetOffsetX": 140,
+          "targetOffsetY": 70,
+          "phase": "drop",
+          "modifiers": [
+            "Space"
+          ]
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-clipboard-selection=\"clipboard-frame-1-0,clipboard-frame-1-1\"][data-clipboard-editing-sheet=\"sheet-002\"]"
+        }
+      ]
+    },
+    {
+      "implementationPath": "/workspace-preview.html?frame=clipboard&clipboard=same-group",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "editing-canvas-navigation",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Navegação do Modo de edição aceita em docs/design/0001-estrutura-da-janela-do-projeto.md: Zoom até 4×, Pan, Ajustar Lâmina e manutenção da Seleção. Preservar o visual do editor vigente, sem controles permanentes de Zoom."
+      },
+      "viewport": {
+        "width": 1567,
+        "height": 900
+      },
+      "readySelector": "body[data-clipboard-editing-sheet=\"sheet-002\"] .canvas-host canvas[data-editing-zoom=\"1\"]",
+      "id": "workspace-editing-pan-escape",
+      "title": "Esc cancela o Pan e mantém a edição",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "wheel",
+          "selector": ".canvas-host canvas",
+          "deltaY": -400,
+          "modifiers": [
+            "Control"
+          ]
+        },
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": ".canvas-host canvas",
+          "targetSelector": ".canvas-host canvas",
+          "sourceOffsetX": 0,
+          "sourceOffsetY": 0,
+          "targetOffsetX": 140,
+          "targetOffsetY": 70,
+          "phase": "escape",
+          "modifiers": [
+            "Space"
+          ]
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-clipboard-selection=\"clipboard-frame-1-0,clipboard-frame-1-1\"][data-clipboard-editing-sheet=\"sheet-002\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "canvas:not(.pixi-canvas--navigation-pan)"
+        }
+      ]
+    },
+    {
+      "implementationPath": "/workspace-preview.html?frame=clipboard&clipboard=same-group",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "editing-canvas-navigation",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Navegação do Modo de edição aceita em docs/design/0001-estrutura-da-janela-do-projeto.md: Zoom até 4×, Pan, Ajustar Lâmina e manutenção da Seleção. Preservar o visual do editor vigente, sem controles permanentes de Zoom."
+      },
+      "viewport": {
+        "width": 1567,
+        "height": 900
+      },
+      "readySelector": "body[data-clipboard-editing-sheet=\"sheet-002\"] .canvas-host canvas[data-editing-zoom=\"1\"]",
+      "id": "workspace-editing-fit-menu",
+      "title": "Menu Exibir retorna à Lâmina completa",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "wheel",
+          "selector": ".canvas-host canvas",
+          "deltaY": -400,
+          "modifiers": [
+            "Control"
+          ]
+        },
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": ".canvas-host canvas",
+          "targetSelector": ".canvas-host canvas",
+          "sourceOffsetX": 0,
+          "sourceOffsetY": 0,
+          "targetOffsetX": 140,
+          "targetOffsetY": 70,
+          "phase": "drop",
+          "modifiers": [
+            "Space"
+          ]
+        },
+        {
+          "type": "click-text",
+          "text": "Exibir"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Ajustar Lâmina\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "canvas[data-editing-zoom=\"1\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-clipboard-selection=\"clipboard-frame-1-0,clipboard-frame-1-1\"][data-clipboard-editing-sheet=\"sheet-002\"]"
+        }
+      ]
+    },
+    {
+      "implementationPath": "/workspace-preview.html?frame=clipboard&clipboard=same-group",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "editing-canvas-navigation",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Navegação do Modo de edição aceita em docs/design/0001-estrutura-da-janela-do-projeto.md: Zoom até 4×, Pan, Ajustar Lâmina e manutenção da Seleção. Preservar o visual do editor vigente, sem controles permanentes de Zoom."
+      },
+      "viewport": {
+        "width": 1567,
+        "height": 900
+      },
+      "readySelector": "body[data-clipboard-editing-sheet=\"sheet-002\"] .canvas-host canvas[data-editing-zoom=\"1\"]",
+      "id": "workspace-editing-fit-key",
+      "title": "Ctrl+0 restaura o ajuste e conserva as alças",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "wheel",
+          "selector": ".canvas-host canvas",
+          "deltaY": -400,
+          "modifiers": [
+            "Control"
+          ]
+        },
+        {
+          "type": "key",
+          "key": "Digit0",
+          "modifiers": [
+            "Control"
+          ]
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-clipboard-selection=\"clipboard-frame-1-0,clipboard-frame-1-1\"][data-clipboard-editing-sheet=\"sheet-002\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "canvas[data-editing-zoom=\"1\"]"
+        }
+      ]
+    },
+    {
+      "implementationPath": "/workspace-preview.html?frame=clipboard&clipboard=same-group",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "editing-canvas-navigation",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Navegação do Modo de edição aceita em docs/design/0001-estrutura-da-janela-do-projeto.md: Zoom até 4×, Pan, Ajustar Lâmina e manutenção da Seleção. Preservar o visual do editor vigente, sem controles permanentes de Zoom."
+      },
+      "viewport": {
+        "width": 1567,
+        "height": 900
+      },
+      "readySelector": "body[data-clipboard-editing-sheet=\"sheet-002\"] .canvas-host canvas[data-editing-zoom=\"1\"]",
+      "id": "workspace-editing-fit-available",
+      "title": "Exibir apresenta Ajustar Lâmina e Ctrl+0",
+      "actions": [
+        {
+          "type": "focus",
+          "selector": ".canvas-host canvas"
+        },
+        {
+          "type": "key",
+          "key": "Plus",
+          "modifiers": [
+            "Control"
+          ]
+        },
+        {
+          "type": "click-text",
+          "text": "Exibir"
+        },
+        {
+          "type": "assert",
+          "selector": "[role=\"menuitem\"][aria-label=\"Ajustar Lâmina\"]:not([disabled])"
+        }
+      ]
     }
   ]
 }

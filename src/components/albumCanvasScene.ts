@@ -34,6 +34,7 @@ import { applySheetBarScale, setSheetBarOverlayHovered, setSheetBarActionFocused
 import { PhotoInteractionSession } from "./photoInteractionSession";
 import { FrameInteractionSession } from "./frameInteractionSession";
 import { FrameAreaSelectionSession } from "./frameAreaSelectionSession";
+import { EditingCanvasNavigation } from "./editingCanvasNavigation";
 import { FrameContentDragSession } from "./frameContentDragSession";
 import { FrameContentDragVisual } from "./frameContentDragVisual";
 import { ViewportTexturePool } from "./viewportTexturePool";
@@ -82,6 +83,7 @@ export class AlbumCanvasScene {
   private readonly frameAreaSelection: FrameAreaSelectionSession;
   private readonly frameContentDrag: FrameContentDragSession;
   private readonly frameContentDragVisual: FrameContentDragVisual;
+  private readonly editingNavigation: EditingCanvasNavigation;
 
   constructor(
     private readonly app: Application,
@@ -94,6 +96,9 @@ export class AlbumCanvasScene {
       onPreviewTextureError,
       onPreviewTextureLoad,
     );
+    this.editingNavigation = new EditingCanvasNavigation(app.canvas, () => this.input,
+      () => { this.frameInteractions.reset(); this.frameAreaSelection.reset(); },
+      () => { if (this.input) this.update(this.input, app.screen.height); });
     this.photoInteractions = new PhotoInteractionSession(
       this.photoNodes,
       () => ({
@@ -175,7 +180,7 @@ export class AlbumCanvasScene {
     this.input = input;
     this.frameAreaSelection.synchronize(input);
     this.app.canvas.setAttribute("aria-label", input.mode.kind === "sheet-editing"
-      ? "Canvas da Lâmina em edição. Ctrl+A seleciona todos os Frames. Arraste na área vazia para selecionar por caixa; Ctrl acrescenta à seleção. Arraste um Frame para mover ou use as alças para redimensionar. Shift preserva a proporção; Alt preserva o centro; Ctrl suspende o snap; Esc cancela o gesto."
+      ? "Canvas da Lâmina em edição. Ctrl mais roda ou Ctrl mais e menos ajustam o Zoom; Ctrl+0 mostra a Lâmina inteira. Espaço mais arraste ou botão do meio movem a visualização ampliada. Ctrl+A seleciona todos os Frames. Arraste na área vazia para selecionar por caixa; Ctrl acrescenta à seleção. Arraste um Frame para mover ou use as alças para redimensionar. Shift preserva a proporção; Alt preserva o centro; Ctrl suspende o snap; Esc cancela o gesto."
       : input.mode.isolatedSheetId ? "Canvas da Lâmina no Painel de Layouts. Passe sobre uma miniatura para visualizar o Layout."
       : "Canvas contínuo do Álbum. Arraste uma Foto sobre outro Frame para trocar o conteúdo, inclusive entre Lâminas. Esc cancela. Use a roda para navegar, Alt mais arraste para Pan e Alt mais roda para Zoom.");
     const modePolicy = albumCanvasModePolicy(input.mode);
@@ -213,11 +218,16 @@ export class AlbumCanvasScene {
       hostHeight || this.app.screen.height,
       sheetHeight,
     );
-    const scale = modePolicy.enablesContinuousNavigation ? heightScale : Math.min(
+    const fitScale = modePolicy.enablesContinuousNavigation ? heightScale : Math.min(
       heightScale,
       Math.max(1, this.app.screen.width - 2 * CANVAS_VERTICAL_MARGIN_PX) /
         layout.entriesAtScale(1)[0].width,
     );
+    const editingTransform = this.editingNavigation.synchronize(input, {
+      width: this.app.screen.width, height: hostHeight || this.app.screen.height,
+      sheetWidth: layout.entriesAtScale(1)[0].width, sheetHeight, scale: fitScale,
+    });
+    const scale = input.mode.kind === "sheet-editing" ? fitScale * editingTransform.zoom : fitScale;
     this.canvasScale = scale;
     this.frameInteractions.synchronize(input, scale);
     this.frameContentDrag.synchronize(input);
@@ -274,8 +284,8 @@ export class AlbumCanvasScene {
     }
     this.reportCanvasMetrics(scale);
     this.world.position.set(
-      boundedOffsetX,
-      modePolicy.enablesContinuousNavigation ? CANVAS_VERTICAL_MARGIN_PX
+      input.mode.kind === "sheet-editing" ? editingTransform.x : boundedOffsetX,
+      input.mode.kind === "sheet-editing" ? editingTransform.y : modePolicy.enablesContinuousNavigation ? CANVAS_VERTICAL_MARGIN_PX
         : ((hostHeight || this.app.screen.height) - sheetHeight * scale) / 2,
     );
     this.world.scale.set(scale);
@@ -305,6 +315,7 @@ export class AlbumCanvasScene {
 
   destroy() {
     this.resetTransientInteractions();
+    this.editingNavigation.destroy();
     this.frameInteractions.destroy();
     this.frameAreaSelection.destroy();
     this.frameContentDrag.destroy();
@@ -316,6 +327,7 @@ export class AlbumCanvasScene {
 
   suspendForContextLoss() {
     this.resetTransientInteractions();
+    this.editingNavigation.suspend();
     this.input?.onTransformPreview(null);
   }
 
