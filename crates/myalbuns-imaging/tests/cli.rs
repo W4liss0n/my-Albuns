@@ -38,6 +38,9 @@ use windows_sys::Win32::{
 
 static NEXT_CACHE_ID: AtomicU64 = AtomicU64::new(1);
 
+#[path = "cli/frame_editing.rs"]
+mod frame_editing;
+
 #[test]
 fn normal_export_without_sources_completes_the_loading_stage() {
     use myalbuns_core::ExportMode;

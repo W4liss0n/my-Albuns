@@ -345,6 +345,9 @@ fn reimporting_the_same_photo_reuses_its_occurrence_without_revision_or_history(
 
 #[test]
 fn edit_drop_uses_topmost_rectangle_and_invalid_targets_leave_no_revision() {
+    use myalbuns_core::{
+        FrameStyleChange, FrameStyleEdit, MediaTransform, PhotoAngleEdit, PhotoOrientationAction,
+    };
     let root = tempfile::tempdir().expect("temporary drop-target Project");
     let project_path = root.path().join("Alvos sobrepostos.myalbuns");
     let core = ProjectCore::new()
@@ -413,6 +416,52 @@ fn edit_drop_uses_topmost_rectangle_and_invalid_targets_leave_no_revision() {
             frame_ids: vec![second_frame.clone()],
         })
         .unwrap();
+    project
+        .apply(ProjectIntent::TransformPhoto {
+            frame_id: second_frame.clone(),
+            delta_pan_x: 0.25,
+            delta_pan_y: -0.5,
+            delta_zoom: 0.75,
+        })
+        .unwrap();
+    for action in [
+        PhotoOrientationAction::RotateCounterClockwise,
+        PhotoOrientationAction::ToggleHorizontalMirror,
+    ] {
+        project
+            .apply(ProjectIntent::OrientPhotos {
+                frame_ids: vec![second_frame.clone()],
+                action,
+            })
+            .unwrap();
+    }
+    project
+        .apply(ProjectIntent::SetPhotoAngle {
+            edit: PhotoAngleEdit {
+                frame_ids: vec![second_frame.clone()],
+                angle_tenths: 175,
+            },
+        })
+        .unwrap();
+    for change in [
+        FrameStyleChange::BorderColor {
+            rgb: "#A03B24".into(),
+        },
+        FrameStyleChange::BorderWidth { width_um: 2_000 },
+        FrameStyleChange::Opacity {
+            opacity_percent: 65,
+        },
+    ] {
+        project
+            .apply(ProjectIntent::SetFrameStyle {
+                edit: FrameStyleEdit {
+                    frame_ids: vec![second_frame.clone()],
+                    change,
+                },
+            })
+            .unwrap();
+    }
+    let before_replacement = project.projection();
     let replaced = project
         .apply_with_outcome(ProjectIntent::DropPhoto {
             sheet_id: sheet_id.clone(),
@@ -426,13 +475,47 @@ fn edit_drop_uses_topmost_rectangle_and_invalid_targets_leave_no_revision() {
         replaced.affected_frame_id.as_deref(),
         Some(second_frame.as_str())
     );
-    assert!(
-        !replaced.projection.state.album.sheets[0].frames[1]
+    assert_eq!(
+        replaced.projection.state.album.sheets[0].frames[1]
             .photo
             .as_ref()
             .unwrap()
-            .transform
-            .black_and_white
+            .transform,
+        MediaTransform {
+            pan_x: 0.0,
+            pan_y: 0.0,
+            user_zoom: 1.0,
+            quarter_turns: 0,
+            fine_rotation_degrees: 0.0,
+            mirror_x: false,
+            black_and_white: false,
+        },
+        "replacement resets every occurrence adjustment, independently of Frame style"
+    );
+    let mut expected_frame = before_replacement.state.album.sheets[0].frames[1].clone();
+    expected_frame.photo = replaced.projection.state.album.sheets[0].frames[1]
+        .photo
+        .clone();
+    assert_eq!(
+        replaced.projection.state.album.sheets[0].frames[1],
+        expected_frame
+    );
+    assert_eq!(
+        replaced.projection.state.album.sheets[0].frames[0],
+        before_replacement.state.album.sheets[0].frames[0],
+        "replacement must not change the lower overlapping Frame"
+    );
+    assert_eq!(
+        replaced.projection.state.revision,
+        before_replacement.state.revision + 1
+    );
+    assert_eq!(
+        project.undo().unwrap().state.album,
+        before_replacement.state.album
+    );
+    assert_eq!(
+        project.redo().unwrap().state.album,
+        replaced.projection.state.album
     );
     assert_eq!(
         replaced.projection.state.album.sheets[0].frames[0].id,
