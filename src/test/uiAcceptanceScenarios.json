@@ -2,219 +2,6 @@
   "schemaVersion": 3,
   "scenarios": [
     {
-      "id": "media-folders-all",
-      "title": "Pastas — contagens, nome longo e faixa horizontal",
-      "implementationPath": "/media-panel-preview.html?folders=1",
-      "comparison": {
-        "kind": "implementation-only",
-        "surface": "media-panel-folders",
-        "implementationCaptureSelector": "body",
-        "reason": "Design 0035 e barra da referência vigente: chips, menus e formulário compacto ancorado com controles do programa."
-      },
-      "viewport": {
-        "width": 760,
-        "height": 400
-      },
-      "readySelector": ".media-folder-chip[title=\"Retratos\"]",
-      "actions": []
-    },
-    {
-      "id": "media-folders-filter",
-      "title": "Pastas — Fotos filtradas",
-      "implementationPath": "/media-panel-preview.html?folders=1",
-      "comparison": {
-        "kind": "implementation-only",
-        "surface": "media-panel-folders",
-        "implementationCaptureSelector": "body",
-        "reason": "Design 0035 e barra da referência vigente: chips, menus e formulário compacto ancorado com controles do programa."
-      },
-      "viewport": {
-        "width": 1100,
-        "height": 400
-      },
-      "readySelector": "[aria-label^=\"Pasta Retratos,\"][aria-pressed=\"true\"]",
-      "actions": [
-        {
-          "type": "click",
-          "selector": "[aria-label^=\"Pasta Retratos,\"]"
-        }
-      ]
-    },
-    {
-      "id": "media-folders-empty",
-      "title": "Pastas — pasta vazia",
-      "implementationPath": "/media-panel-preview.html?folders=1",
-      "comparison": {
-        "kind": "implementation-only",
-        "surface": "media-panel-folders",
-        "implementationCaptureSelector": "body",
-        "reason": "Design 0035 e barra da referência vigente: chips, menus e formulário compacto ancorado com controles do programa."
-      },
-      "viewport": {
-        "width": 1100,
-        "height": 400
-      },
-      "readySelector": "[aria-label^=\"Pasta Famílias,\"][aria-pressed=\"true\"]",
-      "actions": [
-        {
-          "type": "click",
-          "selector": "[aria-label^=\"Pasta Famílias,\"]"
-        }
-      ]
-    },
-    {
-      "id": "media-folders-create",
-      "title": "Pastas — criar",
-      "implementationPath": "/media-panel-preview.html?folders=1",
-      "comparison": {
-        "kind": "implementation-only",
-        "surface": "media-panel-folders",
-        "implementationCaptureSelector": "body",
-        "reason": "Design 0035 e barra da referência vigente: chips, menus e formulário compacto ancorado com controles do programa."
-      },
-      "viewport": {
-        "width": 1100,
-        "height": 400
-      },
-      "readySelector": ".media-folder-popover input",
-      "actions": [
-        {
-          "type": "click",
-          "selector": "[aria-label=\"Nova pasta de organização\"]"
-        }
-      ]
-    },
-    {
-      "id": "media-folders-invalid",
-      "title": "Pastas — nome inválido em tooltip",
-      "implementationPath": "/media-panel-preview.html?folders=1",
-      "comparison": {
-        "kind": "implementation-only",
-        "surface": "media-panel-folders",
-        "implementationCaptureSelector": "body",
-        "reason": "Design 0035 e barra da referência vigente: chips, menus e formulário compacto ancorado com controles do programa."
-      },
-      "viewport": {
-        "width": 1100,
-        "height": 400
-      },
-      "readySelector": ".media-folder-popover [role=\"tooltip\"]",
-      "actions": [
-        {
-          "type": "click",
-          "selector": "[aria-label=\"Nova pasta de organização\"]"
-        },
-        {
-          "type": "click",
-          "selector": ".media-folder-popover button[type=\"submit\"]"
-        }
-      ]
-    },
-    {
-      "id": "media-folders-context",
-      "title": "Pastas — menu contextual",
-      "implementationPath": "/media-panel-preview.html?folders=1",
-      "comparison": {
-        "kind": "implementation-only",
-        "surface": "media-panel-folders",
-        "implementationCaptureSelector": "body",
-        "reason": "Design 0035 e barra da referência vigente: chips, menus e formulário compacto ancorado com controles do programa."
-      },
-      "viewport": {
-        "width": 1100,
-        "height": 400
-      },
-      "readySelector": "[aria-label=\"Ações da pasta Retratos\"]",
-      "actions": [
-        {
-          "type": "context-click",
-          "selector": "[aria-label^=\"Pasta Retratos,\"]"
-        }
-      ]
-    },
-    {
-      "id": "media-folders-rename",
-      "title": "Pastas — renomear",
-      "implementationPath": "/media-panel-preview.html?folders=1",
-      "comparison": {
-        "kind": "implementation-only",
-        "surface": "media-panel-folders",
-        "implementationCaptureSelector": "body",
-        "reason": "Design 0035 e barra da referência vigente: chips, menus e formulário compacto ancorado com controles do programa."
-      },
-      "viewport": {
-        "width": 1100,
-        "height": 400
-      },
-      "readySelector": ".media-folder-popover input",
-      "actions": [
-        {
-          "type": "context-click",
-          "selector": "[aria-label^=\"Pasta Retratos,\"]"
-        },
-        {
-          "type": "click",
-          "selector": "[role=\"menuitem\"]:first-child"
-        }
-      ]
-    },
-    {
-      "id": "media-folders-move",
-      "title": "Pastas — mover seleção",
-      "implementationPath": "/media-panel-preview.html?folders=1",
-      "comparison": {
-        "kind": "implementation-only",
-        "surface": "media-panel-folders",
-        "implementationCaptureSelector": "body",
-        "reason": "Design 0035 e barra da referência vigente: chips, menus e formulário compacto ancorado com controles do programa."
-      },
-      "viewport": {
-        "width": 1100,
-        "height": 400
-      },
-      "readySelector": ".media-folder-popover select",
-      "actions": [
-        {
-          "type": "click",
-          "selector": "[data-media-id=\"test-media-003\"]"
-        },
-        {
-          "type": "context-click",
-          "selector": "[data-media-id=\"test-media-003\"]"
-        },
-        {
-          "type": "click",
-          "selector": "[role=\"menuitem\"]:nth-last-child(2)"
-        }
-      ]
-    },
-    {
-      "id": "media-folders-decorative",
-      "title": "Pastas — Decorativos",
-      "implementationPath": "/media-panel-preview.html?folders=1",
-      "comparison": {
-        "kind": "implementation-only",
-        "surface": "media-panel-folders",
-        "implementationCaptureSelector": "body",
-        "reason": "Design 0035 e barra da referência vigente: chips, menus e formulário compacto ancorado com controles do programa."
-      },
-      "viewport": {
-        "width": 1100,
-        "height": 400
-      },
-      "readySelector": "[aria-label^=\"Pasta Fundos,\"][aria-pressed=\"true\"]",
-      "actions": [
-        {
-          "type": "click",
-          "selector": "[aria-label=\"Decorativos\"]"
-        },
-        {
-          "type": "click",
-          "selector": "[aria-label^=\"Pasta Fundos,\"]"
-        }
-      ]
-    },
-    {
       "id": "welcome",
       "title": "Tela de Boas-vindas",
       "implementationPath": "/welcome-preview.html",
@@ -11191,6 +10978,219 @@
         {
           "type": "assert",
           "selector": "[role=\"menuitem\"][aria-label=\"Ajustar Lâmina\"]:not([disabled])"
+        }
+      ]
+    },
+    {
+      "id": "media-folders-all",
+      "title": "Pastas — contagens, nome longo e faixa horizontal",
+      "implementationPath": "/media-panel-preview.html?folders=1",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-folders",
+        "implementationCaptureSelector": "body",
+        "reason": "Design 0035 e barra da referência vigente: chips, menus e formulário compacto ancorado com controles do programa."
+      },
+      "viewport": {
+        "width": 760,
+        "height": 400
+      },
+      "readySelector": ".media-folder-chip[title=\"Retratos\"]",
+      "actions": []
+    },
+    {
+      "id": "media-folders-filter",
+      "title": "Pastas — Fotos filtradas",
+      "implementationPath": "/media-panel-preview.html?folders=1",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-folders",
+        "implementationCaptureSelector": "body",
+        "reason": "Design 0035 e barra da referência vigente: chips, menus e formulário compacto ancorado com controles do programa."
+      },
+      "viewport": {
+        "width": 1100,
+        "height": 400
+      },
+      "readySelector": "[aria-label^=\"Pasta Retratos,\"][aria-pressed=\"true\"]",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label^=\"Pasta Retratos,\"]"
+        }
+      ]
+    },
+    {
+      "id": "media-folders-empty",
+      "title": "Pastas — pasta vazia",
+      "implementationPath": "/media-panel-preview.html?folders=1",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-folders",
+        "implementationCaptureSelector": "body",
+        "reason": "Design 0035 e barra da referência vigente: chips, menus e formulário compacto ancorado com controles do programa."
+      },
+      "viewport": {
+        "width": 1100,
+        "height": 400
+      },
+      "readySelector": "[aria-label^=\"Pasta Famílias,\"][aria-pressed=\"true\"]",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label^=\"Pasta Famílias,\"]"
+        }
+      ]
+    },
+    {
+      "id": "media-folders-create",
+      "title": "Pastas — criar",
+      "implementationPath": "/media-panel-preview.html?folders=1",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-folders",
+        "implementationCaptureSelector": "body",
+        "reason": "Design 0035 e barra da referência vigente: chips, menus e formulário compacto ancorado com controles do programa."
+      },
+      "viewport": {
+        "width": 1100,
+        "height": 400
+      },
+      "readySelector": ".media-folder-popover input",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Nova pasta de organização\"]"
+        }
+      ]
+    },
+    {
+      "id": "media-folders-invalid",
+      "title": "Pastas — nome inválido em tooltip",
+      "implementationPath": "/media-panel-preview.html?folders=1",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-folders",
+        "implementationCaptureSelector": "body",
+        "reason": "Design 0035 e barra da referência vigente: chips, menus e formulário compacto ancorado com controles do programa."
+      },
+      "viewport": {
+        "width": 1100,
+        "height": 400
+      },
+      "readySelector": ".media-folder-popover [role=\"tooltip\"]",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Nova pasta de organização\"]"
+        },
+        {
+          "type": "click",
+          "selector": ".media-folder-popover button[type=\"submit\"]"
+        }
+      ]
+    },
+    {
+      "id": "media-folders-context",
+      "title": "Pastas — menu contextual",
+      "implementationPath": "/media-panel-preview.html?folders=1",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-folders",
+        "implementationCaptureSelector": "body",
+        "reason": "Design 0035 e barra da referência vigente: chips, menus e formulário compacto ancorado com controles do programa."
+      },
+      "viewport": {
+        "width": 1100,
+        "height": 400
+      },
+      "readySelector": "[aria-label=\"Ações da pasta Retratos\"]",
+      "actions": [
+        {
+          "type": "context-click",
+          "selector": "[aria-label^=\"Pasta Retratos,\"]"
+        }
+      ]
+    },
+    {
+      "id": "media-folders-rename",
+      "title": "Pastas — renomear",
+      "implementationPath": "/media-panel-preview.html?folders=1",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-folders",
+        "implementationCaptureSelector": "body",
+        "reason": "Design 0035 e barra da referência vigente: chips, menus e formulário compacto ancorado com controles do programa."
+      },
+      "viewport": {
+        "width": 1100,
+        "height": 400
+      },
+      "readySelector": ".media-folder-popover input",
+      "actions": [
+        {
+          "type": "context-click",
+          "selector": "[aria-label^=\"Pasta Retratos,\"]"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"]:first-child"
+        }
+      ]
+    },
+    {
+      "id": "media-folders-move",
+      "title": "Pastas — mover seleção",
+      "implementationPath": "/media-panel-preview.html?folders=1",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-folders",
+        "implementationCaptureSelector": "body",
+        "reason": "Design 0035 e barra da referência vigente: chips, menus e formulário compacto ancorado com controles do programa."
+      },
+      "viewport": {
+        "width": 1100,
+        "height": 400
+      },
+      "readySelector": ".media-folder-popover select",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[data-media-id=\"test-media-003\"]"
+        },
+        {
+          "type": "context-click",
+          "selector": "[data-media-id=\"test-media-003\"]"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"]:nth-last-child(2)"
+        }
+      ]
+    },
+    {
+      "id": "media-folders-decorative",
+      "title": "Pastas — Decorativos",
+      "implementationPath": "/media-panel-preview.html?folders=1",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-folders",
+        "implementationCaptureSelector": "body",
+        "reason": "Design 0035 e barra da referência vigente: chips, menus e formulário compacto ancorado com controles do programa."
+      },
+      "viewport": {
+        "width": 1100,
+        "height": 400
+      },
+      "readySelector": "[aria-label^=\"Pasta Fundos,\"][aria-pressed=\"true\"]",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Decorativos\"]"
+        },
+        {
+          "type": "click",
+          "selector": "[aria-label^=\"Pasta Fundos,\"]"
         }
       ]
     }
