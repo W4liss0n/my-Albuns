@@ -1,7 +1,7 @@
 import { createRef, useState } from "react";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { expect, test, vi } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import type { MediaCatalogItem, MediaFolder, MediaFolderEdit } from "../domain/project";
 import { MediaPanel, type MediaPanelHandle } from "./MediaPanel";
 
@@ -27,6 +27,111 @@ function harness(initial = folders) {
   return { view, edit, remove, ref, props };
 }
 function gridItems() { return [...document.querySelectorAll<HTMLElement>("[data-media-id]")].map((item) => item.dataset.mediaId); }
+
+const elementFromPointDescriptor = Object.getOwnPropertyDescriptor(document, "elementFromPoint");
+afterEach(() => {
+  if (elementFromPointDescriptor) Object.defineProperty(document, "elementFromPoint", elementFromPointDescriptor);
+  else Reflect.deleteProperty(document, "elementFromPoint");
+});
+function dragHit(target: Element | null) {
+  const hit = vi.fn(() => target);
+  Object.defineProperty(document, "elementFromPoint", { configurable: true, value: hit });
+  return hit;
+}
+function startDrag(name: string | RegExp = "001.jpg") {
+  fireEvent.pointerDown(screen.getByRole("button", { name }), { pointerId: 7, button: 0, clientX: 20, clientY: 100 });
+}
+function moveDrag() { fireEvent.pointerMove(document, { pointerId: 7, clientX: 320, clientY: 16 }); }
+function dropDrag() { fireEvent.pointerUp(document, { pointerId: 7, button: 0, clientX: 320, clientY: 16 }); }
+
+test("dragging to a folder moves only the dragged photo once without activating the folder or dropping on Canvas", () => {
+  const h = harness();
+  fireEvent.click(screen.getByRole("button", { name: "002.jpg" }));
+  const target = screen.getByRole("button", { name: /Pasta Turma B/ });
+  dragHit(target.querySelector("small"));
+  startDrag();
+  fireEvent.pointerMove(document, { pointerId: 7, clientX: 22, clientY: 101 });
+  expect(target).not.toHaveClass("media-folder-chip--drop");
+  moveDrag();
+  expect(target).toHaveClass("media-folder-chip--drop");
+  expect(h.edit).not.toHaveBeenCalled();
+  dropDrag(); dropDrag();
+  expect(h.edit).toHaveBeenCalledExactlyOnceWith({ kind: "moveMedia", mediaIds: ["p1"], folderId: "b" });
+  expect(h.props.onMediaDragChange).toHaveBeenLastCalledWith(null);
+  expect(h.props.onMediaDragChange.mock.calls.some(([drag]) => drag?.phase === "drop")).toBe(false);
+  expect(target).not.toHaveClass("media-folder-chip--drop");
+  fireEvent.click(target);
+  expect(screen.getByRole("button", { name: "Todas 2" })).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByRole("region", { name: "Painel de imagens" })).toHaveFocus();
+});
+
+test.each(["Escape", "pointercancel", "blur"])("%s cancels folder drag without an edit", (reason) => {
+  const h = harness(); const target = screen.getByRole("button", { name: /Pasta Turma B/ });
+  dragHit(target); startDrag(); moveDrag();
+  expect(target).toHaveClass("media-folder-chip--drop");
+  if (reason === "Escape") fireEvent.keyDown(window, { key: "Escape" });
+  else if (reason === "blur") fireEvent.blur(window);
+  else fireEvent.pointerCancel(document, { pointerId: 7 });
+  dropDrag();
+  expect(h.edit).not.toHaveBeenCalled();
+  expect(target).not.toHaveClass("media-folder-chip--drop");
+  expect(h.props.onMediaDragChange).toHaveBeenLastCalledWith(null);
+});
+
+test("leaving a folder forwards the existing Canvas drag and drop unchanged", () => {
+  const h = harness(); const target = screen.getByRole("button", { name: /Pasta Turma B/ });
+  const hit = dragHit(target); startDrag(); moveDrag();
+  hit.mockReturnValue(null); moveDrag(); dropDrag();
+  expect(target).not.toHaveClass("media-folder-chip--drop");
+  expect(h.edit).not.toHaveBeenCalled();
+  expect(h.props.onMediaDragChange).toHaveBeenLastCalledWith(expect.objectContaining({ mediaId: "p1", kind: "photo", phase: "drop", x: 320, y: 16 }));
+});
+
+test.each(["Todas 2", /^Ausentes/, "Nova pasta de organização"])("%s is not a folder drop target", (name) => {
+  const h = harness(); dragHit(screen.getByRole("button", { name })); startDrag(); moveDrag(); dropDrag();
+  expect(h.edit).not.toHaveBeenCalled();
+  expect(document.querySelector(".media-folder-chip--drop")).toBeNull();
+});
+
+test("blocking interactions during a folder drag cancels it and prevents another drag", () => {
+  const h = harness(); dragHit(screen.getByRole("button", { name: /Pasta Turma B/ })); startDrag(); moveDrag();
+  h.view.rerender(<MediaPanel {...h.props} relinkDisabled />);
+  expect(document.querySelector(".media-folder-chip--drop")).toBeNull();
+  dropDrag(); startDrag(); moveDrag(); dropDrag();
+  expect(h.edit).not.toHaveBeenCalled();
+});
+
+test("a folder removed during drag cannot receive the photo", () => {
+  const h = harness(); const target = screen.getByRole("button", { name: /Pasta Turma B/ });
+  dragHit(target); startDrag(); moveDrag();
+  h.view.rerender(<MediaPanel {...h.props} mediaFolders={[folders[0], folders[2]]} />);
+  dropDrag(); expect(h.edit).not.toHaveBeenCalled();
+});
+
+test("moving out of a filtered folder keeps the filter and connected focus", () => {
+  const h = harness();
+  fireEvent.click(screen.getByRole("button", { name: /Pasta Turma A/ }));
+  dragHit(screen.getByRole("button", { name: /Pasta Turma B/ })); startDrag(); moveDrag(); dropDrag();
+  h.view.rerender(<MediaPanel {...h.props} mediaFolders={[
+    { ...folders[0], mediaIds: [] }, { ...folders[1], mediaIds: ["p1", "p2"] }, folders[2],
+  ]} />);
+  expect(gridItems()).toEqual([]);
+  expect(screen.getByRole("button", { name: /Pasta Turma A/ })).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByRole("region", { name: "Painel de imagens" })).toHaveFocus();
+});
+
+test("Decoratives and photos with missing originals can be organized by dragging", () => {
+  const h = harness();
+  h.view.rerender(<MediaPanel {...h.props} mediaFiles={{ p1: { mediaId: "p1", state: "absent", createdAtMs: null, modifiedAtMs: null } }} />);
+  const hit = dragHit(screen.getByRole("button", { name: /Pasta Turma B/ }));
+  startDrag(/001.jpg/); moveDrag(); dropDrag();
+  expect(h.edit).toHaveBeenLastCalledWith({ kind: "moveMedia", mediaIds: ["p1"], folderId: "b" });
+  h.view.unmount();
+  const decorative = harness(); fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
+  hit.mockReturnValue(screen.getByRole("button", { name: /Pasta Fundos/ }));
+  startDrag("Fundo.jpg"); moveDrag(); dropDrag();
+  expect(decorative.edit).toHaveBeenLastCalledWith({ kind: "moveMedia", mediaIds: ["d1"], folderId: "c" });
+});
 
 test("folders filter each tab independently and intersect search and absence", async () => {
   const h = harness();

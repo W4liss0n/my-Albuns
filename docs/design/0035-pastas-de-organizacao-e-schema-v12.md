@@ -47,6 +47,13 @@ ou `Sem pasta`, com `Cancelar`/`Mover`. Esc cancela sem alteração; enquanto um
 ação é enviada, não há submissão duplicada. Os atalhos do álbum não atravessam
 esses formulários.
 
+Arrastar uma miniatura até a tag de uma pasta da mesma aba move somente a imagem
+arrastada para essa pasta, pelo mesmo comando de organização. O destino recebe
+contorno azul durante o gesto; soltar confirma em uma única ação de Histórico,
+sem abrir formulário nem mudar o filtro ativo. Esc, perda de foco ou cancelamento
+do ponteiro encerram o arrasto sem alterações. `Todas`, `Ausentes` e `+` não são
+destinos de organização. O arrasto para a Lâmina conserva seu comportamento.
+
 Os chips mantêm o padrão da referência vigente: cores neutras, seleção azul,
 contagem discreta, `+` tracejado, sem uma nova linha permanente. Nomes longos
 têm elipse e tooltip; a faixa permite rolagem horizontal e acesso por teclado.

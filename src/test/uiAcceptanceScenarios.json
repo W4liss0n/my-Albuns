@@ -11193,6 +11193,85 @@
           "selector": "[aria-label^=\"Pasta Fundos,\"]"
         }
       ]
+    },
+    {
+      "id": "media-folders-drag-photo",
+      "title": "Pastas — Foto sobre a tag de destino",
+      "implementationPath": "/media-panel-preview.html?folders=1",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-folders",
+        "implementationCaptureSelector": "body",
+        "reason": "Design 0035: destino do arrasto usa destaque azul da interface sem trocar a pasta ativa; Esc remove o destaque. A captura verifica o gesto, sem simular persistência."
+      },
+      "viewport": {
+        "width": 1100,
+        "height": 400
+      },
+      "readySelector": ".media-folder-chip--drop",
+      "actions": [
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": "[data-media-id=\"test-media-001\"]",
+          "targetSelector": "[data-media-folder-id=\"folder-retratos\"]",
+          "phase": "preview"
+        }
+      ]
+    },
+    {
+      "id": "media-folders-drag-decorative",
+      "title": "Pastas — Decorativo sobre a tag de destino",
+      "implementationPath": "/media-panel-preview.html?folders=1",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-folders",
+        "implementationCaptureSelector": "body",
+        "reason": "Design 0035: destino do arrasto usa destaque azul da interface sem trocar a pasta ativa; Esc remove o destaque. A captura verifica o gesto, sem simular persistência."
+      },
+      "viewport": {
+        "width": 1100,
+        "height": 400
+      },
+      "readySelector": ".media-folder-chip--drop",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "[aria-label=\"Decorativos\"]"
+        },
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": "[data-media-id=\"test-decorative-001\"]",
+          "targetSelector": "[data-media-folder-id=\"folder-fundos\"]",
+          "phase": "preview"
+        }
+      ]
+    },
+    {
+      "id": "media-folders-drag-cancel",
+      "title": "Pastas — cancelar arrasto com Esc",
+      "implementationPath": "/media-panel-preview.html?folders=1",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-folders",
+        "implementationCaptureSelector": "body",
+        "reason": "Design 0035: destino do arrasto usa destaque azul da interface sem trocar a pasta ativa; Esc remove o destaque. A captura verifica o gesto, sem simular persistência."
+      },
+      "viewport": {
+        "width": 1100,
+        "height": 400
+      },
+      "readySelector": "[data-media-folder-id=\"folder-retratos\"]:not(.media-folder-chip--drop)",
+      "actions": [
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": "[data-media-id=\"test-media-001\"]",
+          "targetSelector": "[data-media-folder-id=\"folder-retratos\"]",
+          "phase": "escape"
+        }
+      ]
     }
   ]
 }

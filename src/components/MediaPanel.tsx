@@ -263,8 +263,25 @@ export function MediaPanel({
         ? "filtered"
         : null;
   const gridRef = useRef<HTMLDivElement>(null);
-  const mediaDrag = useMediaDragGesture({ threshold: dragThreshold, disabled: Boolean(hidden) || importPending || relinkDisabled, onChange: onMediaDragChange });
   const panelHostRef = useRef<HTMLElement>(null);
+  const [dropFolderId, setDropFolderId] = useState<string | null>(null);
+  const mediaDrag = useMediaDragGesture({ threshold: dragThreshold, disabled: Boolean(hidden) || importPending || relinkDisabled,
+    onChange: (drag) => {
+      const target = drag && !foldersDisabled
+        ? document.elementFromPoint(drag.x, drag.y)?.closest<HTMLElement>("[data-media-folder-id]")
+        : null;
+      const folder = target && panelHostRef.current?.contains(target)
+        ? activeFolders.find((folder) => folder.id === target.dataset.mediaFolderId && folder.kind === drag?.kind)
+        : undefined;
+      setDropFolderId(drag?.phase === "dragging" && folder ? folder.id : null);
+      if (drag?.phase === "drop" && folder) {
+        onMediaDragChange(null);
+        panelHostRef.current?.focus({ preventScroll: true });
+        void onEditMediaFolder?.({ kind: "moveMedia", mediaIds: [drag.mediaId], folderId: folder.id });
+      } else {
+        onMediaDragChange(drag);
+      }
+    } });
   const fileDrop = useMediaFileDrop({ port: dropPort, host: panelHostRef,
     hidden: Boolean(hidden), disabled: importPending || relinkDisabled,
     mediaKind: activeMediaKind, onImport: onImportMedia });
@@ -564,6 +581,9 @@ export function MediaPanel({
       data-project-command-context="media-panel"
       aria-label="Painel de imagens"
       onKeyDown={selectAllVisibleMedia}
+      onClickCapture={(event) => {
+        if (mediaDrag.suppressClick()) { event.preventDefault(); event.stopPropagation(); }
+      }}
     >
       {fileDrop.over && <div className="media-file-drop-hint" role="status">Solte para importar em {activeMediaKind === "photo" ? "Fotos" : "Decorativos"}</div>}
       {fileDrop.error && <div className="media-file-drop-error" role="status">{fileDrop.error}</div>}
@@ -571,6 +591,7 @@ export function MediaPanel({
         activeMediaKind={activeMediaKind}
         folders={activeFolders}
         activeFolderId={activeFolder?.id ?? null}
+        dropFolderId={dropFolderId}
         foldersDisabled={foldersDisabled}
         onFolderChange={(id) => { setContextMenu(null); setFolderIds((current) => ({ ...current, [activeMediaKind]: id })); }}
         onCreateFolder={(anchor) => { setContextMenu(null); setFolderPrompt({ kind: "create", mediaKind: activeMediaKind, anchor }); }}
