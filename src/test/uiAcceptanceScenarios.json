@@ -10659,7 +10659,7 @@
         "width": 1567,
         "height": 900
       },
-      "readySelector": "body[data-clipboard-editing-sheet=\"sheet-002\"] .canvas-host canvas[data-editing-zoom=\"1\"]",
+      "readySelector": "body[data-clipboard-editing-sheet=\"sheet-002\"] .canvas-host canvas[data-editing-zoom]",
       "id": "workspace-editing-zoom",
       "title": "Zoom por teclado no Canvas real",
       "actions": [
@@ -10699,7 +10699,7 @@
         "width": 1567,
         "height": 900
       },
-      "readySelector": "body[data-clipboard-editing-sheet=\"sheet-002\"] .canvas-host canvas[data-editing-zoom=\"1\"]",
+      "readySelector": "body[data-clipboard-editing-sheet=\"sheet-002\"] .canvas-host canvas[data-editing-zoom]",
       "id": "workspace-editing-pan-preview",
       "title": "Pan com Espaço sobre Frames ampliados",
       "actions": [
@@ -10751,7 +10751,7 @@
         "width": 1567,
         "height": 900
       },
-      "readySelector": "body[data-clipboard-editing-sheet=\"sheet-002\"] .canvas-host canvas[data-editing-zoom=\"1\"]",
+      "readySelector": "body[data-clipboard-editing-sheet=\"sheet-002\"] .canvas-host canvas[data-editing-zoom]",
       "id": "workspace-editing-pan-drop",
       "title": "Pan confirma sem alterar Frames ou seleção",
       "actions": [
@@ -10799,7 +10799,7 @@
         "width": 1567,
         "height": 900
       },
-      "readySelector": "body[data-clipboard-editing-sheet=\"sheet-002\"] .canvas-host canvas[data-editing-zoom=\"1\"]",
+      "readySelector": "body[data-clipboard-editing-sheet=\"sheet-002\"] .canvas-host canvas[data-editing-zoom]",
       "id": "workspace-editing-pan-escape",
       "title": "Esc cancela o Pan e mantém a edição",
       "actions": [
@@ -10851,7 +10851,7 @@
         "width": 1567,
         "height": 900
       },
-      "readySelector": "body[data-clipboard-editing-sheet=\"sheet-002\"] .canvas-host canvas[data-editing-zoom=\"1\"]",
+      "readySelector": "body[data-clipboard-editing-sheet=\"sheet-002\"] .canvas-host canvas[data-editing-zoom]",
       "id": "workspace-editing-fit-menu",
       "title": "Menu Exibir retorna à Lâmina completa",
       "actions": [
@@ -10911,7 +10911,7 @@
         "width": 1567,
         "height": 900
       },
-      "readySelector": "body[data-clipboard-editing-sheet=\"sheet-002\"] .canvas-host canvas[data-editing-zoom=\"1\"]",
+      "readySelector": "body[data-clipboard-editing-sheet=\"sheet-002\"] .canvas-host canvas[data-editing-zoom]",
       "id": "workspace-editing-fit-key",
       "title": "Ctrl+0 restaura o ajuste e conserva as alças",
       "actions": [
@@ -10956,7 +10956,7 @@
         "width": 1567,
         "height": 900
       },
-      "readySelector": "body[data-clipboard-editing-sheet=\"sheet-002\"] .canvas-host canvas[data-editing-zoom=\"1\"]",
+      "readySelector": "body[data-clipboard-editing-sheet=\"sheet-002\"] .canvas-host canvas[data-editing-zoom]",
       "id": "workspace-editing-fit-available",
       "title": "Exibir apresenta Ajustar Lâmina e Ctrl+0",
       "actions": [
