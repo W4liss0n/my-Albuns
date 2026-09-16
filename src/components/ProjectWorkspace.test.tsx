@@ -7006,4 +7006,3 @@ test.each(["menu", "context"])("requires the owned loss confirmation for edge co
   await act(async () => { dialog.emit("confirmEdgeConversion"); });
   await waitFor(() => expect(apply).toHaveBeenCalledWith({ kind: "convertEdgeSheet", sheetId: "sheet-003" }, expect.any(Function)));
 });
-
