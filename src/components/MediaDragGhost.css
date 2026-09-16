@@ -1,0 +1,10 @@
+.media-drag-ghost {
+  position: fixed;
+  z-index: 80;
+  top: 0;
+  left: 0;
+  display: grid;
+  opacity: 0.84;
+  pointer-events: none;
+  user-select: none;
+}

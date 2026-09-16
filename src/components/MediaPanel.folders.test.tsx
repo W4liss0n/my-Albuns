@@ -43,6 +43,59 @@ function startDrag(name: string | RegExp = "001.jpg") {
 }
 function moveDrag() { fireEvent.pointerMove(document, { pointerId: 7, clientX: 320, clientY: 16 }); }
 function dropDrag() { fireEvent.pointerUp(document, { pointerId: 7, button: 0, clientX: 320, clientY: 16 }); }
+function dragGhost() { return document.querySelector<HTMLElement>("[data-media-drag-ghost]"); }
+
+test("the ghost reuses the thumbnail, follows the pointer beyond the panel, and disappears on drop", () => {
+  const h = harness();
+  h.view.rerender(<MediaPanel {...h.props} previewSource={{ kind: "static", previews: {
+    p1: { mediaId: "p1", state: "ready", url: "http://myalbuns-cache.localhost/photo.jpg" },
+  } }} />);
+  dragHit(null); startDrag();
+  expect(dragGhost()).toBeNull();
+  fireEvent.pointerMove(document, { pointerId: 7, clientX: 22, clientY: 101 });
+  expect(dragGhost()).toBeNull();
+  moveDrag();
+  const ghost = dragGhost()!;
+  expect(ghost.parentElement).toBe(document.body);
+  expect(ghost).toHaveAttribute("aria-hidden", "true");
+  expect(ghost).toHaveAttribute("data-media-drag-ghost", "p1");
+  expect(ghost.querySelector("img")).toHaveAttribute("src", "http://myalbuns-cache.localhost/photo.jpg");
+  expect(ghost).toHaveStyle({ transform: "translate3d(326px, 22px, 0)" });
+  expect(parseFloat(ghost.style.width)).toBe(80);
+  expect(parseFloat(ghost.style.height)).toBeCloseTo(80 / 1.5);
+  fireEvent.pointerMove(document, { pointerId: 7, clientX: 450, clientY: 250 });
+  expect(dragGhost()).toBe(ghost);
+  expect(ghost).toHaveStyle({ transform: "translate3d(456px, 256px, 0)" });
+  dropDrag();
+  expect(dragGhost()).toBeNull();
+  expect(h.props.onMediaDragChange).toHaveBeenLastCalledWith(expect.objectContaining({ phase: "drop" }));
+});
+
+test.each([true, false])("missing photo ghost preserves its cached preview when available: %s", (cached) => {
+  const h = harness();
+  h.view.rerender(<MediaPanel {...h.props}
+    mediaItems={[{ ...items[0], sourceWidthPx: 400, sourceHeightPx: 600 }, ...items.slice(1)]}
+    mediaFiles={{ p1: { mediaId: "p1", state: "absent", createdAtMs: null, modifiedAtMs: null } }}
+    previewSource={{ kind: "static", previews: {
+      p1: { mediaId: "p1", state: "absent", url: cached ? "http://myalbuns-cache.localhost/retained.jpg" : null },
+    } }} />);
+  dragHit(null); startDrag(/001.jpg/); moveDrag();
+  const ghost = dragGhost()!;
+  expect(parseFloat(ghost.style.height)).toBe(60);
+  expect(parseFloat(ghost.style.width)).toBe(40);
+  if (cached) expect(ghost.querySelector("img")).toHaveAttribute("src", "http://myalbuns-cache.localhost/retained.jpg");
+  else expect(ghost.querySelector(".media-preview-thumbnail")).toHaveAttribute("data-missing", "true");
+  dropDrag(); expect(dragGhost()).toBeNull();
+});
+
+test.each(["hidden", "unmount"])("%s removes the ghost and cancels the shared gesture", (reason) => {
+  const h = harness(); dragHit(null); startDrag(); moveDrag();
+  expect(dragGhost()).not.toBeNull();
+  if (reason === "hidden") h.view.rerender(<MediaPanel {...h.props} hidden />);
+  else h.view.unmount();
+  expect(dragGhost()).toBeNull();
+  expect(h.props.onMediaDragChange).toHaveBeenLastCalledWith(null);
+});
 
 test("dragging to a folder moves only the dragged photo once without activating the folder or dropping on Canvas", () => {
   const h = harness();
@@ -54,8 +107,10 @@ test("dragging to a folder moves only the dragged photo once without activating 
   expect(target).not.toHaveClass("media-folder-chip--drop");
   moveDrag();
   expect(target).toHaveClass("media-folder-chip--drop");
+  expect(dragGhost()).toHaveAttribute("data-media-drag-ghost", "p1");
   expect(h.edit).not.toHaveBeenCalled();
   dropDrag(); dropDrag();
+  expect(dragGhost()).toBeNull();
   expect(h.edit).toHaveBeenCalledExactlyOnceWith({ kind: "moveMedia", mediaIds: ["p1"], folderId: "b" });
   expect(h.props.onMediaDragChange).toHaveBeenLastCalledWith(null);
   expect(h.props.onMediaDragChange.mock.calls.some(([drag]) => drag?.phase === "drop")).toBe(false);
@@ -75,6 +130,7 @@ test.each(["Escape", "pointercancel", "blur"])("%s cancels folder drag without a
   dropDrag();
   expect(h.edit).not.toHaveBeenCalled();
   expect(target).not.toHaveClass("media-folder-chip--drop");
+  expect(dragGhost()).toBeNull();
   expect(h.props.onMediaDragChange).toHaveBeenLastCalledWith(null);
 });
 
@@ -96,6 +152,7 @@ test.each(["Todas 2", /^Ausentes/, "Nova pasta de organização"])("%s is not a 
 test("blocking interactions during a folder drag cancels it and prevents another drag", () => {
   const h = harness(); dragHit(screen.getByRole("button", { name: /Pasta Turma B/ })); startDrag(); moveDrag();
   h.view.rerender(<MediaPanel {...h.props} relinkDisabled />);
+  expect(dragGhost()).toBeNull();
   expect(document.querySelector(".media-folder-chip--drop")).toBeNull();
   dropDrag(); startDrag(); moveDrag(); dropDrag();
   expect(h.edit).not.toHaveBeenCalled();

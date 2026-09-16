@@ -37,6 +37,7 @@ import {
 } from "../state/mediaPanelPreferences";
 import { MediaPanelEmptyState } from "./MediaPanelEmptyState";
 import { MediaFolderPopover, type MediaFolderPrompt } from "./MediaFolderPopover";
+import { MediaDragGhost } from "./MediaDragGhost";
 import { MediaPanelToolbar } from "./MediaPanelToolbar";
 import { MediaPreviewCard } from "./MediaPreviewCard";
 import { isTextEntryTarget } from "./isTextEntryTarget";
@@ -265,8 +266,11 @@ export function MediaPanel({
   const gridRef = useRef<HTMLDivElement>(null);
   const panelHostRef = useRef<HTMLElement>(null);
   const [dropFolderId, setDropFolderId] = useState<string | null>(null);
+  const [dragPreview, setDragPreview] = useState<MediaDrag | null>(null);
+  const draggedMedia = dragPreview ? mediaItems.find((media) => media.id === dragPreview.mediaId) : undefined;
   const mediaDrag = useMediaDragGesture({ threshold: dragThreshold, disabled: Boolean(hidden) || importPending || relinkDisabled,
     onChange: (drag) => {
+      setDragPreview(drag?.phase === "dragging" ? drag : null);
       const target = drag && !foldersDisabled
         ? document.elementFromPoint(drag.x, drag.y)?.closest<HTMLElement>("[data-media-folder-id]")
         : null;
@@ -585,6 +589,10 @@ export function MediaPanel({
         if (mediaDrag.suppressClick()) { event.preventDefault(); event.stopPropagation(); }
       }}
     >
+      {dragPreview && draggedMedia && !hidden && !importPending && !relinkDisabled && <MediaDragGhost
+        media={draggedMedia} x={dragPreview.x} y={dragPreview.y}
+        previewUrl={mediaPreviews[draggedMedia.id]?.url ?? undefined}
+        missing={fileInformation[draggedMedia.id]?.state === "absent"} />}
       {fileDrop.over && <div className="media-file-drop-hint" role="status">Solte para importar em {activeMediaKind === "photo" ? "Fotos" : "Decorativos"}</div>}
       {fileDrop.error && <div className="media-file-drop-error" role="status">{fileDrop.error}</div>}
       <MediaPanelToolbar

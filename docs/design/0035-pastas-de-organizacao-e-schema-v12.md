@@ -54,6 +54,14 @@ sem abrir formulário nem mudar o filtro ativo. Esc, perda de foco ou cancelamen
 do ponteiro encerram o arrasto sem alterações. `Todas`, `Ausentes` e `+` não são
 destinos de organização. O arrasto para a Lâmina conserva seu comportamento.
 
+Durante o arrasto, uma prévia semitransparente da imagem acompanha o ponteiro
+em toda a janela, inclusive fora do Painel de imagens. Usa a miniatura já
+disponível e mantém a proporção, limitada a 80 × 60 px, com pequeno afastamento
+do mouse. Não intercepta os destinos nem troca o cursor sobre as pastas.
+Imagens ausentes conservam sua prévia em Cache; sem prévia, usam o placeholder
+do painel. Soltar, cancelar, ocultar o painel ou bloquear a interação remove a
+prévia imediatamente.
+
 Os chips mantêm o padrão da referência vigente: cores neutras, seleção azul,
 contagem discreta, `+` tracejado, sem uma nova linha permanente. Nomes longos
 têm elipse e tooltip; a faixa permite rolagem horizontal e acesso por teclado.

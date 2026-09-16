@@ -11272,6 +11272,56 @@
           "phase": "escape"
         }
       ]
+    },
+    {
+      "id": "media-drag-ghost-missing-cached",
+      "title": "Arrasto do painel — Foto ausente com Cache",
+      "implementationPath": "/media-panel-preview.html?folders=1&files=1",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-folders",
+        "implementationCaptureSelector": "body",
+        "reason": "Design 0035: prévia proporcional da miniatura acompanha o ponteiro sem bloquear o destino. Imagem ausente conserva Cache ou placeholder."
+      },
+      "viewport": {
+        "width": 1100,
+        "height": 400
+      },
+      "readySelector": "[data-media-drag-ghost=\"test-media-003\"]",
+      "actions": [
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": "[data-media-id=\"test-media-003\"]",
+          "targetSelector": "[data-media-folder-id=\"folder-cerimonia\"]",
+          "phase": "preview"
+        }
+      ]
+    },
+    {
+      "id": "media-drag-ghost-missing-placeholder",
+      "title": "Arrasto do painel — Foto ausente sem Cache",
+      "implementationPath": "/media-panel-preview.html?folders=1&files=1&cache=missing",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "media-panel-folders",
+        "implementationCaptureSelector": "body",
+        "reason": "Design 0035: prévia proporcional da miniatura acompanha o ponteiro sem bloquear o destino. Imagem ausente conserva Cache ou placeholder."
+      },
+      "viewport": {
+        "width": 1100,
+        "height": 400
+      },
+      "readySelector": "[data-media-drag-ghost=\"test-media-003\"]",
+      "actions": [
+        {
+          "type": "drag",
+          "gesture": "pointer",
+          "selector": "[data-media-id=\"test-media-003\"]",
+          "targetSelector": "[data-media-folder-id=\"folder-cerimonia\"]",
+          "phase": "preview"
+        }
+      ]
     }
   ]
 }
