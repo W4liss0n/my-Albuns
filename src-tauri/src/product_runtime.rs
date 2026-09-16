@@ -5,9 +5,7 @@ use std::{
     time::Duration,
 };
 
-use myalbuns_core::{
-    EditableProject, MediaId, MediaKind, PhotoSourceMetadata, project_name_from_path,
-};
+use myalbuns_core::{EditableProject, MediaKind, PhotoSourceMetadata, project_name_from_path};
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
 use myalbuns_paths::{AppPaths, project_data_namespace};
 use tauri::{Emitter, Manager, WebviewWindowBuilder};
@@ -49,6 +47,10 @@ pub(crate) const PROJECT_WINDOW_LABEL: &str = "project";
 pub(crate) const LINKED_MEDIA_CHANGED_EVENT: &str = "myalbuns://linked-media-changed";
 pub(crate) const CACHE_PROCESSOR_WARNING_EVENT: &str = "myalbuns://cache-processor-warning";
 
+#[cfg(test)]
+#[path = "product_runtime_recovery_tests.rs"]
+mod recovery_tests;
+
 pub(crate) fn project_window_title(path: &Path) -> String {
     let project_name = project_name_from_path(path);
     format!("{project_name} — {}", path.display())
@@ -58,7 +60,7 @@ pub(crate) fn run(
     opened: BootstrappedHostProject,
     app_paths: AppPaths,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let (request, mut project) = opened.into_parts();
+    let (request, project) = opened.into_parts();
     #[cfg(debug_assertions)]
     crate::dev_host_registration::register_from_environment(&request.launch_nonce)?;
 
@@ -66,13 +68,17 @@ pub(crate) fn run(
     let cache_namespace_owner = cache_service
         .reserve_namespace(project.identity_authority())
         .map_err(io::Error::other)?;
-    hydrate_project_from_recovered_cache(&mut project, cache_namespace_owner.recovered_artifacts());
     let initial_window_title = project_window_title(project.project_path());
     let recovery = RecoveryCoordinator::new(RecoveryStore::new(app_paths.clone()));
-    let project_host = ProjectHost::with_recovery(project, recovery.clone())?;
-    if !resolve_startup_recovery(&request, &project_host)? {
+    let Some(project_host) = initialize_project_host(
+        project,
+        recovery.clone(),
+        cache_namespace_owner.recovered_artifacts(),
+        |host| resolve_startup_recovery(&request, host),
+    )?
+    else {
         return Ok(());
-    }
+    };
     let engine = CacheEngine::default();
     let media_runtime = MediaRuntime::default();
     let media_monitor = MediaMonitor::default();
@@ -319,6 +325,22 @@ pub(crate) fn run(
     Ok(())
 }
 
+fn initialize_project_host(
+    project: EditableProject,
+    recovery: RecoveryCoordinator,
+    artifacts: &[RecoveredCacheArtifact],
+    resolve_recovery: impl FnOnce(&ProjectHost) -> Result<bool, Box<dyn std::error::Error>>,
+) -> Result<Option<ProjectHost>, Box<dyn std::error::Error>> {
+    let host = ProjectHost::with_recovery(project, recovery)?;
+    if !resolve_recovery(&host)? {
+        return Ok(None);
+    }
+    // Recovery replaces creative state and clears transient source observations.
+    // Hydrate the effective catalog before its first projection reaches the editor.
+    hydrate_project_from_recovered_cache(&host, artifacts).map_err(io::Error::other)?;
+    Ok(Some(host))
+}
+
 fn resolve_startup_recovery(
     request: &BootstrapRequest,
     project_host: &ProjectHost,
@@ -388,37 +410,33 @@ fn resolve_startup_recovery(
 }
 
 fn hydrate_project_from_recovered_cache(
-    project: &mut EditableProject,
+    host: &ProjectHost,
     artifacts: &[RecoveredCacheArtifact],
-) -> usize {
-    artifacts
-        .iter()
-        .filter(|recovered| {
-            let artifact = recovered.artifact();
-            let Ok(media_id) = artifact.media_id.parse::<MediaId>() else {
-                return false;
-            };
-            let Some(media) = project
-                .project()
-                .media()
-                .iter()
-                .find(|media| media.id() == media_id.into_uuid())
-            else {
-                return false;
-            };
-            if media.kind() != MediaKind::Photo || !recovered.matches_source_path(media.path()) {
-                return false;
-            }
-            let Ok(metadata) = PhotoSourceMetadata::new(
-                artifact.width_px,
-                artifact.height_px,
-                ["#D8DEE2".into(), "#BBC4CA".into(), "#929EA6".into()],
-            ) else {
-                return false;
-            };
-            project.observe_photo_source(media_id, metadata).is_ok()
-        })
-        .count()
+) -> Result<usize, String> {
+    let catalog = host.authorized_media_catalog()?;
+    let mut hydrated = 0;
+    for binding in &catalog.bindings {
+        if binding.kind != MediaKind::Photo {
+            continue;
+        }
+        let Some(recovered) = artifacts.iter().find(|recovered| {
+            recovered.artifact().media_id == binding.media_id
+                && recovered.matches_source_path(&binding.logical_path)
+        }) else {
+            continue;
+        };
+        let artifact = recovered.artifact();
+        let Ok(metadata) = PhotoSourceMetadata::new(
+            artifact.width_px,
+            artifact.height_px,
+            ["#D8DEE2".into(), "#BBC4CA".into(), "#929EA6".into()],
+        ) else {
+            continue;
+        };
+        host.observe_photo_source(binding, metadata)?;
+        hydrated += 1;
+    }
+    Ok(hydrated)
 }
 
 fn setup_host(
@@ -2071,7 +2089,7 @@ mod tests {
         open_context
             .capture(&project_path)
             .expect("the reopened Project root is captured");
-        let mut reopened = core
+        let reopened = core
             .open_editable(OpenProjectRequest::new(ProjectLocation::new(
                 project_path,
                 open_context.freeze(),
@@ -2096,28 +2114,29 @@ mod tests {
                 .expect("the recovered fingerprint is valid"),
         };
 
+        let host = ProjectHost::new(reopened);
         let stale_path = root.path().join("Outro vinculo.jpg");
         let stale_recovery = RecoveredCacheArtifact::new(
             artifact.clone(),
             CacheSourceBinding::for_path(&stale_path),
         );
         assert_eq!(
-            hydrate_project_from_recovered_cache(&mut reopened, &[stale_recovery]),
+            hydrate_project_from_recovered_cache(&host, &[stale_recovery]).unwrap(),
             0,
             "a Cache generation from a relinked path cannot hydrate the restored binding"
         );
         assert_eq!(
-            reopened.projection().state.album.media[0].source_width_px,
+            host.projection().unwrap().state.album.media[0].source_width_px,
             Some(1)
         );
 
         let recovered =
             RecoveredCacheArtifact::new(artifact, CacheSourceBinding::for_path(&original_path));
         assert_eq!(
-            hydrate_project_from_recovered_cache(&mut reopened, &[recovered]),
+            hydrate_project_from_recovered_cache(&host, &[recovered]).unwrap(),
             1
         );
-        let restored = reopened.projection();
+        let restored = host.projection().unwrap();
         assert_eq!(restored.state.album.media[0].source_width_px, Some(800));
         assert_eq!(restored.state.album.media[0].source_height_px, Some(1_200));
         assert_eq!(
@@ -2133,6 +2152,9 @@ mod tests {
         assert_eq!(restored.state.revision, 2);
         assert!(!restored.state.dirty);
         assert!(!restored.state.can_undo);
-        assert_eq!(reopened.project().media()[0].path(), original_path);
+        assert_eq!(
+            host.authorized_media_catalog().unwrap().bindings[0].logical_path,
+            original_path
+        );
     }
 }
