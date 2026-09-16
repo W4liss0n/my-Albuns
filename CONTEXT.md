@@ -217,6 +217,9 @@ Acréscimo de escala escolhido pelo usuário sobre o Zoom de preenchimento.
 **Pan da Foto**:
 Deslocamento da Foto dentro de seu Frame sem alterar a Geometria do Frame.
 
+**Ponto focal da Foto**:
+Ponto da Foto usado como referência para conservar a região enquadrada durante uma mudança de formato.
+
 **Ajustes da Foto**:
 Transformações não destrutivas próprias de uma colocação, como Pan, Zoom, espelhamento, preto e branco, giro em passos de 90 graus e Ângulo da Foto.
 
