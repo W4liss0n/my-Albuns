@@ -23,6 +23,7 @@
           "preview_decorative_drop",
           "preview_frame_geometry",
           "preview_photo_angle",
+          "preview_photo_zoom",
           "preview_frame_style",
           "query_layouts",
           "refresh_layout_catalog",
