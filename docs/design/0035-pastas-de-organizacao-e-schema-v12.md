@@ -62,6 +62,12 @@ Imagens ausentes conservam sua prévia em Cache; sem prévia, usam o placeholder
 do painel. Soltar, cancelar, ocultar o painel ou bloquear a interação remove a
 prévia imediatamente.
 
+O Painel e o arrasto do conteúdo de Frames compartilham a definição visual em
+`src/ui/imageDragGhostVisual.ts`: tamanho proporcional sem ampliar fontes
+menores, opacidade, afastamento do ponteiro, margem dos limites, borda branca e
+sombra. Cada superfície apenas desenha essa mesma geometria no seu renderizador;
+as regras visuais não pertencem exclusivamente ao Painel nem à Lâmina.
+
 Os chips mantêm o padrão da referência vigente: cores neutras, seleção azul,
 contagem discreta, `+` tracejado, sem uma nova linha permanente. Nomes longos
 têm elipse e tooltip; a faixa permite rolagem horizontal e acesso por teclado.
