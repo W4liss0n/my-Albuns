@@ -94,6 +94,27 @@ A regressão usa o cenário nativo já existente de cancelamento e ativação
 enfileirada. Um mock de janela não reproduziria a fila e os registros do Tauri.
 O teste não acrescenta atrasos para contornar a disputa.
 
+## Primeiras observações concorrentes
+
+A validação completa revelou #122 no teste público de cargas concorrentes:
+uma tentativa recebia conflito de lease e, logo depois, observava o lease
+inativo. A sondagem tomava brevemente a trava física sem participar da
+arbitragem de publicação. Além disso, a conclusão somente leitura liberava
+essa arbitragem antes de descartar a posse ativa criada apenas para concluir
+a consulta.
+
+Agora sondagem e aquisição usam o mesmo mutex. A carga somente leitura conserva
+o registro durável autorizado e descarta sua posse temporária antes de liberar
+a arbitragem, sem publicar uma Sessão. A comparação física e as recusas por
+registro corrompido ou indisponível permanecem obrigatórias. Isso cumpre a
+serialização de primeiras observações exigida pelo design 0015.
+
+Um teste controla a publicação pendente e verifica que a sondagem espera sua
+conclusão: falhou antes da correção e passou depois. Os 61 testes públicos de
+persistência passaram, seguidos de 500 execuções do cenário concorrente. A
+carga somente leitura também é verificada com armazenamento real de identidade
+e abertura editável posterior, sem posse residual.
+
 ## Limites
 
 O SMB do ensaio é local. A indisponibilidade é provocada pelo desaparecimento do
@@ -108,3 +129,4 @@ arquivos ainda em edição.
 - [GetFinalPathNameByHandleW — Microsoft](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfinalpathnamebyhandlew): caminho físico pelo handle e limitações de normalização em SMB.
 - [Set-Acl — Windows PowerShell 5.1](https://github.com/MicrosoftDocs/PowerShell-Docs/blob/main/reference/5.1/Microsoft.PowerShell.Security/Set-Acl.md): alteração do descritor de segurança de uma fixture por caminho literal.
 - [Cargo — substituição de dependências](https://doc.rust-lang.org/cargo/reference/overriding-dependencies.html): correção transitiva fixada no manifesto do workspace.
+- [LockFileEx — Microsoft](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-lockfileex): a trava exclusiva também impede outra aquisição por um handle do mesmo processo.

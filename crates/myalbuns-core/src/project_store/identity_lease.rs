@@ -204,6 +204,9 @@ impl ProjectIdentityLease {
         project_id: Uuid,
         candidate: Option<PhysicalFileIdentity>,
     ) -> Result<IdentityLeaseObservation, IdentityLeaseError> {
+        // A probe briefly owns the same file lock as an acquiring caller. Keep
+        // it within publication arbitration so it cannot look like a Session.
+        let _publication_lock = IdentityPublicationMutex::acquire(project_id)?;
         let lease_path = lease_path(root, project_id);
         match fs::metadata(&lease_path) {
             Ok(metadata) if metadata.is_file() => {}
@@ -402,7 +405,7 @@ impl Drop for PendingProjectIdentityLease {
 
 #[cfg(all(test, windows))]
 mod tests {
-    use std::sync::mpsc;
+    use std::{sync::mpsc, time::Duration};
 
     use myalbuns_paths::{
         ExpectedObject, OperationPathContext, PhysicalFileIdentity, ProcessInstanceId,
@@ -412,6 +415,46 @@ mod tests {
         ActiveIdentityTarget, IdentityLeaseError, IdentityLeaseObservation, ProjectIdentityLease,
         publish_target_atomically, target_path,
     };
+
+    #[test]
+    fn observation_waits_for_pending_publication_before_probing_the_lease() {
+        let fixture = tempfile::tempdir().expect("temporary identity lease fixture");
+        let root = fixture.path().join("leases");
+        let project_id = uuid::Uuid::new_v4();
+        let publishing_root = root.clone();
+        let (ready_sender, ready_receiver) = mpsc::sync_channel(0);
+        let (release_sender, release_receiver) = mpsc::sync_channel(0);
+        let publisher = std::thread::spawn(move || {
+            let lease = ProjectIdentityLease::acquire(&publishing_root, project_id)
+                .expect("the publisher acquires the pending lease");
+            ready_sender.send(()).expect("the pending lease is held");
+            release_receiver
+                .recv()
+                .expect("the observation releases the publisher");
+            lease.discard_unpublished();
+        });
+        ready_receiver.recv().expect("publication is pending");
+        let (started_sender, started_receiver) = mpsc::sync_channel(0);
+        let (observed_sender, observed_receiver) = mpsc::channel();
+        let observer = std::thread::spawn(move || {
+            started_sender.send(()).expect("the observer is running");
+            observed_sender
+                .send(ProjectIdentityLease::observe(&root, project_id, None))
+                .expect("the observation is collected");
+        });
+        started_receiver.recv().expect("the observer has started");
+        let early = observed_receiver.recv_timeout(Duration::from_millis(100));
+        release_sender.send(()).expect("publication may finish");
+        publisher.join().expect("the publisher does not panic");
+        observer.join().expect("the observer does not panic");
+        assert_eq!(early, Err(mpsc::RecvTimeoutError::Timeout));
+        assert_eq!(
+            observed_receiver
+                .recv()
+                .expect("the stable result is available"),
+            Ok(IdentityLeaseObservation::Inactive)
+        );
+    }
 
     #[test]
     fn observers_see_pending_until_the_complete_target_token_is_atomically_published() {
