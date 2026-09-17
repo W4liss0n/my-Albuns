@@ -115,6 +115,46 @@ persistência passaram, seguidos de 500 execuções do cenário concorrente. A
 carga somente leitura também é verificada com armazenamento real de identidade
 e abertura editável posterior, sem posse residual.
 
+## Coleta da evidência nativa
+
+O coletor acompanha o schema 12 e os diálogos atuais de Importação e Exportação.
+Dois problemas do próprio ensaio foram corrigidos sem alterar o produto: o
+Windows PowerShell 5.1 interpretava o caminho acentuado do JPEG como ANSI, e a
+comparação visual usava coordenadas anteriores ao layout atual. O caminho agora
+constrói os caracteres acentuados explicitamente. A medição usa o centro do
+Frame persistido e a posição da lâmina renderizada, considerando escala,
+navegação e sangria.
+
+A comparação exige transformação neutra e ponto visível no Canvas; continua
+usando tolerância de 32 níveis por canal. A execução final apresentou diferença
+máxima de 1 entre Canvas e JPEG, e 8 entre Original e JPEG. O Background também
+ficou a 1 nível do valor persistido. As imagens retidas foram inspecionadas.
+
+## Resultado final em 17 de setembro de 2026
+
+| Validação | Revisão executada | Resultado | Evidência local |
+| --- | --- | --- | --- |
+| `npm run validate` | `d6afdfe4` | Sete etapas aprovadas; 1.350 testes de frontend, 120 de automação e 970 resultados de testes Rust aprovados; três testes opcionais de automação ignorados | `.tools/windows-path-integration/validation-final/report.json` e logs associados |
+| `npm run test:windows-path -- -AllowVisibleWindows` | `d6afdfe4` | 12 verificações aprovadas; origem limpa | `.tools/windows-path-integration/windows-path-gate-final.json` |
+| `npm run test:productive-journey -- -AllowVisibleWindows` | `468cac71` | 33 verificações aprovadas, das quais 26 nativas, uma pela API pública Rust e seis de componentes; origem limpa | `.tools/windows-path-integration/native-journey.json` |
+
+O relatório completo conserva `sourceInputsDirty: true`: na partida, o índice
+ainda indicava dois arquivos após a remoção de sondas temporárias, embora seu
+diff normalizado estivesse vazio. Atualizar essas entradas no índice não
+produziu alteração para commit; o HEAD permaneceu `d6afdfe4`, sem edição de
+produção durante a execução. Essa ocorrência está descrita no `source-note.md`
+junto ao relatório e não é apresentada como uma execução de origem limpa.
+As duas validações seguintes registraram `sourceInputsDirty: false`.
+
+A jornada final exportou apenas a lâmina 2 em JPEG de 1.440 × 360 pixels,
+preservou o projeto e o Original, verificou ausência de Cache antes e depois da
+exportação e encerrou os processos de teste. Os registros correlacionam cinco
+aberturas e uma execução do Processador. Seus 44 artefatos estão em
+`.scratch/productive-journey-evidence/windows-path-integration-final-r6`, com
+manifesto e hashes. Os 25 testes do coletor também passaram após seu último
+ajuste. As revisões de padrões e aderência à especificação não deixaram achados
+pendentes.
+
 ## Limites
 
 O SMB do ensaio é local. A indisponibilidade é provocada pelo desaparecimento do
@@ -124,9 +164,17 @@ de falha de servidores, VPNs ou redes físicas. O teste de interface complementa
 e arquivos isolados. Os relatórios distinguem origem limpa de execução sobre
 arquivos ainda em edição.
 
+Uma execução anterior registrou `Project(Path(IoFailure))` ao salvar um projeto
+independente, sem conservar a causa bruta do sistema operacional. A ocorrência
+não reapareceu nas jornadas posteriores nem em 100 repetições do teste público
+de salvamento. Permanece uma hipótese sem reprodução determinística; não é
+atribuída a #122 nem declarada corrigida. O registro original foi preservado em
+`.scratch/productive-journey-evidence/windows-path-integration-final-r3`.
+
 ## Documentação técnica consultada
 
 - [GetFinalPathNameByHandleW — Microsoft](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfinalpathnamebyhandlew): caminho físico pelo handle e limitações de normalização em SMB.
 - [Set-Acl — Windows PowerShell 5.1](https://github.com/MicrosoftDocs/PowerShell-Docs/blob/main/reference/5.1/Microsoft.PowerShell.Security/Set-Acl.md): alteração do descritor de segurança de uma fixture por caminho literal.
 - [Cargo — substituição de dependências](https://doc.rust-lang.org/cargo/reference/overriding-dependencies.html): correção transitiva fixada no manifesto do workspace.
 - [LockFileEx — Microsoft](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-lockfileex): a trava exclusiva também impede outra aquisição por um handle do mesmo processo.
+- [Codificação de caracteres — PowerShell](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_character_encoding?view=powershell-7.6): Windows PowerShell interpreta scripts sem BOM segundo a página de códigos ANSI.
