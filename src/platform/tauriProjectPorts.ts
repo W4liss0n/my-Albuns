@@ -37,27 +37,27 @@ import type {
   WorkspacePreferencesPort,
 } from "../application/workspacePreferences";
 import { createWorkspacePreferences } from "../application/workspacePreferences";
-import type { ApplicationSettings as IpcApplicationSettings } from "./generated/ApplicationSettings";
-import type { CancelDisposition as IpcCancelDisposition } from "./generated/CancelDisposition";
-import type { CacheProcessorWarning as IpcCacheProcessorWarning } from "./generated/CacheProcessorWarning";
-import type { ExportCommandError as IpcExportCommandError } from "./generated/ExportCommandError";
+import type { ApplicationSettings as IpcApplicationSettings } from "../contracts/generated/ApplicationSettings";
+import type { CancelDisposition as IpcCancelDisposition } from "../contracts/generated/CancelDisposition";
+import type { CacheProcessorWarning as IpcCacheProcessorWarning } from "../contracts/generated/CacheProcessorWarning";
+import type { ExportCommandError as IpcExportCommandError } from "../contracts/generated/ExportCommandError";
 import { LayoutExportBlockedError } from "../application/projectPorts";
 import { parseLayoutExportProblems } from "./layoutExportContract";
-import type { ExportEvent as IpcExportEvent } from "./generated/ExportEvent";
-import type { ExportResult as IpcExportResult } from "./generated/ExportResult";
-import type { ImportMediaResult as IpcImportMediaResult } from "./generated/ImportMediaResult";
-import type { LinkedMediaChanged as IpcLinkedMediaChanged } from "./generated/LinkedMediaChanged";
-import type { MediaPreview as IpcMediaPreview } from "./generated/MediaPreview";
-import type { MediaFileCatalog as IpcMediaFileCatalog } from "./generated/MediaFileCatalog";
-import type { MediaPreviewCommandError as IpcMediaPreviewCommandError } from "./generated/MediaPreviewCommandError";
-import type { PointerDragThreshold } from "./generated/PointerDragThreshold";
-import type { SaveProjectOutcome as IpcSaveProjectOutcome } from "./generated/SaveProjectOutcome";
-import type { SaveProjectResult as IpcSaveProjectResult } from "./generated/SaveProjectResult";
-import type { SaveAsProjectOutcome as IpcSaveAsProjectOutcome } from "./generated/SaveAsProjectOutcome";
-import type { SaveAsProjectResult as IpcSaveAsProjectResult } from "./generated/SaveAsProjectResult";
-import type { WorkspacePreferenceChange as IpcWorkspacePreferenceChange } from "./generated/WorkspacePreferenceChange";
-import type { WorkspacePreferences as IpcWorkspacePreferences } from "./generated/WorkspacePreferences";
-import type { SettingsPreferenceChange as IpcSettingsPreferenceChange } from "./generated/SettingsPreferenceChange";
+import type { ExportEvent as IpcExportEvent } from "../contracts/generated/ExportEvent";
+import type { ExportResult as IpcExportResult } from "../contracts/generated/ExportResult";
+import type { ImportMediaResult as IpcImportMediaResult } from "../contracts/generated/ImportMediaResult";
+import type { LinkedMediaChanged as IpcLinkedMediaChanged } from "../contracts/generated/LinkedMediaChanged";
+import type { MediaPreview as IpcMediaPreview } from "../contracts/generated/MediaPreview";
+import type { MediaFileCatalog as IpcMediaFileCatalog } from "../contracts/generated/MediaFileCatalog";
+import type { MediaPreviewCommandError as IpcMediaPreviewCommandError } from "../contracts/generated/MediaPreviewCommandError";
+import type { PointerDragThreshold } from "../contracts/generated/PointerDragThreshold";
+import type { SaveProjectOutcome as IpcSaveProjectOutcome } from "../contracts/generated/SaveProjectOutcome";
+import type { SaveProjectResult as IpcSaveProjectResult } from "../contracts/generated/SaveProjectResult";
+import type { SaveAsProjectOutcome as IpcSaveAsProjectOutcome } from "../contracts/generated/SaveAsProjectOutcome";
+import type { SaveAsProjectResult as IpcSaveAsProjectResult } from "../contracts/generated/SaveAsProjectResult";
+import type { WorkspacePreferenceChange as IpcWorkspacePreferenceChange } from "../contracts/generated/WorkspacePreferenceChange";
+import type { WorkspacePreferences as IpcWorkspacePreferences } from "../contracts/generated/WorkspacePreferences";
+import type { SettingsPreferenceChange as IpcSettingsPreferenceChange } from "../contracts/generated/SettingsPreferenceChange";
 import {
   isIpcEditorProjection,
   isIpcRecord,

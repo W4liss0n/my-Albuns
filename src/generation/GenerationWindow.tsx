@@ -1,3 +1,4 @@
+import { observeSnapshot } from "../application/observeSnapshot";
 import { useCallback, useEffect, useState } from "react";
 import { PanelsTopLeft } from "lucide-react";
 import type { GenerationOptions, GenerationView, ProjectGenerationPort } from "../application/projectGeneration";
@@ -19,15 +20,12 @@ export function GenerationWindow({ port }: { port: ProjectGenerationPort }) {
   const report = useCallback((error: unknown) => setError(String(error)), []);
   useEffect(() => {
     let active = true;
-    let receivedView = false;
-    let release: (() => void) | undefined;
-    void Promise.all([port.model(), port.current()]).then(([name, current]) => {
-      if (active) { setModel(name); if (!receivedView) setView(current); }
-    }).catch(error => { if (active) report(error); });
-    void port.onView(next => { receivedView = true; if (active) setView(next); }).then(dispose => {
-      if (active) release = dispose; else dispose();
-    }).catch(error => { if (active) report(error); });
-    return () => { active = false; release?.(); };
+    const observation = observeSnapshot({
+      subscribe: receive => port.onView(receive), read: () => port.current(), receive: setView,
+    });
+    void observation.ready.catch(report);
+    void port.model().then(name => { if (active) setModel(name); }).catch(error => { if (active) report(error); });
+    return () => { active = false; observation.dispose(); };
   }, [port, report]);
   const terminal = view?.phase === "finished" || view?.phase === "cancelled";
   useEffect(() => {

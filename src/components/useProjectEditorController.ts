@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PointerDragThreshold, ProjectCorePort } from "../application/projectPorts";
 import type { PrepareImportedMedia } from "../application/mediaPreviews";
 import type { SheetStructureIntent } from "../application/sheetStructure";
-import type { DecorativeScope, EditorProjection, FrameStackAction, FrameStyleChange, PhotoOrientationAction, SheetVisualChange } from "../domain/project";
+import type { DecorativeScope, EditorProjection, FrameStackAction, PhotoOrientationAction, SheetVisualChange } from "../domain/project";
 import { useEditorView } from "../state/editorView";
 import { CANVAS_MICROMETERS_PER_PIXEL } from "./canvasGeometry";
 import type {
@@ -12,8 +12,7 @@ import type {
 } from "./albumCanvasContract";
 import { useCanvasModeKeyboardShortcuts } from "./useCanvasModeKeyboardShortcuts";
 import { usePhotoGestures } from "./usePhotoGestures";
-import { usePhotoAngleEditing } from "./usePhotoAngleEditing";
-import { useFrameCompositionDraft } from "./useFrameCompositionDraft";
+import { usePropertyDrafts } from "./usePropertyDrafts";
 import { useSliderDoubleClickTime } from "./useSliderDoubleClickTime";
 import { useProjectMutations } from "./useProjectMutations";
 import type { ProjectMutationRunner } from "./useProjectMutationRunner";
@@ -153,33 +152,15 @@ export function useProjectEditorController({
   };
   const canArrangeFrames = canvasMode.kind === "sheet-editing" && selectedFrames.length > 0 && !interactionBlocked;
   const canOrientPhotos = selectedFrames.some((frame) => frame.photo !== null) && !interactionBlocked;
-  const photoAngle = usePhotoAngleEditing({
-    projection,
-    frameIds: navigation.selectedFrameIds,
-    disabled: !canOrientPhotos,
-    port: projectCorePort,
-    runner: runProjectMutation,
-    commit: mutations.commitPhotoAngle,
-    onError: reportInteractionError,
-  });
   const doubleClickTimeMs = useSliderDoubleClickTime(projection.state.projectId, projectCorePort, reportInteractionError);
-  const canEditFrameStyle = selectedFrames.length > 0 && !interactionBlocked;
-  const frameStyle = useFrameCompositionDraft<FrameStyleChange>({
-    projection, frameIds: navigation.selectedFrameIds, disabled: !canEditFrameStyle,
-    session: projectCorePort, runner: runProjectMutation,
-    propertyKey: (change) => change.kind,
-    resolve: (frameIds, change) => projectCorePort.previewFrameStyle({ frameIds, change }),
-    commit: (frameIds, change) => mutations.commitFrameStyle({ frameIds, change }),
+  const properties = usePropertyDrafts({
+    projection, frameIds: navigation.selectedFrameIds, disabled: interactionBlocked,
+    port: projectCorePort, runner: runProjectMutation,
+    commitFrameStyle: mutations.commitFrameStyle, commitPhotoAngle: mutations.commitPhotoAngle,
+    commitPhotoZoom: mutations.commitPhotoZoom, commitInteraction: intent => mutations.commitInteraction(intent, true),
     onError: reportInteractionError,
   });
-  const photoZoom = useFrameCompositionDraft<number>({
-    projection, frameIds: navigation.selectedFrameIds, disabled: !canOrientPhotos,
-    session: projectCorePort, runner: runProjectMutation,
-    resolve: (frameIds, percent) => projectCorePort.previewPhotoZoom({ frameIds, userZoom: percent / 100 }),
-    commit: (frameIds, percent) => mutations.commitPhotoZoom({ frameIds, userZoom: percent / 100 }),
-    onError: reportInteractionError,
-  });
-  const flushPropertyDrafts = () => { void photoAngle.commit(); void frameStyle.commit(); void photoZoom.commit(); };
+  const flushPropertyDrafts = properties.flush;
   const layoutCatalog = useLayoutCatalog({ projection, runner: runProjectMutation,
     port: projectCorePort, dialogPort: projectDialogPort, onError: reportInteractionError });
   const canSaveLayout = canvasMode.kind === "sheet-editing" && !interactionBlocked && !layoutCatalog.busy &&
@@ -327,8 +308,7 @@ export function useProjectEditorController({
     mode: canvasMode.kind === "normal" && layoutPanel.visible && layoutPanel.sheetId
       ? { kind: "normal", isolatedSheetId: layoutPanel.sheetId } : canvasMode,
     composition: layoutPanel.composition !== projection.composition ? layoutPanel.composition
-      : frameStyle.composition !== projection.composition ? frameStyle.composition
-      : photoZoom.composition !== projection.composition ? photoZoom.composition : photoAngle.composition,
+      : properties.composition,
     sheetBarMetadata: projection.state.album.sheets.map((sheet) => ({
       sheetId: sheet.id,
       pageNumbers: sheet.pageNumbers,
@@ -339,7 +319,7 @@ export function useProjectEditorController({
     focusedSheetId: navigation.focusedSheetId,
     centeredSheetId: navigation.centeredSheetId,
     viewport: navigation.viewport,
-    photoZoomPreview: photoGestures.photoZoomPreview,
+    photoZoomPreview: properties.singleZoom.preview,
     sheetSideSwap: {
       disabled: structuralCommandsDisabled || structuralMutationPending,
       onSwap: (sheetId) => { void swapSheetSides(sheetId); },
@@ -455,34 +435,9 @@ export function useProjectEditorController({
     editMediaFolder: (edit: import("../domain/project").MediaFolderEdit) => interactionBlocked
       ? Promise.resolve(false) : mutations.editMediaFolder(edit),
     layoutPanel,
-    frameStyle: {
-      disabled: !canEditFrameStyle,
-      scopeKey: frameStyle.scopeKey,
-      doubleClickTimeMs,
-      dragThreshold,
-      settlement: frameStyle.settlement,
-      onPreview: (change: FrameStyleChange) => { void photoAngle.commit(); void photoZoom.commit(); frameStyle.preview(change); },
-      onCommit: (change?: FrameStyleChange) => { void photoAngle.commit(); void photoZoom.commit(); void frameStyle.commit(change); },
-      onCancel: frameStyle.cancel,
-    },
-    photoZoom: {
-      disabled: !canOrientPhotos,
-      scopeKey: photoZoom.scopeKey,
-      doubleClickTimeMs, dragThreshold, settlement: photoZoom.settlement,
-      onPreview: (percent: number) => { void photoAngle.commit(); void frameStyle.commit(); photoZoom.preview(percent); },
-      onCommit: (percent: number) => { void photoAngle.commit(); void frameStyle.commit(); void photoZoom.commit(percent); },
-      onCancel: photoZoom.cancel,
-    },
-    photoAngle: {
-      disabled: !canOrientPhotos,
-      scopeKey: photoAngle.scopeKey,
-      doubleClickTimeMs,
-      dragThreshold,
-      settlement: photoAngle.settlement,
-      onPreview: (angleTenths: number) => { void frameStyle.commit(); void photoZoom.commit(); photoAngle.preview(angleTenths); },
-      onCommit: (angleTenths: number) => { void frameStyle.commit(); void photoZoom.commit(); void photoAngle.commit(angleTenths); },
-      onCancel: photoAngle.cancel,
-    },
+    frameStyle: { ...properties.frameStyle, doubleClickTimeMs, dragThreshold },
+    photoZoom: { ...properties.photoZoom, doubleClickTimeMs, dragThreshold },
+    photoAngle: { ...properties.photoAngle, doubleClickTimeMs, dragThreshold },
     canOrientPhotos,
     orientPhotos,
     canApplyPhotoEffects,
@@ -517,18 +472,18 @@ export function useProjectEditorController({
     selectedFrame,
     selectedComposedPhoto,
     selectedFrames,
-    displayedPhotoZoom: photoGestures.displayedPhotoZoom,
+    displayedPhotoZoom: properties.singleZoom.value ?? photoGestures.displayedPhotoZoom,
     displayedPhotoPanX: photoGestures.displayedPhotoPanX,
-    zoomCommitting: photoGestures.zoomCommitting,
+    zoomCommitting: properties.singleZoom.committing,
     sheetCount: projection.state.album.sheets.length,
     structuralCommandsDisabled,
     structuralMutationPending,
     canvasProps,
     navigateToSheet: navigation.navigateToSheet,
     navigateToAdjacentSheet: navigation.navigateToAdjacentSheet,
-    beginZoomGesture: photoGestures.beginZoomGesture,
-    updateZoomGesture: photoGestures.updateZoomGesture,
-    finishZoomGesture: photoGestures.finishZoomGesture,
+    beginZoomGesture: properties.singleZoom.begin,
+    updateZoomGesture: properties.singleZoom.update,
+    finishZoomGesture: properties.singleZoom.finish,
     applyAlbumInformation: mutations.applyAlbumInformation,
     applyAlbumDesign: mutations.applyAlbumDesign,
     applyDpi: mutations.applyDpi,

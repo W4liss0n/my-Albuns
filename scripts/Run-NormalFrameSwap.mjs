@@ -1,10 +1,9 @@
-import { spawn, execFileSync } from 'node:child_process';
-import { mkdirSync, openSync, closeSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
-import { aliveProcessInstances, waitForProcessInstance, processForestInstances, terminateProcessInstance } from './DevLifecycleProcessInstances.mjs';
-import { createWebDriverClient, findFreeTcpPort, waitForHttp } from './GateWebDriver.mjs';
+import { createHeadlessBrowserSession } from './HeadlessBrowserSession.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const output = path.resolve(process.argv[2] ?? path.join(root, '.scratch/normal-frame-swap-gestures'));
@@ -15,24 +14,14 @@ const source = () => ({
 const evidence = { schemaVersion: 1, gate: 'normal-frame-swap-gestures', collectedAtUtc: new Date().toISOString(),
   sourceInputs: { initial: source(), final: null }, passed: false, cleanupCompleted: false, scenarios: [] };
 mkdirSync(output, { recursive: true });
-const edge = JSON.parse(execFileSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(root, 'scripts/Resolve-EdgeWebDriver.ps1')], { encoding: 'utf8', windowsHide: true }));
-const roots = [];
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-async function start(executable, args, name) {
-  const fd = openSync(path.join(output, name + '.log'), 'w');
-  const child = spawn(executable, args, { cwd: root, windowsHide: true, stdio: ['ignore', fd, fd] });
-  closeSync(fd);
-  try { roots.push(await waitForProcessInstance(child.pid, name)); }
-  catch (error) { child.kill(); throw error; }
-}
+const browser = createHeadlessBrowserSession({ root, output, windowSize: '1024,859', requestTimeoutMilliseconds: 60000 });
 let request, session;
 try {
-  const port = await findFreeTcpPort(), driverPort = await findFreeTcpPort();
-  await start(process.execPath, [path.join(root, 'node_modules/vite/bin/vite.js'), '--host', '127.0.0.1', '--port', String(port), '--strictPort'], 'vite');
-  await start(edge.driverExecutable, ['--port=' + driverPort, '--host=127.0.0.1'], 'webdriver');
-  await Promise.all([waitForHttp(`http://127.0.0.1:${port}`, 'Vite'), waitForHttp(`http://127.0.0.1:${driverPort}/status`, 'WebDriver')]);
-  request = createWebDriverClient(`http://127.0.0.1:${driverPort}`, { defaultTimeoutMilliseconds: 60000 }); console.log("starting browser");
-  session = (await request('POST', '/session', { capabilities: { alwaysMatch: { browserName: 'MicrosoftEdge', 'ms:edgeOptions': { binary: edge.edgeExecutable, args: ['--headless=new', '--disable-gpu', '--no-first-run', '--window-size=1024,859'] } } } })).sessionId;
+  const started = await browser.start();
+  ({ request, session } = started);
+  const port = started.port;
+
   console.log("browser ready"); const execute = (script, args = []) => request('POST', `/session/${session}/execute/sync`, { script, args });
   const key = (type, value) => request('POST', `/session/${session}/actions`, { actions: [{ type: 'key', id: 'keyboard', actions: [{ type, value }] }] });
   const pointer = actions => request('POST', `/session/${session}/actions`, {actions:[{type:'pointer',id:'mouse',parameters:{pointerType:'mouse'},actions}]});
@@ -118,11 +107,7 @@ try {
     if (screenshot) writeFileSync(path.join(output, 'failure.png'), Buffer.from(screenshot, 'base64'));
   }
 } finally {
-  const owned = roots.flatMap(root => processForestInstances([root]));
-  if (session && request) await request('DELETE', `/session/${session}`).catch(() => {});
-  for (const child of owned.reverse()) terminateProcessInstance(child);
-  for (let attempt = 0; attempt < 100 && aliveProcessInstances(owned).length > 0; ++attempt) await delay(100);
-  evidence.cleanupCompleted = aliveProcessInstances(owned).length === 0;
+  evidence.cleanupCompleted = await browser.close();
   evidence.sourceInputs.final = source();
   evidence.passed = !evidence.error && evidence.cleanupCompleted && evidence.scenarios.length === 6 &&
     evidence.scenarios.every(item => item.passed) && JSON.stringify(evidence.sourceInputs.initial) === JSON.stringify(evidence.sourceInputs.final);

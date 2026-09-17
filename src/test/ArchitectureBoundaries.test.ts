@@ -6,13 +6,14 @@ import path from "node:path";
 import * as ts from "typescript";
 import { expect, test } from "vitest";
 
-type ArchitecturalLayer = "application" | "domain" | "ui";
+type ArchitecturalLayer = "application" | "contracts" | "domain" | "ui";
 
 const sourceRoot = path.resolve("src");
 const allowedDependencies: Record<ArchitecturalLayer, Set<ArchitecturalLayer>> = {
+  contracts: new Set(["contracts"]),
   domain: new Set(["domain"]),
-  application: new Set(["application", "domain"]),
-  ui: new Set(["ui", "application", "domain"]),
+  application: new Set(["application", "contracts", "domain"]),
+  ui: new Set(["ui", "application", "contracts", "domain"]),
 };
 
 function discoverSourceFiles(directory: string): string[] {
@@ -30,6 +31,7 @@ function layerOf(candidate: string): ArchitecturalLayer | "feature" {
   for (const segment of relative.split(path.sep)) {
     if (
       segment === "application" ||
+      segment === "contracts" ||
       segment === "domain" ||
       segment === "ui"
     ) {

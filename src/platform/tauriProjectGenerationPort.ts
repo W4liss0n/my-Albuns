@@ -1,9 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { ProjectGenerationPort } from "../application/projectGeneration";
-import type { GenerationProgress } from "./generated/GenerationProgress";
-import type { GenerationView } from "./generated/GenerationView";
-import type { GenerationOptions } from "./generated/GenerationOptions";
+import type { GenerationProgress } from "../contracts/generated/GenerationProgress";
+import type { GenerationView } from "../contracts/generated/GenerationView";
+import type { GenerationOptions } from "../contracts/generated/GenerationOptions";
 import { tauriWindowControls } from "./tauriWindowControls";
 
 export const tauriProjectGenerationPort: ProjectGenerationPort = {

@@ -107,7 +107,7 @@ try {
             -ContractName 'domain'
         Compare-GeneratedContract `
             -GeneratedRoot $temporaryIpcRoot `
-            -CheckedInRoot (Join-Path $workspaceRoot 'src/platform/generated') `
+            -CheckedInRoot (Join-Path $workspaceRoot 'src/contracts/generated') `
             -ContractName 'ipc'
     )
 

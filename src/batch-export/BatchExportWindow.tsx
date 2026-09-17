@@ -1,3 +1,4 @@
+import { observeSnapshot } from "../application/observeSnapshot";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { BatchExportPort, BatchExportView, BatchRecoverySummary, ExportConflictPolicy } from "../application/batchExport";
 import { ActionButton } from "../ui/ActionButton";
@@ -34,14 +35,12 @@ export function BatchExportWindow({ port }: { port: BatchExportPort }) {
   const report = useCallback((reason: unknown) => setError(String(reason)), []);
   useEffect(() => {
     let active = true;
-    let release: (() => void) | undefined;
-    void port.onView(next => { if (active) setView(next); }).then(dispose => {
-      if (active) release = dispose; else dispose();
-    }).catch(report);
-    void Promise.all([port.current(), port.recoveries()]).then(([current, pending]) => {
-      if (active) { setView(current); setRecoveries(pending); }
-    }).catch(report);
-    return () => { active = false; release?.(); };
+    const observation = observeSnapshot({
+      subscribe: receive => port.onView(receive), read: () => port.current(), receive: setView,
+    });
+    void observation.ready.catch(report);
+    void port.recoveries().then(pending => { if (active) setRecoveries(pending); }).catch(error => { if (active) report(error); });
+    return () => { active = false; observation.dispose(); };
   }, [port, report]);
   useLayoutEffect(() => {
     if (view?.phase === "finished" || view?.phase === "interrupted" || view?.phase === "storageFull") {

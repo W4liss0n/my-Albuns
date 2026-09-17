@@ -1,7 +1,7 @@
 import { invokeImageProcessing } from "./invokeImageProcessing";
 import { invoke } from "@tauri-apps/api/core";
 import type { ExportMediaPort } from "../application/exportMedia";
-import type { ExportRelinkResult } from "./generated/ExportRelinkResult";
+import type { ExportRelinkResult } from "../contracts/generated/ExportRelinkResult";
 import { parseExportMediaProblems } from "./exportMediaContract";
 
 export const tauriExportMediaPort: ExportMediaPort = {

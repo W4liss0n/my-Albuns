@@ -1,13 +1,7 @@
-export type ExportFormat = { kind: "jpeg"; quality: number } | { kind: "png" } | { kind: "pdf" };
-export interface NormalExportOptions {
-  scope: "album" | "range";
-  sheetIds: string[];
-  mode: "sheet" | "page";
-  format: ExportFormat;
-  destination: string;
-  conflictPolicy: "ask" | "skip" | "replace";
-}
-export interface ExportSheetInfo { sheetId: string; number: number; pageCount: number }
+export type { ExportFormat } from "../contracts/generated/ExportFormat";
+export type { NormalExportOptions } from "../contracts/generated/NormalExportOptions";
+import type { NormalExportOptions } from "../contracts/generated/NormalExportOptions";
+export type { ExportSheetInfo } from "../contracts/generated/ExportSheetInfo";
 
 export class ExportConflictsError extends Error {
   constructor(readonly files: string[]) { super("Já existem arquivos no destino da Exportação."); }

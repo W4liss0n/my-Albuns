@@ -239,7 +239,7 @@ fn export_rejects_placeholders_after_unlock_and_on_manual_frames() {
             if lock_then_unlock { 3 } else { 1 }
         );
         assert!(matches!(
-            frozen.into_sheet(&sheet),
+            frozen.into_export(std::slice::from_ref(&sheet)),
             Err(myalbuns_core::CoreError::UnfilledLayoutPositions { .. })
         ));
         let path = root.path().join("Foto.jpg");
@@ -266,7 +266,10 @@ fn export_rejects_placeholders_after_unlock_and_on_manual_frames() {
                 .unwrap();
         }
         assert!(
-            project.freeze_rendering().into_sheet(&sheet).is_ok(),
+            project
+                .freeze_rendering()
+                .into_export(std::slice::from_ref(&sheet))
+                .is_ok(),
             "filling the same selection releases Export"
         );
     }
@@ -322,11 +325,11 @@ fn locked_photo_content_can_be_filled_replaced_and_cleared_while_export_reports_
     );
     assert_eq!(problems[1].frame_number, 2);
     assert!(matches!(
-        frozen.clone().into_sheet(&sheet),
+        frozen.clone().into_export(std::slice::from_ref(&sheet)),
         Err(CoreError::UnfilledLayoutPositions { .. })
     ));
     assert!(
-        frozen.into_sheet(&other).is_ok(),
+        frozen.into_export(std::slice::from_ref(&other)).is_ok(),
         "placeholders outside the selection do not block it"
     );
     for _ in 0..2 {
@@ -339,7 +342,12 @@ fn locked_photo_content_can_be_filled_replaced_and_cleared_while_export_reports_
             .unwrap();
     }
     let filled = project.projection();
-    assert!(project.freeze_rendering().into_sheet(&sheet).is_ok());
+    assert!(
+        project
+            .freeze_rendering()
+            .into_export(std::slice::from_ref(&sheet))
+            .is_ok()
+    );
     assert_eq!(
         project.apply(ProjectIntent::AddPhoto {
             sheet_id: sheet.clone(),
@@ -471,7 +479,12 @@ fn locked_photo_content_can_be_filled_replaced_and_cleared_while_export_reports_
         project.projection().state.album.sheets[0].frames,
         content.state.album.sheets[0].frames
     );
-    assert!(project.freeze_rendering().into_sheet(&sheet).is_ok());
+    assert!(
+        project
+            .freeze_rendering()
+            .into_export(std::slice::from_ref(&sheet))
+            .is_ok()
+    );
 }
 
 #[test]

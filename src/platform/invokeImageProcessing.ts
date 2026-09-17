@@ -1,6 +1,6 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 import type { ImageProcessingProgress } from "../application/projectPorts";
-import type { ImageProcessingProgress as IpcImageProcessingProgress } from "./generated/ImageProcessingProgress";
+import type { ImageProcessingProgress as IpcImageProcessingProgress } from "../contracts/generated/ImageProcessingProgress";
 
 export async function invokeImageProcessing<T>(
   command: string,

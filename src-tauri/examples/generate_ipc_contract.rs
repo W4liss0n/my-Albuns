@@ -21,7 +21,7 @@ fn main() {
     let output_dir = env::args_os()
         .nth(1)
         .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("src/platform/generated"));
+        .unwrap_or_else(|| PathBuf::from("src/contracts/generated"));
     let config = Config::new()
         .with_out_dir(output_dir)
         .with_large_int("number");

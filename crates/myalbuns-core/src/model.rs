@@ -767,19 +767,19 @@ pub struct RenderSnapshotRef<'a> {
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct RenderSnapshotMetadata<'a> {
-    project_id: &'a str,
-    project_name: &'a str,
-    revision: u64,
-    dpi: u32,
+    pub(crate) project_id: &'a str,
+    pub(crate) project_name: &'a str,
+    pub(crate) revision: u64,
+    pub(crate) dpi: u32,
 }
 
-impl<'a> From<&'a EditorState> for RenderSnapshotMetadata<'a> {
-    fn from(state: &'a EditorState) -> Self {
+impl<'a> From<&'a RenderSnapshot> for RenderSnapshotMetadata<'a> {
+    fn from(snapshot: &'a RenderSnapshot) -> Self {
         Self {
-            project_id: &state.project_id,
-            project_name: &state.project_name,
-            revision: state.revision,
-            dpi: state.document.dpi,
+            project_id: &snapshot.project_id,
+            project_name: &snapshot.project_name,
+            revision: snapshot.revision,
+            dpi: snapshot.dpi,
         }
     }
 }

@@ -225,10 +225,9 @@ fn host_and_processor_share_one_serialized_protocol() {
     let sheet_id = frozen.render_snapshot().composition.sheets[0]
         .sheet_id
         .clone();
-    let (snapshot, _unit, frozen_sources) = frozen
-        .into_sheet(&sheet_id)
-        .expect("the selected sheet is frozen with exact originals")
-        .into_parts();
+    let (snapshot, frozen_sources) = frozen
+        .into_export(std::slice::from_ref(&sheet_id))
+        .expect("the selected sheet is frozen with exact originals");
     let sources = frozen_sources
         .into_iter()
         .map(|source| {

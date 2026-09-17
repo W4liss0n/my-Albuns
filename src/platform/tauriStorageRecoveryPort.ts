@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { StorageRecoveryPort } from "../application/storageRecovery";
-import type { StorageRecovery } from "./generated/StorageRecovery";
+import type { StorageRecovery } from "../contracts/generated/StorageRecovery";
 
 export const tauriStorageRecoveryPort: StorageRecoveryPort = {
   status: owner => invoke<StorageRecovery | null>("storage_recovery_status", { owner }),

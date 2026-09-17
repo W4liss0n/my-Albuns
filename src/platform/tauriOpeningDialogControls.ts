@@ -2,8 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 
 import type { ProjectRecoveryDecision } from "../application/projectPorts";
 import type { OpeningExternalCopyDecision } from "../global/application/globalProjectPort";
-import type { OpeningExternalCopyDecision as IpcOpeningExternalCopyDecision } from "./generated/OpeningExternalCopyDecision";
-import type { ProjectRecoveryDecision as IpcProjectRecoveryDecision } from "./generated/ProjectRecoveryDecision";
+import type { OpeningExternalCopyDecision as IpcOpeningExternalCopyDecision } from "../contracts/generated/OpeningExternalCopyDecision";
+import type { ProjectRecoveryDecision as IpcProjectRecoveryDecision } from "../contracts/generated/ProjectRecoveryDecision";
 
 export function resolveOpeningExternalCopy(
   attemptId: string,

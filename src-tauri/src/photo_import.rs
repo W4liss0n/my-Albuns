@@ -710,28 +710,25 @@ async fn execute_import_batch(
                 "O Projeto mudou durante a importação.".into(),
             ));
         }
-        if cancellation.reason() == Some(CacheCancellationReason::Paused) {
-            cancellation.resume_after_pause();
-        }
-        let permit = engine.begin_cancellable_work(cancellation.clone()).await;
-        if cancellation.reason() == Some(CacheCancellationReason::Paused) {
-            drop(permit);
-            continue;
-        }
+        let admission =
+            crate::image_work_admission::ImageWorkAdmission::begin(&engine, &cancellation)
+                .await
+                .map_err(|error| BatchFailure::Recoverable(error.to_string()))?;
         if engine.processor_status() == CacheProcessorStatus::Suspended {
             return Err(BatchFailure::Recoverable(
                 "O Processador de Imagens está suspenso.".into(),
             ));
         }
-        let reservation = match processor
-            .reserve_cache_for(estimate, cancellation.flag())
+        let lease = match admission
+            .reserve(
+                &processor,
+                estimate,
+                crate::image_work_admission::ImageWorkKind::Cache,
+            )
             .await
         {
-            Ok(reservation) => reservation,
-            Err(ProcessorAdmissionFailure::Cancelled) => {
-                drop(permit);
-                continue;
-            }
+            Ok(lease) => lease,
+            Err(ProcessorAdmissionFailure::Cancelled) => continue,
             Err(ProcessorAdmissionFailure::MemoryPressure) => {
                 return Err(BatchFailure::MemoryPressure);
             }
@@ -742,12 +739,7 @@ async fn execute_import_batch(
             }
             Err(error) => return Err(BatchFailure::Recoverable(error.to_string())),
         };
-        if cancellation.reason().is_some() {
-            drop(reservation);
-            drop(permit);
-            continue;
-        }
-        let mut transport = TauriImagingTransport::new(app, &logging, &reservation);
+        let mut transport = TauriImagingTransport::new(app, &logging, lease.reservation());
         let outcome = engine
             .invoke_cache_command(
                 &mut transport,
@@ -757,8 +749,7 @@ async fn execute_import_batch(
                 InvocationControl::controlled(cancellation.flag(), progress),
             )
             .await;
-        drop(reservation);
-        drop(permit);
+        drop(lease);
         match outcome {
             Ok((
                 ImagingResponse::PhotoImportCompleted {
@@ -823,26 +814,21 @@ fn inspect_with_capacity(
     let cancellation = CacheCancellation::default();
     let result = tauri::async_runtime::block_on(async {
         loop {
-            if cancellation.reason() == Some(CacheCancellationReason::Paused) {
-                cancellation.resume_after_pause();
-            }
-            let permit = engine.begin_cancellable_work(cancellation.clone()).await;
-            let reservation = match processor
-                .reserve_inspection(estimate, cancellation.flag())
+            let admission =
+                crate::image_work_admission::ImageWorkAdmission::begin(engine, &cancellation)
+                    .await?;
+            let lease = match admission
+                .reserve(
+                    processor,
+                    estimate,
+                    crate::image_work_admission::ImageWorkKind::Inspection,
+                )
                 .await
             {
-                Ok(reservation) => reservation,
-                Err(ProcessorAdmissionFailure::Cancelled) => {
-                    drop(permit);
-                    continue;
-                }
+                Ok(lease) => lease,
+                Err(ProcessorAdmissionFailure::Cancelled) => continue,
                 Err(error) => return Err(error),
             };
-            if cancellation.reason().is_some() {
-                drop(reservation);
-                drop(permit);
-                continue;
-            }
             // This function runs on the blocking pool. A started decoder is
             // drained before returning its memory and exclusive CPU reservation.
             let proposal = MediaResolver.propose_media_imports_in_plan(
@@ -852,8 +838,7 @@ fn inspect_with_capacity(
                 roots,
                 |_| {},
             );
-            drop(reservation);
-            drop(permit);
+            drop(lease);
             return Ok(proposal);
         }
     });

@@ -2,8 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 import type { PhotoshopPort, PhotoshopSettingsPort, PhotoshopStatus, PhotoshopErrorCode } from "../application/photoshop";
 import { PhotoshopError } from "../application/photoshop";
 import { isIpcRecord } from "./ipcGuards";
-import type { PhotoshopStatus as NativePhotoshopStatus } from "./generated/PhotoshopStatus";
-import type { PhotoshopPhotoTarget as NativePhotoshopPhotoTarget } from "./generated/PhotoshopPhotoTarget";
+import type { PhotoshopStatus as NativePhotoshopStatus } from "../contracts/generated/PhotoshopStatus";
+import type { PhotoshopPhotoTarget as NativePhotoshopPhotoTarget } from "../contracts/generated/PhotoshopPhotoTarget";
 
 const errorCodes: ReadonlySet<string> = new Set([
   "installation_unavailable", "invalid_installation", "original_absent", "original_unavailable",

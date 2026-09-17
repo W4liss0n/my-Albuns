@@ -10,7 +10,7 @@ export interface FrameCompositionDraftInput<Value> {
   runner: ProjectMutationRunner;
   propertyKey?(value: Value): string;
   resolve(frameIds: string[], value: Value): Promise<ComposedFrame[]>;
-  commit(frameIds: string[], value: Value): Promise<EditorProjection | null>;
+  commit(frameIds: string[], value: Value): Promise<boolean>;
   onError(message: string): void;
 }
 
@@ -29,6 +29,8 @@ export function useFrameCompositionDraft<Value>(input: FrameCompositionDraftInpu
   const scope = useMemo(() => ({ active: false, serial: 0,
     draft: null as { frameIds: string[]; value: Value } | null,
   }), [scopeKey, disabled, session]);
+  const [display, setDisplay] = useState<{ scope: object; value: Value } | null>(null);
+  const [pending, setPending] = useState<{ scope: object; value: Value; serial: number }[]>([]);
   const [visual, setVisual] = useState<FramePreview | null>(null);
   const [settlement, setSettlement] = useState({ serial: 0, reset: false });
 
@@ -42,6 +44,7 @@ export function useFrameCompositionDraft<Value>(input: FrameCompositionDraftInpu
     scope.draft = null;
     if (scope.active) {
       setVisual(null);
+      setDisplay(null);
       setSettlement((previous) => ({ serial: previous.serial + 1, reset: true }));
     }
   }, [scope]);
@@ -55,16 +58,20 @@ export function useFrameCompositionDraft<Value>(input: FrameCompositionDraftInpu
     if (!edit) return false;
     scope.draft = null;
     const serial = ++scope.serial;
+    const pendingEdit = { scope, value: edit.value, serial };
+    setPending(previous => [...previous, pendingEdit]);
+    setDisplay({ scope, value: edit.value });
     setSettlement((previous) => ({ serial: previous.serial + 1, reset: false }));
     try {
       // Enqueue synchronously so Save, Undo and adjacent properties follow this edit.
-      const completed = (await latest.current.commit(edit.frameIds, edit.value)) !== null;
+      const completed = await latest.current.commit(edit.frameIds, edit.value);
       if (!completed && scope.active && scope.serial === serial) {
         setSettlement((previous) => ({ serial: previous.serial + 1, reset: true }));
       }
       return completed;
     } finally {
-      if (scope.active && scope.serial === serial) setVisual(null);
+      setPending(previous => previous.filter(item => item !== pendingEdit));
+      if (scope.active && scope.serial === serial) { setVisual(null); setDisplay(null); }
     }
   }, [scope, disabled]);
 
@@ -74,6 +81,7 @@ export function useFrameCompositionDraft<Value>(input: FrameCompositionDraftInpu
     if (scope.draft && propertyKey && propertyKey(scope.draft.value) !== propertyKey(value)) void commit();
     const edit = { frameIds: [...latest.current.frameIds], value };
     scope.draft = edit;
+    setDisplay({ scope, value });
     const serial = ++scope.serial;
     const current = () => scope.active && scope.serial === serial;
     void latest.current.runner.waitForIdle().then(async (outcome) => {
@@ -102,5 +110,9 @@ export function useFrameCompositionDraft<Value>(input: FrameCompositionDraftInpu
     })) };
   }, [visual, disabled, scope, projection.composition]);
 
-  return { scopeKey, preview, commit, cancel, composition, settlement };
+  return { scopeKey, preview, commit, cancel, composition, settlement,
+    peek: () => scope.draft?.value ?? null,
+    value: !disabled && display?.scope === scope ? display.value : null,
+    pendingValues: pending.filter(item => item.scope === scope).map(item => item.value),
+  };
 }

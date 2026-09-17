@@ -245,7 +245,7 @@ fn frozen_rendering_borrows_one_resolved_plan_for_canvas_and_export() {
     let frozen = project.freeze_rendering();
     let snapshot: RenderSnapshotRef<'_> = frozen.render_snapshot();
     assert!(
-        std::ptr::eq(snapshot.composition, &frozen.projection().composition),
+        std::ptr::eq(snapshot.composition, frozen.render_snapshot().composition),
         "Canvas and Export must borrow the same resolved CompositionPlan"
     );
     assert_eq!(snapshot.project_id, "550e8400-e29b-41d4-a716-446655440000");
@@ -256,21 +256,18 @@ fn frozen_rendering_borrows_one_resolved_plan_for_canvas_and_export() {
     assert_eq!(snapshot.composition.sheets[1].sheet_id, selected_sheet_id);
     assert_eq!(snapshot.composition.sheets[1].width_um, 600_000);
     assert_eq!(snapshot.composition.sheets[1].height_um, 300_000);
-    let canvas_sheet = &frozen.projection().composition.sheets[1];
+    let canvas_sheet = &frozen.render_snapshot().composition.sheets[1];
     assert_eq!(canvas_sheet.sheet_id, selected_sheet_id);
     assert_eq!(canvas_sheet.number, 2);
     assert_eq!(canvas_sheet.width_um, 600_000);
     assert_eq!(canvas_sheet.height_um, 300_000);
-    let frozen_sheet = frozen
-        .into_sheet(&selected_sheet_id)
+    let (snapshot, sources) = frozen
+        .into_export(std::slice::from_ref(&selected_sheet_id))
         .expect("the selected sheet owns its exact sources");
 
-    assert_eq!(frozen_sheet.output_unit().sheet.sheet_id, selected_sheet_id);
-    let referenced = frozen_sheet
-        .output_unit()
-        .sheet
-        .referenced_media_ids()
-        .collect::<Vec<MediaId>>();
+    let unit = snapshot.output_unit(&selected_sheet_id).unwrap();
+    assert_eq!(unit.sheet.sheet_id, selected_sheet_id);
+    let referenced = unit.sheet.referenced_media_ids().collect::<Vec<MediaId>>();
     assert_eq!(
         referenced.len(),
         2,
@@ -282,8 +279,7 @@ fn frozen_rendering_borrows_one_resolved_plan_for_canvas_and_export() {
             .all(|media_id| media_id.to_string() == "00000000-0000-4000-8000-000000000011")
     );
     assert_eq!(
-        frozen_sheet
-            .sources()
+        sources
             .iter()
             .map(|source| (source.kind(), source.path()))
             .collect::<Vec<_>>(),

@@ -189,13 +189,17 @@ fn nonuniform_resize_preserves_focal_point_and_history_on_both_single_pages_and_
     project.redo().unwrap();
     assert_eq!(project.project(), &changed);
     assert_eq!(
-        project.freeze_rendering().projection().composition,
+        *project.freeze_rendering().render_snapshot().composition,
         after.composition
     );
     let sheet_id = &after.state.album.sheets[1].id;
-    let frozen = project.freeze_rendering().into_sheet(sheet_id).unwrap();
-    assert_eq!(frozen.output_unit().sheet, after.composition.sheets[1]);
-    frozen.output_unit().validate().unwrap();
+    let (snapshot, _) = project
+        .freeze_rendering()
+        .into_export(std::slice::from_ref(sheet_id))
+        .unwrap();
+    let unit = snapshot.output_unit(sheet_id).unwrap();
+    assert_eq!(unit.sheet, after.composition.sheets[1]);
+    unit.validate().unwrap();
     project.save(project.revision()).unwrap();
     let path = project.project_path().to_owned();
     drop(project);

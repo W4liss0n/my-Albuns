@@ -349,7 +349,12 @@ fn layout_panel_corpus_is_produced_by_the_public_core() {
                     .unwrap();
             }
             entry["filled"] = record(&mut project, &format!("{name}-filled"));
-            assert!(project.freeze_rendering().into_sheet(&sheet).is_ok());
+            assert!(
+                project
+                    .freeze_rendering()
+                    .into_export(std::slice::from_ref(&sheet))
+                    .is_ok()
+            );
             let first = project.projection().state.album.sheets[0].frames[0]
                 .id
                 .clone();

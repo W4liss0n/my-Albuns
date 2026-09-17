@@ -3,10 +3,10 @@ import { listen } from "@tauri-apps/api/event";
 import { tauriWindowControls } from "./tauriWindowControls";
 import type { BatchExportPort } from "../application/batchExport";
 import { tauriStorageRecoveryPort } from "./tauriStorageRecoveryPort";
-import type { BatchExportProgress } from "./generated/BatchExportProgress";
-import type { BatchExportView } from "./generated/BatchExportView";
-import type { BatchExportOptions } from "./generated/BatchExportOptions";
-import type { BatchRecoverySummary } from "./generated/BatchRecoverySummary";
+import type { BatchExportProgress } from "../contracts/generated/BatchExportProgress";
+import type { BatchExportView } from "../contracts/generated/BatchExportView";
+import type { BatchExportOptions } from "../contracts/generated/BatchExportOptions";
+import type { BatchRecoverySummary } from "../contracts/generated/BatchRecoverySummary";
 
 export const openBatchExport = () => invoke<void>("open_batch_export");
 export const tauriBatchExportPort: BatchExportPort = {

@@ -11,6 +11,13 @@ pub(crate) struct ProjectIntentOutcome {
     pub(crate) affected_frame_ids: Option<Vec<Uuid>>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum EditPublication {
+    GuardedIfChanged,
+    GuardedAlways,
+    AlbumInformation,
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct PersistentProjectSession {
     current: ProjectRevision,
@@ -114,305 +121,133 @@ impl PersistentProjectSession {
         sources: &crate::project_document::PhotoDimensions,
     ) -> Result<ProjectIntentOutcome, CoreError> {
         let mut outcome = ProjectIntentOutcome::default();
-        if let ProjectIntent::SetAlbumInformation {
-            information,
-            ref expected_dimension_key,
-        } = intent
-        {
-            if let Some(expected) = expected_dimension_key {
-                let validation = self.validate_album_information(&information, sources);
-                let current = validation
-                    .impact
-                    .and_then(|impact| impact.dimensional_change);
-                if current.as_ref().map(|change| &change.confirmation_key) != Some(expected) {
-                    return Err(CoreError::AlbumInformationReviewChanged);
+        let project = self.project();
+        let custom = &self.layout_catalog.entries;
+        let mut publication = EditPublication::GuardedIfChanged;
+        let candidate = match intent {
+            ProjectIntent::SetAlbumInformation {
+                information,
+                expected_dimension_key,
+            } => {
+                if let Some(expected) = expected_dimension_key {
+                    let validation = self.validate_album_information(&information, sources);
+                    let current = validation
+                        .impact
+                        .and_then(|impact| impact.dimensional_change);
+                    if current.as_ref().map(|change| &change.confirmation_key) != Some(&expected) {
+                        return Err(CoreError::AlbumInformationReviewChanged);
+                    }
                 }
+                publication = EditPublication::AlbumInformation;
+                project
+                    .with_album_information(information, custom, sources)
+                    .map_err(CoreError::InvalidAlbumInformation)
             }
-            let candidate = self
-                .project()
-                .with_album_information(information, &self.layout_catalog.entries, sources)
-                .map_err(CoreError::InvalidAlbumInformation)?;
-            // Only this complete, validated global transformation may resize locked Frames.
-            // Other mutations always pass the normal locked-structure guard.
-            if candidate != *self.project() {
-                self.publish_edit(candidate)?;
+            ProjectIntent::ToggleLayoutFavorite { selection } => {
+                let (_, patch) = self.checked_layout_patch(&selection)?;
+                let layout = patch.last_layout().ok_or(CoreError::IncompatibleLayout)?;
+                publication = EditPublication::GuardedAlways;
+                project.with_toggled_layout_favorite(layout)
             }
-            return Ok(outcome);
-        }
-        if let ProjectIntent::AddFrame { sheet_id } | ProjectIntent::PasteFrames { sheet_id, .. } =
-            &intent
-        {
-            let id =
-                parse_uuid(sheet_id).map_err(|_| CoreError::SheetNotFound(sheet_id.clone()))?;
-            self.project().ensure_layout_unlocked(id)?;
-        }
-        if let ProjectIntent::AddPhoto { sheet_id, .. } = &intent
-            && let Some(sheet) = self
-                .project()
-                .sheets()
-                .iter()
-                .find(|sheet| sheet.id().to_string() == *sheet_id)
-            && sheet.layout_locked()
-            && sheet.frames().iter().all(|frame| frame.photo().is_some())
-        {
-            return Err(CoreError::LockedLayoutHasNoPlaceholder);
-        }
-        if let ProjectIntent::ToggleLayoutFavorite { selection } = &intent {
-            let (_, patch) = self.checked_layout_patch(selection)?;
-            let layout = patch.last_layout().ok_or(CoreError::IncompatibleLayout)?;
-            let next = self.project().with_toggled_layout_favorite(layout)?;
-            self.commit_edit(|_| Ok(next))?;
-            return Ok(outcome);
-        }
-        if let ProjectIntent::UnlockLayout { sheet_id } = &intent {
-            let next = self.project().with_layout_unlocked(sheet_id)?;
-            if next != *self.project() {
-                self.commit_edit(|_| Ok(next))?;
+            ProjectIntent::UnlockLayout { sheet_id } => project.with_layout_unlocked(&sheet_id),
+            ProjectIntent::ApplyLayout { selection } => {
+                let (sheet_id, patch) = self.checked_layout_patch(&selection)?;
+                outcome.affected_sheet_id = Some(sheet_id);
+                project.with_layout_patch(sheet_id, patch)
             }
-            return Ok(outcome);
-        }
-        if let ProjectIntent::ApplyLayout { selection } | ProjectIntent::LockLayout { selection } =
-            &intent
-        {
-            let (sheet_id, patch) = self.checked_layout_patch(selection)?;
-            let next = if matches!(intent, ProjectIntent::LockLayout { .. }) {
-                self.project().with_locked_layout_patch(sheet_id, patch)?
-            } else {
-                self.project().with_layout_patch(sheet_id, patch)?
-            };
-            if next != *self.project() {
-                self.commit_edit(|_| Ok(next))?;
+            ProjectIntent::LockLayout { selection } => {
+                let (sheet_id, patch) = self.checked_layout_patch(&selection)?;
+                outcome.affected_sheet_id = Some(sheet_id);
+                project.with_locked_layout_patch(sheet_id, patch)
             }
-            outcome.affected_sheet_id = Some(sheet_id);
-            return Ok(outcome);
-        }
-        if let ProjectIntent::SetLayoutSettings { settings } = &intent {
-            let next = self.project().with_layout_settings(settings.clone())?;
-            if next != *self.project() {
-                self.commit_edit(|_| Ok(next))?;
+            ProjectIntent::SetLayoutSettings { settings } => project.with_layout_settings(settings),
+            ProjectIntent::SetFrameStyle { edit } => project.with_frame_style(&edit),
+            ProjectIntent::TogglePhotoBlackAndWhite { frame_ids } => {
+                project.with_toggled_photo_black_and_white(&frame_ids)
             }
-            return Ok(outcome);
-        }
-        if let ProjectIntent::SetFrameStyle { edit } = &intent {
-            let next = self.project().with_frame_style(edit)?;
-            if next != *self.project() {
-                self.commit_edit(|_| Ok(next))?;
+            ProjectIntent::SetPhotoZoom { edit } => project.with_photo_zoom(&edit),
+            ProjectIntent::SetPhotoAngle { edit } => project.with_photo_angle(&edit),
+            ProjectIntent::OrientPhotos { frame_ids, action } => {
+                project.with_oriented_photos(&frame_ids, action)
             }
-            return Ok(outcome);
-        }
-        if let ProjectIntent::TogglePhotoBlackAndWhite { frame_ids } = &intent {
-            let next = self
-                .project()
-                .with_toggled_photo_black_and_white(frame_ids)?;
-            if next != *self.project() {
-                self.commit_edit(|_| Ok(next))?;
+            ProjectIntent::SwapSheetSides { sheet_id } => {
+                project.with_swapped_sheet_sides(&sheet_id)
             }
-            return Ok(outcome);
-        }
-        if let ProjectIntent::SetPhotoZoom { edit } = &intent {
-            let next = self.project().with_photo_zoom(edit)?;
-            if next != *self.project() {
-                self.commit_edit(|_| Ok(next))?;
+            ProjectIntent::CopyFrames { frame_ids } => {
+                self.frame_clipboard = Some(project.copy_frames(&frame_ids)?);
+                return Ok(outcome);
             }
-            return Ok(outcome);
-        }
-        if let ProjectIntent::SetPhotoAngle { edit } = &intent {
-            let next = self.project().with_photo_angle(edit)?;
-            if next != *self.project() {
-                self.commit_edit(|_| Ok(next))?;
-            }
-            return Ok(outcome);
-        }
-        if let ProjectIntent::OrientPhotos { frame_ids, action } = &intent {
-            let next = self.project().with_oriented_photos(frame_ids, *action)?;
-            if next != *self.project() {
-                self.commit_edit(|_| Ok(next))?;
-            }
-            return Ok(outcome);
-        }
-        if let ProjectIntent::SwapSheetSides { sheet_id } = &intent {
-            let next = self.project().with_swapped_sheet_sides(sheet_id)?;
-            if next != *self.project() {
-                self.commit_edit(|_| Ok(next))?;
-            }
-            return Ok(outcome);
-        }
-        if let ProjectIntent::CopyFrames { frame_ids } = &intent {
-            self.frame_clipboard = Some(self.project().copy_frames(frame_ids)?);
-            return Ok(outcome);
-        }
-        if let ProjectIntent::PasteFrames {
-            sheet_id,
-            desired_offset_um,
-            mode,
-        } = &intent
-        {
-            let clipboard = self
-                .frame_clipboard
-                .clone()
-                .ok_or(CoreError::FrameClipboardEmpty)?;
-            let (next, ids) = self.project().with_pasted_frames(
-                &clipboard,
+            ProjectIntent::PasteFrames {
                 sheet_id,
-                *desired_offset_um,
-                *mode,
-                &self.layout_catalog.entries,
-            )?;
-            self.commit_edit(|_| Ok(next))?;
-            outcome.affected_frame_ids = Some(ids);
-            return Ok(outcome);
-        }
-        if let ProjectIntent::ArrangeFrames { frame_ids, action } = &intent {
-            let next = self.project().with_arranged_frames(frame_ids, *action)?;
-            if next == *self.project() {
-                return Ok(outcome);
-            }
-        }
-        if let ProjectIntent::EditSheetVisual {
-            sheet_id,
-            scope,
-            change,
-        } = &intent
-        {
-            let next = self
-                .project()
-                .with_edited_sheet_visual(sheet_id, *scope, change)?;
-            if next != *self.project() {
-                self.commit_edit(|_| Ok(next))?;
-            }
-            return Ok(outcome);
-        }
-        if let ProjectIntent::DropDecorative { request } = &intent {
-            let next = self.project().with_dropped_decorative(request)?;
-            if next != *self.project() {
-                self.commit_edit(|_| Ok(next))?;
-            }
-            return Ok(outcome);
-        }
-        if let ProjectIntent::ApplyDecorative {
-            sheet_id,
-            media_id,
-            role,
-            scope,
-        } = &intent
-        {
-            let next = self
-                .project()
-                .with_applied_decorative(sheet_id, *media_id, *role, *scope)?;
-            if next != *self.project() {
-                self.commit_edit(|_| Ok(next))?;
-            }
-            return Ok(outcome);
-        }
-        if let ProjectIntent::EditMediaFolder { edit } = &intent {
-            let next = self.project().with_media_folder_edit(edit)?;
-            if next != *self.project() {
-                self.commit_edit(|_| Ok(next))?;
-            }
-            return Ok(outcome);
-        }
-        if let ProjectIntent::RemoveMedia { media_ids, mode } = &intent {
-            let next = self.project().with_removed_media(media_ids, *mode)?;
-            if next != *self.project() {
-                self.commit_edit(|_| Ok(next))?;
-            }
-            return Ok(outcome);
-        }
-        if let ProjectIntent::DeleteFrames { frame_ids, mode } = &intent {
-            let next = self.project().with_deleted_frames(
-                frame_ids,
-                *mode,
-                &self.layout_catalog.entries,
-            )?;
-            if next != *self.project() {
-                self.commit_edit(|_| Ok(next))?;
-            }
-            return Ok(outcome);
-        }
-        if let ProjectIntent::EditFrameGeometry { edit } = &intent {
-            let (rects, _) = self.project().frame_geometry_edit(edit)?;
-            if rects
-                .iter()
-                .zip(&edit.frames)
-                .all(|((_, rect), target)| crate::RectUm::from(*rect) == target.expected_rect)
-            {
-                return Ok(outcome);
-            }
-        }
-        if let ProjectIntent::SetAlbumDesign {
-            visual_defaults,
-            frame_gap_um,
-        } = &intent
-        {
-            let next = self
-                .project()
-                .with_album_design(visual_defaults.clone(), *frame_gap_um)?;
-            if next != *self.project() {
-                self.commit_edit(|_| Ok(next))?;
-            }
-            return Ok(outcome);
-        }
-        let custom = self.layout_catalog.entries.clone();
-        self.commit_edit(|project| match intent {
-            ProjectIntent::ToggleLayoutFavorite { .. }
-            | ProjectIntent::ApplyLayout { .. }
-            | ProjectIntent::LockLayout { .. }
-            | ProjectIntent::UnlockLayout { .. }
-            | ProjectIntent::SetLayoutSettings { .. } => {
-                unreachable!("Layout commands validate the captured query before committing")
-            }
-            ProjectIntent::SetFrameStyle { .. } => {
-                unreachable!("Frame style handles unchanged selections before committing")
-            }
-            ProjectIntent::SetAlbumDesign { .. } => {
-                unreachable!("Album Design commits its complete draft atomically")
-            }
-            ProjectIntent::TogglePhotoBlackAndWhite { .. } => {
-                unreachable!("Photo effects handle unchanged selections before committing")
-            }
-            ProjectIntent::SetPhotoZoom { .. } => {
-                unreachable!("Photo zoom handles unchanged compositions before committing")
-            }
-            ProjectIntent::SetPhotoAngle { .. } => {
-                unreachable!("Photo angle handles unchanged compositions before committing")
-            }
-            ProjectIntent::OrientPhotos { .. } => {
-                unreachable!("Photo orientation handles unchanged compositions before committing")
-            }
-            ProjectIntent::SwapSheetSides { .. } => {
-                unreachable!("side swapping handles unchanged compositions before committing")
-            }
-            ProjectIntent::CopyFrames { .. } | ProjectIntent::PasteFrames { .. } => {
-                unreachable!("clipboard commands are handled before document intents")
-            }
-            ProjectIntent::SwapFrameContents { frame_ids } => {
-                project.with_swapped_frame_contents(&frame_ids)
-            }
-            ProjectIntent::DropDecorative { .. }
-            | ProjectIntent::EditSheetVisual { .. }
-            | ProjectIntent::ApplyDecorative { .. }
-            | ProjectIntent::EditMediaFolder { .. }
-            | ProjectIntent::RemoveMedia { .. }
-            | ProjectIntent::DeleteFrames { .. } => {
-                unreachable!("Frame deletion commits its prepared document once")
+                desired_offset_um,
+                mode,
+            } => {
+                let id = parse_uuid(&sheet_id)
+                    .map_err(|_| CoreError::SheetNotFound(sheet_id.clone()))?;
+                project.ensure_layout_unlocked(id)?;
+                let clipboard = self
+                    .frame_clipboard
+                    .as_ref()
+                    .ok_or(CoreError::FrameClipboardEmpty)?;
+                let (next, ids) = project.with_pasted_frames(
+                    clipboard,
+                    &sheet_id,
+                    desired_offset_um,
+                    mode,
+                    custom,
+                )?;
+                outcome.affected_frame_ids = Some(ids);
+                publication = EditPublication::GuardedAlways;
+                Ok(next)
             }
             ProjectIntent::ArrangeFrames { frame_ids, action } => {
                 project.with_arranged_frames(&frame_ids, action)
             }
-            ProjectIntent::EditFrameGeometry { edit } => project.with_edited_frame_geometry(&edit),
-            ProjectIntent::SetAlbumInformation { .. } => {
-                unreachable!("Album information prepares its complete candidate before committing")
+            ProjectIntent::EditSheetVisual {
+                sheet_id,
+                scope,
+                change,
+            } => project.with_edited_sheet_visual(&sheet_id, scope, &change),
+            ProjectIntent::DropDecorative { request } => project.with_dropped_decorative(&request),
+            ProjectIntent::ApplyDecorative {
+                sheet_id,
+                media_id,
+                role,
+                scope,
+            } => project.with_applied_decorative(&sheet_id, media_id, role, scope),
+            ProjectIntent::EditMediaFolder { edit } => project.with_media_folder_edit(&edit),
+            ProjectIntent::RemoveMedia { media_ids, mode } => {
+                project.with_removed_media(&media_ids, mode)
             }
-            ProjectIntent::SetVisualDefaults { visual_defaults } => project
-                .with_visual_defaults(visual_defaults)
-                .map_err(|()| CoreError::InvalidVisualDefaults),
-            ProjectIntent::SetDpi { dpi } => project
-                .with_dpi(dpi)
-                .map_err(|()| CoreError::InvalidDpi(dpi)),
+            ProjectIntent::DeleteFrames { frame_ids, mode } => {
+                project.with_deleted_frames(&frame_ids, mode, custom)
+            }
+            ProjectIntent::EditFrameGeometry { edit } => project.with_edited_frame_geometry(&edit),
+            ProjectIntent::SetAlbumDesign {
+                visual_defaults,
+                frame_gap_um,
+            } => project.with_album_design(visual_defaults, frame_gap_um),
+            ProjectIntent::SwapFrameContents { frame_ids } => {
+                publication = EditPublication::GuardedAlways;
+                project.with_swapped_frame_contents(&frame_ids)
+            }
+            ProjectIntent::SetVisualDefaults { visual_defaults } => {
+                publication = EditPublication::GuardedAlways;
+                project
+                    .with_visual_defaults(visual_defaults)
+                    .map_err(|()| CoreError::InvalidVisualDefaults)
+            }
+            ProjectIntent::SetDpi { dpi } => {
+                publication = EditPublication::GuardedAlways;
+                project
+                    .with_dpi(dpi)
+                    .map_err(|()| CoreError::InvalidDpi(dpi))
+            }
             ProjectIntent::AddSheet {
                 anchor_sheet_id,
                 position,
             } => {
+                publication = EditPublication::GuardedAlways;
                 let parsed = parse_uuid(&anchor_sheet_id)
                     .map_err(|()| CoreError::SheetNotFound(anchor_sheet_id.clone()))?;
                 if !project.sheets().iter().any(|sheet| sheet.id() == parsed) {
@@ -425,6 +260,7 @@ impl PersistentProjectSession {
                 Ok(next)
             }
             ProjectIntent::DuplicateSheet { sheet_id } => {
+                publication = EditPublication::GuardedAlways;
                 let parsed = parse_uuid(&sheet_id)
                     .map_err(|()| CoreError::SheetNotFound(sheet_id.clone()))?;
                 if !project.sheets().iter().any(|sheet| sheet.id() == parsed) {
@@ -437,6 +273,7 @@ impl PersistentProjectSession {
                 Ok(next)
             }
             ProjectIntent::DeleteSheet { sheet_id } => {
+                publication = EditPublication::GuardedAlways;
                 let parsed = parse_uuid(&sheet_id)
                     .map_err(|()| CoreError::SheetNotFound(sheet_id.clone()))?;
                 if !project.sheets().iter().any(|sheet| sheet.id() == parsed) {
@@ -452,13 +289,14 @@ impl PersistentProjectSession {
                 Ok(next)
             }
             ProjectIntent::ConvertEdgeSheet { sheet_id } => {
+                publication = EditPublication::GuardedAlways;
                 let parsed = parse_uuid(&sheet_id)
                     .map_err(|()| CoreError::SheetNotFound(sheet_id.clone()))?;
                 if !project.sheets().iter().any(|sheet| sheet.id() == parsed) {
                     return Err(CoreError::SheetNotFound(sheet_id));
                 }
                 let next = project
-                    .with_converted_edge_sheet(parsed, &custom)
+                    .with_converted_edge_sheet(parsed, custom)
                     .map_err(|()| CoreError::InvalidEdgeConversion)?;
                 outcome.affected_sheet_id = Some(parsed);
                 Ok(next)
@@ -467,6 +305,7 @@ impl PersistentProjectSession {
                 sheet_id,
                 target_index,
             } => {
+                publication = EditPublication::GuardedAlways;
                 let parsed = parse_uuid(&sheet_id)
                     .map_err(|()| CoreError::SheetNotFound(sheet_id.clone()))?;
                 if !project.sheets().iter().any(|sheet| sheet.id() == parsed) {
@@ -484,6 +323,7 @@ impl PersistentProjectSession {
                 delta_pan_y,
                 delta_zoom,
             } => {
+                publication = EditPublication::GuardedAlways;
                 let parsed = parse_uuid(&frame_id)
                     .map_err(|()| CoreError::FrameNotFound(frame_id.clone()))?;
                 let next = project
@@ -493,8 +333,10 @@ impl PersistentProjectSession {
                 Ok(next)
             }
             ProjectIntent::AddFrame { sheet_id } => {
+                publication = EditPublication::GuardedAlways;
                 let parsed_sheet = parse_uuid(&sheet_id)
                     .map_err(|()| CoreError::SheetNotFound(sheet_id.clone()))?;
+                project.ensure_layout_unlocked(parsed_sheet)?;
                 let (next, frame_id) = project
                     .with_added_frame(parsed_sheet)
                     .map_err(|()| CoreError::SheetNotFound(sheet_id))?;
@@ -506,10 +348,20 @@ impl PersistentProjectSession {
                 media_id,
                 mode,
             } => {
+                publication = EditPublication::GuardedAlways;
                 let parsed_sheet = parse_uuid(&sheet_id)
                     .map_err(|()| CoreError::SheetNotFound(sheet_id.clone()))?;
+                if let Some(sheet) = project
+                    .sheets()
+                    .iter()
+                    .find(|sheet| sheet.id() == parsed_sheet)
+                    && sheet.layout_locked()
+                    && sheet.frames().iter().all(|frame| frame.photo().is_some())
+                {
+                    return Err(CoreError::LockedLayoutHasNoPlaceholder);
+                }
                 let (next, frame_id) = project
-                    .with_added_photo(parsed_sheet, media_id.into_uuid(), mode, &custom)
+                    .with_added_photo(parsed_sheet, media_id.into_uuid(), mode, custom)
                     .map_err(|()| {
                         CoreError::InvalidProject(
                             "não foi possível adicionar a Foto à Lâmina".into(),
@@ -525,6 +377,7 @@ impl PersistentProjectSession {
                 y_um,
                 mode,
             } => {
+                publication = EditPublication::GuardedAlways;
                 let parsed_sheet = parse_uuid(&sheet_id)
                     .map_err(|()| CoreError::SheetNotFound(sheet_id.clone()))?;
                 let (next, frame_id) = project
@@ -534,7 +387,7 @@ impl PersistentProjectSession {
                         x_um,
                         y_um,
                         mode,
-                        &custom,
+                        custom,
                     )
                     .map_err(|()| {
                         CoreError::InvalidProject("o alvo da Foto não é válido".into())
@@ -542,7 +395,17 @@ impl PersistentProjectSession {
                 outcome.affected_frame_id = Some(frame_id);
                 Ok(next)
             }
-        })?;
+        }?;
+        if publication != EditPublication::GuardedAlways && candidate == *self.project() {
+            return Ok(outcome);
+        }
+        match publication {
+            // Only the complete validated global transformation can resize locked Frames.
+            EditPublication::AlbumInformation => self.publish_edit(candidate)?,
+            EditPublication::GuardedAlways | EditPublication::GuardedIfChanged => {
+                self.commit_edit(|_| Ok(candidate))?;
+            }
+        }
         Ok(outcome)
     }
 

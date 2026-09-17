@@ -1,6 +1,6 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { MediaDropPort } from "../application/projectPorts";
-import type { MediaFileDrag } from "./generated/MediaFileDrag";
+import type { MediaFileDrag } from "../contracts/generated/MediaFileDrag";
 
 export const tauriMediaDropPort: MediaDropPort = {
   subscribe: (listener) => getCurrentWindow().listen<MediaFileDrag>("myalbuns-media-file-drag", ({ payload }) => {

@@ -1,3 +1,4 @@
+import { observeSnapshot } from "../application/observeSnapshot";
 import { useEffect, useState } from "react";
 import type { GenerationProgress, ProjectGenerationPort } from "../application/projectGeneration";
 import { MessageDialog } from "../ui/MessageDialog";
@@ -9,10 +10,12 @@ export function GenerationProgressWindow({ port }: { port: Pick<ProjectGeneratio
   const [failed, setFailed] = useState(false);
   const [cancelled, setCancelled] = useState(false);
   useEffect(() => {
-    let active = true; let release: (() => void) | undefined; let received = false;
-    void port.onProgress(next => { received = true; if (active) setProgress(next); }).then(dispose => { if (active) release = dispose; else dispose(); }).catch(() => { if (active) setFailed(true); });
-    void port.progress().then(value => { if (active && !received) { if (value) setProgress(value); else setFailed(true); } }).catch(() => { if (active) setFailed(true); });
-    return () => { active = false; release?.(); };
+    const observation = observeSnapshot({
+      subscribe: receive => port.onProgress(receive), read: () => port.progress(),
+      receive: value => { if (value) setProgress(value); else setFailed(true); },
+    });
+    void observation.ready.catch(() => setFailed(true));
+    return observation.dispose;
   }, [port]);
   const cancel = () => { setCancelled(true); void port.cancel().catch(() => setCancelled(false)); };
   return <OwnedWindowShell width={400}>{failed ? <MessageDialog tone="error" title="Progresso indisponível" description="Cancele a geração e tente novamente." primaryAction={{ label: "Cancelar", disabled: cancelled, onClick: cancel }} /> : <ProgressDialog

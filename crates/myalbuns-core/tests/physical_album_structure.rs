@@ -809,12 +809,13 @@ fn reordering_is_atomic_persistent_and_never_interiorizes_a_single_page() {
         redone.state.album.sheets[1].id, moved_id,
         "Redo restores the committed physical order",
     );
-    let frozen = project
+    let (snapshot, _) = project
         .freeze_rendering()
-        .into_sheet(&moved_id)
+        .into_export(std::slice::from_ref(&moved_id))
         .expect("the active reordered Sheet is an exportable output unit");
-    assert_eq!(frozen.output_unit().sheet.sheet_id, moved_id);
-    assert_eq!(frozen.output_unit().sheet.number, 2);
+    let unit = snapshot.output_unit(&moved_id).unwrap();
+    assert_eq!(unit.sheet.sheet_id, moved_id);
+    assert_eq!(unit.sheet.number, 2);
 
     assert_eq!(
         project

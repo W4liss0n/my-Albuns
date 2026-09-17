@@ -356,7 +356,7 @@ test("consumes the generated import result at the Tauri boundary", () => {
   const projectPortSource = sourceFiles["./tauriProjectPorts.ts"];
 
   expect(projectPortSource).toContain(
-    'import type { ImportMediaResult as IpcImportMediaResult } from "./generated/ImportMediaResult";',
+    'import type { ImportMediaResult as IpcImportMediaResult } from "../contracts/generated/ImportMediaResult";',
   );
   expect(projectPortSource).toContain(
     'invokeImageProcessing<IpcImportMediaResult>("import_media", { selection }, onProgress)',

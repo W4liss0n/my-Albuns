@@ -8,12 +8,12 @@ import type {
   ProjectDialogProgress,
   ProjectDialogState,
 } from "../application/projectDialogPort";
-import type { ProjectDialogAction as IpcProjectDialogAction } from "./generated/ProjectDialogAction";
-import type { ProjectDialogActionEvent as IpcProjectDialogActionEvent } from "./generated/ProjectDialogActionEvent";
-import type { ProjectDialogDetail as IpcProjectDialogDetail } from "./generated/ProjectDialogDetail";
-import type { ProjectDialogPresentation as IpcProjectDialogPresentation } from "./generated/ProjectDialogPresentation";
-import type { ProjectDialogProgress as IpcProjectDialogProgress } from "./generated/ProjectDialogProgress";
-import type { ProjectDialogState as IpcProjectDialogState } from "./generated/ProjectDialogState";
+import type { ProjectDialogAction as IpcProjectDialogAction } from "../contracts/generated/ProjectDialogAction";
+import type { ProjectDialogActionEvent as IpcProjectDialogActionEvent } from "../contracts/generated/ProjectDialogActionEvent";
+import type { ProjectDialogDetail as IpcProjectDialogDetail } from "../contracts/generated/ProjectDialogDetail";
+import type { ProjectDialogPresentation as IpcProjectDialogPresentation } from "../contracts/generated/ProjectDialogPresentation";
+import type { ProjectDialogProgress as IpcProjectDialogProgress } from "../contracts/generated/ProjectDialogProgress";
+import type { ProjectDialogState as IpcProjectDialogState } from "../contracts/generated/ProjectDialogState";
 import { parseLayoutExportProblems } from "./layoutExportContract";
 
 type ProjectDialogStateKind = ProjectDialogState["kind"];

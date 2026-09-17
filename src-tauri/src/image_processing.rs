@@ -430,29 +430,21 @@ async fn synchronize_processing_sources(
     .await
     .map_err(|_| "Não foi possível inspecionar as imagens do Projeto.".to_string())??;
     drop(_permit);
-    let confirmed =
-        crate::product_runtime::confirm_prepared_media(app, &catalog.bindings, &roots, prepared)
-            .await?;
-    if let Some(update) = confirmed.poll.update() {
-        engine.apply_monitor_media_update(
-            &namespace,
-            app.state::<crate::cache_previews::CachePreviewRegistry>()
-                .inner(),
-            update,
-        );
-        if !update.changed_media_ids().is_empty()
-            && let Some(window) =
-                app.get_webview_window(crate::product_runtime::PROJECT_WINDOW_LABEL)
-        {
-            window
-                .emit(
-                    crate::product_runtime::LINKED_MEDIA_CHANGED_EVENT,
-                    crate::ipc_contract::LinkedMediaChanged {
-                        media_ids: update.changed_media_ids().to_vec(),
-                    },
-                )
-                .map_err(|_| "Não foi possível atualizar as imagens do Projeto.".to_string())?;
-        }
+    let confirmed = crate::media_confirmation::MediaConfirmation::for_app(app, &namespace)
+        .confirm(&catalog.bindings, &roots, prepared, None)
+        .await?;
+    if let Some(update) = confirmed.poll.update()
+        && !update.changed_media_ids().is_empty()
+        && let Some(window) = app.get_webview_window(crate::product_runtime::PROJECT_WINDOW_LABEL)
+    {
+        window
+            .emit(
+                crate::product_runtime::LINKED_MEDIA_CHANGED_EVENT,
+                crate::ipc_contract::LinkedMediaChanged {
+                    media_ids: update.changed_media_ids().to_vec(),
+                },
+            )
+            .map_err(|_| "Não foi possível atualizar as imagens do Projeto.".to_string())?;
     }
     drop(confirmed);
     let _permit = engine
@@ -591,42 +583,25 @@ async fn prepare_owned_cache(
         )
     })?;
     loop {
-        match cancellation.reason() {
-            Some(CacheCancellationReason::Obsolete) => {
-                return Err(CacheFailure::new(
-                    CacheFailureStage::Cancelled,
-                    "A demanda de Cache ficou obsoleta.",
-                ));
-            }
-            Some(CacheCancellationReason::Paused) if !cancellation.resume_after_pause() => {
-                return Err(CacheFailure::new(
-                    CacheFailureStage::Cancelled,
-                    "A demanda de Cache não pôde ser retomada.",
-                ));
-            }
-            Some(CacheCancellationReason::Paused) | None => {}
-        }
-        let permit = engine.begin_cancellable_work(cancellation.clone()).await;
-        if cancellation.reason() == Some(CacheCancellationReason::Paused) {
-            drop(permit);
-            continue;
-        }
-        if cancellation.reason() == Some(CacheCancellationReason::Obsolete) {
-            drop(permit);
-            return Err(CacheFailure::new(
-                CacheFailureStage::Cancelled,
-                "A demanda de Cache ficou obsoleta.",
-            ));
-        }
-        let reservation = match processor
-            .reserve_cache_for(estimate, cancellation.flag())
+        let admission =
+            crate::image_work_admission::ImageWorkAdmission::begin(engine, &cancellation)
+                .await
+                .map_err(|_| {
+                    CacheFailure::new(
+                        CacheFailureStage::Cancelled,
+                        "A demanda de Cache ficou obsoleta.",
+                    )
+                })?;
+        let lease = match admission
+            .reserve(
+                processor,
+                estimate,
+                crate::image_work_admission::ImageWorkKind::Cache,
+            )
             .await
         {
-            Ok(reservation) => reservation,
-            Err(ProcessorAdmissionFailure::Cancelled) => {
-                drop(permit);
-                continue;
-            }
+            Ok(lease) => lease,
+            Err(ProcessorAdmissionFailure::Cancelled) => continue,
             Err(error) => {
                 return Err(CacheFailure::new(
                     if error == ProcessorAdmissionFailure::MemoryPressure {
@@ -638,19 +613,11 @@ async fn prepare_owned_cache(
                 ));
             }
         };
-        if cancellation
-            .flag()
-            .load(std::sync::atomic::Ordering::Acquire)
-        {
-            drop(reservation);
-            drop(permit);
-            continue;
-        }
         let context = InvocationContext::new(
             work.request_id.clone(),
             Some(work.namespace.project_id().to_owned()),
         );
-        let mut transport = TauriImagingTransport::new(app, logging, &reservation);
+        let mut transport = TauriImagingTransport::new(app, logging, lease.reservation());
         let result = engine
             .prepare(
                 &mut transport,
@@ -660,8 +627,7 @@ async fn prepare_owned_cache(
                 &cancellation,
             )
             .await;
-        drop(reservation);
-        drop(permit);
+        drop(lease);
         if result.as_ref().is_err_and(|failure| {
             matches!(
                 failure.stage,

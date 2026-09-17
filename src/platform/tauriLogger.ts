@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 
 import type { LogEvent, Logger } from "../application/logging";
-import type { FrontendLogEvent } from "./generated/FrontendLogEvent";
+import type { FrontendLogEvent } from "../contracts/generated/FrontendLogEvent";
 
 function writeToDevelopmentConsole(event: LogEvent) {
   if (!import.meta.env.DEV) return;

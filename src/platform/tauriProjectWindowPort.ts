@@ -6,9 +6,9 @@ import {
   type ProjectCloseChoice,
   type ProjectWindowPort,
 } from "../application/projectPorts";
-import type { ProjectCloseChoice as IpcProjectCloseChoice } from "./generated/ProjectCloseChoice";
-import type { ProjectCloseRequestOutcome as IpcProjectCloseRequestOutcome } from "./generated/ProjectCloseRequestOutcome";
-import type { ProjectCloseResolution as IpcProjectCloseResolution } from "./generated/ProjectCloseResolution";
+import type { ProjectCloseChoice as IpcProjectCloseChoice } from "../contracts/generated/ProjectCloseChoice";
+import type { ProjectCloseRequestOutcome as IpcProjectCloseRequestOutcome } from "../contracts/generated/ProjectCloseRequestOutcome";
+import type { ProjectCloseResolution as IpcProjectCloseResolution } from "../contracts/generated/ProjectCloseResolution";
 import {
   hasOnlyIpcKeys,
   isIpcEditorProjection,

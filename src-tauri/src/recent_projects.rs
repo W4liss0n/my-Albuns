@@ -1,6 +1,5 @@
 use std::{
-    fs::{self, OpenOptions},
-    io::{self, Write},
+    fs, io,
     path::{Path, PathBuf},
 };
 
@@ -144,30 +143,13 @@ impl RecentProjectsStore {
     }
 
     fn publish(&self, envelope: &RecentProjectsEnvelope) -> Result<(), RecentProjectsError> {
-        let parent = self
-            .file
+        self.file
             .parent()
             .ok_or(RecentProjectsError::InvalidState)?;
-        fs::create_dir_all(parent)?;
-        let temporary = sibling_temporary(&self.file);
-        let result = (|| {
-            let bytes = serde_json::to_vec_pretty(envelope)
-                .map_err(|_| RecentProjectsError::InvalidState)?;
-            let mut file = OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&temporary)?;
-            file.write_all(&bytes)?;
-            file.write_all(b"\n")?;
-            file.sync_all()?;
-            drop(file);
-            replace_file(&temporary, &self.file)?;
-            Ok(())
-        })();
-        if result.is_err() {
-            let _ = fs::remove_file(&temporary);
-        }
-        result
+        let bytes =
+            serde_json::to_vec_pretty(envelope).map_err(|_| RecentProjectsError::InvalidState)?;
+        crate::local_store_io::write_atomically(&self.file, &bytes, "recent-projects.json")?;
+        Ok(())
     }
 }
 
@@ -179,53 +161,6 @@ fn display_name(path: &Path) -> String {
         .to_owned()
 }
 
-fn sibling_temporary(target: &Path) -> PathBuf {
-    let file_name = target
-        .file_name()
-        .and_then(|value| value.to_str())
-        .unwrap_or("recent-projects.json");
-    target.with_file_name(format!(
-        ".{file_name}.{}.tmp",
-        uuid::Uuid::new_v4().simple()
-    ))
-}
-
-#[cfg(windows)]
-fn replace_file(temporary: &Path, target: &Path) -> io::Result<()> {
-    use std::os::windows::ffi::OsStrExt;
-    use windows_sys::Win32::Storage::FileSystem::{
-        MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH, MoveFileExW,
-    };
-
-    let temporary = temporary
-        .as_os_str()
-        .encode_wide()
-        .chain(Some(0))
-        .collect::<Vec<_>>();
-    let target = target
-        .as_os_str()
-        .encode_wide()
-        .chain(Some(0))
-        .collect::<Vec<_>>();
-    let succeeded = unsafe {
-        MoveFileExW(
-            temporary.as_ptr(),
-            target.as_ptr(),
-            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
-        )
-    };
-    if succeeded == 0 {
-        Err(io::Error::last_os_error())
-    } else {
-        Ok(())
-    }
-}
-
-#[cfg(not(windows))]
-fn replace_file(temporary: &Path, target: &Path) -> io::Result<()> {
-    fs::rename(temporary, target)
-}
-
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
@@ -233,6 +168,48 @@ mod tests {
     use myalbuns_paths::{AppPaths, NativePathDto};
 
     use super::{RecentProjectSummary, RecentProjectsStore};
+
+    #[test]
+    fn a_failed_promotion_keeps_the_previous_list_and_can_be_retried() {
+        let root = tempfile::tempdir().unwrap();
+        let paths = AppPaths::from_roots(root.path(), root.path());
+        let store = RecentProjectsStore::new(&paths);
+        store
+            .promote(
+                "first",
+                NativePathDto::from(root.path().join("Primeiro.myalbuns")),
+            )
+            .unwrap();
+        let before = std::fs::read(paths.recent_projects_file()).unwrap();
+        let fault =
+            myalbuns_paths::test_support::DiskFull::on_create(&paths.recent_projects_file());
+        assert!(matches!(
+            store.promote(
+                "second",
+                NativePathDto::from(root.path().join("Segundo.myalbuns"))
+            ),
+            Err(super::RecentProjectsError::Io(_))
+        ));
+        assert_eq!(fault.failure_count(), 1);
+        assert_eq!(std::fs::read(paths.recent_projects_file()).unwrap(), before);
+        assert_eq!(store.list().unwrap()[0].id, "first");
+        drop(fault);
+        store
+            .promote(
+                "second",
+                NativePathDto::from(root.path().join("Segundo.myalbuns")),
+            )
+            .unwrap();
+        assert_eq!(
+            store
+                .list()
+                .unwrap()
+                .iter()
+                .map(|item| item.id.as_str())
+                .collect::<Vec<_>>(),
+            ["second", "first"]
+        );
+    }
 
     #[test]
     fn an_absent_recent_projects_file_is_an_empty_list() {

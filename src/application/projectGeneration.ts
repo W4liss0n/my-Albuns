@@ -1,12 +1,11 @@
-export type GenerationDecision = "replace" | "ignore";
-export interface GenerationOptions { sourceFolder: string; destinationFolder: string; }
-export interface GenerationProgress { completed: number; total: number | null; }
-export interface GenerationView {
-  id: string; options: GenerationOptions;
-  phase: "prepared" | "running" | "finished" | "cancelled";
-  canContinue: boolean;
-  items: { id: string; name: string; destination: string; status: "pending" | "completed" | "ignored" | "failed"; problems: string[]; conflict: boolean; canReplace: boolean; decision: GenerationDecision | null; }[];
-}
+export type { GenerationDecision } from "../contracts/generated/GenerationDecision";
+import type { GenerationDecision } from "../contracts/generated/GenerationDecision";
+export type { GenerationOptions } from "../contracts/generated/GenerationOptions";
+import type { GenerationOptions } from "../contracts/generated/GenerationOptions";
+export type { GenerationProgress } from "../contracts/generated/GenerationProgress";
+import type { GenerationProgress } from "../contracts/generated/GenerationProgress";
+export type { GenerationView } from "../contracts/generated/GenerationView";
+import type { GenerationView } from "../contracts/generated/GenerationView";
 
 export interface ProjectGenerationLauncher { open(): Promise<void>; }
 export interface ProjectGenerationPort {

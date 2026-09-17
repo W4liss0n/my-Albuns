@@ -1,30 +1,14 @@
 import type { ProjectLaunchOutcome } from "../global/application/globalProjectPort";
-
-export type ExportConflictPolicy = "ask" | "skip" | "replace";
-export interface BatchExportOptions {
-  sourceFolder: string;
-  destinationFolder: string | null;
-  format: { kind: "jpeg"; quality: number } | { kind: "png" } | { kind: "pdf" };
-  mode: "sheet" | "page";
-}
-export interface BatchExportProgress { completed: number; total: number; percent: number }
-export interface BatchRecoverySummary { id: string; sourceFolder: string; total: number; remaining: number }
-export interface BatchExportView {
-  id: string;
-  options: BatchExportOptions;
-  phase: "prepared" | "running" | "interrupted" | "storageFull" | "finished";
-  partialPublication: boolean;
-  items: {
-    id: string;
-    name: string;
-    projectPath: string;
-    destination: string;
-    status: "pending" | "completed" | "ignored" | "failed";
-    problems: { kind: "placeholder" | "missingMedia" | "unavailable" | "invalidProject" | "changed" | "failed"; message: string; mediaId: string | null }[];
-  }[];
-  hasConflicts: boolean;
-  canContinue: boolean;
-}
+export type { ExportConflictPolicy } from "../contracts/generated/ExportConflictPolicy";
+import type { ExportConflictPolicy } from "../contracts/generated/ExportConflictPolicy";
+export type { BatchExportOptions } from "../contracts/generated/BatchExportOptions";
+import type { BatchExportOptions } from "../contracts/generated/BatchExportOptions";
+export type { BatchExportProgress } from "../contracts/generated/BatchExportProgress";
+import type { BatchExportProgress } from "../contracts/generated/BatchExportProgress";
+export type { BatchRecoverySummary } from "../contracts/generated/BatchRecoverySummary";
+import type { BatchRecoverySummary } from "../contracts/generated/BatchRecoverySummary";
+export type { BatchExportView } from "../contracts/generated/BatchExportView";
+import type { BatchExportView } from "../contracts/generated/BatchExportView";
 
 export interface BatchExportPort {
   storageRecovery?: import("./storageRecovery").StorageRecoveryPort;

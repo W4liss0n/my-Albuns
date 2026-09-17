@@ -11,9 +11,9 @@ use uuid::Uuid;
 
 use crate::{
     model::{
-        ComposedOutputUnit, CoreError, EditorProjection, ImportPhoto, ImportPhotoDisposition,
-        ImportPhotoOutcome, ImportPhotosOutcome, MediaId, PhotoDropTarget, PhotoSourceMetadata,
-        ProjectIntent, ProjectMutationOutcome, RelinkMedia, RenderSnapshot, RenderSnapshotMetadata,
+        CoreError, EditorProjection, ImportPhoto, ImportPhotoDisposition, ImportPhotoOutcome,
+        ImportPhotosOutcome, MediaId, PhotoDropTarget, PhotoSourceMetadata, ProjectIntent,
+        ProjectMutationOutcome, RelinkMedia, RenderSnapshot, RenderSnapshotMetadata,
         RenderSnapshotRef,
     },
     persistent_projection,
@@ -109,15 +109,14 @@ impl LoadedProjectRevision {
     /// Resolves the persisted document through the same composition owner as
     /// an editor, without an editable identity lease, History or disk writes.
     pub fn freeze_rendering(&self) -> FrozenProjectRendering {
-        let session = PersistentProjectSession::from_persisted(self.revision.clone(), false);
-        let projection = persistent_projection::editor_projection(
-            &session,
-            false,
-            &project_name_from_path(&self.project_path),
-            &HashMap::new(),
-        );
         FrozenProjectRendering {
-            projection,
+            snapshot: persistent_projection::render_snapshot(
+                &self.revision.project,
+                self.revision.project_id,
+                &project_name_from_path(&self.project_path),
+                self.revision.revision,
+                &HashMap::new(),
+            ),
             sources: self.revision.project.media().to_vec(),
         }
     }
@@ -354,14 +353,7 @@ pub struct EditableProject {
 
 #[derive(Clone, Debug)]
 pub struct FrozenProjectRendering {
-    projection: EditorProjection,
-    sources: Vec<MediaRef>,
-}
-
-#[derive(Clone, Debug)]
-pub struct FrozenSheetRendering {
-    render_snapshot: RenderSnapshot,
-    output_unit: ComposedOutputUnit,
+    snapshot: RenderSnapshot,
     sources: Vec<MediaRef>,
 }
 
@@ -374,10 +366,7 @@ impl FrozenProjectRendering {
         if !problems.is_empty() {
             return Err(CoreError::UnfilledLayoutPositions { problems });
         }
-        let snapshot = RenderSnapshot::from_resolved(
-            RenderSnapshotMetadata::from(&self.projection.state),
-            self.projection.composition,
-        );
+        let snapshot = self.snapshot;
         snapshot.export_units(sheet_ids, crate::ExportMode::Sheet)?;
         let referenced: HashSet<_> = snapshot
             .composition
@@ -405,23 +394,21 @@ impl FrozenProjectRendering {
     ) -> Result<Vec<crate::LayoutExportProblem>, CoreError> {
         for id in sheet_ids {
             if !self
-                .projection
-                .state
-                .album
+                .snapshot
+                .composition
                 .sheets
                 .iter()
-                .any(|sheet| sheet.id == *id)
+                .any(|sheet| sheet.sheet_id == *id)
             {
                 return Err(CoreError::SheetNotFound(id.clone()));
             }
         }
         Ok(self
-            .projection
-            .state
-            .album
+            .snapshot
+            .composition
             .sheets
             .iter()
-            .filter(|sheet| sheet_ids.contains(&sheet.id))
+            .filter(|sheet| sheet_ids.contains(&sheet.sheet_id))
             .flat_map(|sheet| {
                 sheet
                     .frames
@@ -429,77 +416,24 @@ impl FrozenProjectRendering {
                     .enumerate()
                     .filter(|(_, frame)| frame.photo.is_none())
                     .map(|(index, frame)| crate::LayoutExportProblem {
-                        sheet_id: sheet.id.clone(),
+                        sheet_id: sheet.sheet_id.clone(),
                         sheet_number: sheet.number,
-                        frame_id: frame.id.clone(),
+                        frame_id: frame.frame_id.clone(),
                         frame_number: index + 1,
                     })
             })
             .collect())
     }
 
-    pub fn projection(&self) -> &EditorProjection {
-        &self.projection
-    }
-
     pub fn render_snapshot(&self) -> RenderSnapshotRef<'_> {
         RenderSnapshotRef::from_resolved(
-            RenderSnapshotMetadata::from(&self.projection.state),
-            &self.projection.composition,
+            RenderSnapshotMetadata::from(&self.snapshot),
+            &self.snapshot.composition,
         )
     }
 
     pub fn sources(&self) -> &[MediaRef] {
         &self.sources
-    }
-
-    pub fn into_sheet(self, sheet_id: &str) -> Result<FrozenSheetRendering, CoreError> {
-        let problems = self.validate_export_sheets(&[sheet_id.into()])?;
-        if !problems.is_empty() {
-            return Err(CoreError::UnfilledLayoutPositions { problems });
-        }
-        let render_snapshot = RenderSnapshot::from_resolved(
-            RenderSnapshotMetadata::from(&self.projection.state),
-            self.projection.composition,
-        );
-        let output_unit = render_snapshot.output_unit(sheet_id)?;
-        let referenced = output_unit
-            .sheet
-            .referenced_media_ids()
-            .collect::<HashSet<_>>();
-        let sources = self
-            .sources
-            .into_iter()
-            .filter(|source| referenced.contains(&MediaId::from_uuid(source.id())))
-            .collect::<Vec<_>>();
-        if sources.len() != referenced.len() {
-            return Err(CoreError::InvalidSnapshot(
-                "a composição congelada referencia uma fonte ausente".into(),
-            ));
-        }
-        Ok(FrozenSheetRendering {
-            render_snapshot,
-            output_unit,
-            sources,
-        })
-    }
-}
-
-impl FrozenSheetRendering {
-    pub fn render_snapshot(&self) -> &RenderSnapshot {
-        &self.render_snapshot
-    }
-
-    pub fn output_unit(&self) -> &ComposedOutputUnit {
-        &self.output_unit
-    }
-
-    pub fn sources(&self) -> &[MediaRef] {
-        &self.sources
-    }
-
-    pub fn into_parts(self) -> (RenderSnapshot, ComposedOutputUnit, Vec<MediaRef>) {
-        (self.render_snapshot, self.output_unit, self.sources)
     }
 }
 
@@ -595,10 +529,12 @@ impl EditableProject {
     }
 
     pub fn render_snapshot(&self) -> RenderSnapshot {
-        let projection = self.projection();
-        RenderSnapshot::from_resolved(
-            RenderSnapshotMetadata::from(&projection.state),
-            projection.composition,
+        persistent_projection::render_snapshot(
+            self.project(),
+            self.project_id(),
+            &project_name_from_path(self.project_path()),
+            self.revision(),
+            &self.photo_sources,
         )
     }
 
@@ -672,24 +608,13 @@ impl EditableProject {
             .into_iter()
             .map(|(id, rect)| (id.hyphenated().to_string(), rect))
             .collect::<Vec<_>>();
-        let mut state = persistent_projection::editor_state(
-            &self.session,
-            self.session_valid,
-            &project_name_from_path(self.project_path()),
-            &self.photo_sources,
-        );
-        for frame in state
-            .album
-            .sheets
-            .iter_mut()
-            .flat_map(|sheet| &mut sheet.frames)
-        {
+        let mut album = persistent_projection::album_snapshot(self.project(), &self.photo_sources);
+        for frame in album.sheets.iter_mut().flat_map(|sheet| &mut sheet.frames) {
             if let Some((_, rect)) = edits.iter().find(|(id, _)| *id == frame.id) {
                 frame.rect = (*rect).into();
             }
         }
-        let frames = crate::composition::resolve_editor_projection(state)
-            .composition
+        let frames = crate::composition::compose_album(&album)
             .sheets
             .into_iter()
             .flat_map(|sheet| sheet.frames)
@@ -782,28 +707,17 @@ impl EditableProject {
     }
 
     fn preview_composition(&self, candidate: ProjectDocument) -> crate::CompositionPlan {
-        let transient = PersistentProjectSession::from_persisted(
-            crate::project_document::ProjectRevision::new(
-                self.session.project_id(),
-                self.revision(),
-                candidate,
-            ),
-            false,
-        );
-        persistent_projection::editor_projection(
-            &transient,
-            false,
-            &project_name_from_path(self.project_path()),
+        crate::composition::compose_album(&persistent_projection::album_snapshot(
+            &candidate,
             &self.photo_sources,
-        )
-        .composition
+        ))
     }
 
-    /// Freezes one resolved editor projection and only the exact linked
-    /// originals referenced by its CompositionPlan at that creative Revision.
+    /// Freezes one resolved composition and only the exact linked originals
+    /// referenced at that creative Revision, without constructing editor state.
     pub fn freeze_rendering(&self) -> FrozenProjectRendering {
-        let projection = self.projection();
-        let referenced = projection
+        let snapshot = self.render_snapshot();
+        let referenced = snapshot
             .composition
             .sheets
             .iter()
@@ -817,10 +731,7 @@ impl EditableProject {
             .cloned()
             .collect();
 
-        FrozenProjectRendering {
-            projection,
-            sources,
-        }
+        FrozenProjectRendering { snapshot, sources }
     }
 
     pub fn apply_with_outcome(

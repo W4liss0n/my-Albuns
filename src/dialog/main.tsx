@@ -13,7 +13,7 @@ import {
 import { dismissOwnedWindow } from "../platform/tauriOwnedDialogControls";
 import { tauriWindowControls } from "../platform/tauriWindowControls";
 import { subscribeOpeningImageProgress } from "../platform/tauriOpeningImageProgress";
-import type { StartupImageProgress } from "../platform/generated/StartupImageProgress";
+import type { StartupImageProgress } from "../contracts/generated/StartupImageProgress";
 import { OpeningProgressDialog } from "./OpeningProgressDialog";
 import {
   MessageDialog,
@@ -45,15 +45,9 @@ function DialogContent() {
   });
   useEffect(() => {
     if (!["opening-project", "creating-project", "project-recovery", "external-copy"].includes(kind ?? "")) return;
-    let active = true;
-    const subscription = subscribeOpeningImageProgress((progress) => {
-      if (active) setImageProgress(progress);
-    });
-    void subscription.catch(() => undefined);
-    return () => {
-      active = false;
-      void subscription.then((unlisten) => unlisten()).catch(() => undefined);
-    };
+    const subscription = subscribeOpeningImageProgress(setImageProgress);
+    void subscription.ready.catch(() => undefined);
+    return subscription.dispose;
   }, [kind]);
   useLayoutEffect(() => {
     if (kind === "opening-project") window.sessionStorage.setItem(OPENING_OWNER_MARKER, "loading");

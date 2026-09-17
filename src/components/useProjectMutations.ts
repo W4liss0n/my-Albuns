@@ -349,7 +349,7 @@ export function useProjectMutations({
       });
   }
 
-  async function commitInteraction(intent: ProjectIntent) {
+  async function commitInteraction(intent: ProjectIntent, cancelAfterPendingFailure = false) {
     const capturedProjection = projection;
     return (await commitProjection((port, latestProjection) =>
       imageProcessing.run((publish) => port.apply(
@@ -360,6 +360,7 @@ export function useProjectMutations({
         ),
         publish,
       )),
+      cancelAfterPendingFailure,
     )) !== null;
   }
 
@@ -487,10 +488,10 @@ export function useProjectMutations({
     return { kind: "rejected" };
   }
 
-  async function commitProjection(operation: ProjectMutationOperation) {
+  async function commitProjection(operation: ProjectMutationOperation, cancelAfterPendingFailure = false) {
     if (saveAsBarrierRef.current) return null;
     setMessage(null);
-    const outcome = await runProjectMutation.run(operation);
+    const outcome = await runProjectMutation.run(operation, { cancelAfterPendingFailure });
     if (outcome.status === "completed") {
       onProjectionChange(outcome.projection);
       return outcome.projection;

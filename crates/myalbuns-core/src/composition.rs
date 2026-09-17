@@ -9,94 +9,90 @@ use crate::model::{
     ProjectedFrameBorder, ProjectedOverlay, ProjectedOverlayContent, RectUm, SizeUm, VectorUm,
 };
 
-struct CompositionCore;
-
-impl CompositionCore {
-    fn compose(album: &AlbumSnapshot) -> CompositionPlan {
-        let media_by_id = album
-            .media
+pub(crate) fn compose_album(album: &AlbumSnapshot) -> CompositionPlan {
+    let media_by_id = album
+        .media
+        .iter()
+        .map(|media| (media.id, media))
+        .collect::<HashMap<_, _>>();
+    CompositionPlan {
+        frame_border: album.visual_defaults.frame_border.clone(),
+        sheets: album
+            .sheets
             .iter()
-            .map(|media| (media.id, media))
-            .collect::<HashMap<_, _>>();
-        CompositionPlan {
-            frame_border: album.visual_defaults.frame_border.clone(),
-            sheets: album
-                .sheets
-                .iter()
-                .map(|sheet| {
-                    let visuals = sheet.visuals.clone().unwrap_or_default();
-                    let surface =
-                        active_surface_rect(sheet.active_sides, sheet.width_um, sheet.height_um);
-                    let mut frames = sheet
-                        .frames
-                        .iter()
-                        .map(|frame| {
-                            let border = if frame.style.border_width_um == 0 {
-                                ProjectedFrameBorder::None
-                            } else {
-                                ProjectedFrameBorder::Solid {
-                                    rgb: frame.style.border_rgb.clone(),
-                                    width_um: frame.style.border_width_um,
-                                }
-                            };
-                            ComposedFrame {
-                                frame_id: frame.id.clone(),
-                                clip_rect: frame.rect.clone(),
-                                opacity_byte: ((u16::from(frame.style.opacity_percent) * 255 + 50)
-                                    / 100) as u8,
-                                border_fill_rects: compose_frame_border_fill_rects(
-                                    &frame.rect,
-                                    &border,
-                                ),
-                                border,
-                                z_index: frame.z_index,
-                                photo: frame.photo.as_ref().map(|photo| {
-                                    let media = media_by_id
-                                        .get(&photo.media_id)
-                                        .copied()
-                                        .expect("validated Frame media reference");
-                                    compose_photo(&frame.rect, photo, media)
-                                }),
+            .map(|sheet| {
+                let visuals = sheet.visuals.clone().unwrap_or_default();
+                let surface =
+                    active_surface_rect(sheet.active_sides, sheet.width_um, sheet.height_um);
+                let mut frames = sheet
+                    .frames
+                    .iter()
+                    .map(|frame| {
+                        let border = if frame.style.border_width_um == 0 {
+                            ProjectedFrameBorder::None
+                        } else {
+                            ProjectedFrameBorder::Solid {
+                                rgb: frame.style.border_rgb.clone(),
+                                width_um: frame.style.border_width_um,
                             }
-                        })
-                        .collect::<Vec<_>>();
-                    frames.sort_by(|left, right| {
-                        left.z_index
-                            .cmp(&right.z_index)
-                            .then_with(|| left.frame_id.cmp(&right.frame_id))
-                    });
+                        };
+                        ComposedFrame {
+                            frame_id: frame.id.clone(),
+                            clip_rect: frame.rect.clone(),
+                            opacity_byte: ((u16::from(frame.style.opacity_percent) * 255 + 50)
+                                / 100) as u8,
+                            border_fill_rects: compose_frame_border_fill_rects(
+                                &frame.rect,
+                                &border,
+                            ),
+                            border,
+                            z_index: frame.z_index,
+                            photo: frame.photo.as_ref().map(|photo| {
+                                let media = media_by_id
+                                    .get(&photo.media_id)
+                                    .copied()
+                                    .expect("validated Frame media reference");
+                                compose_photo(&frame.rect, photo, media)
+                            }),
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                frames.sort_by(|left, right| {
+                    left.z_index
+                        .cmp(&right.z_index)
+                        .then_with(|| left.frame_id.cmp(&right.frame_id))
+                });
 
-                    ComposedSheet {
-                        sheet_id: sheet.id.clone(),
-                        number: sheet.number,
-                        active_sides: sheet.active_sides,
-                        width_um: surface.width,
-                        height_um: sheet.height_um,
-                        base: ComposedColor {
-                            rgb: "#FFFFFF".into(),
-                            draw_rect: surface.clone(),
-                        },
-                        backgrounds: compose_backgrounds(
-                            &album.visual_defaults.background,
-                            &visuals.background,
-                            sheet.active_sides,
-                            sheet.width_um,
-                            sheet.height_um,
-                            &media_by_id,
-                        ),
-                        frames,
-                        overlays: compose_overlays(
-                            &album.visual_defaults.overlay,
-                            &visuals.overlay,
-                            sheet.active_sides,
-                            sheet.width_um,
-                            sheet.height_um,
-                            &media_by_id,
-                        ),
-                    }
-                })
-                .collect(),
-        }
+                ComposedSheet {
+                    sheet_id: sheet.id.clone(),
+                    number: sheet.number,
+                    active_sides: sheet.active_sides,
+                    width_um: surface.width,
+                    height_um: sheet.height_um,
+                    base: ComposedColor {
+                        rgb: "#FFFFFF".into(),
+                        draw_rect: surface.clone(),
+                    },
+                    backgrounds: compose_backgrounds(
+                        &album.visual_defaults.background,
+                        &visuals.background,
+                        sheet.active_sides,
+                        sheet.width_um,
+                        sheet.height_um,
+                        &media_by_id,
+                    ),
+                    frames,
+                    overlays: compose_overlays(
+                        &album.visual_defaults.overlay,
+                        &visuals.overlay,
+                        sheet.active_sides,
+                        sheet.width_um,
+                        sheet.height_um,
+                        &media_by_id,
+                    ),
+                }
+            })
+            .collect(),
     }
 }
 
@@ -193,7 +189,7 @@ fn derive_media_usage(album: &AlbumSnapshot, composition: &CompositionPlan) -> V
 
 /// The crate's only entry point that resolves an Album into a CompositionPlan.
 pub(crate) fn resolve_editor_projection(state: EditorState) -> EditorProjection {
-    let composition = CompositionCore::compose(&state.album);
+    let composition = compose_album(&state.album);
     let media_usage = derive_media_usage(&state.album, &composition);
     EditorProjection {
         can_paste_frames: false,

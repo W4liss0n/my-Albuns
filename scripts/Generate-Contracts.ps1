@@ -13,5 +13,5 @@ if ($LASTEXITCODE -ne 0) {
     run `
     -p myalbuns-desktop `
     --example generate_ipc_contract `
-    -- src/platform/generated
+    -- src/contracts/generated
 exit $LASTEXITCODE

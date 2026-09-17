@@ -54,8 +54,8 @@ pub use model::{
 };
 pub use persistent_project::{
     CreateAuthorization, CreateProjectError, CreateProjectRequest, EditableProject,
-    ExternalCopySource, FrozenProjectRendering, FrozenSheetRendering, LoadedProjectRevision,
-    OpenProjectError, OpenProjectRequest, ProjectCore, ProjectIdentityAuthority, ProjectTemplate,
+    ExternalCopySource, FrozenProjectRendering, LoadedProjectRevision, OpenProjectError,
+    OpenProjectRequest, ProjectCore, ProjectIdentityAuthority, ProjectTemplate,
     SaveAsAuthorization, SaveAsProjectError, SaveAsProjectOutcome, SaveAsProjectRequest,
     SaveCopyAsError, SaveCopyAsRequest, SaveProjectError, SaveProjectOutcome,
     project_name_from_path,

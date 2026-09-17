@@ -27,6 +27,7 @@ mod global_activation;
 mod global_runtime;
 mod graphics_launch_gate;
 mod image_processing;
+mod image_work_admission;
 mod imaging_processor;
 #[cfg(test)]
 mod imaging_recovery_integration;
@@ -35,6 +36,7 @@ mod layout_catalog_store;
 mod layout_commands;
 mod local_store_io;
 mod logging;
+mod media_confirmation;
 mod media_file_drop;
 mod media_import_selection;
 mod media_preview_commands;

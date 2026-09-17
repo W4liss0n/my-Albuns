@@ -1,4 +1,4 @@
-import type { SaveProjectCommandError as IpcSaveProjectCommandError } from "./generated/SaveProjectCommandError";
+import type { SaveProjectCommandError as IpcSaveProjectCommandError } from "../contracts/generated/SaveProjectCommandError";
 import {
   parseProjectPersistenceFailure,
   type ProjectPersistenceFailure,

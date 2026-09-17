@@ -1,4 +1,4 @@
-import type { SaveAsProjectCommandError as IpcSaveAsProjectCommandError } from "./generated/SaveAsProjectCommandError";
+import type { SaveAsProjectCommandError as IpcSaveAsProjectCommandError } from "../contracts/generated/SaveAsProjectCommandError";
 import { SAVE_AS_STATE_INDETERMINATE_MESSAGE } from "../application/projectSaveAsStartup";
 import {
   parseProjectPersistenceFailure,

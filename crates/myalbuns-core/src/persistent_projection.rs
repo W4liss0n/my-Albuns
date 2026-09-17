@@ -16,6 +16,24 @@ use crate::{
     },
 };
 
+pub(crate) fn render_snapshot(
+    project: &crate::ProjectDocument,
+    project_id: uuid::Uuid,
+    project_name: &str,
+    revision: u64,
+    photo_sources: &HashMap<MediaId, HashMap<PathBuf, PhotoSourceMetadata>>,
+) -> crate::RenderSnapshot {
+    crate::RenderSnapshot::from_resolved(
+        crate::model::RenderSnapshotMetadata {
+            project_id: &project_id.hyphenated().to_string(),
+            project_name,
+            revision,
+            dpi: project.document().dpi(),
+        },
+        crate::composition::compose_album(&album_snapshot(project, photo_sources)),
+    )
+}
+
 pub(crate) fn editor_projection(
     session: &PersistentProjectSession,
     history_enabled: bool,
@@ -39,10 +57,28 @@ pub(crate) fn editor_state(
     photo_sources: &HashMap<MediaId, HashMap<PathBuf, PhotoSourceMetadata>>,
 ) -> EditorState {
     let project = session.project();
+    EditorState {
+        project_id: session.project_id().hyphenated().to_string(),
+        project_name: project_name.into(),
+        document: DocumentSnapshot::from_settings(project.document()),
+        layout_settings: project.layout_settings().clone(),
+        revision: session.revision(),
+        saved_revision: session.saved_revision(),
+        dirty: session.has_unsaved_changes(),
+        can_undo: history_enabled && session.can_undo(),
+        can_redo: history_enabled && session.can_redo(),
+        album: album_snapshot(project, photo_sources),
+    }
+}
+
+pub(crate) fn album_snapshot(
+    project: &crate::ProjectDocument,
+    photo_sources: &HashMap<MediaId, HashMap<PathBuf, PhotoSourceMetadata>>,
+) -> AlbumSnapshot {
     let settings = project.document();
     let last_sheet = project.sheets().len().saturating_sub(1);
     let mut next_page_number = 1;
-    let album = AlbumSnapshot {
+    AlbumSnapshot {
         media_folders: (!project.media_folders().is_empty())
             .then(|| project.media_folders().to_vec()),
         sheets: project
@@ -147,18 +183,6 @@ pub(crate) fn editor_state(
             })
             .collect(),
         visual_defaults: projected_visual_defaults(project.visual_defaults()),
-    };
-    EditorState {
-        project_id: session.project_id().hyphenated().to_string(),
-        project_name: project_name.into(),
-        document: DocumentSnapshot::from_settings(settings),
-        layout_settings: project.layout_settings().clone(),
-        revision: session.revision(),
-        saved_revision: session.saved_revision(),
-        dirty: session.has_unsaved_changes(),
-        can_undo: history_enabled && session.can_undo(),
-        can_redo: history_enabled && session.can_redo(),
-        album,
     }
 }
 

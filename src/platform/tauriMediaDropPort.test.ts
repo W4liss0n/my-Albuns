@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import type { MediaFileDrag } from "./generated/MediaFileDrag";
+import type { MediaFileDrag } from "../contracts/generated/MediaFileDrag";
 import { tauriMediaDropPort } from "./tauriMediaDropPort";
 
 vi.mock("@tauri-apps/api/window", () => ({ getCurrentWindow: vi.fn() }));

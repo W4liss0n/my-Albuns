@@ -1,3 +1,4 @@
+import { observeSnapshot } from "../application/observeSnapshot";
 import { useEffect, useState } from "react";
 import type { BatchExportPort, BatchExportProgress } from "../application/batchExport";
 import { OwnedWindowShell } from "../ui/OwnedWindowShell";
@@ -9,15 +10,12 @@ export function BatchProgressWindow({ port }: { port: BatchExportPort }) {
   const [failed, setFailed] = useState(false);
   const [cancelled, setCancelled] = useState(false);
   useEffect(() => {
-    let active = true;
-    let release: (() => void) | undefined;
-    void port.onProgress(next => { if (active) setProgress(next); }).then(dispose => {
-      if (active) release = dispose; else dispose();
-    }).catch(() => { if (active) setFailed(true); });
-    void port.progress().then(current => {
-      if (active) { if (current) setProgress(current); else setFailed(true); }
-    }).catch(() => { if (active) setFailed(true); });
-    return () => { active = false; release?.(); };
+    const observation = observeSnapshot({
+      subscribe: receive => port.onProgress(receive), read: () => port.progress(),
+      receive: value => { if (value) setProgress(value); else setFailed(true); },
+    });
+    void observation.ready.catch(() => setFailed(true));
+    return observation.dispose;
   }, [port]);
   if (!progress && !failed) return null;
   if (failed) return <OwnedWindowShell controls="none" width={400}>

@@ -105,6 +105,56 @@ test("committing another style property first preserves the current opacity draf
   expect(h.apply.mock.calls[1][0]).toMatchObject({ edit: { change: { kind: "borderWidth", widthUm: 5_000 } } });
 });
 
+test.each(["success", "failure"])("the individual Zoom flushes a style draft before Save and Undo: %s", async outcome => {
+  const h = harness();
+  const view = renderHook(() => h.useHarness());
+  const baseline = view.result.current.selectedFrame!.photo!.transform.userZoom;
+  await act(async () => view.result.current.frameStyle.onPreview({ kind: "opacity", opacityPercent: 50 }));
+  act(() => {
+    view.result.current.beginZoomGesture();
+    view.result.current.updateZoomGesture(baseline + 0.25);
+    void view.result.current.save();
+    void view.result.current.undo();
+  });
+  expect(h.apply).toHaveBeenCalledTimes(1);
+  expect(h.apply.mock.calls[0][0]).toMatchObject({ kind: "setFrameStyle" });
+  expect(h.save).not.toHaveBeenCalled();
+  await act(async () => {
+    if (outcome === "success") h.pending.resolve(h.first);
+    else h.pending.reject(new Error("Falha no estilo anterior."));
+    await view.result.current.runner.waitForIdle();
+  });
+  if (outcome === "success") {
+    expect(h.apply.mock.calls[1][0]).toEqual({ kind: "transformPhoto", frameId: corpus.single[0],
+      deltaPanX: 0, deltaPanY: 0, deltaZoom: 0.25 });
+    expect(h.save).toHaveBeenCalledWith(h.second.state.revision);
+    expect(h.undo).toHaveBeenCalledOnce();
+  } else {
+    expect(h.apply).toHaveBeenCalledTimes(1);
+    expect(h.save).not.toHaveBeenCalled();
+    expect(h.undo).not.toHaveBeenCalled();
+    expect(view.result.current.projection).toEqual(h.initial);
+  }
+  expect(view.result.current.canvasProps.photoZoomPreview).toBeNull();
+});
+
+test("a late angle preview cannot replace a newer property draft", async () => {
+  const h = harness();
+  const angle = deferred<Awaited<ReturnType<ProjectCorePort["previewPhotoAngle"]>>>();
+  h.port.previewPhotoAngle = vi.fn(() => angle.promise);
+  const view = renderHook(() => h.useHarness());
+  await act(async () => view.result.current.photoAngle.onPreview(100));
+  act(() => view.result.current.photoZoom.onPreview(175));
+  act(() => view.result.current.frameStyle.onCommit({ kind: "opacity", opacityPercent: 50 }));
+  await act(async () => {
+    angle.resolve(h.first.composition.sheets[0].frames);
+    h.pending.resolve(h.first);
+    await view.result.current.runner.waitForIdle();
+  });
+  expect(h.apply.mock.calls.map(([intent]) => intent.kind)).toEqual(["setPhotoAngle", "setPhotoZoom", "setFrameStyle"]);
+  expect(view.result.current.canvasProps.composition).toEqual(view.result.current.projection.composition);
+});
+
 test.each(["cancel", "reselect"])("a late style preview cannot revive a draft after %s", async (action) => {
   const h = harness();
   const pending = deferred<Awaited<ReturnType<ProjectCorePort["previewFrameStyle"]>>>();

@@ -1,14 +1,11 @@
-import { spawn, execFileSync } from 'node:child_process';
-import { mkdirSync, openSync, closeSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { aliveProcessInstances, waitForProcessInstance, processForestInstances, terminateProcessInstance } from './DevLifecycleProcessInstances.mjs';
-import { createWebDriverClient, findFreeTcpPort, waitForHttp } from './GateWebDriver.mjs';
+import { createHeadlessBrowserSession } from './HeadlessBrowserSession.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const output = path.resolve(process.argv[2] ?? path.join(root, '.scratch/frame-gesture-evidence', new Date().toISOString().replaceAll(':', '-')));
 mkdirSync(output, { recursive: true });
-const edge = JSON.parse(execFileSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(root, 'scripts/Resolve-EdgeWebDriver.ps1')], { encoding: 'utf8', windowsHide: true }));
-const roots = [];
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const source = () => ({
   gitCommit: execFileSync('git.exe', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', windowsHide: true }).trim(),
@@ -16,27 +13,17 @@ const source = () => ({
 });
 const evidence = {
   schemaVersion: 1, gate: 'frame-gesture-rendering', collectedAtUtc: new Date().toISOString(),
-  browser: { version: edge.edgeVersion, mode: 'headless-new' },
   sourceInputs: { initial: source(), final: null }, passed: false, cleanupCompleted: false,
   scenarios: [],
 };
-async function start(executable, args, name) {
-  const fd = openSync(path.join(output, name + '.log'), 'w');
-  const child = spawn(executable, args, { cwd: root, windowsHide: true, stdio: ['ignore', fd, fd] }); closeSync(fd);
-  try { roots.push(await waitForProcessInstance(child.pid, name)); }
-  catch (error) { child.kill(); throw error; }
-}
+const browser = createHeadlessBrowserSession({ root, output, windowSize: '1000,800', requestTimeoutMilliseconds: 10000 });
 let request, session;
 try {
-  const vitePort = await findFreeTcpPort(); const driverPort = await findFreeTcpPort();
-  await start(process.execPath, [path.join(root, 'node_modules/vite/bin/vite.js'), '--host', '127.0.0.1', '--port', String(vitePort), '--strictPort'], 'vite');
-  await start(edge.driverExecutable, ['--port='+driverPort, '--host=127.0.0.1'], 'webdriver');
-  await Promise.all([
-    waitForHttp(`http://127.0.0.1:${vitePort}`, 'Vite'),
-    waitForHttp(`http://127.0.0.1:${driverPort}/status`, 'Edge WebDriver'),
-  ]);
-  request = createWebDriverClient(`http://127.0.0.1:${driverPort}`);
-  session = (await request('POST', '/session', { capabilities: { alwaysMatch: { browserName: 'MicrosoftEdge', 'ms:edgeOptions': { binary: edge.edgeExecutable, args: ['--headless=new', '--disable-gpu', '--no-first-run', '--window-size=1000,800'] } } } })).sessionId;
+  const started = await browser.start();
+  ({ request, session } = started);
+  const port = started.port;
+  evidence.browser = { version: started.edge.edgeVersion, mode: 'headless-new' };
+
   const execute = (script, args=[]) => request('POST', `/session/${session}/execute/sync`, { script, args });
   const actions = list => request('POST', `/session/${session}/actions`, { actions: [{ type: 'pointer', id: 'mouse', parameters: { pointerType: 'mouse' }, actions: list }] });
   const key = (type, value) => request('POST', `/session/${session}/actions`, {
@@ -45,7 +32,7 @@ try {
   for (const scenario of ['resize', 'move', 'group-resize', 'group-move']) {
     const action = scenario.endsWith('resize') ? 'resize' : 'move';
     const group = scenario.startsWith('group-');
-    await request('POST', `/session/${session}/url`, { url: `http://127.0.0.1:${vitePort}/frame-gesture-preview.html?${scenario}` });
+    await request('POST', `/session/${session}/url`, { url: `http://127.0.0.1:${port}/frame-gesture-preview.html?${scenario}` });
     let ready = false;
     for (let attempt = 0; attempt < 600; ++attempt) {
       ready = await execute("return document.body.dataset.ready === 'true'");
@@ -133,11 +120,7 @@ try {
   evidence.error = error instanceof Error ? error.stack : String(error);
   console.error(evidence.error);
 } finally {
-  if (session && request) await request('DELETE', `/session/${session}`).catch(() => {});
-  const owned = roots.flatMap(root => processForestInstances([root]));
-  for (const child of owned.reverse()) terminateProcessInstance(child);
-  for (let attempt = 0; attempt < 100 && aliveProcessInstances(owned).length > 0; ++attempt) await delay(100);
-  evidence.cleanupCompleted = aliveProcessInstances(owned).length === 0;
+  evidence.cleanupCompleted = await browser.close();
   evidence.sourceInputs.final = source();
   evidence.passed = !evidence.error && evidence.cleanupCompleted &&
     evidence.scenarios.length === 4 && evidence.scenarios.every(item => item.passed) &&

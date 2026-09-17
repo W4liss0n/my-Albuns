@@ -21,10 +21,10 @@ use crate::{
         MediaPreviewState,
     },
     logging::LoggingState,
+    media_confirmation::MediaConfirmation,
     media_runtime::{MediaAvailability, MediaMonitor, MediaRuntime},
     product_runtime::{
         CACHE_PROCESSOR_WARNING_EVENT, LINKED_MEDIA_CHANGED_EVENT, PROJECT_WINDOW_LABEL,
-        confirm_prepared_media,
     },
     project_host::ProjectHost,
 };
@@ -129,16 +129,16 @@ pub(crate) async fn retry_unavailable_media(
     .map_err(MediaPreviewCommandError::retry_failed)?
     .map_err(MediaPreviewCommandError::retry_failed)?;
     drop(_causal_cache_permit);
-    let confirmed = confirm_prepared_media(
-        &app,
-        std::slice::from_ref(&retry_binding),
-        &roots,
-        Some(prepared),
-    )
-    .await
-    .map_err(MediaPreviewCommandError::retry_failed)?;
+    let confirmed = MediaConfirmation::for_app(&app, &retry_namespace)
+        .confirm(
+            std::slice::from_ref(&retry_binding),
+            &roots,
+            Some(prepared),
+            None,
+        )
+        .await
+        .map_err(MediaPreviewCommandError::retry_failed)?;
     let update = confirmed.poll.update().cloned().unwrap_or_default();
-    engine.apply_monitor_media_update(&retry_namespace, &registry, &update);
     if let Some(change) =
         linked_media_change_for_update(&update, &confirmed.refreshed_media_ids, true)
     {
@@ -261,7 +261,13 @@ pub(crate) async fn prepare_media_previews(
     .await
     .map_err(|_| MediaPreviewCommandError::read_failed())?;
     drop(causal_cache_permit);
-    let confirmed = confirm_prepared_media(&app, &catalog.bindings, &roots, prepared)
+    let confirmed = MediaConfirmation::for_app(&app, &namespace)
+        .confirm(
+            &catalog.bindings,
+            &roots,
+            prepared,
+            Some(&mut demand_revision),
+        )
         .await
         .map_err(MediaPreviewCommandError::retry_failed)?;
     let poll = &confirmed.poll;
@@ -276,19 +282,7 @@ pub(crate) async fn prepare_media_previews(
                 .collect::<HashMap<_, _>>()
         })
         .unwrap_or_default();
-    let cache_update = if let Some(runtime_update) = runtime_update.as_ref()
-        && (!runtime_update.changed_media_ids().is_empty()
-            || !runtime_update.invalidated_media_ids().is_empty())
-    {
-        Some(engine.apply_demand_media_update(
-            &namespace,
-            registry.inner(),
-            &mut demand_revision,
-            runtime_update,
-        ))
-    } else {
-        None
-    };
+    let cache_update = confirmed.cache_update;
     if let Some(runtime_update) = runtime_update.as_ref()
         && let Some(change) = linked_media_change_for_update(
             runtime_update,
