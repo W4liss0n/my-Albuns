@@ -714,6 +714,12 @@ validação das superfícies descritas nesta seção.
 - O Projeto usa uma única Unidade de medida, entre `mm`, `cm` e `in`, para todas as medidas físicas. Trocar a Unidade converte valores sem alterar tamanhos reais.
 - A Resolução do Projeto é expressa em DPI, começa em 300 DPI, governa a renderização das Exportações e pode ser alterada depois da criação sem mudar a composição física.
 - A Mudança dimensional segura transforma proporcionalmente Frames e ajustes de Fotos. Alterações fora da faixa visualmente segura são bloqueadas.
+- A diferença de proporção é `max(r_atual / r_nova, r_nova / r_atual) − 1`, com limite inclusivo de 10%, conforme o [ADR 0011](../adr/0011-limitar-mudanca-de-proporcao-a-dez-por-cento.md). A escala física pode variar além de 10% mantendo a proporção; origem e destino invertidos produzem a mesma decisão. Não há giro ou troca automática de eixos para admitir um formato.
+- Frames acompanham cada eixo da mudança; Fotos mantêm sua proporção original e o Zoom do usuário. O Zoom de preenchimento é recalculado e o Pan conserva o ponto da Foto que estava no centro do Frame sempre que compatível com o Preenchimento. O recorte pode mudar e nunca deixa vazios para forçar esse ponto.
+- Bordas e parâmetros físicos dos Layouts usam o menor fator de escala. Sangria e Área de segurança conservam os valores físicos, salvo edição explícita. Backgrounds e Overlays conservam vínculo, escopo e regra de preenchimento da região.
+- A transformação conserva organização, Pilha visual e travamento. O Último Layout aplicado acompanha a mudança dimensional; Favoritos e o catálogo global permanecem independentes. A operação não executa uma nova organização de Layout.
+- Proporções diferentes exigem dimensões orientadas conhecidas das Fotos colocadas; metadados conservados de uma Foto ausente são suficientes. Sem esses dados, bloquear a transformação do conjunto sem usar as dimensões de um placeholder genérico. Proporções iguais conservam os ajustes normalizados sem essa exigência adicional.
+- Pré-validação, confirmação e aplicação usam o mesmo candidato completo no Core, com uma única ação de Undo/Redo, sem Salvamento automático. Erro ou cancelamento não modifica parcialmente o Álbum. Os detalhes, exemplos e regras de arredondamento pertencem ao [contrato de Mudança dimensional segura](../design/0036-mudanca-dimensional-segura.md).
 
 ### Recorte, segurança e visualização
 
@@ -882,6 +888,7 @@ validação das superfícies descritas nesta seção.
 - Aplicar um Layout copia sua geometria para a Lâmina. A Organização aplicada não mantém referência viva ao item de catálogo.
 - Um Layout destravado realiza uma organização única; depois disso, o usuário pode mover e redimensionar Frames sem influência do Layout.
 - Travar um Layout congela quantidade, posição e dimensões de todos os Frames da Lâmina: impede criar ou excluir estruturas de Frame, movê-las ou redimensioná-las. Seleção, substituição de Foto, Borda, Opacidade, Pan, Zoom, Giro, Ângulo, Espelhamento, efeitos e ordem visual continuam editáveis.
+- A Mudança dimensional segura global é uma exceção: adapta a composição inteira ao novo formato, preservando organização e travamento, conforme o design 0036. Ela não habilita movimento ou redimensionamento direto dos Frames travados.
 - O cadeado na prévia do Layout aplica e trava a organização no mesmo fluxo; não existe uma tela separada para travamento.
 - Em uma Lâmina travada, a preview aplicada fica destacada com o cadeado fechado e todas as outras previews ficam desabilitadas.
 - Na navegação comum, somente Layouts com a mesma quantidade total de Frames são oferecidos.
@@ -1233,7 +1240,6 @@ A garantia de Publicação é deliberadamente limitada: todas as saídas são pr
 
 As funcionalidades abaixo permanecem no produto, mas seus detalhes foram deliberadamente adiados e exigem decisões próprias antes da implementação correspondente:
 
-- limite numérico da Mudança dimensional segura e eventual ponto focal adicional;
 - formato e resolução da representação visual reduzida, representação concreta dos identificadores de geração/versão, algoritmo de fingerprint e eventual adoção de tiles depois do spike;
 - eventual paralelismo entre itens de Exportação em lote, somente se medições demonstrarem ganho e preservarem o contrato serial observável;
 - perfis de hardware mínimo e recomendado e metas quantitativas de desempenho, que serão definidos somente após medições reais do spike;

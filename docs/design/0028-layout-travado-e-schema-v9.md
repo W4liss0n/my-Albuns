@@ -83,6 +83,12 @@ O Último Layout aplicado mantém sua definição original. Destravar preserva
 ambos os estados. Converter uma extremidade muda a superfície ativa,
 destrava e reorganiza em uma única ação reversível, conforme a SPEC.
 
+A Mudança dimensional segura global é uma exceção à edição estrutural direta:
+transforma a composição completa e adapta a definição do Último Layout,
+preservando o travamento. Não permite movimentar ou redimensionar um Frame
+travado isoladamente. O proprietário valida o resultado inteiro antes da
+confirmação, conforme o [design 0036](0036-mudanca-dimensional-segura.md).
+
 ## Persistência e Exportação
 
 O escritor passa a emitir `schemaVersion: 9`. Cada Lâmina exige o booleano
