@@ -25,6 +25,7 @@ recuperação de imagens e apresentação dos controles.
 | R6 | `src/contracts/generated` contém os valores gerados compartilhados com o Host. Exportação e geração deixam de copiar suas formas manualmente. | Comparação com a geração Rust, typecheck e limite entre aplicação e adaptadores Tauri. |
 | R7 | A projeção imutável do Álbum e `compose_album` servem editor, previews e congelamento sem criar sessões artificiais. | Mesma composição entre Canvas e Exportação, previews sem Histórico e transformações dimensionais. |
 | R8 | `local_store_io::write_atomically` publica também a lista de Projetos recentes. | Promoção, ordenação, substituição e propagação de falha de gravação. |
+| L1 | `LayoutRules` captura a definição corrente e concentra a inferência de escopo usada também na validação. | Captura personalizada, miniatura travada, toque e Travessia central, ordem e geometria exatas. |
 
 ## Contratos preservados
 
@@ -57,6 +58,13 @@ o estado vigente, confere a chave e publica esse mesmo candidato. A consulta
 anterior ao diálogo permanece independente; nenhum candidato atravessa a espera
 pela decisão. Rejeições conservam a prioridade de erro existente, a composição
 e o ramo de Redo. Isso conclui o caso dimensional residual de R3.
+
+A captura personalizada e a consulta do Layout travado usam a mesma definição
+validada por `LayoutRules`. O documento fornece superfície, posições e origem;
+não infere escopo, e a captura personalizada não reconstrói a definição recebida.
+A regra exata de Travessia central permanece separada da classificação com
+tolerância interna do Gerador. Captura vazia ou inválida continua rejeitada;
+ordem, coordenadas, origem, composição e Histórico conservam seus contratos.
 
 Eventos de mídia são emitidos pelos adaptadores depois da confirmação estável.
 A demanda atual pode adotar a nova época; uma demanda substituída não ganha

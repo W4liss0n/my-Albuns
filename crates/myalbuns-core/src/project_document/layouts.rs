@@ -128,22 +128,11 @@ impl ProjectDocument {
             .iter()
             .find(|sheet| sheet.id == sheet_id)
             .unwrap();
-        let positions: Vec<crate::RectUm> =
-            sheet.frames.iter().map(|frame| frame.rect.into()).collect();
-        let crosses = query.surface.kind == LayoutSurfaceKind::DoubleSheet
-            && positions.iter().any(|r| {
-                2 * r.x < query.surface.width_um && 2 * (r.x + r.width) > query.surface.width_um
-            });
         Ok(StoredLayout {
-            definition: crate::LayoutDefinition {
-                surface: query.surface,
-                scope: if crosses {
-                    crate::LayoutScope::Sheet
-                } else {
-                    crate::LayoutScope::Page
-                },
-                positions,
-            },
+            definition: crate::LayoutRules::capture_custom(
+                query.surface,
+                sheet.frames.iter().map(|frame| frame.rect.into()).collect(),
+            )?,
             origin: sheet
                 .last_layout
                 .as_ref()

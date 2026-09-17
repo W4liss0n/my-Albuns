@@ -66,18 +66,9 @@ impl LayoutRules {
         surface: LayoutSurface,
         positions: Vec<crate::RectUm>,
     ) -> Result<LayoutDefinition, CoreError> {
-        let crosses = surface.kind == LayoutSurfaceKind::DoubleSheet
-            && positions.iter().any(|r| {
-                2 * i128::from(r.x) < i128::from(surface.width_um)
-                    && 2 * (i128::from(r.x) + i128::from(r.width)) > i128::from(surface.width_um)
-            });
         let definition = LayoutDefinition {
+            scope: Self::inferred_scope(&surface, &positions),
             surface,
-            scope: if crosses {
-                LayoutScope::Sheet
-            } else {
-                LayoutScope::Page
-            },
             positions,
         };
         if !Self::definition_is_valid(&definition) {
@@ -267,6 +258,19 @@ impl LayoutRules {
             })
     }
 
+    fn inferred_scope(surface: &LayoutSurface, positions: &[crate::RectUm]) -> LayoutScope {
+        if surface.kind == LayoutSurfaceKind::DoubleSheet
+            && positions.iter().any(|r| {
+                2 * i128::from(r.x) < i128::from(surface.width_um)
+                    && 2 * (i128::from(r.x) + i128::from(r.width)) > i128::from(surface.width_um)
+            })
+        {
+            LayoutScope::Sheet
+        } else {
+            LayoutScope::Page
+        }
+    }
+
     pub(crate) fn definition_is_valid(definition: &LayoutDefinition) -> bool {
         if !definition.surface.is_valid() || definition.positions.is_empty() {
             return false;
@@ -283,12 +287,7 @@ impl LayoutRules {
         }) {
             return false;
         }
-        let crosses = definition.surface.kind == LayoutSurfaceKind::DoubleSheet
-            && definition
-                .positions
-                .iter()
-                .any(|r| 2 * r.x < w && 2 * (r.x + r.width) > w);
-        (definition.scope == LayoutScope::Sheet) == crosses
+        definition.scope == Self::inferred_scope(&definition.surface, &definition.positions)
     }
 
     /// Reserve is deliberately absent from listings and never becomes Last Layout.

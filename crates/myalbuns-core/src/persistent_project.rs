@@ -547,8 +547,7 @@ impl EditableProject {
         }
         let parsed =
             Uuid::parse_str(sheet_id).map_err(|_| CoreError::SheetNotFound(sheet_id.into()))?;
-        let current = self.project().current_layout(parsed)?.definition;
-        crate::LayoutRules::capture_custom(current.surface, current.positions)
+        Ok(self.project().current_layout(parsed)?.definition)
     }
 
     pub fn refresh_layout_catalog(

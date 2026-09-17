@@ -530,6 +530,10 @@ fn the_locked_preview_tracks_frame_order_and_remains_available_after_permission_
     let query = project.query_layouts(&sheet).unwrap();
     assert!(query.locked);
     assert!(query.listing.candidates[0].is_last_applied);
+    assert_eq!(
+        query.listing.candidates[0].layout.definition,
+        project.capture_custom_layout(&sheet).unwrap()
+    );
     let selection = LayoutSelection {
         query_id: query.query_id,
         candidate_index: 0,
