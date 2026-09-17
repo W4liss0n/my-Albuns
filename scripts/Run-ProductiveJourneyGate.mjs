@@ -501,7 +501,7 @@ async function openPhotoImportDialog(driver, label) {
   await clickWhenEnabled(
     driver,
     "xpath",
-    "//*[@role='menu' and @aria-label='Importar']//button[normalize-space()='Arquivos JPEG…']",
+    "//*[@role='menu' and @aria-label='Importar']//button[normalize-space()='Arquivos…']",
     label,
   );
 }
@@ -1157,7 +1157,7 @@ try {
   const selectedPhoto = driveNativeDialog(
     firstHost,
     "select",
-    "Importar Fotos JPEG",
+    "Importar Fotos",
     photoPath,
   );
   if (selectedPhoto.action !== "select") {
@@ -1169,7 +1169,7 @@ try {
   const reselectedPhoto = driveNativeDialog(
     firstHost,
     "select",
-    "Importar Fotos JPEG",
+    "Importar Fotos",
     photoPath,
   );
   if (reselectedPhoto.action !== "select") {
@@ -2581,7 +2581,6 @@ try {
   let missingOriginalActionable = false;
   let cacheCouldNotProduceFalseSuccess = false;
   const missingOriginalProcessorCount = exportProcessorAttempts().length;
-  unlinkSync(photoPath);
   try {
     await selectApplicationMenuCommandUntilLogEvent(
       hostDriver,
@@ -2590,6 +2589,10 @@ try {
       "native_save_dialog_opening",
       "missing-Original Export action",
     );
+    // Preflight now rejects absent originals before opening the picker. Remove
+    // the fixture after that check to prove the Processor also fails closed
+    // when the original disappears while the user chooses a destination.
+    unlinkSync(photoPath);
     const selectedMissingExport = driveNativeDialog(
       secondHost,
       "select",
@@ -3494,7 +3497,7 @@ try {
         {
           script: `
             const grid = document.querySelector('.workspace-grid');
-            const exportButton = document.querySelector("button[aria-label='Exportar Lâmina']");
+            const exportButton = document.querySelector("button[aria-label='Exportar']");
             return {
               canvasStillMounted: document.querySelector('canvas.pixi-canvas') !== null,
               exportDisabled: exportButton?.disabled === true,
