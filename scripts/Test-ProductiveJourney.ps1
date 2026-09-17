@@ -512,6 +512,7 @@ try {
         -not $gate.originalUnchanged -or
         -not $gate.missingOriginalBlocked -or
         -not $gate.missingOriginalActionable -or
+        -not $gate.missingOriginalBlockedBeforePipeline -or
         -not $gate.residentCanvasPreviewBeforeMissingOriginal -or
         $gate.previewArtifactCountBeforePurge -le 0 -or
         $gate.cacheEntryCountBeforeExport -ne 0 -or
@@ -531,14 +532,14 @@ try {
         $contractViolations += 'output'
     }
     if (
-        $gate.correlations.bootstraps -ne 4 -or
-        $gate.correlations.imagingAttempts -ne 2 -or
+        $gate.correlations.bootstraps -ne 5 -or
+        $gate.correlations.imagingAttempts -ne 1 -or
         $gate.processIds.firstHost -eq $gate.processIds.host -or
         -not $gate.reopenedInIndependentHost -or
         -not $gate.reopenedHistoryEmpty -or
-        $gate.terminalCounts.globalHandoffs -ne 4 -or
-        $gate.terminalCounts.hostReady -ne 4 -or
-        $gate.terminalCounts.imagingStopped -ne 2
+        $gate.terminalCounts.globalHandoffs -ne 5 -or
+        $gate.terminalCounts.hostReady -ne 5 -or
+        $gate.terminalCounts.imagingStopped -ne 1
     ) {
         $contractViolations += 'processes'
     }
@@ -548,7 +549,7 @@ try {
         throw "The productive journey result violated contract groups ($violationSummary): $observed"
     }
     Add-Type -AssemblyName System.Drawing
-    $jpegPath = Join-Path $runRoot 'Jornada produtiva_002.jpg'
+    $jpegPath = Join-Path $runRoot 'Exportação\Jornada produtiva - Cópia_002.jpg'
     $jpegBitmap = [System.Drawing.Bitmap]::FromFile($jpegPath)
     try {
         $sampleX = 2
@@ -925,6 +926,7 @@ try {
             originalUnchanged = [bool] $gate.originalUnchanged
             missingOriginalBlocked = [bool] $gate.missingOriginalBlocked
             missingOriginalActionable = [bool] $gate.missingOriginalActionable
+            missingOriginalBlockedBeforePipeline = [bool] $gate.missingOriginalBlockedBeforePipeline
             residentCanvasPreviewBeforeMissingOriginal = [bool] $gate.residentCanvasPreviewBeforeMissingOriginal
             previewArtifactCountBeforePurge = [int] $gate.previewArtifactCountBeforePurge
             cacheEntryCountBeforeExport = [int] $gate.cacheEntryCountBeforeExport

@@ -86,10 +86,12 @@ const externalSavedCopyPath = path.join(
   scratch,
   "Jornada produtiva - Cópia externa editável.myalbuns",
 );
-const exportPath = path.join(scratch, "Jornada produtiva_002.jpg");
+const exportDirectory = path.join(scratch, "Exportação");
+const exportPath = path.join(exportDirectory, "Jornada produtiva - Cópia_002.jpg");
+const missingOriginalExportDirectory = path.join(scratch, "Exportação sem original");
 const missingOriginalExportPath = path.join(
-  scratch,
-  "Jornada produtiva_original-ausente.jpg",
+  missingOriginalExportDirectory,
+  "Jornada produtiva - Cópia_002.jpg",
 );
 const photoFixturePath = path.join(
   workspace,
@@ -2454,42 +2456,88 @@ try {
     "Exportar Lâmina…",
     "Export action",
   );
-  const cancelledExport = driveNativeDialog(
-    secondHost,
-    "cancel",
-    "Exportar Lâmina como JPEG",
+  await withProjectDialog(
+    hostDriver,
+    "cancelled Export configuration",
+    async (dialogDriver) => {
+      const destination = await findElement(
+        dialogDriver, "css selector", "input[aria-label='Pasta de destino']",
+        "Export destination",
+      );
+      const before = await elementAttribute(dialogDriver, destination, "value");
+      await clickWhenEnabled(
+        dialogDriver, "xpath", "//button[normalize-space()='Escolher…']",
+        "choose Export folder",
+      );
+      const cancelledFolder = driveNativeDialog(
+        secondHost, "cancel", "Escolher pasta de destino da Exportação",
+      );
+      await waitFor(
+        "cancelled folder preserves destination",
+        async () =>
+          (await elementAttribute(dialogDriver, destination, "value")) === before &&
+          (await elementAttribute(dialogDriver, destination, "disabled")) === null,
+        timeoutMilliseconds,
+      );
+      if (cancelledFolder.action !== "cancel") {
+        throw new Error("The Export folder picker was not cancelled");
+      }
+      await clickWhenEnabled(
+        dialogDriver, "xpath", "//button[normalize-space()='Cancelar']",
+        "cancel Export configuration",
+      );
+    },
+  );
+  await waitForHttpUnavailable(
+    `http://127.0.0.1:${hostDriver.projectDialogDebugPort}/json/version`,
+    "cancelled Export configuration", timeoutMilliseconds,
   );
   if (
-    cancelledExport.action !== "cancel" ||
     existsSync(exportPath) ||
     recordsFor("export_started").length !== exportStartedBeforeCancel ||
     exportProcessorAttempts().length !== processorBeforeCancel
   ) {
     throw new Error(
-      `Cancelled Export crossed the ExportPipeline boundary: action=${cancelledExport.action}, ` +
+      `Cancelled Export crossed the ExportPipeline boundary: ` +
         `targetExists=${existsSync(exportPath)}, ` +
         `exportStarted=${exportStartedBeforeCancel}->${recordsFor("export_started").length}, ` +
         `exportProcessorSpawned=${processorBeforeCancel}->${exportProcessorAttempts().length}`,
     );
   }
 
-  await selectApplicationMenuCommandUntilLogEvent(
+  await selectApplicationMenuCommand(
     hostDriver,
     "Arquivo",
     "Exportar Lâmina…",
-    "native_save_dialog_opening",
     "Export retry action",
   );
-  const emptyCacheBeforeExport = purgeOwnedCache(cacheRoot);
-  const selectedExport = driveNativeDialog(
-    secondHost,
-    "select",
-    "Exportar Lâmina como JPEG",
-    exportPath,
+  mkdirSync(exportDirectory);
+  const emptyCacheBeforeExport = await withProjectDialog(
+    hostDriver,
+    "configured Export",
+    async (dialogDriver) => {
+      const interval = await findElement(
+        dialogDriver, "css selector", "input[aria-label='Lâminas do intervalo']",
+        "selected Export interval",
+      );
+      if (
+        (await elementAttribute(dialogDriver, interval, "value")) !== String(activeSheetNumber) ||
+        (await elementAttribute(dialogDriver, interval, "disabled")) !== null
+      ) {
+        throw new Error("Export configuration did not preserve the selected Sheet");
+      }
+      await replaceInput(
+        dialogDriver, "css selector", "input[aria-label='Pasta de destino']",
+        exportDirectory, "Export destination",
+      );
+      const empty = purgeOwnedCache(cacheRoot);
+      await clickWhenEnabled(
+        dialogDriver, "xpath", "//button[normalize-space()='Exportar']",
+        "confirm Export",
+      );
+      return empty;
+    },
   );
-  if (selectedExport.action !== "select") {
-    throw new Error("The JPEG destination was not confirmed");
-  }
   await waitForLogEvent("export_completed", 1, "Export completion");
   await clickProjectDialogAction(
     hostDriver,
@@ -2504,6 +2552,12 @@ try {
   );
   await waitForLogEvent("imaging_process_stopped", 1, "Processador terminal");
   const exported = readFileSync(exportPath);
+  const exportedFiles = readdirSync(exportDirectory);
+  if (exportedFiles.length !== 1 || exportedFiles[0] !== path.basename(exportPath)) {
+    throw new Error(
+      `Export wrote outside the selected Sheet or left preparation files: ${JSON.stringify(exportedFiles)}`,
+    );
+  }
   const emptyCacheAfterExport = summarizeOwnedCache(cacheRoot);
   const emptyCacheEvidence = assertEmptyCacheExport({
     previewArtifactCountBeforePurge: previewCacheBeforePurge.jpegCount,
@@ -2590,48 +2644,33 @@ try {
     canvasPreviewCountBeforeReopen;
   let missingOriginalBlocked = false;
   let missingOriginalActionable = false;
+  let missingOriginalBlockedBeforePipeline = false;
   let cacheCouldNotProduceFalseSuccess = false;
   const missingOriginalProcessorCount = exportProcessorAttempts().length;
   try {
-    await selectApplicationMenuCommandUntilLogEvent(
+    await selectApplicationMenuCommand(
       hostDriver,
       "Arquivo",
       "Exportar Lâmina…",
-      "native_save_dialog_opening",
       "missing-Original Export action",
     );
-    // Preflight now rejects absent originals before opening the picker. Remove
-    // the fixture after that check to prove the Processor also fails closed
-    // when the original disappears while the user chooses a destination.
-    unlinkSync(photoPath);
-    const selectedMissingExport = driveNativeDialog(
-      secondHost,
-      "select",
-      "Exportar Lâmina como JPEG",
-      missingOriginalExportPath,
-    );
-    if (selectedMissingExport.action !== "select") {
-      throw new Error(
-        "The missing-Original Export destination was not confirmed",
-      );
-    }
-    await waitForLogEvent("export_failed", 1, "missing-Original failure");
-    await waitFor(
-      "missing-Original Processador spawn",
-      () =>
-        exportProcessorAttempts().length === missingOriginalProcessorCount + 1,
-      timeoutMilliseconds,
-    );
-    const missingOriginalAttempt = exportProcessorAttempts().at(-1);
-    await waitFor(
-      "missing-Original Processador terminal",
-      () =>
-        recordsFor("imaging_process_stopped").some(
-          (record) =>
-            Number(record.process_id) ===
-            Number(missingOriginalAttempt.imaging_process_id),
-        ),
-      timeoutMilliseconds,
+    const startedBeforeMissingOriginal = recordsFor("export_started").length;
+    await withProjectDialog(
+      hostDriver,
+      "missing-Original Export configuration",
+      async (dialogDriver) => {
+        await replaceInput(
+          dialogDriver, "css selector", "input[aria-label='Pasta de destino']",
+          missingOriginalExportDirectory, "missing-Original destination",
+        );
+        // The current album flow checks originals when Exportar is confirmed.
+        // Keep the resident preview while removing only this test's original.
+        unlinkSync(photoPath);
+        await clickWhenEnabled(
+          dialogDriver, "xpath", "//button[normalize-space()='Exportar']",
+          "confirm missing-Original Export",
+        );
+      },
     );
     const failureText = await withProjectDialog(
       hostDriver,
@@ -2640,14 +2679,14 @@ try {
         const failureDialog = await findElement(
           dialogDriver,
           "xpath",
-          accessibleProjectDialogXpath("Exportação não concluída"),
+          accessibleProjectDialogXpath("Problemas na Exportação"),
           "actionable missing-Original message",
         );
         const text = await elementText(dialogDriver, failureDialog);
         await clickWhenEnabled(
           dialogDriver,
           "xpath",
-          `${accessibleProjectDialogXpath("Exportação não concluída")}//button[normalize-space()=${xpathLiteral("Fechar")}]`,
+          `${accessibleProjectDialogXpath("Problemas na Exportação")}//button[normalize-space()=${xpathLiteral("Fechar")}]`,
           "close missing-Original feedback",
         );
         return text;
@@ -2655,11 +2694,14 @@ try {
     );
     missingOriginalBlocked = !existsSync(missingOriginalExportPath);
     missingOriginalActionable =
-      failureText.includes("Religar") || failureText.includes("Religue");
-    const missingOriginalFailure = recordsFor("export_failed").at(-1);
+      failureText.includes(path.basename(photoPath)) &&
+      failureText.includes("ausente") && failureText.includes("Relinkar");
+    missingOriginalBlockedBeforePipeline =
+      recordsFor("export_started").length === startedBeforeMissingOriginal &&
+      exportProcessorAttempts().length === missingOriginalProcessorCount;
     cacheCouldNotProduceFalseSuccess =
       residentCanvasPreviewBeforeMissingOriginal &&
-      missingOriginalFailure?.stage === "source_verification" &&
+      missingOriginalBlockedBeforePipeline &&
       missingOriginalBlocked;
     if (
       !missingOriginalBlocked ||
@@ -3801,7 +3843,7 @@ try {
           record.event === "imaging_process_spawned" &&
           record.operation === "export",
       );
-      if (observedExportSpawns.length !== 2) return false;
+      if (observedExportSpawns.length !== 1) return false;
       try {
         assertCorrelatedJourneyTerminals(observedRecords, {
           bootstraps: bootstrapCorrelations,
@@ -3824,12 +3866,12 @@ try {
       record.event === "imaging_process_spawned" &&
       record.operation === "export",
   );
-  if (exportSpawns.length !== 2) {
+  if (exportSpawns.length !== 1) {
     throw new Error(
-      `The productive journey expected exactly two Processador Export attempts and observed ${exportSpawns.length}`,
+      `The productive journey expected exactly one Processador Export attempt and observed ${exportSpawns.length}`,
     );
   }
-  const [successfulSpawn, missingOriginalSpawn] = exportSpawns;
+  const [successfulSpawn] = exportSpawns;
   const correlations = assertCorrelatedJourneyTerminals(records, {
     bootstraps: bootstrapCorrelations,
     imagingAttempts: exportSpawns.map((record) => ({
@@ -3861,7 +3903,7 @@ try {
     10 + exportSpawns.length
   ) {
     throw new Error(
-      "Global, Host, serialized external-copy attempts and both Processadores did not use distinct PIDs",
+      "Global, Host, serialized external-copy attempts and Processador did not use distinct PIDs",
     );
   }
   if (applicationProcesses().length !== 0) {
@@ -3959,6 +4001,7 @@ try {
       originalUnchanged: readFileSync(photoPath).equals(originalPhoto),
       missingOriginalBlocked,
       missingOriginalActionable,
+      missingOriginalBlockedBeforePipeline,
       residentCanvasPreviewBeforeMissingOriginal,
       ...emptyCacheEvidence,
       cacheCouldNotProduceFalseSuccess,
@@ -3981,7 +4024,6 @@ try {
         queuedExternalCopyHost: queuedExternalCopyHost.processId,
         externalCopyHost: externalCopyHost.processId,
         imaging: Number(successfulSpawn.imaging_process_id),
-        missingOriginalImaging: Number(missingOriginalSpawn.imaging_process_id),
       },
       correlations,
       exportedAfterReopen,
