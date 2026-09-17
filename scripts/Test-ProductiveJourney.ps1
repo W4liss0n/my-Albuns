@@ -549,7 +549,7 @@ try {
         throw "The productive journey result violated contract groups ($violationSummary): $observed"
     }
     Add-Type -AssemblyName System.Drawing
-    $jpegPath = Join-Path $runRoot 'Exportação\Jornada produtiva - Cópia_002.jpg'
+    $jpegPath = Join-Path $runRoot "Exporta$([char]0x00E7)$([char]0x00E3)o\Jornada produtiva - C$([char]0x00F3)pia_002.jpg"
     $jpegBitmap = [System.Drawing.Bitmap]::FromFile($jpegPath)
     try {
         $sampleX = 2
