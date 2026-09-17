@@ -45,6 +45,30 @@ com orientação para escolher outra pasta ou ajustar a permissão. O código da
 fase continua distinto para preparação e publicação; falta de espaço mantém seu
 tratamento próprio.
 
+## Travamento encontrado no ensaio nativo
+
+Ao alternar entre dois projetos, a jornada nativa encontrou um bloqueio na
+thread principal do Tao 0.35.3. A captura com CDB mostrou `PeekMessageW`
+reentrando no callback de teclado enquanto o mutex de `KeyEventBuilder` ainda
+estava adquirido. Trazer a janela à frente ou trocar a edição de DPI por eventos
+de formulário não eliminou a falha.
+
+A pilha corresponde à causa corrigida no
+[PR 1215 do Tao](https://github.com/tauri-apps/tao/pull/1215).
+O workspace fixa o commit oficial
+`c704261c519c58cfdd0bc2d58ba24e06a0b71c92` por `[patch.crates-io]`, mantendo
+a versão compatível 0.35.3 exigida pelo `tauri-runtime-wry` 2.11.4. O teste
+continua usando teclado nos campos e confirmações reais. Não foi mantido o
+contorno por eventos de formulário.
+
+Em relação à versão publicada 0.35.3, esse commit contém a correção de teclado e
+IME no Windows e um ajuste de seis linhas no mapeamento de teclas JIS no Linux.
+Não altera APIs ou dependências. O `Cargo.lock` fixa também a origem do macro
+associado; as demais resoluções de dependências foram preservadas. Remover esse
+override quando a dependência estável do Tauri aceitar uma versão publicada que
+contenha a correção. A compilação passa a precisar do repositório Git oficial
+na primeira obtenção dessa dependência.
+
 ## Limites
 
 O SMB do ensaio é local. A indisponibilidade é provocada pelo desaparecimento do
@@ -58,3 +82,4 @@ arquivos ainda em edição.
 
 - [GetFinalPathNameByHandleW — Microsoft](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfinalpathnamebyhandlew): caminho físico pelo handle e limitações de normalização em SMB.
 - [Set-Acl — Windows PowerShell 5.1](https://github.com/MicrosoftDocs/PowerShell-Docs/blob/main/reference/5.1/Microsoft.PowerShell.Security/Set-Acl.md): alteração do descritor de segurança de uma fixture por caminho literal.
+- [Cargo — substituição de dependências](https://doc.rust-lang.org/cargo/reference/overriding-dependencies.html): correção transitiva fixada no manifesto do workspace.
