@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { ProjectDialogPort, ProjectDialogSession } from "../application/projectDialogPort";
+import type { ProjectDialogPort } from "../application/projectDialogPort";
+import { createProjectDecisions } from "../application/projectDecision";
 import type { ProjectCorePort } from "../application/projectPorts";
 import type { CustomLayoutId, EditorProjection, SaveCustomLayoutResult } from "../domain/project";
 import type { ProjectMutationRunner } from "./useProjectMutationRunner";
@@ -16,7 +17,7 @@ interface LayoutCatalogInput {
 export function useLayoutCatalog(input: LayoutCatalogInput) {
   const latest = useRef(input);
   latest.current = input;
-  const context = useMemo(() => ({ active: false, busy: false, dialog: null as ProjectDialogSession | null }),
+  const context = useMemo(() => ({ active: false, busy: false, decisions: createProjectDecisions(input.dialogPort) }),
     [input.projection.state.projectId, input.runner, input.dialogPort, input.port]);
   const [revision, setRevision] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -41,8 +42,7 @@ export function useLayoutCatalog(input: LayoutCatalogInput) {
     setRevealId(null);
     return () => {
       context.active = false;
-      void context.dialog?.dismiss().catch(() => undefined);
-      context.dialog = null;
+      context.decisions.cancel();
     };
   }, [context]);
 
@@ -92,52 +92,38 @@ export function useLayoutCatalog(input: LayoutCatalogInput) {
     }
   }
 
-  function requestDelete(layoutId: CustomLayoutId) {
+  async function requestDelete(layoutId: CustomLayoutId) {
     if (context.busy || !context.active) return;
     context.busy = true;
     setBusy(true);
-    let deciding = true;
-    const finish = async () => {
-      if (context.dialog !== session) return;
-      context.dialog = null;
-      await session.dismiss().catch(() => undefined);
-      if (!context.active) return;
-      context.busy = false;
-      setBusy(false);
-    };
-    const fail = async (error: unknown) => {
-      await finish();
-      if (context.active) latest.current.onError(messageFromError(error));
-    };
-    const confirm = async () => {
-      try {
-        await session.present({ kind: "layoutDeletionConfirmation", busy: true });
-        if (!context.active || context.dialog !== session) return;
+    try {
+      const result = await context.decisions.run(null, async (decision) => {
+        const confirmed = await decision.ask({ kind: "layoutDeletionConfirmation", busy: false },
+          (action) => action === "confirmLayoutDeletion" ? true : action === "cancelLayoutDeletion" ? false : undefined);
+        if (!confirmed || !await decision.present({ kind: "layoutDeletionConfirmation", busy: true })) return null;
         let observed = 0;
         const outcome = await input.runner.run(async (port, projection) => {
           observed = await port.deleteCustomLayout(layoutId);
           return projection ?? latest.current.projection;
         });
-        if (!context.active) return;
-        await finish();
-        if (outcome.status === "failed") latest.current.onError(messageFromError(outcome.error));
-        if (outcome.status === "completed") {
-          setRevision((previous) => Math.max(previous, observed));
-          setRevealId((pending) => pending === layoutId ? null : pending);
-          setNotice(null);
-        }
-      } catch (error: unknown) { await fail(error); }
-    };
-    const session = input.dialogPort.acquire((action) => {
-      if (!deciding || !context.active || context.dialog !== session) return;
-      if (action === "cancelLayoutDeletion") { deciding = false; void finish(); }
-      if (action === "confirmLayoutDeletion") { deciding = false; void confirm(); }
-    });
-    context.dialog = session;
-    void session.present({ kind: "layoutDeletionConfirmation", busy: false }).catch(fail);
+        return { outcome, observed };
+      });
+      if (!context.active || !result) return;
+      if (result.outcome.status === "failed") latest.current.onError(messageFromError(result.outcome.error));
+      if (result.outcome.status === "completed") {
+        setRevision((previous) => Math.max(previous, result.observed));
+        setRevealId((pending) => pending === layoutId ? null : pending);
+        setNotice(null);
+      }
+    } catch (error: unknown) {
+      if (context.active) latest.current.onError(messageFromError(error));
+    } finally {
+      if (context.active) { context.busy = false; setBusy(false); }
+    }
   }
 
-  return { revision, busy, notice: notice?.message ?? null, revealId, refresh, save, requestDelete,
+  return { revision, busy, notice: notice?.message ?? null, revealId, refresh, save,
+    requestDelete: (layoutId: CustomLayoutId) => { void requestDelete(layoutId); },
     acknowledgeReveal: () => setRevealId(null), dismissNotice };
 }
 

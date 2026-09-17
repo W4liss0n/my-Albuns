@@ -1,19 +1,19 @@
 use myalbuns_core::{
     AlbumInformation, AlbumInformationValidation, EditorProjection, PathFailure, PhotoDropTarget,
-    ProjectIntent, ProjectLocation, ProjectMutationOutcome, SaveAsProjectError,
-    SaveAsProjectOutcome as CoreSaveAsProjectOutcome, SaveAsProjectRequest, SaveProjectError,
+    ProjectIntent, ProjectMutationOutcome, SaveAsProjectError,
+    SaveAsProjectOutcome as CoreSaveAsProjectOutcome, SaveProjectError,
     SaveProjectOutcome as CoreSaveProjectOutcome,
 };
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
-use myalbuns_paths::{AppPaths, AppPathsError, OperationPathContext};
+use myalbuns_paths::{AppPaths, AppPathsError};
 use tauri::{AppHandle, Manager, State, WebviewWindow};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 
 use crate::{
     cache_engine::CacheEngine,
     cache_previews::CachePreviewRegistry,
-    cache_service::{ActiveCacheNamespace, CacheService},
-    image_processing::{ImageProcessingBatch, prepare_changed_images},
+    cache_service::ActiveCacheNamespace,
+    image_processing::ImageProcessingBatch,
     ipc_contract::{
         ImportMediaResult, SaveAsProjectCommandError, SaveAsProjectOutcome, SaveAsProjectResult,
         SaveProjectCommandError, SaveProjectOutcome, SaveProjectResult,
@@ -21,10 +21,10 @@ use crate::{
     logging::validate_optional_identifier,
     media_runtime::{MediaAvailability, MediaBinding, MediaResolver},
     native_project_dialog::{SaveAsDialogOutcome, choose_save_as_destination},
-    product_runtime::{PROJECT_WINDOW_LABEL, project_window_title},
+    product_runtime::PROJECT_WINDOW_LABEL,
+    project_creative_commands,
     project_host::{ProjectHost, ProjectHostSaveAsError, ProjectHostSaveError},
-    project_recovery::RecoveryCoordinator,
-    project_webview_authority::ProjectWebviewAuthority,
+    project_identity_transition::{self, IdentityTransitionError},
 };
 
 #[tauri::command]
@@ -55,8 +55,6 @@ pub(crate) async fn apply_project_intent(
     state: State<'_, ProjectHost>,
     on_progress: tauri::ipc::Channel<crate::ipc_contract::ImageProcessingProgress>,
 ) -> Result<ProjectMutationOutcome, String> {
-    let _operation = crate::project_ui_operations::begin(&app)?;
-    let previous_bindings = state.authorized_media_catalog()?.bindings;
     let intent_kind = match &intent {
         ProjectIntent::RemoveMedia { .. } => "remove_media",
         ProjectIntent::EditMediaFolder { .. } => "edit_media_folder",
@@ -95,31 +93,38 @@ pub(crate) async fn apply_project_intent(
         ProjectIntent::DropPhoto { .. } => "drop_photo",
     };
     let process_id = std::process::id();
-    let mut outcome = state.apply_with_outcome(intent).inspect_err(|_| {
-        tracing::warn!(
-            target: "myalbuns.desktop",
-            process_role = ProcessRole::DesktopHost.as_str(),
-            process_id = process_id,
-            window_label = window.label(),
-            intent = intent_kind,
-            event = "project_intent_rejected",
-        );
-    })?;
-    tracing::info!(
-        target: "myalbuns.desktop",
-        process_role = ProcessRole::DesktopHost.as_str(),
-        process_id = process_id,
-        window_label = window.label(),
-        project_id = safe_log_identifier(&outcome.projection.state.project_id),
-        revision = outcome.projection.state.revision,
-        intent = intent_kind,
-        event = "project_intent_applied",
-    );
-    prepare_changed_images(&app, &previous_bindings, |progress| {
-        let _ = on_progress.send(progress);
-    })
+    let (mut outcome, projection) = project_creative_commands::execute_in_app(
+        &app,
+        &state,
+        || {
+            let outcome = state.apply_with_outcome(intent).inspect_err(|_| {
+                tracing::warn!(
+                    target: "myalbuns.desktop",
+                    process_role = ProcessRole::DesktopHost.as_str(),
+                    process_id = process_id,
+                    window_label = window.label(),
+                    intent = intent_kind,
+                    event = "project_intent_rejected",
+                );
+            })?;
+            tracing::info!(
+                target: "myalbuns.desktop",
+                process_role = ProcessRole::DesktopHost.as_str(),
+                process_id = process_id,
+                window_label = window.label(),
+                project_id = safe_log_identifier(&outcome.projection.state.project_id),
+                revision = outcome.projection.state.revision,
+                intent = intent_kind,
+                event = "project_intent_applied",
+            );
+            Ok(outcome)
+        },
+        |progress| {
+            let _ = on_progress.send(progress);
+        },
+    )
     .await?;
-    outcome.projection = state.projection()?;
+    outcome.projection = projection;
     Ok(outcome)
 }
 
@@ -637,12 +642,14 @@ pub(crate) async fn undo_project(
     state: State<'_, ProjectHost>,
     on_progress: tauri::ipc::Channel<crate::ipc_contract::ImageProcessingProgress>,
 ) -> Result<EditorProjection, String> {
-    let _operation = crate::project_ui_operations::begin(&app)?;
-    let previous_bindings = state.authorized_media_catalog()?.bindings;
-    let projection = state.undo()?;
-    prepare_changed_images(&app, &previous_bindings, |progress| {
-        let _ = on_progress.send(progress);
-    })
+    let (projection, completed) = project_creative_commands::execute_in_app(
+        &app,
+        &state,
+        || state.undo(),
+        |progress| {
+            let _ = on_progress.send(progress);
+        },
+    )
     .await?;
     tracing::info!(
         target: "myalbuns.desktop",
@@ -652,7 +659,7 @@ pub(crate) async fn undo_project(
         revision = projection.state.revision,
         event = "project_undo_completed",
     );
-    state.projection()
+    Ok(completed)
 }
 
 #[tauri::command]
@@ -662,12 +669,14 @@ pub(crate) async fn redo_project(
     state: State<'_, ProjectHost>,
     on_progress: tauri::ipc::Channel<crate::ipc_contract::ImageProcessingProgress>,
 ) -> Result<EditorProjection, String> {
-    let _operation = crate::project_ui_operations::begin(&app)?;
-    let previous_bindings = state.authorized_media_catalog()?.bindings;
-    let projection = state.redo()?;
-    prepare_changed_images(&app, &previous_bindings, |progress| {
-        let _ = on_progress.send(progress);
-    })
+    let (projection, completed) = project_creative_commands::execute_in_app(
+        &app,
+        &state,
+        || state.redo(),
+        |progress| {
+            let _ = on_progress.send(progress);
+        },
+    )
     .await?;
     tracing::info!(
         target: "myalbuns.desktop",
@@ -677,7 +686,7 @@ pub(crate) async fn redo_project(
         revision = projection.state.revision,
         event = "project_redo_completed",
     );
-    state.projection()
+    Ok(completed)
 }
 
 #[tauri::command]
@@ -793,174 +802,20 @@ pub(crate) async fn save_project_as(
         } => (path, authorization),
     };
 
-    let next_title = project_window_title(&path);
-    let previous_title = window.title().map_err(|error| {
-        tracing::error!(
-            target: "myalbuns.desktop",
-            process_role = ProcessRole::DesktopHost.as_str(),
-            window_label = window.label(),
-            error = %error,
-            event = "project_save_as_title_read_failed",
-        );
-        SaveAsProjectCommandError::IoFailure
-    })?;
-    let transition_window = window.clone();
-    let window_label = window.label().to_owned();
-    let cache_pause = window.state::<CacheEngine>().pause().await;
-    let transition_app = window.app_handle().clone();
-    let saved = tauri::async_runtime::spawn_blocking(move || {
-        let mut paths = OperationPathContext::new();
-        paths
-            .capture(&path)
-            .map_err(map_save_as_operation_path_error)?;
-        let mut staged_cache = None;
-        let mut committed_webview = None;
-        let saved = host
-            .save_as_with_transition(
-                SaveAsProjectRequest::new(
-                    expected_revision,
-                    ProjectLocation::new(path, paths.freeze()),
-                    authorization,
-                ),
-                |previous_authority, authority, outcome| {
-                    let owner = transition_app
-                        .state::<CacheService>()
-                        .reserve_fresh_namespace(authority)
-                        .map_err(|error| {
-                            tracing::error!(
-                                target: "myalbuns.desktop",
-                                error = %error,
-                                event = "project_save_as_cache_stage_failed",
-                            );
-                        })?;
-                    tracing::info!(
-                        target: "myalbuns.desktop",
-                        process_role = ProcessRole::DesktopHost.as_str(),
-                        project_id = safe_log_identifier(
-                            &authority.project_id().hyphenated().to_string()
-                        ),
-                        cache_entry_count = 0,
-                        cache_byte_count = 0,
-                        event = "project_save_as_cache_staged_empty",
-                    );
-                    let staged_webview = transition_app
-                        .state::<ProjectWebviewAuthority>()
-                        .stage(&transition_app, outcome.previous_project_id, authority)
-                        .map_err(|error| {
-                            tracing::error!(
-                                target: "myalbuns.desktop",
-                                error = %error,
-                                event = "project_save_as_webview_stage_failed",
-                            );
-                        })?;
-                    let webview = staged_webview.commit(&transition_app).map_err(|error| {
-                        tracing::error!(
-                            target: "myalbuns.desktop",
-                            error = %error,
-                            event = "project_save_as_webview_transition_failed",
-                        );
-                    })?;
-                    if let Err(error) = transition_window.set_title(&next_title) {
-                        tracing::error!(
-                            target: "myalbuns.desktop",
-                            process_role = ProcessRole::DesktopHost.as_str(),
-                            window_label = transition_window.label(),
-                            error = %error,
-                            event = "project_save_as_title_update_failed",
-                        );
-                        if let Err(rollback_error) = webview.rollback(&transition_app) {
-                            tracing::error!(
-                                target: "myalbuns.desktop",
-                                error = %rollback_error,
-                                event = "project_save_as_webview_rollback_failed",
-                            );
-                            transition_app.exit(1);
-                        }
-                        return Err(());
-                    }
-                    if let Err(error) = transition_app
-                        .state::<RecoveryCoordinator>()
-                        .finish(previous_authority)
-                    {
-                        tracing::error!(
-                            target: "myalbuns.desktop",
-                            error = %error,
-                            event = "project_save_as_recovery_transition_failed",
-                        );
-                        let mut rollback_failed = false;
-                        if let Err(rollback_error) = transition_window.set_title(&previous_title) {
-                            tracing::error!(
-                                target: "myalbuns.desktop",
-                                error = %rollback_error,
-                                event = "project_save_as_title_rollback_failed",
-                            );
-                            rollback_failed = true;
-                        }
-                        if let Err(rollback_error) = webview.rollback(&transition_app) {
-                            tracing::error!(
-                                target: "myalbuns.desktop",
-                                error = %rollback_error,
-                                event = "project_save_as_webview_rollback_failed",
-                            );
-                            rollback_failed = true;
-                        }
-                        if rollback_failed {
-                            transition_app.exit(1);
-                        }
-                        return Err(());
-                    }
-                    tracing::info!(
-                        target: "myalbuns.desktop",
-                        process_role = ProcessRole::DesktopHost.as_str(),
-                        project_id = safe_log_identifier(
-                            &authority.project_id().hyphenated().to_string()
-                        ),
-                        event = "project_save_as_previous_recovery_finished",
-                    );
-                    staged_cache = Some(owner);
-                    committed_webview = Some(webview);
-                    Ok(())
-                },
-            )
-            .map_err(map_save_as_project_error)?;
-        Ok::<_, SaveAsProjectCommandError>((
-            saved,
-            staged_cache.expect("a successful Save As staged its new Cache authority"),
-            committed_webview.expect("a successful Save As committed its WebView authority"),
-            cache_pause,
-        ))
-    })
+    let saved = project_identity_transition::save_as(
+        window.clone(),
+        host,
+        expected_revision,
+        path,
+        authorization,
+    )
     .await
-    .map_err(|error| {
-        tracing::error!(
-            target: "myalbuns.desktop",
-            process_role = ProcessRole::DesktopHost.as_str(),
-            window_label = window_label.as_str(),
-            expected_revision,
-            error = %error,
-            event = "project_save_as_worker_failed",
-        );
-        SaveAsProjectCommandError::SessionUnavailable
-    })??;
-    let (saved, staged_cache, committed_webview, cache_pause) = saved;
-
-    window.state::<CacheEngine>().retire_project_identity(
-        &cache_pause,
-        window.state::<CachePreviewRegistry>().inner(),
-        &saved.outcome.previous_project_id.hyphenated().to_string(),
-    );
-    let retired_cache = window
-        .state::<ActiveCacheNamespace>()
-        .transition_to(staged_cache);
-    drop(retired_cache);
-    committed_webview.finalize();
-    tracing::info!(
-        target: "myalbuns.desktop",
-        process_role = ProcessRole::DesktopHost.as_str(),
-        project_id = safe_log_identifier(&saved.projection.state.project_id),
-        event = "project_save_as_local_authority_transitioned",
-    );
-    drop(cache_pause);
+    .map_err(|error| match error {
+        IdentityTransitionError::TitleRead => SaveAsProjectCommandError::IoFailure,
+        IdentityTransitionError::Path(error) => map_save_as_operation_path_error(error),
+        IdentityTransitionError::Worker => SaveAsProjectCommandError::SessionUnavailable,
+        IdentityTransitionError::Save(error) => map_save_as_project_error(error),
+    })?;
 
     let outcome = map_save_as_project_outcome(saved.outcome);
     tracing::info!(

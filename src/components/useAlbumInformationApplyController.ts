@@ -1,197 +1,53 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-
-import type {
-  ProjectDialogDetail,
-  ProjectDialogAction,
-  ProjectDialogPort,
-  ProjectDialogSession,
-} from "../application/projectDialogPort";
-import type {
-  AlbumInformation,
-  AlbumInformationImpact,
-  SheetSnapshot,
-} from "../domain/project";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { ProjectDialogDetail, ProjectDialogPort } from "../application/projectDialogPort";
+import { createProjectDecisions } from "../application/projectDecision";
+import type { AlbumInformation, AlbumInformationImpact, SheetSnapshot } from "../domain/project";
 import { edgeConversionLossDescription } from "../application/edgeConversionReview";
 import type { AlbumInformationProjectDraft } from "../application/projectSettingsDraft";
-import {
-  createAlbumInformationReview,
-  type AlbumInformationCommitResult,
-  type AlbumInformationReview,
-} from "../application/albumInformationReview";
-import {
-  displayUnitLabel,
-  formatPhysicalMeasurement,
-} from "../application/physicalMeasurements";
+import { createAlbumInformationReview, type AlbumInformationCommitResult, type AlbumInformationReview } from "../application/albumInformationReview";
+import { displayUnitLabel, formatPhysicalMeasurement } from "../application/physicalMeasurements";
 
 interface AlbumInformationApplyControllerOptions {
   sheets: readonly SheetSnapshot[];
   projectDialogPort: ProjectDialogPort;
-  onApply(
-    draft: AlbumInformationProjectDraft,
-    confirmedReview: AlbumInformationReview,
-  ): Promise<AlbumInformationCommitResult>;
+  onApply(draft: AlbumInformationProjectDraft, confirmedReview: AlbumInformationReview): Promise<AlbumInformationCommitResult>;
   onError(message: string): void;
 }
 
-type Phase = "idle" | "deciding" | "applying" | "closing";
-
-interface PendingAlbumInformation {
-  draft: AlbumInformationProjectDraft;
-  review: AlbumInformationReview;
-}
-
-interface ApplyCompletion {
-  resolve(completed: boolean): void;
-}
-
-export function useAlbumInformationApplyController({
-  sheets,
-  projectDialogPort,
-  onApply,
-  onError,
-}: AlbumInformationApplyControllerOptions) {
+export function useAlbumInformationApplyController(input: AlbumInformationApplyControllerOptions) {
   const [active, setActive] = useState(false);
-  const phaseRef = useRef<Phase>("idle");
-  const pendingRef = useRef<PendingAlbumInformation | null>(null);
-  const completionRef = useRef<ApplyCompletion | null>(null);
-  const dialogSessionRef = useRef<ProjectDialogSession | null>(null);
-  const actionListenerRef = useRef<(action: ProjectDialogAction) => void>(
-    () => undefined,
-  );
-
-  const finish = useCallback(async (completed: boolean) => {
-    phaseRef.current = "closing";
-    pendingRef.current = null;
-    const completion = completionRef.current;
-    completionRef.current = null;
-    const session = dialogSessionRef.current;
-    dialogSessionRef.current = null;
-    await session?.dismiss().catch(() => undefined);
-    phaseRef.current = "idle";
+  const latest = useRef(input);
+  latest.current = input;
+  const context = useMemo(() => ({ active: true, decisions: createProjectDecisions(input.projectDialogPort) }), [input.projectDialogPort]);
+  useEffect(() => {
+    context.active = true;
     setActive(false);
-    completion?.resolve(completed);
-  }, []);
+    return () => { context.active = false; context.decisions.cancel(); };
+  }, [context]);
 
-  const requestApply = useCallback(
-    async (
-      draft: AlbumInformationProjectDraft,
-      impact: AlbumInformationImpact,
-    ) => {
-      if (phaseRef.current !== "idle") return false;
-      let resolveCompletion!: (completed: boolean) => void;
-      const completion = new Promise<boolean>((resolve) => {
-        resolveCompletion = resolve;
-      });
-      completionRef.current = { resolve: resolveCompletion };
-      phaseRef.current = "deciding";
-      const review = createAlbumInformationReview(
-        draft.baseline,
-        draft.value,
-        impact,
-        sheets,
-      );
-      pendingRef.current = { draft, review };
-      setActive(true);
-      const session = projectDialogPort.acquire(
-        (action) => actionListenerRef.current(action),
-      );
-      dialogSessionRef.current = session;
-      try {
-        await session.present({
-          busy: false,
-          details: detailsFromReview(review),
-          kind: "albumInformationConfirmation",
-        });
-      } catch (error: unknown) {
-        if (dialogSessionRef.current !== session) return completion;
-        dialogSessionRef.current = null;
-        void session.dismiss().catch(() => undefined);
-        phaseRef.current = "idle";
-        pendingRef.current = null;
-        setActive(false);
-        completionRef.current = null;
-        resolveCompletion(false);
-        onError(messageFromError(error));
-      }
-      return completion;
-    },
-    [onError, projectDialogPort, sheets],
-  );
-
-  const confirm = useCallback(async () => {
-    const pending = pendingRef.current;
-    if (phaseRef.current !== "deciding" || !pending) return;
-    phaseRef.current = "applying";
-    const session = dialogSessionRef.current;
-    if (!session) {
-      await finish(false);
-      return;
-    }
+  async function requestApply(draft: AlbumInformationProjectDraft, impact: AlbumInformationImpact) {
+    if (!context.active || context.decisions.busy) return false;
+    setActive(true);
     try {
-      await session.present({
-        busy: true,
-        details: detailsFromReview(pending.review),
-        kind: "albumInformationConfirmation",
+      return await context.decisions.run(false, async (decision) => {
+        let review = createAlbumInformationReview(draft.baseline, draft.value, impact, latest.current.sheets);
+        while (decision.current) {
+          const confirmed = await decision.ask({ kind: "albumInformationConfirmation", busy: false, details: detailsFromReview(review) },
+            (action) => action === "confirmAlbumInformation" ? true : action === "cancelAlbumInformation" ? false : undefined);
+          if (!confirmed || !await decision.present({ kind: "albumInformationConfirmation", busy: true, details: detailsFromReview(review) })) return false;
+          const result = await latest.current.onApply(draft, review);
+          if (result.kind !== "reviewRequired") return result.kind === "completed";
+          review = result.review;
+        }
+        return false;
       });
     } catch (error: unknown) {
-      if (dialogSessionRef.current !== session) return;
-      onError(messageFromError(error));
-      await finish(false);
-      return;
+      if (context.active) latest.current.onError(messageFromError(error));
+      return false;
+    } finally {
+      if (context.active) setActive(false);
     }
-    if (
-      dialogSessionRef.current !== session ||
-      phaseRef.current !== "applying" ||
-      pendingRef.current !== pending
-    ) {
-      return;
-    }
-    let result: AlbumInformationCommitResult;
-    try {
-      result = await onApply(pending.draft, pending.review);
-    } catch (error: unknown) {
-      onError(messageFromError(error));
-      await finish(false);
-      return;
-    }
-    if (result.kind === "reviewRequired") {
-      pendingRef.current = { draft: pending.draft, review: result.review };
-      phaseRef.current = "deciding";
-      try {
-        await dialogSessionRef.current?.present({
-          busy: false,
-          details: detailsFromReview(result.review),
-          kind: "albumInformationConfirmation",
-        });
-      } catch (error: unknown) {
-        onError(messageFromError(error));
-        await finish(false);
-      }
-      return;
-    }
-    await finish(result.kind === "completed");
-  }, [finish, onApply, onError]);
-
-  actionListenerRef.current = (action) => {
-    if (action === "cancelAlbumInformation" && phaseRef.current === "deciding") {
-      void finish(false);
-    }
-    if (action === "confirmAlbumInformation") {
-      void confirm();
-    }
-  };
-
-  useEffect(
-    () => () => {
-      const session = dialogSessionRef.current;
-      dialogSessionRef.current = null;
-      completionRef.current?.resolve(false);
-      completionRef.current = null;
-      void session?.dismiss().catch(() => undefined);
-    },
-    [],
-  );
-
+  }
   return { active, requestApply };
 }
 
