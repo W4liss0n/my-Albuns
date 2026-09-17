@@ -75,5 +75,7 @@ export type { RectUm } from "./generated/RectUm";
 export type { SheetRole } from "./generated/SheetRole";
 export type { SheetInsertionPosition } from "./generated/SheetInsertionPosition";
 export type { SheetSnapshot } from "./generated/SheetSnapshot";
+export type { SheetStructureAvailability } from "./generated/SheetStructureAvailability";
+export type { EdgeConversionLoss } from "./generated/EdgeConversionLoss";
 export type { SizeUm } from "./generated/SizeUm";
 export type { VectorUm } from "./generated/VectorUm";

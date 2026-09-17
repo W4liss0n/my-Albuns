@@ -10,6 +10,7 @@ import { createAlbumDesignProjectDraft } from "../application/projectSettingsDra
 import type { EditorProjection } from "../domain/project";
 import {
   createThreeSheetProjection,
+  refreshSheetStructureFixture,
   representativeProjection,
 } from "../test/projectFixtures";
 import {
@@ -38,7 +39,7 @@ function projectSessionPort(
     load: async () => representativeProjection,
     validateAlbumInformation: async () => ({
       errors: [],
-      impact: { sheetWidthPx: 7_087, pageWidthPx: 3_543, heightPx: 3_543 },
+      impact: { conversionLosses: [], sheetWidthPx: 7_087, pageWidthPx: 3_543, heightPx: 3_543 },
     }),
     apply,
     applyWithOutcome: async (intent, publish) => ({
@@ -317,6 +318,7 @@ test.each(["unchanged", "removed", "converted", "failure"] as const)(
       afterHistory.state.album.sheets.splice(2, 1);
       afterHistory.state.album.sheets[1].activeSides = "left";
       afterHistory.state.album.sheets[1].role = "final";
+      afterHistory.state.album.sheets = refreshSheetStructureFixture(afterHistory.state.album.sheets);
     }
     const pending = deferredProjection();
     const apply = vi.fn<ProjectCorePort["apply"]>(async () => afterHistory);
@@ -568,13 +570,14 @@ function conversionHarness(initial = decoratedEdgeProjection()) {
   const apply = vi.fn<ProjectCorePort["apply"]>(async () => initial);
   const undo = vi.fn<ProjectCorePort["undo"]>(async () => initial);
   const port = projectSessionPort(apply, undo);
+  const validateAlbumInformation = vi.mocked(port.validateAlbumInformation = vi.fn(port.validateAlbumInformation));
   const onAffectedSheet = vi.fn();
   const view = renderHook(({ projection }) => useProjectMutations({
     projection, projectDialogPort: dialogPort,
     runProjectMutation: useProjectMutationRunner(projection.state.projectId, port),
     onProjectionChange: vi.fn(), onAffectedFrame: vi.fn(), onAffectedSheet,
   }), { initialProps: { projection: initial } });
-  return { ...view, apply, undo, present, dismiss, onAffectedSheet, emit: (action: ProjectDialogAction) => onAction(action) };
+  return { ...view, apply, undo, present, dismiss, onAffectedSheet, validateAlbumInformation, emit: (action: ProjectDialogAction) => onAction(action) };
 }
 
 function decoratedEdgeProjection() {
@@ -583,6 +586,8 @@ function decoratedEdgeProjection() {
     background: { kind: "perSide", left: { kind: "custom", content: { kind: "color", rgb: "#123456" }, mapping: "side" }, right: { kind: "default" } },
     overlay: { kind: "default" },
   };
+  projection.state.album.sheets[0].edgeConversionLoss = { sheetId: "sheet-001", sheetNumber: 1, side: "left",
+    background: { kind: "custom", content: { kind: "color", rgb: "#123456" }, mapping: "side" }, overlay: null };
   return projection;
 }
 
@@ -669,8 +674,9 @@ test("Album information re-reviews newly discarded content after queued Undo, th
   const baseline = { ...initial.state.document, firstSheet: "double" as const, lastSheet: "double" as const };
   const information = { ...baseline, firstSheet: "singlePage" as const };
   const draft = createAlbumInformationProjectDraft(initial.state.revision, baseline).transition(information);
-  const impact = { sheetWidthPx: 7_087, pageWidthPx: 3_543, heightPx: 3_543 };
-  const review = createAlbumInformationReview(baseline, information, impact, initial.state.album.sheets);
+  const impact = { conversionLosses: [], sheetWidthPx: 7_087, pageWidthPx: 3_543, heightPx: 3_543 };
+  const review = createAlbumInformationReview(baseline, information, impact);
+  harness.validateAlbumInformation.mockResolvedValue({ errors: [], impact: { ...impact, conversionLosses: [latest.state.album.sheets[0].edgeConversionLoss!] } });
   let commit!: ReturnType<typeof harness.result.current.applyAlbumInformation>;
   act(() => { harness.result.current.undo(); commit = harness.result.current.applyAlbumInformation(draft, review); });
   await act(async () => { pending.resolve(latest); await commit; });
@@ -692,6 +698,8 @@ test("rechecks changed discarded applications after confirmation without blockin
   const latest = decoratedEdgeProjection();
   latest.state.album.sheets[0].visuals = { background: { kind: "default" },
     overlay: { kind: "perSide", left: { kind: "custom", content: { kind: "media", mediaId: "new-overlay" }, mapping: "side" }, right: { kind: "default" } } };
+  latest.state.album.sheets[0].edgeConversionLoss = { sheetId: "sheet-001", sheetNumber: 1, side: "left", background: null,
+    overlay: { kind: "custom", content: { kind: "media", mediaId: "new-overlay" }, mapping: "side" } };
   harness.undo.mockResolvedValueOnce(latest);
   let completed!: Promise<boolean>;
   act(() => { completed = harness.result.current.applyWithOutcome(convertFirstEdge); });

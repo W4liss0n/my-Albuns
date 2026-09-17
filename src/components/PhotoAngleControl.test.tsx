@@ -53,6 +53,7 @@ test("two off-center clicks reset once and respect the Windows double-click inte
 
 test("accepts comma or dot, validates precision and range, and cancels invalid edits", () => {
   const h = harness();
+  expect(h.number).toHaveAttribute("autocomplete", "off");
   fireEvent.change(h.number, { target: { value: "-12,3" } });
   expect(h.onPreview).toHaveBeenLastCalledWith(-123);
   fireEvent.keyDown(h.number, { key: "Enter" });

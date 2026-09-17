@@ -43,7 +43,7 @@ function projectCorePortWithApply(
     load: async () => projection,
     validateAlbumInformation: async () => ({
       errors: [],
-      impact: { sheetWidthPx: 7_087, pageWidthPx: 3_543, heightPx: 3_543 },
+      impact: { conversionLosses: [], sheetWidthPx: 7_087, pageWidthPx: 3_543, heightPx: 3_543 },
     }),
     apply,
     applyWithOutcome: async (intent) => ({

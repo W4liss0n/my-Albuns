@@ -541,15 +541,10 @@ function props(): ComponentProps<typeof InspectorPanel> {
     mediaItems: projection.state.album.media,
     mediaPreviews: {},
     onApplyAlbumDesign: vi.fn(),
-    onApplyAlbumInformation: vi.fn(),
-    onBeginPhotoZoom: vi.fn(),
-    onFinishPhotoZoom: vi.fn(),
-    onNavigateToSheet: vi.fn(),
-    onPresentationUnitChange: vi.fn(),
-    onUpdatePhotoZoom: vi.fn(),
-    onValidateAlbumInformation: vi.fn(async () => ({
+    onApplyAlbumInformation: vi.fn(),    onNavigateToSheet: vi.fn(),
+    onPresentationUnitChange: vi.fn(),    onValidateAlbumInformation: vi.fn(async () => ({
       errors: [],
-      impact: { heightPx: 1, pageWidthPx: 1, sheetWidthPx: 2 },
+      impact: { conversionLosses: [], heightPx: 1, pageWidthPx: 1, sheetWidthPx: 2 },
     })),
     presentationUnit: projection.state.document.displayUnit,
     revision: projection.state.revision,
@@ -557,7 +552,5 @@ function props(): ComponentProps<typeof InspectorPanel> {
     sheets: projection.composition.sheets,
     sheetStates: projection.state.album.sheets,
     visualDefaults: projection.state.album.visualDefaults,
-    frameGapUm: projection.state.layoutSettings.gapUm,
-    zoomCommitting: false,
-  };
+    frameGapUm: projection.state.layoutSettings.gapUm,  };
 }

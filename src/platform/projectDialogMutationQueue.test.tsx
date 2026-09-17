@@ -29,10 +29,12 @@ test("conversion and Album information can share the owned dialog while Save is 
     } },
     overlay: { kind: "default" },
   };
+  initial.state.album.sheets[2].edgeConversionLoss = { sheetId: "sheet-003", sheetNumber: 3, side: "right",
+    background: { kind: "custom", content: { kind: "color", rgb: "#123456" }, mapping: "side" }, overlay: null };
   let finishSave!: () => void;
   const pendingSave = new Promise<void>((resolve) => { finishSave = resolve; });
   const apply = vi.fn<ProjectCorePort["apply"]>(async () => initial);
-  const impact = { sheetWidthPx: 14_173, pageWidthPx: 7_087, heightPx: 7_087 };
+  const impact = { conversionLosses: [], sheetWidthPx: 14_173, pageWidthPx: 7_087, heightPx: 7_087 };
   const port: ProjectCorePort = {
     ...tauriProjectCorePort,
     apply,
@@ -53,7 +55,7 @@ test("conversion and Album information can share the owned dialog while Save is 
       onProjectionChange: vi.fn(), onAffectedFrame: vi.fn(), onAffectedSheet: vi.fn(),
     });
     const information = useAlbumInformationApplyController({
-      sheets: initial.state.album.sheets, projectDialogPort: dialogPort,
+       projectDialogPort: dialogPort,
       onApply: mutations.applyAlbumInformation, onError: vi.fn(),
     });
     return { mutations, information };
@@ -92,7 +94,7 @@ test.each([false, true])("dimensional review follows queued Save and preserves i
   const baseline = { ...initial.state.document, firstSheet: "double" as const, lastSheet: "double" as const };
   const value = { ...baseline, sheetWidthUm: baseline.sheetWidthUm * 1.05 };
   const draft = createAlbumInformationProjectDraft(initial.state.revision, baseline).transition(value);
-  const impact = (key: string) => ({ sheetWidthPx: 7_441, pageWidthPx: 3_720, heightPx: 3_543,
+  const impact = (key: string) => ({ conversionLosses: [], sheetWidthPx: 7_441, pageWidthPx: 3_720, heightPx: 3_543,
     dimensionalChange: { proportionChanged: true, confirmationKey: key } });
   let finishSave!: () => void;
   const pending = new Promise<void>((resolve) => { finishSave = resolve; });
@@ -114,7 +116,7 @@ test.each([false, true])("dimensional review follows queued Save and preserves i
   act(() => {
     void view.result.current.save();
     result = view.result.current.applyAlbumInformation(draft,
-      createAlbumInformationReview(baseline, value, impact("old-source"), initial.state.album.sheets));
+      createAlbumInformationReview(baseline, value, impact("old-source")));
   });
   expect(apply).not.toHaveBeenCalled();
   await act(async () => { finishSave(); });
@@ -134,7 +136,7 @@ test("a source observation racing the native commit reopens confirmation without
   const value = { ...baseline, sheetWidthUm: baseline.sheetWidthUm * 1.05 };
   const draft = createAlbumInformationProjectDraft(initial.state.revision, baseline).transition(value);
   let key = "before";
-  const impact = () => ({ sheetWidthPx: 7_441, pageWidthPx: 3_720, heightPx: 3_543,
+  const impact = () => ({ conversionLosses: [], sheetWidthPx: 7_441, pageWidthPx: 3_720, heightPx: 3_543,
     dimensionalChange: { proportionChanged: true, confirmationKey: key } });
   const originalImpact = impact();
   const apply = vi.fn<ProjectCorePort["apply"]>(async () => {
@@ -150,7 +152,7 @@ test("a source observation racing the native commit reopens confirmation without
   }));
   await act(async () => {
     const result = await view.result.current.applyAlbumInformation(draft,
-      createAlbumInformationReview(baseline, value, originalImpact, initial.state.album.sheets));
+      createAlbumInformationReview(baseline, value, originalImpact));
     expect(result).toMatchObject({ kind: "reviewRequired", review: { impact: { dimensionalChange: { confirmationKey: "after" } } } });
   });
   expect(apply).toHaveBeenCalledOnce();

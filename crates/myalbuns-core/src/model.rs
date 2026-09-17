@@ -380,6 +380,8 @@ impl Default for ProjectedVisualDefaults {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct SheetSnapshot {
+    pub structure: SheetStructureProjection,
+    pub edge_conversion_loss: Option<crate::sheet_visuals::EdgeConversionLoss>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub visuals: Option<crate::SheetVisuals>,
@@ -392,6 +394,24 @@ pub struct SheetSnapshot {
     pub width_um: i64,
     pub height_um: i64,
     pub frames: Vec<FrameSnapshot>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct SheetStructureAvailability {
+    pub can_add_after: bool,
+    pub can_add_before: bool,
+    pub can_convert_edge: bool,
+    pub can_delete: bool,
+    pub can_duplicate: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct SheetStructureProjection {
+    pub availability: SheetStructureAvailability,
+    pub minimum_reorder_index: usize,
+    pub maximum_reorder_index: usize,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]

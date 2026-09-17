@@ -1,14 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ProjectDialogDetail, ProjectDialogPort } from "../application/projectDialogPort";
 import { createProjectDecisions } from "../application/projectDecision";
-import type { AlbumInformation, AlbumInformationImpact, SheetSnapshot } from "../domain/project";
+import type { AlbumInformation, AlbumInformationImpact } from "../domain/project";
 import { edgeConversionLossDescription } from "../application/edgeConversionReview";
 import type { AlbumInformationProjectDraft } from "../application/projectSettingsDraft";
 import { createAlbumInformationReview, type AlbumInformationCommitResult, type AlbumInformationReview } from "../application/albumInformationReview";
 import { displayUnitLabel, formatPhysicalMeasurement } from "../application/physicalMeasurements";
 
 interface AlbumInformationApplyControllerOptions {
-  sheets: readonly SheetSnapshot[];
   projectDialogPort: ProjectDialogPort;
   onApply(draft: AlbumInformationProjectDraft, confirmedReview: AlbumInformationReview): Promise<AlbumInformationCommitResult>;
   onError(message: string): void;
@@ -30,7 +29,7 @@ export function useAlbumInformationApplyController(input: AlbumInformationApplyC
     setActive(true);
     try {
       return await context.decisions.run(false, async (decision) => {
-        let review = createAlbumInformationReview(draft.baseline, draft.value, impact, latest.current.sheets);
+        let review = createAlbumInformationReview(draft.baseline, draft.value, impact);
         while (decision.current) {
           const confirmed = await decision.ask({ kind: "albumInformationConfirmation", busy: false, details: detailsFromReview(review) },
             (action) => action === "confirmAlbumInformation" ? true : action === "cancelAlbumInformation" ? false : undefined);

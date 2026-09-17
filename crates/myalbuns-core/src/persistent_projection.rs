@@ -95,6 +95,8 @@ pub(crate) fn album_snapshot(
                 next_page_number += page_count;
 
                 SheetSnapshot {
+                    structure: project.sheet_structure(index),
+                    edge_conversion_loss: project.edge_conversion_loss(index),
                     visuals: (!sheet.visuals().is_default()).then(|| sheet.visuals().clone()),
                     id: sheet.id().hyphenated().to_string(),
                     layout_locked: sheet.layout_locked(),

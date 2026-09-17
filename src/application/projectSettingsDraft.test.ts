@@ -67,6 +67,8 @@ const representativeProjection: EditorProjection = {
     album: {
       sheets: [
         {
+          structure: { availability: { canAddBefore: true, canAddAfter: true, canConvertEdge: true, canDelete: false, canDuplicate: true }, minimumReorderIndex: 0, maximumReorderIndex: 0 },
+          edgeConversionLoss: null,
           id: "sheet-001",
           number: 1,
           role: "initial",

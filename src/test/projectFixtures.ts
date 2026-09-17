@@ -1,6 +1,7 @@
 import placementFixture from "../../tests/fixtures/photo-placement-cases.json";
 import type {
   EditorProjection,
+  SheetSnapshot,
   PhotoPlacementPlan,
 } from "../domain/project";
 
@@ -26,6 +27,8 @@ export const representativeProjection: EditorProjection = {
     album: {
       sheets: [
         {
+          structure: { availability: { canAddBefore: true, canAddAfter: true, canConvertEdge: true, canDelete: false, canDuplicate: true }, minimumReorderIndex: 0, maximumReorderIndex: 0 },
+          edgeConversionLoss: null,
           id: "sheet-001",
           number: 1,
           role: "initial",
@@ -182,7 +185,7 @@ export function createEmptyProjection(): EditorProjection {
 }
 
 export function createTwoSheetProjection(): EditorProjection {
-  return {
+  const projection: EditorProjection = {
     canPasteFrames: false,
     state: {
       ...representativeProjection.state,
@@ -215,6 +218,8 @@ export function createTwoSheetProjection(): EditorProjection {
     },
     mediaUsage: representativeProjection.mediaUsage,
   };
+  projection.state.album.sheets = refreshSheetStructureFixture(projection.state.album.sheets);
+  return projection;
 }
 
 export function createThreeSheetProjection(): EditorProjection {
@@ -240,5 +245,24 @@ export function createThreeSheetProjection(): EditorProjection {
   };
   projection.state.album.sheets.push(finalSheet);
   projection.composition.sheets.push(finalComposition);
+  projection.state.album.sheets = refreshSheetStructureFixture(projection.state.album.sheets);
   return projection;
+}
+
+/** Deterministic fake-port facts only. Production consumes the Rust projection.
+ * Public Core tests prove the structure/command contract independently. */
+export function refreshSheetStructureFixture(
+  sheets: readonly (Omit<SheetSnapshot, "structure" | "edgeConversionLoss"> & Partial<Pick<SheetSnapshot, "structure" | "edgeConversionLoss">>)[],
+): SheetSnapshot[] {
+  const last = sheets.length - 1;
+  return sheets.map((sheet, index) => ({ ...sheet, edgeConversionLoss: sheet.edgeConversionLoss ?? null,
+    structure: {
+      availability: { canAddBefore: index > 0 || sheet.activeSides === "both",
+        canAddAfter: index < last || sheet.activeSides === "both",
+        canConvertEdge: index === 0 || index === last, canDelete: sheets.length > 2,
+        canDuplicate: sheet.activeSides === "both" },
+      minimumReorderIndex: sheet.activeSides === "both" ? Number(sheets[0].activeSides !== "both") : index,
+      maximumReorderIndex: sheet.activeSides === "both" ? last - Number(sheets[last].activeSides !== "both") : index,
+    },
+  }));
 }

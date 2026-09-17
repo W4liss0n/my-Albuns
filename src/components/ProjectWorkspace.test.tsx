@@ -358,7 +358,7 @@ function projectCorePortWithApply(
     load: async () => projection,
     validateAlbumInformation: async () => ({
       errors: [],
-      impact: { sheetWidthPx: 7_087, pageWidthPx: 3_543, heightPx: 3_543 },
+      impact: { conversionLosses: [], sheetWidthPx: 7_087, pageWidthPx: 3_543, heightPx: 3_543 },
     }),
     apply,
     applyWithOutcome: async (intent, publish) => ({
@@ -4839,7 +4839,7 @@ test("revalidates materialized Album Information after pending History and block
       ? { errors: ["sheetWidthRasterOutOfRange"], impact: null }
       : {
           errors: [],
-          impact: {
+          impact: { conversionLosses: [],
             sheetWidthPx: 7_087,
             pageWidthPx: 3_543,
             heightPx: 3_543,
@@ -6248,13 +6248,16 @@ test("commits a slider zoom once without flashing a global busy state", async ()
     name: "Exportar",
   });
 
-  fireEvent.pointerDown(slider);
+  await waitFor(() => expect(slider).toBeEnabled());
+  slider.setPointerCapture = vi.fn();
+  fireEvent.pointerDown(slider, { pointerId: 1, button: 0, clientX: 0, clientY: 0 });
+  fireEvent.pointerMove(slider, { pointerId: 1, clientX: 40, clientY: 0 });
   fireEvent.change(slider, { target: { value: "112" } });
   fireEvent.change(slider, { target: { value: "125" } });
 
   expect(apply).not.toHaveBeenCalled();
 
-  fireEvent.pointerUp(slider);
+  fireEvent.pointerUp(slider, { pointerId: 1 });
 
   expect(apply).toHaveBeenCalledOnce();
   expect(apply).toHaveBeenCalledWith({
@@ -6271,6 +6274,36 @@ test("commits a slider zoom once without flashing a global busy state", async ()
     pending.resolve(projection);
     await pending.promise;
   });
+});
+
+test.each(["apply", "cancel", "invalid", "reset"])("individual numeric Zoom preserves its delta command: %s", async (action) => {
+  const initial = structuredClone(projection);
+  initial.state.album.sheets[0].frames[0].photo!.transform.userZoom = 1.5;
+  const apply = vi.fn(async () => initial);
+  useEditorView.setState({ selectedFrameIds: ["frame-001"] });
+  render(<ProjectWorkspace exportPipelinePort={exportPipelinePort} projection={initial}
+    projectCorePort={projectCorePortWithApply(apply)} onProjectionChange={() => undefined} />);
+  const field = screen.getByRole("spinbutton", { name: "Zoom da Foto em porcentagem" });
+  expect(field).toHaveValue("150");
+  expect(field).toHaveAttribute("autocomplete", "off");
+  if (action === "reset") {
+    const slider = screen.getByRole("slider", { name: "Zoom da Foto" });
+    await waitFor(() => expect(slider).toBeEnabled());
+    fireEvent.doubleClick(slider);
+  } else {
+    fireEvent.change(field, { target: { value: action === "invalid" ? "9999" : "175" } });
+    expect(apply).not.toHaveBeenCalled();
+    fireEvent.keyDown(field, { key: action === "cancel" ? "Escape" : "Enter" });
+  }
+  if (action === "apply" || action === "reset") {
+    await waitFor(() => expect(apply).toHaveBeenCalledExactlyOnceWith({
+      kind: "transformPhoto", frameId: "frame-001", deltaPanX: 0, deltaPanY: 0,
+      deltaZoom: action === "apply" ? 0.25 : -0.5,
+    }, expect.any(Function)));
+  } else {
+    expect(apply).not.toHaveBeenCalled();
+    expect(field).toHaveValue("150");
+  }
 });
 
 test("updates the contextual Zoom slider during a Canvas gesture", () => {
@@ -6392,9 +6425,12 @@ test("does not let an old Project completion clear a new slider draft", async ()
   const oldSlider = screen.getByRole("slider", {
     name: "Zoom da Foto",
   });
-  fireEvent.pointerDown(oldSlider);
+  await waitFor(() => expect(oldSlider).toBeEnabled());
+  oldSlider.setPointerCapture = vi.fn();
+  fireEvent.pointerDown(oldSlider, { pointerId: 1, button: 0, clientX: 0, clientY: 0 });
+  fireEvent.pointerMove(oldSlider, { pointerId: 1, clientX: 40, clientY: 0 });
   fireEvent.change(oldSlider, { target: { value: "125" } });
-  fireEvent.pointerUp(oldSlider);
+  fireEvent.pointerUp(oldSlider, { pointerId: 1 });
   expect(oldApply).toHaveBeenCalledOnce();
 
   view.rerender(
@@ -6409,7 +6445,10 @@ test("does not let an old Project completion clear a new slider draft", async ()
   const newSlider = screen.getByRole("slider", {
     name: "Zoom da Foto",
   });
-  fireEvent.pointerDown(newSlider);
+  await waitFor(() => expect(newSlider).toBeEnabled());
+  newSlider.setPointerCapture = vi.fn();
+  fireEvent.pointerDown(newSlider, { pointerId: 1, button: 0, clientX: 0, clientY: 0 });
+  fireEvent.pointerMove(newSlider, { pointerId: 1, clientX: 40, clientY: 0 });
   fireEvent.change(newSlider, { target: { value: "130" } });
   expect(newSlider).toHaveValue("130");
 
@@ -6421,7 +6460,7 @@ test("does not let an old Project completion clear a new slider draft", async ()
   expect(newSlider).toHaveValue("130");
   expect(onProjectionChange).not.toHaveBeenCalled();
 
-  fireEvent.pointerUp(newSlider);
+  fireEvent.pointerUp(newSlider, { pointerId: 1 });
   expect(newApply).toHaveBeenCalledWith({
     kind: "transformPhoto",
     frameId: "frame-001",
@@ -7007,6 +7046,8 @@ test.each(["menu", "context"])("requires the owned loss confirmation for edge co
     background: { kind: "default" },
     overlay: { kind: "perSide", left: { kind: "default" }, right: { kind: "custom", content: { kind: "media", mediaId: "overlay-1" }, mapping: "side" } },
   };
+  projection.state.album.sheets[2].edgeConversionLoss = { sheetId: "sheet-003", sheetNumber: 3, side: "right", background: null,
+    overlay: { kind: "custom", content: { kind: "media", mediaId: "overlay-1" }, mapping: "side" } };
   const apply = vi.fn(async () => projection);
   const port = projectCorePortWithApply(apply);
   const dialog = projectDialogHarness();

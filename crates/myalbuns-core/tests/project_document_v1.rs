@@ -1863,6 +1863,7 @@ fn changing_album_information_is_one_atomic_authoritative_revision() {
         myalbuns_core::AlbumInformationValidation {
             errors: vec![],
             impact: Some(AlbumInformationImpact {
+                conversion_losses: Vec::new(),
                 sheet_width_px: 6_614,
                 page_width_px: 3_307,
                 height_px: 3_307,

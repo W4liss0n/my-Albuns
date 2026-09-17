@@ -347,6 +347,7 @@
         "sheets": [
           {
             "activeSides": "both",
+            "edgeConversionLoss": null,
             "frames": [
               {
                 "id": "side-frame-0-0",
@@ -448,10 +449,22 @@
               2
             ],
             "role": "initial",
+            "structure": {
+              "availability": {
+                "canAddAfter": true,
+                "canAddBefore": true,
+                "canConvertEdge": true,
+                "canDelete": false,
+                "canDuplicate": true
+              },
+              "maximumReorderIndex": 1,
+              "minimumReorderIndex": 0
+            },
             "widthUm": 600000
           },
           {
             "activeSides": "both",
+            "edgeConversionLoss": null,
             "frames": [
               {
                 "id": "side-frame-1-0",
@@ -497,6 +510,17 @@
               4
             ],
             "role": "final",
+            "structure": {
+              "availability": {
+                "canAddAfter": true,
+                "canAddBefore": true,
+                "canConvertEdge": true,
+                "canDelete": false,
+                "canDuplicate": true
+              },
+              "maximumReorderIndex": 1,
+              "minimumReorderIndex": 0
+            },
             "widthUm": 600000
           }
         ],
@@ -890,6 +914,7 @@
             "sheets": [
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "side-frame-0-0",
@@ -991,10 +1016,22 @@
                   2
                 ],
                 "role": "initial",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": true,
+                    "canDelete": false,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 1,
+                  "minimumReorderIndex": 0
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "side-frame-1-0",
@@ -1040,6 +1077,17 @@
                   4
                 ],
                 "role": "final",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": true,
+                    "canDelete": false,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 1,
+                  "minimumReorderIndex": 0
+                },
                 "widthUm": 600000
               }
             ],
@@ -1436,6 +1484,7 @@
             "sheets": [
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "side-frame-0-0",
@@ -1537,10 +1586,22 @@
                   2
                 ],
                 "role": "initial",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": true,
+                    "canDelete": false,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 1,
+                  "minimumReorderIndex": 0
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "side-frame-1-0",
@@ -1586,6 +1647,17 @@
                   4
                 ],
                 "role": "final",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": true,
+                    "canDelete": false,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 1,
+                  "minimumReorderIndex": 0
+                },
                 "widthUm": 600000
               }
             ],
@@ -1710,6 +1782,7 @@
             "sheets": [
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-001",
@@ -1720,10 +1793,22 @@
                   2
                 ],
                 "role": "initial",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": true,
+                    "canDelete": false,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 1,
+                  "minimumReorderIndex": 0
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-002",
@@ -1734,6 +1819,17 @@
                   4
                 ],
                 "role": "final",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": true,
+                    "canDelete": false,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 1,
+                  "minimumReorderIndex": 0
+                },
                 "widthUm": 600000
               }
             ],
@@ -1853,6 +1949,7 @@
             "sheets": [
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-001",
@@ -1863,10 +1960,22 @@
                   2
                 ],
                 "role": "initial",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": true,
+                    "canDelete": false,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 1,
+                  "minimumReorderIndex": 0
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-002",
@@ -1877,6 +1986,17 @@
                   4
                 ],
                 "role": "final",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": true,
+                    "canDelete": false,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 1,
+                  "minimumReorderIndex": 0
+                },
                 "widthUm": 600000
               }
             ],
@@ -2018,6 +2138,7 @@
             "sheets": [
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "side-frame-0-0",
@@ -2046,10 +2167,22 @@
                   2
                 ],
                 "role": "initial",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": true,
+                    "canDelete": false,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 1,
+                  "minimumReorderIndex": 0
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-002",
@@ -2060,6 +2193,17 @@
                   4
                 ],
                 "role": "final",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": true,
+                    "canDelete": false,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 1,
+                  "minimumReorderIndex": 0
+                },
                 "widthUm": 600000
               }
             ],
@@ -2196,6 +2340,7 @@
             "sheets": [
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "side-frame-0-0",
@@ -2224,10 +2369,22 @@
                   2
                 ],
                 "role": "initial",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": true,
+                    "canDelete": false,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 1,
+                  "minimumReorderIndex": 0
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-002",
@@ -2238,6 +2395,17 @@
                   4
                 ],
                 "role": "final",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": true,
+                    "canDelete": false,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 1,
+                  "minimumReorderIndex": 0
+                },
                 "widthUm": 600000
               }
             ],
@@ -2362,6 +2530,7 @@
             "sheets": [
               {
                 "activeSides": "right",
+                "edgeConversionLoss": null,
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-001",
@@ -2371,10 +2540,22 @@
                   1
                 ],
                 "role": "initial",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": false,
+                    "canConvertEdge": true,
+                    "canDelete": false,
+                    "canDuplicate": false
+                  },
+                  "maximumReorderIndex": 0,
+                  "minimumReorderIndex": 0
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-002",
@@ -2385,6 +2566,17 @@
                   3
                 ],
                 "role": "final",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": true,
+                    "canDelete": false,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 1,
+                  "minimumReorderIndex": 1
+                },
                 "widthUm": 600000
               }
             ],
@@ -2504,6 +2696,7 @@
             "sheets": [
               {
                 "activeSides": "right",
+                "edgeConversionLoss": null,
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-001",
@@ -2513,10 +2706,22 @@
                   1
                 ],
                 "role": "initial",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": false,
+                    "canConvertEdge": true,
+                    "canDelete": false,
+                    "canDuplicate": false
+                  },
+                  "maximumReorderIndex": 0,
+                  "minimumReorderIndex": 0
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-002",
@@ -2527,6 +2732,17 @@
                   3
                 ],
                 "role": "final",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": true,
+                    "canDelete": false,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 1,
+                  "minimumReorderIndex": 1
+                },
                 "widthUm": 600000
               }
             ],
@@ -2651,6 +2867,7 @@
             "sheets": [
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-001",
@@ -2661,10 +2878,22 @@
                   2
                 ],
                 "role": "initial",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": true,
+                    "canDelete": false,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 0,
+                  "minimumReorderIndex": 0
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "left",
+                "edgeConversionLoss": null,
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-002",
@@ -2674,6 +2903,17 @@
                   3
                 ],
                 "role": "final",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": false,
+                    "canAddBefore": true,
+                    "canConvertEdge": true,
+                    "canDelete": false,
+                    "canDuplicate": false
+                  },
+                  "maximumReorderIndex": 1,
+                  "minimumReorderIndex": 1
+                },
                 "widthUm": 600000
               }
             ],
@@ -2793,6 +3033,7 @@
             "sheets": [
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-001",
@@ -2803,10 +3044,22 @@
                   2
                 ],
                 "role": "initial",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": true,
+                    "canDelete": false,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 0,
+                  "minimumReorderIndex": 0
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "left",
+                "edgeConversionLoss": null,
                 "frames": [],
                 "heightUm": 300000,
                 "id": "sheet-002",
@@ -2816,6 +3069,17 @@
                   3
                 ],
                 "role": "final",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": false,
+                    "canAddBefore": true,
+                    "canConvertEdge": true,
+                    "canDelete": false,
+                    "canDuplicate": false
+                  },
+                  "maximumReorderIndex": 1,
+                  "minimumReorderIndex": 1
+                },
                 "widthUm": 600000
               }
             ],

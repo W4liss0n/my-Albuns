@@ -1,3 +1,4 @@
+import { refreshSheetStructureFixture } from "../test/projectFixtures";
 import { describe, expect, test } from "vitest";
 
 import type { SheetSnapshot } from "../domain/project";
@@ -253,20 +254,20 @@ describe("sheet reorder automatic scrolling", () => {
   });
 });
 
-const physicalAlbum: readonly SheetSnapshot[] = [
+const physicalAlbum = refreshSheetStructureFixture([
   sheet("initial", 1, "initial", "right"),
   sheet("second", 2, "internal", "both"),
   sheet("third", 3, "internal", "both"),
   sheet("fourth", 4, "internal", "both"),
   sheet("final", 5, "final", "left"),
-];
+]);
 
 function sheet(
   id: string,
   number: number,
   role: SheetSnapshot["role"],
   activeSides: SheetSnapshot["activeSides"],
-): SheetSnapshot {
+): Omit<SheetSnapshot, "structure" | "edgeConversionLoss"> {
   return {
     id,
     number,

@@ -24,15 +24,10 @@ function inspectorProps(
     mediaItems: representativeProjection.state.album.media,
     mediaPreviews: {},
     onApplyAlbumDesign: vi.fn(),
-    onApplyAlbumInformation: vi.fn(),
-    onBeginPhotoZoom: vi.fn(),
-    onFinishPhotoZoom: vi.fn(),
-    onNavigateToSheet: vi.fn(),
-    onPresentationUnitChange: vi.fn(),
-    onUpdatePhotoZoom: vi.fn(),
-    onValidateAlbumInformation: vi.fn(async () => ({
+    onApplyAlbumInformation: vi.fn(),    onNavigateToSheet: vi.fn(),
+    onPresentationUnitChange: vi.fn(),    onValidateAlbumInformation: vi.fn(async () => ({
       errors: [],
-      impact: {
+      impact: { conversionLosses: [],
         heightPx: 3_543,
         pageWidthPx: 3_543,
         sheetWidthPx: 7_087,
@@ -44,9 +39,7 @@ function inspectorProps(
     sheets: representativeProjection.composition.sheets,
     sheetStates: representativeProjection.state.album.sheets,
     visualDefaults: representativeProjection.state.album.visualDefaults,
-    frameGapUm: 5_000,
-    zoomCommitting: false,
-  };
+    frameGapUm: 5_000,  };
 }
 
 function sheetContext(): InspectorContext {

@@ -55,12 +55,6 @@ export function usePropertyDrafts(input: PropertyDraftsInput) {
       }
     },
   });
-  function beginZoomGesture() {
-    if (!canEditPhoto || !selected?.photo) return;
-    if (draft.peek()?.kind === "singlePhotoZoom") return;
-    const value = selected.photo.transform.userZoom;
-    draft.preview({ kind: "singlePhotoZoom", frameId: selected.id, startValue: value, value });
-  }
   function updateZoomGesture(value: number) {
     if (!canEditPhoto || !selected?.photo) return;
     const pending = draft.peek();
@@ -81,14 +75,20 @@ export function usePropertyDrafts(input: PropertyDraftsInput) {
       onPreview: (angleTenths: number) => { if (canEditPhoto) draft.preview({ kind: "photoAngle", angleTenths }); },
       onCommit: (angleTenths: number) => { if (canEditPhoto) void draft.commit({ kind: "photoAngle", angleTenths }); },
     },
-    photoZoom: { ...control, disabled: !canEditPhoto,
+    photoZoom: selected ? { ...control, disabled: !canEditPhoto || pendingZoom !== undefined,
+      onPreview: (percent: number) => { if (!pendingZoom) updateZoomGesture(percent / 100); },
+      onCommit: (percent: number) => {
+        if (!canEditPhoto || pendingZoom) return;
+        updateZoomGesture(percent / 100);
+        void draft.commit();
+      },
+      onCancel: () => { if (draft.peek()?.kind === "singlePhotoZoom") draft.cancel(); },
+    } : { ...control, disabled: !canEditPhoto,
       onPreview: (percent: number) => { if (canEditPhoto) draft.preview({ kind: "photoZoom", percent }); },
       onCommit: (percent: number) => { if (canEditPhoto) void draft.commit({ kind: "photoZoom", percent }); },
     },
     singleZoom: { preview: singleZoom ? { frameId: singleZoom.frameId, value: singleZoom.value } : null,
-      value: singleZoom?.value, committing: pendingZoom !== undefined,
-      begin: beginZoomGesture, update: updateZoomGesture,
-      finish: async () => { if (draft.peek()?.kind === "singlePhotoZoom") await draft.commit(); },
+      value: singleZoom?.value,
     },
   };
 }

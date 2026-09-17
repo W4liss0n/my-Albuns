@@ -433,7 +433,6 @@ export function useProjectMutations({
           materialized.baseline,
           materialized.value,
           validation.impact,
-          effectiveProjection.state.album.sheets,
         );
         if (!albumInformationReviewHasChanges(currentReview)) {
           intentAlreadySatisfied = true;
@@ -458,7 +457,7 @@ export function useProjectMutations({
           if (refreshed.errors.length > 0 || !refreshed.impact?.dimensionalChange ||
               refreshed.impact.dimensionalChange.confirmationKey === dimensionalChange.confirmationKey) throw error;
           currentReview = createAlbumInformationReview(materialized.baseline, materialized.value,
-            refreshed.impact, effectiveProjection.state.album.sheets);
+            refreshed.impact);
           reviewRequired = true;
           applyRequested = false;
           return effectiveProjection;

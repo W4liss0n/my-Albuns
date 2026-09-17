@@ -80,19 +80,24 @@ impl<T: Clone> SheetVisual<T> {
             right = SideVisual::Default;
         }
         *self = Self::PerSide { left, right };
-        self.retain_active_sides(active);
+        let _ = self.retain_active_sides(active);
     }
-    pub(crate) fn retain_active_sides(&mut self, active: crate::ActiveSides) {
+    pub(crate) fn retain_active_sides(
+        &mut self,
+        active: crate::ActiveSides,
+    ) -> Option<SideVisual<T>> {
+        let mut removed = SideVisual::Default;
         if let Self::PerSide { left, right } = self {
             match active {
                 crate::ActiveSides::Both => (),
-                crate::ActiveSides::Left => *right = SideVisual::Default,
-                crate::ActiveSides::Right => *left = SideVisual::Default,
+                crate::ActiveSides::Left => removed = std::mem::take(right),
+                crate::ActiveSides::Right => removed = std::mem::take(left),
             }
             if matches!(left, SideVisual::Default) && matches!(right, SideVisual::Default) {
                 *self = Self::Default;
             }
         }
+        (!matches!(removed, SideVisual::Default)).then_some(removed)
     }
 
     pub(crate) fn apply(&mut self, scope: DecorativeScope, content: T, active: crate::ActiveSides) {
@@ -121,7 +126,7 @@ impl<T: Clone> SheetVisual<T> {
             mapping: VisualMapping::Side,
         };
         *self = Self::PerSide { left, right };
-        self.retain_active_sides(active);
+        let _ = self.retain_active_sides(active);
     }
 
     pub(crate) fn contents(&self) -> Vec<&T> {
@@ -173,6 +178,48 @@ impl SheetVisuals {
     pub fn is_default(&self) -> bool {
         *self == Self::default()
     }
+
+    pub(crate) fn retain_active_sides(
+        &mut self,
+        active: crate::ActiveSides,
+    ) -> RemovedSheetVisuals {
+        let background = self.background.retain_active_sides(active);
+        let overlay = self.overlay.retain_active_sides(active).filter(|side| {
+            matches!(
+                side,
+                SideVisual::Custom {
+                    content: Some(_),
+                    ..
+                }
+            )
+        });
+        RemovedSheetVisuals {
+            background,
+            overlay,
+        }
+    }
+}
+
+pub(crate) struct RemovedSheetVisuals {
+    pub background: Option<SideVisual<ProjectedBackgroundContent>>,
+    pub overlay: Option<SideVisual<Option<ProjectedOverlayContent>>>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum EdgeConversionSide {
+    Left,
+    Right,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct EdgeConversionLoss {
+    pub sheet_id: String,
+    pub sheet_number: usize,
+    pub side: EdgeConversionSide,
+    pub background: Option<SideVisual<ProjectedBackgroundContent>>,
+    pub overlay: Option<SideVisual<Option<ProjectedOverlayContent>>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]

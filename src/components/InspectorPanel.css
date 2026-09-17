@@ -244,35 +244,6 @@
   border-top: 0;
 }
 
-.photo-zoom-control {
-  display: grid;
-  padding-top: var(--ui-space-3);
-  gap: var(--ui-space-2);
-}
-
-.photo-zoom-label {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  color: var(--ui-text-muted);
-  font-size: var(--ui-font-size-caption);
-}
-
-.photo-zoom-label output {
-  color: var(--ui-text-secondary);
-  font-family: var(--ui-font-mono);
-  font-size: var(--ui-font-size-caption);
-  font-weight: 500;
-}
-
-.photo-zoom-control input {
-  cursor: ew-resize;
-}
-
-.photo-zoom-control input:disabled {
-  opacity: 0.72;
-}
-
 .sheet-grid {
   position: relative;
   display: grid;

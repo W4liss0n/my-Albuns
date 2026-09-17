@@ -544,6 +544,7 @@
         "sheets": [
           {
             "activeSides": "right",
+            "edgeConversionLoss": null,
             "frames": [
               {
                 "id": "clipboard-frame-0-0",
@@ -599,10 +600,22 @@
               1
             ],
             "role": "initial",
+            "structure": {
+              "availability": {
+                "canAddAfter": true,
+                "canAddBefore": false,
+                "canConvertEdge": true,
+                "canDelete": true,
+                "canDuplicate": false
+              },
+              "maximumReorderIndex": 0,
+              "minimumReorderIndex": 0
+            },
             "widthUm": 600000
           },
           {
             "activeSides": "both",
+            "edgeConversionLoss": null,
             "frames": [
               {
                 "id": "clipboard-frame-1-0",
@@ -659,10 +672,22 @@
               3
             ],
             "role": "internal",
+            "structure": {
+              "availability": {
+                "canAddAfter": true,
+                "canAddBefore": true,
+                "canConvertEdge": false,
+                "canDelete": true,
+                "canDuplicate": true
+              },
+              "maximumReorderIndex": 2,
+              "minimumReorderIndex": 1
+            },
             "widthUm": 600000
           },
           {
             "activeSides": "both",
+            "edgeConversionLoss": null,
             "frames": [
               {
                 "id": "clipboard-frame-2-0",
@@ -719,10 +744,22 @@
               5
             ],
             "role": "internal",
+            "structure": {
+              "availability": {
+                "canAddAfter": true,
+                "canAddBefore": true,
+                "canConvertEdge": false,
+                "canDelete": true,
+                "canDuplicate": true
+              },
+              "maximumReorderIndex": 2,
+              "minimumReorderIndex": 1
+            },
             "widthUm": 600000
           },
           {
             "activeSides": "left",
+            "edgeConversionLoss": null,
             "frames": [
               {
                 "id": "clipboard-frame-3-0",
@@ -778,6 +815,17 @@
               6
             ],
             "role": "final",
+            "structure": {
+              "availability": {
+                "canAddAfter": false,
+                "canAddBefore": true,
+                "canConvertEdge": true,
+                "canDelete": true,
+                "canDuplicate": false
+              },
+              "maximumReorderIndex": 3,
+              "minimumReorderIndex": 3
+            },
             "widthUm": 600000
           }
         ],
@@ -1463,6 +1511,7 @@
             "sheets": [
               {
                 "activeSides": "right",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-0-0",
@@ -1518,10 +1567,22 @@
                   1
                 ],
                 "role": "initial",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": false,
+                    "canConvertEdge": true,
+                    "canDelete": true,
+                    "canDuplicate": false
+                  },
+                  "maximumReorderIndex": 0,
+                  "minimumReorderIndex": 0
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-1-0",
@@ -1623,10 +1684,22 @@
                   3
                 ],
                 "role": "internal",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": false,
+                    "canDelete": true,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 2,
+                  "minimumReorderIndex": 1
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-2-0",
@@ -1683,10 +1756,22 @@
                   5
                 ],
                 "role": "internal",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": false,
+                    "canDelete": true,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 2,
+                  "minimumReorderIndex": 1
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "left",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-3-0",
@@ -1742,6 +1827,17 @@
                   6
                 ],
                 "role": "final",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": false,
+                    "canAddBefore": true,
+                    "canConvertEdge": true,
+                    "canDelete": true,
+                    "canDuplicate": false
+                  },
+                  "maximumReorderIndex": 3,
+                  "minimumReorderIndex": 3
+                },
                 "widthUm": 600000
               }
             ],
@@ -2424,6 +2520,7 @@
             "sheets": [
               {
                 "activeSides": "right",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-0-0",
@@ -2479,10 +2576,22 @@
                   1
                 ],
                 "role": "initial",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": false,
+                    "canConvertEdge": true,
+                    "canDelete": true,
+                    "canDuplicate": false
+                  },
+                  "maximumReorderIndex": 0,
+                  "minimumReorderIndex": 0
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-1-0",
@@ -2567,10 +2676,22 @@
                   3
                 ],
                 "role": "internal",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": false,
+                    "canDelete": true,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 2,
+                  "minimumReorderIndex": 1
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-2-0",
@@ -2627,10 +2748,22 @@
                   5
                 ],
                 "role": "internal",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": false,
+                    "canDelete": true,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 2,
+                  "minimumReorderIndex": 1
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "left",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-3-0",
@@ -2686,6 +2819,17 @@
                   6
                 ],
                 "role": "final",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": false,
+                    "canAddBefore": true,
+                    "canConvertEdge": true,
+                    "canDelete": true,
+                    "canDuplicate": false
+                  },
+                  "maximumReorderIndex": 3,
+                  "minimumReorderIndex": 3
+                },
                 "widthUm": 600000
               }
             ],
@@ -3382,6 +3526,7 @@
             "sheets": [
               {
                 "activeSides": "right",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-0-0",
@@ -3437,10 +3582,22 @@
                   1
                 ],
                 "role": "initial",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": false,
+                    "canConvertEdge": true,
+                    "canDelete": true,
+                    "canDuplicate": false
+                  },
+                  "maximumReorderIndex": 0,
+                  "minimumReorderIndex": 0
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-1-0",
@@ -3497,10 +3654,22 @@
                   3
                 ],
                 "role": "internal",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": false,
+                    "canDelete": true,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 2,
+                  "minimumReorderIndex": 1
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-2-0",
@@ -3602,10 +3771,22 @@
                   5
                 ],
                 "role": "internal",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": false,
+                    "canDelete": true,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 2,
+                  "minimumReorderIndex": 1
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "left",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-3-0",
@@ -3661,6 +3842,17 @@
                   6
                 ],
                 "role": "final",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": false,
+                    "canAddBefore": true,
+                    "canConvertEdge": true,
+                    "canDelete": true,
+                    "canDuplicate": false
+                  },
+                  "maximumReorderIndex": 3,
+                  "minimumReorderIndex": 3
+                },
                 "widthUm": 600000
               }
             ],
@@ -4359,6 +4551,7 @@
             "sheets": [
               {
                 "activeSides": "right",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-0-0",
@@ -4459,10 +4652,22 @@
                   1
                 ],
                 "role": "initial",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": false,
+                    "canConvertEdge": true,
+                    "canDelete": true,
+                    "canDuplicate": false
+                  },
+                  "maximumReorderIndex": 0,
+                  "minimumReorderIndex": 0
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-1-0",
@@ -4519,10 +4724,22 @@
                   3
                 ],
                 "role": "internal",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": false,
+                    "canDelete": true,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 2,
+                  "minimumReorderIndex": 1
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-2-0",
@@ -4579,10 +4796,22 @@
                   5
                 ],
                 "role": "internal",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": false,
+                    "canDelete": true,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 2,
+                  "minimumReorderIndex": 1
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "left",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-3-0",
@@ -4638,6 +4867,17 @@
                   6
                 ],
                 "role": "final",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": false,
+                    "canAddBefore": true,
+                    "canConvertEdge": true,
+                    "canDelete": true,
+                    "canDuplicate": false
+                  },
+                  "maximumReorderIndex": 3,
+                  "minimumReorderIndex": 3
+                },
                 "widthUm": 600000
               }
             ],
@@ -5336,6 +5576,7 @@
             "sheets": [
               {
                 "activeSides": "right",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-0-0",
@@ -5391,10 +5632,22 @@
                   1
                 ],
                 "role": "initial",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": false,
+                    "canConvertEdge": true,
+                    "canDelete": true,
+                    "canDuplicate": false
+                  },
+                  "maximumReorderIndex": 0,
+                  "minimumReorderIndex": 0
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-1-0",
@@ -5451,10 +5704,22 @@
                   3
                 ],
                 "role": "internal",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": false,
+                    "canDelete": true,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 2,
+                  "minimumReorderIndex": 1
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-2-0",
@@ -5511,10 +5776,22 @@
                   5
                 ],
                 "role": "internal",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": false,
+                    "canDelete": true,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 2,
+                  "minimumReorderIndex": 1
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "left",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-3-0",
@@ -5615,6 +5892,17 @@
                   6
                 ],
                 "role": "final",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": false,
+                    "canAddBefore": true,
+                    "canConvertEdge": true,
+                    "canDelete": true,
+                    "canDuplicate": false
+                  },
+                  "maximumReorderIndex": 3,
+                  "minimumReorderIndex": 3
+                },
                 "widthUm": 600000
               }
             ],
@@ -6313,6 +6601,7 @@
             "sheets": [
               {
                 "activeSides": "right",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-0-0",
@@ -6368,10 +6657,22 @@
                   1
                 ],
                 "role": "initial",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": false,
+                    "canConvertEdge": true,
+                    "canDelete": true,
+                    "canDuplicate": false
+                  },
+                  "maximumReorderIndex": 0,
+                  "minimumReorderIndex": 0
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-1-0",
@@ -6473,10 +6774,22 @@
                   3
                 ],
                 "role": "internal",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": false,
+                    "canDelete": true,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 2,
+                  "minimumReorderIndex": 1
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-2-0",
@@ -6533,10 +6846,22 @@
                   5
                 ],
                 "role": "internal",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": false,
+                    "canDelete": true,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 2,
+                  "minimumReorderIndex": 1
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "left",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-3-0",
@@ -6592,6 +6917,17 @@
                   6
                 ],
                 "role": "final",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": false,
+                    "canAddBefore": true,
+                    "canConvertEdge": true,
+                    "canDelete": true,
+                    "canDuplicate": false
+                  },
+                  "maximumReorderIndex": 3,
+                  "minimumReorderIndex": 3
+                },
                 "widthUm": 600000
               }
             ],
@@ -7290,6 +7626,7 @@
             "sheets": [
               {
                 "activeSides": "right",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-0-0",
@@ -7345,10 +7682,22 @@
                   1
                 ],
                 "role": "initial",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": false,
+                    "canConvertEdge": true,
+                    "canDelete": true,
+                    "canDuplicate": false
+                  },
+                  "maximumReorderIndex": 0,
+                  "minimumReorderIndex": 0
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-1-0",
@@ -7450,10 +7799,22 @@
                   3
                 ],
                 "role": "internal",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": false,
+                    "canDelete": true,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 2,
+                  "minimumReorderIndex": 1
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-2-0",
@@ -7510,10 +7871,22 @@
                   5
                 ],
                 "role": "internal",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": false,
+                    "canDelete": true,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 2,
+                  "minimumReorderIndex": 1
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "left",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-3-0",
@@ -7569,6 +7942,17 @@
                   6
                 ],
                 "role": "final",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": false,
+                    "canAddBefore": true,
+                    "canConvertEdge": true,
+                    "canDelete": true,
+                    "canDuplicate": false
+                  },
+                  "maximumReorderIndex": 3,
+                  "minimumReorderIndex": 3
+                },
                 "widthUm": 600000
               }
             ],
@@ -8267,6 +8651,7 @@
             "sheets": [
               {
                 "activeSides": "right",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-0-0",
@@ -8322,10 +8707,22 @@
                   1
                 ],
                 "role": "initial",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": false,
+                    "canConvertEdge": true,
+                    "canDelete": true,
+                    "canDuplicate": false
+                  },
+                  "maximumReorderIndex": 0,
+                  "minimumReorderIndex": 0
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-1-0",
@@ -8427,10 +8824,22 @@
                   3
                 ],
                 "role": "internal",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": false,
+                    "canDelete": true,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 2,
+                  "minimumReorderIndex": 1
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-2-0",
@@ -8487,10 +8896,22 @@
                   5
                 ],
                 "role": "internal",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": false,
+                    "canDelete": true,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 2,
+                  "minimumReorderIndex": 1
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "left",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-3-0",
@@ -8546,6 +8967,17 @@
                   6
                 ],
                 "role": "final",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": false,
+                    "canAddBefore": true,
+                    "canConvertEdge": true,
+                    "canDelete": true,
+                    "canDuplicate": false
+                  },
+                  "maximumReorderIndex": 3,
+                  "minimumReorderIndex": 3
+                },
                 "widthUm": 600000
               }
             ],
@@ -9134,6 +9566,7 @@
             "sheets": [
               {
                 "activeSides": "right",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-0-0",
@@ -9189,10 +9622,22 @@
                   1
                 ],
                 "role": "initial",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": false,
+                    "canConvertEdge": true,
+                    "canDelete": true,
+                    "canDuplicate": false
+                  },
+                  "maximumReorderIndex": 0,
+                  "minimumReorderIndex": 0
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-1-0",
@@ -9249,10 +9694,22 @@
                   3
                 ],
                 "role": "internal",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": false,
+                    "canDelete": true,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 2,
+                  "minimumReorderIndex": 1
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-2-0",
@@ -9309,10 +9766,22 @@
                   5
                 ],
                 "role": "internal",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": false,
+                    "canDelete": true,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 2,
+                  "minimumReorderIndex": 1
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "left",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-3-0",
@@ -9368,6 +9837,17 @@
                   6
                 ],
                 "role": "final",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": false,
+                    "canAddBefore": true,
+                    "canConvertEdge": true,
+                    "canDelete": true,
+                    "canDuplicate": false
+                  },
+                  "maximumReorderIndex": 3,
+                  "minimumReorderIndex": 3
+                },
                 "widthUm": 600000
               }
             ],
@@ -9956,6 +10436,7 @@
             "sheets": [
               {
                 "activeSides": "right",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-0-0",
@@ -10011,10 +10492,22 @@
                   1
                 ],
                 "role": "initial",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": false,
+                    "canConvertEdge": true,
+                    "canDelete": true,
+                    "canDuplicate": false
+                  },
+                  "maximumReorderIndex": 0,
+                  "minimumReorderIndex": 0
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-1-0",
@@ -10071,10 +10564,22 @@
                   3
                 ],
                 "role": "internal",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": false,
+                    "canDelete": true,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 2,
+                  "minimumReorderIndex": 1
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-2-0",
@@ -10131,10 +10636,22 @@
                   5
                 ],
                 "role": "internal",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": false,
+                    "canDelete": true,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 2,
+                  "minimumReorderIndex": 1
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "left",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-3-0",
@@ -10190,6 +10707,17 @@
                   6
                 ],
                 "role": "final",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": false,
+                    "canAddBefore": true,
+                    "canConvertEdge": true,
+                    "canDelete": true,
+                    "canDuplicate": false
+                  },
+                  "maximumReorderIndex": 3,
+                  "minimumReorderIndex": 3
+                },
                 "widthUm": 600000
               }
             ],
@@ -10872,6 +11400,7 @@
             "sheets": [
               {
                 "activeSides": "right",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-0-0",
@@ -10927,10 +11456,22 @@
                   1
                 ],
                 "role": "initial",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": false,
+                    "canConvertEdge": true,
+                    "canDelete": true,
+                    "canDuplicate": false
+                  },
+                  "maximumReorderIndex": 0,
+                  "minimumReorderIndex": 0
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-1-0",
@@ -11015,10 +11556,22 @@
                   3
                 ],
                 "role": "internal",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": false,
+                    "canDelete": true,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 2,
+                  "minimumReorderIndex": 1
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-2-0",
@@ -11075,10 +11628,22 @@
                   5
                 ],
                 "role": "internal",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": false,
+                    "canDelete": true,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 2,
+                  "minimumReorderIndex": 1
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "left",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-3-0",
@@ -11134,6 +11699,17 @@
                   6
                 ],
                 "role": "final",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": false,
+                    "canAddBefore": true,
+                    "canConvertEdge": true,
+                    "canDelete": true,
+                    "canDuplicate": false
+                  },
+                  "maximumReorderIndex": 3,
+                  "minimumReorderIndex": 3
+                },
                 "widthUm": 600000
               }
             ],
@@ -11830,6 +12406,7 @@
             "sheets": [
               {
                 "activeSides": "right",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-0-0",
@@ -11885,10 +12462,22 @@
                   1
                 ],
                 "role": "initial",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": false,
+                    "canConvertEdge": true,
+                    "canDelete": true,
+                    "canDuplicate": false
+                  },
+                  "maximumReorderIndex": 0,
+                  "minimumReorderIndex": 0
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-1-0",
@@ -11945,10 +12534,22 @@
                   3
                 ],
                 "role": "internal",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": false,
+                    "canDelete": true,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 2,
+                  "minimumReorderIndex": 1
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-2-0",
@@ -12050,10 +12651,22 @@
                   5
                 ],
                 "role": "internal",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": false,
+                    "canDelete": true,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 2,
+                  "minimumReorderIndex": 1
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "left",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-3-0",
@@ -12109,6 +12722,17 @@
                   6
                 ],
                 "role": "final",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": false,
+                    "canAddBefore": true,
+                    "canConvertEdge": true,
+                    "canDelete": true,
+                    "canDuplicate": false
+                  },
+                  "maximumReorderIndex": 3,
+                  "minimumReorderIndex": 3
+                },
                 "widthUm": 600000
               }
             ],
@@ -12791,6 +13415,7 @@
             "sheets": [
               {
                 "activeSides": "right",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-0-0",
@@ -12846,10 +13471,22 @@
                   1
                 ],
                 "role": "initial",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": false,
+                    "canConvertEdge": true,
+                    "canDelete": true,
+                    "canDuplicate": false
+                  },
+                  "maximumReorderIndex": 0,
+                  "minimumReorderIndex": 0
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-1-0",
@@ -12906,10 +13543,22 @@
                   3
                 ],
                 "role": "internal",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": false,
+                    "canDelete": true,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 2,
+                  "minimumReorderIndex": 1
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-2-0",
@@ -12994,10 +13643,22 @@
                   5
                 ],
                 "role": "internal",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": false,
+                    "canDelete": true,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 2,
+                  "minimumReorderIndex": 1
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "left",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-3-0",
@@ -13053,6 +13714,17 @@
                   6
                 ],
                 "role": "final",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": false,
+                    "canAddBefore": true,
+                    "canConvertEdge": true,
+                    "canDelete": true,
+                    "canDuplicate": false
+                  },
+                  "maximumReorderIndex": 3,
+                  "minimumReorderIndex": 3
+                },
                 "widthUm": 600000
               }
             ],
@@ -13749,6 +14421,7 @@
             "sheets": [
               {
                 "activeSides": "right",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-0-0",
@@ -13849,10 +14522,22 @@
                   1
                 ],
                 "role": "initial",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": false,
+                    "canConvertEdge": true,
+                    "canDelete": true,
+                    "canDuplicate": false
+                  },
+                  "maximumReorderIndex": 0,
+                  "minimumReorderIndex": 0
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-1-0",
@@ -13909,10 +14594,22 @@
                   3
                 ],
                 "role": "internal",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": false,
+                    "canDelete": true,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 2,
+                  "minimumReorderIndex": 1
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-2-0",
@@ -13969,10 +14666,22 @@
                   5
                 ],
                 "role": "internal",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": false,
+                    "canDelete": true,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 2,
+                  "minimumReorderIndex": 1
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "left",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-3-0",
@@ -14028,6 +14737,17 @@
                   6
                 ],
                 "role": "final",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": false,
+                    "canAddBefore": true,
+                    "canConvertEdge": true,
+                    "canDelete": true,
+                    "canDuplicate": false
+                  },
+                  "maximumReorderIndex": 3,
+                  "minimumReorderIndex": 3
+                },
                 "widthUm": 600000
               }
             ],
@@ -14726,6 +15446,7 @@
             "sheets": [
               {
                 "activeSides": "right",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-0-0",
@@ -14781,10 +15502,22 @@
                   1
                 ],
                 "role": "initial",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": false,
+                    "canConvertEdge": true,
+                    "canDelete": true,
+                    "canDuplicate": false
+                  },
+                  "maximumReorderIndex": 0,
+                  "minimumReorderIndex": 0
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-1-0",
@@ -14886,10 +15619,22 @@
                   3
                 ],
                 "role": "internal",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": false,
+                    "canDelete": true,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 2,
+                  "minimumReorderIndex": 1
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "both",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-2-0",
@@ -14946,10 +15691,22 @@
                   5
                 ],
                 "role": "internal",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": true,
+                    "canAddBefore": true,
+                    "canConvertEdge": false,
+                    "canDelete": true,
+                    "canDuplicate": true
+                  },
+                  "maximumReorderIndex": 2,
+                  "minimumReorderIndex": 1
+                },
                 "widthUm": 600000
               },
               {
                 "activeSides": "left",
+                "edgeConversionLoss": null,
                 "frames": [
                   {
                     "id": "clipboard-frame-3-0",
@@ -15005,6 +15762,17 @@
                   6
                 ],
                 "role": "final",
+                "structure": {
+                  "availability": {
+                    "canAddAfter": false,
+                    "canAddBefore": true,
+                    "canConvertEdge": true,
+                    "canDelete": true,
+                    "canDuplicate": false
+                  },
+                  "maximumReorderIndex": 3,
+                  "minimumReorderIndex": 3
+                },
                 "widthUm": 600000
               }
             ],
@@ -15608,6 +16376,7 @@
         "sheets": [
           {
             "activeSides": "right",
+            "edgeConversionLoss": null,
             "frames": [
               {
                 "id": "clipboard-frame-0-0",
@@ -15663,10 +16432,22 @@
               1
             ],
             "role": "initial",
+            "structure": {
+              "availability": {
+                "canAddAfter": true,
+                "canAddBefore": false,
+                "canConvertEdge": true,
+                "canDelete": true,
+                "canDuplicate": false
+              },
+              "maximumReorderIndex": 0,
+              "minimumReorderIndex": 0
+            },
             "widthUm": 600000
           },
           {
             "activeSides": "both",
+            "edgeConversionLoss": null,
             "frames": [
               {
                 "id": "clipboard-frame-1-0",
@@ -15723,10 +16504,22 @@
               3
             ],
             "role": "internal",
+            "structure": {
+              "availability": {
+                "canAddAfter": true,
+                "canAddBefore": true,
+                "canConvertEdge": false,
+                "canDelete": true,
+                "canDuplicate": true
+              },
+              "maximumReorderIndex": 2,
+              "minimumReorderIndex": 1
+            },
             "widthUm": 600000
           },
           {
             "activeSides": "both",
+            "edgeConversionLoss": null,
             "frames": [
               {
                 "id": "clipboard-frame-2-0",
@@ -15783,10 +16576,22 @@
               5
             ],
             "role": "internal",
+            "structure": {
+              "availability": {
+                "canAddAfter": true,
+                "canAddBefore": true,
+                "canConvertEdge": false,
+                "canDelete": true,
+                "canDuplicate": true
+              },
+              "maximumReorderIndex": 2,
+              "minimumReorderIndex": 1
+            },
             "widthUm": 600000
           },
           {
             "activeSides": "left",
+            "edgeConversionLoss": null,
             "frames": [
               {
                 "id": "clipboard-frame-3-0",
@@ -15842,6 +16647,17 @@
               6
             ],
             "role": "final",
+            "structure": {
+              "availability": {
+                "canAddAfter": false,
+                "canAddBefore": true,
+                "canConvertEdge": true,
+                "canDelete": true,
+                "canDuplicate": false
+              },
+              "maximumReorderIndex": 3,
+              "minimumReorderIndex": 3
+            },
             "widthUm": 600000
           }
         ],

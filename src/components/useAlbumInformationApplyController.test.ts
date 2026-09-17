@@ -27,7 +27,7 @@ test("describes only the Album information field that actually changed", () => {
   const details = albumInformationDetails(
     { ...baseline, firstSheet: "singlePage" },
     baseline,
-    {
+    { conversionLosses: [],
       sheetWidthPx: 7_087,
       pageWidthPx: 3_543,
       heightPx: 3_543,
@@ -52,7 +52,7 @@ test("describes final raster size and structural and dimensional impact", () => 
       firstSheet: "singlePage",
     },
     baseline,
-    {
+    { conversionLosses: [],
       sheetWidthPx: 6_614,
       pageWidthPx: 3_307,
       heightPx: 3_307,
@@ -79,7 +79,7 @@ test("describes final raster size and structural and dimensional impact", () => 
 });
 
 test("warns about crop only when the Core reports a proportion change", () => {
-  const details = albumInformationDetails({ ...baseline, sheetWidthUm: 630_000 }, baseline, {
+  const details = albumInformationDetails({ ...baseline, sheetWidthUm: 630_000 }, baseline, { conversionLosses: [],
     sheetWidthPx: 7_441, pageWidthPx: 3_720, heightPx: 3_543,
     dimensionalChange: { proportionChanged: true, confirmationKey: "review-a" },
   });
@@ -94,7 +94,7 @@ test("uses the selected Unit for changed measurements without unrelated raster d
       displayUnit: "cm",
     },
     baseline,
-    {
+    { conversionLosses: [],
       sheetWidthPx: 7_087,
       pageWidthPx: 3_543,
       heightPx: 3_543,
@@ -132,7 +132,7 @@ const changedDraft = createAlbumInformationProjectDraft(3, baseline).transition(
   ...baseline,
   dpi: 600,
 });
-const impact = {
+const impact = { conversionLosses: [],
   heightPx: 7_087,
   pageWidthPx: 7_087,
   sheetWidthPx: 14_173,
@@ -142,7 +142,7 @@ test("completes the Apply request only after the owned confirmation commits", as
   const dialog = dialogHarness();
   const onApply = vi.fn(async () => ({ kind: "completed" as const }));
   const { result } = renderHook(() =>
-    useAlbumInformationApplyController({ sheets: [],
+    useAlbumInformationApplyController({
       projectDialogPort: dialog.port,
       onApply,
       onError: vi.fn(),
@@ -176,7 +176,7 @@ test("keeps commands blocked until the owned confirmation releases its window", 
   );
   const dialog = dialogHarness(dismiss);
   const { result } = renderHook(() =>
-    useAlbumInformationApplyController({ sheets: [],
+    useAlbumInformationApplyController({
       projectDialogPort: dialog.port,
       onApply: vi.fn(async () => ({ kind: "completed" as const })),
       onError: vi.fn(),
@@ -210,7 +210,7 @@ test("resolves cancellation and a rejected commit without orphaning command bloc
   const dialog = dialogHarness();
   const onApply = vi.fn(async () => ({ kind: "rejected" as const }));
   const { result } = renderHook(() =>
-    useAlbumInformationApplyController({ sheets: [],
+    useAlbumInformationApplyController({
       projectDialogPort: dialog.port,
       onApply,
       onError: vi.fn(),
@@ -245,7 +245,7 @@ test("resolves false when confirmation presentation or the commit fails", async 
     throw new Error("Falha ao aplicar a alteração.");
   });
   const { result } = renderHook(() =>
-    useAlbumInformationApplyController({ sheets: [],
+    useAlbumInformationApplyController({
       projectDialogPort: dialog.port,
       onApply,
       onError,
@@ -280,7 +280,7 @@ test("aborts before committing when the owned busy projection fails", async () =
   const onApply = vi.fn(async () => ({ kind: "completed" as const }));
   const onError = vi.fn();
   const { result } = renderHook(() =>
-    useAlbumInformationApplyController({ sheets: [],
+    useAlbumInformationApplyController({
       projectDialogPort: dialog.port,
       onApply,
       onError,
@@ -304,7 +304,7 @@ test("aborts before committing when the owned busy projection fails", async () =
 test("settles an outstanding Apply completion when its controller unmounts", async () => {
   const dialog = dialogHarness();
   const { result, unmount } = renderHook(() =>
-    useAlbumInformationApplyController({ sheets: [],
+    useAlbumInformationApplyController({
       projectDialogPort: dialog.port,
       onApply: vi.fn(async () => ({ kind: "completed" as const })),
       onError: vi.fn(),
@@ -324,14 +324,14 @@ test("settles an outstanding Apply completion when its controller unmounts", asy
 
 test("includes edge losses in the existing Album information confirmation", async () => {
   const dialog = dialogHarness();
-  const { createThreeSheetProjection } = await import("../test/projectFixtures");
-  const sheets = createThreeSheetProjection().state.album.sheets;
-  sheets[0].visuals = { background: { kind: "perSide", left: { kind: "custom", content: { kind: "color", rgb: "#123456" }, mapping: "side" }, right: { kind: "default" } }, overlay: { kind: "default" } };
   const onApply = vi.fn(async () => ({ kind: "completed" as const }));
-  const view = renderHook(() => useAlbumInformationApplyController({ sheets, projectDialogPort: dialog.port, onApply, onError: vi.fn() }));
+  const view = renderHook(() => useAlbumInformationApplyController({ projectDialogPort: dialog.port, onApply, onError: vi.fn() }));
   const draft = createAlbumInformationProjectDraft(3, baseline).transition({ ...baseline, firstSheet: "singlePage" });
   let completion!: Promise<boolean>;
-  await act(async () => { completion = view.result.current.requestApply(draft, impact); });
+  await act(async () => { completion = view.result.current.requestApply(draft, { ...impact, conversionLosses: [{
+    sheetId: "sheet-001", sheetNumber: 1, side: "left", overlay: null,
+    background: { kind: "custom", content: { kind: "color", rgb: "#123456" }, mapping: "side" },
+  }] }); });
   expect(dialog.present).toHaveBeenCalledOnce();
   expect(dialog.present).toHaveBeenCalledWith({ kind: "albumInformationConfirmation", busy: false, details: [
     { label: "Primeira Lâmina", value: "Lâmina dupla → Página única" },

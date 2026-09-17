@@ -17,7 +17,7 @@ import type {
 import { representativeProjection } from "../test/projectFixtures";
 import { AlbumInformationForm } from "./AlbumInformationForm";
 
-const validImpact = {
+const validImpact = { conversionLosses: [],
   sheetWidthPx: 7_087,
   pageWidthPx: 3_543,
   heightPx: 3_543,

@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
+import { TextInput } from "../ui/TextInput";
 import "./NumericPropertyControl.css";
 import type { PointerDragThreshold } from "../application/projectPorts";
 
@@ -136,7 +137,7 @@ export function NumericPropertyControl(props: NumericPropertyControlProps) {
       <div className="numeric-property-heading">
         <span>{props.label}</span>
         <div className="numeric-property-number">
-          <input
+          <TextInput
             ref={numberRef}
             className="ui-field-control"
             type="text"

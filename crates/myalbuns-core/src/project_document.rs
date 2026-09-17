@@ -518,8 +518,7 @@ pub struct ProjectSheet {
 impl ProjectSheet {
     fn convert_active_sides(&mut self, active_sides: ActiveSides) {
         self.active_sides = active_sides;
-        self.visuals.background.retain_active_sides(active_sides);
-        self.visuals.overlay.retain_active_sides(active_sides);
+        self.visuals.retain_active_sides(active_sides);
         self.layout_locked = false;
     }
 
@@ -648,6 +647,76 @@ impl ProjectDocument {
         Ok(candidate)
     }
 
+    /// Facts for the current validated sequence, shared by projections and commands.
+    /// The reorder interval is compact so dragging needs no per-pointer IPC query.
+    pub(crate) fn sheet_structure(&self, index: usize) -> crate::model::SheetStructureProjection {
+        let count = self.sheets.len();
+        let last = count - 1;
+        let sides = self.sheets[index].active_sides;
+        let (minimum_reorder_index, maximum_reorder_index) = if sides == ActiveSides::Both {
+            (
+                usize::from(!active_sides_are_valid_at(
+                    self.sheets[0].active_sides,
+                    1,
+                    count,
+                )),
+                last - usize::from(!active_sides_are_valid_at(
+                    self.sheets[last].active_sides,
+                    last - 1,
+                    count,
+                )),
+            )
+        } else {
+            (index, index)
+        };
+        crate::model::SheetStructureProjection {
+            availability: crate::model::SheetStructureAvailability {
+                can_add_before: active_sides_are_valid_at(sides, index + 1, count + 1),
+                can_add_after: active_sides_are_valid_at(sides, index, count + 1),
+                can_convert_edge: self.converted_edge_sides(index).is_some(),
+                can_delete: count > 2,
+                can_duplicate: sides == ActiveSides::Both,
+            },
+            minimum_reorder_index,
+            maximum_reorder_index,
+        }
+    }
+
+    fn converted_edge_sides(&self, index: usize) -> Option<ActiveSides> {
+        match (index, self.sheets[index].active_sides) {
+            (0, ActiveSides::Both) => Some(ActiveSides::Right),
+            (0, ActiveSides::Right) => Some(ActiveSides::Both),
+            (i, ActiveSides::Both) if i == self.sheets.len() - 1 => Some(ActiveSides::Left),
+            (i, ActiveSides::Left) if i == self.sheets.len() - 1 => Some(ActiveSides::Both),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn edge_conversion_loss(
+        &self,
+        index: usize,
+    ) -> Option<crate::sheet_visuals::EdgeConversionLoss> {
+        use crate::sheet_visuals::{EdgeConversionLoss, EdgeConversionSide};
+        let active = self.converted_edge_sides(index)?;
+        let side = match active {
+            ActiveSides::Right => EdgeConversionSide::Left,
+            ActiveSides::Left => EdgeConversionSide::Right,
+            ActiveSides::Both => return None,
+        };
+        // Ask the actual transformation what it removes, without cloning Frames.
+        let removed = self.sheets[index]
+            .visuals
+            .clone()
+            .retain_active_sides(active);
+        (removed.background.is_some() || removed.overlay.is_some()).then(|| EdgeConversionLoss {
+            sheet_id: self.sheets[index].id.hyphenated().to_string(),
+            sheet_number: index + 1,
+            side,
+            background: removed.background,
+            overlay: removed.overlay,
+        })
+    }
+
     pub(crate) fn with_added_sheet(
         &self,
         anchor_sheet_id: Uuid,
@@ -660,8 +729,23 @@ impl ProjectDocument {
             .position(|sheet| sheet.id == anchor_sheet_id)
             .ok_or(())?;
         let insertion_index = match position {
-            SheetInsertionPosition::Before => anchor_index,
-            SheetInsertionPosition::After => anchor_index + 1,
+            SheetInsertionPosition::Before
+                if self
+                    .sheet_structure(anchor_index)
+                    .availability
+                    .can_add_before =>
+            {
+                anchor_index
+            }
+            SheetInsertionPosition::After
+                if self
+                    .sheet_structure(anchor_index)
+                    .availability
+                    .can_add_after =>
+            {
+                anchor_index + 1
+            }
+            _ => return Err(()),
         };
         let sheet_id = Uuid::new_v4();
         candidate.sheets.insert(
@@ -679,7 +763,7 @@ impl ProjectDocument {
             .position(|sheet| sheet.id == sheet_id)
             .ok_or(())?;
         let source = &self.sheets[index];
-        if source.active_sides != ActiveSides::Both {
+        if !self.sheet_structure(index).availability.can_duplicate {
             return Err(());
         }
         let mut copy = source.clone();
@@ -696,14 +780,14 @@ impl ProjectDocument {
 
     pub(crate) fn with_deleted_sheet(&self, sheet_id: Uuid) -> Result<(Self, Uuid), ()> {
         let mut candidate = self.clone();
-        if candidate.sheets.len() <= 2 {
-            return Err(());
-        }
         let deleted_index = candidate
             .sheets
             .iter()
             .position(|sheet| sheet.id == sheet_id)
             .ok_or(())?;
+        if !self.sheet_structure(deleted_index).availability.can_delete {
+            return Err(());
+        }
         candidate.sheets.remove(deleted_index);
         let neighbor_index = deleted_index.min(candidate.sheets.len() - 1);
         let neighbor_id = candidate.sheets[neighbor_index].id;
@@ -722,15 +806,8 @@ impl ProjectDocument {
             .iter()
             .position(|sheet| sheet.id == sheet_id)
             .ok_or(())?;
-        let last_index = candidate.sheets.len() - 1;
+        let active_sides = self.converted_edge_sides(sheet_index).ok_or(())?;
         let sheet = &mut candidate.sheets[sheet_index];
-        let active_sides = match (sheet_index, sheet.active_sides) {
-            (0, ActiveSides::Both) => ActiveSides::Right,
-            (0, ActiveSides::Right) => ActiveSides::Both,
-            (index, ActiveSides::Both) if index == last_index => ActiveSides::Left,
-            (index, ActiveSides::Left) if index == last_index => ActiveSides::Both,
-            _ => return Err(()),
-        };
         sheet.convert_active_sides(active_sides);
         candidate
             .reorganize_sheet(sheet_id, custom)
@@ -753,7 +830,11 @@ impl ProjectDocument {
             .iter()
             .position(|sheet| sheet.id == sheet_id)
             .ok_or(())?;
-        if source_index == target_index {
+        let structure = self.sheet_structure(source_index);
+        if source_index == target_index
+            || target_index < structure.minimum_reorder_index
+            || target_index > structure.maximum_reorder_index
+        {
             return Err(());
         }
         let sheet = candidate.sheets.remove(source_index);
@@ -800,7 +881,21 @@ impl ProjectDocument {
         let impact = errors
             .is_empty()
             .then(|| album_information_impact(information))
-            .flatten();
+            .flatten()
+            .map(|mut impact| {
+                impact.conversion_losses = [
+                    (0, information.first_sheet),
+                    (self.sheets.len() - 1, information.last_sheet),
+                ]
+                .into_iter()
+                .filter_map(|(index, format)| {
+                    (format == EndSheetFormat::SinglePage)
+                        .then(|| self.edge_conversion_loss(index))
+                        .flatten()
+                })
+                .collect();
+                impact
+            });
         AlbumInformationValidation { errors, impact }
     }
 
@@ -1898,6 +1993,7 @@ pub struct AlbumInformationValidation {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct AlbumInformationImpact {
+    pub conversion_losses: Vec<crate::sheet_visuals::EdgeConversionLoss>,
     pub sheet_width_px: u32,
     pub page_width_px: u32,
     pub height_px: u32,
@@ -2123,13 +2219,7 @@ pub(crate) fn validate_project_state(project: &ProjectDocument) -> Result<(), ()
             return Err(());
         }
         let last = project.sheets().len() - 1;
-        let valid_sides = if index == 0 {
-            matches!(sheet.active_sides(), ActiveSides::Both | ActiveSides::Right)
-        } else if index == last {
-            matches!(sheet.active_sides(), ActiveSides::Both | ActiveSides::Left)
-        } else {
-            sheet.active_sides() == ActiveSides::Both
-        };
+        let valid_sides = active_sides_are_valid_at(sheet.active_sides(), index, last + 1);
         if !valid_sides {
             return Err(());
         }
@@ -2275,11 +2365,20 @@ fn raster_axis_pixels(micrometers: i128, dpi: i128) -> Option<i128> {
         .map(|numerator| numerator / 25_400)
 }
 
+fn active_sides_are_valid_at(sides: ActiveSides, index: usize, count: usize) -> bool {
+    match sides {
+        ActiveSides::Both => true,
+        ActiveSides::Right => index == 0,
+        ActiveSides::Left => index == count - 1,
+    }
+}
+
 fn album_information_impact(information: &AlbumInformation) -> Option<AlbumInformationImpact> {
     let width = i128::from(information.sheet_width_um);
     let height = i128::from(information.sheet_height_um);
     let dpi = i128::from(information.dpi);
     Some(AlbumInformationImpact {
+        conversion_losses: Vec::new(),
         sheet_width_px: u32::try_from(raster_axis_pixels(width, dpi)?).ok()?,
         page_width_px: u32::try_from(raster_axis_pixels(width / 2, dpi)?).ok()?,
         height_px: u32::try_from(raster_axis_pixels(height, dpi)?).ok()?,

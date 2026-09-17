@@ -33,7 +33,7 @@ import type {
   ProjectIntent,
   ProjectMutationOutcome,
 } from "./domain/project";
-import { createTwoSheetProjection } from "./test/projectFixtures";
+import { createTwoSheetProjection, refreshSheetStructureFixture } from "./test/projectFixtures";
 import { useEditorView } from "./state/editorView";
 import groupGeometryCorpus from "../tests/fixtures/frame-group-geometry-cases.json";
 import stackCorpus from "../tests/fixtures/frame-stack-cases.json";
@@ -229,7 +229,7 @@ const projectCorePort: ProjectCorePort = {
   load: async () => projection,
   validateAlbumInformation: async () => ({
     errors: [],
-    impact: {
+    impact: { conversionLosses: [],
       heightPx: 3_543,
       pageWidthPx: 3_543,
       sheetWidthPx: 7_087,
@@ -534,7 +534,7 @@ function configurePhysicalPreview(
     (_, index) => `sheet-${String(index + 1).padStart(3, "0")}`,
   );
   let nextPageNumber = 1;
-  preview.state.album.sheets = ids.map((id, index) => {
+  preview.state.album.sheets = refreshSheetStructureFixture(ids.map((id, index) => {
     const activeSides =
       index === 0 ? "right" : index === ids.length - 1 ? "left" : "both";
     const pageCount = activeSides === "both" ? 2 : 1;
@@ -558,7 +558,7 @@ function configurePhysicalPreview(
       heightUm: sheetHeightUm,
       frames: [],
     };
-  });
+  }));
   preview.composition.sheets = preview.state.album.sheets.map((sheet) =>
     blankPreviewCompositionSheet(preview, sheet.id),
   );
@@ -809,7 +809,7 @@ function applyPreviewIntent(intent: ProjectIntent): ProjectMutationOutcome {
       heightUm: next.state.document.sheetHeightUm,
       frames: [],
     };
-    next.state.album.sheets.splice(insertionIndex, 0, sheet);
+    next.state.album.sheets.splice(insertionIndex, 0, { ...sheet, structure: next.state.album.sheets[0].structure, edgeConversionLoss: null });
     next.composition.sheets.splice(
       insertionIndex,
       0,
@@ -859,6 +859,7 @@ function finalizePhysicalPreviewMutation(
   next: EditorProjection,
   before: EditorProjection,
 ) {
+  next.state.album.sheets = refreshSheetStructureFixture(next.state.album.sheets);
   const compositionById = new Map(
     next.composition.sheets.map((sheet) => [sheet.sheetId, sheet] as const),
   );

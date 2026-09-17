@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ActionButton } from "./ActionButton";
+import { TextInput } from "./TextInput";
 import { useDismissableSurface } from "./useDismissableSurface";
 import "./ColorPropertyControl.css";
 
@@ -51,7 +52,7 @@ export function ColorPropertyControl({ rgb, disabled, label, defaultRgb = "#0000
       <div className="ui-color-property-inputs">
         <input type="color" aria-label={`Selecionar cor ${label}`} value={valid ? draft : defaultRgb}
           onChange={(event) => update(event.currentTarget.value)} />
-        <input type="text" className="ui-field-control" aria-label={`Cor hexadecimal ${label}`} value={draft} maxLength={7}
+        <TextInput type="text" className="ui-field-control" aria-label={`Cor hexadecimal ${label}`} value={draft} maxLength={7}
           autoFocus aria-invalid={!valid} onChange={(event) => update(event.currentTarget.value)}
           onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); event.stopPropagation(); apply(); } }} />
       </div>

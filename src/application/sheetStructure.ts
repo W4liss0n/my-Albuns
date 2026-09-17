@@ -1,7 +1,9 @@
 import type {
   ProjectIntent,
   SheetSnapshot,
+  SheetStructureAvailability,
 } from "../domain/project";
+export type { SheetStructureAvailability } from "../domain/project";
 
 export type SheetStructureIntent = Extract<
   ProjectIntent,
@@ -9,14 +11,6 @@ export type SheetStructureIntent = Extract<
     kind: "addSheet" | "duplicateSheet" | "convertEdgeSheet" | "deleteSheet" | "reorderSheet";
   }
 >;
-
-export interface SheetStructureAvailability {
-  canAddAfter: boolean;
-  canAddBefore: boolean;
-  canConvertEdge: boolean;
-  canDelete: boolean;
-  canDuplicate: boolean;
-}
 
 export interface SheetReorderPlan {
   changed: boolean;
@@ -30,25 +24,12 @@ export function sheetStructureAvailability(
   sheets: readonly SheetSnapshot[],
   sheetId: string,
 ): SheetStructureAvailability {
-  const index = sheets.findIndex((sheet) => sheet.id === sheetId);
-  if (index < 0) {
-    return {
-      canAddAfter: false,
-      canAddBefore: false,
-      canConvertEdge: false,
-      canDelete: false,
-      canDuplicate: false,
-    };
-  }
-  const sheet = sheets[index];
-  return {
-    canAddBefore: index > 0 || sheet.activeSides === "both",
-    canAddAfter:
-      index < sheets.length - 1 || sheet.activeSides === "both",
-    canConvertEdge:
-      index === 0 || index === sheets.length - 1,
-    canDelete: sheets.length > 2,
-    canDuplicate: sheet.activeSides === "both",
+  return sheets.find((sheet) => sheet.id === sheetId)?.structure.availability ?? {
+    canAddAfter: false,
+    canAddBefore: false,
+    canConvertEdge: false,
+    canDelete: false,
+    canDuplicate: false,
   };
 }
 
@@ -76,16 +57,8 @@ export function planSheetReorder(
   const candidate = [...sheets];
   const [moved] = candidate.splice(sourceIndex, 1);
   candidate.splice(targetIndex, 0, moved);
-  const lastIndex = candidate.length - 1;
-  const valid = candidate.every((sheet, index) => {
-    if (index === 0) {
-      return sheet.activeSides === "both" || sheet.activeSides === "right";
-    }
-    if (index === lastIndex) {
-      return sheet.activeSides === "both" || sheet.activeSides === "left";
-    }
-    return sheet.activeSides === "both";
-  });
+  const { minimumReorderIndex, maximumReorderIndex } = sheets[sourceIndex].structure;
+  const valid = targetIndex >= minimumReorderIndex && targetIndex <= maximumReorderIndex;
 
   return {
     changed: true,

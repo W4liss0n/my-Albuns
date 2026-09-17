@@ -368,7 +368,7 @@ test("maps the Project and media ports to the desktop commands", async () => {
     .mockResolvedValueOnce(representativeProjection)
     .mockResolvedValueOnce({
       errors: [],
-      impact: { heightPx: 3_543, pageWidthPx: 3_543, sheetWidthPx: 7_087 },
+      impact: { conversionLosses: [], heightPx: 3_543, pageWidthPx: 3_543, sheetWidthPx: 7_087 },
     })
     .mockResolvedValueOnce({
       projection: representativeProjection,

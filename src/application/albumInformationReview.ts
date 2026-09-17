@@ -1,9 +1,8 @@
 import type {
   AlbumInformation,
   AlbumInformationImpact,
-  SheetSnapshot,
 } from "../domain/project";
-import { albumInformationConversionLosses, type EdgeConversionLoss } from "./edgeConversionReview";
+import type { EdgeConversionLoss } from "./edgeConversionReview";
 
 export interface AlbumInformationReview {
   readonly baseline: Readonly<AlbumInformation>;
@@ -45,9 +44,8 @@ export function createAlbumInformationReview(
   baseline: Readonly<AlbumInformation>,
   information: Readonly<AlbumInformation>,
   impact: Readonly<AlbumInformationImpact>,
-  sheets: readonly SheetSnapshot[] = [],
 ): AlbumInformationReview {
-  return { baseline, information, impact, conversionLosses: albumInformationConversionLosses(sheets, information) };
+  return { baseline, information, impact, conversionLosses: impact.conversionLosses };
 }
 
 /**

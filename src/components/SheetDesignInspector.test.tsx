@@ -33,6 +33,7 @@ test("a color draft commits once, while cancellation, invalid input and a scope 
   const open = () => fireEvent.click(screen.getByRole("button", { name: "Cor do Background da Lâmina" }));
   const field = () => screen.getByRole("textbox", { name: "Cor hexadecimal do Background da Lâmina" });
   open();
+  expect(field()).toHaveAttribute("autocomplete", "off");
   fireEvent.change(field(), { target: { value: "#abcdef" } });
   fireEvent.keyDown(field(), { key: "Escape" });
   expect(screen.queryByRole("dialog")).toBeNull();

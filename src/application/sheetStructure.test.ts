@@ -1,3 +1,4 @@
+import { refreshSheetStructureFixture } from "../test/projectFixtures";
 import { describe, expect, test } from "vitest";
 
 import type { SheetSnapshot } from "../domain/project";
@@ -9,7 +10,7 @@ import {
 function sheet(
   id: string,
   activeSides: SheetSnapshot["activeSides"] = "both",
-): SheetSnapshot {
+): Omit<SheetSnapshot, "structure" | "edgeConversionLoss"> {
   return {
     activeSides,
     frames: [],
@@ -23,13 +24,13 @@ function sheet(
   };
 }
 
-const physicalAlbum = [
+const physicalAlbum = refreshSheetStructureFixture([
   sheet("initial", "right"),
   sheet("second"),
   sheet("third"),
   sheet("fourth"),
   sheet("final", "left"),
-];
+]);
 
 describe("physical Album structure projection", () => {
   test("disables only external insertion around single-Page ends", () => {
@@ -55,7 +56,7 @@ describe("physical Album structure projection", () => {
       canDuplicate: false,
     });
     expect(
-      sheetStructureAvailability(physicalAlbum.slice(0, 2), "initial"),
+      sheetStructureAvailability(refreshSheetStructureFixture(physicalAlbum.slice(0, 2)), "initial"),
     ).toMatchObject({ canDelete: false });
   });
 

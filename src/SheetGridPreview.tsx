@@ -18,12 +18,12 @@ import type {
   SheetSnapshot,
 } from "./domain/project";
 import { mediaPanelPreviewFixture } from "./test/mediaPanelPreviewFixtures";
-import { representativeProjection } from "./test/projectFixtures";
+import { representativeProjection, refreshSheetStructureFixture } from "./test/projectFixtures";
 
 const PREVIEW_SHEET_COUNT = 6;
 
 const initialSheetStates: readonly SheetSnapshot[] = renumberSheetStates(
-  Array.from({ length: PREVIEW_SHEET_COUNT }, (_, index) => {
+  refreshSheetStructureFixture(Array.from({ length: PREVIEW_SHEET_COUNT }, (_, index) => {
     const number = index + 1;
     const activeSides = activeSidesFor(number);
     return {
@@ -37,7 +37,7 @@ const initialSheetStates: readonly SheetSnapshot[] = renumberSheetStates(
       role: roleFor(number),
       widthUm: activeSides === "both" ? 600_000 : 300_000,
     };
-  }),
+  })),
 );
 
 const previewUrl =
@@ -147,15 +147,10 @@ export function SheetGridPreview() {
         onApplyAlbumDesign={async (draft) => {
           setVisualDefaults(draft.value);
           return true;
-        }}
-        onBeginPhotoZoom={() => undefined}
-        onFinishPhotoZoom={async () => undefined}
-        onNavigateToSheet={setFocusedSheetId}
-        onPresentationUnitChange={changePresentationUnit}
-        onUpdatePhotoZoom={() => undefined}
-        onValidateAlbumInformation={async () => ({
+        }}        onNavigateToSheet={setFocusedSheetId}
+        onPresentationUnitChange={changePresentationUnit}        onValidateAlbumInformation={async () => ({
           errors: [],
-          impact: {
+          impact: { conversionLosses: [],
             sheetWidthPx: 7_087,
             pageWidthPx: 3_543,
             heightPx: 3_543,
@@ -163,9 +158,7 @@ export function SheetGridPreview() {
         })}
         sheetStates={sheetStates}
         sheets={sheets}
-        visualDefaults={visualDefaults}
-        zoomCommitting={false}
-      />
+        visualDefaults={visualDefaults}      />
     </main>
   );
 }
@@ -186,7 +179,7 @@ function renumberSheetStates(
   sheets: readonly SheetSnapshot[],
 ): SheetSnapshot[] {
   let nextPageNumber = 1;
-  return sheets.map((sheet) => {
+  return refreshSheetStructureFixture(sheets).map((sheet) => {
     const pageCount = sheet.activeSides === "both" ? 2 : 1;
     const pageNumbers = Array.from(
       { length: pageCount },

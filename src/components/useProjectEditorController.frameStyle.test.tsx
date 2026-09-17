@@ -110,9 +110,7 @@ test.each(["success", "failure"])("the individual Zoom flushes a style draft bef
   const view = renderHook(() => h.useHarness());
   const baseline = view.result.current.selectedFrame!.photo!.transform.userZoom;
   await act(async () => view.result.current.frameStyle.onPreview({ kind: "opacity", opacityPercent: 50 }));
-  act(() => {
-    view.result.current.beginZoomGesture();
-    view.result.current.updateZoomGesture(baseline + 0.25);
+  act(() => {    view.result.current.photoZoom.onPreview((baseline + 0.25) * 100);
     void view.result.current.save();
     void view.result.current.undo();
   });
@@ -144,14 +142,14 @@ test("a late angle preview cannot replace a newer property draft", async () => {
   h.port.previewPhotoAngle = vi.fn(() => angle.promise);
   const view = renderHook(() => h.useHarness());
   await act(async () => view.result.current.photoAngle.onPreview(100));
-  act(() => view.result.current.photoZoom.onPreview(175));
+  act(() => view.result.current.photoZoom.onPreview(200));
   act(() => view.result.current.frameStyle.onCommit({ kind: "opacity", opacityPercent: 50 }));
   await act(async () => {
     angle.resolve(h.first.composition.sheets[0].frames);
     h.pending.resolve(h.first);
     await view.result.current.runner.waitForIdle();
   });
-  expect(h.apply.mock.calls.map(([intent]) => intent.kind)).toEqual(["setPhotoAngle", "setPhotoZoom", "setFrameStyle"]);
+  expect(h.apply.mock.calls.map(([intent]) => intent.kind)).toEqual(["setPhotoAngle", "transformPhoto", "setFrameStyle"]);
   expect(view.result.current.canvasProps.composition).toEqual(view.result.current.projection.composition);
 });
 

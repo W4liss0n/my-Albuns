@@ -266,7 +266,6 @@ export function ProjectWorkspace({
     } : undefined,
   });
   const albumInformationApply = useAlbumInformationApplyController({
-    sheets: projection.state.album.sheets,
     projectDialogPort,
     onApply: controller.applyAlbumInformation,
     onError: setCloseMessage,
@@ -800,9 +799,7 @@ export function ProjectWorkspace({
             onToggleBlackAndWhite: () => { void controller.togglePhotoBlackAndWhite(); } }}
           context={inspectorContext}
           displayedPhotoZoom={displayedPhotoZoom}
-          displayedPhotoPanX={displayedPhotoPanX}
-          zoomCommitting={controller.zoomCommitting}
-          document={projection.state.document}
+          displayedPhotoPanX={displayedPhotoPanX}          document={projection.state.document}
           presentationUnit={presentationUnit}
           mediaItems={projection.state.album.media}
           sheetStates={projection.state.album.sheets}
@@ -811,11 +808,7 @@ export function ProjectWorkspace({
           frameGapUm={projection.state.layoutSettings.gapUm}
           focusedSheetId={controller.canvasProps.focusedSheetId}
           mediaPreviews={mediaPreviews}
-          revision={projection.state.revision}
-          onBeginPhotoZoom={controller.beginZoomGesture}
-          onUpdatePhotoZoom={controller.updateZoomGesture}
-          onFinishPhotoZoom={controller.finishZoomGesture}
-          onApplyAlbumInformation={albumInformationApply.requestApply}
+          revision={projection.state.revision}          onApplyAlbumInformation={albumInformationApply.requestApply}
           onApplyAlbumDesign={controller.applyAlbumDesign}
           onPresentationUnitChange={changePresentationUnit}
           onValidateAlbumInformation={projectCorePort.validateAlbumInformation}

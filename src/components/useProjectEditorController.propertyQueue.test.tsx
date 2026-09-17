@@ -51,24 +51,22 @@ test.each([
     return { runner, ...useProjectEditorController({ projectDialogPort: unusedLayoutDialogPort,
       projection, projectCorePort: port, runProjectMutation: runner, onProjectionChange: setProjection }) };
   });
-  act(() => {
-    view.result.current.beginZoomGesture();
-    view.result.current.updateZoomGesture(baseline + 0.5);
-    void view.result.current.finishZoomGesture();
+  act(() => {    view.result.current.photoZoom.onPreview((baseline + 0.5) * 100);
+    view.result.current.photoZoom.onCommit((baseline + 0.5) * 100);
   });
-  expect(view.result.current.zoomCommitting).toBe(true);
+  expect(view.result.current.photoZoom.disabled).toBe(true);
   act(() => view.result.current.frameStyle.onCommit({ kind: "opacity", opacityPercent: 50 }));
   try {
-    // InspectorPanel uses this flag to disable the individual slider. Re-enabling
+    // InspectorPanel uses these actions to disable the individual control. Re-enabling
     // it here lets a second gesture capture the old Zoom as its delta baseline.
-    expect(view.result.current.zoomCommitting).toBe(true);
+    expect(view.result.current.photoZoom.disabled).toBe(true);
     expect(view.result.current.displayedPhotoZoom).toBe(baseline + 0.5);
     expect(view.result.current.canvasProps.photoZoomPreview).toEqual({ frameId: selected.id, value: baseline + 0.5 });
     expect(apply).toHaveBeenCalledExactlyOnceWith({ kind: "transformPhoto", frameId: selected.id,
       deltaPanX: 0, deltaPanY: 0, deltaZoom: 0.5 }, expect.any(Function));
     if (reselect) {
       act(() => useEditorView.getState().selectFrames(corpus.placeholders));
-      expect(view.result.current.zoomCommitting).toBe(false);
+      expect(view.result.current.photoZoom.disabled).toBe(true);
       expect(view.result.current.canvasProps.photoZoomPreview).toBeNull();
     }
   } finally {
@@ -77,7 +75,7 @@ test.each([
       else reject(new Error("Falha ao confirmar Zoom."));
       await view.result.current.runner.waitForIdle();
     });
-    expect(view.result.current.zoomCommitting).toBe(false);
+    expect(view.result.current.photoZoom.disabled).toBe(reselect);
     expect(view.result.current.canvasProps.photoZoomPreview).toBeNull();
     expect(apply).toHaveBeenCalledTimes(outcome === "success" ? 2 : 1);
     if (reselect) expect(useEditorView.getState().selectedFrameIds).toEqual(corpus.placeholders);

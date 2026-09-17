@@ -18,7 +18,7 @@ const baseline: AlbumInformation = {
   lastSheet: "double",
 };
 
-const impact = {
+const impact = { conversionLosses: [],
   sheetWidthPx: 14_173,
   pageWidthPx: 7_087,
   heightPx: 7_087,

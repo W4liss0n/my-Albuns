@@ -17,8 +17,9 @@ mod sheet_visuals;
 mod validation;
 
 pub use sheet_visuals::{
-    DecorativeDropPreview, DecorativeDropRequest, DecorativeRole, DecorativeScope, SheetVisual,
-    SheetVisualChange, SheetVisuals, SideVisual, VisualMapping,
+    DecorativeDropPreview, DecorativeDropRequest, DecorativeRole, DecorativeScope,
+    EdgeConversionLoss, EdgeConversionSide, SheetVisual, SheetVisualChange, SheetVisuals,
+    SideVisual, VisualMapping,
 };
 
 pub use frame_geometry::{
@@ -49,8 +50,8 @@ pub use model::{
     ProjectIntent, ProjectMutationOutcome, ProjectedActiveSides, ProjectedBackground,
     ProjectedBackgroundContent, ProjectedDisplayUnit, ProjectedFrameBorder, ProjectedFrameStyle,
     ProjectedOverlay, ProjectedOverlayContent, ProjectedVisualDefaults, RectUm, RelinkMedia,
-    RenderSnapshot, RenderSnapshotRef, SheetInsertionPosition, SheetRole, SheetSnapshot, SizeUm,
-    VectorUm,
+    RenderSnapshot, RenderSnapshotRef, SheetInsertionPosition, SheetRole, SheetSnapshot,
+    SheetStructureAvailability, SheetStructureProjection, SizeUm, VectorUm,
 };
 pub use persistent_project::{
     CreateAuthorization, CreateProjectError, CreateProjectRequest, EditableProject,

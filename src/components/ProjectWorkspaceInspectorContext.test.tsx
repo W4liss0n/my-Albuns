@@ -49,7 +49,7 @@ const projectCorePort: ProjectCorePort = {
   load: async () => representativeProjection,
   validateAlbumInformation: async () => ({
     errors: [],
-    impact: { heightPx: 3_543, pageWidthPx: 3_543, sheetWidthPx: 7_087 },
+    impact: { conversionLosses: [], heightPx: 3_543, pageWidthPx: 3_543, sheetWidthPx: 7_087 },
   }),
   apply: async () => representativeProjection,
   applyWithOutcome: async () => ({

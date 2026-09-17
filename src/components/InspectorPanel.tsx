@@ -54,17 +54,6 @@ import {
 } from "./useSheetPointerReorder";
 import "./InspectorPanel.css";
 
-const PHOTO_ZOOM_KEYS = new Set([
-  "ArrowLeft",
-  "ArrowRight",
-  "ArrowUp",
-  "ArrowDown",
-  "Home",
-  "End",
-  "PageUp",
-  "PageDown",
-]);
-
 const ALBUM_INFORMATION_FORM_ID = "album-information-settings";
 const ALBUM_DESIGN_FORM_ID = "album-design-settings";
 
@@ -97,7 +86,6 @@ export interface InspectorPanelProps {
   context: InspectorContext;
   displayedPhotoZoom: number;
   displayedPhotoPanX: number;
-  zoomCommitting: boolean;
   document: DocumentSnapshot;
   presentationUnit: DisplayUnit;
   mediaItems: readonly MediaCatalogItem[];
@@ -108,9 +96,6 @@ export interface InspectorPanelProps {
   focusedSheetId: string | null;
   mediaPreviews: Readonly<Record<string, MediaPreview>>;
   revision: number;
-  onBeginPhotoZoom(): void;
-  onUpdatePhotoZoom(value: number): void;
-  onFinishPhotoZoom(): void | Promise<void>;
   onApplyAlbumInformation(
     draft: AlbumInformationProjectDraft,
     impact: AlbumInformationImpact,
@@ -148,7 +133,6 @@ export function InspectorPanel({
   context,
   displayedPhotoZoom,
   displayedPhotoPanX,
-  zoomCommitting,
   document,
   presentationUnit,
   mediaItems,
@@ -159,9 +143,6 @@ export function InspectorPanel({
   focusedSheetId,
   mediaPreviews,
   revision,
-  onBeginPhotoZoom,
-  onUpdatePhotoZoom,
-  onFinishPhotoZoom,
   onApplyAlbumInformation,
   onApplyAlbumDesign,
   onPresentationUnitChange,
@@ -406,45 +387,11 @@ export function InspectorPanel({
                 label="Pan horizontal"
                 value={`${Math.round(displayedPhotoPanX * 100)}%`}
               />}
-              {context.frame.photo && context.composedPhoto && (
-                <label className="photo-zoom-control">
-                  <span className="photo-zoom-label">
-                    <span>Zoom da Foto</span>
-                    <output>{Math.round(displayedPhotoZoom * 100)}%</output>
-                  </span>
-                  <input
-                    className="ui-range"
-                    type="range"
-                    aria-label="Zoom da Foto"
-                    min={
-                      context.composedPhoto.placement.zoomRange.minimum * 100
-                    }
-                    max={
-                      context.composedPhoto.placement.zoomRange.maximum * 100
-                    }
-                    step="1"
-                    value={Math.round(displayedPhotoZoom * 100)}
-                    disabled={zoomCommitting}
-                    onPointerDown={onBeginPhotoZoom}
-                    onChange={(event) =>
-                      onUpdatePhotoZoom(
-                        Number(event.currentTarget.value) / 100,
-                      )
-                    }
-                    onPointerUp={() => void onFinishPhotoZoom()}
-                    onKeyDown={(event) => {
-                      if (PHOTO_ZOOM_KEYS.has(event.key)) {
-                        onBeginPhotoZoom();
-                      }
-                    }}
-                    onKeyUp={(event) => {
-                      if (PHOTO_ZOOM_KEYS.has(event.key)) {
-                        void onFinishPhotoZoom();
-                      }
-                    }}
-                    onBlur={() => void onFinishPhotoZoom()}
-                  />
-                </label>
+              {context.frame.photo && context.composedPhoto && photoZoom && (
+                <PhotoZoomControl key={photoZoom.scopeKey} {...photoZoom}
+                  value={Math.round(displayedPhotoZoom * 100)}
+                  minimum={Math.round(context.composedPhoto.placement.zoomRange.minimum * 100)}
+                  maximum={Math.round(context.composedPhoto.placement.zoomRange.maximum * 100)} />
               )}
               {photoOrientation && <PhotoOrientationControls frames={[context.frame]} {...photoOrientation} />}
               {frameStyle && <FrameStyleControls key={`${frameStyle.scopeKey}:${presentationUnit}`} frames={[context.frame]} unit={presentationUnit} {...frameStyle} />}

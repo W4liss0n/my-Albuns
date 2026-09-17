@@ -55,7 +55,16 @@ fn duplicate_inserts_an_independent_sheet_after_its_source_in_one_persistent_his
         copy.frames[0].rect,
         before.state.album.sheets[0].frames[0].rect
     );
-    assert_eq!(after.state.album.sheets[0], before.state.album.sheets[0]);
+    let mut original = after.state.album.sheets[0].clone();
+    assert!(original.structure.availability.can_delete);
+    assert!(
+        !before.state.album.sheets[0]
+            .structure
+            .availability
+            .can_delete
+    );
+    original.structure = before.state.album.sheets[0].structure.clone();
+    assert_eq!(original, before.state.album.sheets[0]);
     assert_eq!(
         after.state.album.sheets[2].id,
         before.state.album.sheets[1].id
@@ -271,13 +280,17 @@ fn duplication_preserves_complete_composition_layout_and_media_and_emits_the_vis
     comparable.number = source.number;
     comparable.role = source.role;
     comparable.page_numbers.clone_from(&source.page_numbers);
+    assert!(!comparable.structure.availability.can_convert_edge);
+    assert!(comparable.edge_conversion_loss.is_none());
+    comparable.structure = source.structure.clone();
+    comparable.edge_conversion_loss = source.edge_conversion_loss.clone();
     for (copy, original) in comparable.frames.iter_mut().zip(&source.frames) {
         assert_ne!(copy.id, original.id);
         copy.id.clone_from(&original.id);
     }
     assert_eq!(
         &comparable, source,
-        "all public state, including stack, Photos, styles and Layout, is preserved"
+        "creative content, including stack, Photos, styles and Layout, is preserved"
     );
     assert_eq!(after.state.album.media, before.state.album.media);
     assert_eq!(project.undo().unwrap().composition, before.composition);
@@ -322,7 +335,7 @@ fn duplication_preserves_complete_composition_layout_and_media_and_emits_the_vis
             frame_ids: vec![copy_photo],
         })
         .unwrap();
-    assert_eq!(edited.state.album.sheets[0], before.state.album.sheets[0]);
+    assert_eq!(edited.state.album.sheets[0], after.state.album.sheets[0]);
     assert_ne!(edited.state.album.sheets[1], after.state.album.sheets[1]);
     let inherited = project
         .apply(ProjectIntent::SetVisualDefaults {

@@ -1,53 +1,36 @@
 import { expect, test } from "vitest";
 import { createThreeSheetProjection } from "./projectFixtures";
-import { albumInformationConversionLosses, edgeConversionLoss, edgeConversionLossDescription } from "../application/edgeConversionReview";
+import { edgeConversionLoss, edgeConversionLossDescription } from "../application/edgeConversionReview";
 import { createAlbumInformationReview, albumInformationReviewEquals } from "../application/albumInformationReview";
+import type { EdgeConversionLoss } from "../domain/project";
 
 const background = { kind: "custom", content: { kind: "color", rgb: "#123456" }, mapping: "side" } as const;
 const overlay = { kind: "custom", content: { kind: "media", mediaId: "overlay-1" }, mapping: "side" } as const;
 
-test.each([0, 2])("reviews only the disappearing applications on edge %s", (index) => {
+test.each([0, 2])("presents the Core's loss facts for edge %s without deriving them from visuals", (index) => {
   const sheets = createThreeSheetProjection().state.album.sheets;
   const sheet = sheets[index];
-  sheet.activeSides = "both";
-  sheet.visuals = {
-    background: { kind: "perSide", left: background, right: background },
-    overlay: { kind: "perSide", left: overlay, right: overlay },
-  };
-  const loss = edgeConversionLoss(sheets, sheet.id)!;
-  expect(loss).toEqual({ sheetId: sheet.id, sheetNumber: sheet.number,
-    side: index === 0 ? "left" : "right", background, overlay });
+  const loss: EdgeConversionLoss = { sheetId: sheet.id, sheetNumber: sheet.number,
+    side: index === 0 ? "left" : "right", background, overlay };
+  sheet.edgeConversionLoss = loss;
+  expect(edgeConversionLoss(sheets, sheet.id)).toBe(loss);
   expect(edgeConversionLossDescription(loss)).toContain("Background e Overlay personalizados");
   expect(edgeConversionLossDescription(loss)).toContain(index === 0 ? "esquerda" : "direita");
+  sheet.edgeConversionLoss = null;
+  sheet.visuals = { background: { kind: "perSide", left: background, right: background }, overlay: { kind: "default" } };
+  expect(edgeConversionLoss(sheets, sheet.id)).toBeNull();
+  expect(edgeConversionLoss(sheets, "missing")).toBeNull();
 });
 
-test.each(["default", "bothSides", "keptSide", "emptyOverlay", "expansion", "internal"])(
-  "does not warn for %s", (mode) => {
-    const sheets = createThreeSheetProjection().state.album.sheets;
-    const sheet = sheets[mode === "internal" ? 1 : 0];
-    sheet.activeSides = mode === "expansion" ? "right" : "both";
-    sheet.visuals = { background: { kind: "default" }, overlay: { kind: "default" } };
-    if (mode === "bothSides") sheet.visuals.background = { kind: "bothSides", content: background.content };
-    if (mode === "keptSide") sheet.visuals.background = { kind: "perSide", left: { kind: "default" }, right: background };
-    if (mode === "emptyOverlay") sheet.visuals.overlay = { kind: "perSide", left: { ...overlay, content: null }, right: { kind: "default" } };
-    if (mode === "expansion" || mode === "internal") sheet.visuals.background = { kind: "perSide", left: background, right: background };
-    expect(edgeConversionLoss(sheets, sheet.id)).toBeNull();
-  },
-);
-
-test("Album information review detects changed local content, but ignores the retained page", () => {
+test("Album information compares the supplied impact, including changed lost content", () => {
   const projection = createThreeSheetProjection();
-  const sheets = projection.state.album.sheets;
-  sheets[0].activeSides = "both";
-  sheets[0].visuals = { background: { kind: "perSide", left: background, right: background }, overlay: { kind: "default" } };
   const baseline = { ...projection.state.document, firstSheet: "double" as const, lastSheet: "double" as const };
   const information = { ...baseline, firstSheet: "singlePage" as const };
-  const impact = { sheetWidthPx: 100, pageWidthPx: 50, heightPx: 50 };
-  const review = createAlbumInformationReview(baseline, information, impact, sheets);
-  expect(albumInformationConversionLosses(sheets, information)).toHaveLength(1);
-  const changed = structuredClone(sheets);
-  changed[0].visuals = { background: { kind: "perSide", left: background, right: { kind: "default" } }, overlay: { kind: "default" } };
-  expect(albumInformationReviewEquals(review, createAlbumInformationReview(baseline, information, impact, changed))).toBe(true);
-  changed[0].visuals.background = { kind: "perSide", left: { ...background, content: { kind: "media", mediaId: "new-background" } }, right: background };
-  expect(albumInformationReviewEquals(review, createAlbumInformationReview(baseline, information, impact, changed))).toBe(false);
+  const loss: EdgeConversionLoss = { sheetId: "sheet-001", sheetNumber: 1, side: "left", background, overlay: null };
+  const impact = { conversionLosses: [loss], sheetWidthPx: 100, pageWidthPx: 50, heightPx: 50 };
+  const review = createAlbumInformationReview(baseline, information, impact);
+  expect(review.conversionLosses).toEqual([loss]);
+  expect(albumInformationReviewEquals(review, createAlbumInformationReview(baseline, information, structuredClone(impact)))).toBe(true);
+  const changed = { ...impact, conversionLosses: [{ ...loss, background: null, overlay }] };
+  expect(albumInformationReviewEquals(review, createAlbumInformationReview(baseline, information, changed))).toBe(false);
 });
