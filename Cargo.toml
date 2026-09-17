@@ -14,6 +14,12 @@ resolver = "2"
 [patch.crates-io]
 tao = { git = "https://github.com/tauri-apps/tao", rev = "c704261c519c58cfdd0bc2d58ba24e06a0b71c92" }
 
+# Optimize across crates while keeping the image worker's catch_unwind recovery.
+[profile.release]
+lto = "thin"
+codegen-units = 1
+panic = "unwind"
+
 # Pixel loops and codecs must stay responsive in the local desktop build too.
 # Include the Processor because generic image operations are instantiated there.
 [profile.dev.package.myalbuns-imaging]

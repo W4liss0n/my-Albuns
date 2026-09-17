@@ -119,6 +119,15 @@ O Rust está fixado na versão exata declarada em [`rust-toolchain.toml`](rust-t
 
 ## Validação durante o desenvolvimento
 
+Para gerar a distribuição otimizada, execute `npm run tauri:build -- --ci`.
+O comando compila o aplicativo e o Processador de Imagens em Release e produz
+o instalador em `target/release/bundle/nsis/`. O perfil usa ThinLTO e uma unidade
+de geração de código por crate; preserva a recuperação de falhas por `unwind`.
+O Tauri remove comandos de plugins ausentes das permissões estáticas.
+Essa configuração prioriza o tamanho e a execução do programa e pode aumentar
+o tempo da compilação. A medição está na
+[comparação de compilações Release](docs/research/2026-09-17-otimizacao-da-compilacao-release.md).
+
 `npm run validate` é o comando padrão: prepara o Processador de Imagens e executa
 build, contratos, tipos, testes
 React, testes da automação e verificações Rust sem abrir o MyAlbuns. O relatório

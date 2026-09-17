@@ -1,0 +1,603 @@
+{
+  "collectedAt": "2026-09-17T16:00:23.241Z",
+  "protocolVersion": 26,
+  "workload": "Five JPEG previews; 600 x 300 mm sheet with five decorative images, JPEG at 300 dpi",
+  "methodology": "Two warmups and eight timed samples per variant/workload; alternating order; wall time includes process startup; output hashing excluded",
+  "inputs": [
+    {
+      "name": "photo-1.jpg",
+      "bytes": 3918523,
+      "sha256": "b02b12a5d6cff85802f587f1c76c4e09761e63a969cb39c113a7967f9d2fe0dc"
+    },
+    {
+      "name": "photo-2.jpg",
+      "bytes": 6712096,
+      "sha256": "383466e2c55f0ac7b1246207f186304096a11ca47d8c62fcec425413354f8e29"
+    },
+    {
+      "name": "photo-3.jpg",
+      "bytes": 5147885,
+      "sha256": "daae04c93eefb3008952c750ba7e933cabee2687f217c28708c1bd27a7ca8417"
+    },
+    {
+      "name": "photo-4.jpg",
+      "bytes": 4563910,
+      "sha256": "835bc96b24dec9ee326668f4887c270bb455e3f25cb214deadabe5d39cacc3a9"
+    },
+    {
+      "name": "photo-5.jpg",
+      "bytes": 4695236,
+      "sha256": "3b6b37ef02d5f327147736c6dd27c4c53bfc8d0eca5656cc2d3a5a032974f207"
+    }
+  ],
+  "binaries": {
+    "baseline": {
+      "bytes": 3933696,
+      "sha256": "fa130f2bfd203389c45ed76293eb475987df4972e8ec21907d17d5507afa3c3c"
+    },
+    "optimized": {
+      "bytes": 3738624,
+      "sha256": "662390dec1c0de95ea98c183ea97a1881c8967632dbf73af292483aa5624397a"
+    }
+  },
+  "samples": [
+    {
+      "workload": "processor-startup",
+      "variant": "baseline",
+      "round": 0,
+      "warmup": true,
+      "milliseconds": 20.507799999999975
+    },
+    {
+      "workload": "processor-startup",
+      "variant": "optimized",
+      "round": 0,
+      "warmup": true,
+      "milliseconds": 25.241499999999974
+    },
+    {
+      "workload": "processor-startup",
+      "variant": "optimized",
+      "round": 1,
+      "warmup": true,
+      "milliseconds": 20.338300000000004
+    },
+    {
+      "workload": "processor-startup",
+      "variant": "baseline",
+      "round": 1,
+      "warmup": true,
+      "milliseconds": 20.469800000000077
+    },
+    {
+      "workload": "processor-startup",
+      "variant": "baseline",
+      "round": 2,
+      "warmup": false,
+      "milliseconds": 20.78180000000009
+    },
+    {
+      "workload": "processor-startup",
+      "variant": "optimized",
+      "round": 2,
+      "warmup": false,
+      "milliseconds": 19.913800000000037
+    },
+    {
+      "workload": "processor-startup",
+      "variant": "optimized",
+      "round": 3,
+      "warmup": false,
+      "milliseconds": 27.06269999999995
+    },
+    {
+      "workload": "processor-startup",
+      "variant": "baseline",
+      "round": 3,
+      "warmup": false,
+      "milliseconds": 22.02139999999997
+    },
+    {
+      "workload": "processor-startup",
+      "variant": "baseline",
+      "round": 4,
+      "warmup": false,
+      "milliseconds": 21.33370000000002
+    },
+    {
+      "workload": "processor-startup",
+      "variant": "optimized",
+      "round": 4,
+      "warmup": false,
+      "milliseconds": 20.40020000000004
+    },
+    {
+      "workload": "processor-startup",
+      "variant": "optimized",
+      "round": 5,
+      "warmup": false,
+      "milliseconds": 23.59400000000005
+    },
+    {
+      "workload": "processor-startup",
+      "variant": "baseline",
+      "round": 5,
+      "warmup": false,
+      "milliseconds": 18.962400000000002
+    },
+    {
+      "workload": "processor-startup",
+      "variant": "baseline",
+      "round": 6,
+      "warmup": false,
+      "milliseconds": 19.845000000000027
+    },
+    {
+      "workload": "processor-startup",
+      "variant": "optimized",
+      "round": 6,
+      "warmup": false,
+      "milliseconds": 23.7038
+    },
+    {
+      "workload": "processor-startup",
+      "variant": "optimized",
+      "round": 7,
+      "warmup": false,
+      "milliseconds": 23.451400000000035
+    },
+    {
+      "workload": "processor-startup",
+      "variant": "baseline",
+      "round": 7,
+      "warmup": false,
+      "milliseconds": 20.129999999999995
+    },
+    {
+      "workload": "processor-startup",
+      "variant": "baseline",
+      "round": 8,
+      "warmup": false,
+      "milliseconds": 19.771299999999997
+    },
+    {
+      "workload": "processor-startup",
+      "variant": "optimized",
+      "round": 8,
+      "warmup": false,
+      "milliseconds": 22.934999999999945
+    },
+    {
+      "workload": "processor-startup",
+      "variant": "optimized",
+      "round": 9,
+      "warmup": false,
+      "milliseconds": 21.65059999999994
+    },
+    {
+      "workload": "processor-startup",
+      "variant": "baseline",
+      "round": 9,
+      "warmup": false,
+      "milliseconds": 20.437000000000012
+    },
+    {
+      "workload": "photo-import",
+      "variant": "baseline",
+      "round": 0,
+      "warmup": true,
+      "milliseconds": 1002.569
+    },
+    {
+      "workload": "photo-import",
+      "variant": "optimized",
+      "round": 0,
+      "warmup": true,
+      "milliseconds": 980.4854999999998
+    },
+    {
+      "workload": "photo-import",
+      "variant": "optimized",
+      "round": 1,
+      "warmup": true,
+      "milliseconds": 1005.7929999999997
+    },
+    {
+      "workload": "photo-import",
+      "variant": "baseline",
+      "round": 1,
+      "warmup": true,
+      "milliseconds": 990.9665999999997
+    },
+    {
+      "workload": "photo-import",
+      "variant": "baseline",
+      "round": 2,
+      "warmup": false,
+      "milliseconds": 1000.1902
+    },
+    {
+      "workload": "photo-import",
+      "variant": "optimized",
+      "round": 2,
+      "warmup": false,
+      "milliseconds": 989.5770000000002
+    },
+    {
+      "workload": "photo-import",
+      "variant": "optimized",
+      "round": 3,
+      "warmup": false,
+      "milliseconds": 1001.6552000000001
+    },
+    {
+      "workload": "photo-import",
+      "variant": "baseline",
+      "round": 3,
+      "warmup": false,
+      "milliseconds": 999.6900999999998
+    },
+    {
+      "workload": "photo-import",
+      "variant": "baseline",
+      "round": 4,
+      "warmup": false,
+      "milliseconds": 984.2691000000013
+    },
+    {
+      "workload": "photo-import",
+      "variant": "optimized",
+      "round": 4,
+      "warmup": false,
+      "milliseconds": 984.8635000000013
+    },
+    {
+      "workload": "photo-import",
+      "variant": "optimized",
+      "round": 5,
+      "warmup": false,
+      "milliseconds": 986.8299000000006
+    },
+    {
+      "workload": "photo-import",
+      "variant": "baseline",
+      "round": 5,
+      "warmup": false,
+      "milliseconds": 1043.5735999999997
+    },
+    {
+      "workload": "photo-import",
+      "variant": "baseline",
+      "round": 6,
+      "warmup": false,
+      "milliseconds": 979.0548999999992
+    },
+    {
+      "workload": "photo-import",
+      "variant": "optimized",
+      "round": 6,
+      "warmup": false,
+      "milliseconds": 981.7870999999996
+    },
+    {
+      "workload": "photo-import",
+      "variant": "optimized",
+      "round": 7,
+      "warmup": false,
+      "milliseconds": 993.2278000000006
+    },
+    {
+      "workload": "photo-import",
+      "variant": "baseline",
+      "round": 7,
+      "warmup": false,
+      "milliseconds": 994.6797999999981
+    },
+    {
+      "workload": "photo-import",
+      "variant": "baseline",
+      "round": 8,
+      "warmup": false,
+      "milliseconds": 960.3652000000002
+    },
+    {
+      "workload": "photo-import",
+      "variant": "optimized",
+      "round": 8,
+      "warmup": false,
+      "milliseconds": 961.2877999999982
+    },
+    {
+      "workload": "photo-import",
+      "variant": "optimized",
+      "round": 9,
+      "warmup": false,
+      "milliseconds": 947.5943000000007
+    },
+    {
+      "workload": "photo-import",
+      "variant": "baseline",
+      "round": 9,
+      "warmup": false,
+      "milliseconds": 965.1261000000013
+    },
+    {
+      "workload": "jpeg-render",
+      "variant": "baseline",
+      "round": 0,
+      "warmup": true,
+      "milliseconds": 2034.201000000001
+    },
+    {
+      "workload": "jpeg-render",
+      "variant": "optimized",
+      "round": 0,
+      "warmup": true,
+      "milliseconds": 2006.2201000000023
+    },
+    {
+      "workload": "jpeg-render",
+      "variant": "optimized",
+      "round": 1,
+      "warmup": true,
+      "milliseconds": 2031.0187000000005
+    },
+    {
+      "workload": "jpeg-render",
+      "variant": "baseline",
+      "round": 1,
+      "warmup": true,
+      "milliseconds": 2023.7530000000006
+    },
+    {
+      "workload": "jpeg-render",
+      "variant": "baseline",
+      "round": 2,
+      "warmup": false,
+      "milliseconds": 2026.4629000000023
+    },
+    {
+      "workload": "jpeg-render",
+      "variant": "optimized",
+      "round": 2,
+      "warmup": false,
+      "milliseconds": 2002.6285000000025
+    },
+    {
+      "workload": "jpeg-render",
+      "variant": "optimized",
+      "round": 3,
+      "warmup": false,
+      "milliseconds": 2018.649400000002
+    },
+    {
+      "workload": "jpeg-render",
+      "variant": "baseline",
+      "round": 3,
+      "warmup": false,
+      "milliseconds": 2021.2777999999962
+    },
+    {
+      "workload": "jpeg-render",
+      "variant": "baseline",
+      "round": 4,
+      "warmup": false,
+      "milliseconds": 2036.5982999999978
+    },
+    {
+      "workload": "jpeg-render",
+      "variant": "optimized",
+      "round": 4,
+      "warmup": false,
+      "milliseconds": 2017.5607999999993
+    },
+    {
+      "workload": "jpeg-render",
+      "variant": "optimized",
+      "round": 5,
+      "warmup": false,
+      "milliseconds": 2008.238599999997
+    },
+    {
+      "workload": "jpeg-render",
+      "variant": "baseline",
+      "round": 5,
+      "warmup": false,
+      "milliseconds": 2046.3392999999996
+    },
+    {
+      "workload": "jpeg-render",
+      "variant": "baseline",
+      "round": 6,
+      "warmup": false,
+      "milliseconds": 2067.824800000002
+    },
+    {
+      "workload": "jpeg-render",
+      "variant": "optimized",
+      "round": 6,
+      "warmup": false,
+      "milliseconds": 2026.1468000000023
+    },
+    {
+      "workload": "jpeg-render",
+      "variant": "optimized",
+      "round": 7,
+      "warmup": false,
+      "milliseconds": 2007.956299999998
+    },
+    {
+      "workload": "jpeg-render",
+      "variant": "baseline",
+      "round": 7,
+      "warmup": false,
+      "milliseconds": 2038.0890999999974
+    },
+    {
+      "workload": "jpeg-render",
+      "variant": "baseline",
+      "round": 8,
+      "warmup": false,
+      "milliseconds": 2019.5098999999973
+    },
+    {
+      "workload": "jpeg-render",
+      "variant": "optimized",
+      "round": 8,
+      "warmup": false,
+      "milliseconds": 1994.9977
+    },
+    {
+      "workload": "jpeg-render",
+      "variant": "optimized",
+      "round": 9,
+      "warmup": false,
+      "milliseconds": 1983.8444999999992
+    },
+    {
+      "workload": "jpeg-render",
+      "variant": "baseline",
+      "round": 9,
+      "warmup": false,
+      "milliseconds": 2304.9285999999993
+    }
+  ],
+  "passed": true,
+  "summary": [
+    {
+      "workload": "processor-startup",
+      "medianMs": {
+        "baseline": 20.283500000000004,
+        "optimized": 23.19319999999999
+      },
+      "reductionPercent": -14.345157393940822
+    },
+    {
+      "workload": "photo-import",
+      "medianMs": {
+        "baseline": 989.4744499999997,
+        "optimized": 985.846700000001
+      },
+      "reductionPercent": 0.3666340247591826
+    },
+    {
+      "workload": "jpeg-render",
+      "medianMs": {
+        "baseline": 2037.3436999999976,
+        "optimized": 2008.0974499999975
+      },
+      "reductionPercent": 1.4355088932711868
+    }
+  ],
+  "outputHashes": {
+    "photo-import": [
+      "02db234ff37d6ad5075acd7f917f228aafdfc1226c4bac7a468ad1364b9062b9",
+      "03bce294432bac610947c2b09ec5f50cf7b70eb0e317ab34a7cf842ff003f2f8",
+      "3d5af580907e133ac1b95bdd474f9d4f3e06bfc10403edea91b4dec5ef0c2b88",
+      "942767abb200a966207f65e7968b039206305ca830135ab8c11590c1c47916c4",
+      "a005906152fce54898e337ea134e84988e501d4b7652d70b14ef482e54b3066a"
+    ],
+    "jpeg-render": [
+      "3c20fc608bc737f305c38c54cb40425a8b1075b39d3563b02c6a88968c19d0b9"
+    ]
+  },
+  "source": {
+    "baseCommit": "0b81f146e0e8cafdca621f8bbf9602d9b3458b40",
+    "cargoTomlSha256": "87bc213b9f16cfb1d0ef98d291ac5935df3b8e7c619e58b4543579a852be547e",
+    "tauriConfigSha256": "21870399b5ae39c2e5d7392ce81add685703ea01368b420db217644a5334f256"
+  },
+  "artifacts": {
+    "baseline": [
+      {
+        "name": "MyAlbuns_0.1.0_x64-setup.exe",
+        "bytes": 7455250,
+        "sha256": "f0178307263188eb4122e43ae25f874c5ee4969f7e9f19c5947282683e31d017"
+      },
+      {
+        "name": "myalbuns-desktop.exe",
+        "bytes": 28953600,
+        "sha256": "d9715b12469988d93d31e9e6e16fbf84811526618b199057322bacff0c6cd5a3"
+      },
+      {
+        "name": "myalbuns-imaging.exe",
+        "bytes": 3933696,
+        "sha256": "fa130f2bfd203389c45ed76293eb475987df4972e8ec21907d17d5507afa3c3c"
+      }
+    ],
+    "optimized": [
+      {
+        "name": "MyAlbuns_0.1.0_x64-setup.exe",
+        "bytes": 6382128,
+        "sha256": "c8a2d4ddaedc2a1d234ec5b51b19eca3b52034b4946599f84f0a3c64979fb187"
+      },
+      {
+        "name": "myalbuns-desktop.exe",
+        "bytes": 21656576,
+        "sha256": "69f9cf7f503ad10265b1d8f81cc19d205b6953f74b77c82730196b475c972bea"
+      },
+      {
+        "name": "myalbuns-imaging.exe",
+        "bytes": 3738624,
+        "sha256": "662390dec1c0de95ea98c183ea97a1881c8967632dbf73af292483aa5624397a"
+      }
+    ]
+  },
+  "validation": {
+    "schemaVersion": 1,
+    "gate": "headless-validation",
+    "collectedAtUtc": "2026-09-17T16:14:26.5369129Z",
+    "gitCommit": "0b81f146e0e8cafdca621f8bbf9602d9b3458b40",
+    "sourceInputsDirty": true,
+    "passed": true,
+    "visibleNativeTestsInvoked": false,
+    "steps": [
+      {
+        "name": "processor-build",
+        "exitCode": 0,
+        "durationSeconds": 21.36,
+        "log": "processor-build.log"
+      },
+      {
+        "name": "frontend-build",
+        "exitCode": 0,
+        "durationSeconds": 138.63,
+        "log": "frontend-build.log"
+      },
+      {
+        "name": "owned-window-fitting",
+        "exitCode": 0,
+        "durationSeconds": 10.83,
+        "log": "owned-window-fitting.log"
+      },
+      {
+        "name": "frontend-tests",
+        "exitCode": 0,
+        "durationSeconds": 181.05,
+        "log": "frontend-tests.log"
+      },
+      {
+        "name": "automation-tests",
+        "exitCode": 0,
+        "durationSeconds": 36.08,
+        "log": "automation-tests.log"
+      },
+      {
+        "name": "rust-quality",
+        "exitCode": 0,
+        "durationSeconds": 44.67,
+        "log": "rust-quality.log"
+      },
+      {
+        "name": "rust-tests",
+        "exitCode": 0,
+        "durationSeconds": 309.67,
+        "log": "rust-tests.log"
+      }
+    ]
+  },
+  "executableCompilerFlags": [
+    "-C opt-level=3",
+    "-C lto=thin",
+    "-C codegen-units=1"
+  ]
+}
