@@ -111,8 +111,34 @@ impl PersistentProjectSession {
     pub(crate) fn apply(
         &mut self,
         intent: ProjectIntent,
+        sources: &crate::project_document::PhotoDimensions,
     ) -> Result<ProjectIntentOutcome, CoreError> {
         let mut outcome = ProjectIntentOutcome::default();
+        if let ProjectIntent::SetAlbumInformation {
+            information,
+            ref expected_dimension_key,
+        } = intent
+        {
+            if let Some(expected) = expected_dimension_key {
+                let validation = self.validate_album_information(&information, sources);
+                let current = validation
+                    .impact
+                    .and_then(|impact| impact.dimensional_change);
+                if current.as_ref().map(|change| &change.confirmation_key) != Some(expected) {
+                    return Err(CoreError::AlbumInformationReviewChanged);
+                }
+            }
+            let candidate = self
+                .project()
+                .with_album_information(information, &self.layout_catalog.entries, sources)
+                .map_err(CoreError::InvalidAlbumInformation)?;
+            // Only this complete, validated global transformation may resize locked Frames.
+            // Other mutations always pass the normal locked-structure guard.
+            if candidate != *self.project() {
+                self.publish_edit(candidate)?;
+            }
+            return Ok(outcome);
+        }
         if let ProjectIntent::AddFrame { sheet_id } | ProjectIntent::PasteFrames { sheet_id, .. } =
             &intent
         {
@@ -374,9 +400,9 @@ impl PersistentProjectSession {
                 project.with_arranged_frames(&frame_ids, action)
             }
             ProjectIntent::EditFrameGeometry { edit } => project.with_edited_frame_geometry(&edit),
-            ProjectIntent::SetAlbumInformation { information } => project
-                .with_album_information(information, &custom)
-                .map_err(CoreError::InvalidAlbumInformation),
+            ProjectIntent::SetAlbumInformation { .. } => {
+                unreachable!("Album information prepares its complete candidate before committing")
+            }
             ProjectIntent::SetVisualDefaults { visual_defaults } => project
                 .with_visual_defaults(visual_defaults)
                 .map_err(|()| CoreError::InvalidVisualDefaults),
@@ -728,19 +754,35 @@ impl PersistentProjectSession {
         &mut self,
         edit: impl FnOnce(&ProjectDocument) -> Result<ProjectDocument, CoreError>,
     ) -> Result<(), CoreError> {
+        let project = edit(&self.current.project)?;
+        self.current.project.validate_locked_structure(&project)?;
+        self.publish_edit(project)
+    }
+
+    fn publish_edit(&mut self, project: ProjectDocument) -> Result<(), CoreError> {
         let next_revision = self
             .latest_revision
             .checked_add(1)
             .filter(|revision| *revision <= MAX_SAFE_INTEGER)
             .ok_or(CoreError::RevisionSpaceExhausted)?;
-        let project = edit(&self.current.project)?;
-        self.current.project.validate_locked_structure(&project)?;
 
         self.undo.push(self.current.clone());
         self.redo.clear();
         self.current = ProjectRevision::new(self.current.project_id, next_revision, project);
         self.latest_revision = next_revision;
         Ok(())
+    }
+
+    pub(crate) fn validate_album_information(
+        &self,
+        information: &crate::AlbumInformation,
+        sources: &crate::project_document::PhotoDimensions,
+    ) -> crate::AlbumInformationValidation {
+        self.project().validate_album_information(
+            information,
+            &self.layout_catalog.entries,
+            sources,
+        )
     }
 
     pub(crate) fn undo(&mut self) -> Option<()> {

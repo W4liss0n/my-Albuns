@@ -8,6 +8,7 @@ import type {
   DocumentSnapshot,
   DisplayUnit,
   EndSheetFormat,
+  MediaCatalogItem,
   SheetSnapshot,
 } from "../domain/project";
 import {
@@ -43,6 +44,7 @@ interface AlbumInformationFormProps {
   document: DocumentSnapshot;
   formId: string;
   revision: number;
+  photoSources?: readonly MediaCatalogItem[];
   sheetStates: readonly SheetSnapshot[];
   onApply(
     draft: AlbumInformationProjectDraft,
@@ -104,6 +106,7 @@ const END_SHEET_OPTIONS = [
 ] as const;
 
 export function AlbumInformationForm({
+  photoSources,
   document,
   formId,
   revision,
@@ -187,7 +190,7 @@ export function AlbumInformationForm({
     return () => {
       current = false;
     };
-  }, [dirty, onValidate, validationKey]);
+  }, [dirty, onValidate, photoSources, validationKey]);
 
   const validationCurrent = validated?.key === validationKey;
   const errors = mergeErrors(
@@ -388,10 +391,6 @@ export function AlbumInformationForm({
     : undefined;
   const pageDimensionValid =
     pageWidth !== undefined && pageWidth > 0 && pageWidth % 2 === 0;
-  // PLACEHOLDER UI: #31 owns proportional transformation of existing content.
-  const dimensionChangeRequiresSafeTransformation = sheetStates.some(
-    (sheet) => sheet.frames.length > 0,
-  );
 
   return (
     <form
@@ -461,24 +460,20 @@ export function AlbumInformationForm({
           <legend>Dimensão da Lâmina</legend>
           <div className="inspector-readout-grid">
             <MeasurementField
-              disabled={dimensionChangeRequiresSafeTransformation}
               error={firstError(errors.sheetWidth)}
               field="sheetWidth"
               label="Largura"
               onReset={measurementResetAction("sheetWidth")}
-              placeholderFeature="safe-sheet-dimension-change"
               unit={draft.displayUnit}
               validationTooltip={validationTooltip}
               value={draft.sheetWidth.text}
               onChange={(value) => setMeasurement("sheetWidth", value)}
             />
             <MeasurementField
-              disabled={dimensionChangeRequiresSafeTransformation}
               error={firstError(errors.sheetHeight)}
               field="sheetHeight"
               label="Altura"
               onReset={measurementResetAction("sheetHeight")}
-              placeholderFeature="safe-sheet-dimension-change"
               unit={draft.displayUnit}
               validationTooltip={validationTooltip}
               value={draft.sheetHeight.text}

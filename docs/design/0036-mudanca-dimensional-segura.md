@@ -12,9 +12,8 @@ Este contrato conclui a decisão [#5](https://github.com/W4liss0n/my-Albuns/issu
 e orienta a implementação [#31](https://github.com/W4liss0n/my-Albuns/issues/31).
 O [ADR 0011](../adr/0011-limitar-mudanca-de-proporcao-a-dez-por-cento.md) possui
 o limite aprovado; a [SPEC](../specs/programa-de-diagramacao-de-albuns.md) possui
-o comportamento observável. O código atual ainda bloqueia mudanças de tamanho
-em Álbuns com Frames e proporções diferentes em Álbuns vazios. Este documento
-não afirma que a implementação já foi entregue.
+o comportamento observável. A implementação da #31 aplica este contrato no
+Core e no fluxo existente de Informações do Álbum.
 
 ## Admissão do formato
 

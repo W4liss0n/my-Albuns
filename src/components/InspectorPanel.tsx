@@ -504,6 +504,7 @@ export function InspectorPanel({
             >
               <div className="inspector-subsections">
                 <AlbumInformationForm
+                  photoSources={mediaItems}
                   document={document}
                   formId={ALBUM_INFORMATION_FORM_ID}
                   revision={revision}

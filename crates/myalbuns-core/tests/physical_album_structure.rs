@@ -3,9 +3,8 @@ use std::fs;
 use myalbuns_core::{
     AlbumInformation, CoreError, CreateAuthorization, CreateProjectRequest, DisplayUnit,
     EndSheetFormat, ImportPhoto, InitialProject, InitialProjectConfiguration, OpenProjectRequest,
-    PhotoPlacementMode, PhotoSourceMetadata,
-    ProjectConfigurationValidationError as ValidationError, ProjectCore, ProjectIntent,
-    ProjectLocation, ProjectedActiveSides, SaveProjectOutcome, SheetInsertionPosition, SheetRole,
+    PhotoPlacementMode, PhotoSourceMetadata, ProjectCore, ProjectIntent, ProjectLocation,
+    ProjectedActiveSides, SaveProjectOutcome, SheetInsertionPosition, SheetRole,
 };
 use myalbuns_paths::OperationPathContext;
 
@@ -533,7 +532,7 @@ fn deleting_and_undoing_a_composed_sheet_never_removes_its_media_catalog_entry()
 }
 
 #[test]
-fn composed_album_requires_the_safe_dimension_change_owner() {
+fn composed_album_resizes_atomically_without_reorganizing_photos() {
     let root = tempfile::tempdir().expect("temporary composed Album root");
     let project_path = root.path().join("Dimensão composta.myalbuns");
     let photo_path = root.path().join("Foto dimensional.jpg");
@@ -573,11 +572,26 @@ fn composed_album_requires_the_safe_dimension_change_owner() {
     };
     let validation = project.validate_album_information(&information);
 
-    assert_eq!(
-        validation.errors,
-        [ValidationError::SheetDimensionsRequireContentTransformation]
-    );
-    assert_eq!(validation.impact, None);
+    assert!(validation.errors.is_empty(), "{:?}", validation.errors);
+    let before = project.project().clone();
+    let revision = project.revision();
+    project
+        .apply(ProjectIntent::SetAlbumInformation {
+            expected_dimension_key: None,
+            information,
+        })
+        .unwrap();
+    assert_eq!(project.revision(), revision + 1);
+    let old = &before.sheets()[1].frames()[0];
+    let new = &project.project().sheets()[1].frames()[0];
+    assert_eq!(new.id(), old.id());
+    assert_eq!(new.rect().x(), old.rect().x() * 2);
+    assert_eq!(new.rect().y(), old.rect().y() * 2);
+    assert_eq!(new.rect().width(), old.rect().width() * 2);
+    assert_eq!(new.rect().height(), old.rect().height() * 2);
+    assert_eq!(new.photo(), old.photo());
+    project.undo().unwrap();
+    assert_eq!(project.project(), &before);
 }
 
 #[test]
@@ -625,7 +639,10 @@ fn composed_edge_conversion_uses_layout_rules() {
     assert!(validation.impact.is_some());
     assert!(
         project
-            .apply(ProjectIntent::SetAlbumInformation { information })
+            .apply(ProjectIntent::SetAlbumInformation {
+                expected_dimension_key: None,
+                information
+            })
             .is_ok()
     );
 }
@@ -683,7 +700,10 @@ fn composed_final_edge_conversion_uses_layout_rules() {
     assert!(validation.impact.is_some());
     assert!(
         project
-            .apply(ProjectIntent::SetAlbumInformation { information })
+            .apply(ProjectIntent::SetAlbumInformation {
+                expected_dimension_key: None,
+                information
+            })
             .is_ok()
     );
 }

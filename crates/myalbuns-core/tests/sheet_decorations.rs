@@ -429,6 +429,7 @@ fn applying_to_one_side_preserves_the_other_crop_and_history_through_save() {
     for through_information in [false, true] {
         let intent = if through_information {
             ProjectIntent::SetAlbumInformation {
+                expected_dimension_key: None,
                 information: AlbumInformation {
                     display_unit: DisplayUnit::Mm,
                     sheet_width_um: 600_000,

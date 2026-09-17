@@ -399,7 +399,7 @@ fn technical_targets_match_active_edges_and_zero_disables_only_the_technical_ref
                 single,
                 &[[80_000, 47_000, 60_000, 40_000]],
             );
-            project.apply(ProjectIntent::SetAlbumInformation { information: serde_json::from_value(serde_json::json!({
+            project.apply(ProjectIntent::SetAlbumInformation { expected_dimension_key: None, information: serde_json::from_value(serde_json::json!({
                 "displayUnit": "mm", "sheetWidthUm": 600_000, "sheetHeightUm": 300_000, "dpi": 300,
                 "bleedUm": if enabled { 10_000 } else { 0 }, "safetyUm": if enabled { 12_000 } else { 0 },
                 "firstSheet": if single { "singlePage" } else { "double" }, "lastSheet": "double"
@@ -527,6 +527,7 @@ fn equidistant_technical_references_follow_numeric_geometric_order() {
         project_with_rectangles(root.path(), 0, false, &[[80_000, 47_000, 60_000, 40_000]]);
     project
         .apply(ProjectIntent::SetAlbumInformation {
+            expected_dimension_key: None,
             information: serde_json::from_value(serde_json::json!({
                 "displayUnit": "mm", "sheetWidthUm": 600_000, "sheetHeightUm": 300_000, "dpi": 300,
                 "bleedUm": 6_000, "safetyUm": 6_000, "firstSheet": "double", "lastSheet": "double"

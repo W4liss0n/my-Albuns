@@ -430,21 +430,75 @@ fn compose_overlays(
         })
         .collect()
 }
+pub(crate) fn resized_photo_pan(
+    before: &RectUm,
+    after: &RectUm,
+    transform: &crate::model::MediaTransform,
+    source: (u32, u32),
+) -> NormalizedPan {
+    let old = PhotoFit::new(before, transform, source);
+    let new = PhotoFit::new(after, transform, source);
+    let pan = |value: f32, old_span: f64, new_span: f64| {
+        if new_span > 0.0 {
+            (f64::from(value) * old_span * (new.scale / old.scale) / new_span).clamp(-1.0, 1.0)
+        } else {
+            0.0
+        }
+    };
+    NormalizedPan {
+        x: pan(transform.pan_x, old.horizontal_span, new.horizontal_span),
+        y: pan(transform.pan_y, old.vertical_span, new.vertical_span),
+    }
+}
+
+/// Canonical fill and Pan room, shared by rendering and dimensional changes.
+struct PhotoFit {
+    scale: f64,
+    draw_width: f64,
+    draw_height: f64,
+    horizontal_span: f64,
+    vertical_span: f64,
+}
+
+impl PhotoFit {
+    fn new(frame: &RectUm, transform: &crate::model::MediaTransform, source: (u32, u32)) -> Self {
+        let rotation = transform.quarter_turns as f32 * 90.0 - transform.fine_rotation_degrees;
+        let radians = f64::from(rotation).to_radians();
+        let (sine, cosine) = radians.sin_cos();
+        let required_width = cosine.abs() * frame.width as f64 + sine.abs() * frame.height as f64;
+        let required_height = sine.abs() * frame.width as f64 + cosine.abs() * frame.height as f64;
+        let scale =
+            (required_width / f64::from(source.0)).max(required_height / f64::from(source.1));
+        let draw_width = f64::from(source.0) * scale;
+        let draw_height = f64::from(source.1) * scale;
+        let zoom = f64::from(transform.user_zoom.clamp(PHOTO_ZOOM_MIN, PHOTO_ZOOM_MAX));
+        Self {
+            scale,
+            draw_width,
+            draw_height,
+            horizontal_span: (draw_width * zoom - required_width).max(0.0),
+            vertical_span: (draw_height * zoom - required_height).max(0.0),
+        }
+    }
+}
+
 fn compose_photo(frame: &RectUm, photo: &PhotoSnapshot, media: &MediaCatalogItem) -> ComposedPhoto {
     let rotation_degrees =
         photo.transform.quarter_turns as f32 * 90.0 - photo.transform.fine_rotation_degrees;
     let radians = (rotation_degrees as f64).to_radians();
-    let cosine = radians.cos();
-    let sine = radians.sin();
     let frame_width = frame.width as f64;
     let frame_height = frame.height as f64;
-    let source_width = media.source_width_px.expect("validated Photo width") as f64;
-    let source_height = media.source_height_px.expect("validated Photo height") as f64;
-    let required_width = cosine.abs() * frame_width + sine.abs() * frame_height;
-    let required_height = sine.abs() * frame_width + cosine.abs() * frame_height;
-    let fill_scale = (required_width / source_width).max(required_height / source_height);
-    let draw_width_at_fill = source_width * fill_scale;
-    let draw_height_at_fill = source_height * fill_scale;
+    let fit = PhotoFit::new(
+        frame,
+        &photo.transform,
+        (
+            media.source_width_px.expect("validated Photo width"),
+            media.source_height_px.expect("validated Photo height"),
+        ),
+    );
+    let fill_scale = fit.scale;
+    let draw_width_at_fill = fit.draw_width;
+    let draw_height_at_fill = fit.draw_height;
     let current_pan = NormalizedPan {
         x: photo.transform.pan_x.clamp(PHOTO_PAN_MIN, PHOTO_PAN_MAX) as f64,
         y: photo.transform.pan_y.clamp(PHOTO_PAN_MIN, PHOTO_PAN_MAX) as f64,
@@ -472,8 +526,8 @@ fn compose_photo(frame: &RectUm, photo: &PhotoSnapshot, media: &MediaCatalogItem
         x: -pan_radians.sin(),
         y: pan_radians.cos(),
     };
-    let horizontal_span = (draw_width_at_fill * current_zoom - required_width).max(0.0);
-    let vertical_span = (draw_height_at_fill * current_zoom - required_height).max(0.0);
+    let horizontal_span = fit.horizontal_span;
+    let vertical_span = fit.vertical_span;
     let horizontal_offset = scale_vector(&horizontal_direction, horizontal_span / 2.0);
     let vertical_offset = scale_vector(&vertical_direction, vertical_span / 2.0);
     let pan_to_center = matrix_from_columns(&horizontal_offset, &vertical_offset);
