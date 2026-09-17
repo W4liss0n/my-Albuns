@@ -330,7 +330,7 @@ try {
         $gate.selectedSheetDimensions.height -ne 360 -or
         $gate.expectedBackgroundRgb -ne '#204060' -or
         $gate.exportedDpi -ne 360 -or
-        $gate.schemaVersion -ne 3 -or
+        $gate.schemaVersion -ne 12 -or
         $gate.savedRevision -ne 3 -or
         $gate.savedDpi -ne 300 -or
         $gate.photoFrameCount -ne 1 -or

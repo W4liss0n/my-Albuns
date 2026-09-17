@@ -698,11 +698,18 @@ async function clickUntilLogEvent(driver, using, value, event, label) {
 async function replaceInput(driver, using, value, text, label) {
   const elementId = await findElement(driver, using, value, label);
   const endpoint = `/session/${driver.sessionId}/element/${encodeURIComponent(elementId)}`;
-  await driver.request("POST", `${endpoint}/clear`, {});
+  await driver.request("POST", `${endpoint}/click`, {});
+  // Replace through keyboard input so controlled fields receive input events.
+  const replacement = `\uE009a\uE000${text}`;
   await driver.request("POST", `${endpoint}/value`, {
-    text,
-    value: [...text],
+    text: replacement,
+    value: [...replacement],
   });
+  await waitFor(
+    `${label} value`,
+    async () => (await elementAttribute(driver, elementId, "value")) === text,
+    timeoutMilliseconds,
+  );
   return elementId;
 }
 
@@ -1269,9 +1276,9 @@ try {
     savedFrames.length === 1 &&
     savedFrames[0].photo?.mediaId === savedPhoto.id &&
     Object.keys(savedFrames[0].photo.transform).sort().join(",") ===
-      "panX,panY,userZoom";
+      "angleTenths,blackAndWhite,mirrorX,panX,panY,quarterTurns,userZoom";
   if (
-    savedDocument.schemaVersion !== 3 ||
+    savedDocument.schemaVersion !== 12 ||
     savedDocument.revision !== 3 ||
     savedDocument.project.document.dpi !== 300 ||
     !persistedPhotoLinkOnly
@@ -1473,7 +1480,7 @@ try {
             "baseRevision,creativeState,projectId,schemaVersion" &&
           baseKeys === "projectId,revision" &&
           creativeKeys ===
-            "documentType,project,projectId,revision,schemaVersion"
+            "documentType,mediaFolders,project,projectId,revision,schemaVersion,sheetVisuals"
           ? checkpoint
           : undefined;
       } catch {
@@ -1647,7 +1654,11 @@ try {
             .map((button) => button.textContent.trim()),
           contentFitted:
             shell !== null &&
-            Math.abs(document.documentElement.clientHeight - shell.scrollHeight) <= 2,
+            Math.abs(document.documentElement.clientHeight - Math.ceil(shell.getBoundingClientRect().height)) <= 1 &&
+            shell.scrollHeight <= shell.clientHeight + 1,
+          shellHeight: shell?.getBoundingClientRect().height ?? null,
+          shellClientHeight: shell?.clientHeight ?? null,
+          shellScrollHeight: shell?.scrollHeight ?? null,
           dialogCount: document.querySelectorAll('[role="dialog"]').length,
           externalDialog:
             window.location.pathname.endsWith('/dialog.html') &&
@@ -1989,7 +2000,7 @@ try {
   );
   expectedSavedAsProject.document.dpi = 360;
   const savedAsContentPreserved =
-    savedAsDocument.schemaVersion === 3 &&
+    savedAsDocument.schemaVersion === 12 &&
     savedAsDocument.projectId !== originalProjectId &&
     savedAsDocument.revision === 6 &&
     JSON.stringify(savedAsDocument.project) ===
@@ -2946,7 +2957,11 @@ try {
             .map((button) => button.textContent.trim()),
           contentFitted:
             shell !== null &&
-            Math.abs(document.documentElement.clientHeight - shell.scrollHeight) <= 2,
+            Math.abs(document.documentElement.clientHeight - Math.ceil(shell.getBoundingClientRect().height)) <= 1 &&
+            shell.scrollHeight <= shell.clientHeight + 1,
+          shellHeight: shell?.getBoundingClientRect().height ?? null,
+          shellClientHeight: shell?.clientHeight ?? null,
+          shellScrollHeight: shell?.scrollHeight ?? null,
           dialogCount: document.querySelectorAll('[role="dialog"]').length,
           externalDialog:
             window.location.pathname.endsWith('/dialog.html') &&
