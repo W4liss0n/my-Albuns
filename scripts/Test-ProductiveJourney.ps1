@@ -527,6 +527,10 @@ try {
         -not $gate.exportedAfterReopen -or
         $gate.canvasPhotoSample.cssWidth -le 0 -or
         $gate.canvasPhotoSample.cssHeight -le 0 -or
+        $gate.canvasPhotoSample.exportXFraction -le 0 -or
+        $gate.canvasPhotoSample.exportXFraction -ge 1 -or
+        $gate.canvasPhotoSample.exportYFraction -le 0 -or
+        $gate.canvasPhotoSample.exportYFraction -ge 1 -or
         $gate.sourcePathExposedToWebView
     ) {
         $contractViolations += 'output'
@@ -555,10 +559,13 @@ try {
         $sampleX = 2
         $sampleY = [Math]::Floor($jpegBitmap.Height / 2)
         $backgroundSample = $jpegBitmap.GetPixel($sampleX, $sampleY)
-        # Match the Canvas sample while staying clear of the editor-only
-        # center spine, which is intentionally absent from the exported JPEG.
-        $photoExportSampleX = [Math]::Floor($jpegBitmap.Width * 0.45)
-        $photoExportSampleY = [Math]::Floor($jpegBitmap.Height / 2)
+        # Compare the same Frame center in the Original, Canvas and JPEG.
+        $photoExportSampleX = [Math]::Floor(
+            $jpegBitmap.Width * [double] $gate.canvasPhotoSample.exportXFraction
+        )
+        $photoExportSampleY = [Math]::Floor(
+            $jpegBitmap.Height * [double] $gate.canvasPhotoSample.exportYFraction
+        )
         $photoExportSample = $jpegBitmap.GetPixel(
             $photoExportSampleX,
             $photoExportSampleY

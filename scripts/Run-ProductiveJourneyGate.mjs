@@ -2606,6 +2606,16 @@ try {
     "canvas.pixi-canvas",
     "productive Canvas",
   );
+  const fidelityFrame = savedFrames[0];
+  const neutralTransform = {
+    panX: 0, panY: 0, userZoom: 1, quarterTurns: 0,
+    mirrorX: false, angleTenths: 0, blackAndWhite: false,
+  };
+  if (Object.entries(neutralTransform).some(
+    ([key, value]) => fidelityFrame.photo.transform[key] !== value,
+  )) {
+    throw new Error("The fidelity fixture must keep the Original centered in its Frame");
+  }
   const screenshot = await hostDriver.request(
     "GET",
     `/session/${hostDriver.sessionId}/element/${encodeURIComponent(canvas)}/screenshot`,
@@ -2617,21 +2627,40 @@ try {
     {
       script: `
         const canvas = arguments[0];
-        const sheetHeightPx = arguments[1] / 1000;
+        const settings = arguments[1];
+        const sheetId = arguments[2];
+        const frame = arguments[3];
         const bounds = canvas.getBoundingClientRect();
-        const scale = (bounds.height - 48) / (sheetHeightPx + 24);
+        const bar = document.querySelector(
+          '.sheet-bar-overlay__handle[data-sheet-id="' + sheetId + '"]'
+        );
+        if (!bar) throw new Error("The selected Sheet has no rendered bar");
+        const sheetBounds = bar.getBoundingClientRect();
+        const bleed = settings.bleedUm;
+        const scale = sheetBounds.width / (settings.sheetWidthUm - 2 * bleed);
+        const sheetX = frame.x + frame.width / 2;
+        const sheetY = frame.y + frame.height / 2;
+        // The normal Canvas crops bleed. Its rendered Sheet bar supplies the
+        // current position and scale, including horizontal navigation.
+        const x = sheetBounds.left - bounds.left + (sheetX - bleed) * scale;
+        const y = sheetBounds.top - bounds.top + (sheetY - bleed) * scale;
+        if (!Number.isFinite(scale) || scale <= 0 ||
+            x < 0 || x >= bounds.width || y < 0 || y >= bounds.height) {
+          throw new Error("The Photo center is outside the rendered Canvas");
+        }
         return {
           cssWidth: bounds.width,
           cssHeight: bounds.height,
-          // Keep the fidelity sample inside the Photo while avoiding the
-          // editor-only spine rendered at the exact center of a double sheet.
-          x: bounds.width * 0.45,
-          y: 24 + (24 + sheetHeightPx / 2) * scale,
+          x, y,
+          exportXFraction: sheetX / settings.sheetWidthUm,
+          exportYFraction: sheetY / settings.sheetHeightUm,
         };
       `,
       args: [
         { "element-6066-11e4-a52e-4f735466cecf": canvas },
-        savedDocument.project.document.sheetHeightUm,
+        savedDocument.project.document,
+        sheetEvidence.selectedSheetId,
+        fidelityFrame.rect,
       ],
     },
   );
