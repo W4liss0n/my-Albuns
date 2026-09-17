@@ -251,7 +251,7 @@ impl ProjectDocument {
                             let photo = frame.photo.as_ref().map(|photo| {
                                 let t = photo.transform;
                                 (
-                                    photo.media_id,
+                                    photo.media_id.to_string(),
                                     t.pan_x_scaled,
                                     t.pan_y_scaled,
                                     t.user_zoom_scaled,
@@ -268,7 +268,7 @@ impl ProjectDocument {
                             });
                             let (border, opacity) = frame.resolved_style(&project.visual_defaults);
                             serde_json::json!([
-                                frame.id,
+                                frame.id.to_string(),
                                 RectUm::from(frame.rect),
                                 photo,
                                 matches!(frame.style, FrameStyle::Album),
@@ -279,7 +279,7 @@ impl ProjectDocument {
                         })
                         .collect();
                     serde_json::json!([
-                        sheet.id,
+                        sheet.id.to_string(),
                         surface(
                             sheet.active_sides,
                             project.document.sheet_width_um as i64,
