@@ -56,6 +56,14 @@ campos textuais internos. Seus drafts, refs, validação, foco e handlers perman
 com os controles existentes. A política comum de autocomplete não admite exceção
 nesses campos. Inputs de cor e range permanecem nativos.
 
+Erros de validação dos campos usam por padrão o tooltip visual existente do
+programa, com indicação no campo e descrição acessível. Não se adicionam avisos
+em fluxo nem se substitui a ajuda normal por texto de erro: altura, espaçamento
+e posição dos controles seguintes permanecem estáveis. A regra abrange Zoom,
+Ângulo, Opacidade, Borda e entrada hexadecimal de cor. O tooltip reaproveita os
+tokens de erro, superfície, sombra e tipografia vigentes; a hierarquia continua
+centrada no campo em edição. Correção ou cancelamento remove o erro.
+
 ## Verificação
 
 - Projeção estrutural versus comandos reais: duas, três e cinco Lâminas; quatro

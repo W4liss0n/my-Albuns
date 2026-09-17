@@ -9618,6 +9618,18 @@
       ]
     },
     {
+      "id": "workspace-sheet-design-color-invalid",
+      "title": "Design da Lâmina — erro de cor em tooltip sem deslocar controles",
+      "implementationPath": "/workspace-preview.html?frame=decorations&decoration-state=mixed-origin&context=sheet",
+      "comparison": { "kind": "implementation-only", "surface": "sheet-design", "reason": "O design 0040 usa o tooltip de validação existente também na entrada hexadecimal, mantendo a geometria do painel e do seletor de cor." },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "[role='dialog']:has(input[aria-invalid='true']) [role='tooltip']",
+      "actions": [
+        { "type": "click", "selector": "[aria-label='Cor do Background da Lâmina']" },
+        { "type": "input", "selector": "[aria-label='Cor hexadecimal do Background da Lâmina']", "value": "#oops" }
+      ]
+    },
+    {
       "id": "workspace-sheet-design-color-apply",
       "title": "Design da Lâmina — Aplicar cor aos dois lados",
       "implementationPath": "/workspace-preview.html?frame=decorations&decoration-state=mixed-origin&context=sheet",
@@ -11544,7 +11556,7 @@
       },
       "id": "workspace-photo-zoom-invalid",
       "title": "Zoom — valor inválido não altera o Projeto",
-      "readySelector": "body[data-photo-orientation=\"single-zoom\"][data-photo-orientation-history=\"0,0\"] [aria-label=\"Zoom da Foto em porcentagem\"][aria-invalid=\"true\"]",
+      "readySelector": "body[data-photo-orientation='single-zoom'][data-photo-orientation-history='0,0'] .numeric-property-control:has([aria-label='Zoom da Foto em porcentagem'][aria-invalid='true']) [role='tooltip']",
       "actions": [
         {
           "type": "input",
@@ -11568,7 +11580,7 @@
       "implementationPath": "/workspace-preview.html?frame=orientation&orientation=single-zoom",
       "comparison": { "kind": "implementation-only", "surface": "photo-zoom", "reason": "O design 0040 mantém a validação no controle numérico existente e preserva o Projeto enquanto a entrada é inválida." },
       "viewport": { "width": 1440, "height": 800 },
-      "readySelector": "body[data-photo-orientation-history='0,0'] [aria-label='Zoom da Foto em porcentagem'][aria-invalid='true']",
+      "readySelector": "body[data-photo-orientation-history='0,0'] .numeric-property-control:has([aria-label='Zoom da Foto em porcentagem'][aria-invalid='true']) [role='tooltip']",
       "actions": [{ "type": "input", "selector": "[aria-label='Zoom da Foto em porcentagem']", "value": "9999" }]
     },
     {

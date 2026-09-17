@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { ActionButton } from "./ActionButton";
 import { TextInput } from "./TextInput";
+import { FieldValidationAutoTooltip, FieldValidationTooltip, fieldValidationTooltipAttributes, useFieldValidationTooltip } from "./FieldValidationTooltip";
 import { useDismissableSurface } from "./useDismissableSurface";
 import "./ColorPropertyControl.css";
 
@@ -21,6 +22,10 @@ export function ColorPropertyControl({ rgb, disabled, label, defaultRgb = "#0000
   const actions = useRef({ onCancel });
   actions.current = { onCancel };
   const valid = draft !== null && /^#[\da-f]{6}$/i.test(draft);
+  const error = draft !== null && !valid ? "Use uma cor hexadecimal com seis dígitos, como #A1B2C3." : undefined;
+  const validationTooltip = useFieldValidationTooltip(useId(), [
+    { field: "color", messages: error ? [error] : undefined },
+  ]);
   const cancel = () => { setDraft(null); onCancel?.(); };
   useEffect(() => { if (disabled) setDraft(null); }, [disabled]);
   useEffect(() => () => actions.current.onCancel?.(), []);
@@ -53,9 +58,13 @@ export function ColorPropertyControl({ rgb, disabled, label, defaultRgb = "#0000
         <input type="color" aria-label={`Selecionar cor ${label}`} value={valid ? draft : defaultRgb}
           onChange={(event) => update(event.currentTarget.value)} />
         <TextInput type="text" className="ui-field-control" aria-label={`Cor hexadecimal ${label}`} value={draft} maxLength={7}
+          {...fieldValidationTooltipAttributes("color", error, validationTooltip)}
+          onMouseEnter={() => { if (error) validationTooltip.show("color"); }}
           autoFocus aria-invalid={!valid} onChange={(event) => update(event.currentTarget.value)}
           onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); event.stopPropagation(); apply(); } }} />
+        <FieldValidationAutoTooltip field="color" tooltip={validationTooltip} />
       </div>
+      <FieldValidationTooltip tooltip={validationTooltip} />
       <div className="ui-color-property-actions">
         <ActionButton density="compact" variant="quiet" onClick={() => { cancel(); trigger.current?.focus(); }}>Cancelar</ActionButton>
         <ActionButton density="compact" variant="primary" disabled={!valid} onClick={apply}>Aplicar cor</ActionButton>

@@ -24,7 +24,8 @@
   padding: var(--ui-space-3);
 }
 
-.ui-color-property-inputs { display: flex; gap: var(--ui-space-2); align-items: center; }
+.ui-color-property-inputs { position: relative; display: flex; gap: var(--ui-space-2); align-items: center; }
+.ui-color-property-inputs > .ui-field-validation-auto-tooltip { --ui-tooltip-pointer-inline-start: 56px; }
 .ui-color-property-inputs input[type="color"] { width: 32px; height: 28px; padding: 1px; }
 .ui-color-property-inputs input[type="text"] { width: 100%; min-width: 0; font-family: var(--ui-font-mono); }
 .ui-color-property-actions { display: flex; justify-content: flex-end; gap: var(--ui-space-2); }

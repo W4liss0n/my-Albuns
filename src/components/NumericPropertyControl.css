@@ -12,7 +12,13 @@
 }
 
 .numeric-property-heading {
+  position: relative;
   justify-content: space-between;
+}
+
+.numeric-property-heading > .ui-field-validation-auto-tooltip {
+  --ui-tooltip-pointer-inline-start: auto;
+  --ui-tooltip-pointer-inline-end: 40px;
 }
 
 .numeric-property-number input {
@@ -27,10 +33,6 @@
   margin: 0;
   color: var(--ui-text-muted);
   font-size: var(--ui-font-size-micro);
-}
-
-.numeric-property-help[data-invalid="true"] {
-  color: var(--ui-danger);
 }
 
 .numeric-property-slider[data-mixed="true"]::-webkit-slider-thumb {

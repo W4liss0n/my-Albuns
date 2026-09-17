@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { TextInput } from "../ui/TextInput";
+import { FieldValidationAutoTooltip, FieldValidationTooltip, fieldValidationTooltipAttributes, useFieldValidationTooltip } from "../ui/FieldValidationTooltip";
 import "./NumericPropertyControl.css";
 import type { PointerDragThreshold } from "../application/projectPorts";
 
@@ -55,6 +56,10 @@ export function NumericPropertyControl(props: NumericPropertyControlProps) {
   const press = useRef<{ id: number; x: number; y: number; dragged: boolean } | null>(null);
   const shownValue = liveValue ?? value;
   const invalid = textDraft !== null && parseValue(textDraft) === null;
+  const error = invalid ? props.invalidHelp : undefined;
+  const validationTooltip = useFieldValidationTooltip(`${helpId}-error`, [
+    { field: "value", messages: error ? [error] : undefined },
+  ]);
 
   function clearTimer() {
     if (timer.current !== null) clearTimeout(timer.current);
@@ -148,8 +153,10 @@ export function NumericPropertyControl(props: NumericPropertyControlProps) {
             aria-valuemax={displayNumber(maximum)}
             aria-valuenow={shownValue === null ? undefined : displayNumber(shownValue)}
             aria-valuetext={shownValue === null ? "Múltiplos valores" : undefined}
+            {...fieldValidationTooltipAttributes("value", error, validationTooltip)}
             aria-invalid={invalid}
-            aria-describedby={helpId}
+            aria-describedby={invalid ? validationTooltip.id : helpId}
+            onMouseEnter={() => { if (invalid) validationTooltip.show("value"); }}
             disabled={disabled}
             value={textDraft ?? (shownValue === null ? "" : formatValue(shownValue))}
             placeholder={value === null ? "—" : undefined}
@@ -186,6 +193,7 @@ export function NumericPropertyControl(props: NumericPropertyControlProps) {
           />
           <span aria-hidden="true">{props.unit}</span>
         </div>
+        <FieldValidationAutoTooltip field="value" tooltip={validationTooltip} />
       </div>
       <input
         className="ui-range numeric-property-slider"
@@ -240,9 +248,10 @@ export function NumericPropertyControl(props: NumericPropertyControlProps) {
         onKeyUp={(event) => { if (SLIDER_KEYS.has(event.key)) finish(); }}
         onBlur={finish}
       />
-      <p id={helpId} className="numeric-property-help" data-invalid={invalid}>
-        {invalid ? props.invalidHelp : props.help}
+      <p id={helpId} className="numeric-property-help">
+        {props.help}
       </p>
+      <FieldValidationTooltip tooltip={validationTooltip} />
     </div>
   );
 }

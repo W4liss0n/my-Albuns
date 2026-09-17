@@ -24,6 +24,10 @@ accepted ADRs, `docs/design/`, and the current visual-reference pointer in
 - Apply the deletion test before accepting a new abstraction: removing a useful
   shared seam must make the same non-trivial policy reappear in multiple callers.
 
+- Field validation follows the tooltip policy in design 0040. Reuse the shared
+  field-validation tooltip and accessible description; do not add in-flow error
+  messages that displace adjacent controls.
+
 ## Review evidence
 
 - A static CSS or source-string check proves structure, not rendered appearance.

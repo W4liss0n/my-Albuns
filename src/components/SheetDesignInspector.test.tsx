@@ -41,10 +41,14 @@ test("a color draft commits once, while cancellation, invalid input and a scope 
   open();
   fireEvent.change(field(), { target: { value: "#oops" } });
   expect(screen.getByRole("button", { name: "Aplicar cor" })).toBeDisabled();
+  expect(screen.getByRole("tooltip")).toHaveTextContent("Use uma cor hexadecimal com seis dígitos, como #A1B2C3.");
+  expect(field()).toHaveAccessibleDescription("Use uma cor hexadecimal com seis dígitos, como #A1B2C3.");
   view.rerender(<SheetDesignInspector {...input} scope="right" />);
   expect(screen.queryByRole("dialog")).toBeNull();
+  expect(screen.queryByRole("tooltip")).toBeNull();
   open();
   fireEvent.change(field(), { target: { value: "#abcdef" } });
+  expect(screen.queryByRole("alert")).toBeNull();
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "Aplicar cor" })));
   expect(input.actions!.onChange).toHaveBeenCalledExactlyOnceWith(input.sheet.sheetId, "right", { kind: "backgroundColor", rgb: "#ABCDEF" });
 });
