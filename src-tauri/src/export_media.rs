@@ -9,6 +9,7 @@ use crate::{
     media_runtime::{MediaAvailability, MediaBinding, MediaResolver},
     product_runtime::PROJECT_WINDOW_LABEL,
     project_host::ProjectHost,
+    project_media_reference::{self, MediaChangeKind},
 };
 
 fn required_bindings_for(
@@ -174,12 +175,13 @@ pub(crate) async fn relink_export_media(
                     .to_string_lossy()
                     .into_owned();
                 let result = match candidates.get(&binding.media_id) {
-                    Some(path) => crate::project_commands::change_media_binding(
+                    Some(path) => project_media_reference::change_in_app(
                         &app,
-                        binding.clone(),
+                        binding,
                         path.clone(),
                         roots.clone(),
-                        crate::project_commands::MediaChangeKind::Relink,
+                        MediaChangeKind::Relink,
+                        &mut processing,
                     )
                     .await
                     .map(|_| ()),
@@ -188,19 +190,8 @@ pub(crate) async fn relink_export_media(
                             .into(),
                     ),
                 };
-                match result {
-                    Ok(()) => {
-                        let replacement = MediaBinding {
-                            logical_path: candidates[&binding.media_id].clone(),
-                            ..binding
-                        };
-                        processing
-                            .prepare_all_in_plan(&app, vec![replacement], roots.clone())
-                            .await;
-                    }
-                    Err(reason) => {
-                        processing.complete(Some(ImageProcessingProblem { file_name, reason }))
-                    }
+                if let Err(reason) = result {
+                    processing.complete(Some(ImageProcessingProblem { file_name, reason }));
                 }
             }
         }

@@ -5,13 +5,11 @@ use myalbuns_core::{
     SaveProjectOutcome as CoreSaveProjectOutcome,
 };
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
-use myalbuns_paths::{AppPaths, AppPathsError};
+use myalbuns_paths::AppPathsError;
 use tauri::{AppHandle, Manager, State, WebviewWindow};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 
 use crate::{
-    cache_engine::CacheEngine,
-    cache_previews::CachePreviewRegistry,
     cache_service::ActiveCacheNamespace,
     image_processing::ImageProcessingBatch,
     ipc_contract::{
@@ -25,6 +23,7 @@ use crate::{
     project_creative_commands,
     project_host::{ProjectHost, ProjectHostSaveAsError, ProjectHostSaveError},
     project_identity_transition::{self, IdentityTransitionError},
+    project_media_reference::{self, MediaChangeKind},
 };
 
 #[tauri::command]
@@ -419,12 +418,6 @@ pub(crate) async fn replace_media(
     .await
 }
 
-#[derive(Clone, Copy, PartialEq)]
-pub(crate) enum MediaChangeKind {
-    Relink,
-    Replace,
-}
-
 async fn change_media_reference(
     media_id: String,
     app: AppHandle,
@@ -529,16 +522,9 @@ async fn change_media_reference(
     })
     .await
     .map_err(|error| error.to_string())??;
-    let relinked = change_media_binding(&app, binding, path, roots.clone(), kind).await?;
-    let relinked_binding = state
-        .authorized_media_catalog()?
-        .bindings
-        .into_iter()
-        .find(|binding| binding.media_id == selected_media_id)
-        .ok_or_else(|| "A imagem não pertence mais ao Projeto.".to_string())?;
-    processing
-        .prepare_all_in_plan(&app, vec![relinked_binding], roots)
-        .await;
+    let relinked =
+        project_media_reference::change_in_app(&app, binding, path, roots, kind, &mut processing)
+            .await?;
     tracing::info!(
         target: "myalbuns.desktop",
         process_role = ProcessRole::DesktopHost.as_str(),
@@ -547,67 +533,7 @@ async fn change_media_reference(
         revision = relinked.state.revision,
         event = if kind == MediaChangeKind::Relink { "linked_media_relinked" } else { "linked_media_replaced" },
     );
-    state.projection()
-}
-
-pub(crate) async fn change_media_binding(
-    app: &AppHandle,
-    binding: MediaBinding,
-    path: std::path::PathBuf,
-    roots: myalbuns_paths::RootBindingPlan,
-    kind: MediaChangeKind,
-) -> Result<EditorProjection, String> {
-    let cache_pause = app.state::<CacheEngine>().pause().await;
-    let relink_app = app.clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        let estimate =
-            crate::imaging_processor::ImageMemoryEstimate::in_plan(&roots, [path.as_path()]);
-        let cancellation = crate::cache_activity_gate::CacheCancellation::default();
-        let _reservation = tauri::async_runtime::block_on(
-            relink_app
-                .state::<crate::imaging_processor::ImagingProcessor>()
-                .reserve_inspection(estimate, cancellation.flag()),
-        )
-        .map_err(|error| error.to_string())?;
-        let proposal = match kind {
-            MediaChangeKind::Relink => {
-                MediaResolver.propose_relink_in_plan(&binding, path, &roots)?
-            }
-            MediaChangeKind::Replace => {
-                MediaResolver.propose_replacement_in_plan(&binding, path, &roots)?
-            }
-        };
-        let engine = relink_app.state::<CacheEngine>();
-        // Reject the catalog's duplicate-reference constraint before discarding
-        // the current Cache. The Core still validates the committed document.
-        if relink_app
-            .state::<ProjectHost>()
-            .authorized_media_catalog()?
-            .bindings
-            .iter()
-            .any(|other| {
-                other.media_id != binding.media_id
-                    && other.kind == binding.kind
-                    && other.logical_path == proposal.replacement_path()
-            })
-        {
-            return Err(
-                "O arquivo escolhido já está vinculado a outra imagem deste Projeto.".into(),
-            );
-        }
-        engine
-            .invalidate_relinked_media(
-                &cache_pause,
-                relink_app.state::<AppPaths>().inner(),
-                &relink_app.state::<ActiveCacheNamespace>().namespace(),
-                relink_app.state::<CachePreviewRegistry>().inner(),
-                &binding.media_id,
-            )
-            .map_err(|error| error.message)?;
-        relink_app.state::<ProjectHost>().relink_media(proposal)
-    })
-    .await
-    .map_err(|_| "Não foi possível atualizar a imagem.".to_string())?
+    Ok(relinked)
 }
 
 fn occurrence_is_authoritatively_absent(binding: &MediaBinding) -> bool {

@@ -61,6 +61,7 @@ mod project_creative_commands;
 mod project_dialog_window;
 mod project_host;
 mod project_identity_transition;
+mod project_media_reference;
 mod project_recovery;
 mod project_ui_operations;
 mod project_webview_authority;
