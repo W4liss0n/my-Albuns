@@ -109,7 +109,7 @@ if ($usedLetters -contains $DriveLetter) {
     throw 'The fixture drive is already assigned; no existing mapping may be changed.'
 }
 $mappedDrive = "$DriveLetter`:"
-& net.exe use $mappedDrive *> $null
+& cmd.exe /d /c "net use $mappedDrive >nul 2>&1"
 if ($LASTEXITCODE -eq 0) {
     throw 'The fixture drive already has a network mapping.'
 }
