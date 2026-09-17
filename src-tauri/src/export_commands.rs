@@ -174,7 +174,7 @@ impl ExportCommandError {
                 layout_problems: None,
             };
         }
-        match failure.stage {
+        let mut result = match failure.stage {
             export_pipeline::ExportFailureStage::Cancelled => Self::cancelled(),
             export_pipeline::ExportFailureStage::ExportConflict => Self {
                 code: ExportCommandErrorCode::ExportConflict,
@@ -193,7 +193,12 @@ impl ExportCommandError {
                 layout_problems: None,
             },
             _ => Self::failed(failure.message),
+        };
+        if failure.path_failure == Some(myalbuns_paths::AppPathsError::OperationPathAccessDenied) {
+            result.path_code = Some(ExportPathCode::AccessDenied);
+            result.message = "Sem permissão para gravar no destino. Escolha outra pasta ou ajuste as permissões e tente novamente.".into();
         }
+        result
     }
 }
 
@@ -949,6 +954,36 @@ mod tests {
             myalbuns_paths::AppPathsError::EXPORT_STORAGE_FULL_MESSAGE,
         ));
         assert_eq!(failure.code, ExportCommandErrorCode::OutputStorageFull);
+    }
+
+    #[test]
+    fn native_destination_permission_failure_keeps_actionable_context_over_ipc() {
+        for (stage, expected_code) in [
+            (ExportFailureStage::Prepare, "failed"),
+            (
+                ExportFailureStage::Publish {
+                    promoted_outputs: 0,
+                    total_outputs: 1,
+                },
+                "publication_failed",
+            ),
+        ] {
+            let error = ExportCommandError::from_pipeline(ExportFailure::from_path_error(
+                stage,
+                myalbuns_paths::AppPathsError::export_io(
+                    &std::io::ErrorKind::PermissionDenied.into(),
+                ),
+                "A preparação da Exportação está indisponível.",
+            ));
+            assert_eq!(
+                serde_json::to_value(error).unwrap(),
+                json!({
+                    "code": expected_code,
+                    "pathCode": "access_denied",
+                    "message": "Sem permissão para gravar no destino. Escolha outra pasta ou ajuste as permissões e tente novamente.",
+                })
+            );
+        }
     }
 
     #[test]
