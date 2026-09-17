@@ -51,6 +51,13 @@ depois da validação integral e da confirmação dimensional, pode publicar a
 transformação global de Frames travados. Clipboard continua independente do
 Histórico criativo.
 
+A preparação de Informações do Álbum conserva o candidato junto da validação
+calculada sobre ele. Na execução com chave dimensional, a Sessão prepara sobre
+o estado vigente, confere a chave e publica esse mesmo candidato. A consulta
+anterior ao diálogo permanece independente; nenhum candidato atravessa a espera
+pela decisão. Rejeições conservam a prioridade de erro existente, a composição
+e o ramo de Redo. Isso conclui o caso dimensional residual de R3.
+
 Eventos de mídia são emitidos pelos adaptadores depois da confirmação estável.
 A demanda atual pode adotar a nova época; uma demanda substituída não ganha
 novamente autoridade de publicação. O resultado de confirmação não transfere

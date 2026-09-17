@@ -129,19 +129,23 @@ impl PersistentProjectSession {
                 information,
                 expected_dimension_key,
             } => {
+                publication = EditPublication::AlbumInformation;
                 if let Some(expected) = expected_dimension_key {
-                    let validation = self.validate_album_information(&information, sources);
+                    let (candidate, validation) = project
+                        .prepare_album_information(&information, custom, sources)
+                        .map_err(|_| CoreError::AlbumInformationReviewChanged)?;
                     let current = validation
                         .impact
                         .and_then(|impact| impact.dimensional_change);
                     if current.as_ref().map(|change| &change.confirmation_key) != Some(&expected) {
                         return Err(CoreError::AlbumInformationReviewChanged);
                     }
+                    Ok(candidate)
+                } else {
+                    project
+                        .with_album_information(information, custom, sources)
+                        .map_err(CoreError::InvalidAlbumInformation)
                 }
-                publication = EditPublication::AlbumInformation;
-                project
-                    .with_album_information(information, custom, sources)
-                    .map_err(CoreError::InvalidAlbumInformation)
             }
             ProjectIntent::ToggleLayoutFavorite { selection } => {
                 let (_, patch) = self.checked_layout_patch(&selection)?;

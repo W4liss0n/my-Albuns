@@ -94,32 +94,8 @@ impl ProjectDocument {
         custom: &[crate::CustomLayout],
         sources: &PhotoDimensions,
     ) -> AlbumInformationValidation {
-        match self.with_album_information(*information, custom, sources) {
-            Ok(candidate) => {
-                let mut validation = self.validate_album_information_fields(information);
-                if (
-                    self.document.sheet_width_um as i64,
-                    self.document.sheet_height_um as i64,
-                ) != (information.sheet_width_um, information.sheet_height_um)
-                    && let Some(impact) = &mut validation.impact
-                {
-                    let proportion_changed = !dimensions_keep_proportion(
-                        self.document.sheet_width_um,
-                        self.document.sheet_height_um,
-                        information.sheet_width_um,
-                        information.sheet_height_um,
-                    );
-                    impact.dimensional_change = Some(AlbumDimensionChange {
-                        proportion_changed,
-                        confirmation_key: self.dimension_confirmation_key(
-                            &candidate,
-                            sources,
-                            proportion_changed,
-                        ),
-                    });
-                }
-                validation
-            }
+        match self.prepare_album_information(information, custom, sources) {
+            Ok((_, validation)) => validation,
             Err(errors) => AlbumInformationValidation {
                 errors,
                 impact: None,
@@ -127,11 +103,46 @@ impl ProjectDocument {
         }
     }
 
+    /// Keeps the current candidate with the review calculated from that exact transformation.
+    pub(crate) fn prepare_album_information(
+        &self,
+        information: &AlbumInformation,
+        custom: &[crate::CustomLayout],
+        sources: &PhotoDimensions,
+    ) -> Result<(Self, AlbumInformationValidation), Vec<Failure>> {
+        let candidate = self.with_album_information(*information, custom, sources)?;
+        let mut validation = self.validate_album_information_fields(information);
+        if (
+            self.document.sheet_width_um as i64,
+            self.document.sheet_height_um as i64,
+        ) != (information.sheet_width_um, information.sheet_height_um)
+            && let Some(impact) = &mut validation.impact
+        {
+            let proportion_changed = !dimensions_keep_proportion(
+                self.document.sheet_width_um,
+                self.document.sheet_height_um,
+                information.sheet_width_um,
+                information.sheet_height_um,
+            );
+            impact.dimensional_change = Some(AlbumDimensionChange {
+                proportion_changed,
+                confirmation_key: self.dimension_confirmation_key(
+                    &candidate,
+                    sources,
+                    proportion_changed,
+                ),
+            });
+        }
+        Ok((candidate, validation))
+    }
+
     pub(super) fn resized_composition(
         &self,
         information: &AlbumInformation,
         sources: &PhotoDimensions,
     ) -> Result<Self, Failure> {
+        #[cfg(all(test, windows))]
+        tests::PREPARATIONS.with(|count| count.set(count.get() + 1));
         let mut candidate = self.clone();
         let old_width = self.document.sheet_width_um as i64;
         let old_height = self.document.sheet_height_um as i64;
@@ -305,5 +316,73 @@ impl ProjectDocument {
                     .expect("dimensional facts serialize")
             )
         )
+    }
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::*;
+    use crate::{
+        CreateAuthorization, CreateProjectRequest, ProjectCore, ProjectIntent, ProjectLocation,
+    };
+    use myalbuns_paths::OperationPathContext;
+    use std::cell::Cell;
+
+    // Observe real preparation work without replacing its algorithm or adding a production seam.
+    thread_local! {
+        pub(super) static PREPARATIONS: Cell<usize> = const { Cell::new(0) };
+    }
+
+    #[test]
+    fn confirmed_apply_prepares_once_after_its_independent_review() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("Dimensions.myalbuns");
+        let mut paths = OperationPathContext::new();
+        paths.capture(&path).unwrap();
+        let mut information = AlbumInformation {
+            display_unit: DisplayUnit::Mm,
+            sheet_width_um: 600_000,
+            sheet_height_um: 300_000,
+            dpi: 300,
+            bleed_um: 3_000,
+            safety_um: 3_000,
+            first_sheet: EndSheetFormat::SinglePage,
+            last_sheet: EndSheetFormat::SinglePage,
+        };
+        let mut project = ProjectCore::new()
+            .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"))
+            .create_editable(CreateProjectRequest::new(
+                ProjectLocation::new(path, paths.freeze()),
+                InitialProject::configured(information.configuration(3).unwrap()),
+                CreateAuthorization::CreateOnly,
+            ))
+            .unwrap();
+        let sheet_id = project.projection().state.album.sheets[0].id.clone();
+        project.apply(ProjectIntent::AddFrame { sheet_id }).unwrap();
+        let before = project.projection();
+        information.sheet_width_um = 630_000;
+
+        PREPARATIONS.with(|count| count.set(0));
+        let review = project.validate_album_information(&information);
+        assert!(review.errors.is_empty());
+        PREPARATIONS.with(|count| assert_eq!(count.get(), 1));
+        assert_eq!(project.projection(), before);
+        let key = review
+            .impact
+            .unwrap()
+            .dimensional_change
+            .unwrap()
+            .confirmation_key;
+
+        PREPARATIONS.with(|count| count.set(0));
+        let after = project
+            .apply(ProjectIntent::SetAlbumInformation {
+                information,
+                expected_dimension_key: Some(key),
+            })
+            .unwrap();
+        PREPARATIONS.with(|count| assert_eq!(count.get(), 1));
+        assert_eq!(after.state.document.sheet_width_um, 630_000);
+        assert_eq!(after.state.revision, before.state.revision + 1);
     }
 }

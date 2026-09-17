@@ -266,6 +266,48 @@ fn stale_source_observations_cannot_apply_a_previously_confirmed_crop() {
 }
 
 #[test]
+fn rejected_preparation_preserves_error_priority_and_the_redo_branch() {
+    let root = tempfile::tempdir().unwrap();
+    let mut project = composed(root.path(), &[[20_000, 20_000, 120_000, 80_000]], false);
+    project.apply(ProjectIntent::SetDpi { dpi: 360 }).unwrap();
+    project.undo().unwrap();
+    let before = project.projection();
+    assert!(before.state.can_redo);
+    let path = root.path().join("Dimensions.myalbuns");
+    let saved = fs::read(&path).unwrap();
+
+    // Exercise both field rejection and failure to prepare a valid-sized change
+    // because this reopened Project has no observed Photo dimensions.
+    for proposed in [information(-1, 300_000), information(630_000, 300_000)] {
+        assert!(
+            !project
+                .validate_album_information(&proposed)
+                .errors
+                .is_empty()
+        );
+        for guarded in [false, true] {
+            let error = project
+                .apply(ProjectIntent::SetAlbumInformation {
+                    information: proposed,
+                    expected_dimension_key: guarded.then(|| "prior-review".into()),
+                })
+                .unwrap_err();
+            if guarded {
+                assert!(matches!(error, CoreError::AlbumInformationReviewChanged));
+            } else {
+                assert!(matches!(error, CoreError::InvalidAlbumInformation(_)));
+            }
+            assert_eq!(project.projection(), before);
+            assert_eq!(fs::read(&path).unwrap(), saved);
+        }
+    }
+    let redone = project.redo().unwrap();
+    assert_eq!(redone.state.document.dpi, 360);
+    assert_eq!(redone.state.album, before.state.album);
+    assert_eq!(fs::read(&path).unwrap(), saved);
+}
+
+#[test]
 fn locked_layouts_scale_without_reorganization_and_remain_locked_after_save() {
     let root = tempfile::tempdir().unwrap();
     let mut project = composed(root.path(), &[[20_000, 20_000, 120_000, 80_000]], true);
