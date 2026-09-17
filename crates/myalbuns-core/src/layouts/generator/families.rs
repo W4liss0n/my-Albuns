@@ -222,6 +222,8 @@ pub(super) fn local(
             (1.0, 0.85),
             (0.75, 1.0),
             (1.0, 0.75),
+            (0.70, 1.0),
+            (1.0, 0.70),
             (0.85, 0.85),
             (0.75, 0.75),
             (0.64, 0.64),
@@ -230,6 +232,17 @@ pub(super) fn local(
             candidates.extend(compositions(
                 frames,
                 bounds.centered(bounds.w * width, bounds.h * height),
+                search,
+                true,
+            ));
+        }
+        // Each step changes a centered rectangle's area by about 13.5%,
+        // enough to offer another size under the supplementary novelty rule.
+        for step in 1..=9 {
+            let factor = 0.93_f64.powi(step);
+            candidates.extend(compositions(
+                frames,
+                bounds.centered(bounds.w * factor, bounds.h * factor),
                 search,
                 true,
             ));
@@ -337,8 +350,13 @@ fn compositions(
                 .copied()
                 .collect();
             let support_patterns = band_patterns(&support);
+            let shares: &[f64] = if expanded {
+                &[1.0 / 3.0, 0.4, 0.45, 0.5, 0.55, 0.6, 2.0 / 3.0]
+            } else {
+                &[1.0 / 3.0, 0.4, 0.5, 0.6, 2.0 / 3.0]
+            };
             for side in ["left", "right", "top", "bottom"] {
-                for share in [1.0 / 3.0, 0.4, 0.5, 0.6, 2.0 / 3.0] {
+                for &share in shares {
                     let (large, small) = split(bounds, search.gap, side, share);
                     let hero = Slot {
                         bounds: large,
@@ -358,7 +376,9 @@ fn compositions(
                             .iter()
                             .map(|s| s.bounds.w * s.bounds.h)
                             .fold(0.0, f64::max);
-                        if !slots.is_empty() && hero.bounds.w * hero.bounds.h >= 1.5 * largest {
+                        let contrast = if expanded { 1.2 } else { 1.5 };
+                        if !slots.is_empty() && hero.bounds.w * hero.bounds.h >= contrast * largest
+                        {
                             slots.insert(0, hero);
                             add(slots, label, &format!("hero-{side}"));
                         }
@@ -718,11 +738,11 @@ pub(super) fn pages(frames: &[Slot], search: &Search<'_>, expanded: bool) -> Vec
                         for candidate in candidates {
                             if distinct
                                 .iter()
-                                .all(|other| distance(&candidate, other) >= 0.18)
+                                .all(|other| distance(&candidate, other) >= 0.12)
                             {
                                 distinct.push(candidate);
                             }
-                            if distinct.len() == 6 {
+                            if distinct.len() == 10 {
                                 break;
                             }
                         }

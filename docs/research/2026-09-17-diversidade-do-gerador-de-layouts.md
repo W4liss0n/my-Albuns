@@ -7,9 +7,18 @@ date: 2026-09-17
 # Revisão da variedade do Gerador de Layouts
 
 Este documento registra a versão 1, anterior à implementação autorizada em
-17/09/2026. A decisão vigente está no ADR 0012. Na mesma matriz, a versão 2
+17/09/2026. A decisão vigente está no ADR 0013. Na mesma matriz, a versão 2
 passou a produzir pelo menos cinco opções nas 165 consultas e vinte opções
 em 35 delas. Os resultados estão no [CSV da versão 2](2026-09-17-diversidade-do-gerador-de-layouts-v2.csv).
+
+A versão 3 chegou a pelo menos dez opções em 164 das 165 consultas; 51
+atingiram vinte. A exceção foi a Página de 300 × 300 mm com seis quadrados,
+que ofereceu oito. Dois horizontais em Lâmina de 600 × 300 mm, com permissão
+por Página e por Lâmina, passaram de cinco para catorze opções. O
+[CSV da versão 3](2026-09-17-diversidade-do-gerador-de-layouts-v3.csv) registra
+todas as contagens. Uma passagem em compilação de desenvolvimento mediu
+média de 22,6 ms e máximo de 102,7 ms por consulta; esses tempos locais não
+representam um limite de desempenho nem incluem a renderização das prévias.
 
 A limitação relatada foi reproduzida. Aumentar somente o teto de dez para vinte
 não resolve os casos com menos de cinco sugestões. A recomendação é ampliar

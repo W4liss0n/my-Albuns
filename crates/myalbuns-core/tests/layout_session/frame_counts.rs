@@ -18,10 +18,10 @@ fn the_panel_can_preview_lock_and_undo_a_supplemental_small_layout() {
     let query = project
         .query_layouts_with_frame_request(&sheet, request(2))
         .unwrap();
-    assert!(query.listing.candidates.len() >= 5);
+    assert!(query.listing.candidates.len() >= 10);
     let selection = LayoutSelection {
         query_id: query.query_id,
-        candidate_index: 4,
+        candidate_index: 9,
     };
     let preview = project.preview_layout(&selection).unwrap();
     assert_eq!(preview.len(), 2);
@@ -35,6 +35,62 @@ fn the_panel_can_preview_lock_and_undo_a_supplemental_small_layout() {
     assert!(project.projection().state.album.sheets[0].frames.is_empty());
     project.redo().unwrap();
     assert_eq!(project.projection().composition.sheets[0].frames, preview);
+}
+
+#[test]
+fn a_reflected_layout_moves_frames_without_flipping_photos_and_can_be_undone() {
+    let root = tempfile::tempdir().unwrap();
+    let mut project = super::visual_corpus::fixture_project(root.path(), 2);
+    let before = project.projection();
+    let sheet = &before.state.album.sheets[0];
+    let query = project.query_layouts(&sheet.id).unwrap();
+    let candidate_index = query
+        .listing
+        .candidates
+        .iter()
+        .enumerate()
+        .rev()
+        .find_map(|(index, candidate)| {
+            query.listing.candidates[..index]
+                .iter()
+                .any(|source| {
+                    source.layout.definition != candidate.layout.definition
+                        && source
+                            .layout
+                            .definition
+                            .positions
+                            .iter()
+                            .zip(&candidate.layout.definition.positions)
+                            .all(|(a, b)| {
+                                (a.x + b.x + b.width - sheet.width_um).abs() <= 1
+                                    && (a.y - b.y).abs() <= 1
+                                    && (a.width - b.width).abs() <= 1
+                                    && (a.height - b.height).abs() <= 1
+                            })
+                })
+                .then_some(index)
+        })
+        .expect("the panel should include a horizontal reflection for two mixed Frames");
+    let selection = LayoutSelection {
+        query_id: query.query_id,
+        candidate_index,
+    };
+    let preview = project.preview_layout(&selection).unwrap();
+    assert_eq!(project.projection(), before);
+    let after = project
+        .apply(ProjectIntent::ApplyLayout { selection })
+        .unwrap();
+    assert_eq!(after.composition.sheets[0].frames, preview);
+    assert_eq!(after.media_usage, before.media_usage);
+    for (original, reflected) in sheet.frames.iter().zip(&after.state.album.sheets[0].frames) {
+        assert_eq!(reflected.id, original.id);
+        assert_eq!(reflected.photo, original.photo);
+        assert_eq!(reflected.style, original.style);
+    }
+    let undone = project.undo().unwrap();
+    assert_eq!(undone.state.album, before.state.album);
+    assert_eq!(undone.composition, before.composition);
+    assert_eq!(project.redo().unwrap(), after);
 }
 
 #[test]

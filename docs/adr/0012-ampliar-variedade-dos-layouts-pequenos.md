@@ -5,6 +5,10 @@ date: 2026-09-17
 
 # Ampliar a variedade dos Layouts com poucos Frames
 
+O [ADR 0013](0013-incluir-espelhamentos-e-buscar-dez-layouts.md) atualiza a
+meta e a política de espelhamentos na versão 3. Este documento registra a
+decisão da versão 2.
+
 A revisão de 165 consultas encontrou 73 com menos de cinco sugestões. O
 autor solicitou ampliar a variedade para buscar de cinco a dez opções e
 permitir até vinte quando houver composições distintas e espaço físico.

@@ -7689,12 +7689,12 @@
     },
     {
       "id": "workspace-layout-small-alternatives",
-      "title": "Layouts pequenos — cinco alternativas para dois Frames horizontais",
+      "title": "Layouts pequenos — décima alternativa para dois Frames horizontais",
       "implementationPath": "/workspace-preview.html?frame=layouts&layouts=empty-lock",
       "comparison": {
         "kind": "implementation-only",
         "surface": "layout-panel",
-        "reason": "O ADR 0012 define a busca complementar. A consulta e as cinco prévias de dois Frames horizontais vêm do Core produtivo; este cenário apresenta a quinta opção."
+        "reason": "O ADR 0013 define a meta de dez. A consulta e as prévias de dois Frames horizontais vêm do Core produtivo; este cenário apresenta a décima opção."
       },
       "viewport": { "width": 1440, "height": 800 },
       "readySelector": ".layout-panel__preview:disabled",
@@ -7705,8 +7705,32 @@
         { "type": "key", "key": "ArrowDown" },
         { "type": "key", "key": "ArrowDown" },
         { "type": "key", "key": "Enter" },
-        { "type": "assert", "selector": ".layout-panel__candidate:nth-child(5)" },
-        { "type": "hover", "selector": ".layout-panel__candidate:nth-child(5)" }
+        { "type": "click", "selector": ".layout-panel__header" },
+        { "type": "assert", "selector": ".layout-panel__candidate:nth-child(10)" },
+        { "type": "hover", "selector": ".layout-panel__candidate:nth-child(10)" }
+      ]
+    },
+    {
+      "id": "workspace-layout-mirrored-alternative",
+      "title": "Layouts pequenos — espelhamento horizontal com destaque à esquerda",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=empty-lock",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "O ADR 0013 admite reflexões geometricamente distintas. A opção 11, produzida pelo Core, é o espelhamento horizontal da opção 2 e conserva a identidade dos Frames."
+      },
+      "viewport": { "width": 1440, "height": 800 },
+      "readySelector": ".layout-panel__preview:disabled",
+      "actions": [
+        { "type": "assert", "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))" },
+        { "type": "click", "selector": "button[aria-label=\"Layouts da Lâmina 01\"]" },
+        { "type": "focus", "selector": "select[aria-label=\"Quantidade de Frames\"]" },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "Enter" },
+        { "type": "click", "selector": ".layout-panel__header" },
+        { "type": "assert", "selector": ".layout-panel__candidate:nth-child(11)" },
+        { "type": "hover", "selector": ".layout-panel__candidate:nth-child(11)" }
       ]
     },
     {

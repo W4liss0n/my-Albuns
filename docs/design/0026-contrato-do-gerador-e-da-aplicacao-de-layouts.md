@@ -185,38 +185,51 @@ nem acrescentam restrições ao arranjo de reserva do ADR 0008.
 
 ## Busca, classificação e diversidade
 
-### Perfil vigente: versão 2
+### Perfil vigente: versão 3
 
-O [ADR 0012](../adr/0012-ampliar-variedade-dos-layouts-pequenos.md) mantém
+O [ADR 0013](../adr/0013-incluir-espelhamentos-e-buscar-dez-layouts.md) mantém
 as invariantes e o perfil geométrico de base, com estas alterações:
 
 1. A seleção principal admite até vinte sugestões, preservando nota mínima
    de 72, janela de dez pontos abaixo da melhor, novidade mínima de 0,25 e
    as cotas por família do perfil inicial.
-2. Com menos de cinco sugestões, uma etapa complementar tenta completar
-   cinco. Mantém as escolhas principais e sua ordem, exige nota mínima de
-   72 e novidade de pelo menos 0,18 no mesmo escopo, e dispensa a janela
+2. Com menos de dez sugestões, uma etapa complementar tenta completar
+   dez. Mantém as escolhas principais e sua ordem, exige nota mínima de
+   72 e novidade de pelo menos 0,12 no mesmo escopo, e dispensa a janela
    relativa e as cotas por família. As opções continuam distintas.
 3. Para consultas de um a seis Frames, essa etapa também amplia a enumeração.
    Reutiliza as famílias em regiões centralizadas de largura/altura relativas
-   `(0,85; 1)`, `(1; 0,85)`, `(0,75; 1)`, `(1; 0,75)`, `(0,85; 0,85)`,
-   `(0,75; 0,75)`, `(0,64; 0,64)` e `(0,54; 0,54)`. Cada composição é
-   recalculada mantendo o intervalo físico original.
+   `(0,85; 1)`, `(1; 0,85)`, `(0,75; 1)`, `(1; 0,75)`, `(0,70; 1)`,
+   `(1; 0,70)`, `(0,85; 0,85)`, `(0,75; 0,75)`, `(0,64; 0,64)` e
+   `(0,54; 0,54)`, além de nove escalas iguais nos dois eixos, dadas por
+   `0,93^n`, com `n` de 1 a 9. Cada composição é recalculada mantendo o
+   intervalo físico original.
 4. Bandas graduadas com uma orientação por banda também são ajustadas às
    proporções naturais, inclusive em ordem inversa e a partir de três Frames.
    Isso permite blocos completos de quadrados com tamanhos diferentes.
-5. Na busca complementar por Página, as seis opções locais são escolhidas
-   por nota com novidade mínima de 0,18 entre elas, antes da combinação dos
+5. Na busca complementar por Página, até dez opções locais são escolhidas
+   por nota com novidade mínima de 0,12 entre elas, antes da combinação dos
    lados. O caminho principal mantém o limite e a ordenação anteriores.
 6. Para uma consulta com um único Frame, a referência de ocupação é a área
    do maior Frame de proporção natural que cabe na região correspondente:
    Página ou superfície conjunta, conforme o escopo efetivo. Os demais pesos,
    inclusive o fator 0,86, são preservados.
+7. As composições complementares de destaque e apoio incluem repartições de
+   45% e 55%, além de um terço, 40%, metade, 60% e dois terços. A área do
+   destaque deve ser pelo menos 1,2 vez a de cada apoio; a busca principal
+   mantém o contraste de 1,5 e as repartições anteriores.
+8. Se restarem vagas, uma terceira etapa reflete as opções selecionadas nos
+   eixos horizontal, vertical e nos dois simultaneamente. Revalida e
+   quantiza as posições, exige nota de 72 e novidade de 0,05 no mesmo escopo,
+   sem cotas por família, e acrescenta opções até vinte. A identidade
+   geométrica desconsidera a ordem de Frames de mesma orientação, excluindo
+   reflexões simétricas idênticas. Os índices dos Frames são preservados:
+   somente suas posições mudam, sem espelhar o conteúdo das Fotos.
 
-A meta usual é oferecer de cinco a dez alternativas, com até vinte quando
-a seleção principal encontra variedade suficiente. A etapa complementar
-para ao atingir cinco e não força vinte opções de menor qualidade.
-O resultado pode ficar abaixo de cinco quando a busca não encontra variedade
+A meta usual é oferecer dez alternativas, com até vinte quando a seleção
+principal ou os espelhamentos encontram variedade suficiente. A etapa
+complementar para ao atingir dez; os espelhamentos são acrescentados depois.
+O resultado pode ficar abaixo de dez quando a busca não encontra variedade
 válida; uma superfície que comporta somente uma geometria continua oferecendo
 essa opção. Não se relaxam limites físicos nem se usa a reserva para completar
 o Painel. Favoritos e Último Layout conservam suas prioridades e cópias.

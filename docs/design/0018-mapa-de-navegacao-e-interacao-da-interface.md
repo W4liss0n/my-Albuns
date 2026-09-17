@@ -224,6 +224,7 @@ renderizada e uma revisão explícita posterior decide `accepted`, `rejected` ou
 | seleção múltipla e mistos | `frame-multi-selection-mixed`, `frame-multi-selection-absolute-edit` |
 | mover, redimensionar e travar | `frame-manipulation-move`, `frame-manipulation-resize`, `frame-layout-locked` |
 | variedade de Layouts com poucos Frames | `workspace-layout-small-alternatives` |
+| espelhamento horizontal de Layout assimétrico | `workspace-layout-mirrored-alternative` |
 
 As provas geradas ficam em `.scratch/ui-acceptance/` e são deliberadamente
 ignoradas pelo Git. O manifesto, este mapa, o protótipo e seus testes permanecem

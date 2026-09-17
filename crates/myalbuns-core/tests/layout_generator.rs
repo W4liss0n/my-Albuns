@@ -1,7 +1,7 @@
 use myalbuns_core::{LayoutGenerationStatus, LayoutQuery, LayoutScope, generate_layouts};
 
 #[test]
-fn two_horizontal_frames_offer_at_least_five_distinct_layouts() {
+fn two_horizontal_frames_offer_at_least_ten_distinct_layouts() {
     let query: LayoutQuery = serde_json::from_value(serde_json::json!({
         "surface": {"type":"doubleSheet", "widthUm":600000, "heightUm":300000},
         "frameOrientations":["horizontal", "horizontal"],
@@ -11,7 +11,7 @@ fn two_horizontal_frames_offer_at_least_five_distinct_layouts() {
     .unwrap();
     let result = generate_layouts(&query);
     assert!(
-        (5..=20).contains(&result.candidates.len()),
+        (10..=20).contains(&result.candidates.len()),
         "{} suggestions",
         result.candidates.len()
     );
@@ -25,7 +25,84 @@ fn two_horizontal_frames_offer_at_least_five_distinct_layouts() {
 }
 
 #[test]
-fn a_single_frame_has_five_centered_choices_when_the_surface_has_room() {
+fn an_asymmetric_three_frame_layout_includes_its_vertical_reflection() {
+    let query: LayoutQuery = serde_json::from_value(serde_json::json!({
+        "surface":{"type":"singlePage","widthUm":300000,"heightUm":300000},
+        "frameOrientations":["horizontal","horizontal","horizontal"],
+        "permission":"pagesOnly","marginUm":15000,"gapUm":5000,"minimumSideUm":20000
+    }))
+    .unwrap();
+    let result = generate_layouts(&query);
+    assert!(result.candidates.iter().any(|candidate| {
+        candidate.family == "Espelhamento vertical"
+            && result.candidates.iter().any(|source| {
+                source.definition != candidate.definition
+                    && candidate
+                        .definition
+                        .positions
+                        .iter()
+                        .zip(&source.definition.positions)
+                        .all(|(a, b)| {
+                            (a.x - b.x).abs() <= 1
+                                && (a.width - b.width).abs() <= 1
+                                && (a.height - b.height).abs() <= 1
+                                && (a.y + b.y + b.height - query.surface.height_um).abs() <= 1
+                        })
+            })
+    }));
+    for candidate in &result.candidates {
+        assert_generated_geometry(&query, &candidate.definition, "vertical reflection");
+    }
+}
+
+#[test]
+fn two_frames_can_offer_a_balanced_unequal_split() {
+    let query: LayoutQuery = serde_json::from_value(serde_json::json!({
+        "surface":{"type":"singlePage","widthUm":300000,"heightUm":300000},
+        "frameOrientations":["horizontal","horizontal"],
+        "permission":"pagesOnly","marginUm":15000,"gapUm":5000,"minimumSideUm":20000
+    }))
+    .unwrap();
+    let result = generate_layouts(&query);
+    assert!(
+        result.candidates.iter().any(|candidate| {
+            let positions = &candidate.definition.positions;
+            let first = positions[0].width as f64 * positions[0].height as f64;
+            let second = positions[1].width as f64 * positions[1].height as f64;
+            (1.15..1.45).contains(&(first.max(second) / first.min(second)))
+        }),
+        "a moderately larger Frame should be available"
+    );
+    for candidate in &result.candidates {
+        assert_generated_geometry(&query, &candidate.definition, "balanced unequal split");
+    }
+}
+
+#[test]
+fn two_vertical_frames_in_a_wide_sheet_keep_searching_for_ten_options() {
+    let query: LayoutQuery = serde_json::from_value(serde_json::json!({
+        "surface":{"type":"doubleSheet","widthUm":600000,"heightUm":240000},
+        "frameOrientations":["vertical","vertical"],
+        "permission":"pagesOnly","marginUm":15000,"gapUm":5000,"minimumSideUm":20000
+    }))
+    .unwrap();
+    let result = generate_layouts(&query);
+    assert!(
+        result.candidates.len() >= 10,
+        "{} suggestions",
+        result.candidates.len()
+    );
+    for candidate in &result.candidates {
+        assert_generated_geometry(
+            &query,
+            &candidate.definition,
+            "wide sheet with two portraits",
+        );
+    }
+}
+
+#[test]
+fn a_single_frame_has_ten_centered_choices_when_the_surface_has_room() {
     for (kind, width, height) in [
         ("singlePage", 300000, 300000),
         ("doubleSheet", 600000, 300000),
@@ -41,7 +118,7 @@ fn a_single_frame_has_five_centered_choices_when_the_surface_has_room() {
                 .unwrap();
                 let result = generate_layouts(&query);
                 assert!(
-                    result.candidates.len() >= 5,
+                    result.candidates.len() >= 10,
                     "{kind} {width}x{height} {permission} {orientation}: {}",
                     result.candidates.len()
                 );
@@ -83,13 +160,28 @@ fn small_compositions_expand_without_relaxing_physical_constraints() {
                     let label = format!("{kind} {width}x{height} {permission} {orientations:?}");
                     let result = generate_layouts(&query);
                     assert!(
-                        (5..=20).contains(&result.candidates.len()),
+                        (8..=20).contains(&result.candidates.len()),
                         "{label}: {} suggestions",
                         result.candidates.len()
                     );
+                    let mut geometries = std::collections::BTreeSet::new();
                     for candidate in &result.candidates {
                         assert_generated_geometry(&query, &candidate.definition, &label);
                         assert!(candidate.quality >= 72.0, "{label}: quality");
+                        let mut rectangles: Vec<_> = candidate
+                            .definition
+                            .positions
+                            .iter()
+                            .zip(&query.frame_orientations)
+                            .map(|(r, orientation)| {
+                                (format!("{orientation:?}"), r.x, r.y, r.width, r.height)
+                            })
+                            .collect();
+                        rectangles.sort();
+                        assert!(
+                            geometries.insert(rectangles),
+                            "{label}: duplicate geometry after reflection"
+                        );
                     }
                 }
             }

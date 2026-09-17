@@ -344,7 +344,7 @@ fn query_is_valid(query: &LayoutQuery) -> bool {
 /// Pure, bounded generation. Positions always follow the caller's Frame order.
 pub fn generate_layouts(query: &LayoutQuery) -> LayoutGeneration {
     let mut result = LayoutGeneration {
-        algorithm_version: 2,
+        algorithm_version: 3,
         status: LayoutGenerationStatus::NoCandidates,
         candidates: Vec::new(),
     };
@@ -407,7 +407,7 @@ pub fn generate_layouts(query: &LayoutQuery) -> LayoutGeneration {
             family_limits: true,
         },
     );
-    if selected.len() < 5 {
+    if selected.len() < 10 {
         if frames.len() <= 6 {
             if search.double() {
                 pool.extend(families::pages(&frames, &search, true));
@@ -421,9 +421,51 @@ pub fn generate_layouts(query: &LayoutQuery) -> LayoutGeneration {
             &mut pool,
             &mut selected,
             Selection {
-                maximum: 5,
+                maximum: 10,
                 cutoff: 72.0,
-                novelty: 0.18,
+                novelty: 0.12,
+                family_limits: false,
+            },
+        );
+    }
+    if selected.len() < 20 {
+        let mut reflected = Vec::new();
+        for candidate in &selected {
+            for (horizontal, vertical, label) in [
+                (true, false, "Espelhamento horizontal"),
+                (false, true, "Espelhamento vertical"),
+                (true, true, "Espelhamento horizontal e vertical"),
+            ] {
+                let slots = candidate
+                    .slots
+                    .iter()
+                    .map(|slot| {
+                        let r = slot.bounds;
+                        Slot {
+                            bounds: Bounds {
+                                x: if horizontal { 1.0 - r.x - r.w } else { r.x },
+                                y: if vertical {
+                                    search.height - r.y - r.h
+                                } else {
+                                    r.y
+                                },
+                                ..r
+                            },
+                            ..*slot
+                        }
+                    })
+                    .collect();
+                reflected.push(Candidate::new(slots, label, "reflection"));
+            }
+        }
+        prepare_candidates(&mut reflected, &search);
+        select_candidates(
+            &mut reflected,
+            &mut selected,
+            Selection {
+                maximum: 20,
+                cutoff: 72.0,
+                novelty: 0.05,
                 family_limits: false,
             },
         );
