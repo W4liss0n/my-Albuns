@@ -35,6 +35,17 @@ original e remoção da preparação. Não acrescenta comandos de diagnóstico a
 produto. Os testes de ACL só alteram arquivos e pastas criados pelo próprio
 ensaio, restaurando a regra mesmo em falhas de asserção.
 
+A jornada de interface usa a configuração atual de Exportação. Confere o
+cancelamento do seletor nativo de pasta e da configuração, confirma o destino
+pelo campo editável e verifica uma única lâmina selecionada, os arquivos exatos
+produzidos e o bloqueio de original ausente antes de iniciar o Processador.
+O desaparecimento posterior ao congelamento dos bindings continua coberto por
+`reopened_project_exports_the_frozen_visible_sheet_through_the_real_processor`
+no Host: remove o original, executa o Processador real e exige falha tipada,
+orientação para religar e nenhuma saída. O teste de CLI
+`processor_identifies_a_missing_original_as_a_source_verification_failure`
+confere também a fase e o diagnóstico dessa falha.
+
 ## Correção encontrada
 
 Com escrita negada na pasta de destino, a criação da preparação retornava
@@ -68,6 +79,20 @@ associado; as demais resoluções de dependências foram preservadas. Remover es
 override quando a dependência estável do Tauri aceitar uma versão publicada que
 contenha a correção. A compilação passa a precisar do repositório Git oficial
 na primeira obtenção dessa dependência.
+
+## Abertura enfileirada após cancelamento
+
+O mesmo ensaio encontrou #121: cancelar a decisão sobre uma Cópia externa com
+outra ativação na fila podia impedir a próxima abertura. O criador compartilhado
+de janelas solicitava a destruição e reutilizava imediatamente o identificador;
+o [runtime Wry 2.11.4](https://github.com/tauri-apps/tauri/blob/tauri-runtime-wry-v2.11.4/crates/tauri-runtime-wry/src/lib.rs)
+apenas enfileira esse pedido. Agora o criador aguarda assincronamente a retirada
+da janela e do WebView dos registros, com limite de cinco segundos, antes de
+criar o substituto. Falhas de destruição são propagadas.
+
+A regressão usa o cenário nativo já existente de cancelamento e ativação
+enfileirada. Um mock de janela não reproduziria a fila e os registros do Tauri.
+O teste não acrescenta atrasos para contornar a disputa.
 
 ## Limites
 
