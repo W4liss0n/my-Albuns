@@ -16,9 +16,9 @@ use std::{
 
 use myalbuns_imaging_protocol::{
     IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingEvent, ImagingFailureCode,
-    ImagingFailureStage, ImagingPathCode, ImagingProgress, ImagingProgressStage, ImagingRequest,
-    ImagingResponse, PROCESSOR_HANDSHAKE_CHALLENGE_ENV, decode_command, encode_event,
-    encode_processor_handshake, root_binding_plan_sha256,
+    ImagingFailureStage, ImagingPathCode, ImagingProgress, ImagingProgressStage, ImagingResponse,
+    PROCESSOR_HANDSHAKE_CHALLENGE_ENV, decode_command, encode_event, encode_processor_handshake,
+    root_binding_plan_sha256,
 };
 use myalbuns_logging::{
     ProcessRole, init_local_logging, safe_log_identifier, sidecar_log_directory,
@@ -148,7 +148,6 @@ fn run(app_paths: &AppPaths) -> Result<(), ProcessFailure> {
     })?;
     match command {
         ImagingCommand::RenderAlbum(request) => run_album_render(request),
-        ImagingCommand::Render(request) => run_render(request),
         ImagingCommand::BuildCache(request) => {
             cache::run_cache(request, app_paths).map_err(cache_failure)
         }
@@ -161,51 +160,9 @@ fn run(app_paths: &AppPaths) -> Result<(), ProcessFailure> {
 fn run_album_render(
     request: myalbuns_imaging_protocol::AlbumRenderRequest,
 ) -> Result<(), ProcessFailure> {
-    let mut progress =
-        |stage, completed, total| write_progress(&request.request_id, stage, completed, total);
-    let mut completed = Vec::new();
-    let response = match album_render::render_retaining(&request, &mut progress, &mut completed) {
-        Ok(completion) => ImagingResponse::AlbumCompleted {
-            request_id: request.request_id,
-            completion,
-        },
-        Err(failure)
-            if failure.failure.code
-                == myalbuns_imaging_protocol::ImagingFailureCode::OutputStorageFull =>
-        {
-            ImagingResponse::AlbumStorageFull {
-                request_id: request.request_id,
-                completion: myalbuns_imaging_protocol::AlbumRenderCompletion { outputs: completed },
-                failure: failure.failure,
-            }
-        }
-        Err(failure) => {
-            tracing::error!(target: "myalbuns.imaging", operation_id = request.request_id, reason = failure.message, event = "album_render_failed");
-            ImagingResponse::failed(
-                request.request_id,
-                failure.failure.code,
-                failure.failure.media_id,
-                failure.failure.path_code,
-            )
-        }
-    };
-    write_response(&response)?;
-    Ok(())
-}
-
-fn cache_failure(error: cache_error::CacheError) -> ProcessFailure {
-    ProcessFailure {
-        stage: Some(match error {
-            cache_error::CacheError::StorageFull => ImagingFailureStage::CacheStorageFull,
-            cache_error::CacheError::Other(_) => ImagingFailureStage::CacheProcessing,
-        }),
-    }
-}
-
-fn run_render(request: ImagingRequest) -> Result<(), ProcessFailure> {
     let operation_id = safe_log_identifier(&request.request_id);
-    let project_id = safe_log_identifier(&request.project_id);
-    let revision = request.revision;
+    let project_id = safe_log_identifier(&request.snapshot.project_id);
+    let revision = request.snapshot.revision;
     if request.validate().is_err() {
         tracing::warn!(
             target: "myalbuns.imaging",
@@ -243,66 +200,62 @@ fn run_render(request: ImagingRequest) -> Result<(), ProcessFailure> {
         event = "imaging_request_started",
     );
 
-    let mut report_progress =
-        |stage: ImagingProgressStage, completed_units: u32, total_units: u32| {
-            write_progress(&request.request_id, stage, completed_units, total_units)
-        };
-    let completion = match render::render_request(&request, &mut report_progress) {
-        Ok(completion) => completion,
+    let mut progress =
+        |stage, completed, total| write_progress(&request.request_id, stage, completed, total);
+    let mut completed = Vec::new();
+    let response = match album_render::render_retaining(&request, &mut progress, &mut completed) {
+        Ok(completion) => ImagingResponse::AlbumCompleted {
+            request_id: request.request_id.clone(),
+            completion,
+        },
+        Err(failure)
+            if failure.failure.code
+                == myalbuns_imaging_protocol::ImagingFailureCode::OutputStorageFull =>
+        {
+            ImagingResponse::AlbumStorageFull {
+                request_id: request.request_id.clone(),
+                completion: myalbuns_imaging_protocol::AlbumRenderCompletion { outputs: completed },
+                failure: failure.failure,
+            }
+        }
         Err(failure) => {
-            tracing::error!(
-                target: "myalbuns.imaging",
-                process_role = ProcessRole::Imaging.as_str(),
-                protocol_version = request.protocol_version,
-                operation_id,
-                project_id,
-                revision,
+            tracing::error!(target: "myalbuns.imaging",
+                process_role = ProcessRole::Imaging.as_str(), protocol_version = request.protocol_version,
+                operation_id, project_id, revision,
                 stage = failure.failure.code.stage().as_str(),
                 failure_code = failure.failure.code.as_str(),
                 path_code = failure.failure.path_code.map(ImagingPathCode::as_str),
-                reason = failure.message.as_str(),
-                event = "imaging_render_failed",
-            );
-            write_response(&ImagingResponse::failed(
-                request.request_id,
+                reason = failure.message.as_str(), event = "imaging_render_failed");
+            ImagingResponse::failed(
+                request.request_id.clone(),
                 failure.failure.code,
                 failure.failure.media_id,
                 failure.failure.path_code,
-            ))?;
-            return Ok(());
+            )
         }
     };
-    let response = ImagingResponse::completed(request.request_id.clone(), completion.clone());
     write_response(&response).inspect_err(|_| {
-        tracing::error!(
-            target: "myalbuns.imaging",
-            process_role = ProcessRole::Imaging.as_str(),
-            protocol_version = request.protocol_version,
-            operation_id,
-            project_id,
-            revision,
-            event = "imaging_response_write_failed",
-        );
+        tracing::error!(target: "myalbuns.imaging",
+            process_role = ProcessRole::Imaging.as_str(), protocol_version = request.protocol_version,
+            operation_id, project_id, revision, event = "imaging_response_write_failed");
     })?;
-    tracing::info!(
-        target: "myalbuns.imaging",
-        process_role = ProcessRole::Imaging.as_str(),
-        protocol_version = request.protocol_version,
-        operation_id,
-        project_id,
-        revision,
-        process_id = std::process::id(),
-        root_binding_plan_sha256,
-        event = "imaging_request_completed",
-        width_px = completion.width_px,
-        height_px = completion.height_px,
-        dpi = completion.dpi,
-        source_count = completion.source_count,
-        source_bytes = completion.source_bytes,
-        output_bytes = completion.output_bytes,
-        output_sha256 = completion.output_sha256.as_str(),
-    );
+    if let ImagingResponse::AlbumCompleted { completion, .. } = &response {
+        tracing::info!(target: "myalbuns.imaging",
+            process_role = ProcessRole::Imaging.as_str(), protocol_version = request.protocol_version,
+            operation_id, project_id, revision, process_id = std::process::id(),
+            root_binding_plan_sha256, output_count = completion.outputs.len(),
+            event = "imaging_request_completed");
+    }
     Ok(())
+}
+
+fn cache_failure(error: cache_error::CacheError) -> ProcessFailure {
+    ProcessFailure {
+        stage: Some(match error {
+            cache_error::CacheError::StorageFull => ImagingFailureStage::CacheStorageFull,
+            cache_error::CacheError::Other(_) => ImagingFailureStage::CacheProcessing,
+        }),
+    }
 }
 
 pub(crate) fn write_response(response: &ImagingResponse) -> Result<(), String> {

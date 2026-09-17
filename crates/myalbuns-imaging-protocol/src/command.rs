@@ -4,7 +4,6 @@ use sha2::{Digest, Sha256};
 
 use crate::PhotoImportRequest;
 use crate::cache::CacheRequest;
-use crate::render::ImagingRequest;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -194,16 +193,11 @@ impl ImagingFailureStage {
 #[allow(clippy::large_enum_variant)]
 pub enum ImagingCommand {
     RenderAlbum(crate::AlbumRenderRequest),
-    Render(ImagingRequest),
     BuildCache(CacheRequest),
     PreparePhotoImport(PhotoImportRequest),
 }
 
 impl ImagingCommand {
-    pub fn render(request: ImagingRequest) -> Self {
-        Self::Render(request)
-    }
-
     pub fn build_cache(request: CacheRequest) -> Self {
         Self::BuildCache(request)
     }
@@ -213,7 +207,6 @@ impl ImagingCommand {
     pub fn root_bindings(&self) -> &RootBindingPlan {
         match self {
             Self::RenderAlbum(request) => &request.root_bindings,
-            Self::Render(request) => &request.root_bindings,
             Self::BuildCache(request) => &request.root_bindings,
             Self::PreparePhotoImport(request) => &request.root_bindings,
         }
@@ -223,7 +216,7 @@ impl ImagingCommand {
         match self {
             Self::BuildCache(request) => Some(&request.cache_paths),
             Self::PreparePhotoImport(request) => Some(&request.cache_paths),
-            Self::Render(_) | Self::RenderAlbum(_) => None,
+            Self::RenderAlbum(_) => None,
         }
     }
 }

@@ -255,7 +255,7 @@ interface LegacyExportPort {
 const exportPort: LegacyExportPort = {
   startSheet: (sheetId, onEvent) =>
     exportPipelinePort.startSheet(
-      { projectName: "Projeto de teste", sheetId, sheetNumber: 1 },
+      { projectName: "Projeto de teste", sheetId, sheetNumber: 1, options: { scope: "range", sheetIds: [sheetId], mode: "sheet", format: { kind: "jpeg", quality: 100 }, destination: "C:/Exportados", conflictPolicy: "ask" } },
       onEvent,
     ),
 };

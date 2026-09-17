@@ -3,15 +3,10 @@ use std::collections::HashMap;
 use image::{Rgba, RgbaImage};
 use myalbuns_core::{ComposedBackground, ComposedFrame, MediaId, ProjectedFrameBorder, RectUm};
 use myalbuns_imaging_protocol::{
-    ImagingFailure, ImagingFailureCode, ImagingPathCode, ImagingProgressStage, ImagingRequest,
-    RenderCompletion,
+    ImagingFailure, ImagingFailureCode, ImagingPathCode, ImagingProgressStage,
 };
-use myalbuns_paths::ExpectedObject;
 
-use crate::{
-    jpeg_output::{JpegFailure, RasterPlan, write_verified},
-    source::{MAX_DECODED_SOURCE_PIXELS_TOTAL, open_render_source},
-};
+use crate::jpeg_output::{JpegFailure, RasterPlan};
 
 const MICROMETERS_PER_INCH: f64 = 25_400.0;
 
@@ -59,41 +54,6 @@ impl From<JpegFailure> for RenderFailure {
     fn from(failure: JpegFailure) -> Self {
         Self::new(failure.code, failure.message)
     }
-}
-
-pub(crate) fn render_request(
-    request: &ImagingRequest,
-    progress: &mut dyn FnMut(ImagingProgressStage, u32, u32) -> Result<(), String>,
-) -> Result<RenderCompletion, RenderFailure> {
-    let (sources, source_bytes) = load_render_sources(request, progress)?;
-    let image = render_unit(&request.unit, request.dpi, &sources, progress)?;
-    let raster = RasterPlan::new(
-        request.unit.sheet.width_um,
-        request.unit.sheet.height_um,
-        request.dpi,
-    )?;
-
-    progress(ImagingProgressStage::EncodingOutput, 0, 1)?;
-    let operational_output = request
-        .root_bindings
-        .resolve(request.prepared_output_path())
-        .map_err(|error| {
-            RenderFailure::new(
-                ImagingFailureCode::EncodeFailed,
-                format!("não foi possível aplicar o plano de caminhos: {error}"),
-            )
-        })?;
-    let verified = write_verified(&image, &operational_output, request.dpi)?;
-    progress(ImagingProgressStage::EncodingOutput, 1, 1)?;
-    Ok(RenderCompletion {
-        width_px: raster.width_px,
-        height_px: raster.height_px,
-        dpi: request.dpi,
-        source_count: sources.len(),
-        source_bytes,
-        output_bytes: verified.output_bytes,
-        output_sha256: verified.output_sha256,
-    })
 }
 
 pub(crate) fn render_unit(
@@ -158,119 +118,6 @@ pub(crate) fn render_unit(
     }
 
     Ok(image)
-}
-
-fn load_render_sources(
-    request: &ImagingRequest,
-    progress: &mut dyn FnMut(ImagingProgressStage, u32, u32) -> Result<(), String>,
-) -> Result<(HashMap<MediaId, RgbaImage>, u64), RenderFailure> {
-    let mut opened = Vec::new();
-    opened
-        .try_reserve_exact(request.sources.len())
-        .map_err(|_| {
-            RenderFailure::typed(
-                ImagingFailureCode::ResourceLimitExceeded,
-                None,
-                None,
-                "não há memória suficiente para planejar as fontes da Exportação",
-            )
-        })?;
-    let mut source_bytes = 0_u64;
-    let mut source_pixels = 0_u64;
-    let source_count = u32::try_from(request.sources.len())
-        .map_err(|_| "a Exportação contém fontes demais".to_string())?;
-    let loading_units = source_count.max(1);
-    progress(ImagingProgressStage::LoadingSources, 0, loading_units)?;
-    for source in &request.sources {
-        let resolved = request
-            .root_bindings
-            .resolve_existing(source.source_path(), ExpectedObject::RegularFile)
-            .map_err(|error| {
-                RenderFailure::typed(
-                    ImagingFailureCode::SourceUnavailable,
-                    Some(source.media_id().to_string()),
-                    Some(ImagingPathCode::from_resolve_error(error)),
-                    format!("não foi possível aplicar o plano de caminhos: {error}"),
-                )
-            })?;
-        let opened_source = open_render_source(&resolved).map_err(|failure| {
-            RenderFailure::typed(
-                failure.code,
-                Some(source.media_id().to_string()),
-                failure.path_code,
-                failure.message,
-            )
-        })?;
-        source_bytes = source_bytes
-            .checked_add(opened_source.byte_count())
-            .ok_or_else(|| {
-                RenderFailure::typed(
-                    ImagingFailureCode::ResourceLimitExceeded,
-                    Some(source.media_id().to_string()),
-                    None,
-                    "o tamanho total das fontes excedeu o limite",
-                )
-            })?;
-        source_pixels = source_pixels
-            .checked_add(opened_source.pixel_count().map_err(|failure| {
-                RenderFailure::typed(
-                    failure.code,
-                    Some(source.media_id().to_string()),
-                    failure.path_code,
-                    failure.message,
-                )
-            })?)
-            .ok_or_else(|| {
-                RenderFailure::typed(
-                    ImagingFailureCode::ResourceLimitExceeded,
-                    Some(source.media_id().to_string()),
-                    None,
-                    "a soma dos pixels das fontes excedeu o intervalo seguro",
-                )
-            })?;
-        if source_pixels > MAX_DECODED_SOURCE_PIXELS_TOTAL {
-            return Err(RenderFailure::typed(
-                ImagingFailureCode::ResourceLimitExceeded,
-                Some(source.media_id().to_string()),
-                None,
-                format!(
-                    "as fontes teriam {source_pixels} pixels e excedem o limite de {MAX_DECODED_SOURCE_PIXELS_TOTAL}"
-                ),
-            ));
-        }
-        opened.push((source.media_id(), opened_source));
-    }
-
-    let mut decoded = HashMap::new();
-    decoded.try_reserve(request.sources.len()).map_err(|_| {
-        RenderFailure::typed(
-            ImagingFailureCode::ResourceLimitExceeded,
-            None,
-            None,
-            "não há memória suficiente para indexar as fontes decodificadas",
-        )
-    })?;
-    for (index, (media_id, opened_source)) in opened.into_iter().enumerate() {
-        let image = opened_source.decode().map_err(|failure| {
-            RenderFailure::typed(
-                failure.code,
-                Some(media_id.to_string()),
-                failure.path_code,
-                failure.message,
-            )
-        })?;
-        decoded.insert(media_id, image);
-        progress(
-            ImagingProgressStage::LoadingSources,
-            u32::try_from(index + 1)
-                .map_err(|_| "a Exportação contém fontes demais".to_string())?,
-            loading_units,
-        )?;
-    }
-    if source_count == 0 {
-        progress(ImagingProgressStage::LoadingSources, 1, loading_units)?;
-    }
-    Ok((decoded, source_bytes))
 }
 
 fn draw_frame(

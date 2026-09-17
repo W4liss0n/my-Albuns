@@ -23,7 +23,8 @@ test.each([
 ] as const)("keeps the native export dialog open for %s progress with %i units", async (stage, totalUnits) => {
   const harness = createExportHarness();
   const rejectedStates: unknown[] = [];
-  vi.mocked(listen).mockResolvedValue(() => undefined);
+  let action!: (event: { payload: unknown }) => void;
+  vi.mocked(listen).mockImplementation(async (_event, listener) => { action = listener as typeof action; return () => undefined; });
   const native = vi.mocked(invoke).mockImplementation(async (command, args) => {
     if (command === "present_project_dialog" &&
         !parseProjectDialogState((args as { state: unknown }).state)) {
@@ -33,8 +34,12 @@ test.each([
   });
   render(<ExportPreviewControl dialogPort={createTauriProjectDialogPort()}
     exportPipelinePort={harness.port} projectId="project-a"
+    sheets={[{ sheetId: "first", number: 1, pageCount: 2 }]}
     selection={{ projectName: "Album", sheetId: "first", sheetNumber: 1 }} />);
   fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  await act(async () => { await Promise.resolve(); });
+  const presentation = native.mock.calls.find(([command]) => command === "present_project_dialog")?.[1] as { sessionId: string; state: { options: unknown } };
+  await act(async () => action({ payload: { sessionId: presentation.sessionId, action: { configureExport: presentation.state.options } } }));
   await act(async () => harness.attempts[0].emit({ event: "started", cancellable: true }));
   native.mockClear();
 

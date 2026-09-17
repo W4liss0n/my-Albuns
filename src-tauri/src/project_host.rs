@@ -5,11 +5,10 @@ use std::{
 };
 
 use myalbuns_core::{
-    AlbumInformation, AlbumInformationValidation, ComposedOutputUnit, EditableProject,
-    EditorProjection, MediaId, PhotoDropTarget, PhotoSourceMetadata, ProjectIdentityAuthority,
-    ProjectIntent, ProjectMutationOutcome, RecoveryCheckpoint, RelinkMedia, RenderSnapshot,
-    SaveAsProjectError, SaveAsProjectOutcome, SaveAsProjectRequest, SaveProjectError,
-    SaveProjectOutcome,
+    AlbumInformation, AlbumInformationValidation, EditableProject, EditorProjection, MediaId,
+    PhotoDropTarget, PhotoSourceMetadata, ProjectIdentityAuthority, ProjectIntent,
+    ProjectMutationOutcome, RecoveryCheckpoint, RelinkMedia, RenderSnapshot, SaveAsProjectError,
+    SaveAsProjectOutcome, SaveAsProjectRequest, SaveProjectError, SaveProjectOutcome,
 };
 use myalbuns_imaging_protocol::RenderSource;
 
@@ -206,9 +205,10 @@ pub(crate) struct ProjectHostSaveAsResult {
 }
 
 #[derive(Debug)]
+#[cfg(test)]
 pub(crate) struct FrozenSheetExport {
     pub(crate) snapshot: RenderSnapshot,
-    pub(crate) output_unit: ComposedOutputUnit,
+    pub(crate) output_unit: myalbuns_core::ComposedOutputUnit,
     pub(crate) sources: Vec<RenderSource>,
 }
 
@@ -937,24 +937,12 @@ impl ProjectHost {
             .ok_or_else(|| "A ocorrência de mídia não pertence ao Projeto atual.".into())
     }
 
+    #[cfg(test)]
     pub(crate) fn freeze_sheet_export(&self, sheet_id: &str) -> Result<FrozenSheetExport, String> {
-        let frozen = self
-            .project()?
-            .freeze_rendering()
-            .into_sheet(sheet_id)
+        let (snapshot, sources) = self.freeze_export(&[sheet_id.to_owned()])?;
+        let output_unit = snapshot
+            .output_unit(sheet_id)
             .map_err(|error| error.to_string())?;
-        let (snapshot, output_unit, frozen_sources) = frozen.into_parts();
-        let sources = frozen_sources
-            .into_iter()
-            .map(|media| {
-                RenderSource::new(
-                    MediaId::try_from(media.id())
-                        .expect("persisted MediaRef identities are canonical UUID v4"),
-                    media.path().to_path_buf(),
-                )
-                .map_err(|error| format!("A fonte original congelada é inválida: {error}"))
-            })
-            .collect::<Result<_, _>>()?;
         Ok(FrozenSheetExport {
             snapshot,
             output_unit,
@@ -1005,16 +993,6 @@ impl ProjectHost {
         self.project()?
             .freeze_rendering()
             .validate_export_sheets(sheet_ids)
-            .map_err(|error| error.to_string())
-    }
-
-    pub(crate) fn validate_sheet_export(
-        &self,
-        sheet_id: &str,
-    ) -> Result<Vec<myalbuns_core::LayoutExportProblem>, String> {
-        self.project()?
-            .freeze_rendering()
-            .validate_export_sheets(&[sheet_id.into()])
             .map_err(|error| error.to_string())
     }
 
@@ -2289,7 +2267,12 @@ mod tests {
                     locked.projection.composition.sheets[1].frames,
                     locked_preview
                 );
-                assert_eq!(host.validate_sheet_export(&sheet_id).unwrap().len(), 1);
+                assert_eq!(
+                    host.validate_export(std::slice::from_ref(&sheet_id))
+                        .unwrap()
+                        .len(),
+                    1
+                );
                 assert!(host.freeze_sheet_export(&sheet_id).is_err());
                 let filled = host
                     .apply_with_outcome(ProjectIntent::AddPhoto {
@@ -2298,7 +2281,11 @@ mod tests {
                         mode: PhotoPlacementMode::Normal,
                     })
                     .unwrap();
-                assert!(host.validate_sheet_export(&sheet_id).unwrap().is_empty());
+                assert!(
+                    host.validate_export(std::slice::from_ref(&sheet_id))
+                        .unwrap()
+                        .is_empty()
+                );
                 assert!(filled.projection.state.album.sheets[1].layout_locked);
                 filled.projection
             } else {
@@ -2343,17 +2330,25 @@ mod tests {
                 .expect("the visible noninitial Lâmina is frozen by the Host");
             let expected_dpi = frozen.snapshot.dpi;
             let expected_revision = frozen.snapshot.revision;
-            let output_path = project_root.path().join("visible-sheet.jpg");
+            let output_path = project_root.path().join(format!(
+                "{}_{:03}.jpg",
+                crate::export_commands::export_name(&frozen.snapshot.project_name),
+                frozen.output_unit.sheet.number
+            ));
             let request_id = "host-pipeline-real-processor";
-            let planned = export_pipeline::plan(
+            let planned = export_pipeline::plan_album(
                 frozen.snapshot,
-                export_pipeline::ExportOptions::new(
-                    request_id,
-                    output_path.clone(),
-                    ExportWriteAuthorization::CreateOnly,
-                    sheet_id.clone(),
-                    frozen.sources,
-                ),
+                export_pipeline::AlbumExportOptions {
+                    request_id: request_id.into(),
+                    destination: output_path.parent().unwrap().to_path_buf(),
+                    authorization: ExportWriteAuthorization::CreateOnly,
+                    sheet_ids: vec![sheet_id.clone()],
+                    sources: frozen.sources,
+                    protected_originals: vec![],
+                    whole_album: false,
+                    mode: myalbuns_core::ExportMode::Sheet,
+                    format: myalbuns_core::ExportFormat::Jpeg { quality: 100 },
+                },
             )
             .expect("the Host snapshot owns the exact Exportação dependencies");
             let empty_cache = project_root.path().join("empty-cache");
@@ -2372,18 +2367,14 @@ mod tests {
                     .all(|path| !path.starts_with(&empty_cache)),
                 "the Exportação plan contains Originals and Destino, never Cache paths"
             );
-            let operation_paths = planned
-                .required_paths()
-                .into_iter()
-                .map(Path::to_path_buf)
-                .collect();
+            let operation_paths = planned.required_paths();
             let root_bindings = path_io::capture_root_bindings(operation_paths)
                 .await
                 .expect("the Exportação roots are captured once");
             let log_directory = project_root.path().join("processor-logs");
             std::fs::create_dir(&log_directory).expect("the Processador log directory exists");
             let mut transport = RealProcessTransport::stable(executable, log_directory);
-            let published = export_pipeline::execute(
+            let published = export_pipeline::execute_album(
                 &mut transport,
                 planned,
                 &root_bindings,
@@ -2479,26 +2470,28 @@ mod tests {
                 "Exportação does not save or mutate the Projeto"
             );
 
-            let missing_output_path = project_root.path().join("missing-original.jpg");
+            let missing_destination = project_root.path().join("missing-export");
+            std::fs::create_dir(&missing_destination).unwrap();
+            let missing_output_path = missing_destination.join(output_path.file_name().unwrap());
             let missing_frozen = host
                 .freeze_sheet_export(&sheet_id)
                 .expect("the same visible state is frozen before the Original disappears");
-            let missing_plan = export_pipeline::plan(
+            let missing_plan = export_pipeline::plan_album(
                 missing_frozen.snapshot,
-                export_pipeline::ExportOptions::new(
-                    "host-pipeline-missing-original",
-                    missing_output_path.clone(),
-                    ExportWriteAuthorization::CreateOnly,
-                    sheet_id,
-                    missing_frozen.sources,
-                ),
+                export_pipeline::AlbumExportOptions {
+                    request_id: "host-pipeline-missing-original".into(),
+                    destination: missing_output_path.parent().unwrap().to_path_buf(),
+                    authorization: ExportWriteAuthorization::CreateOnly,
+                    sheet_ids: vec![sheet_id],
+                    sources: missing_frozen.sources,
+                    protected_originals: vec![],
+                    whole_album: false,
+                    mode: myalbuns_core::ExportMode::Sheet,
+                    format: myalbuns_core::ExportFormat::Jpeg { quality: 100 },
+                },
             )
             .expect("the missing-Original attempt uses the same public plan");
-            let missing_paths = missing_plan
-                .required_paths()
-                .into_iter()
-                .map(Path::to_path_buf)
-                .collect();
+            let missing_paths = missing_plan.required_paths();
             let missing_bindings = path_io::capture_root_bindings(missing_paths)
                 .await
                 .expect("bindings are frozen while the Original still exists");
@@ -2514,7 +2507,7 @@ mod tests {
                 ),
                 missing_log_directory,
             );
-            let missing_failure = export_pipeline::execute(
+            let missing_failure = export_pipeline::execute_album(
                 &mut missing_transport,
                 missing_plan,
                 &missing_bindings,
@@ -2528,17 +2521,12 @@ mod tests {
             .await
             .expect_err("Cache cannot turn a missing Original into a successful Exportação");
             assert_eq!(
-                missing_failure
-                    .processor_failure
-                    .as_ref()
-                    .expect("the Processador reports the missing source")
-                    .code,
-                myalbuns_imaging_protocol::ImagingFailureCode::SourceUnavailable
+                missing_failure.stage,
+                export_pipeline::ExportFailureStage::Prepare
             );
             assert!(
-                missing_failure.message.contains("Religue"),
-                "the missing-Original message tells the user how to recover: {}",
-                missing_failure.message
+                missing_failure.processor_failure.is_none(),
+                "the Host retains Originals before invoking the Processor"
             );
             assert!(!missing_output_path.exists());
         });

@@ -28,13 +28,6 @@ fn required_bindings_for(
         .collect())
 }
 
-pub(crate) fn inspect(
-    host: &ProjectHost,
-    sheet_id: &str,
-) -> Result<Vec<ExportMediaProblem>, String> {
-    inspect_selection(host, &[sheet_id.into()])
-}
-
 pub(crate) fn inspect_selection(
     host: &ProjectHost,
     sheet_ids: &[String],
@@ -278,16 +271,18 @@ mod tests {
         let persisted = std::fs::read(&project_path).unwrap();
         std::fs::remove_file(panel_only).unwrap();
         assert!(
-            inspect(&host, &sheet_id).unwrap().is_empty(),
+            inspect_selection(&host, std::slice::from_ref(&sheet_id))
+                .unwrap()
+                .is_empty(),
             "a Panel-only missing file cannot block the selection"
         );
         std::fs::remove_file(&original).unwrap();
-        let problems = inspect(&host, &sheet_id).unwrap();
+        let problems = inspect_selection(&host, std::slice::from_ref(&sheet_id)).unwrap();
         assert_eq!(problems.len(), 1);
         assert_eq!(problems[0].state, ExportMediaState::Absent);
         std::fs::create_dir(&original).unwrap();
         assert_eq!(
-            inspect(&host, &sheet_id).unwrap()[0].state,
+            inspect_selection(&host, std::slice::from_ref(&sheet_id)).unwrap()[0].state,
             ExportMediaState::Unavailable
         );
         std::fs::remove_dir(&original).unwrap();
@@ -319,17 +314,25 @@ mod tests {
             persisted,
             "recovery does not save the Project"
         );
-        assert!(inspect(&host, &sheet_id).unwrap().is_empty());
+        assert!(
+            inspect_selection(&host, std::slice::from_ref(&sheet_id))
+                .unwrap()
+                .is_empty()
+        );
         let exported = host.freeze_sheet_export(&sheet_id).unwrap();
         assert_eq!(exported.sources.len(), 1);
         assert_eq!(exported.sources[0].source_path(), direct_replacement);
         host.undo().unwrap();
         assert_eq!(
-            inspect(&host, &sheet_id).unwrap()[0].state,
+            inspect_selection(&host, std::slice::from_ref(&sheet_id)).unwrap()[0].state,
             ExportMediaState::Absent
         );
         host.redo().unwrap();
-        assert!(inspect(&host, &sheet_id).unwrap().is_empty());
+        assert!(
+            inspect_selection(&host, std::slice::from_ref(&sheet_id))
+                .unwrap()
+                .is_empty()
+        );
         assert_eq!(std::fs::read(&project_path).unwrap(), persisted);
     }
 }

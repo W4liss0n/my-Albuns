@@ -31,6 +31,12 @@ use crate::{
     },
 };
 
+mod new_publication;
+
+use new_publication::{
+    NewProjectTarget, NewPublicationError, PublishedNewProject, publish_new_project,
+};
+
 /// Small public seam for productive Project persistence and editable ownership.
 ///
 /// Session, store and identity coordination remain private. Each process
@@ -1122,72 +1128,40 @@ impl EditableProject {
             }
         }
 
-        let lease_root = self
-            .core
-            .identity_lease_root()
-            .ok_or(SaveAsProjectError::Path(PathFailure::IoFailure))?;
         let source_physical_identity = self
             .store
             .physical_identity()
             .ok_or(SaveAsProjectError::IdentityIndeterminate)?;
         let previous_project_id = self.project_id();
         let project_id = Uuid::new_v4();
-        let identity_lease = ProjectIdentityLease::acquire(lease_root, project_id)
-            .map_err(map_save_as_identity_lease_error)?;
         let current_revision = self.session.current_revision();
         let candidate = ProjectRevision::new(
             project_id,
             current_revision.revision,
             current_revision.project,
         );
-        let store_result = match authorization {
-            SaveAsAuthorization::CreateOnly => project_store::create_only_excluding(
-                destination,
-                &candidate,
-                lease_root,
-                source_physical_identity,
-            )
-            .map_err(map_save_as_store_error),
-            SaveAsAuthorization::ReplaceConfirmed(confirmed_target) => {
-                project_store::prepare_replacement_excluding(
-                    destination,
-                    &candidate,
-                    lease_root,
-                    source_physical_identity,
-                    confirmed_target,
-                )
-                .map_err(map_save_as_store_error)
-                .and_then(|prepared| {
-                    let _replaced_identity_lease = prepared
-                        .replaced_project_id()
-                        .map(|replaced_id| ProjectIdentityLease::acquire(lease_root, replaced_id))
-                        .transpose()
-                        .map_err(map_save_as_replaced_lease_error)?;
-                    prepared.publish().map_err(map_save_as_store_error)
-                })
+        let PublishedNewProject {
+            store,
+            identity_lease,
+            identity_authority,
+        } = publish_new_project(
+            &self.core,
+            &candidate,
+            NewProjectTarget::SaveAs {
+                location: destination,
+                authorization,
+                source: &self.store,
+                source_identity: source_physical_identity,
+            },
+        )
+        .map_err(|error| match error {
+            NewPublicationError::Store(error) => map_save_as_store_error(error),
+            NewPublicationError::BaselineChanged
+            | NewPublicationError::RegistryUnavailable
+            | NewPublicationError::BindingUnavailable => {
+                SaveAsProjectError::SaveAsStateIndeterminate
             }
-        };
-        let store = match store_result {
-            Ok(store) => store,
-            Err(error) => {
-                identity_lease.discard_unpublished();
-                return Err(error);
-            }
-        };
-        if !store.location_still_matches_baseline() {
-            identity_lease.discard_unpublished();
-            return Err(SaveAsProjectError::SaveAsStateIndeterminate);
-        }
-        if !self.store.location_still_matches_baseline() {
-            identity_lease.discard_unpublished();
-            return Err(SaveAsProjectError::SaveAsStateIndeterminate);
-        }
-        if publish_identity_location(&self.core, project_id, &store).is_err() {
-            identity_lease.discard_unpublished();
-            return Err(SaveAsProjectError::SaveAsStateIndeterminate);
-        }
-        let identity_lease = bind_identity_target(identity_lease, &store)
-            .map_err(|_| SaveAsProjectError::SaveAsStateIndeterminate)?;
+        })?;
         let previous_session = self.session.clone();
         if self.session.adopt_saved_as(&candidate).is_err() {
             return Err(SaveAsProjectError::SaveAsStateIndeterminate);
@@ -1198,7 +1172,6 @@ impl EditableProject {
             project_id,
             revision: current,
         };
-        let identity_authority = ProjectIdentityAuthority::authorized(project_id);
         if transition(&identity_authority, outcome).is_err() {
             self.session = previous_session;
             return Err(SaveAsProjectError::SaveAsStateIndeterminate);
@@ -1334,59 +1307,28 @@ impl ProjectCore {
         project: ProjectDocument,
         authorization: CreateAuthorization,
     ) -> Result<EditableProject, CreateProjectError> {
-        let lease_root = self
-            .identity_lease_root()
-            .ok_or(CreateProjectError::Path(PathFailure::IoFailure))?;
         let revision = ProjectRevision::new(Uuid::new_v4(), 0, project);
-        let identity_lease = ProjectIdentityLease::acquire(lease_root, revision.project_id)
-            .map_err(map_new_identity_lease_error)?;
-
-        let store_result = match authorization {
-            CreateAuthorization::CreateOnly => {
-                project_store::create_only(location, &revision, lease_root)
-                    .map_err(map_create_store_error)
+        let PublishedNewProject {
+            store,
+            identity_lease,
+            identity_authority,
+        } = publish_new_project(
+            self,
+            &revision,
+            NewProjectTarget::Create {
+                location,
+                authorization,
+            },
+        )
+        .map_err(|error| match error {
+            NewPublicationError::Store(error) => map_create_store_error(error),
+            NewPublicationError::BaselineChanged | NewPublicationError::BindingUnavailable => {
+                CreateProjectError::IdentityIndeterminate
             }
-            CreateAuthorization::ReplaceConfirmed
-            | CreateAuthorization::ReplaceTargetConfirmed(_) => {
-                let prepared = match authorization {
-                    CreateAuthorization::ReplaceTargetConfirmed(identity) => {
-                        project_store::prepare_replacement_confirmed(
-                            location, &revision, lease_root, identity,
-                        )
-                    }
-                    _ => project_store::prepare_replacement(location, &revision, lease_root),
-                };
-                prepared
-                    .map_err(map_create_store_error)
-                    .and_then(|prepared| {
-                        let _replaced_identity_lease = prepared
-                            .replaced_project_id()
-                            .map(|project_id| ProjectIdentityLease::acquire(lease_root, project_id))
-                            .transpose()
-                            .map_err(map_replaced_identity_lease_error)?;
-                        prepared.publish().map_err(map_create_store_error)
-                    })
+            NewPublicationError::RegistryUnavailable => {
+                CreateProjectError::CreateStateIndeterminate
             }
-        };
-        let store = match store_result {
-            Ok(store) => store,
-            Err(error) => {
-                identity_lease.discard_unpublished();
-                return Err(error);
-            }
-        };
-        if !store.location_still_matches_baseline() {
-            identity_lease.discard_unpublished();
-            return Err(CreateProjectError::IdentityIndeterminate);
-        }
-        if publish_identity_location(self, revision.project_id, &store).is_err() {
-            identity_lease.discard_unpublished();
-            return Err(CreateProjectError::CreateStateIndeterminate);
-        }
-        let identity_lease = bind_identity_target(identity_lease, &store)
-            .map_err(|_| CreateProjectError::IdentityIndeterminate)?;
-
-        let identity_authority = ProjectIdentityAuthority::authorized(identity_lease.project_id());
+        })?;
         Ok(EditableProject {
             core: self.clone(),
             session: PersistentProjectSession::from_persisted(revision, false),
@@ -1682,20 +1624,6 @@ fn map_save_copy_store_error(error: CreateStoreError) -> SaveCopyAsError {
     }
 }
 
-fn map_save_copy_identity_lease_error(error: IdentityLeaseError) -> SaveCopyAsError {
-    match error {
-        IdentityLeaseError::Conflict => SaveCopyAsError::IdentityIndeterminate,
-        IdentityLeaseError::Unavailable => SaveCopyAsError::Path(PathFailure::IoFailure),
-    }
-}
-
-fn map_save_copy_replaced_lease_error(error: IdentityLeaseError) -> SaveCopyAsError {
-    match error {
-        IdentityLeaseError::Conflict => SaveCopyAsError::ProjectInUse,
-        IdentityLeaseError::Unavailable => SaveCopyAsError::Path(PathFailure::IoFailure),
-    }
-}
-
 fn map_save_as_store_error(error: CreateStoreError) -> SaveAsProjectError {
     match error {
         CreateStoreError::Path(error) => SaveAsProjectError::Path(error),
@@ -1706,20 +1634,6 @@ fn map_save_as_store_error(error: CreateStoreError) -> SaveAsProjectError {
         CreateStoreError::DestinationConflict => SaveAsProjectError::DestinationConflict,
         CreateStoreError::ProjectInUse => SaveAsProjectError::ProjectInUse,
         CreateStoreError::StateIndeterminate => SaveAsProjectError::SaveAsStateIndeterminate,
-    }
-}
-
-fn map_save_as_identity_lease_error(error: IdentityLeaseError) -> SaveAsProjectError {
-    match error {
-        IdentityLeaseError::Conflict => SaveAsProjectError::IdentityIndeterminate,
-        IdentityLeaseError::Unavailable => SaveAsProjectError::Path(PathFailure::IoFailure),
-    }
-}
-
-fn map_save_as_replaced_lease_error(error: IdentityLeaseError) -> SaveAsProjectError {
-    match error {
-        IdentityLeaseError::Conflict => SaveAsProjectError::ProjectInUse,
-        IdentityLeaseError::Unavailable => SaveAsProjectError::Path(PathFailure::IoFailure),
     }
 }
 
@@ -1736,67 +1650,30 @@ impl ProjectCore {
         if !source.store.location_still_matches_baseline() {
             return Err(SaveCopyAsError::IdentityIndeterminate);
         }
-        let lease_root = self
-            .identity_lease_root()
-            .ok_or(SaveCopyAsError::Path(PathFailure::IoFailure))?;
-        let project_id = Uuid::new_v4();
-        let identity_lease = ProjectIdentityLease::acquire(lease_root, project_id)
-            .map_err(map_save_copy_identity_lease_error)?;
         let revision = ProjectRevision::new(
-            project_id,
+            Uuid::new_v4(),
             source.revision.revision,
             source.revision.project.clone(),
         );
-        let store_result = match authorization {
-            CreateAuthorization::CreateOnly => {
-                project_store::create_only(destination, &revision, lease_root)
-                    .map_err(map_save_copy_store_error)
+        let PublishedNewProject {
+            store,
+            identity_lease,
+            identity_authority,
+        } = publish_new_project(
+            self,
+            &revision,
+            NewProjectTarget::Create {
+                location: destination,
+                authorization,
+            },
+        )
+        .map_err(|error| match error {
+            NewPublicationError::Store(error) => map_save_copy_store_error(error),
+            NewPublicationError::BaselineChanged => SaveCopyAsError::IdentityIndeterminate,
+            NewPublicationError::RegistryUnavailable | NewPublicationError::BindingUnavailable => {
+                SaveCopyAsError::SaveCopyStateIndeterminate
             }
-            CreateAuthorization::ReplaceConfirmed
-            | CreateAuthorization::ReplaceTargetConfirmed(_) => {
-                let prepared = match authorization {
-                    CreateAuthorization::ReplaceTargetConfirmed(identity) => {
-                        project_store::prepare_replacement_confirmed(
-                            destination,
-                            &revision,
-                            lease_root,
-                            identity,
-                        )
-                    }
-                    _ => project_store::prepare_replacement(destination, &revision, lease_root),
-                };
-                prepared
-                    .map_err(map_save_copy_store_error)
-                    .and_then(|prepared| {
-                        let _replaced_identity_lease = prepared
-                            .replaced_project_id()
-                            .map(|replaced_id| {
-                                ProjectIdentityLease::acquire(lease_root, replaced_id)
-                            })
-                            .transpose()
-                            .map_err(map_save_copy_replaced_lease_error)?;
-                        prepared.publish().map_err(map_save_copy_store_error)
-                    })
-            }
-        };
-        let store = match store_result {
-            Ok(store) => store,
-            Err(error) => {
-                identity_lease.discard_unpublished();
-                return Err(error);
-            }
-        };
-        if !store.location_still_matches_baseline() {
-            identity_lease.discard_unpublished();
-            return Err(SaveCopyAsError::IdentityIndeterminate);
-        }
-        if publish_identity_location(self, project_id, &store).is_err() {
-            identity_lease.discard_unpublished();
-            return Err(SaveCopyAsError::SaveCopyStateIndeterminate);
-        }
-        let identity_lease = bind_identity_target(identity_lease, &store)
-            .map_err(|_| SaveCopyAsError::SaveCopyStateIndeterminate)?;
-        let identity_authority = ProjectIdentityAuthority::authorized(project_id);
+        })?;
         Ok(EditableProject {
             core: self.clone(),
             session: PersistentProjectSession::from_persisted(revision, false),
@@ -1884,20 +1761,6 @@ fn map_active_identity_observation(
             OpenProjectError::ProjectInUse
         }
         Err(_) => OpenProjectError::IdentityIndeterminate,
-    }
-}
-
-fn map_new_identity_lease_error(error: IdentityLeaseError) -> CreateProjectError {
-    match error {
-        IdentityLeaseError::Conflict => CreateProjectError::IdentityIndeterminate,
-        IdentityLeaseError::Unavailable => CreateProjectError::Path(PathFailure::IoFailure),
-    }
-}
-
-fn map_replaced_identity_lease_error(error: IdentityLeaseError) -> CreateProjectError {
-    match error {
-        IdentityLeaseError::Conflict => CreateProjectError::ProjectInUse,
-        IdentityLeaseError::Unavailable => CreateProjectError::Path(PathFailure::IoFailure),
     }
 }
 

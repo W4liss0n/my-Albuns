@@ -1,5 +1,4 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
 
 import type {
@@ -21,7 +20,7 @@ test("normal export keeps its dialog and resumes only after cache cleanup", asyn
   (harness.port as ExportPipelinePort).storageRecovery = { status: async () => ({ id: "full", canClearCache: true }),
     clear: vi.fn(() => new Promise<boolean>(resolve => { finish = resolve; })) };
   const { dialog } = renderControl({ exportHarness: harness });
-  fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  await startConfigured(dialog);
   await act(async () => harness.attempts[0].reject(new StorageFullError("Libere espaço.")));
   await waitFor(() => expect(dialog.present).toHaveBeenLastCalledWith({ kind: "storageFull", message: "Libere espaço.", canClearCache: true, busy: false }));
   dialog.emit("clearStorageCache");
@@ -107,7 +106,7 @@ test("retrying after cancelling a resumed export does not reuse its consumed nat
     status: async () => ({ id: "full", canClearCache: false }), clear: async () => false,
   };
   const { dialog } = renderControl({ exportHarness: harness });
-  fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  await startConfigured(dialog);
   await act(async () => harness.attempts[0].reject(new StorageFullError("Libere espaço.")));
   await waitFor(() => expect(dialog.present).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "storageFull", busy: false })));
   dialog.emit("resumeStorage");
@@ -128,7 +127,7 @@ test("cancelling the disk-full dialog waits for native preparation disposal befo
   port.discardRecovery = discard;
   port.storageRecovery = { status: async () => ({ id: "paused", canClearCache: false }), clear: async () => false };
   const { dialog } = renderControl({ exportHarness: harness });
-  fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  await startConfigured(dialog);
   await act(async () => harness.attempts[0].reject(new StorageFullError("Libere espaço.")));
   await waitFor(() => expect(dialog.present).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "storageFull", busy: false })));
   dialog.emit("cancelStorage");
@@ -260,6 +259,14 @@ function createDialogHarness() {
   };
 }
 
+async function startConfigured(dialog: ReturnType<typeof createDialogHarness>) {
+  fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  await act(async () => { await Promise.resolve(); });
+  const state = dialog.present.mock.calls[dialog.present.mock.calls.length - 1]?.[0];
+  if (state?.kind !== "exportConfiguration") throw new Error("Export configuration was not opened");
+  dialog.emit({ configureExport: state.options });
+}
+
 function renderControl({
   dialog = createDialogHarness(),
   exportHarness = createExportHarness(),
@@ -277,6 +284,7 @@ function renderControl({
 } = {}) {
   const view = render(
     <ExportPreviewControl
+      sheets={[{ sheetId: "sheet-001", number: 1, pageCount: 2 }]}
       dialogPort={dialog.port}
       exportPipelinePort={exportHarness.port}
       exportMediaPort={exportMediaPort}
@@ -304,7 +312,7 @@ test("folder recovery publishes the unsaved projection and resumes once after cl
   const inspect = vi.fn<ExportMediaPort["inspect"]>(async () => []);
   const onProjectionChange = vi.fn();
   const { dialog, exportHarness } = renderControl({ exportMediaPort: { relink, inspect }, onProjectionChange });
-  fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  await startConfigured(dialog);
   await act(async () => exportHarness.attempts[0].reject(new MediaExportBlockedError(problems)));
   dialog.emit("relinkExportMedia");
   dialog.emit("relinkExportMedia");
@@ -324,7 +332,7 @@ test("folder recovery publishes the unsaved projection and resumes once after cl
   await act(async () => exportHarness.attempts[1].resolve({ status: "cancelled" }));
   expect(dialog.dismiss).toHaveBeenCalledOnce();
   expect(screen.getByRole("button", { name: "Exportar" })).toBeEnabled();
-  fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  await startConfigured(dialog);
   expect(exportHarness.startSheet).toHaveBeenCalledTimes(3);
 });
 
@@ -333,7 +341,7 @@ test("unavailable sources resume only after reinspection clears the last problem
   const problems = [{ mediaId: "photo-1", fileName: "Rede.png", state: "unavailable" as const }];
   const inspect = vi.fn<ExportMediaPort["inspect"]>(async () => problems);
   const { dialog, exportHarness } = renderControl({ exportMediaPort: { relink, inspect } });
-  fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  await startConfigured(dialog);
   await act(async () => exportHarness.attempts[0].reject(new MediaExportBlockedError(problems)));
   dialog.emit("retryExportMedia");
   await waitFor(() => expect(dialog.present).toHaveBeenLastCalledWith(expect.objectContaining({ problems, busy: false })));
@@ -355,7 +363,7 @@ test("partial folder recovery keeps remaining problems and closing cancels the p
   const relink = vi.fn<ExportMediaPort["relink"]>(async () => ({ projection: representativeProjection, problems,
     notes: [{ fileName: "Foto.jpg", reason: "Mais de uma correspondência encontrada." }] }));
   const { dialog, exportHarness } = renderControl({ exportMediaPort: { relink, inspect: vi.fn() } });
-  fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  await startConfigured(dialog);
   await act(async () => exportHarness.attempts[0].reject(new MediaExportBlockedError(problems)));
   dialog.emit("relinkExportMedia");
   await waitFor(() => expect(dialog.present).toHaveBeenLastCalledWith(expect.objectContaining({ problems, busy: false,
@@ -371,7 +379,7 @@ test("retiring the Project during recovery prevents automatic resumption", async
   const relink = vi.fn<ExportMediaPort["relink"]>(() => new Promise(done => { resolve = done; }));
   const onProjectionChange = vi.fn();
   const { dialog, exportHarness, view } = renderControl({ exportMediaPort: { relink, inspect: vi.fn() }, onProjectionChange });
-  fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  await startConfigured(dialog);
   await act(async () => exportHarness.attempts[0].reject(new MediaExportBlockedError([
     { mediaId: "photo-1", fileName: "Foto.jpg", state: "absent" },
   ])));
@@ -387,7 +395,7 @@ test("a recovered Original with a failed preview shows the processing problem in
   const relink = vi.fn<ExportMediaPort["relink"]>(async () => ({ projection: representativeProjection, problems: [], notes }));
   const onProjectionChange = vi.fn();
   const { dialog, exportHarness } = renderControl({ exportMediaPort: { relink, inspect: vi.fn() }, onProjectionChange });
-  fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  await startConfigured(dialog);
   await act(async () => exportHarness.attempts[0].reject(new MediaExportBlockedError([
     { mediaId: "photo-1", fileName: "Foto.jpg", state: "absent" },
   ])));
@@ -404,7 +412,7 @@ test("a recovered Original with a failed preview shows the processing problem in
 
 test("placeholder validation presents Project problems and returns to the Project without retrying", async () => {
   const { dialog, exportHarness } = renderControl();
-  fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  await startConfigured(dialog);
   const { LayoutExportBlockedError } = await import("../application/projectPorts");
   const problems = [{ sheetId: "sheet-001", sheetNumber: 1, frameId: "frame-002", frameNumber: 2 }];
   await act(async () => exportHarness.attempts[0].reject(new LayoutExportBlockedError(problems)));
@@ -416,19 +424,19 @@ test("placeholder validation presents Project problems and returns to the Projec
 });
 
 test("waits for the backend started event before opening the native progress window", async () => {
-  const user = userEvent.setup();
   const { dialog, exportHarness } = renderControl();
-  await user.click(screen.getByRole("button", { name: "Exportar" }));
+  await startConfigured(dialog);
 
   expect(exportHarness.startSheet).toHaveBeenCalledWith(
     {
       projectName: "Projeto de teste",
       sheetId: "sheet-001",
       sheetNumber: 1,
+      options: expect.objectContaining({ sheetIds: ["sheet-001"] }),
     },
     expect.any(Function),
   );
-  expect(dialog.present).not.toHaveBeenCalled();
+  expect(dialog.present).not.toHaveBeenCalledWith(expect.objectContaining({ kind: "exportProgress" }));
 
   act(() => {
     exportHarness.attempts[0].emit({ event: "started", cancellable: false });
@@ -447,9 +455,8 @@ test("waits for the backend started event before opening the native progress win
 });
 
 test("displays the native overall percentage independently of stage units", async () => {
-  const user = userEvent.setup();
   const { dialog, exportHarness } = renderControl();
-  await user.click(screen.getByRole("button", { name: "Exportar" }));
+  await startConfigured(dialog);
   act(() => {
     exportHarness.attempts[0].emit({ event: "started", cancellable: true });
     exportHarness.attempts[0].emit({
@@ -468,7 +475,7 @@ test("displays the native overall percentage independently of stage units", asyn
     });
   });
 
-  expect(dialog.present).toHaveBeenNthCalledWith(2, {
+  expect(dialog.present).toHaveBeenNthCalledWith(4, {
     cancelRequested: false,
     cancellable: true,
     kind: "exportProgress",
@@ -477,23 +484,22 @@ test("displays the native overall percentage independently of stage units", asyn
       status: "0 lâminas de 1",
     },
   });
-  expect(dialog.present).toHaveBeenNthCalledWith(3, {
+  expect(dialog.present).toHaveBeenNthCalledWith(5, {
     cancelRequested: false,
     cancellable: true,
     kind: "exportProgress",
     progress: {
       completed: 37,
       kind: "determinate",
-      status: "0 lâminas de 1",
+      status: "2 lâminas de 5",
       total: 100,
     },
   });
 });
 
 test("handles cancellation actions from the child window and keeps feedback there", async () => {
-  const user = userEvent.setup();
   const { dialog, exportHarness } = renderControl();
-  await user.click(screen.getByRole("button", { name: "Exportar" }));
+  await startConfigured(dialog);
   act(() => {
     exportHarness.attempts[0].emit({ event: "started", cancellable: true });
   });
@@ -522,10 +528,9 @@ test("handles cancellation actions from the child window and keeps feedback ther
 });
 
 test("opens the standard failure dialog for a pre-start conflict", async () => {
-  const user = userEvent.setup();
   const onActiveChange = vi.fn();
   const { dialog, exportHarness } = renderControl({ onActiveChange });
-  await user.click(screen.getByRole("button", { name: "Exportar" }));
+  await startConfigured(dialog);
 
   await act(async () => {
     exportHarness.attempts[0].reject({
@@ -546,15 +551,13 @@ test("opens the standard failure dialog for a pre-start conflict", async () => {
 });
 
 test("recovers after the native progress window cannot be presented", async () => {
-  const user = userEvent.setup();
   const onActiveChange = vi.fn();
   const dialog = createDialogHarness();
-  dialog.present.mockRejectedValue(
-    new Error("Não foi possível abrir a janela de progresso."),
-  );
   const { exportHarness } = renderControl({ dialog, onActiveChange });
 
-  await user.click(screen.getByRole("button", { name: "Exportar" }));
+  await startConfigured(dialog);
+  dialog.present.mockClear();
+  dialog.present.mockRejectedValue(new Error("Não foi possível abrir a janela de progresso."));
   act(() => {
     exportHarness.attempts[0].emit({ event: "started", cancellable: true });
   });
@@ -576,7 +579,7 @@ test("recovers after the native progress window cannot be presented", async () =
 
 test("replaces native progress with the standard success dialog", async () => {
   const { dialog, exportHarness } = renderControl();
-  fireEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  await startConfigured(dialog);
   act(() => {
     exportHarness.attempts[0].emit({ event: "started", cancellable: true });
   });
@@ -596,9 +599,8 @@ test("replaces native progress with the standard success dialog", async () => {
 });
 
 test("retries and dismisses terminal feedback from semantic child-window actions", async () => {
-  const user = userEvent.setup();
   const { dialog, exportHarness } = renderControl();
-  await user.click(screen.getByRole("button", { name: "Exportar" }));
+  await startConfigured(dialog);
   act(() => {
     exportHarness.attempts[0].emit({ event: "started", cancellable: true });
   });
@@ -633,18 +635,18 @@ test("retries and dismisses terminal feedback from semantic child-window actions
 });
 
 test("retires the attempt and native presentation when the Project changes", async () => {
-  const user = userEvent.setup();
   const onActiveChange = vi.fn();
   const dialog = createDialogHarness();
   const exportHarness = createExportHarness();
   const { view } = renderControl({ dialog, exportHarness, onActiveChange });
-  await user.click(screen.getByRole("button", { name: "Exportar" }));
+  await startConfigured(dialog);
   act(() => {
     exportHarness.attempts[0].emit({ event: "started", cancellable: true });
   });
 
   view.rerender(
     <ExportPreviewControl
+      sheets={[{ sheetId: "sheet-001", number: 1, pageCount: 2 }]}
       dialogPort={dialog.port}
       exportPipelinePort={exportHarness.port}
       onActiveChange={onActiveChange}

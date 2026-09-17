@@ -6,15 +6,15 @@ import { representativeProjection } from "../test/projectFixtures";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(), Channel: class { onmessage = () => undefined; } }));
 beforeEach(() => vi.mocked(invoke).mockReset());
-const selection = { sheetId: "sheet-1", sheetNumber: 1, projectName: "Projeto" };
+const selection: Parameters<typeof tauriExportMediaPort.inspect>[0] = { options: { scope: "range", sheetIds: ["sheet-1"], mode: "sheet", format: { kind: "jpeg", quality: 100 }, destination: "C:/Exportados", conflictPolicy: "ask" }, sheetId: "sheet-1", sheetNumber: 1, projectName: "Projeto" };
 
 test("recovery sends only the selected sheet and receives native folder results", async () => {
   const problems = [{ mediaId: "photo-1", fileName: "Foto.jpg", state: "absent" }];
   vi.mocked(invoke).mockResolvedValueOnce(problems).mockResolvedValueOnce({ projection: representativeProjection, problems: [], notes: [] });
   expect(await tauriExportMediaPort.inspect(selection)).toEqual(problems);
   expect(await tauriExportMediaPort.relink(selection, vi.fn())).toEqual({ projection: representativeProjection, problems: [], notes: [] });
-  expect(invoke).toHaveBeenNthCalledWith(1, "inspect_export_media", { sheetId: "sheet-1" });
-  expect(invoke).toHaveBeenNthCalledWith(2, "relink_export_media", { sheetId: "sheet-1", onProgress: expect.any(Object) });
+  expect(invoke).toHaveBeenNthCalledWith(1, "inspect_export_media", { sheetId: "sheet-1", sheetIds: ["sheet-1"] });
+  expect(invoke).toHaveBeenNthCalledWith(2, "relink_export_media", { sheetId: "sheet-1", sheetIds: ["sheet-1"], onProgress: expect.any(Object) });
 });
 
 test("invalid inspection payloads never unblock Export", async () => {

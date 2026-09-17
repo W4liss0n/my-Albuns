@@ -6,10 +6,10 @@ use myalbuns_core::{
     MediaKind, ProjectCore, ProjectLocation,
 };
 use myalbuns_imaging_protocol::{
-    CacheCompletion, CacheJob, CacheMediaSource, CacheRepresentationPolicy, CacheRequest,
-    IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingEvent, ImagingEventStreamDecoder,
-    ImagingFailureCode, ImagingFailureStage, ImagingPathCode, ImagingProgress,
-    ImagingProgressStage, ImagingRequest, ImagingResponse, MediaSource, RenderCompletion,
+    AlbumRenderRequest, CacheCompletion, CacheJob, CacheMediaSource, CacheRepresentationPolicy,
+    CacheRequest, IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingEvent,
+    ImagingEventStreamDecoder, ImagingFailureCode, ImagingFailureStage, ImagingPathCode,
+    ImagingProgress, ImagingProgressStage, ImagingResponse, MediaSource, RenderCompletion,
     RenderSource, decode_command, decode_event_stream, encode_command, encode_event,
     root_binding_plan_sha256,
 };
@@ -225,7 +225,7 @@ fn host_and_processor_share_one_serialized_protocol() {
     let sheet_id = frozen.render_snapshot().composition.sheets[0]
         .sheet_id
         .clone();
-    let (snapshot, unit, frozen_sources) = frozen
+    let (snapshot, _unit, frozen_sources) = frozen
         .into_sheet(&sheet_id)
         .expect("the selected sheet is frozen with exact originals")
         .into_parts();
@@ -262,19 +262,26 @@ fn host_and_processor_share_one_serialized_protocol() {
             .expect("the source root is captured");
     }
     let root_bindings = path_context.freeze();
-    let request = ImagingRequest::new(
-        "render-42",
-        snapshot.project_id.clone(),
-        snapshot.revision,
-        NativePathDto::from(prepared_output_path.clone()),
-        unit,
-        snapshot.dpi,
+    let request = AlbumRenderRequest {
+        protocol_version: IMAGING_PROTOCOL_VERSION,
+        request_id: "render-42".into(),
+        snapshot: snapshot.clone(),
+        format: myalbuns_core::ExportFormat::Jpeg { quality: 100 },
+        outputs: vec![myalbuns_imaging_protocol::AlbumRenderOutput {
+            prepared_path: prepared_output_path.clone().into(),
+            units: snapshot
+                .export_units(
+                    std::slice::from_ref(&sheet_id),
+                    myalbuns_core::ExportMode::Sheet,
+                )
+                .unwrap(),
+        }],
         sources,
-        root_bindings.clone(),
-    )
-    .expect("the render request is valid");
+        root_bindings: root_bindings.clone(),
+    };
+    request.validate().expect("the render request is valid");
 
-    let command = ImagingCommand::render(request.clone());
+    let command = ImagingCommand::RenderAlbum(request.clone());
     let owner_plan_digest =
         root_binding_plan_sha256(&root_bindings).expect("the frozen plan has a stable digest");
     assert_eq!(owner_plan_digest.len(), 64);
@@ -283,26 +290,26 @@ fn host_and_processor_share_one_serialized_protocol() {
     assert_eq!(command_payload.last(), Some(&b'\n'));
     let request_json: serde_json::Value =
         serde_json::from_slice(&command_payload).expect("command is JSON");
-    assert_eq!(request_json["kind"], "render");
+    assert_eq!(request_json["kind"], "renderAlbum");
     assert_eq!(
         request_json["request"]["protocolVersion"],
         IMAGING_PROTOCOL_VERSION
     );
     assert_eq!(request_json["request"]["requestId"], "render-42");
     assert_eq!(
-        request_json["request"]["projectId"], snapshot.project_id,
+        request_json["request"]["snapshot"]["projectId"], snapshot.project_id,
         "the frozen Identidade do Projeto remains opaque render context"
     );
     assert_eq!(
-        request_json["request"]["revision"], snapshot.revision,
+        request_json["request"]["snapshot"]["revision"], snapshot.revision,
         "the visible Revisão crosses the process boundary with its composition"
     );
     assert_eq!(
-        request_json["request"]["preparedOutputPath"]["encoding"],
+        request_json["request"]["outputs"][0]["preparedPath"]["encoding"],
         "windowsUtf16"
     );
     assert!(
-        request_json["request"]["preparedOutputPath"]["units"]
+        request_json["request"]["outputs"][0]["preparedPath"]["units"]
             .as_array()
             .is_some_and(|units| !units.is_empty()),
         "the output path uses only the reversible native Windows wire form"
@@ -312,10 +319,10 @@ fn host_and_processor_share_one_serialized_protocol() {
         "selection belongs to the host; the Processor receives one output unit"
     );
     assert_eq!(
-        request_json["request"]["unit"]["sheet"]["sheetId"],
+        request_json["request"]["outputs"][0]["units"][0]["sheetId"],
         sheet_id
     );
-    assert_eq!(request_json["request"]["dpi"], 300);
+    assert_eq!(request_json["request"]["snapshot"]["dpi"], 300);
     assert!(
         request_json["request"].get("sourcePolicy").is_none(),
         "the production protocol has one source contract: linked originals"
@@ -362,7 +369,7 @@ fn host_and_processor_share_one_serialized_protocol() {
     legacy_json["request"]["protocolVersion"] = serde_json::json!(9);
     let legacy_command: ImagingCommand =
         serde_json::from_value(legacy_json).expect("the old wire remains syntactically JSON");
-    let ImagingCommand::Render(legacy_request) = legacy_command else {
+    let ImagingCommand::RenderAlbum(legacy_request) = legacy_command else {
         panic!("the fixture remains a Render command");
     };
     assert!(
@@ -376,37 +383,26 @@ fn host_and_processor_share_one_serialized_protocol() {
         "a worker must never resolve a root omitted by the operation owner"
     );
     let mut non_jpeg_request = request.clone();
-    non_jpeg_request.prepared_output_path =
+    non_jpeg_request.outputs[0].prepared_path =
         NativePathDto::from(prepared_output_path.with_extension("png"));
     assert!(
         non_jpeg_request.validate().is_err(),
         "the Processor rejects a JPEG payload prepared under a misleading extension"
     );
-    let mut uppercase_jpeg_request = request.clone();
-    uppercase_jpeg_request.prepared_output_path =
-        NativePathDto::from(prepared_output_path.with_extension("JPG"));
+    let mut unsafe_request = request.clone();
+    unsafe_request.request_id = r"C:privateoperation".into();
     assert!(
-        uppercase_jpeg_request.validate().is_ok(),
-        "Windows extension casing must not make the host and Processor disagree"
-    );
-    assert!(
-        ImagingRequest::new(
-            r"C:\private\operation",
-            request.project_id.clone(),
-            request.revision,
-            NativePathDto::from(PathBuf::from(
-                r"C:\Temp\.myalbuns-export-invalid.tmp\invalid.jpg",
-            )),
-            request.unit.clone(),
-            25,
-            request.sources.clone(),
-            root_bindings,
-        )
-        .is_err(),
+        unsafe_request.validate().is_err(),
         "request identifiers remain safe correlation values"
     );
+    let mut removed_command = request_json.clone();
+    removed_command["kind"] = serde_json::json!("render");
+    assert!(
+        serde_json::from_value::<ImagingCommand>(removed_command).is_err(),
+        "the removed single-sheet wire contract cannot be dispatched"
+    );
 
-    let response = ImagingResponse::completed(
+    let response = ImagingResponse::single_output_completed(
         "render-42",
         RenderCompletion {
             width_px: 7087,
@@ -441,11 +437,11 @@ fn host_and_processor_share_one_serialized_protocol() {
     assert_eq!(decoded_progress, progress);
     assert_eq!(
         decoded_response
-            .completed_for("render-42")
+            .single_output_for("render-42")
             .map(|completion| (completion.width_px, completion.height_px)),
         Some((7087, 3543))
     );
-    assert_eq!(decoded_response.completed_for("another"), None);
+    assert_eq!(decoded_response.single_output_for("another"), None);
     assert_eq!(decoded_response, response);
 }
 

@@ -116,14 +116,6 @@ impl JpegFailure {
     }
 }
 
-pub(crate) fn write_verified(
-    image: &RgbaImage,
-    prepared_output_path: &Path,
-    dpi: u32,
-) -> Result<VerifiedJpeg, JpegFailure> {
-    write_verified_quality(image, prepared_output_path, dpi, 100)
-}
-
 pub(crate) fn write_verified_quality(
     image: &RgbaImage,
     prepared_output_path: &Path,

@@ -19,15 +19,15 @@ use myalbuns_core::{
     Rgb as ProjectRgb,
 };
 use myalbuns_imaging_protocol::{
-    CacheArtifact, CacheArtifactFormat, CacheArtifactProperties, CacheJob, CacheMediaSource,
-    CacheRepresentationPolicy, CacheRequest, CacheReusableGeneration, IMAGING_PROTOCOL_VERSION,
-    ImagingCommand, ImagingFailure, ImagingFailureCode, ImagingFailureStage, ImagingPathCode,
-    ImagingRequest, ImagingResponse, PROCESSOR_HANDSHAKE_CHALLENGE_ENV, RenderSource,
-    decode_event_stream, decode_processor_handshake, root_binding_plan_sha256,
+    AlbumRenderRequest, CacheArtifact, CacheArtifactFormat, CacheArtifactProperties, CacheJob,
+    CacheMediaSource, CacheRepresentationPolicy, CacheRequest, CacheReusableGeneration,
+    IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingFailure, ImagingFailureCode,
+    ImagingFailureStage, ImagingPathCode, ImagingResponse, PROCESSOR_HANDSHAKE_CHALLENGE_ENV,
+    RenderSource, decode_event_stream, decode_processor_handshake, root_binding_plan_sha256,
 };
 use myalbuns_paths::{
-    AppPaths, CachePathPlan, NativePathDto, OperationPathContext, ProcessInstanceId,
-    RootBindingPlan, project_data_namespace,
+    AppPaths, CachePathPlan, OperationPathContext, ProcessInstanceId, RootBindingPlan,
+    project_data_namespace,
 };
 use sha2::{Digest, Sha256};
 #[cfg(windows)]
@@ -483,23 +483,15 @@ fn processor_exports_the_neutral_project_as_the_canonical_jpeg() {
         ))
         .expect("the neutral Project is created");
     let snapshot = project.render_snapshot();
-    let unit = snapshot
-        .output_unit(&snapshot.composition.sheets[0].sheet_id)
-        .expect("the first neutral Sheet becomes an output unit");
     let output_directory = tempfile::tempdir().expect("temporary JPEG output directory");
     let output_path = output_directory.path().join("Projeto_001.jpg");
-    let bindings = root_bindings(&[&output_path]);
-    let request = ImagingRequest::new(
+    let request = render_request(
+        snapshot.clone(),
+        output_path.clone(),
         "neutral-jpeg-001",
-        snapshot.project_id.clone(),
-        snapshot.revision,
-        NativePathDto::from(output_path.as_path()),
-        unit,
         snapshot.dpi,
-        Vec::new(),
-        bindings,
-    )
-    .expect("the source-free neutral render request is valid");
+        vec![],
+    );
 
     let log_directory = tempfile::tempdir().expect("temporary Processor log directory");
     let result = invoke_render_request(&request, Some(log_directory.path()));
@@ -573,7 +565,7 @@ fn processor_exports_the_neutral_project_as_the_canonical_jpeg() {
     let (_, response) =
         decode_event_stream(&result.stdout).expect("the processor output is a valid event stream");
     let completion = response
-        .completed_for("neutral-jpeg-001")
+        .single_output_for("neutral-jpeg-001")
         .expect("the neutral render completes");
     assert_eq!(completion.source_count, 0);
     assert_eq!(completion.source_bytes, 0);
@@ -685,23 +677,16 @@ fn visible_noninitial_sheet_uses_unsaved_dpi_personalization_and_exact_originals
                     .expect("the exact original descriptor is valid"),
             );
         }
-        let mut paths = Vec::with_capacity(sources.len() + 1);
-        paths.push(output_path.as_path());
-        paths.extend(sources.iter().map(RenderSource::source_path));
-        let bindings = root_bindings(&paths);
-        let request = ImagingRequest::new(
-            format!("visible-revision-{index}"),
-            snapshot.project_id.clone(),
-            snapshot.revision,
-            NativePathDto::from(output_path.as_path()),
-            unit,
+        let request = render_request_for_sheet(
+            snapshot.clone(),
+            &sheet.sheet_id,
+            output_path.clone(),
+            &format!("visible-revision-{index}"),
             snapshot.dpi,
             sources,
-            bindings,
-        )
-        .expect("the exact visible-state request is valid");
-        assert_eq!(request.revision, visible.state.revision);
-        assert_eq!(request.unit.sheet.sheet_id, sheet.sheet_id);
+        );
+        assert_eq!(request.snapshot.revision, visible.state.revision);
+        assert_eq!(request.outputs[0].units[0].sheet_id, sheet.sheet_id);
 
         let result = invoke_render_request(&request, None);
 
@@ -712,7 +697,7 @@ fn visible_noninitial_sheet_uses_unsaved_dpi_personalization_and_exact_originals
         );
         let response = processor_response(&result.stdout);
         let completion = response
-            .completed_for(&request.request_id)
+            .single_output_for(&request.request_id)
             .expect("the visible-state terminal is correlated");
         assert_eq!(completion.width_px, expected_widths[index]);
         assert_eq!(completion.height_px, 100);
@@ -1172,7 +1157,7 @@ fn processor_renders_linked_original_pixels_and_only_the_configured_frame_border
     );
     let response = processor_response(&result.stdout);
     let completion = response
-        .completed_for("real-request-001")
+        .single_output_for("real-request-001")
         .expect("the response is correlated");
     assert_eq!((completion.width_px, completion.height_px), (100, 50));
     assert_eq!(completion.dpi, 100);
@@ -1321,7 +1306,7 @@ fn processor_composites_a_transparent_decorative_from_its_original_png() {
     );
     let response = processor_response(&result.stdout);
     let completion = response
-        .completed_for("decorative-original-001")
+        .single_output_for("decorative-original-001")
         .expect("the response is correlated");
     assert_eq!(completion.source_count, 2);
     let rendered = image::open(output_path)
@@ -1798,7 +1783,7 @@ fn processor_decodes_a_supported_progressive_jpeg_in_the_isolated_worker() {
         String::from_utf8_lossy(&result.stderr)
     );
     processor_response(&result.stdout)
-        .completed_for("progressive-worker")
+        .single_output_for("progressive-worker")
         .expect("the successful terminal is correlated");
     image::open(output_path).expect("the JPEG produced by Exportação decodes");
 }
@@ -1816,7 +1801,7 @@ fn cancelling_processor_during_progressive_decode_leaves_no_worker_process() {
     std::fs::write(&source_path, bytes).expect("the progressive JPEG fixture is written");
     let request =
         single_source_render_request(output_path, "cancel-progressive-worker", &source_path);
-    let command = ImagingCommand::render(request);
+    let command = ImagingCommand::RenderAlbum(request);
     let mut processor = spawn_imaging_command_with_barrier(&command, &barrier_path);
     let worker_pid = wait_for_worker_pid(&barrier_path);
     assert!(
@@ -1866,7 +1851,7 @@ fn processor_rejects_a_progressive_jpeg_decoder_budget_before_publication() {
 }
 
 #[test]
-fn processor_rejects_tiff_by_detected_content_with_a_stable_code() {
+fn processor_classifies_truncated_tiff_by_detected_content() {
     let source_dir = tempfile::tempdir().expect("temporary source directory");
     let output_dir = tempfile::tempdir().expect("temporary output directory");
     let source_path = source_dir.path().join("misleading.jpg");
@@ -1884,7 +1869,7 @@ fn processor_rejects_tiff_by_detected_content_with_a_stable_code() {
     assert_eq!(
         render_failure(&result, "unsupported-format"),
         ImagingFailure {
-            code: ImagingFailureCode::UnsupportedSourceFormat,
+            code: ImagingFailureCode::DecodeFailed,
             media_id: Some(media_id.to_string()),
             path_code: None,
         }
@@ -2103,10 +2088,10 @@ fn processor_rejects_an_invalid_output_unit() {
     let output_path = output_dir.path().join("invalid.jpg");
     let request = neutral_render_request(output_path.clone(), "invalid", 25);
     let mut request = serde_json::to_value(request).expect("request is serializable");
-    request["unit"]["sheet"]["widthUm"] = serde_json::json!(0);
+    request["snapshot"]["composition"]["sheets"][0]["widthUm"] = serde_json::json!(0);
 
     let command = serde_json::json!({
-        "kind": "render",
+        "kind": "renderAlbum",
         "request": request,
     });
     let result = invoke_render_payload(
@@ -2126,8 +2111,8 @@ fn processor_rejects_a_render_root_omitted_by_the_operation_owner() {
     let output_dir = tempfile::tempdir().expect("temporary output directory");
     let output_path = output_dir.path().join("unbound.jpg");
     let request = neutral_render_request(output_path.clone(), "unbound-root", 25);
-    let mut command =
-        serde_json::to_value(ImagingCommand::render(request)).expect("the command is serializable");
+    let mut command = serde_json::to_value(ImagingCommand::RenderAlbum(request))
+        .expect("the command is serializable");
     command["request"]["rootBindings"] = serde_json::json!({ "bindings": [] });
 
     let result = invoke_render_payload(
@@ -2245,7 +2230,7 @@ fn single_source_render_request(
     output_path: PathBuf,
     request_id: &str,
     source_path: &Path,
-) -> ImagingRequest {
+) -> AlbumRenderRequest {
     let initial =
         small_initial_project(25).with_personalization(InitialProjectPersonalization::new(
             InitialBackground::BothSides {
@@ -2279,7 +2264,7 @@ fn single_source_render_request(
     )
 }
 
-fn neutral_render_request(output_path: PathBuf, request_id: &str, dpi: u32) -> ImagingRequest {
+fn neutral_render_request(output_path: PathBuf, request_id: &str, dpi: u32) -> AlbumRenderRequest {
     let snapshot = productive_snapshot(small_initial_project(i64::from(dpi)));
     render_request(snapshot, output_path, request_id, dpi, Vec::new())
 }
@@ -2770,7 +2755,7 @@ fn render_request(
     request_id: &str,
     dpi: u32,
     sources: Vec<RenderSource>,
-) -> ImagingRequest {
+) -> AlbumRenderRequest {
     let sheet_id = snapshot
         .composition
         .sheets
@@ -2788,25 +2773,32 @@ fn render_request_for_sheet(
     request_id: &str,
     dpi: u32,
     sources: Vec<RenderSource>,
-) -> ImagingRequest {
+) -> AlbumRenderRequest {
     let mut paths = Vec::with_capacity(sources.len() + 1);
     paths.push(output_path.as_path());
     paths.extend(sources.iter().map(RenderSource::source_path));
     let bindings = root_bindings(&paths);
-    let unit = snapshot
-        .output_unit(sheet_id)
-        .expect("the selected Sheet becomes an output unit");
-    ImagingRequest::new(
-        request_id,
-        snapshot.project_id.clone(),
-        snapshot.revision,
-        NativePathDto::from(output_path),
-        unit,
-        dpi,
+    let mut snapshot = snapshot;
+    snapshot.dpi = dpi;
+    let units = snapshot
+        .export_units(&[sheet_id.to_owned()], myalbuns_core::ExportMode::Sheet)
+        .expect("the selected Sheet belongs to the frozen composition");
+    let request = AlbumRenderRequest {
+        protocol_version: IMAGING_PROTOCOL_VERSION,
+        request_id: request_id.to_owned(),
+        snapshot,
+        format: myalbuns_core::ExportFormat::Jpeg { quality: 100 },
+        outputs: vec![myalbuns_imaging_protocol::AlbumRenderOutput {
+            prepared_path: output_path.into(),
+            units,
+        }],
         sources,
-        bindings,
-    )
-    .expect("the productive render request is valid")
+        root_bindings: bindings,
+    };
+    request
+        .validate()
+        .expect("the productive render request is valid");
+    request
 }
 
 fn read_logs(log_dir: &Path) -> String {
@@ -2879,7 +2871,10 @@ fn crc32(bytes: &[u8]) -> u32 {
     !crc
 }
 
-fn invoke_render_request(request: &ImagingRequest, log_dir: Option<&Path>) -> std::process::Output {
+fn invoke_render_request(
+    request: &AlbumRenderRequest,
+    log_dir: Option<&Path>,
+) -> std::process::Output {
     spawn_render_request(request, log_dir)
         .wait_with_output()
         .expect("processor exits")
@@ -2891,8 +2886,8 @@ fn invoke_render_payload(mut payload: Vec<u8>, log_dir: Option<&Path>) -> std::p
         .expect("processor exits")
 }
 
-fn spawn_render_request(request: &ImagingRequest, log_dir: Option<&Path>) -> Child {
-    spawn_imaging_command(&ImagingCommand::render(request.clone()), log_dir)
+fn spawn_render_request(request: &AlbumRenderRequest, log_dir: Option<&Path>) -> Child {
+    spawn_imaging_command(&ImagingCommand::RenderAlbum(request.clone()), log_dir)
 }
 
 fn spawn_render_payload(payload: &mut Vec<u8>, log_dir: Option<&Path>) -> Child {

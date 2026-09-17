@@ -21,10 +21,6 @@ pub enum ImagingResponse {
         request_id: String,
         completion: crate::AlbumRenderCompletion,
     },
-    Completed {
-        request_id: String,
-        completion: RenderCompletion,
-    },
     CacheCompleted {
         request_id: String,
         completion: CacheCompletion,
@@ -41,10 +37,15 @@ pub enum ImagingResponse {
 }
 
 impl ImagingResponse {
-    pub fn completed(request_id: impl Into<String>, completion: RenderCompletion) -> Self {
-        Self::Completed {
+    pub fn single_output_completed(
+        request_id: impl Into<String>,
+        completion: RenderCompletion,
+    ) -> Self {
+        Self::AlbumCompleted {
             request_id: request_id.into(),
-            completion,
+            completion: crate::AlbumRenderCompletion {
+                outputs: vec![completion],
+            },
         }
     }
 
@@ -71,12 +72,14 @@ impl ImagingResponse {
         }
     }
 
-    pub fn completed_for(&self, expected_request_id: &str) -> Option<&RenderCompletion> {
+    pub fn single_output_for(&self, expected_request_id: &str) -> Option<&RenderCompletion> {
         match self {
-            Self::Completed {
+            Self::AlbumCompleted {
                 request_id,
                 completion,
-            } if request_id == expected_request_id => Some(completion),
+            } if request_id == expected_request_id && completion.outputs.len() == 1 => {
+                completion.outputs.first()
+            }
             _ => None,
         }
     }
@@ -114,7 +117,6 @@ impl ImagingResponse {
         match self {
             Self::AlbumStorageFull { request_id, .. }
             | Self::AlbumCompleted { request_id, .. }
-            | Self::Completed { request_id, .. }
             | Self::CacheCompleted { request_id, .. }
             | Self::PhotoImportCompleted { request_id, .. }
             | Self::Failed { request_id, .. } => request_id,

@@ -6,9 +6,9 @@ import { parseExportMediaProblems } from "./exportMediaContract";
 
 export const tauriExportMediaPort: ExportMediaPort = {
   inspect: async ({ sheetId, options }) => {
-    const problems = parseExportMediaProblems(await invoke("inspect_export_media", { sheetId, ...(options ? { sheetIds: options.sheetIds } : {}) }));
+    const problems = parseExportMediaProblems(await invoke("inspect_export_media", { sheetId, sheetIds: options.sheetIds }));
     if (!problems) throw new Error("A verificação dos Arquivos retornou uma resposta inválida.");
     return problems;
   },
-  relink: ({ sheetId, options }, onProgress) => invokeImageProcessing<ExportRelinkResult>("relink_export_media", { sheetId, ...(options ? { sheetIds: options.sheetIds } : {}) }, onProgress),
+  relink: ({ sheetId, options }, onProgress) => invokeImageProcessing<ExportRelinkResult>("relink_export_media", { sheetId, sheetIds: options.sheetIds }, onProgress),
 };

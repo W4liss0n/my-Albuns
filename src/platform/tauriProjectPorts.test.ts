@@ -27,7 +27,8 @@ const eventBoundary = vi.hoisted(() => ({
   listeners: [] as Array<(event: { payload: unknown }) => void>,
 }));
 
-const exportSelection = {
+const exportSelection: Parameters<typeof tauriExportPipelinePort.startSheet>[0] = {
+  options: { scope: "range", sheetIds: ["sheet-001"], mode: "sheet", format: { kind: "jpeg", quality: 100 }, destination: "C:/Exportados", conflictPolicy: "ask" },
   projectName: "Projeto de teste",
   sheetId: "sheet-001",
   sheetNumber: 1,
@@ -156,6 +157,7 @@ test("completes an Export attempt with the backend result", async () => {
 
   const attempt = tauriExportPipelinePort.startSheet(
     {
+      ...exportSelection,
       projectName: "Álbum de teste",
       sheetId: "sheet-001",
       sheetNumber: 3,
@@ -167,10 +169,8 @@ test("completes an Export attempt with the backend result", async () => {
     status: "completed",
     result,
   });
-  expect(invoke).toHaveBeenCalledWith("export_sheet", {
-    projectName: "Álbum de teste",
-    sheetId: "sheet-001",
-    sheetNumber: 3,
+  expect(invoke).toHaveBeenCalledWith("export_project", {
+    options: exportSelection.options,
     onEvent: tauriBoundary.channels[0],
   });
 });

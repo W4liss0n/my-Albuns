@@ -45,7 +45,6 @@
           "dismiss_project_dialog",
           "prepare_media_previews",
           "read_media_files",
-          "export_sheet",
           "export_project",
           "default_export_destination",
           "choose_export_folder",

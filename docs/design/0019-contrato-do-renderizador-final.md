@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-01
-updated: 2026-09-01
+updated: 2026-09-17
 ticket: 3-programa-04-renderizador-final
 ---
 
@@ -863,7 +863,10 @@ As entregas posteriores possuem limites inequívocos:
 | issue #38 | detecção, confirmação e remoção de Saídas órfãs finais pela gramática aceita |
 | issue #39 | `BatchRunner`, lease único, revalidação do Projeto, checkpoint e retomada por item |
 
-`BatchRunner` pode reutilizar `plan` e `execute_group`, mas não recompõe,
+`BatchRunner` reutiliza o planejamento de Álbum (`plan_album` e
+`plan_album_in_paths`) e `execute_album`, também usados pela Exportação normal
+e por uma única Lâmina. O envelope produtivo é `RenderAlbum`; o protocolo 27
+retira o antigo comando `Render` de saída única. O lote não recompõe,
 reabre uma versão diferente do mesmo Original dentro do item nem altera a
 transação limitada. A revalidação do Arquivo de Projeto entre itens pertence ao
 lote e é separada da captura de Originais desta tentativa.

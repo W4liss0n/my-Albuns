@@ -306,7 +306,6 @@ pub(crate) fn run(
             crate::project_dialog_window::submit_project_dialog_action,
             crate::media_preview_commands::prepare_media_previews,
             crate::media_preview_commands::read_media_files,
-            crate::export_commands::export_sheet,
             crate::export_commands::normal::export_project,
             crate::export_commands::normal::default_export_destination,
             crate::export_commands::normal::choose_export_folder,

@@ -338,11 +338,14 @@ export interface MediaPreviewPort {
 }
 
 export interface ExportSheetSelection {
-  recoveryId?: string;
-  options?: import("./normalExport").NormalExportOptions;
   projectName: string;
   sheetId: string;
   sheetNumber: number;
+}
+
+export interface ConfiguredExportSelection extends ExportSheetSelection {
+  recoveryId?: string;
+  options: import("./normalExport").NormalExportOptions;
 }
 
 export interface ExportPipelinePort {
@@ -351,7 +354,7 @@ export interface ExportPipelinePort {
   defaultDestination(): Promise<string>;
   chooseDestination(): Promise<string | null>;
   startSheet(
-    selection: ExportSheetSelection,
+    selection: ConfiguredExportSelection,
     onEvent: (event: ExportProgressEvent) => void,
   ): ExportAttempt;
 }

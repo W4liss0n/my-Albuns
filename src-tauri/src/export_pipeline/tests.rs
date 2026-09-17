@@ -1,5 +1,4 @@
 use std::{
-    collections::VecDeque,
     path::PathBuf,
     sync::{Arc, Barrier, Mutex},
     thread,
@@ -20,9 +19,8 @@ use myalbuns_paths::{ExportWriteAuthorization, OperationPathContext, RootBinding
 use sha2::{Digest, Sha256};
 
 use super::{
-    ExportCancellationResult, ExportExecutionControl, ExportFailureStage, ExportOptions,
-    ExportPlan, ExportProgressStage, ExportProgressUnits, bind_execution_paths, execute,
-    execute_group, plan,
+    AlbumExportPlan, ExportCancellationResult, ExportExecutionControl, ExportFailureStage,
+    ExportProgressStage, ExportProgressUnits, bind_execution_paths, execute_album as execute,
 };
 mod recovery_tests;
 use crate::imaging_processor::{
@@ -710,17 +708,68 @@ fn normal_export_never_replaces_or_cleans_an_original_outside_the_render_selecti
     }
 }
 
+#[test]
+fn album_reports_partial_publication_and_discards_unpublished_preparations() {
+    let destination = tempfile::tempdir().unwrap();
+    let plan = skip_export_plan(
+        destination.path(),
+        myalbuns_core::ExportMode::Sheet,
+        myalbuns_core::ExportFormat::Png,
+    );
+    let first = destination.path().join("Album_001.png");
+    let second = destination.path().join("Album_002.png");
+    let original = destination.path().join("original.jpg");
+    let preparation = plan.preparation_directory().to_path_buf();
+    let bindings = root_bindings(&plan);
+    let mut transport = AlbumTransport {
+        fail: None,
+        prior_bytes: std::fs::read(&original).unwrap(),
+        prior_output: original,
+    };
+    let stages = Mutex::new(Vec::new());
+    let progress = |event: super::ExportProgress| {
+        stages.lock().unwrap().push(event.stage);
+        if event.stage == ExportProgressStage::Publishing
+            && event.units
+                == (ExportProgressUnits::Measured {
+                    completed_units: 1,
+                    total_units: 2,
+                })
+        {
+            assert_eq!(std::fs::read(&first).unwrap(), b"prepared-0");
+            std::fs::create_dir(&second).unwrap();
+        }
+    };
+    let failure = tauri::async_runtime::block_on(execute(
+        &mut transport,
+        plan,
+        &bindings,
+        &ExportExecutionControl::default(),
+        &progress,
+        &context("skip-existing"),
+    ))
+    .expect_err("external interference blocks the second publication");
+    assert_eq!(
+        failure.stage,
+        ExportFailureStage::Publish {
+            promoted_outputs: 1,
+            total_outputs: 2
+        }
+    );
+    assert_eq!(std::fs::read(first).unwrap(), b"prepared-0");
+    assert!(second.is_dir());
+    assert!(!preparation.exists());
+    assert!(
+        !stages
+            .lock()
+            .unwrap()
+            .contains(&ExportProgressStage::Completed)
+    );
+}
+
 struct CancellationAwareTransport {
     prepared_path: PathBuf,
     invocation_started: Arc<Barrier>,
-    invocations: usize,
-}
-
-struct GroupedTransport {
-    prepared_outputs: VecDeque<Vec<u8>>,
-    first_output: PathBuf,
-    first_output_before_second_invocation: Option<Vec<u8>>,
-    block_output_before_publication: Option<PathBuf>,
     invocations: usize,
 }
 
@@ -766,7 +815,7 @@ impl ImagingTransport for ScriptedTransport {
         attempt: u8,
         control: InvocationControl<'a>,
     ) -> InvocationFuture<'a> {
-        let ImagingCommand::Render(request) = command else {
+        let ImagingCommand::RenderAlbum(request) = command else {
             panic!("the scripted Export receives a Render command");
         };
         assert_eq!(operation, ImagingOperation::Export);
@@ -789,53 +838,6 @@ impl ImagingTransport for ScriptedTransport {
     }
 }
 
-impl ImagingTransport for GroupedTransport {
-    fn invoke<'a>(
-        &'a mut self,
-        command: &'a ImagingCommand,
-        _context: &'a InvocationContext,
-        operation: ImagingOperation,
-        attempt: u8,
-        _control: InvocationControl<'a>,
-    ) -> InvocationFuture<'a> {
-        let ImagingCommand::Render(request) = command else {
-            panic!("the grouped Export receives a Render command");
-        };
-        assert_eq!(operation, ImagingOperation::Export);
-        assert_eq!(attempt, 1);
-        if self.invocations == 1 {
-            self.first_output_before_second_invocation = Some(
-                std::fs::read(&self.first_output)
-                    .expect("the first previous output remains readable"),
-            );
-        }
-        self.invocations += 1;
-        let prepared = self
-            .prepared_outputs
-            .pop_front()
-            .expect("one prepared payload exists per grouped Export unit");
-        std::fs::write(request.prepared_output_path(), &prepared)
-            .expect("the grouped Processor writes its preparation");
-        if self.invocations == 2
-            && let Some(blocked_output) = self.block_output_before_publication.take()
-        {
-            std::fs::create_dir(blocked_output)
-                .expect("external interference blocks the second final output");
-        }
-        let completion = RenderCompletion {
-            width_px: 10,
-            height_px: 5,
-            dpi: 25,
-            source_count: 0,
-            source_bytes: 0,
-            output_bytes: prepared.len() as u64,
-            output_sha256: format!("{:x}", Sha256::digest(&prepared)),
-        };
-        let response = ImagingResponse::completed(&request.request_id, completion);
-        Box::pin(async move { Ok(response) })
-    }
-}
-
 impl ImagingTransport for PlanObservingTransport {
     fn invoke<'a>(
         &'a mut self,
@@ -854,10 +856,10 @@ impl ImagingTransport for PlanObservingTransport {
         self.observed_round_trip = true;
         std::fs::write(&self.prepared_path, &self.prepared_bytes)
             .expect("the observed Processor writes its preparation");
-        let ImagingCommand::Render(request) = decoded else {
+        let ImagingCommand::RenderAlbum(request) = decoded else {
             panic!("the Export sends a Render command");
         };
-        let response = ImagingResponse::completed(
+        let response = ImagingResponse::single_output_completed(
             &request.request_id,
             RenderCompletion {
                 width_px: 10,
@@ -873,11 +875,51 @@ impl ImagingTransport for PlanObservingTransport {
     }
 }
 
-fn export_plan(output: PathBuf, request_id: &str) -> ExportPlan {
+fn single_sheet_plan(
+    mut snapshot: RenderSnapshot,
+    request_id: &str,
+    output: PathBuf,
+    authorization: ExportWriteAuthorization,
+    sheet_id: String,
+    sources: Vec<RenderSource>,
+) -> Result<AlbumExportPlan, super::ExportFailure> {
+    snapshot.project_name = output
+        .file_stem()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .strip_suffix("_001")
+        .expect("fixture uses canonical numbering")
+        .to_owned();
+    super::plan_album(
+        snapshot,
+        super::AlbumExportOptions {
+            protected_originals: sources
+                .iter()
+                .map(|source| source.source_path().to_path_buf())
+                .collect(),
+            sheet_ids: vec![sheet_id],
+            whole_album: false,
+            mode: myalbuns_core::ExportMode::Sheet,
+            format: myalbuns_core::ExportFormat::Jpeg { quality: 100 },
+            destination: output.parent().unwrap().to_path_buf(),
+            authorization,
+            sources,
+            request_id: request_id.into(),
+        },
+    )
+}
+
+fn output_plan(plan: &AlbumExportPlan) -> myalbuns_paths::ExportPathPlan {
+    myalbuns_paths::ExportPathPlan::new(plan.required_paths()[0].clone(), plan.request_id())
+        .unwrap()
+}
+
+fn export_plan(output: PathBuf, request_id: &str) -> AlbumExportPlan {
     export_plan_with_authorization(output, request_id, ExportWriteAuthorization::CreateOnly)
 }
 
-fn replacement_export_plan(output: PathBuf, request_id: &str) -> ExportPlan {
+fn replacement_export_plan(output: PathBuf, request_id: &str) -> AlbumExportPlan {
     export_plan_with_authorization(
         output,
         request_id,
@@ -889,7 +931,7 @@ fn export_plan_with_authorization(
     output: PathBuf,
     request_id: &str,
     authorization: ExportWriteAuthorization,
-) -> ExportPlan {
+) -> AlbumExportPlan {
     let source_directory = output
         .parent()
         .expect("the test Export output has a parent directory");
@@ -910,29 +952,23 @@ fn export_plan_with_authorization(
         .expect("the productive fixture references its original");
     let sources =
         vec![RenderSource::new(media_id, source_path).expect("the test original source is valid")];
-    plan(
+    single_sheet_plan(
         snapshot,
-        ExportOptions::new(request_id, output, authorization, sheet_id, sources),
+        request_id,
+        output,
+        authorization,
+        sheet_id,
+        sources,
     )
     .expect("the Export request is valid")
 }
 
-fn root_bindings(plan: &ExportPlan) -> RootBindingPlan {
+fn root_bindings(plan: &AlbumExportPlan) -> RootBindingPlan {
     let mut context = OperationPathContext::new();
     for path in plan.required_paths() {
         context
-            .capture(path)
+            .capture(&path)
             .expect("the Export path root is captured");
-    }
-    context.freeze()
-}
-
-fn grouped_root_bindings(plans: &[&ExportPlan]) -> RootBindingPlan {
-    let mut context = OperationPathContext::new();
-    for path in plans.iter().flat_map(|plan| plan.required_paths()) {
-        context
-            .capture(path)
-            .expect("the grouped Export path root is captured");
     }
     context.freeze()
 }
@@ -943,17 +979,32 @@ fn export_plan_rejects_missing_originals_at_the_typed_plan_stage() {
     let snapshot = productive_snapshot(destination.path().join("missing-original.jpg"));
     let sheet_id = snapshot.composition.sheets[0].sheet_id.clone();
 
-    let failure = plan(
+    let planned = single_sheet_plan(
         snapshot,
-        ExportOptions::new(
-            "export-without-originals",
-            destination.path().join("Album.jpg"),
-            ExportWriteAuthorization::CreateOnly,
-            sheet_id,
-            vec![],
-        ),
+        "export-without-originals",
+        destination.path().join("Album_001.jpg"),
+        ExportWriteAuthorization::CreateOnly,
+        sheet_id,
+        vec![],
     )
-    .expect_err("an Export without linked originals is rejected");
+    .unwrap();
+    let bindings = root_bindings(&planned);
+    let mut transport = ScriptedTransport {
+        prepared_path: output_plan(&planned).prepared_output_path().into(),
+        prepared_bytes: vec![],
+        result: None,
+        invocations: 0,
+    };
+    let failure = tauri::async_runtime::block_on(execute(
+        &mut transport,
+        planned,
+        &bindings,
+        &ExportExecutionControl::default(),
+        &|_| {},
+        &context("export-without-originals"),
+    ))
+    .expect_err("an Export without linked originals is rejected before invoking the Processor");
+    assert_eq!(transport.invocations, 0);
 
     assert_eq!(failure.stage, ExportFailureStage::Plan);
 }
@@ -973,23 +1024,22 @@ fn render_descriptor_plan_freezes_identity_and_path_without_reading_sources() {
                 .expect("the planned source descriptor is valid")
         })
         .collect::<Vec<_>>();
-    let planned = plan(
+    let planned = single_sheet_plan(
         snapshot,
-        ExportOptions::new(
-            "dependency-plan",
-            root.path().join("Album.jpg"),
-            ExportWriteAuthorization::CreateOnly,
-            sheet_id,
-            sources.clone(),
-        ),
+        "dependency-plan",
+        root.path().join("Album_001.jpg"),
+        ExportWriteAuthorization::CreateOnly,
+        sheet_id,
+        sources.clone(),
     )
     .expect("planning needs identities and paths but no source I/O");
-    assert_eq!(planned.sources, sources);
-    assert!(
+    assert!(sources.iter().all(|source| {
         planned
-            .sources
-            .iter()
-            .all(|source| !source.source_path().exists()),
+            .required_paths()
+            .contains(&source.source_path().to_path_buf())
+    }));
+    assert!(
+        sources.iter().all(|source| !source.source_path().exists()),
         "planning freezes descriptors without opening their originals"
     );
 }
@@ -1052,10 +1102,10 @@ fn host_execution_uses_the_same_frozen_mapped_drive_binding_as_the_processor() {
 fn export_pipeline_sends_the_exact_plan_used_by_the_host_through_the_ipc_boundary() {
     tauri::async_runtime::block_on(async {
         let destination = tempfile::tempdir().expect("temporary Export destination");
-        let output = destination.path().join("Album.jpg");
+        let output = destination.path().join("Album_001.jpg");
         let plan = export_plan(output.clone(), "export-plan-correlation");
         let bindings = root_bindings(&plan);
-        let prepared_path = plan.path_plan().prepared_output_path().to_path_buf();
+        let prepared_path = output_plan(&plan).prepared_output_path().to_path_buf();
         let prepared_bytes = b"correlated plan".to_vec();
         let mut transport = PlanObservingTransport {
             expected_root_bindings: bindings.clone(),
@@ -1084,7 +1134,7 @@ fn export_pipeline_sends_the_exact_plan_used_by_the_host_through_the_ipc_boundar
 fn planning_an_export_does_not_create_its_destination() {
     let root = tempfile::tempdir().expect("temporary Export root");
     let destination = root.path().join("not-created").join("nested");
-    let output = destination.join("Album.jpg");
+    let output = destination.join("Album_001.jpg");
 
     let _plan = export_plan(output, "export-pure-plan");
 
@@ -1099,182 +1149,14 @@ fn context(request_id: &str) -> InvocationContext {
 }
 
 #[test]
-fn grouped_export_prepares_every_output_before_publishing_the_complete_set() {
-    tauri::async_runtime::block_on(async {
-        let destination = tempfile::tempdir().expect("temporary grouped Export destination");
-        let first_output = destination.path().join("Album_001.jpg");
-        let second_output = destination.path().join("Album_002.jpg");
-        std::fs::write(&first_output, b"previous first")
-            .expect("the first previous Export is writable");
-        std::fs::write(&second_output, b"previous second")
-            .expect("the second previous Export is writable");
-        let first_plan = replacement_export_plan(first_output.clone(), "export-group-success-1");
-        let second_plan = replacement_export_plan(second_output.clone(), "export-group-success-2");
-        let bindings = grouped_root_bindings(&[&first_plan, &second_plan]);
-        let first_preparation = first_plan.path_plan().preparation_directory().to_path_buf();
-        let second_preparation = second_plan
-            .path_plan()
-            .preparation_directory()
-            .to_path_buf();
-        let mut transport = GroupedTransport {
-            prepared_outputs: VecDeque::from([b"new first".to_vec(), b"new second".to_vec()]),
-            first_output: first_output.clone(),
-            first_output_before_second_invocation: None,
-            block_output_before_publication: None,
-            invocations: 0,
-        };
-        let control = ExportExecutionControl::default();
-        let progress_events = Mutex::new(Vec::new());
-        let progress = |event: super::ExportProgress| {
-            progress_events
-                .lock()
-                .expect("the grouped progress collector remains available")
-                .push(event);
-        };
-
-        let published = execute_group(
-            &mut transport,
-            vec![
-                (first_plan, context("export-group-success-1")),
-                (second_plan, context("export-group-success-2")),
-            ],
-            &bindings,
-            &control,
-            &progress,
-        )
-        .await
-        .expect("the complete prepared set is published");
-
-        assert_eq!(transport.invocations, 2);
-        assert_eq!(
-            transport.first_output_before_second_invocation,
-            Some(b"previous first".to_vec()),
-            "the first output cannot be promoted while the second is still being prepared"
-        );
-        assert_eq!(published.len(), 2);
-        assert_eq!(
-            std::fs::read(&first_output).expect("the first grouped output is readable"),
-            b"new first"
-        );
-        assert_eq!(
-            std::fs::read(&second_output).expect("the second grouped output is readable"),
-            b"new second"
-        );
-        assert!(!first_preparation.exists());
-        assert!(!second_preparation.exists());
-        let events = progress_events
-            .lock()
-            .expect("the grouped progress collector remains available");
-        let publishing_index = events
-            .iter()
-            .position(|event| event.stage == ExportProgressStage::Publishing)
-            .expect("the grouped Export reaches Publication");
-        assert_eq!(
-            events[..publishing_index]
-                .iter()
-                .filter(|event| event.stage == ExportProgressStage::Verifying)
-                .count(),
-            2
-        );
-        assert_eq!(
-            events
-                .iter()
-                .filter(|event| event.stage == ExportProgressStage::Completed)
-                .map(|event| event.units)
-                .collect::<Vec<_>>(),
-            [ExportProgressUnits::Measured {
-                completed_units: 2,
-                total_units: 2,
-            }]
-        );
-    });
-}
-
-#[test]
-fn grouped_export_reports_a_typed_partial_publication_and_discards_the_remainder() {
-    tauri::async_runtime::block_on(async {
-        let destination = tempfile::tempdir().expect("temporary grouped Export destination");
-        let first_output = destination.path().join("Album_001.jpg");
-        let second_output = destination.path().join("Album_002.jpg");
-        std::fs::write(&first_output, b"previous first")
-            .expect("the first previous Export is writable");
-        let first_plan = replacement_export_plan(first_output.clone(), "export-group-partial-1");
-        let second_plan = export_plan(second_output.clone(), "export-group-partial-2");
-        let bindings = grouped_root_bindings(&[&first_plan, &second_plan]);
-        let first_preparation = first_plan.path_plan().preparation_directory().to_path_buf();
-        let second_preparation = second_plan
-            .path_plan()
-            .preparation_directory()
-            .to_path_buf();
-        let mut transport = GroupedTransport {
-            prepared_outputs: VecDeque::from([b"new first".to_vec(), b"new second".to_vec()]),
-            first_output: first_output.clone(),
-            first_output_before_second_invocation: None,
-            block_output_before_publication: Some(second_output.clone()),
-            invocations: 0,
-        };
-        let control = ExportExecutionControl::default();
-        let observed_stages = Mutex::new(Vec::new());
-        let progress = |event: super::ExportProgress| {
-            observed_stages
-                .lock()
-                .expect("the grouped progress collector remains available")
-                .push(event.stage);
-        };
-
-        let failure = execute_group(
-            &mut transport,
-            vec![
-                (first_plan, context("export-group-partial-1")),
-                (second_plan, context("export-group-partial-2")),
-            ],
-            &bindings,
-            &control,
-            &progress,
-        )
-        .await
-        .expect_err("the second real filesystem promotion is rejected");
-
-        assert_eq!(
-            failure.stage,
-            ExportFailureStage::Publish {
-                promoted_outputs: 1,
-                total_outputs: 2,
-            }
-        );
-        assert_eq!(transport.invocations, 2);
-        assert_eq!(
-            transport.first_output_before_second_invocation,
-            Some(b"previous first".to_vec())
-        );
-        assert_eq!(
-            std::fs::read(&first_output).expect("the first promoted output remains readable"),
-            b"new first",
-            "the limited transaction does not roll back an earlier atomic promotion"
-        );
-        assert!(second_output.is_dir());
-        assert!(!first_preparation.exists());
-        assert!(!second_preparation.exists());
-        let stages = observed_stages
-            .lock()
-            .expect("the grouped progress collector remains available");
-        assert!(stages.contains(&ExportProgressStage::Publishing));
-        assert!(
-            !stages.contains(&ExportProgressStage::Completed),
-            "a partial publication is never announced as completed"
-        );
-    });
-}
-
-#[test]
 fn a_processor_crash_is_not_retried_and_preserves_the_previous_output() {
     tauri::async_runtime::block_on(async {
         let destination = tempfile::tempdir().expect("temporary Export destination");
-        let output = destination.path().join("Album.jpg");
+        let output = destination.path().join("Album_001.jpg");
         std::fs::write(&output, b"previous export").expect("the previous Export is writable");
         let plan = replacement_export_plan(output.clone(), "export-failure");
         let mut transport = ScriptedTransport {
-            prepared_path: plan.path_plan().prepared_output_path().to_path_buf(),
+            prepared_path: output_plan(&plan).prepared_output_path().to_path_buf(),
             prepared_bytes: b"incomplete".to_vec(),
             result: Some(Err(InvocationFailure::unexpected_termination(4242))),
             invocations: 0,
@@ -1318,11 +1200,11 @@ fn a_processor_crash_is_not_retried_and_preserves_the_previous_output() {
 fn a_known_processor_failure_uses_the_structured_terminal_without_an_exit_code() {
     tauri::async_runtime::block_on(async {
         let destination = tempfile::tempdir().expect("temporary Export destination");
-        let output = destination.path().join("Album.jpg");
+        let output = destination.path().join("Album_001.jpg");
         std::fs::write(&output, b"previous export").expect("the previous Export is writable");
         let plan = replacement_export_plan(output.clone(), "export-known-failure");
         let mut transport = ScriptedTransport {
-            prepared_path: plan.path_plan().prepared_output_path().to_path_buf(),
+            prepared_path: output_plan(&plan).prepared_output_path().to_path_buf(),
             prepared_bytes: b"incomplete".to_vec(),
             result: Some(Ok(ImagingResponse::failed(
                 "export-known-failure",
@@ -1371,11 +1253,11 @@ fn a_known_processor_failure_uses_the_structured_terminal_without_an_exit_code()
 fn unconfirmed_process_termination_preserves_the_preparation_for_safe_recovery() {
     tauri::async_runtime::block_on(async {
         let destination = tempfile::tempdir().expect("temporary Export destination");
-        let output = destination.path().join("Album.jpg");
+        let output = destination.path().join("Album_001.jpg");
         std::fs::write(&output, b"previous export").expect("the previous Export is writable");
         let plan = replacement_export_plan(output.clone(), "export-unconfirmed-termination");
-        let prepared_path = plan.path_plan().prepared_output_path().to_path_buf();
-        let preparation_directory = plan.path_plan().preparation_directory().to_path_buf();
+        let prepared_path = output_plan(&plan).prepared_output_path().to_path_buf();
+        let preparation_directory = output_plan(&plan).preparation_directory().to_path_buf();
         let mut transport = ScriptedTransport {
             prepared_path: prepared_path.clone(),
             prepared_bytes: b"possibly active export".to_vec(),
@@ -1423,7 +1305,7 @@ fn unconfirmed_process_termination_preserves_the_preparation_for_safe_recovery()
 fn a_verified_preparation_is_published_only_after_the_response_is_validated() {
     tauri::async_runtime::block_on(async {
         let destination = tempfile::tempdir().expect("temporary Export destination");
-        let output = destination.path().join("Album.jpg");
+        let output = destination.path().join("Album_001.jpg");
         std::fs::write(&output, b"previous export").expect("the previous Export is writable");
         let plan = replacement_export_plan(output.clone(), "export-success");
         let bytes = b"verified export".to_vec();
@@ -1436,9 +1318,10 @@ fn a_verified_preparation_is_published_only_after_the_response_is_validated() {
             output_bytes: bytes.len() as u64,
             output_sha256: format!("{:x}", Sha256::digest(&bytes)),
         };
-        let response = ImagingResponse::completed("export-success", completion.clone());
+        let response =
+            ImagingResponse::single_output_completed("export-success", completion.clone());
         let mut transport = ScriptedTransport {
-            prepared_path: plan.path_plan().prepared_output_path().to_path_buf(),
+            prepared_path: output_plan(&plan).prepared_output_path().to_path_buf(),
             prepared_bytes: bytes,
             result: Some(Ok(response)),
             invocations: 0,
@@ -1480,7 +1363,10 @@ fn a_verified_preparation_is_published_only_after_the_response_is_validated() {
             [
                 (
                     ExportProgressStage::Preparing,
-                    ExportProgressUnits::Unmeasured,
+                    ExportProgressUnits::Measured {
+                        completed_units: 0,
+                        total_units: 1
+                    },
                     true,
                 ),
                 (
@@ -1514,7 +1400,10 @@ fn a_verified_preparation_is_published_only_after_the_response_is_validated() {
                 ),
                 (
                     ExportProgressStage::Publishing,
-                    ExportProgressUnits::Unmeasured,
+                    ExportProgressUnits::Measured {
+                        completed_units: 0,
+                        total_units: 1
+                    },
                     false,
                 ),
                 (
@@ -1534,11 +1423,11 @@ fn a_verified_preparation_is_published_only_after_the_response_is_validated() {
 fn pipeline_claims_publication_before_observers_receive_the_event() {
     tauri::async_runtime::block_on(async {
         let destination = tempfile::tempdir().expect("temporary Export destination");
-        let output = destination.path().join("Album.jpg");
+        let output = destination.path().join("Album_001.jpg");
         std::fs::write(&output, b"previous export").expect("the previous Export is writable");
         let plan = replacement_export_plan(output.clone(), "export-publication-boundary");
         let bytes = b"verified replacement".to_vec();
-        let response = ImagingResponse::completed(
+        let response = ImagingResponse::single_output_completed(
             "export-publication-boundary",
             RenderCompletion {
                 width_px: 10,
@@ -1551,7 +1440,7 @@ fn pipeline_claims_publication_before_observers_receive_the_event() {
             },
         );
         let mut transport = ScriptedTransport {
-            prepared_path: plan.path_plan().prepared_output_path().to_path_buf(),
+            prepared_path: output_plan(&plan).prepared_output_path().to_path_buf(),
             prepared_bytes: bytes,
             result: Some(Ok(response)),
             invocations: 0,
@@ -1597,11 +1486,11 @@ fn pipeline_claims_publication_before_observers_receive_the_event() {
 fn cancellation_that_wins_before_the_publication_claim_preserves_the_previous_output() {
     tauri::async_runtime::block_on(async {
         let destination = tempfile::tempdir().expect("temporary Export destination");
-        let output = destination.path().join("Album.jpg");
+        let output = destination.path().join("Album_001.jpg");
         std::fs::write(&output, b"previous export").expect("the previous Export is writable");
         let plan = replacement_export_plan(output.clone(), "export-cancel-before-publication");
         let bytes = b"verified replacement".to_vec();
-        let response = ImagingResponse::completed(
+        let response = ImagingResponse::single_output_completed(
             "export-cancel-before-publication",
             RenderCompletion {
                 width_px: 10,
@@ -1614,7 +1503,7 @@ fn cancellation_that_wins_before_the_publication_claim_preserves_the_previous_ou
             },
         );
         let mut transport = ScriptedTransport {
-            prepared_path: plan.path_plan().prepared_output_path().to_path_buf(),
+            prepared_path: output_plan(&plan).prepared_output_path().to_path_buf(),
             prepared_bytes: bytes,
             result: Some(Ok(response)),
             invocations: 0,
@@ -1670,11 +1559,11 @@ fn cancellation_that_wins_before_the_publication_claim_preserves_the_previous_ou
 fn an_unverified_preparation_never_replaces_the_previous_output() {
     tauri::async_runtime::block_on(async {
         let destination = tempfile::tempdir().expect("temporary Export destination");
-        let output = destination.path().join("Album.jpg");
+        let output = destination.path().join("Album_001.jpg");
         std::fs::write(&output, b"previous export").expect("the previous Export is writable");
         let plan = replacement_export_plan(output.clone(), "export-invalid");
         let bytes = b"unverified export".to_vec();
-        let response = ImagingResponse::completed(
+        let response = ImagingResponse::single_output_completed(
             "export-invalid",
             RenderCompletion {
                 width_px: 10,
@@ -1688,7 +1577,7 @@ fn an_unverified_preparation_never_replaces_the_previous_output() {
             },
         );
         let mut transport = ScriptedTransport {
-            prepared_path: plan.path_plan().prepared_output_path().to_path_buf(),
+            prepared_path: output_plan(&plan).prepared_output_path().to_path_buf(),
             prepared_bytes: bytes,
             result: Some(Ok(response)),
             invocations: 0,
@@ -1720,9 +1609,9 @@ fn an_unverified_preparation_never_replaces_the_previous_output() {
 fn cancellation_before_execution_creates_no_preparation_or_processor_work() {
     tauri::async_runtime::block_on(async {
         let destination = tempfile::tempdir().expect("temporary Export destination");
-        let output = destination.path().join("Album.jpg");
+        let output = destination.path().join("Album_001.jpg");
         let plan = export_plan(output, "export-cancelled");
-        let preparation_path = plan.path_plan().preparation_directory().to_path_buf();
+        let preparation_path = output_plan(&plan).preparation_directory().to_path_buf();
         let bindings = root_bindings(&plan);
         let cancellation = ExportExecutionControl::default();
         assert_eq!(
@@ -1730,7 +1619,7 @@ fn cancellation_before_execution_creates_no_preparation_or_processor_work() {
             ExportCancellationResult::Requested
         );
         let mut transport = ScriptedTransport {
-            prepared_path: plan.path_plan().prepared_output_path().to_path_buf(),
+            prepared_path: output_plan(&plan).prepared_output_path().to_path_buf(),
             prepared_bytes: Vec::new(),
             result: None,
             invocations: 0,
@@ -1770,13 +1659,13 @@ fn cancellation_before_execution_creates_no_preparation_or_processor_work() {
 fn cancellation_during_processing_discards_preparation_and_preserves_previous_output() {
     tauri::async_runtime::block_on(async {
         let destination = tempfile::tempdir().expect("temporary Export destination");
-        let output = destination.path().join("Album.jpg");
+        let output = destination.path().join("Album_001.jpg");
         std::fs::write(&output, b"previous export").expect("the previous Export is writable");
         let plan = replacement_export_plan(output.clone(), "export-cancelled-during-processing");
-        let preparation_directory = plan.path_plan().preparation_directory().to_path_buf();
+        let preparation_directory = output_plan(&plan).preparation_directory().to_path_buf();
         let invocation_started = Arc::new(Barrier::new(2));
         let mut transport = CancellationAwareTransport {
-            prepared_path: plan.path_plan().prepared_output_path().to_path_buf(),
+            prepared_path: output_plan(&plan).prepared_output_path().to_path_buf(),
             invocation_started: Arc::clone(&invocation_started),
             invocations: 0,
         };

@@ -1165,7 +1165,7 @@ mod tests {
                     .expect("the progress fixture serializes"),
             );
         }
-        let response = ImagingResponse::completed(
+        let response = ImagingResponse::single_output_completed(
             "render-stream",
             RenderCompletion {
                 width_px: 10,

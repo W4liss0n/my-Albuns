@@ -1,5 +1,5 @@
 import type { EditorProjection } from "../domain/project";
-import type { ExportSheetSelection, ImageProcessingProblem, ImageProcessingProgress } from "./projectPorts";
+import type { ConfiguredExportSelection, ImageProcessingProblem, ImageProcessingProgress } from "./projectPorts";
 
 export interface ExportMediaProblem {
   mediaId: string;
@@ -16,8 +16,8 @@ export class MediaExportBlockedError extends Error {
 
 /** Recovery updates the editing session before the immutable export is planned. */
 export interface ExportMediaPort {
-  inspect(selection: ExportSheetSelection): Promise<ExportMediaProblem[]>;
-  relink(selection: ExportSheetSelection, onProgress: (progress: ImageProcessingProgress) => void): Promise<{
+  inspect(selection: ConfiguredExportSelection): Promise<ExportMediaProblem[]>;
+  relink(selection: ConfiguredExportSelection, onProgress: (progress: ImageProcessingProgress) => void): Promise<{
     projection: EditorProjection;
     problems: ExportMediaProblem[];
     notes: ImageProcessingProblem[];

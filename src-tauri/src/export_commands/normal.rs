@@ -223,7 +223,7 @@ pub(crate) async fn export_project(
         acquisition,
         attempt,
         operation_paths: plan.required_paths(),
-        plan: ExportCommandPlan::Album(plan),
+        plan: ExportCommandPlan::Album(Box::new(plan)),
         project_id,
         request_id,
     };

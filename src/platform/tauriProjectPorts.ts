@@ -442,7 +442,7 @@ export const tauriExportPipelinePort: ExportPipelinePort = {
   discardRecovery: id => invoke<void>("discard_export_recovery", { id }),
   chooseDestination: () => invoke<string | null>("choose_export_folder"),
   startSheet: (
-    { projectName, sheetId, sheetNumber, options, recoveryId },
+    { options, recoveryId },
     emitEvent: (event: ExportProgressEvent) => void,
   ) => {
     const onEvent = new Channel<IpcExportEvent>();
@@ -480,9 +480,7 @@ export const tauriExportPipelinePort: ExportPipelinePort = {
         cancellable: event.data.cancellable,
       });
     };
-    const request = options
-      ? invoke<IpcExportResult | null>("export_project", { options, onEvent, ...(recoveryId ? { recoveryId } : {}) })
-      : invoke<IpcExportResult>("export_sheet", { projectName, sheetId, sheetNumber, onEvent });
+    const request = invoke<IpcExportResult | null>("export_project", { options, onEvent, ...(recoveryId ? { recoveryId } : {}) });
     const completion = request
       .then((result) => result === null ? { status: "skipped" as const } : ({
         status: "completed" as const,

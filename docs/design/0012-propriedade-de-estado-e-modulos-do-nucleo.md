@@ -1,7 +1,7 @@
 ---
 status: accepted
 document: design
-updated: 2026-09-09
+updated: 2026-09-17
 ---
 
 # Propriedade de estado e módulos do núcleo
@@ -148,7 +148,7 @@ Sua implementação possui três fases internas:
 
 `ExportPipeline` possui o ciclo de vida da preparação; `ExportExecutor` grava e verifica as saídas nela, e o pipeline garante sua limpeza nos estados terminais tratáveis. `Publisher` segue a transação limitada do [ADR 0006](../adr/0006-publicar-exportacao-com-transacao-limitada.md). Staging no Destino permite substituição atômica por arquivo quando suportada, mas não oferece rollback do conjunto, backup integral ou manifesto persistente.
 
-`BatchRunner` permanece fora de `ExportPipeline`. Ele descobre e pré-valida Projetos, mantém checkpoint e processa os itens serialmente. Primeiro usa `plan` para os itens conhecidos e captura o único `RootBindingPlan` da tentativa do lote; depois chama `execute_group` para cada item com esse mesmo plano — `execute` é apenas a especialização de saída única. Uma raiz inesperada interrompe o planejamento atual em vez de ser resolvida independentemente por um worker.
+`BatchRunner` permanece fora de `ExportPipeline`. Ele descobre e pré-valida Projetos, mantém checkpoint e processa os itens serialmente. Na implementação corrente, `plan_album` e `plan_album_in_paths` materializam o planejamento em `AlbumExportPlan`; `execute_album` executa o conjunto de saídas de cada item com o mesmo `RootBindingPlan` da tentativa do lote. A exportação de uma única Lâmina usa esse mesmo caminho. Uma raiz inesperada interrompe o planejamento atual em vez de ser resolvida independentemente por um worker.
 
 ### Dois mecanismos de exclusividade, deliberadamente separados
 

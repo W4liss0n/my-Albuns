@@ -198,12 +198,6 @@ impl OpenRenderSource {
     }
 }
 
-pub(crate) fn open_render_source(
-    resolved: &ResolvedObject,
-) -> Result<OpenRenderSource, SourceFailure> {
-    open_source(resolved, false)
-}
-
 pub(crate) fn open_cache_source(
     resolved: &ResolvedObject,
 ) -> Result<OpenRenderSource, SourceFailure> {
@@ -1581,7 +1575,7 @@ mod render_source_tests {
     use myalbuns_paths::{ExpectedObject, OperationPathContext};
     use sha2::{Digest, Sha256};
 
-    use super::{FallibleJpegReader, image_failure, open_render_source};
+    use super::{FallibleJpegReader, capture_render_source, image_failure};
 
     #[test]
     fn rgb_preview_preserves_oriented_pixels_and_encoded_bytes() {
@@ -2138,7 +2132,7 @@ mod render_source_tests {
             .freeze()
             .resolve_existing(&path, ExpectedObject::RegularFile)
             .expect("the source is resolved once");
-        open_render_source(&resolved)
+        capture_render_source(&resolved)
     }
 
     fn jpeg_fixture(profile: Option<&[u8]>, color: ExtendedColorType, pixels: &[u8]) -> Vec<u8> {
