@@ -1,4 +1,5 @@
 *.myalbuns text eol=lf
 /src/domain/generated/*.ts text eol=lf
+/src/contracts/generated/*.ts text eol=lf
 /src/platform/generated/*.ts text eol=lf
 /src-tauri/Cargo.toml text eol=lf
