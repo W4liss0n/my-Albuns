@@ -24,7 +24,7 @@ possui a sessão e suas responsabilidades.
 
 | Responsável | Contrato |
 | --- | --- |
-| Gerador de Layouts | Recebe uma consulta imutável e devolve de zero a vinte geometrias ordenadas; busca ao menos cinco quando houver qualidade, variedade e espaço físico; concentra famílias, classificação e diversidade |
+| Gerador de Layouts | Recebe uma consulta imutável e devolve de zero a vinte geometrias ordenadas; busca dez quando houver qualidade, variedade e espaço físico; concentra famílias, classificação e diversidade |
 | `LayoutRules` | Resolve compatibilidade, identidade, prioridade entre origens, Mapeamento, arranjo de reserva e `LayoutPatch` |
 | `ProjectSession` | Valida a revisão vigente e confirma o patch como um comando de Histórico |
 | `CompositionCore` | Recalcula o enquadramento com o caminho já compartilhado por editor e Exportação |
