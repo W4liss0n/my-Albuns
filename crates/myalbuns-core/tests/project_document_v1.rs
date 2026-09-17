@@ -672,6 +672,7 @@ fn classifies_invalid_native_path_shape_and_syntax() {
 #[test]
 fn read_only_loading_succeeds_without_retaining_an_editable_lock() {
     let directory = tempfile::tempdir().expect("temporary directory");
+    let core = project_core_with_identity_storage(directory.path());
     let project_path = directory.path().join("somente-leitura.myalbuns");
     fs::write(&project_path, NEUTRAL_PROJECT_V1.as_bytes()).expect("fixture is written");
     let mut permissions = fs::metadata(&project_path)
@@ -680,10 +681,10 @@ fn read_only_loading_succeeds_without_retaining_an_editable_lock() {
     permissions.set_readonly(true);
     fs::set_permissions(&project_path, permissions).expect("fixture becomes read-only");
 
-    let loaded = ProjectCore::new()
+    let loaded = core
         .load_persisted_revision(load_request(&project_path))
         .expect("read-only loading does not require an editable handle");
-    let loaded_again = ProjectCore::new()
+    let loaded_again = core
         .load_persisted_revision(load_request(&project_path))
         .expect("the immutable value retains no opening lock");
     assert_eq!(loaded.project_id(), loaded_again.project_id());
@@ -696,6 +697,8 @@ fn read_only_loading_succeeds_without_retaining_an_editable_lock() {
     #[allow(clippy::permissions_set_readonly_false)]
     permissions.set_readonly(false);
     fs::set_permissions(&project_path, permissions).expect("temporary fixture can be cleaned up");
+    core.open_editable(OpenProjectRequest::new(project_location(&project_path)))
+        .expect("read-only loading retains neither the Identity lease nor the file lock");
 }
 
 #[test]
@@ -3067,7 +3070,11 @@ fn concurrent_first_read_only_observations_serialize_duplicate_identities() {
             })
             .count(),
         1,
-        "the losing copy re-evaluates durable evidence under the Identity lease"
+        "the losing copy re-evaluates durable evidence under the Identity lease: {:?}",
+        outcomes
+            .iter()
+            .filter_map(|outcome| outcome.as_ref().err())
+            .collect::<Vec<_>>()
     );
 }
 

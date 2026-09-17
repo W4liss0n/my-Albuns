@@ -92,11 +92,11 @@ if ([string]::IsNullOrWhiteSpace($UncRoot)) {
 }
 $UncRoot = $UncRoot.TrimEnd('\')
 
-if ([string]::IsNullOrWhiteSpace($DriveLetter)) {
-    $usedLetters = @(
+$usedLetters = @(
         [System.IO.DriveInfo]::GetDrives() |
             ForEach-Object { $_.Name.Substring(0, 1).ToUpperInvariant() }
-    )
+)
+if ([string]::IsNullOrWhiteSpace($DriveLetter)) {
     $DriveLetter = @('R', 'Q', 'P', 'O', 'N', 'M') |
         Where-Object { $usedLetters -notcontains $_ } |
         Select-Object -First 1
@@ -105,11 +105,20 @@ $DriveLetter = $DriveLetter.TrimEnd(':').ToUpperInvariant()
 if ($DriveLetter -notmatch '^[A-Z]$') {
     throw 'DriveLetter must be one unused letter.'
 }
+if ($usedLetters -contains $DriveLetter) {
+    throw 'The fixture drive is already assigned; no existing mapping may be changed.'
+}
 $mappedDrive = "$DriveLetter`:"
+& cmd.exe /d /c "net use $mappedDrive >nul 2>&1"
+if ($LASTEXITCODE -eq 0) {
+    throw 'The fixture drive already has a network mapping.'
+}
 
 $preflightPath = Join-Path $UncRoot 'preflight.tmp'
 $evidencePath = Join-Path $runRoot 'path-evidence.json'
 $sidecarEvidencePath = Join-Path $runRoot 'sidecar-evidence.json'
+$projectEvidencePath = Join-Path $runRoot 'project-evidence.json'
+$permissionEvidencePath = Join-Path $runRoot 'permission-evidence.json'
 $targetDirectory = Join-Path `
     (Resolve-MyAlbunsCargoTargetDirectory) `
     'windows-path-gate'
@@ -130,12 +139,16 @@ $environmentNames = [ordered]@{
     MYALBUNS_PATH_GATE_DRIVE = $mappedDrive
     MYALBUNS_PATH_GATE_EVIDENCE = $evidencePath
     MYALBUNS_PATH_GATE_SIDECAR_EVIDENCE = $sidecarEvidencePath
+    MYALBUNS_PATH_GATE_PROJECT_EVIDENCE = $projectEvidencePath
+    MYALBUNS_PATH_GATE_PERMISSION_EVIDENCE = $permissionEvidencePath
     MYALBUNS_REAL_IMAGING_PROCESSOR = $processorPath
 }
 $previousEnvironment = @{}
 $results = [System.Collections.Generic.List[object]]::new()
 $pathEvidence = $null
 $sidecarEvidence = $null
+$projectEvidence = $null
+$permissionEvidence = $null
 $locationWasPushed = $false
 
 try {
@@ -238,6 +251,14 @@ try {
                 '--exact',
                 '--nocapture'
             )
+        },
+        [ordered]@{
+            name = 'real-project-create-reopen-export'
+            arguments = @(
+                'test', '-p', 'myalbuns-desktop', '--lib',
+                'project_bootstrap::host::tests::windows_paths::',
+                '--', '--ignored', '--test-threads=1', '--nocapture'
+            )
         }
     )
 
@@ -320,6 +341,25 @@ try {
         throw 'The real sidecar UNC test did not produce evidence.'
     }
     $pathEvidence = Get-Content -LiteralPath $evidencePath -Raw | ConvertFrom-Json
+    $projectEvidence = Get-Content -LiteralPath $projectEvidencePath -Raw | ConvertFrom-Json
+    $permissionEvidence = Get-Content -LiteralPath $permissionEvidencePath -Raw | ConvertFrom-Json
+    $expectedCases = @('local', 'unc', 'mapped', 'verbatim-disk', 'verbatim-unc', 'long-local', 'long-unc')
+    if (@($projectEvidence).Count -ne $expectedCases.Count) {
+        throw 'The native project path matrix is incomplete.'
+    }
+    foreach ($case in $expectedCases) {
+        $rows = @($projectEvidence | Where-Object { $_.case -eq $case })
+        if ($rows.Count -ne 1 -or -not $rows[0].created -or -not $rows[0].reopened `
+                -or -not $rows[0].exported -or -not $rows[0].originalUnchanged `
+                -or -not $rows[0].projectUnchangedByExport -or -not $rows[0].stagingRemoved) {
+            throw "The native project path case '$case' did not satisfy the gate."
+        }
+    }
+    if (-not $permissionEvidence.creationDenied -or -not $permissionEvidence.openingDenied `
+            -or -not $permissionEvidence.exportDenied -or -not $permissionEvidence.explicitRetryExported `
+            -or -not $permissionEvidence.projectUnchanged) {
+        throw 'The native permissions journey did not satisfy the gate.'
+    }
     $sidecarEvidence =
         Get-Content -LiteralPath $sidecarEvidencePath -Raw | ConvertFrom-Json
     if (-not $pathEvidence.planRoundTripLossless `
@@ -397,6 +437,8 @@ $report = [ordered]@{
     evidence = [ordered]@{
         paths = $pathEvidence
         sidecar = $sidecarEvidence
+        projects = $projectEvidence
+        permissions = $permissionEvidence
         libraryBoundaries = [ordered]@{
             directories = [ordered]@{
                 responsibility = 'known_folder_discovery'

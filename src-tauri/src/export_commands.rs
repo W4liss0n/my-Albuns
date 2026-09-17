@@ -174,7 +174,7 @@ impl ExportCommandError {
                 layout_problems: None,
             };
         }
-        match failure.stage {
+        let mut result = match failure.stage {
             export_pipeline::ExportFailureStage::Cancelled => Self::cancelled(),
             export_pipeline::ExportFailureStage::ExportConflict => Self {
                 code: ExportCommandErrorCode::ExportConflict,
@@ -193,7 +193,17 @@ impl ExportCommandError {
                 layout_problems: None,
             },
             _ => Self::failed(failure.message),
+        };
+        if failure.path_failure == Some(myalbuns_paths::AppPathsError::OperationPathAccessDenied) {
+            result.path_code = Some(ExportPathCode::AccessDenied);
+            let guidance = "Sem permissão para gravar no destino. Escolha outra pasta ou ajuste as permissões e tente novamente.";
+            result.message = if result.code == ExportCommandErrorCode::PublicationFailed {
+                format!("{} {guidance}", result.message)
+            } else {
+                guidance.into()
+            };
         }
+        result
     }
 }
 
@@ -949,6 +959,55 @@ mod tests {
             myalbuns_paths::AppPathsError::EXPORT_STORAGE_FULL_MESSAGE,
         ));
         assert_eq!(failure.code, ExportCommandErrorCode::OutputStorageFull);
+    }
+
+    #[test]
+    fn native_destination_permission_failure_keeps_actionable_context_over_ipc() {
+        let guidance = "Sem permissão para gravar no destino. Escolha outra pasta ou ajuste as permissões e tente novamente.";
+        for (stage, expected_code, context, expected_message) in [
+            (
+                ExportFailureStage::Prepare,
+                "failed",
+                "A preparação está indisponível.",
+                guidance.into(),
+            ),
+            (
+                ExportFailureStage::Publish {
+                    promoted_outputs: 0,
+                    total_outputs: 1,
+                },
+                "publication_failed",
+                "Os arquivos já existentes foram mantidos.",
+                format!("Os arquivos já existentes foram mantidos. {guidance}"),
+            ),
+            (
+                ExportFailureStage::Publish {
+                    promoted_outputs: 1,
+                    total_outputs: 2,
+                },
+                "publication_failed",
+                "O álbum foi publicado parcialmente. Tente exportar novamente para concluir.",
+                format!(
+                    "O álbum foi publicado parcialmente. Tente exportar novamente para concluir. {guidance}"
+                ),
+            ),
+        ] {
+            let error = ExportCommandError::from_pipeline(ExportFailure::from_path_error(
+                stage,
+                myalbuns_paths::AppPathsError::export_io(
+                    &std::io::ErrorKind::PermissionDenied.into(),
+                ),
+                context,
+            ));
+            assert_eq!(
+                serde_json::to_value(error).unwrap(),
+                json!({
+                    "code": expected_code,
+                    "pathCode": "access_denied",
+                    "message": expected_message,
+                })
+            );
+        }
     }
 
     #[test]

@@ -97,8 +97,8 @@ test("locates the New Project flow through stable accessible names", () => {
   assert.match(runner, /waitForWebViewDataDirectoryRelease/);
   assert.match(runner, /waitForHostUiReady/);
   assert.match(runner, /webDriverSessionTimeoutMilliseconds/);
-  assert.match(runner, /missing-Original Processador terminal/);
-  assert.match(runner, /Number\(missingOriginalAttempt\.imaging_process_id\)/);
+  assert.match(runner, /missingOriginalBlockedBeforePipeline/);
+  assert.match(runner, /exportProcessorAttempts\(\)\.length === missingOriginalProcessorCount/);
   assert.match(runner, /MYALBUNS_DEV_ALTERNATE_HOST_WEBVIEW_DEBUG_PORT/);
   assert.match(runner, /reopenedHostDebugPort/);
   assert.match(runner, /The productive Host WebView2 process was not observable/);

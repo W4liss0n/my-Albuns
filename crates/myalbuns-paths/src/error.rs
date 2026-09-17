@@ -31,6 +31,8 @@ impl AppPathsError {
     pub fn export_io(error: &std::io::Error) -> Self {
         if Self::is_storage_full(error) {
             Self::ExportStorageFull
+        } else if error.kind() == std::io::ErrorKind::PermissionDenied {
+            Self::OperationPathAccessDenied
         } else {
             Self::ExportStorageUnavailable
         }

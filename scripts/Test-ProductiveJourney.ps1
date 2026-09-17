@@ -330,7 +330,7 @@ try {
         $gate.selectedSheetDimensions.height -ne 360 -or
         $gate.expectedBackgroundRgb -ne '#204060' -or
         $gate.exportedDpi -ne 360 -or
-        $gate.schemaVersion -ne 3 -or
+        $gate.schemaVersion -ne 12 -or
         $gate.savedRevision -ne 3 -or
         $gate.savedDpi -ne 300 -or
         $gate.photoFrameCount -ne 1 -or
@@ -512,6 +512,7 @@ try {
         -not $gate.originalUnchanged -or
         -not $gate.missingOriginalBlocked -or
         -not $gate.missingOriginalActionable -or
+        -not $gate.missingOriginalBlockedBeforePipeline -or
         -not $gate.residentCanvasPreviewBeforeMissingOriginal -or
         $gate.previewArtifactCountBeforePurge -le 0 -or
         $gate.cacheEntryCountBeforeExport -ne 0 -or
@@ -526,19 +527,23 @@ try {
         -not $gate.exportedAfterReopen -or
         $gate.canvasPhotoSample.cssWidth -le 0 -or
         $gate.canvasPhotoSample.cssHeight -le 0 -or
+        $gate.canvasPhotoSample.exportXFraction -le 0 -or
+        $gate.canvasPhotoSample.exportXFraction -ge 1 -or
+        $gate.canvasPhotoSample.exportYFraction -le 0 -or
+        $gate.canvasPhotoSample.exportYFraction -ge 1 -or
         $gate.sourcePathExposedToWebView
     ) {
         $contractViolations += 'output'
     }
     if (
-        $gate.correlations.bootstraps -ne 4 -or
-        $gate.correlations.imagingAttempts -ne 2 -or
+        $gate.correlations.bootstraps -ne 5 -or
+        $gate.correlations.imagingAttempts -ne 1 -or
         $gate.processIds.firstHost -eq $gate.processIds.host -or
         -not $gate.reopenedInIndependentHost -or
         -not $gate.reopenedHistoryEmpty -or
-        $gate.terminalCounts.globalHandoffs -ne 4 -or
-        $gate.terminalCounts.hostReady -ne 4 -or
-        $gate.terminalCounts.imagingStopped -ne 2
+        $gate.terminalCounts.globalHandoffs -ne 5 -or
+        $gate.terminalCounts.hostReady -ne 5 -or
+        $gate.terminalCounts.imagingStopped -ne 1
     ) {
         $contractViolations += 'processes'
     }
@@ -548,16 +553,19 @@ try {
         throw "The productive journey result violated contract groups ($violationSummary): $observed"
     }
     Add-Type -AssemblyName System.Drawing
-    $jpegPath = Join-Path $runRoot 'Jornada produtiva_002.jpg'
+    $jpegPath = Join-Path $runRoot "Exporta$([char]0x00E7)$([char]0x00E3)o\Jornada produtiva - C$([char]0x00F3)pia_002.jpg"
     $jpegBitmap = [System.Drawing.Bitmap]::FromFile($jpegPath)
     try {
         $sampleX = 2
         $sampleY = [Math]::Floor($jpegBitmap.Height / 2)
         $backgroundSample = $jpegBitmap.GetPixel($sampleX, $sampleY)
-        # Match the Canvas sample while staying clear of the editor-only
-        # center spine, which is intentionally absent from the exported JPEG.
-        $photoExportSampleX = [Math]::Floor($jpegBitmap.Width * 0.45)
-        $photoExportSampleY = [Math]::Floor($jpegBitmap.Height / 2)
+        # Compare the same Frame center in the Original, Canvas and JPEG.
+        $photoExportSampleX = [Math]::Floor(
+            $jpegBitmap.Width * [double] $gate.canvasPhotoSample.exportXFraction
+        )
+        $photoExportSampleY = [Math]::Floor(
+            $jpegBitmap.Height * [double] $gate.canvasPhotoSample.exportYFraction
+        )
         $photoExportSample = $jpegBitmap.GetPixel(
             $photoExportSampleX,
             $photoExportSampleY
@@ -925,6 +933,7 @@ try {
             originalUnchanged = [bool] $gate.originalUnchanged
             missingOriginalBlocked = [bool] $gate.missingOriginalBlocked
             missingOriginalActionable = [bool] $gate.missingOriginalActionable
+            missingOriginalBlockedBeforePipeline = [bool] $gate.missingOriginalBlockedBeforePipeline
             residentCanvasPreviewBeforeMissingOriginal = [bool] $gate.residentCanvasPreviewBeforeMissingOriginal
             previewArtifactCountBeforePurge = [int] $gate.previewArtifactCountBeforePurge
             cacheEntryCountBeforeExport = [int] $gate.cacheEntryCountBeforeExport

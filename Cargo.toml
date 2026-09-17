@@ -9,6 +9,11 @@ members = [
 ]
 resolver = "2"
 
+# Upstream Windows input deadlock fix, compatible with Tauri's Tao 0.35 range.
+# Remove when that range includes https://github.com/tauri-apps/tao/pull/1215.
+[patch.crates-io]
+tao = { git = "https://github.com/tauri-apps/tao", rev = "c704261c519c58cfdd0bc2d58ba24e06a0b71c92" }
+
 # Pixel loops and codecs must stay responsive in the local desktop build too.
 # Include the Processor because generic image operations are instantiated there.
 [profile.dev.package.myalbuns-imaging]

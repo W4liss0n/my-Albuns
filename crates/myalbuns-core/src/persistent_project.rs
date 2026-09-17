@@ -1525,7 +1525,7 @@ fn authorize_loaded_identity(
             return Err(project_store::LoadProjectError::IdentityIndeterminate);
         }
     };
-    let physical_identity = loaded
+    loaded
         .physical_identity
         .ok_or(project_store::LoadProjectError::IdentityIndeterminate)?;
     let current_candidate = loaded
@@ -1546,10 +1546,9 @@ fn authorize_loaded_identity(
         lease.discard_unpublished();
         return Err(map_load_identity_error(error));
     }
-    lease
-        .bind_target(physical_identity)
-        .and_then(|_| lease.into_published().map(|_| ()))
-        .map_err(|_| project_store::LoadProjectError::IdentityIndeterminate)?;
+    // The registry now holds durable evidence. A read-only observation creates
+    // no Session; release its file lease before releasing publication arbitration.
+    lease.discard_unpublished();
     Ok(())
 }
 

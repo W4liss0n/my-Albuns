@@ -714,9 +714,23 @@ pub(crate) async fn build_hidden_owned_window(
         browser_arguments,
         browser_data_directory,
     } = config;
-    if let Some(existing) = app.get_webview_window(label) {
-        let _ = existing.destroy();
+    if let Some(existing) = app.get_window(label) {
+        existing.destroy().map_err(io::Error::other)?;
     }
+    // Wry queues destruction. Reusing the label before both manager entries
+    // disappear can reject the next queued project opening as a duplicate.
+    tokio::time::timeout(DIALOG_LOAD_TIMEOUT, async {
+        while app.get_window(label).is_some() || app.get_webview(label).is_some() {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .map_err(|_| {
+        io::Error::new(
+            io::ErrorKind::TimedOut,
+            format!("the previous {label} dialog did not release its window and WebView"),
+        )
+    })?;
 
     let (ready_token, ready_receiver) = owned_window_readiness()
         .lock()
