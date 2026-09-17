@@ -1425,7 +1425,7 @@
         "reason": "A referência visual vigente não representa a restauração persistida da visibilidade dos Painéis definida nas decisões aceitas posteriores."
       },
       "viewport": { "width": 1440, "height": 900 },
-      "readySelector": ".workspace-grid:not(:has(#contextual-panel)):not(:has(.media-panel))",
+      "readySelector": ".workspace-grid:not(:has(#contextual-panel)):has(.media-panel[hidden])",
       "actions": []
     },
     {
@@ -2169,7 +2169,7 @@
         { "type": "focus", "selector": ".canvas-host canvas" },
         { "type": "key", "key": "ArrowRight" },
         { "type": "assert", "selector": ".canvas-host[data-centered-sheet-id=\"sheet-003\"]" },
-        { "type": "drag", "gesture": "pointer", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-003\"]", "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "dropTargetSelector": "[data-reorder-surface=\"grid\"]", "phase": "drop" }
+        { "type": "drag", "gesture": "pointer", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-003\"]", "sourceXRatio": 0.25, "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "dropTargetSelector": "[data-reorder-surface=\"grid\"]", "phase": "drop" }
       ]
     },
     {
