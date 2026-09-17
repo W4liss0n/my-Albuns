@@ -13146,20 +13146,20 @@
                   },
                   "borderFillRects": [],
                   "clipRect": {
-                    "height": 135000,
-                    "width": 135000,
-                    "x": 10000,
-                    "y": 10000
+                    "height": 50667,
+                    "width": 76000,
+                    "x": 71500,
+                    "y": 15000
                   },
                   "frameId": "clipboard-frame-0-0",
                   "opacityByte": 255,
                   "photo": {
                     "blackAndWhite": false,
                     "drawRect": {
-                      "height": 202500,
-                      "width": 303750,
-                      "x": -57500,
-                      "y": -27125
+                      "height": 76001,
+                      "width": 114001,
+                      "x": 56300,
+                      "y": 1067
                     },
                     "mediaId": "00000000-0000-4000-8000-000000000001",
                     "mirrorX": false,
@@ -13170,15 +13170,15 @@
                       "#E7C58B"
                     ],
                     "placement": {
-                      "baseFillZoom": 337.5,
+                      "baseFillZoom": 126.6675,
                       "current": {
                         "center": {
-                          "x": 84375.0002514571,
-                          "y": 64124.99994970858
+                          "x": 41800.07505662553,
+                          "y": 24066.82498112507
                         },
                         "size": {
-                          "height": 202500.0,
-                          "width": 303750.0
+                          "height": 76000.5,
+                          "width": 114000.75
                         }
                       },
                       "currentPan": {
@@ -13187,28 +13187,28 @@
                       },
                       "currentZoom": 1.5,
                       "panOrigin": {
-                        "x": 67500.0,
-                        "y": 67500.0
+                        "x": 38000.0,
+                        "y": 25333.5
                       },
                       "panRange": {
                         "maximum": 1.0,
                         "minimum": -1.0
                       },
                       "panToCenter": {
-                        "xx": 84375.0,
+                        "xx": 19000.375,
                         "xy": -0.0,
                         "yx": 0.0,
-                        "yy": 33750.0
+                        "yy": 12666.75
                       },
                       "panToCenterPerZoom": {
-                        "xx": 101250.0,
+                        "xx": 38000.25,
                         "xy": -0.0,
                         "yx": 0.0,
-                        "yy": 67500.0
+                        "yy": 25333.5
                       },
                       "sizePerZoom": {
-                        "height": 135000.0,
-                        "width": 202500.0
+                        "height": 50667.0,
+                        "width": 76000.5
                       },
                       "zoomRange": {
                         "maximum": 4.0,
@@ -13225,10 +13225,10 @@
                   },
                   "borderFillRects": [],
                   "clipRect": {
-                    "height": 135000,
-                    "width": 135000,
-                    "x": 155000,
-                    "y": 10000
+                    "height": 50667,
+                    "width": 76000,
+                    "x": 152500,
+                    "y": 15000
                   },
                   "frameId": "clipboard-frame-0-1",
                   "opacityByte": 255,
@@ -13241,20 +13241,20 @@
                   },
                   "borderFillRects": [],
                   "clipRect": {
-                    "height": 135000,
-                    "width": 135000,
-                    "x": 10000,
-                    "y": 155000
+                    "height": 104666,
+                    "width": 157000,
+                    "x": 71500,
+                    "y": 70667
                   },
                   "frameId": "pasted-frame-0",
                   "opacityByte": 255,
                   "photo": {
                     "blackAndWhite": false,
                     "drawRect": {
-                      "height": 202500,
-                      "width": 303750,
-                      "x": -57500,
-                      "y": 117875
+                      "height": 157000,
+                      "width": 235500,
+                      "x": 40100,
+                      "y": 41883
                     },
                     "mediaId": "00000000-0000-4000-8000-000000000001",
                     "mirrorX": false,
@@ -13265,15 +13265,15 @@
                       "#E7C58B"
                     ],
                     "placement": {
-                      "baseFillZoom": 337.5,
+                      "baseFillZoom": 261.6666666666667,
                       "current": {
                         "center": {
-                          "x": 84375.0002514571,
-                          "y": 64124.99994970858
+                          "x": 86350.00011697412,
+                          "y": 49716.29996100813
                         },
                         "size": {
-                          "height": 202500.0,
-                          "width": 303750.0
+                          "height": 157000.0,
+                          "width": 235500.0
                         }
                       },
                       "currentPan": {
@@ -13282,28 +13282,28 @@
                       },
                       "currentZoom": 1.5,
                       "panOrigin": {
-                        "x": 67500.0,
-                        "y": 67500.0
+                        "x": 78500.0,
+                        "y": 52333.0
                       },
                       "panRange": {
                         "maximum": 1.0,
                         "minimum": -1.0
                       },
                       "panToCenter": {
-                        "xx": 84375.0,
+                        "xx": 39250.0,
                         "xy": -0.0,
                         "yx": 0.0,
-                        "yy": 33750.0
+                        "yy": 26167.0
                       },
                       "panToCenterPerZoom": {
-                        "xx": 101250.0,
+                        "xx": 78500.0,
                         "xy": -0.0,
                         "yx": 0.0,
-                        "yy": 67500.0
+                        "yy": 52333.333333333336
                       },
                       "sizePerZoom": {
-                        "height": 135000.0,
-                        "width": 202500.0
+                        "height": 104666.66666666669,
+                        "width": 157000.0
                       },
                       "zoomRange": {
                         "maximum": 4.0,
@@ -13320,10 +13320,10 @@
                   },
                   "borderFillRects": [],
                   "clipRect": {
-                    "height": 135000,
-                    "width": 135000,
-                    "x": 155000,
-                    "y": 155000
+                    "height": 104667,
+                    "width": 157000,
+                    "x": 71500,
+                    "y": 180333
                   },
                   "frameId": "pasted-frame-1",
                   "opacityByte": 255,
@@ -13765,10 +13765,10 @@
                       }
                     },
                     "rect": {
-                      "height": 135000,
-                      "width": 135000,
-                      "x": 10000,
-                      "y": 10000
+                      "height": 50667,
+                      "width": 76000,
+                      "x": 71500,
+                      "y": 15000
                     },
                     "style": {
                       "borderRgb": "#000000",
@@ -13782,10 +13782,10 @@
                     "id": "clipboard-frame-0-1",
                     "photo": null,
                     "rect": {
-                      "height": 135000,
-                      "width": 135000,
-                      "x": 155000,
-                      "y": 10000
+                      "height": 50667,
+                      "width": 76000,
+                      "x": 152500,
+                      "y": 15000
                     },
                     "style": {
                       "borderRgb": "#000000",
@@ -13810,10 +13810,10 @@
                       }
                     },
                     "rect": {
-                      "height": 135000,
-                      "width": 135000,
-                      "x": 10000,
-                      "y": 155000
+                      "height": 104666,
+                      "width": 157000,
+                      "x": 71500,
+                      "y": 70667
                     },
                     "style": {
                       "borderRgb": "#000000",
@@ -13827,10 +13827,10 @@
                     "id": "pasted-frame-1",
                     "photo": null,
                     "rect": {
-                      "height": 135000,
-                      "width": 135000,
-                      "x": 155000,
-                      "y": 155000
+                      "height": 104667,
+                      "width": 157000,
+                      "x": 71500,
+                      "y": 180333
                     },
                     "style": {
                       "borderRgb": "#000000",

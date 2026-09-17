@@ -223,6 +223,7 @@ renderizada e uma revisão explícita posterior decide `accepted`, `rejected` ou
 | splitters finos e alvo interativo | `project-splitters-normal-100`, `project-splitter-horizontal-hover-125`, `project-splitter-vertical-focus-150`, `project-splitters-resized` |
 | seleção múltipla e mistos | `frame-multi-selection-mixed`, `frame-multi-selection-absolute-edit` |
 | mover, redimensionar e travar | `frame-manipulation-move`, `frame-manipulation-resize`, `frame-layout-locked` |
+| variedade de Layouts com poucos Frames | `workspace-layout-small-alternatives` |
 
 As provas geradas ficam em `.scratch/ui-acceptance/` e são deliberadamente
 ignoradas pelo Git. O manifesto, este mapa, o protótipo e seus testes permanecem

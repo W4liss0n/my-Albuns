@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-09-09
-updated: 2026-09-11
+updated: 2026-09-17
 ticket: 28
 ---
 
@@ -24,7 +24,7 @@ possui a sessão e suas responsabilidades.
 
 | Responsável | Contrato |
 | --- | --- |
-| Gerador de Layouts | Recebe uma consulta imutável e devolve de zero a dez geometrias ordenadas; concentra famílias, classificação e diversidade |
+| Gerador de Layouts | Recebe uma consulta imutável e devolve de zero a vinte geometrias ordenadas; busca ao menos cinco quando houver qualidade, variedade e espaço físico; concentra famílias, classificação e diversidade |
 | `LayoutRules` | Resolve compatibilidade, identidade, prioridade entre origens, Mapeamento, arranjo de reserva e `LayoutPatch` |
 | `ProjectSession` | Valida a revisão vigente e confirma o patch como um comando de Histórico |
 | `CompositionCore` | Recalcula o enquadramento com o caminho já compartilhado por editor e Exportação |
@@ -97,7 +97,7 @@ reposicionar Frames existentes.
 
 | Resultado | Significado |
 | --- | --- |
-| `candidates` | Uma a dez sugestões válidas, ordenadas |
+| `candidates` | Uma a vinte sugestões válidas, ordenadas |
 | `empty` | Consulta sem Frames; não há organização a aplicar |
 | `noCandidates` | A busca não encontrou um padrão que satisfaça as restrições |
 | `outsideCoverage` | Quantidade acima de 30; preserva todos os Frames e permite que `LayoutRules` use outras origens ou a reserva |
@@ -138,7 +138,7 @@ Prévia e confirmação recebem exatamente os mesmos retângulos finais.
 
 `pagesAndSheet` reúne candidatos por Página e da superfície conjunta antes
 da seleção. `pagesOnly` exclui qualquer candidato com Travessia central.
-A lista combinada compartilha o teto de dez; não há cota fixa por tipo.
+A lista combinada compartilha o teto de vinte; não há cota fixa por tipo.
 
 O tipo efetivo é inferido da geometria. A família de origem não autoriza
 rotular como por Lâmina um candidato sem travessia. No Gerador, um candidato
@@ -184,6 +184,44 @@ invalidam um Layout personalizado criado a partir da composição manual,
 nem acrescentam restrições ao arranjo de reserva do ADR 0008.
 
 ## Busca, classificação e diversidade
+
+### Perfil vigente: versão 2
+
+O [ADR 0012](../adr/0012-ampliar-variedade-dos-layouts-pequenos.md) mantém
+as invariantes e o perfil geométrico de base, com estas alterações:
+
+1. A seleção principal admite até vinte sugestões, preservando nota mínima
+   de 72, janela de dez pontos abaixo da melhor, novidade mínima de 0,25 e
+   as cotas por família do perfil inicial.
+2. Com menos de cinco sugestões, uma etapa complementar tenta completar
+   cinco. Mantém as escolhas principais e sua ordem, exige nota mínima de
+   72 e novidade de pelo menos 0,18 no mesmo escopo, e dispensa a janela
+   relativa e as cotas por família. As opções continuam distintas.
+3. Para consultas de um a seis Frames, essa etapa também amplia a enumeração.
+   Reutiliza as famílias em regiões centralizadas de largura/altura relativas
+   `(0,85; 1)`, `(1; 0,85)`, `(0,75; 1)`, `(1; 0,75)`, `(0,85; 0,85)`,
+   `(0,75; 0,75)`, `(0,64; 0,64)` e `(0,54; 0,54)`. Cada composição é
+   recalculada mantendo o intervalo físico original.
+4. Bandas graduadas com uma orientação por banda também são ajustadas às
+   proporções naturais, inclusive em ordem inversa e a partir de três Frames.
+   Isso permite blocos completos de quadrados com tamanhos diferentes.
+5. Na busca complementar por Página, as seis opções locais são escolhidas
+   por nota com novidade mínima de 0,18 entre elas, antes da combinação dos
+   lados. O caminho principal mantém o limite e a ordenação anteriores.
+6. Para uma consulta com um único Frame, a referência de ocupação é a área
+   do maior Frame de proporção natural que cabe na região correspondente:
+   Página ou superfície conjunta, conforme o escopo efetivo. Os demais pesos,
+   inclusive o fator 0,86, são preservados.
+
+A meta usual é oferecer de cinco a dez alternativas, com até vinte quando
+a seleção principal encontra variedade suficiente. A etapa complementar
+para ao atingir cinco e não força vinte opções de menor qualidade.
+O resultado pode ficar abaixo de cinco quando a busca não encontra variedade
+válida; uma superfície que comporta somente uma geometria continua oferecendo
+essa opção. Não se relaxam limites físicos nem se usa a reserva para completar
+o Painel. Favoritos e Último Layout conservam suas prioridades e cópias.
+
+### Perfil inicial e parâmetros preservados
 
 A primeira versão parte das famílias aprovadas: composições pequenas,
 faixas, colunas, bandas com tamanhos graduados, destaque e apoio, grupos

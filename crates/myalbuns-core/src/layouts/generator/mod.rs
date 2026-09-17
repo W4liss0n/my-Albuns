@@ -193,12 +193,25 @@ impl Search<'_> {
             .iter()
             .map(|s| s.bounds.w.min(s.bounds.h))
             .fold(f64::INFINITY, f64::min);
-        let coverage = area / (self.bounds().w * self.bounds().h);
+        let by_page = self.double() && candidate.scope == LayoutScope::Page;
+        let mut coverage_area = self.bounds().w * self.bounds().h;
+        if self.query.frame_orientations.len() == 1 {
+            // A lone portrait cannot fill a wide sheet. Judge its occupation
+            // against the largest natural-ratio frame in its permitted region.
+            let width = if by_page {
+                0.5 - 2.0 * self.margin.max(self.gap / 2.0)
+            } else {
+                self.bounds().w
+            };
+            let ratio = base_ratio(slots[0].orientation);
+            let height = self.bounds().h.min(width / ratio);
+            coverage_area = height * height * ratio;
+        }
+        let coverage = area / coverage_area;
         let mut quality = 100.0
             * (0.45 * proportion
                 + 0.4 * (coverage / 0.86).clamp(0.0, 1.0)
                 + 0.15 * (shortest / (2.0 * self.minimum)).clamp(0.0, 1.0));
-        let by_page = self.double() && candidate.scope == LayoutScope::Page;
         if by_page && slots.len() > 1 {
             let left: f64 = slots
                 .iter()
@@ -331,7 +344,7 @@ fn query_is_valid(query: &LayoutQuery) -> bool {
 /// Pure, bounded generation. Positions always follow the caller's Frame order.
 pub fn generate_layouts(query: &LayoutQuery) -> LayoutGeneration {
     let mut result = LayoutGeneration {
-        algorithm_version: 1,
+        algorithm_version: 2,
         status: LayoutGenerationStatus::NoCandidates,
         candidates: Vec::new(),
     };
@@ -369,73 +382,51 @@ pub fn generate_layouts(query: &LayoutQuery) -> LayoutGeneration {
         })
         .collect();
     let mut pool = if search.double() {
-        families::pages(&frames, &search)
+        families::pages(&frames, &search, false)
     } else {
         Vec::new()
     };
     if !search.double() || query.permission == LayoutPermission::PagesAndSheet {
-        pool.extend(families::local(&frames, search.bounds(), &search));
+        pool.extend(families::local(&frames, search.bounds(), &search, false));
         pool.extend(families::complementary_groups(
             &frames,
             search.bounds(),
             &search,
         ));
     }
-    let mut seen = BTreeSet::new();
-    pool.retain_mut(|c| {
-        c.scope = search.scope(&c.slots);
-        if !search.valid_candidate(c) {
-            return false;
-        }
-        c.slots.sort_by_key(|s| s.index);
-        let Some(positions) = quantization::resolve(&c.slots, c.scope, query) else {
-            return false;
-        };
-        c.positions = positions;
-        c.key = geometry_key(&c.slots, search.height);
-        if !seen.insert(c.key.clone()) {
-            return false;
-        }
-        c.quality = search.score(c);
-        true
-    });
-    pool.sort_by(|a, b| {
-        b.quality
-            .total_cmp(&a.quality)
-            .then_with(|| a.key.cmp(&b.key))
-    });
-    let Some(first) = pool.first() else {
-        return result;
-    };
-    let cutoff = 72.0_f64.max(first.quality - 10.0);
-    pool.retain(|c| c.quality >= cutoff);
-    let mut selected: Vec<Candidate> = Vec::new();
-    while !pool.is_empty() && selected.len() < 10 {
-        let mut best = None;
-        let mut utility = f64::NEG_INFINITY;
-        for (i, c) in pool.iter().enumerate() {
-            let novelty = selected
-                .iter()
-                .filter(|o| o.scope == c.scope)
-                .map(|o| distance(c, o))
-                .fold(1.0, f64::min);
-            if novelty < 0.25 {
-                continue;
+    prepare_candidates(&mut pool, &search);
+    let best_quality = pool.first().map_or(72.0, |c| c.quality);
+    let mut selected = Vec::new();
+    select_candidates(
+        &mut pool,
+        &mut selected,
+        Selection {
+            maximum: 20,
+            cutoff: 72.0_f64.max(best_quality - 10.0),
+            novelty: 0.25,
+            family_limits: true,
+        },
+    );
+    if selected.len() < 5 {
+        if frames.len() <= 6 {
+            if search.double() {
+                pool.extend(families::pages(&frames, &search, true));
             }
-            let limit = if c.kind.starts_with("group-") { 4 } else { 2 };
-            if c.kind != "page" && selected.iter().filter(|o| o.kind == c.kind).count() >= limit {
-                continue;
+            if !search.double() || query.permission == LayoutPermission::PagesAndSheet {
+                pool.extend(families::local(&frames, search.bounds(), &search, true));
             }
-            let value = rounded(0.85 * c.quality / 100.0 + 0.15 * novelty);
-            if value > utility {
-                best = Some(i);
-                utility = value;
-            }
+            prepare_candidates(&mut pool, &search);
         }
-        let Some(best) = best else {
-            break;
-        };
-        selected.push(pool.remove(best));
+        select_candidates(
+            &mut pool,
+            &mut selected,
+            Selection {
+                maximum: 5,
+                cutoff: 72.0,
+                novelty: 0.18,
+                family_limits: false,
+            },
+        );
     }
     result.candidates = selected
         .into_iter()
@@ -453,4 +444,73 @@ pub fn generate_layouts(query: &LayoutQuery) -> LayoutGeneration {
         result.status = LayoutGenerationStatus::Candidates;
     }
     result
+}
+
+fn prepare_candidates(pool: &mut Vec<Candidate>, search: &Search<'_>) {
+    let mut seen = BTreeSet::new();
+    pool.retain_mut(|c| {
+        c.scope = search.scope(&c.slots);
+        if !search.valid_candidate(c) {
+            return false;
+        }
+        c.slots.sort_by_key(|s| s.index);
+        let Some(positions) = quantization::resolve(&c.slots, c.scope, search.query) else {
+            return false;
+        };
+        c.positions = positions;
+        c.key = geometry_key(&c.slots, search.height);
+        if !seen.insert(c.key.clone()) {
+            return false;
+        }
+        c.quality = search.score(c);
+        true
+    });
+    pool.sort_by(|a, b| {
+        b.quality
+            .total_cmp(&a.quality)
+            .then_with(|| a.key.cmp(&b.key))
+    });
+}
+
+struct Selection {
+    maximum: usize,
+    cutoff: f64,
+    novelty: f64,
+    family_limits: bool,
+}
+
+fn select_candidates(pool: &mut Vec<Candidate>, selected: &mut Vec<Candidate>, policy: Selection) {
+    while !pool.is_empty() && selected.len() < policy.maximum {
+        let mut best = None;
+        let mut utility = f64::NEG_INFINITY;
+        for (i, c) in pool.iter().enumerate() {
+            if c.quality < policy.cutoff || selected.iter().any(|other| other.key == c.key) {
+                continue;
+            }
+            let novelty = selected
+                .iter()
+                .filter(|o| o.scope == c.scope)
+                .map(|o| distance(c, o))
+                .fold(1.0, f64::min);
+            if novelty < policy.novelty {
+                continue;
+            }
+            let limit = if c.kind.starts_with("group-") { 4 } else { 2 };
+            if policy.family_limits
+                && c.kind != "page"
+                && selected.iter().filter(|o| o.kind == c.kind).count() >= limit
+            {
+                continue;
+            }
+            let value = rounded(0.85 * c.quality / 100.0 + 0.15 * novelty);
+            if value > utility {
+                best = Some(i);
+                utility = value;
+            }
+        }
+        let Some(best) = best else {
+            break;
+        };
+        selected.push(pool.remove(best));
+    }
 }

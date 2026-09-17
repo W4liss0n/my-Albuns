@@ -207,7 +207,45 @@ fn grids(frames: &[Slot], bounds: Bounds, gap: f64, fit: bool) -> Vec<Vec<Slot>>
     result
 }
 
-pub(super) fn local(frames: &[Slot], bounds: Bounds, search: &Search<'_>) -> Vec<Candidate> {
+pub(super) fn local(
+    frames: &[Slot],
+    bounds: Bounds,
+    search: &Search<'_>,
+    expanded: bool,
+) -> Vec<Candidate> {
+    let mut candidates = compositions(frames, bounds, search, expanded);
+    if expanded && !frames.is_empty() && frames.len() <= 6 {
+        // Rebuild inside each centered region so the physical gap stays fixed.
+        // Scaling finished rectangles would also scale their gaps.
+        for (width, height) in [
+            (0.85, 1.0),
+            (1.0, 0.85),
+            (0.75, 1.0),
+            (1.0, 0.75),
+            (0.85, 0.85),
+            (0.75, 0.75),
+            (0.64, 0.64),
+            (0.54, 0.54),
+        ] {
+            candidates.extend(compositions(
+                frames,
+                bounds.centered(bounds.w * width, bounds.h * height),
+                search,
+                true,
+            ));
+        }
+        let mut seen = BTreeSet::new();
+        candidates.retain(|c| seen.insert(geometry_key(&c.slots, search.height)));
+    }
+    candidates
+}
+
+fn compositions(
+    frames: &[Slot],
+    bounds: Bounds,
+    search: &Search<'_>,
+    expanded: bool,
+) -> Vec<Candidate> {
     if frames.is_empty() {
         return vec![Candidate::new(Vec::new(), "Página livre", "empty")];
     }
@@ -243,7 +281,7 @@ pub(super) fn local(frames: &[Slot], bounds: Bounds, search: &Search<'_>) -> Vec
             }
         }
     }
-    if frames.len() >= 4 {
+    if frames.len() >= 4 || expanded && frames.len() == 3 {
         for pattern in varied_patterns(frames) {
             for axis in [Axis::Rows, Axis::Columns] {
                 let (label, kind) = if matches!(axis, Axis::Rows) {
@@ -256,6 +294,35 @@ pub(super) fn local(frames: &[Slot], bounds: Bounds, search: &Search<'_>) -> Vec
                     label,
                     kind,
                 );
+                if expanded
+                    && pattern
+                        .iter()
+                        .all(|counts| counts.iter().filter(|n| **n > 0).count() == 1)
+                {
+                    let fitted_pattern: Vec<_> = pattern
+                        .iter()
+                        .map(|counts| {
+                            let orientation = counts.iter().position(|n| *n > 0).unwrap();
+                            Band {
+                                orientation: ORIENTATIONS[orientation],
+                                count: counts[orientation],
+                            }
+                        })
+                        .collect();
+                    // Fit the complete unequal bands at their natural aspect
+                    // ratios; stretching them cannot preserve square Frames.
+                    add(
+                        bands(frames, bounds, &fitted_pattern, axis, search.gap, true),
+                        label,
+                        kind,
+                    );
+                    let reversed: Vec<_> = fitted_pattern.into_iter().rev().collect();
+                    add(
+                        bands(frames, bounds, &reversed, axis, search.gap, true),
+                        label,
+                        kind,
+                    );
+                }
             }
         }
     }
@@ -487,7 +554,7 @@ pub(super) fn complementary_groups(
                 share,
             );
             let select = |frames: &[Slot], region: Bounds| {
-                let mut candidates = local(frames, region, search);
+                let mut candidates = local(frames, region, search, false);
                 candidates.retain(|c| {
                     let block = bounding_box(&c.slots);
                     (block.x - region.x).abs() < 1e-8
@@ -604,7 +671,7 @@ fn split(bounds: Bounds, gap: f64, side: &str, share: f64) -> (Bounds, Bounds) {
     }
 }
 
-pub(super) fn pages(frames: &[Slot], search: &Search<'_>) -> Vec<Candidate> {
+pub(super) fn pages(frames: &[Slot], search: &Search<'_>, expanded: bool) -> Vec<Candidate> {
     let inset = search.margin.max(search.gap / 2.0);
     let left = Bounds {
         x: inset,
@@ -636,7 +703,7 @@ pub(super) fn pages(frames: &[Slot], search: &Search<'_>) -> Vec<Candidate> {
                     continue;
                 }
                 let select = |frames: &[Slot], region| {
-                    let mut candidates = local(frames, region, search);
+                    let mut candidates = local(frames, region, search, expanded);
                     for c in &mut candidates {
                         c.quality = search.score(c);
                         c.key = geometry_key(&c.slots, search.height);
@@ -646,6 +713,21 @@ pub(super) fn pages(frames: &[Slot], search: &Search<'_>) -> Vec<Candidate> {
                             .total_cmp(&a.quality)
                             .then_with(|| a.key.cmp(&b.key))
                     });
+                    if expanded {
+                        let mut distinct = Vec::new();
+                        for candidate in candidates {
+                            if distinct
+                                .iter()
+                                .all(|other| distance(&candidate, other) >= 0.18)
+                            {
+                                distinct.push(candidate);
+                            }
+                            if distinct.len() == 6 {
+                                break;
+                            }
+                        }
+                        return distinct;
+                    }
                     candidates.truncate(6);
                     candidates
                 };

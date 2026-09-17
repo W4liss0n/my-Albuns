@@ -10,6 +10,34 @@ fn request(frame_count: usize) -> Option<LayoutFrameRequest> {
 }
 
 #[test]
+fn the_panel_can_preview_lock_and_undo_a_supplemental_small_layout() {
+    let root = tempfile::tempdir().unwrap();
+    let mut project = super::project(root.path());
+    let before = project.projection();
+    let sheet = before.state.album.sheets[0].id.clone();
+    let query = project
+        .query_layouts_with_frame_request(&sheet, request(2))
+        .unwrap();
+    assert!(query.listing.candidates.len() >= 5);
+    let selection = LayoutSelection {
+        query_id: query.query_id,
+        candidate_index: 4,
+    };
+    let preview = project.preview_layout(&selection).unwrap();
+    assert_eq!(preview.len(), 2);
+    assert_eq!(project.projection(), before);
+    let after = project
+        .apply(ProjectIntent::LockLayout { selection })
+        .unwrap();
+    assert_eq!(after.composition.sheets[0].frames, preview);
+    assert_eq!(after.state.revision, before.state.revision + 1);
+    project.undo().unwrap();
+    assert!(project.projection().state.album.sheets[0].frames.is_empty());
+    project.redo().unwrap();
+    assert_eq!(project.projection().composition.sheets[0].frames, preview);
+}
+
+#[test]
 fn reducing_after_expansion_and_unlock_preserves_photos_and_is_one_undoable_edit() {
     for (count, lock) in [(2, false), (3, false), (2, true)] {
         let root = tempfile::tempdir().unwrap();

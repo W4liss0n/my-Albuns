@@ -1,6 +1,132 @@
 use myalbuns_core::{LayoutGenerationStatus, LayoutQuery, LayoutScope, generate_layouts};
 
 #[test]
+fn two_horizontal_frames_offer_at_least_five_distinct_layouts() {
+    let query: LayoutQuery = serde_json::from_value(serde_json::json!({
+        "surface": {"type":"doubleSheet", "widthUm":600000, "heightUm":300000},
+        "frameOrientations":["horizontal", "horizontal"],
+        "permission":"pagesAndSheet", "marginUm":15000, "gapUm":5000,
+        "minimumSideUm":20000
+    }))
+    .unwrap();
+    let result = generate_layouts(&query);
+    assert!(
+        (5..=20).contains(&result.candidates.len()),
+        "{} suggestions",
+        result.candidates.len()
+    );
+    for (i, candidate) in result.candidates.iter().enumerate() {
+        assert_generated_geometry(&query, &candidate.definition, "two horizontal frames");
+        assert!(result.candidates[..i].iter().all(|other| {
+            !myalbuns_core::LayoutRules::same_definition(&candidate.definition, &other.definition)
+        }));
+    }
+    assert_eq!(result, generate_layouts(&query));
+}
+
+#[test]
+fn a_single_frame_has_five_centered_choices_when_the_surface_has_room() {
+    for (kind, width, height) in [
+        ("singlePage", 300000, 300000),
+        ("doubleSheet", 600000, 300000),
+        ("doubleSheet", 600000, 240000),
+    ] {
+        for permission in ["pagesOnly", "pagesAndSheet"] {
+            for orientation in ["vertical", "horizontal", "square"] {
+                let query: LayoutQuery = serde_json::from_value(serde_json::json!({
+                    "surface":{"type":kind,"widthUm":width,"heightUm":height},
+                    "frameOrientations":[orientation],"permission":permission,
+                    "marginUm":15000,"gapUm":5000,"minimumSideUm":20000
+                }))
+                .unwrap();
+                let result = generate_layouts(&query);
+                assert!(
+                    result.candidates.len() >= 5,
+                    "{kind} {width}x{height} {permission} {orientation}: {}",
+                    result.candidates.len()
+                );
+                for candidate in &result.candidates {
+                    assert_generated_geometry(&query, &candidate.definition, orientation);
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn small_compositions_expand_without_relaxing_physical_constraints() {
+    for n in 2..=6 {
+        for (kind, width, height) in [
+            ("singlePage", 300000, 300000),
+            ("doubleSheet", 600000, 300000),
+            ("doubleSheet", 600000, 240000),
+        ] {
+            for permission in ["pagesOnly", "pagesAndSheet"] {
+                for vertical in 0..=n + 1 {
+                    let orientations: Vec<_> = (0..n)
+                        .map(|i| {
+                            if vertical > n {
+                                "square"
+                            } else if i < vertical {
+                                "vertical"
+                            } else {
+                                "horizontal"
+                            }
+                        })
+                        .collect();
+                    let query: LayoutQuery = serde_json::from_value(serde_json::json!({
+                        "surface":{"type":kind,"widthUm":width,"heightUm":height},
+                        "frameOrientations":orientations,"permission":permission,
+                        "marginUm":15000,"gapUm":5000,"minimumSideUm":20000
+                    }))
+                    .unwrap();
+                    let label = format!("{kind} {width}x{height} {permission} {orientations:?}");
+                    let result = generate_layouts(&query);
+                    assert!(
+                        (5..=20).contains(&result.candidates.len()),
+                        "{label}: {} suggestions",
+                        result.candidates.len()
+                    );
+                    for candidate in &result.candidates {
+                        assert_generated_geometry(&query, &candidate.definition, &label);
+                        assert!(candidate.quality >= 72.0, "{label}: quality");
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn rich_compositions_can_offer_twenty_options() {
+    let query: LayoutQuery = serde_json::from_value(serde_json::json!({
+        "surface":{"type":"doubleSheet","widthUm":600000,"heightUm":300000},
+        "frameOrientations":["vertical","vertical","horizontal","horizontal"],
+        "permission":"pagesAndSheet","marginUm":15000,"gapUm":5000,"minimumSideUm":20000
+    }))
+    .unwrap();
+    let result = generate_layouts(&query);
+    assert_eq!(result.candidates.len(), 20);
+    for candidate in &result.candidates {
+        assert_generated_geometry(&query, &candidate.definition, "twenty choices");
+    }
+    assert_eq!(result, generate_layouts(&query));
+}
+
+#[test]
+fn a_tight_surface_keeps_one_valid_choice_instead_of_filling_the_quota() {
+    let query: LayoutQuery = serde_json::from_value(serde_json::json!({
+        "surface":{"type":"singlePage","widthUm":70000,"heightUm":70000},
+        "frameOrientations":["square"],"permission":"pagesOnly",
+        "marginUm":15000,"gapUm":5000,"minimumSideUm":40000
+    }))
+    .unwrap();
+    let result = generate_layouts(&query);
+    assert_eq!(result.candidates.len(), 1);
+    assert_generated_geometry(&query, &result.candidates[0].definition, "tight surface");
+}
+
+#[test]
 fn one_vertical_frame_uses_the_approved_centered_geometry() {
     let corpus: serde_json::Value =
         serde_json::from_str(include_str!("fixtures/layouts/generator-v1.json")).unwrap();
@@ -59,7 +185,7 @@ fn approved_counts_and_surfaces_produce_complete_varied_compositions() {
             "{}",
             example["id"]
         );
-        assert!((1..=10).contains(&result.candidates.len()));
+        assert!((1..=20).contains(&result.candidates.len()));
         for candidate in &result.candidates {
             assert_generated_geometry(
                 &query,

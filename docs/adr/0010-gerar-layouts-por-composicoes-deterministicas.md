@@ -5,6 +5,10 @@ date: 2026-09-09
 
 # Gerar Layouts por composições determinísticas
 
+Em 17/09/2026, o [ADR 0012](0012-ampliar-variedade-dos-layouts-pequenos.md)
+ampliou o teto e definiu a busca complementar da versão 2. O perfil de dez
+sugestões descrito abaixo registra a decisão inicial.
+
 O autor aprovou a versão 9 do protótipo como base do Gerador, após comparar
 quantidades, orientações, tamanhos e permissões de Travessia central. Adotamos
 uma busca finita por composições alinhadas, seguida de classificação por
