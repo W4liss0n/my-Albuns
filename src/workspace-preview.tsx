@@ -851,6 +851,7 @@ function applyPreviewIntent(intent: ProjectIntent): ProjectMutationOutcome {
     affectedSheetId = intent.sheetId;
   }
 
+  next.state.album.sheets = refreshSheetStructureFixture(next.state.album.sheets);
   projection = finalizePhysicalPreviewMutation(next, before);
   return { projection, affectedFrameId: null, affectedSheetId };
 }
@@ -859,7 +860,6 @@ function finalizePhysicalPreviewMutation(
   next: EditorProjection,
   before: EditorProjection,
 ) {
-  next.state.album.sheets = refreshSheetStructureFixture(next.state.album.sheets);
   const compositionById = new Map(
     next.composition.sheets.map((sheet) => [sheet.sheetId, sheet] as const),
   );

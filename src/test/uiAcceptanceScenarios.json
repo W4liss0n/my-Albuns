@@ -1372,7 +1372,6 @@
       "comparison": {
         "kind": "implementation-only",
         "surface": "project-workspace-splitters",
-        "implementationCaptureSelector": ".app-shell",
         "reason": "A referência visual vigente não representa a linha fina com alvo invisível e realce de hover na escala exercitada."
       },
       "viewport": { "width": 1440, "height": 900 },
@@ -1388,7 +1387,6 @@
       "comparison": {
         "kind": "implementation-only",
         "surface": "project-workspace-splitters",
-        "implementationCaptureSelector": ".app-shell",
         "reason": "A referência visual vigente não representa a linha fina com alvo invisível e foco por teclado na escala exercitada."
       },
       "viewport": { "width": 1440, "height": 900 },

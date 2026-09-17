@@ -75,3 +75,8 @@ os contratos oficiais de [input controlado](https://react.dev/reference/react-do
 e [limpeza de Effects](https://react.dev/reference/react/useEffect). Mantém-se a
 atualização síncrona dos drafts e a limpeza de listeners/temporizadores do controle
 existente; não se introduz API nova nem dependência.
+
+Vitest instalado: 4.1.10. A descoberta dos testes fica restrita a `src`, onde
+estão todos os testes frontend versionados, para não percorrer os artefatos e a
+toolchain local. A opção [`dir` da versão 4](https://v4.vitest.dev/config/dir)
+altera apenas o diretório de busca; preserva os padrões de testes e o root.
