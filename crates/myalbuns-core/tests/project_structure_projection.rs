@@ -178,7 +178,7 @@ fn projected_conversion_losses_follow_the_actual_transform_in_both_entrypoints()
             if let Some(loss) = loss {
                 assert_eq!(loss.sheet_id, sheet_id);
                 assert_eq!(loss.sheet_number, index + 1);
-                assert_eq!(serde_json::to_value(&loss.side).unwrap(), lost_side);
+                assert_eq!(serde_json::to_value(loss.side).unwrap(), lost_side);
             }
             let information = AlbumInformation {
                 display_unit: DisplayUnit::Mm,
