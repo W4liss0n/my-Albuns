@@ -1,11 +1,11 @@
-import { refreshSheetStructureFixture } from "../test/projectFixtures";
+import { refreshSheetStructureFixture } from "./projectFixtures";
 import { describe, expect, test } from "vitest";
 
 import type { SheetSnapshot } from "../domain/project";
 import {
   planSheetReorder,
   sheetStructureAvailability,
-} from "./sheetStructure";
+} from "../application/sheetStructure";
 
 function sheet(
   id: string,
