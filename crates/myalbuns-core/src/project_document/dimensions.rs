@@ -62,9 +62,9 @@ impl SurfaceMap {
 }
 
 fn side(rect: &RectUm, width: i64) -> u8 {
-    if rect.x + rect.width <= width / 2 {
+    if 2 * (rect.x + rect.width) <= width {
         0
-    } else if rect.x >= width / 2 {
+    } else if 2 * rect.x >= width {
         1
     } else {
         2

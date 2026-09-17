@@ -328,6 +328,60 @@ fn locked_layouts_scale_without_reorganization_and_remain_locked_after_save() {
 }
 
 #[test]
+fn persisted_last_layout_with_odd_reference_width_keeps_its_center_crossing() {
+    let root = tempfile::tempdir().unwrap();
+    let project = create(root.path(), 600_000, 360_000);
+    let path = project.project_path().to_owned();
+    drop(project);
+    let mut payload: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    payload["project"]["sheets"][1]["lastLayout"] = serde_json::json!({
+        "origin": "custom",
+        "definition": {
+            "surface": { "type": "doubleSheet", "widthUm": 5, "heightUm": 3 },
+            "scope": "sheet",
+            "positions": [{ "x": 2, "y": 0, "width": 1, "height": 3 }]
+        }
+    });
+    fs::write(&path, serde_json::to_vec(&payload).unwrap()).unwrap();
+    let mut project = core(root.path())
+        .open_editable(OpenProjectRequest::new(location(&path)))
+        .unwrap();
+    let before = project.project().clone();
+    let proposed = information(630_000, 360_000);
+    assert!(
+        project
+            .validate_album_information(&proposed)
+            .errors
+            .is_empty()
+    );
+    resize(&mut project, proposed).unwrap();
+    let last = project.project().sheets()[1].last_layout().unwrap();
+    assert_eq!(last.origin, LayoutOrigin::Custom);
+    assert_eq!(last.definition.scope, LayoutScope::Sheet);
+    assert_eq!(last.definition.surface.width_um, 630_000);
+    assert_eq!(last.definition.surface.height_um, 360_000);
+    assert_eq!(
+        last.definition.positions,
+        vec![RectUm {
+            x: 252_000,
+            y: 0,
+            width: 126_000,
+            height: 360_000
+        }]
+    );
+    let after = project.project().clone();
+    project.undo().unwrap();
+    assert_eq!(project.project(), &before);
+    project.redo().unwrap();
+    project.save(project.revision()).unwrap();
+    drop(project);
+    let reopened = core(root.path())
+        .open_editable(OpenProjectRequest::new(location(&path)))
+        .unwrap();
+    assert_eq!(reopened.project(), &after);
+}
+
+#[test]
 fn quantization_failure_never_publishes_a_partial_resize() {
     let root = tempfile::tempdir().unwrap();
     let mut project = composed(root.path(), &[[20_000, 20_000, 1, 1]], true);
