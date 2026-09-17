@@ -1845,20 +1845,34 @@ fn changing_album_information_is_one_atomic_authoritative_revision() {
         first_sheet: EndSheetFormat::SinglePage,
         last_sheet: EndSheetFormat::SinglePage,
     };
+    let mut validation = project.validate_album_information(&information);
+    let dimensional = validation
+        .impact
+        .as_mut()
+        .unwrap()
+        .dimensional_change
+        .take()
+        .unwrap();
+    assert!(!dimensional.proportion_changed);
+    assert!(!dimensional.confirmation_key.is_empty());
     assert_eq!(
-        project.validate_album_information(&information),
+        validation,
         myalbuns_core::AlbumInformationValidation {
             errors: vec![],
             impact: Some(AlbumInformationImpact {
                 sheet_width_px: 6_614,
                 page_width_px: 3_307,
                 height_px: 3_307,
+                dimensional_change: None,
             }),
         }
     );
 
     let changed = project
-        .apply(ProjectIntent::SetAlbumInformation { information })
+        .apply(ProjectIntent::SetAlbumInformation {
+            expected_dimension_key: None,
+            information,
+        })
         .expect("all Album information changes are valid");
     assert_eq!(changed.state.revision, 1);
     assert_eq!(
@@ -2037,7 +2051,10 @@ fn invalid_album_information_does_not_consume_history() {
     );
     assert_eq!(
         project
-            .apply(ProjectIntent::SetAlbumInformation { information })
+            .apply(ProjectIntent::SetAlbumInformation {
+                expected_dimension_key: None,
+                information
+            })
             .expect_err("invalid Album information is rejected"),
         CoreError::InvalidAlbumInformation(vec![ValidationError::BleedEliminatesCutArea,])
     );
@@ -2074,7 +2091,10 @@ fn dimensional_change_requires_the_current_sheet_proportion() {
     );
     assert_eq!(
         project
-            .apply(ProjectIntent::SetAlbumInformation { information })
+            .apply(ProjectIntent::SetAlbumInformation {
+                expected_dimension_key: None,
+                information
+            })
             .expect_err("an incompatible proportion is rejected"),
         CoreError::InvalidAlbumInformation(vec![ValidationError::SheetDimensionsNotProportional,])
     );

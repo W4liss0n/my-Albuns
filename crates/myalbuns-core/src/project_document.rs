@@ -18,10 +18,12 @@ use crate::model::{
 pub(crate) const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
 
 mod decorations;
+mod dimensions;
 mod frame_clipboard;
 mod layouts;
 mod media;
 pub(crate) use frame_clipboard::FrameClipboard;
+pub(crate) type PhotoDimensions = HashMap<Uuid, (u32, u32)>;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -760,7 +762,7 @@ impl ProjectDocument {
         Ok(candidate)
     }
 
-    pub(crate) fn validate_album_information(
+    fn validate_album_information_fields(
         &self,
         information: &AlbumInformation,
     ) -> AlbumInformationValidation {
@@ -786,7 +788,7 @@ impl ProjectDocument {
                 != signed_persisted_value(self.document.sheet_height_um());
         if dimensions_are_valid
             && dimensions_changed
-            && !dimensions_keep_proportion(
+            && !dimensions::proportion_is_allowed(
                 self.document.sheet_width_um(),
                 self.document.sheet_height_um(),
                 information.sheet_width_um,
@@ -794,14 +796,6 @@ impl ProjectDocument {
             )
         {
             errors.push(ProjectConfigurationValidationError::SheetDimensionsNotProportional);
-        }
-        if dimensions_are_valid
-            && dimensions_changed
-            && self.sheets.iter().any(|sheet| !sheet.frames.is_empty())
-        {
-            errors.push(
-                ProjectConfigurationValidationError::SheetDimensionsRequireContentTransformation,
-            );
         }
         let impact = errors
             .is_empty()
@@ -814,13 +808,16 @@ impl ProjectDocument {
         &self,
         information: AlbumInformation,
         custom: &[crate::CustomLayout],
+        sources: &PhotoDimensions,
     ) -> Result<Self, Vec<ProjectConfigurationValidationError>> {
-        let validation = self.validate_album_information(&information);
+        let validation = self.validate_album_information_fields(&information);
         if !validation.errors.is_empty() {
             return Err(validation.errors);
         }
 
-        let mut candidate = self.clone();
+        let mut candidate = self
+            .resized_composition(&information, sources)
+            .map_err(|error| vec![error])?;
         candidate.document = DocumentSettings::new(
             information.display_unit,
             u64::try_from(information.sheet_width_um)
@@ -844,7 +841,9 @@ impl ProjectDocument {
                 candidate.reorganize_sheet(candidate.sheets[index].id, custom).map_err(|_| vec![error])?;
             }
         }
-        validate_project_state(&candidate).map_err(|()| validation.errors)?;
+        validate_project_state(&candidate).map_err(|()| {
+            vec![ProjectConfigurationValidationError::SheetDimensionsInvalidContent]
+        })?;
         Ok(candidate)
     }
 
@@ -1836,6 +1835,8 @@ pub enum ProjectConfigurationValidationError {
     SheetHeightRasterOutOfRange,
     SheetDimensionsNotProportional,
     SheetDimensionsRequireContentTransformation,
+    SheetDimensionsUnknownPhotoSize,
+    SheetDimensionsInvalidContent,
     FirstSheetConversionRequiresContentReorganization,
     LastSheetConversionRequiresContentReorganization,
     DpiOutOfRange,
@@ -1894,12 +1895,22 @@ pub struct AlbumInformationValidation {
     pub impact: Option<AlbumInformationImpact>,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct AlbumInformationImpact {
     pub sheet_width_px: u32,
     pub page_width_px: u32,
     pub height_px: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub dimensional_change: Option<AlbumDimensionChange>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct AlbumDimensionChange {
+    pub proportion_changed: bool,
+    pub confirmation_key: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -2272,6 +2283,7 @@ fn album_information_impact(information: &AlbumInformation) -> Option<AlbumInfor
         sheet_width_px: u32::try_from(raster_axis_pixels(width, dpi)?).ok()?,
         page_width_px: u32::try_from(raster_axis_pixels(width / 2, dpi)?).ok()?,
         height_px: u32::try_from(raster_axis_pixels(height, dpi)?).ok()?,
+        dimensional_change: None,
     })
 }
 

@@ -824,7 +824,12 @@ impl EditableProject {
         if !self.session_valid {
             return Err(CoreError::EditableSessionInvalidated);
         }
-        let intent_outcome = self.session.apply(intent)?;
+        let sources = if matches!(&intent, ProjectIntent::SetAlbumInformation { .. }) {
+            self.observed_photo_dimensions()
+        } else {
+            HashMap::new()
+        };
+        let intent_outcome = self.session.apply(intent, &sources)?;
         let affected_frame_id = intent_outcome
             .affected_frame_id
             .map(|frame_id| frame_id.hyphenated().to_string());
@@ -974,7 +979,25 @@ impl EditableProject {
         &self,
         information: &AlbumInformation,
     ) -> AlbumInformationValidation {
-        self.project().validate_album_information(information)
+        self.session
+            .validate_album_information(information, &self.observed_photo_dimensions())
+    }
+
+    fn observed_photo_dimensions(&self) -> crate::project_document::PhotoDimensions {
+        self.project()
+            .media()
+            .iter()
+            .filter_map(|media| {
+                let source = self
+                    .photo_sources
+                    .get(&MediaId::from_uuid(media.id()))?
+                    .get(media.path())?;
+                Some((
+                    media.id(),
+                    (source.source_width_px(), source.source_height_px()),
+                ))
+            })
+            .collect()
     }
 
     pub fn undo(&mut self) -> Option<EditorProjection> {

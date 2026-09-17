@@ -75,12 +75,20 @@ const validationPresentation: Record<
   sheetDimensionsNotProportional: {
     field: "sheetWidth",
     message:
-      "Mantenha a proporção atual da Lâmina para preservar a composição.",
+      "A mudança de proporção deve ficar dentro do limite de 10%.",
   },
   sheetDimensionsRequireContentTransformation: {
     field: "sheetWidth",
     message:
       "A composição existente exige o fluxo de mudança dimensional segura.",
+  },
+  sheetDimensionsUnknownPhotoSize: {
+    field: "sheetWidth",
+    message: "Não foi possível obter o tamanho de uma foto para ajustar o recorte.",
+  },
+  sheetDimensionsInvalidContent: {
+    field: "sheetWidth",
+    message: "Esse tamanho não permite preservar todos os frames e as medidas do álbum.",
   },
   firstSheetConversionRequiresContentReorganization: {
     field: "firstSheet",

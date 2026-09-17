@@ -70,6 +70,7 @@ function ProjectionHarness({
   onPresentationUnitChange,
   onValidate,
   revision = representativeProjection.state.revision,
+  photoSources,
   sheetStates,
 }: {
   document: typeof representativeProjection.state.document;
@@ -79,6 +80,7 @@ function ProjectionHarness({
     information: AlbumInformation,
   ) => Promise<AlbumInformationValidation>;
   revision?: number;
+  photoSources?: ComponentProps<typeof AlbumInformationForm>["photoSources"];
   sheetStates: typeof representativeProjection.state.album.sheets;
 }) {
   const [ready, setReady] = useState(false);
@@ -88,6 +90,7 @@ function ProjectionHarness({
         document={document}
         formId="album-information-equivalent-projection"
         revision={revision}
+        photoSources={photoSources}
         sheetStates={sheetStates}
         onApply={onApply}
         onPresentationUnitChange={onPresentationUnitChange}
@@ -105,18 +108,31 @@ function ProjectionHarness({
   );
 }
 
-test("marks composed dimension changes as owned by the safe transformation flow", () => {
+test("allows composed dimension drafts for Core validation", () => {
   renderForm({ sheetStates: representativeProjection.state.album.sheets });
 
   const dimensions = screen.getByRole("group", { name: "Dimensão da Lâmina" });
   for (const label of ["Largura", "Altura"]) {
     const input = within(dimensions).getByRole("textbox", { name: label });
-    expect(input).toBeDisabled();
-    expect(input.closest(".album-information-field")).toHaveAttribute(
-      "data-placeholder-feature",
-      "safe-sheet-dimension-change",
-    );
+    expect(input).toBeEnabled();
+    expect(input.closest(".album-information-field")).not.toHaveAttribute("data-placeholder-feature");
   }
+});
+
+test("revalidates a blocked crop when source observations arrive without a History revision", async () => {
+  const onValidate = vi.fn<ComponentProps<typeof AlbumInformationForm>["onValidate"]>()
+    .mockResolvedValue({ errors: ["sheetDimensionsUnknownPhotoSize"], impact: null });
+  const props = { document: representativeProjection.state.document,
+    sheetStates: representativeProjection.state.album.sheets,
+    onValidate, onPresentationUnitChange: vi.fn() };
+  const sources = representativeProjection.state.album.media;
+  const view = render(<ProjectionHarness {...props} photoSources={sources} />);
+  fireEvent.change(screen.getByRole("textbox", { name: "Largura" }), { target: { value: "630" } });
+  await waitFor(() => expect(onValidate).toHaveBeenCalled());
+  expect(screen.getByRole("button", { name: "Aplicar" })).toBeDisabled();
+  onValidate.mockResolvedValue({ errors: [], impact: validImpact });
+  view.rerender(<ProjectionHarness {...props} photoSources={sources.map((source) => ({ ...source }))} />);
+  await waitFor(() => expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled());
 });
 
 test("enables composed edge conversion through the Core Layout flow", () => {

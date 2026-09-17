@@ -287,7 +287,9 @@ export function albumInformationDetails(
   if (dimensionsChanged) {
     details.push({
       label: "Composição",
-      value: "A proporção será preservada no novo formato.",
+      value: impact.dimensionalChange?.proportionChanged
+        ? "As fotos manterão a proporção. O recorte poderá ser ajustado."
+        : "A composição acompanhará o novo tamanho.",
     });
   }
   return details;

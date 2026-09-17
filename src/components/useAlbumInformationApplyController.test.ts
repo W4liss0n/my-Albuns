@@ -73,9 +73,17 @@ test("describes final raster size and structural and dimensional impact", () => 
     },
     {
       label: "Composição",
-      value: "A proporção será preservada no novo formato.",
+      value: "A composição acompanhará o novo tamanho.",
     },
   ]);
+});
+
+test("warns about crop only when the Core reports a proportion change", () => {
+  const details = albumInformationDetails({ ...baseline, sheetWidthUm: 630_000 }, baseline, {
+    sheetWidthPx: 7_441, pageWidthPx: 3_720, heightPx: 3_543,
+    dimensionalChange: { proportionChanged: true, confirmationKey: "review-a" },
+  });
+  expect(details).toContainEqual({ label: "Composição", value: "As fotos manterão a proporção. O recorte poderá ser ajustado." });
 });
 
 test("uses the selected Unit for changed measurements without unrelated raster details", () => {

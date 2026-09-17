@@ -443,7 +443,25 @@ export function useProjectMutations({
           return effectiveProjection;
         }
         applyRequested = true;
-        return imageProcessing.run((publish) => port.apply(materialized.intent, publish));
+        const dimensionalChange = validation.impact.dimensionalChange;
+        const intent = dimensionalChange
+          ? { ...materialized.intent, expectedDimensionKey: dimensionalChange.confirmationKey }
+          : materialized.intent;
+        try {
+          return await imageProcessing.run((publish) => port.apply(intent, publish));
+        } catch (error) {
+          // Source observations may change between validation and the native commit
+          // without a creative revision. A rejected guard gets a fresh review.
+          if (!dimensionalChange) throw error;
+          const refreshed = await port.validateAlbumInformation(materialized.value);
+          if (refreshed.errors.length > 0 || !refreshed.impact?.dimensionalChange ||
+              refreshed.impact.dimensionalChange.confirmationKey === dimensionalChange.confirmationKey) throw error;
+          currentReview = createAlbumInformationReview(materialized.baseline, materialized.value,
+            refreshed.impact, effectiveProjection.state.album.sheets);
+          reviewRequired = true;
+          applyRequested = false;
+          return effectiveProjection;
+        }
       },
     );
 

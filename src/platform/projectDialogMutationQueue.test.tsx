@@ -8,6 +8,7 @@ import { useProjectMutations } from "../components/useProjectMutations";
 import { useProjectMutationRunner } from "../components/useProjectMutationRunner";
 import { useAlbumInformationApplyController } from "../components/useAlbumInformationApplyController";
 import { createAlbumInformationProjectDraft } from "../application/projectSettingsDraft";
+import { createAlbumInformationReview } from "../application/albumInformationReview";
 import type { ProjectCorePort } from "../application/projectPorts";
 import { createThreeSheetProjection } from "../test/projectFixtures";
 
@@ -84,4 +85,73 @@ test("conversion and Album information can share the owned dialog while Save is 
   });
   expect(apply).toHaveBeenCalledTimes(2);
   expect(apply).toHaveBeenLastCalledWith({ kind: "convertEdgeSheet", sheetId: "sheet-003" }, expect.any(Function));
+});
+
+test.each([false, true])("dimensional review follows queued Save and preserves its guard (Save failure: %s)", async (failSave) => {
+  const initial = createThreeSheetProjection();
+  const baseline = { ...initial.state.document, firstSheet: "double" as const, lastSheet: "double" as const };
+  const value = { ...baseline, sheetWidthUm: baseline.sheetWidthUm * 1.05 };
+  const draft = createAlbumInformationProjectDraft(initial.state.revision, baseline).transition(value);
+  const impact = (key: string) => ({ sheetWidthPx: 7_441, pageWidthPx: 3_720, heightPx: 3_543,
+    dimensionalChange: { proportionChanged: true, confirmationKey: key } });
+  let finishSave!: () => void;
+  const pending = new Promise<void>((resolve) => { finishSave = resolve; });
+  const apply = vi.fn<ProjectCorePort["apply"]>(async () => initial);
+  const port: ProjectCorePort = { ...tauriProjectCorePort, apply,
+    validateAlbumInformation: async () => ({ errors: [], impact: impact("new-source") }),
+    save: async (revision) => {
+      await pending;
+      if (failSave) throw new Error("Save failed");
+      return { outcome: { kind: "saved", revision }, projection: initial };
+    },
+  };
+  const view = renderHook(() => useProjectMutations({ projection: initial,
+    runProjectMutation: useProjectMutationRunner(initial.state.projectId, port),
+    projectDialogPort: createTauriProjectDialogPort(), onProjectionChange: vi.fn(),
+    onAffectedFrame: vi.fn(), onAffectedSheet: vi.fn(),
+  }));
+  let result!: ReturnType<typeof view.result.current.applyAlbumInformation>;
+  act(() => {
+    void view.result.current.save();
+    result = view.result.current.applyAlbumInformation(draft,
+      createAlbumInformationReview(baseline, value, impact("old-source"), initial.state.album.sheets));
+  });
+  expect(apply).not.toHaveBeenCalled();
+  await act(async () => { finishSave(); });
+  const review = await result;
+  expect(review.kind).toBe("reviewRequired");
+  expect(apply).not.toHaveBeenCalled();
+  if (review.kind !== "reviewRequired") throw new Error("Expected a new review");
+  await act(async () => {
+    expect(await view.result.current.applyAlbumInformation(draft, review.review)).toEqual({ kind: "completed" });
+  });
+  expect(apply).toHaveBeenCalledWith(expect.objectContaining({ expectedDimensionKey: "new-source" }), expect.any(Function));
+});
+
+test("a source observation racing the native commit reopens confirmation without retrying automatically", async () => {
+  const initial = createThreeSheetProjection();
+  const baseline = { ...initial.state.document, firstSheet: "double" as const, lastSheet: "double" as const };
+  const value = { ...baseline, sheetWidthUm: baseline.sheetWidthUm * 1.05 };
+  const draft = createAlbumInformationProjectDraft(initial.state.revision, baseline).transition(value);
+  let key = "before";
+  const impact = () => ({ sheetWidthPx: 7_441, pageWidthPx: 3_720, heightPx: 3_543,
+    dimensionalChange: { proportionChanged: true, confirmationKey: key } });
+  const originalImpact = impact();
+  const apply = vi.fn<ProjectCorePort["apply"]>(async () => {
+    key = "after";
+    throw new Error("The native dimensional guard rejected stale observations");
+  });
+  const port: ProjectCorePort = { ...tauriProjectCorePort, apply,
+    validateAlbumInformation: async () => ({ errors: [], impact: impact() }) };
+  const view = renderHook(() => useProjectMutations({ projection: initial,
+    runProjectMutation: useProjectMutationRunner(initial.state.projectId, port),
+    projectDialogPort: createTauriProjectDialogPort(), onProjectionChange: vi.fn(),
+    onAffectedFrame: vi.fn(), onAffectedSheet: vi.fn(),
+  }));
+  await act(async () => {
+    const result = await view.result.current.applyAlbumInformation(draft,
+      createAlbumInformationReview(baseline, value, originalImpact, initial.state.album.sheets));
+    expect(result).toMatchObject({ kind: "reviewRequired", review: { impact: { dimensionalChange: { confirmationKey: "after" } } } });
+  });
+  expect(apply).toHaveBeenCalledOnce();
 });

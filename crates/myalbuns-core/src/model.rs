@@ -940,6 +940,9 @@ pub enum ProjectIntent {
     },
     SetAlbumInformation {
         information: AlbumInformation,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        expected_dimension_key: Option<String>,
     },
     SetVisualDefaults {
         visual_defaults: ProjectedVisualDefaults,
@@ -1119,6 +1122,10 @@ pub enum CoreError {
     InvalidDpi(u32),
     #[error("As Informações do Álbum não são válidas")]
     InvalidAlbumInformation(Vec<ProjectConfigurationValidationError>),
+    #[error(
+        "A composição mudou durante a confirmação. Revise as Informações do Álbum antes de Aplicar."
+    )]
+    AlbumInformationReviewChanged,
     #[error("O Design do Álbum não é válido")]
     InvalidVisualDefaults,
     #[error("A Sessão do Projeto esgotou o intervalo seguro de Revisões")]

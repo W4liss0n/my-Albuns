@@ -53,7 +53,8 @@ export function createAlbumInformationReview(
 /**
  * Equality follows the canonical confirmation content: changed before/after
  * values, the Unit used to present changed measurements, and resulting raster
- * impact when dimensions or DPI changed. Unrelated History fields therefore do
+ * impact when dimensions or DPI changed, including the Core's dimensional
+ * composition fingerprint. Unrelated History fields therefore do
  * not force another confirmation.
  */
 export function albumInformationReviewEquals(

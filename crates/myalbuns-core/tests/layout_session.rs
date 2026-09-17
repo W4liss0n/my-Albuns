@@ -1227,7 +1227,10 @@ fn album_information_converts_both_populated_edges_in_one_history_action() {
             .is_empty()
     );
     let after = project
-        .apply(ProjectIntent::SetAlbumInformation { information })
+        .apply(ProjectIntent::SetAlbumInformation {
+            expected_dimension_key: None,
+            information,
+        })
         .unwrap();
     assert_eq!(after.state.revision, revision + 1);
     assert_eq!(

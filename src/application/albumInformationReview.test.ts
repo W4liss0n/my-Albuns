@@ -49,6 +49,15 @@ test("compares only facts visible in the Album Information confirmation", () => 
   );
 });
 
+test("requires a new confirmation when dimensional composition or source facts change", () => {
+  const information = { ...baseline, sheetWidthUm: 630_000 };
+  const review = (confirmationKey: string) => createAlbumInformationReview(baseline, information, {
+    ...impact, dimensionalChange: { proportionChanged: true, confirmationKey },
+  });
+  expect(albumInformationReviewEquals(review("same"), review("same"))).toBe(true);
+  expect(albumInformationReviewEquals(review("old"), review("new"))).toBe(false);
+});
+
 test("recognizes when History already satisfied the confirmed intent", () => {
   expect(
     albumInformationReviewHasChanges(
