@@ -1,4 +1,3 @@
-import { rasterLimitsAt300Dpi } from "../test/projectConfigurationFixtures";
 import { expect, test } from "vitest";
 
 import {
@@ -6,6 +5,11 @@ import {
   parseIntegerText,
   presentConfigurationValidationErrors,
 } from "./projectConfigurationFields";
+
+const rasterLimitsAt300Dpi = {
+  sheetWidth: { minimumUm: 86, maximumUm: 5_548_672 },
+  sheetHeight: { minimumUm: 43, maximumUm: 5_548_672 },
+};
 
 test("presents shared Project configuration validation by field", () => {
   expect(

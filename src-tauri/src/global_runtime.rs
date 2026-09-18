@@ -2470,7 +2470,13 @@ public static class MyAlbunsFocusFixture
         assert_eq!(
             serde_json::to_value(validate_project_configuration(configuration))
                 .expect("the validation response serializes"),
-            serde_json::json!({ "errors": [] })
+            serde_json::json!({
+                "errors": [],
+                "rasterLimits": {
+                    "sheetWidth": { "minimumUm": 106, "maximumUm": 6_935_840 },
+                    "sheetHeight": { "minimumUm": 53, "maximumUm": 6_935_840 }
+                }
+            })
         );
     }
 
