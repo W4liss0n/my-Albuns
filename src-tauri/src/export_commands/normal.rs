@@ -184,10 +184,11 @@ pub(crate) async fn export_project(
         let conflicts = plan.conflicts()?;
         if conflicts.is_empty() || conflict_policy != ExportConflictPolicy::Ask {
             std::fs::create_dir_all(&destination).map_err(|error| {
+                tracing::warn!(target: "myalbuns.desktop", %error, event = "export_destination_creation_failed");
                 export_pipeline::ExportFailure::from_path_error(
                     export_pipeline::ExportFailureStage::Prepare,
                     myalbuns_paths::AppPathsError::export_io(&error),
-                    format!("Não foi possível criar a pasta de destino: {error}"),
+                    "Não foi possível criar a pasta de destino. Escolha outra pasta ou confira as permissões.",
                 )
             })?;
         }

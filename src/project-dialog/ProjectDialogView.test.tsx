@@ -367,9 +367,9 @@ test("edge conversion uses the standard confirmation actions and names the disca
   const user = userEvent.setup();
   const onAction = vi.fn();
   render(<ProjectDialogView onAction={onAction} state={{ kind: "edgeConversionConfirmation",
-    message: "O sobreposição personalizado da página direita da lâmina 3 será removido." }} />);
+    message: "A sobreposição personalizada da página direita da lâmina 3 será removida." }} />);
   expect(screen.getByRole("heading", { name: "Converter para página única?" })).toBeInTheDocument();
-  expect(screen.getByText(/sobreposição personalizado da página direita/)).toBeInTheDocument();
+  expect(screen.getByText(/sobreposição personalizada da página direita/)).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Cancelar" }));
   await user.click(screen.getByRole("button", { name: "Converter" }));
   expect(onAction.mock.calls).toEqual([["cancelEdgeConversion"], ["confirmEdgeConversion"]]);

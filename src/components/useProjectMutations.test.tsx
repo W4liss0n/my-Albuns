@@ -710,7 +710,7 @@ test("rechecks changed discarded applications after confirmation without blockin
   await act(async () => { harness.emit("confirmEdgeConversion"); });
   await waitFor(() => expect(harness.present).toHaveBeenCalledTimes(2));
   expect(harness.present).toHaveBeenLastCalledWith({ kind: "edgeConversionConfirmation",
-    message: "O sobreposição personalizado da página esquerda da lâmina 1 será removido." });
+    message: "A sobreposição personalizada da página esquerda da lâmina 1 será removida." });
   expect(harness.apply).not.toHaveBeenCalled();
   await act(async () => { harness.emit("confirmEdgeConversion"); expect(await completed).toBe(true); });
   expect(harness.apply).toHaveBeenCalledOnce();

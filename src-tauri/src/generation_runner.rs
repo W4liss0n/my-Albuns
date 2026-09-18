@@ -70,7 +70,9 @@ pub(crate) struct GenerationRunner {
 impl GenerationRunner {
     pub(crate) fn count_folders(source: &Path) -> Result<usize, String> {
         let mut paths = OperationPathContext::new();
-        paths.capture(source).map_err(|error| error.to_string())?;
+        paths
+            .capture(source)
+            .map_err(|error| generation_path_failure(error, source))?;
         discover_folders(source, &mut paths, &AtomicBool::new(false))
             .map(|folders| folders.len())
             .map_err(|error| error.to_string())
@@ -137,10 +139,12 @@ impl GenerationRunner {
         let source = Path::new(&options.source_folder);
         let destination = Path::new(&options.destination_folder);
         let mut paths = OperationPathContext::new();
-        paths.capture(source).map_err(|error| error.to_string())?;
+        paths
+            .capture(source)
+            .map_err(|error| generation_path_failure(error, source))?;
         paths
             .capture(destination)
-            .map_err(|error| error.to_string())?;
+            .map_err(|error| generation_path_failure(error, destination))?;
         let guard = MirroredDestination::open(&paths.current_plan(), source, destination)
             .map_err(|error| error.to_string())?;
         let folders = discover_folders(source, &mut paths, cancellation)?;
@@ -192,7 +196,7 @@ impl GenerationRunner {
                 }
                 Err(ResolveError::NotFound) => None,
                 Err(error) => {
-                    problems.push(format!("Destino indisponível: {error}"));
+                    problems.push(generation_destination_failure(error));
                     None
                 }
             };
@@ -425,22 +429,21 @@ fn discover_folders(
         ensure_running(cancellation)?;
         let directory = paths
             .resolve_existing(&folder, ExpectedObject::Directory)
-            .map_err(|error| format!("Não foi possível ler {}: {error}", folder.display()))?;
+            .map_err(|error| generation_path_failure(error, &folder))?;
         let identity = directory
             .physical_identity()
             .ok_or("Não foi possível confirmar a identidade da pasta de origem.")?;
         if !seen.insert(identity.to_local_token()) {
             continue;
         }
-        let entries =
-            std::fs::read_dir(directory.operational_path()).map_err(|error| error.to_string())?;
+        let entries = std::fs::read_dir(directory.operational_path())
+            .map_err(|error| generation_path_failure(error, &folder))?;
         let mut photos = Vec::new();
         for entry in entries {
-            let entry = entry.map_err(|error| error.to_string())?;
+            let entry = entry.map_err(|error| generation_path_failure(error, &folder))?;
             let path = folder.join(entry.file_name());
-            let metadata = std::fs::metadata(entry.path()).map_err(|error| {
-                format!("Não foi possível verificar {}: {error}", path.display())
-            })?;
+            let metadata = std::fs::metadata(entry.path())
+                .map_err(|error| generation_path_failure(error, &path))?;
             if metadata.is_dir() {
                 pending.push(path);
             } else if path
@@ -452,7 +455,9 @@ fn discover_folders(
                         .any(|accepted| extension.eq_ignore_ascii_case(accepted))
                 })
             {
-                paths.capture(&path).map_err(|error| error.to_string())?;
+                paths
+                    .capture(&path)
+                    .map_err(|error| generation_path_failure(error, &path))?;
                 photos.push(path);
             }
         }
@@ -463,6 +468,23 @@ fn discover_folders(
     }
     folders.sort_by(|left, right| left.0.cmp(&right.0));
     Ok(folders)
+}
+
+fn generation_destination_failure(error: ResolveError) -> String {
+    tracing::warn!(target: "myalbuns.desktop", ?error, event = "generation_destination_unavailable");
+    match error {
+        ResolveError::UnexpectedObjectType { .. } => "O nome do projeto no destino já é usado por uma pasta ou outro item que não é um arquivo. Escolha outra pasta de destino.",
+        ResolveError::AccessDenied => "Sem permissão para acessar o destino deste projeto. Escolha outra pasta ou confira as permissões.",
+        _ => "Não foi possível acessar o destino deste projeto. Confira se a pasta está disponível e verifique novamente.",
+    }.into()
+}
+
+fn generation_path_failure(error: impl std::fmt::Display, path: &Path) -> String {
+    tracing::warn!(target: "myalbuns.desktop", %error, path = %path.display(), event = "generation_path_unavailable");
+    format!(
+        "Não foi possível acessar {}. Confira se o local está disponível e se você tem permissão para acessá-lo.",
+        path.display()
+    )
 }
 
 fn ensure_running(cancellation: &AtomicBool) -> Result<(), GenerationPreparationError> {

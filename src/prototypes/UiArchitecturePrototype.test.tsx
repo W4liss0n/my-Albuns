@@ -61,7 +61,7 @@ test("exposes every canonical surface as a navigable, stable map node", () => {
 test("applies only Ctrl zoom gestures between Ajustar Lâmina and the calibrated 4× cap", () => {
   const { unmount } = render(<UiArchitecturePrototype initialView="editor" />);
 
-  const canvas = screen.getByRole("region", { name: "área de edição do protótipo" });
+  const canvas = screen.getByRole("region", { name: "Área de edição do protótipo" });
   const sheet = screen.getByTestId("prototype-editing-sheet");
   expect(canvas).toHaveAttribute("data-zoom-level", "1");
   expect(screen.queryByRole("region", { name: "Barra de lâminas" })).not.toBeInTheDocument();
@@ -152,7 +152,7 @@ test("previews, cancels, and commits one synchronized reorder from the Barra", (
   expect(grid).toHaveAttribute("data-sheet-order", originalOrder);
   expect(screen.getByText("Modo normal · reordenação de lâminas")).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Layout travado" })).not.toBeInTheDocument();
-  const canvas = screen.getByRole("region", { name: "área de edição do protótipo" });
+  const canvas = screen.getByRole("region", { name: "Área de edição do protótipo" });
   fireEvent.keyDown(canvas, { ctrlKey: true, key: "+" });
   expect(canvas).toHaveAttribute("data-zoom-level", "1");
 

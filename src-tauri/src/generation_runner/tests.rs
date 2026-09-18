@@ -13,6 +13,55 @@ fn location(path: &Path) -> ProjectLocation {
 }
 
 #[test]
+fn a_directory_at_the_project_destination_stays_untouched_and_gets_actionable_guidance() {
+    let root = tempfile::tempdir().unwrap();
+    let source = root.path().join("origem");
+    let destination = root.path().join("destino");
+    let occupied = destination.join("001.myalbuns");
+    std::fs::create_dir_all(source.join("001")).unwrap();
+    std::fs::create_dir_all(&occupied).unwrap();
+    image::RgbImage::new(8, 6)
+        .save(source.join("001/foto.png"))
+        .unwrap();
+    let core = ProjectCore::new()
+        .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"));
+    let model = core
+        .create_editable(CreateProjectRequest::new(
+            location(&root.path().join("modelo.myalbuns")),
+            InitialProject::neutral(),
+            CreateAuthorization::CreateOnly,
+        ))
+        .unwrap();
+    let batch = GenerationRunner::prepare(
+        GenerationOptions {
+            source_folder: source.to_string_lossy().into(),
+            destination_folder: destination.to_string_lossy().into(),
+        },
+        model.freeze_template().unwrap(),
+        core,
+        &AtomicBool::new(false),
+    )
+    .unwrap();
+    let view = batch.view();
+    assert!(!view.can_continue);
+    assert!(!view.items[0].can_replace);
+    assert!(
+        view.items[0]
+            .problems
+            .iter()
+            .any(|message| message.contains("pasta de destino"))
+    );
+    assert!(
+        view.items[0]
+            .problems
+            .iter()
+            .all(|message| !message.contains("RegularFile"))
+    );
+    assert!(occupied.is_dir());
+    assert_eq!(std::fs::read_dir(occupied).unwrap().count(), 0);
+}
+
+#[test]
 fn conflicts_require_explicit_decisions_and_recheck_after_closing_a_project() {
     let root = tempfile::tempdir().unwrap();
     let source = root.path().join("origem");

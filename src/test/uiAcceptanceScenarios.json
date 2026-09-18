@@ -14,7 +14,7 @@
     {
       "id": "album-dimensional-confirmation",
       "title": "Mudança dimensional — confirmação do recorte",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22albumInformationConfirmation%22%2C%22busy%22%3Afalse%2C%22details%22%3A%5B%7B%22label%22%3A%22Largura%20da%20l%C3%A2mina%22%2C%22value%22%3A%22600%20mm%20%E2%86%92%20630%20mm%22%7D%2C%7B%22label%22%3A%22Resolu%C3%A7%C3%A3o%20resultante%22%2C%22value%22%3A%22L%C3%A2mina%207.441%20%C3%97%203.543%20px%20%C2%B7%20P%C3%A1gina%203.720%20%C3%97%203.543%20px%22%7D%2C%7B%22label%22%3A%22Composi%C3%A7%C3%A3o%22%2C%22value%22%3A%22As%20fotos%20manter%C3%A3o%20a%20propor%C3%A7%C3%A3o.%20O%20recorte%20poder%C3%A1%20ser%20ajustado.%22%7D%5D%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22albumInformationConfirmation%22%2C%22busy%22%3Afalse%2C%22details%22%3A%5B%7B%22label%22%3A%22Largura%20da%20l%C3%A2mina%22%2C%22value%22%3A%22600%20mm%20%E2%86%92%20630%20mm%22%7D%2C%7B%22label%22%3A%22Resolu%C3%A7%C3%A3o%20resultante%22%2C%22value%22%3A%22L%C3%A2mina%207.441%20%C3%97%203.543%20px%20%C2%B7%20p%C3%A1gina%203.720%20%C3%97%203.543%20px%22%7D%2C%7B%22label%22%3A%22Composi%C3%A7%C3%A3o%22%2C%22value%22%3A%22As%20fotos%20manter%C3%A3o%20a%20propor%C3%A7%C3%A3o.%20O%20recorte%20poder%C3%A1%20ser%20ajustado.%22%7D%5D%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-confirmation-dialog",
@@ -709,7 +709,7 @@
     {
       "id": "album-information-conversion-losses",
       "title": "Informações do Álbum — conversão das duas extremidades",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22albumInformationConfirmation%22%2C%22busy%22%3Afalse%2C%22details%22%3A%5B%7B%22label%22%3A%22Primeira%20l%C3%A2mina%22%2C%22value%22%3A%22L%C3%A2mina%20dupla%20%E2%86%92%20P%C3%A1gina%20%C3%BAnica%22%7D%2C%7B%22label%22%3A%22%C3%9Altima%20l%C3%A2mina%22%2C%22value%22%3A%22L%C3%A2mina%20dupla%20%E2%86%92%20P%C3%A1gina%20%C3%BAnica%22%7D%2C%7B%22label%22%3A%22Remo%C3%A7%C3%A3o%20na%20l%C3%A2mina%201%22%2C%22value%22%3A%22O%20Background%20personalizado%20da%20p%C3%A1gina%20esquerda%20da%20L%C3%A2mina%201%20ser%C3%A1%20removido.%22%7D%2C%7B%22label%22%3A%22Remo%C3%A7%C3%A3o%20na%20l%C3%A2mina%2018%22%2C%22value%22%3A%22O%20Overlay%20personalizado%20da%20p%C3%A1gina%20direita%20da%20L%C3%A2mina%2018%20ser%C3%A1%20removido.%22%7D%5D%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22albumInformationConfirmation%22%2C%22busy%22%3Afalse%2C%22details%22%3A%5B%7B%22label%22%3A%22Primeira%20l%C3%A2mina%22%2C%22value%22%3A%22L%C3%A2mina%20dupla%20%E2%86%92%20p%C3%A1gina%20%C3%BAnica%22%7D%2C%7B%22label%22%3A%22%C3%9Altima%20l%C3%A2mina%22%2C%22value%22%3A%22L%C3%A2mina%20dupla%20%E2%86%92%20p%C3%A1gina%20%C3%BAnica%22%7D%2C%7B%22label%22%3A%22Remo%C3%A7%C3%A3o%20na%20l%C3%A2mina%201%22%2C%22value%22%3A%22O%20fundo%20personalizado%20da%20p%C3%A1gina%20esquerda%20da%20l%C3%A2mina%201%20ser%C3%A1%20removido.%22%7D%2C%7B%22label%22%3A%22Remo%C3%A7%C3%A3o%20na%20l%C3%A2mina%2018%22%2C%22value%22%3A%22A%20sobreposi%C3%A7%C3%A3o%20personalizada%20da%20p%C3%A1gina%20direita%20da%20l%C3%A2mina%2018%20ser%C3%A1%20removida.%22%7D%5D%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-confirmation-dialog",
@@ -726,7 +726,7 @@
     {
       "id": "album-information-confirmation-single-change",
       "title": "Diálogo de Informações do Álbum — uma alteração",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22albumInformationConfirmation%22%2C%22busy%22%3Afalse%2C%22details%22%3A%5B%7B%22label%22%3A%22Primeira%20l%C3%A2mina%22%2C%22value%22%3A%22P%C3%A1gina%20%C3%BAnica%20%E2%86%92%20L%C3%A2mina%20dupla%22%7D%5D%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22albumInformationConfirmation%22%2C%22busy%22%3Afalse%2C%22details%22%3A%5B%7B%22label%22%3A%22Primeira%20l%C3%A2mina%22%2C%22value%22%3A%22P%C3%A1gina%20%C3%BAnica%20%E2%86%92%20l%C3%A2mina%20dupla%22%7D%5D%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-confirmation-dialog",
@@ -768,7 +768,7 @@
     {
       "id": "album-information-confirmation-busy",
       "title": "Diálogo de Informações do Álbum — aplicação em andamento",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22albumInformationConfirmation%22%2C%22busy%22%3Atrue%2C%22details%22%3A%5B%7B%22label%22%3A%22Primeira%20l%C3%A2mina%22%2C%22value%22%3A%22P%C3%A1gina%20%C3%BAnica%20%E2%86%92%20L%C3%A2mina%20dupla%22%7D%5D%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22albumInformationConfirmation%22%2C%22busy%22%3Atrue%2C%22details%22%3A%5B%7B%22label%22%3A%22Primeira%20l%C3%A2mina%22%2C%22value%22%3A%22P%C3%A1gina%20%C3%BAnica%20%E2%86%92%20l%C3%A2mina%20dupla%22%7D%5D%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-confirmation-dialog",
@@ -1429,7 +1429,7 @@
     {
       "id": "project-graphics-failure",
       "title": "Janela do Projeto — falha gráfica tardia em diálogo pertencente",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22graphicsFailure%22%2C%22reason%22%3A%22O%20contexto%20WebGL2%20foi%20perdido%20e%20n%C3%A3o%20p%C3%B4de%20ser%20restaurado.%22%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22graphicsFailure%22%2C%22reason%22%3A%22A%20%C3%A1rea%20de%20edi%C3%A7%C3%A3o%20foi%20interrompida%20e%20n%C3%A3o%20p%C3%B4de%20ser%20restaurada.%22%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-project-graphics-failure",
@@ -2365,7 +2365,7 @@
     {
       "id": "photo-import-problems-partial",
       "title": "Problemas no processamento — sucesso parcial",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22imageProcessingProblems%22%2C%22importedCount%22%3A2%2C%22problems%22%3A%5B%7B%22fileName%22%3A%22DSC_0148.jpg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0152.jpeg%22%2C%22reason%22%3A%22O%20arquivo%20escolhido%20n%C3%A3o%20est%C3%A1%20dispon%C3%ADvel.%22%7D%5D%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22imageProcessingProblems%22%2C%22importedCount%22%3A2%2C%22problems%22%3A%5B%7B%22fileName%22%3A%22DSC_0148.jpg%22%2C%22reason%22%3A%22N%C3%A3o%20foi%20poss%C3%ADvel%20ler%20o%20JPEG.%20O%20arquivo%20pode%20estar%20danificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0152.jpeg%22%2C%22reason%22%3A%22O%20arquivo%20escolhido%20n%C3%A3o%20est%C3%A1%20dispon%C3%ADvel.%22%7D%5D%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-problems-dialog",
@@ -2382,7 +2382,7 @@
     {
       "id": "photo-import-problems-rejected",
       "title": "Problemas no processamento — todos rejeitados e lista longa",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22imageProcessingProblems%22%2C%22importedCount%22%3A0%2C%22problems%22%3A%5B%7B%22fileName%22%3A%22Foto%20da%20turma%20%E2%80%94%20c%C3%B3pia%20com%20nome%20muito%20longo%20para%20testar%20a%20leitura%20de%20arquivos%20originais%20selecionados.jpg%22%2C%22reason%22%3A%22O%20arquivo%20escolhido%20n%C3%A3o%20est%C3%A1%20dispon%C3%ADvel.%20Verifique%20o%20acesso%20ao%20local%20e%20selecione%20o%20arquivo%20novamente.%22%7D%2C%7B%22fileName%22%3A%22DSC_0001.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0002.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0003.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0004.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0005.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0006.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0007.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0008.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0009.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0010.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0011.jpeg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%5D%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22imageProcessingProblems%22%2C%22importedCount%22%3A0%2C%22problems%22%3A%5B%7B%22fileName%22%3A%22Foto%20da%20turma%20%E2%80%94%20c%C3%B3pia%20com%20nome%20muito%20longo%20para%20testar%20a%20leitura%20de%20arquivos%20originais%20selecionados.jpg%22%2C%22reason%22%3A%22O%20arquivo%20escolhido%20n%C3%A3o%20est%C3%A1%20dispon%C3%ADvel.%20Verifique%20o%20acesso%20ao%20local%20e%20selecione%20o%20arquivo%20novamente.%22%7D%2C%7B%22fileName%22%3A%22DSC_0001.jpeg%22%2C%22reason%22%3A%22N%C3%A3o%20foi%20poss%C3%ADvel%20ler%20o%20JPEG.%20O%20arquivo%20pode%20estar%20danificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0002.jpeg%22%2C%22reason%22%3A%22N%C3%A3o%20foi%20poss%C3%ADvel%20ler%20o%20JPEG.%20O%20arquivo%20pode%20estar%20danificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0003.jpeg%22%2C%22reason%22%3A%22N%C3%A3o%20foi%20poss%C3%ADvel%20ler%20o%20JPEG.%20O%20arquivo%20pode%20estar%20danificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0004.jpeg%22%2C%22reason%22%3A%22N%C3%A3o%20foi%20poss%C3%ADvel%20ler%20o%20JPEG.%20O%20arquivo%20pode%20estar%20danificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0005.jpeg%22%2C%22reason%22%3A%22N%C3%A3o%20foi%20poss%C3%ADvel%20ler%20o%20JPEG.%20O%20arquivo%20pode%20estar%20danificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0006.jpeg%22%2C%22reason%22%3A%22N%C3%A3o%20foi%20poss%C3%ADvel%20ler%20o%20JPEG.%20O%20arquivo%20pode%20estar%20danificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0007.jpeg%22%2C%22reason%22%3A%22N%C3%A3o%20foi%20poss%C3%ADvel%20ler%20o%20JPEG.%20O%20arquivo%20pode%20estar%20danificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0008.jpeg%22%2C%22reason%22%3A%22N%C3%A3o%20foi%20poss%C3%ADvel%20ler%20o%20JPEG.%20O%20arquivo%20pode%20estar%20danificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0009.jpeg%22%2C%22reason%22%3A%22N%C3%A3o%20foi%20poss%C3%ADvel%20ler%20o%20JPEG.%20O%20arquivo%20pode%20estar%20danificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0010.jpeg%22%2C%22reason%22%3A%22N%C3%A3o%20foi%20poss%C3%ADvel%20ler%20o%20JPEG.%20O%20arquivo%20pode%20estar%20danificado.%22%7D%2C%7B%22fileName%22%3A%22DSC_0011.jpeg%22%2C%22reason%22%3A%22N%C3%A3o%20foi%20poss%C3%ADvel%20ler%20o%20JPEG.%20O%20arquivo%20pode%20estar%20danificado.%22%7D%5D%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-problems-dialog",
@@ -8777,7 +8777,7 @@
     {
       "id": "photo-import-memory-with-file-problems",
       "title": "Importação — interrupção por memória e arquivo corrompido",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22imageProcessingProblems%22%2C%22importedCount%22%3A2%2C%22problems%22%3A%5B%7B%22fileName%22%3A%22DSC_0148.jpg%22%2C%22reason%22%3A%22O%20JPEG%20est%C3%A1%20corrompido%20ou%20n%C3%A3o%20p%C3%B4de%20ser%20decodificado.%22%7D%5D%2C%22operationProblem%22%3A%22N%C3%A3o%20foi%20poss%C3%ADvel%20continuar%20o%20processamento%20por%20falta%20de%20mem%C3%B3ria.%20Tente%20novamente%20mais%20tarde.%22%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22imageProcessingProblems%22%2C%22importedCount%22%3A2%2C%22problems%22%3A%5B%7B%22fileName%22%3A%22DSC_0148.jpg%22%2C%22reason%22%3A%22N%C3%A3o%20foi%20poss%C3%ADvel%20ler%20o%20JPEG.%20O%20arquivo%20pode%20estar%20danificado.%22%7D%5D%2C%22operationProblem%22%3A%22N%C3%A3o%20foi%20poss%C3%ADvel%20continuar%20o%20processamento%20por%20falta%20de%20mem%C3%B3ria.%20Tente%20novamente%20mais%20tarde.%22%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-problems-dialog",

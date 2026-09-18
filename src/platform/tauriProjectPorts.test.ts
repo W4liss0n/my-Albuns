@@ -583,7 +583,7 @@ test("maps the typed Cache processor warning without blocking Project commands",
   eventBoundary.listeners[0]({
     payload: {
       state: "suspended",
-      message: "O prévias temporárias foi suspenso após falhas repetidas.",
+      message: "A criação de prévias foi suspensa após falhas repetidas.",
     },
   });
 
@@ -593,7 +593,7 @@ test("maps the typed Cache processor warning without blocking Project commands",
   );
   expect(listener).toHaveBeenCalledWith({
     state: "suspended",
-    message: "O prévias temporárias foi suspenso após falhas repetidas.",
+    message: "A criação de prévias foi suspensa após falhas repetidas.",
   });
   expect(unlisten).toEqual(expect.any(Function));
 });

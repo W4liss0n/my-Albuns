@@ -283,7 +283,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
           code: "context_restore_failed",
           renderer: activeDiagnostic?.renderer ?? "não confirmado",
           reason:
-            "O contexto WebGL2 foi perdido e não pôde ser restaurado.",
+            "A área de edição foi interrompida e não pôde ser restaurada.",
           limits: activeDiagnostic?.limits ?? null,
         };
         logger.write({

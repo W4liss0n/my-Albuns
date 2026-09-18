@@ -1134,7 +1134,7 @@ test("shows the canonical Project warning when repeated processor failures suspe
     warnCacheSuspended?.({
       state: "suspended",
       message:
-        "O prévias temporárias foi suspenso após falhas repetidas do Processador de imagens.",
+        "A criação de prévias foi suspensa após falhas repetidas do Processador de imagens.",
     }),
   );
 
@@ -1142,7 +1142,7 @@ test("shows the canonical Project warning when repeated processor failures suspe
     expect(dialog.present).toHaveBeenCalledWith({
       kind: "projectOperationFailure",
       message:
-        "O prévias temporárias foi suspenso após falhas repetidas do Processador de imagens.",
+        "A criação de prévias foi suspensa após falhas repetidas do Processador de imagens.",
     }),
   );
   expect(screen.getByRole("button", { name: "Exportar" })).toBeEnabled();
@@ -1195,7 +1195,7 @@ test("registers the Cache warning listener before the first preview demand", asy
     warnCacheSuspended?.({
       state: "suspended",
       message:
-        "O prévias temporárias foi suspenso após falhas repetidas do Processador de imagens.",
+        "A criação de prévias foi suspensa após falhas repetidas do Processador de imagens.",
     });
     return [];
   });
@@ -1854,7 +1854,7 @@ test("cancels resident media demand when runtime graphics become unavailable", a
   ).toBeDisabled();
   expect(screen.getByTestId("album-canvas")).toBeInTheDocument();
   expect(
-    screen.queryByRole("heading", { name: /O área de edição/ }),
+    screen.queryByRole("heading", { name: /A área de edição/ }),
   ).not.toBeInTheDocument();
   await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledTimes(2));
   expect(prepareMediaPreviews).toHaveBeenNthCalledWith(2, {
@@ -2081,7 +2081,7 @@ test("keeps a created Project usable while reporting initial image cache problem
   const problem = { fileName: "Fundo.png", reason: "A imagem foi vinculada, mas sua prévia não pôde ser preparada." };
   let warn: Parameters<MediaPreviewPort["onCacheProcessorWarning"]>[0] | undefined;
   const confirmUiReady = vi.fn(async () => {
-    warn?.({ state: "suspended", message: "O prévias temporárias foi suspenso." });
+    warn?.({ state: "suspended", message: "A criação de prévias foi suspensa." });
     return [problem];
   });
   render(<App
@@ -2099,7 +2099,7 @@ test("keeps a created Project usable while reporting initial image cache problem
     logger={silentLogger}
   />);
   await waitFor(() => expect(dialog.present).toHaveBeenCalledWith({
-    kind: "projectOperationFailure", message: "O prévias temporárias foi suspenso.",
+    kind: "projectOperationFailure", message: "A criação de prévias foi suspensa.",
   }));
   act(() => dialog.emit("dismissProjectOperationFailure"));
   await waitFor(() => expect(dialog.present).toHaveBeenCalledWith({

@@ -11,7 +11,8 @@ export function edgeConversionLoss(
 
 export function edgeConversionLossDescription(loss: EdgeConversionLoss): string {
   const subject = loss.background && loss.overlay ? "Fundo e sobreposição personalizados"
-    : loss.background ? "O fundo personalizado" : "O sobreposição personalizado";
-  const verb = loss.background && loss.overlay ? "serão removidos" : "será removido";
+    : loss.background ? "O fundo personalizado" : "A sobreposição personalizada";
+  const verb = loss.background && loss.overlay ? "serão removidos"
+    : loss.background ? "será removido" : "será removida";
   return `${subject} da página ${loss.side === "left" ? "esquerda" : "direita"} da lâmina ${loss.sheetNumber} ${verb}.`;
 }

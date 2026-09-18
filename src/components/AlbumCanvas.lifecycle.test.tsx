@@ -36,7 +36,7 @@ test("reports when the actual Pixi Canvas diagnostic rejects WebGL2", async () =
       supported: false,
       code: "webgl2_unavailable",
       renderer: "indisponível",
-      reason: "O área de edição real não disponibilizou WebGL2.",
+      reason: "A área de edição real não disponibilizou WebGL2.",
       limits: null,
     }));
   const view = renderCanvas({

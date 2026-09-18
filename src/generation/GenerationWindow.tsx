@@ -43,13 +43,13 @@ export function GenerationWindow({ port }: { port: ProjectGenerationPort }) {
     <div hidden={error !== null}>
     {!view ? <GenerationConfiguration model={model} port={port} busy={busy} onError={report} onClose={close}
       onSubmit={options => void perform(() => port.prepare(options))} /> : terminal && issues.length === 0 ? <MessageDialog tone="success" title="Geração concluída"
-      description={`${view.items.length} ${view.items.length === 1 ? "Projeto gerado" : "Projetos gerados"}.`}
+      description={`${view.items.length} ${view.items.length === 1 ? "projeto gerado" : "projetos gerados"}.`}
       primaryAction={{ label: "Fechar", disabled: busy, onClick: close }} /> : !terminal && issues.length === 0 ? <MessageDialog tone="success" title="Pronto para gerar"
       description="Pastas verificadas. Confirme para iniciar."
       primaryAction={{ label: "Iniciar geração", disabled: busy || !view.canContinue, onClick: () => void perform(() => port.run()) }}
       secondaryAction={{ label: "Fechar", disabled: busy, onClick: close }} /> : <ProblemsDialog
       title={terminal ? view.phase === "cancelled" ? "Geração cancelada" : "Resultado da geração" : "Problemas na geração"}
-      description={terminal ? `${view.items.filter(item => item.status === "completed").length} de ${view.items.length} Projetos gerados.` : "Resolva ou ignore as pendências para continuar."}
+      description={terminal ? `${view.items.filter(item => item.status === "completed").length} de ${view.items.length} projetos gerados.` : "Resolva ou ignore as pendências para continuar."}
       columns={terminal ? ["Projeto", "Situação", "Motivo"] : ["Projeto", "Problema", "Ações"]}
       rows={issues.map(item => terminal ? [
         <span title={item.destination}>{item.name}</span>,
@@ -95,7 +95,7 @@ function GenerationConfiguration({ model, port, busy, onSubmit, onError, onClose
     catch (error) { onError(error); }
   };
   return <div className="ui-operation-dialog"><DialogWindowFrame title="Gerar projetos em lote" layout="form" actions={<>
-    <span className="ui-operation-form__summary" aria-live="polite">{count === null ? "" : `${count} ${count === 1 ? "Projeto" : "Projetos"}`}</span>
+    <span className="ui-operation-form__summary" aria-live="polite">{count === null ? "" : `${count} ${count === 1 ? "projeto" : "projetos"}`}</span>
     <ActionButton disabled={busy} onClick={onClose}>Cancelar</ActionButton>
     <ActionButton variant="primary" disabled={busy || !model || !source.trim() || !destination.trim()} onClick={() => onSubmit({ sourceFolder: source.trim(), destinationFolder: destination.trim() })}>Verificar e gerar</ActionButton>
   </>}>

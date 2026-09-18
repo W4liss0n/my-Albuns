@@ -50,7 +50,7 @@ const unavailableGraphics = {
   supported: false,
   code: "hardware_unconfirmed",
   renderer: "Microsoft Basic Render Driver",
-  reason: "A aceleração WebGL2 por hardware não pôde ser confirmada.",
+  reason: "Não foi possível confirmar a aceleração gráfica necessária para abrir o editor.",
   limits: null,
 } as const;
 

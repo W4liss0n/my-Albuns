@@ -135,7 +135,7 @@ export function BatchExportWindow({ port }: { port: BatchExportPort }) {
         <ActionButton disabled={busy} onClick={() => end(view.id)}>Encerrar</ActionButton>
       </> : <>
         {problems.some(item => item.status !== "ignored" && item.problems.some(problem => problem.kind === "missingMedia")) &&
-          <ActionButton disabled={busy} onClick={() => refresh(() => port.relink(null))}>Localizar imagem… todos…</ActionButton>}
+          <ActionButton disabled={busy} onClick={() => refresh(() => port.relink(null))}>Localizar todas as imagens…</ActionButton>}
         <ActionButton disabled={busy} onClick={() => refresh(() => port.recheck())}>Tentar novamente</ActionButton>
         <ActionButton variant="primary" disabled={busy || !view.canContinue}
           onClick={() => void act(() => continueBatch(view))}>Continuar exportação</ActionButton>

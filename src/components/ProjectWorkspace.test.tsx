@@ -2442,7 +2442,7 @@ test("forwards a fatal Canvas graphics diagnostic without interpreting it", () =
     supported: false,
     code: "webgl2_unavailable",
     renderer: "indisponível",
-    reason: "O área de edição real não possui WebGL2.",
+    reason: "A área de edição real não possui WebGL2.",
     limits: null,
   };
   render(
@@ -7063,7 +7063,7 @@ test.each(["menu", "context"])("requires the owned loss confirmation for edge co
     fireEvent.click(within(screen.getByRole("menu", { name: "Ações da lâmina 03" })).getByRole("menuitem", { name: "Converter extremidade" }));
   }
   await waitFor(() => expect(dialog.present).toHaveBeenCalledWith({ kind: "edgeConversionConfirmation",
-    message: "O sobreposição personalizado da página direita da lâmina 3 será removido." }));
+    message: "A sobreposição personalizada da página direita da lâmina 3 será removida." }));
   expect(apply).not.toHaveBeenCalled();
   await act(async () => { dialog.emit("confirmEdgeConversion"); });
   await waitFor(() => expect(apply).toHaveBeenCalledWith({ kind: "convertEdgeSheet", sheetId: "sheet-003" }, expect.any(Function)));

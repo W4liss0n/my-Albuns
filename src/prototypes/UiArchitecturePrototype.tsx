@@ -851,7 +851,7 @@ export function UiArchitecturePrototype({
             />
           ) : null}
           <section
-            aria-label="área de edição do protótipo"
+            aria-label="Área de edição do protótipo"
             className="editor-prototype__canvas"
             data-last-zoom-input={lastZoomInput ?? undefined}
             data-zoom-anchor={zoomAnchor}
