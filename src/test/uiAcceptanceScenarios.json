@@ -11260,7 +11260,7 @@
         "width": 1100,
         "height": 400
       },
-      "readySelector": "[aria-label^=\"Pasta fundos,\"][aria-pressed=\"true\"]",
+      "readySelector": "[aria-label^=\"Pasta Fundos,\"][aria-pressed=\"true\"]",
       "actions": [
         {
           "type": "click",
@@ -11268,7 +11268,7 @@
         },
         {
           "type": "click",
-          "selector": "[aria-label^=\"Pasta fundos,\"]"
+          "selector": "[aria-label^=\"Pasta Fundos,\"]"
         }
       ]
     },
