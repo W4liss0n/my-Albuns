@@ -7690,11 +7690,11 @@
     {
       "id": "workspace-layout-portrait-insertion",
       "title": "Foto vertical — inserção cria Frame vertical",
-      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=portrait-insertion&preview=palette",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=portrait-insertion",
       "comparison": {
         "kind": "implementation-only",
         "surface": "layout-panel",
-        "reason": "O ADR 0014 define a orientação inicial pela Foto. A geometria e as sugestões vêm do Core após AddPhoto normal com imagem 400 × 600; a paleta representa seu conteúdo."
+        "reason": "O ADR 0014 define a orientação inicial pela Foto. A geometria e as sugestões vêm do Core após AddPhoto normal com imagem 400 × 600, representada por quadrantes de referência."
       },
       "viewport": { "width": 1440, "height": 800 },
       "readySelector": ".layout-panel__candidate",
@@ -7707,11 +7707,11 @@
     {
       "id": "workspace-layout-portrait-insertion-preview",
       "title": "Foto vertical — alternativa conserva a orientação",
-      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=portrait-insertion&preview=palette",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=portrait-insertion",
       "comparison": {
         "kind": "implementation-only",
         "surface": "layout-panel",
-        "reason": "O ADR 0014 conserva a orientação da Foto na criação. O hover mostra uma alternativa gerada pelo Core para o Frame vertical; a paleta representa seu conteúdo."
+        "reason": "O ADR 0014 conserva a orientação da Foto na criação. O hover mostra uma alternativa gerada pelo Core para o Frame vertical, com quadrantes de referência."
       },
       "viewport": { "width": 1440, "height": 800 },
       "readySelector": ".layout-panel__candidate",

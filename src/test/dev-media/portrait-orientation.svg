@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600" viewBox="0 0 400 600">
+  <path fill="#e63f35" d="M0 0h200v300H0z"/>
+  <path fill="#329858" d="M200 0h200v300H200z"/>
+  <path fill="#376dcc" d="M0 300h200v300H0z"/>
+  <path fill="#e3b634" d="M200 300h200v300H200z"/>
+  <g font-family="sans-serif" font-size="80" fill="white" text-anchor="middle">
+    <text x="100" y="175">A</text><text x="300" y="175">B</text>
+    <text x="100" y="475">C</text><text x="300" y="475">D</text>
+  </g>
+</svg>

@@ -1,5 +1,6 @@
 import React from "react";
 import retainedPhotoPreview from "./test/dev-media/serra-amanhecer.svg";
+import portraitInsertionPreview from "./test/dev-media/portrait-orientation.svg";
 import ReactDOM from "react-dom/client";
 
 import App from "./App";
@@ -306,6 +307,8 @@ const mediaPreviewPort: MediaPreviewPort = {
         ? '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="300"><path fill="#dbad45" fill-opacity=".65" d="M0 0h600v24H0zM0 276h600v24H0zM0 0h24v300H0zM576 0h24v300h-24z"/><circle cx="300" cy="150" r="75" fill="#247580" fill-opacity=".4"/></svg>'
         : '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="300"><path fill="#d97e63" d="M0 0h300v300H0z"/><path fill="#557f98" d="M300 0h300v300H300z"/><circle cx="150" cy="150" r="85" fill="#f7c988"/><path fill="#b2d6cd" d="m450 55 95 190H355z"/></svg>')}`,
     })) :
+    frameContext === "layouts" && previewParameters.get("layouts") === "portrait-insertion"
+      ? projection.state.album.media.map((media) => ({ mediaId: media.id, state: "ready" as const, url: portraitInsertionPreview })) :
     (frameContext === "orientation" || frameContext === "style" || frameContext === "layouts") && previewParameters.get("preview") === "palette"
       ? projection.state.album.media.map((media) => ({ mediaId: media.id, state: "unavailable" as const, url: null }))
       : frameContext === "orientation" || frameContext === "style" || frameContext === "layouts" || frameContext === "clipboard" ? projection.state.album.media.map((media) => ({
