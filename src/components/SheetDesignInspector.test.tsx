@@ -10,7 +10,8 @@ function props(name: string): ComponentProps<typeof SheetDesignInspector> {
   return {
     sheet: projection.composition.sheets[0], visuals: projection.state.album.sheets[0].visuals,
     scope: "both", onScopeChange: vi.fn(), mediaPreviewUrls: {},
-    actions: { disabled: false, onChange: vi.fn(async () => true) },
+    mediaItems: projection.state.album.media,
+    actions: { disabled: false, onChange: vi.fn(async () => true), onApplyDecorative: vi.fn(async () => true) },
   };
 }
 
@@ -18,11 +19,9 @@ test("equal colors with different origins remain separate and restoration target
   const input = props("mixed-origin");
   render(<SheetDesignInspector {...input} />);
   const background = within(screen.getByRole("region", { name: "Fundo" }));
-  expect(background.getAllByText("#FFFFFF")).toHaveLength(2);
-  expect(background.getByText("Esquerda")).toBeInTheDocument();
-  expect(background.getByText("Direita")).toBeInTheDocument();
-  expect(background.getByText("Personalizado nesta lâmina")).toBeInTheDocument();
-  expect(background.getByText("Usando o padrão do álbum")).toBeInTheDocument();
+  expect(background.getByRole("group", { name: "Opções de fundo" })).toHaveAccessibleDescription(
+    "Esquerda: #FFFFFF. Personalizado nesta lâmina. Direita: #FFFFFF. Usando o padrão do álbum.",
+  );
   expect(within(screen.getByRole("region", { name: "Sobreposição" })).queryByText("Usar padrão do álbum")).toBeNull();
   await act(async () => fireEvent.click(background.getByRole("button", { name: "Usar padrão do álbum" })));
   expect(input.actions!.onChange).toHaveBeenCalledExactlyOnceWith(input.sheet.sheetId, "bothSides", { kind: "restoreAlbum", role: "background" });
@@ -77,11 +76,13 @@ test("a color draft commits once, while cancellation, invalid input and a scope 
 test.each([true, false])("a pending removal keeps its original side and blocks repeat actions until completion (%s)", async (success) => {
   let finish!: (value: boolean) => void;
   const onChange = vi.fn(() => new Promise<boolean>((resolve) => { finish = resolve; }));
-  const input = { ...props("overlay"), actions: { disabled: false, onChange } };
+  const original = props("overlay");
+  const input = { ...original, actions: { ...original.actions!, onChange } };
   const view = render(<SheetDesignInspector {...input} scope="left" />);
-  fireEvent.click(within(screen.getByRole("region", { name: "Sobreposição" })).getByRole("button", { name: "Remover" }));
+  fireEvent.click(within(screen.getByRole("region", { name: "Sobreposição" })).getByRole("button", { name: "Sem sobreposição" }));
   view.rerender(<SheetDesignInspector {...input} scope="right" />);
-  for (const button of screen.getAllByRole("button", { name: "Remover" })) expect(button).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Sem sobreposição" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Remover" })).toBeDisabled();
   expect(onChange).toHaveBeenCalledExactlyOnceWith(input.sheet.sheetId, "left", { kind: "remove", role: "overlay" });
   await act(async () => finish(success));
   expect(screen.getByRole("button", { name: "Cor do fundo da lâmina" })).toBeEnabled();
@@ -95,4 +96,40 @@ test("a single-page sheet exposes only its active side and sends its explicit sc
   expect(screen.queryByRole("button", { name: "Ambos os lados" })).toBeNull();
   await act(async () => fireEvent.click(within(screen.getByRole("region", { name: "Fundo" })).getByRole("button", { name: "Remover" })));
   expect(input.actions!.onChange).toHaveBeenCalledExactlyOnceWith(input.sheet.sheetId, "right", { kind: "remove", role: "background" });
+});
+
+test.each([true, false])("decorative selection retains its target and blocks adjacent edits while pending (%s)", async (success) => {
+  const input = props("neutral");
+  let finish!: (value: boolean) => void;
+  const onApplyDecorative = vi.fn(() => new Promise<boolean>(resolve => { finish = resolve; }));
+  input.actions = { ...input.actions!, onApplyDecorative };
+  const view = render(<SheetDesignInspector {...input} scope="left" />);
+  fireEvent.click(screen.getByRole("button", { name: "Escolher decorativo para fundo" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Usar fundo Textura.png" }));
+  expect(onApplyDecorative).toHaveBeenCalledExactlyOnceWith(
+    input.sheet.sheetId, "left", "background", "00000000-0000-4000-8000-000000000020",
+  );
+  view.rerender(<SheetDesignInspector {...input} scope="right" />);
+  expect(screen.queryByRole("menu")).toBeNull();
+  expect(screen.getByRole("button", { name: "Cor do fundo da lâmina" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Escolher decorativo para sobreposição" })).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "Sem sobreposição" }));
+  expect(input.actions.onChange).not.toHaveBeenCalled();
+  await act(async () => finish(success));
+  expect(screen.getByRole("button", { name: "Cor do fundo da lâmina" })).toBeEnabled();
+  expect(screen.queryByRole("menu")).toBeNull();
+});
+
+test("one decorative picker is open at a time and changing scope discards the open picker", () => {
+  const input = props("neutral");
+  const view = render(<SheetDesignInspector {...input} scope="left" />);
+  fireEvent.click(screen.getByRole("button", { name: "Escolher decorativo para fundo" }));
+  fireEvent.click(screen.getByRole("button", { name: "Escolher decorativo para sobreposição" }));
+  expect(screen.getAllByRole("menu")).toHaveLength(1);
+  expect(screen.getByRole("menu", { name: "Decorativos para sobreposição" })).toBeInTheDocument();
+  view.rerender(<SheetDesignInspector {...input} scope="right" />);
+  expect(screen.queryByRole("menu")).toBeNull();
+  view.rerender(<SheetDesignInspector {...input} scope="left" />);
+  expect(screen.queryByRole("menu")).toBeNull();
+  expect(input.actions!.onApplyDecorative).not.toHaveBeenCalled();
 });

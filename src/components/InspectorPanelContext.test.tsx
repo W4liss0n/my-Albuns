@@ -247,7 +247,7 @@ test("keeps inactive sides inert for a single-page Sheet", () => {
   });
 });
 
-test("uses the canonical media fallback when a Sheet decorative has no preview", () => {
+test("uses the shared decorative picker fallback when a Sheet decorative has no preview", () => {
   const sheetWithoutDecorativePreview = {
     ...composedSheet,
     backgrounds: [
@@ -270,14 +270,13 @@ test("uses the canonical media fallback when a Sheet decorative has no preview",
         kind: "sheet",
         sheet: sheetWithoutDecorativePreview,
       })}
+      mediaItems={[{ id: "decorative-without-preview", kind: "decorative", name: "Textura sem prévia", palette: null, sourceWidthPx: null, sourceHeightPx: null }]}
     />,
   );
 
-  const value = screen.getByText("Textura sem prévia").closest(
-    ".sheet-design-value",
-  ) as HTMLElement;
-  expect(value.querySelector(".sheet-design-value__swatch--media")).toHaveStyle(
-    { backgroundColor: "#D8DEE2" },
+  const value = screen.getByRole("button", { name: "Decorativo do fundo: Textura sem prévia. Escolher outro" });
+  expect(value.querySelector(".visual-design-picker__tile")).toHaveStyle(
+    { background: "var(--ui-surface-muted)" },
   );
 });
 
@@ -326,7 +325,8 @@ test("shows Sheet-design origin and local controls without placeholders", () => 
 
   expect(design.getByText("Fundo")).toBeInTheDocument();
   expect(design.getByText("Sobreposição")).toBeInTheDocument();
-  expect(design.getAllByText("Usando o padrão do álbum")).toHaveLength(2);
+  expect(design.getByRole("group", { name: "Opções de fundo" })).toHaveAccessibleDescription(/Usando o padrão do álbum/);
+  expect(design.getByRole("group", { name: "Opções de sobreposição" })).toHaveAccessibleDescription(/Usando o padrão do álbum/);
   expect(design.getByRole("button", { name: "Cor do fundo da lâmina" })).toBeInTheDocument();
   expect(design.queryByText("Origem ainda não disponível")).not.toBeInTheDocument();
   expect(section.querySelector('[data-placeholder-feature="edit-sheet-background"]')).toBeNull();

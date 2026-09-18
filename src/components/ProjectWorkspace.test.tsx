@@ -222,6 +222,26 @@ function deferredProjection() {
   return { promise, reject, resolve };
 }
 
+test.each([
+  ["Página esquerda", "left", "fundo", "background"],
+  ["Página direita", "right", "sobreposição", "overlay"],
+  ["Ambos os lados", "bothSides", "sobreposição", "overlay"],
+] as const)("applies a decorative from the Sheet inspector to %s", async (label, scope, roleLabel, role) => {
+  const apply = vi.fn(async () => decorativeProjection);
+  render(<ProjectWorkspace exportPipelinePort={exportPipelinePort} projection={decorativeProjection}
+    projectCorePort={projectCorePortWithApply(apply)} onProjectionChange={vi.fn()} />);
+  const sheetId = decorativeProjection.state.album.sheets[0].id;
+  act(() => canvasHarness.props?.onEditSheet?.(sheetId));
+  const inspector = within(screen.getByRole("button", { name: "Design da lâmina" }).closest("section")!);
+  fireEvent.click(inspector.getByRole("button", { name: label }));
+  const options = within(inspector.getByRole("group", { name: `Opções de ${roleLabel}` }));
+  fireEvent.click(options.getByRole("button", { name: /decorativo|Decorativo/ }));
+  fireEvent.click(options.getByRole("menuitem", { name: new RegExp(`Usar ${roleLabel} Overlay translúcido.png`) }));
+  await waitFor(() => expect(apply).toHaveBeenCalledExactlyOnceWith({
+    kind: "applyDecorative", sheetId, scope, role, mediaId: "decorative-overlay",
+  }, expect.any(Function)));
+});
+
 function deferredValue<Value>() {
   let resolve!: (value: Value) => void;
   let reject!: (reason: unknown) => void;
@@ -3743,7 +3763,7 @@ test("presents an empty per-side Overlay as absent", () => {
     within(visualDefaults).getByRole("button", { name: "Sem sobreposição" }),
   ).toHaveAttribute("aria-pressed", "true");
   expect(
-    visualDefaults.querySelector(".visual-default-picker__preview--none"),
+    visualDefaults.querySelector(".visual-design-picker__preview--none"),
   ).toBeInTheDocument();
 });
 

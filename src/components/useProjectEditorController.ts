@@ -513,6 +513,12 @@ export function useProjectEditorController({
     },
     sheetDesign: {
       disabled: interactionBlocked || canvasMode.kind !== "sheet-editing",
+      onApplyDecorative: (sheetId: string, scope: DecorativeScope, role: import("../domain/project").DecorativeRole, mediaId: string) => {
+        if (interactionBlocked || canvasMode.kind !== "sheet-editing" || canvasMode.sheetId !== sheetId) {
+          return Promise.resolve(false);
+        }
+        return mutations.applyIntent({ kind: "applyDecorative", sheetId, scope, role, mediaId });
+      },
       onChange: (sheetId: string, scope: DecorativeScope, change: SheetVisualChange) => {
         if (interactionBlocked || canvasMode.kind !== "sheet-editing" || canvasMode.sheetId !== sheetId) {
           return Promise.resolve(false);

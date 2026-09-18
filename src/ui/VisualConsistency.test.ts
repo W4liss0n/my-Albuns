@@ -39,7 +39,7 @@ const albumInformationStyles = readStyles(
   "src/components/AlbumInformationForm.css",
 );
 const visualDefaultPickerStyles = readStyles(
-  "src/components/VisualDefaultPicker.css",
+  "src/components/VisualDesignControl.css",
 );
 const decorativePickerStyles = readStyles(
   "src/components/DecorativeMediaPicker.css",
@@ -201,7 +201,7 @@ test("shares only the equivalent chrome of floating surfaces", () => {
     /\.ui-floating-surface\s*\{[^}]*border:\s*1px solid var\(--ui-border-strong\);[^}]*border-radius:\s*var\(--ui-radius\);[^}]*background:\s*var\(--ui-surface-raised\);[^}]*box-shadow:\s*var\(--ui-shadow-menu\);/s,
   );
   expect(decorativePickerSource).toContain(
-    'className="ui-floating-surface visual-default-popup"',
+    'className="ui-floating-surface visual-design-popup"',
   );
   expect(mediaToolbarSource).toContain(
     'className="ui-floating-surface media-popup media-import-popup"',
@@ -216,7 +216,7 @@ test("shares only the equivalent chrome of floating surfaces", () => {
     'className="ui-floating-surface app-menu-popup"',
   );
   expect(decorativePickerStyles).not.toMatch(
-    /\.visual-default-popup\s*\{[^}]*(?:background|box-shadow|border:)/s,
+    /\.visual-design-popup\s*\{[^}]*(?:background|box-shadow|border:)/s,
   );
   expect(mediaPanelStyles).not.toMatch(
     /\.media-popup\s*\{[^}]*(?:background|box-shadow|border:)/s,
@@ -266,28 +266,28 @@ test("keeps the shared visual preview neutral from New Project chrome", () => {
 
 test("keeps compact visual-default focus independent from selection", () => {
   expect(visualDefaultPickerStyles).toMatch(
-    /\.visual-default-picker__option:focus-visible \.visual-default-picker__tile\s*\{[^}]*outline:\s*1px solid var\(--ui-focus-neutral\);[^}]*outline-offset:\s*2px;/s,
+    /\.visual-design-picker__option:focus-visible \.visual-design-picker__tile\s*\{[^}]*outline:\s*1px solid var\(--ui-focus-neutral\);[^}]*outline-offset:\s*2px;/s,
   );
   expect(visualDefaultPickerStyles).toMatch(
-    /\.visual-default-picker__option\[data-selected="true"\][\s\S]*border-color:\s*var\(--ui-accent\);/,
+    /\.visual-design-picker__option\[data-selected="true"\][\s\S]*border-color:\s*var\(--ui-accent\);/,
   );
 });
 
 test("centers the empty Decorative tile after the shared tile geometry", () => {
   const sharedTileRule = visualDefaultPickerStyles.indexOf(
-    ".visual-default-picker__tile {",
+    ".visual-design-picker__tile {",
   );
   const addTileRule = visualDefaultPickerStyles.indexOf(
-    ".visual-default-picker__tile--add {",
+    ".visual-design-picker__tile--add {",
   );
 
   expect(sharedTileRule).toBeGreaterThanOrEqual(0);
   expect(addTileRule).toBeGreaterThan(sharedTileRule);
   expect(visualDefaultPickerStyles).toMatch(
-    /\.visual-default-picker__tile--add\s*\{[^}]*display:\s*flex;[^}]*align-items:\s*center;[^}]*justify-content:\s*center;/s,
+    /\.visual-design-picker__tile--add\s*\{[^}]*display:\s*flex;[^}]*align-items:\s*center;[^}]*justify-content:\s*center;/s,
   );
   expect(decorativePickerStyles).not.toContain(
-    ".visual-default-picker__tile--add",
+    ".visual-design-picker__tile--add",
   );
 });
 

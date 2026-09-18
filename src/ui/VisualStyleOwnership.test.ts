@@ -63,13 +63,13 @@ test("keeps the outside-surface interaction with its sole New Project owner", ()
 
 test("keeps shared visual-default option policy in a neutral module", () => {
   for (const owner of [
-    "src/components/AlbumDesignForm.tsx",
+    "src/components/VisualDesignControl.tsx",
     "src/components/DecorativeMediaPicker.tsx",
   ]) {
-    expect(source(owner), owner).toContain('import "./VisualDefaultPicker.css";');
+    expect(source(owner), owner).toContain('import "./VisualDesignControl.css";');
   }
   expect(source("src/components/AlbumDesignForm.css")).not.toMatch(
-    /^\.visual-default-picker__(?:option|tile)\s*\{/m,
+    /^\.visual-design-picker__(?:option|tile)\s*\{/m,
   );
 });
 
@@ -91,7 +91,7 @@ test("makes the shared media card own its wrapper protocol", () => {
     expect(source(caller), caller).not.toContain('className="media-preview-card');
   }
   expect(source("src/components/DecorativeMediaPicker.css")).not.toContain(
-    "visual-default-card",
+    "visual-design-card",
   );
 });
 
@@ -138,7 +138,7 @@ test("keeps shared contracts canonical and removes dead visual protocols", () =>
       "visual-personalization-preview",
     ],
     ["src/global/DimensionsPreview.tsx", "new-project-dimensions-sheet"],
-    ["src/components/DecorativeMediaPicker.tsx", "visual-default-card"],
+    ["src/components/DecorativeMediaPicker.tsx", "visual-design-card"],
   ] as const) {
     expect(source(path), path).not.toContain(protocol);
   }

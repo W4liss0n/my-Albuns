@@ -1,0 +1,153 @@
+.visual-design-picker__option {
+  position: relative;
+  display: grid;
+  width: 26px;
+  min-width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  flex: none;
+  place-items: center;
+  color: var(--ui-text-muted);
+  background: transparent;
+}
+
+.visual-design-picker__tile {
+  display: block;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 5px;
+  background: var(--ui-surface-raised);
+}
+
+.visual-design-picker__tile--add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-color: var(--ui-text-muted);
+  border-style: dashed;
+  color: var(--ui-text-muted);
+  background: transparent;
+}
+
+.visual-design-picker__option:hover,
+.visual-design-picker__option:focus-visible {
+  color: var(--ui-text);
+}
+
+.visual-design-picker__option:hover .visual-design-picker__tile {
+  border-color: var(--ui-text-muted);
+}
+
+.visual-design-picker__option:focus-visible {
+  outline: 0;
+}
+
+.visual-design-picker__option:focus-visible .visual-design-picker__tile {
+  outline: 1px solid var(--ui-focus-neutral);
+  outline-offset: 2px;
+}
+
+.visual-design-picker__option[aria-pressed="true"]
+  .visual-design-picker__tile,
+.visual-design-picker__option[data-selected="true"]
+  .visual-design-picker__tile {
+  border-color: var(--ui-accent);
+}
+
+.visual-design-field {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--ui-space-2);
+}
+
+/* Sem overflow: a faixa tem duas opções fixas, e um container rolável
+   recortaria o seletor flutuante ancorado no quadrado de Decorativo. */
+.visual-design-picker {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  padding: 4px 2px;
+  gap: var(--ui-space-2);
+}
+
+.visual-design-label {
+  flex: none;
+  width: 62px;
+  color: var(--ui-text-muted);
+  font-size: var(--ui-font-size-support);
+}
+
+.visual-design-picker__divider {
+  width: 1px;
+  height: 26px;
+  flex: none;
+  background: var(--ui-border);
+}
+
+.visual-design-picker__preview--none {
+  background: linear-gradient(
+    135deg,
+    var(--ui-surface-raised) 0 47%,
+    var(--ui-border-strong) 47% 53%,
+    var(--ui-surface-raised) 53%
+  );
+}
+
+.visual-design-picker__color:has(input:focus-visible)
+  .visual-design-picker__tile {
+  outline: 1px solid var(--ui-focus-neutral);
+  outline-offset: 2px;
+}
+
+.visual-design-picker__color {
+  cursor: default;
+}
+
+.visual-design-picker__color input {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+}
+
+.visual-design-picker__option:disabled { opacity: 0.5; }
+
+.visual-design-actions {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+  gap: var(--ui-space-1);
+}
+
+.visual-design-actions > button {
+  width: 26px;
+  min-width: 26px;
+  height: 26px;
+  padding: 0;
+}
+
+.visual-design-color-property {
+  display: flex;
+  flex: none;
+}
+
+.visual-design-color-property .ui-color-property-trigger {
+  display: block;
+  width: 26px;
+  height: 26px;
+  margin: 0;
+  border-radius: 5px;
+  box-shadow: none;
+}
+
+.visual-design-color-property .ui-color-property-trigger[data-mixed="true"] {
+  background: var(--visual-design-color-preview, linear-gradient(to right, var(--ui-surface-raised) 50%, var(--ui-surface-muted) 50%));
+}

@@ -9725,7 +9725,7 @@
         },
         {
           "type": "click",
-          "selector": ".sheet-design-role[aria-label=\"Fundo\"] .sheet-design-role__actions > button"
+          "selector": ".sheet-design-role[aria-label=\"Fundo\"] button[aria-label=\"Remover\"]"
         }
       ]
     },
@@ -9781,7 +9781,7 @@
         },
         {
           "type": "click",
-          "selector": ".sheet-design-role[aria-label=\"Sobreposição\"] .sheet-design-role__actions > button"
+          "selector": ".sheet-design-role[aria-label=\"Sobreposição\"] button[aria-label=\"Sem sobreposição\"]"
         }
       ]
     },
@@ -11633,6 +11633,186 @@
         { "type": "click", "selector": ".media-import-menu > button" },
         { "type": "key", "key": "KeyA", "modifiers": ["Control"] },
         { "type": "key", "key": "Delete" }
+      ]
+    },
+    {
+      "id": "workspace-sheet-design-background-picker",
+      "title": "Design da lâmina — seletor de fundo",
+      "implementationPath": "/workspace-preview.html?frame=decorations&context=sheet&decoration-state=neutral",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-design",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Design 0044: controles compactos compartilhados com o álbum, preservando o escopo e as operações existentes."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".sheet-design-inspector",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Escolher decorativo para fundo\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-design-overlay-picker",
+      "title": "Design da lâmina — seletor de sobreposição",
+      "implementationPath": "/workspace-preview.html?frame=decorations&context=sheet&decoration-state=neutral",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-design",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Design 0044: controles compactos compartilhados com o álbum, preservando o escopo e as operações existentes."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".sheet-design-inspector",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Escolher decorativo para sobreposição\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-design-image-left",
+      "title": "Design da lâmina — imagem aplicada à esquerda",
+      "implementationPath": "/workspace-preview.html?frame=decorations&context=sheet&decoration-state=neutral",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-design",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Design 0044: controles compactos compartilhados com o álbum, preservando o escopo e as operações existentes."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".sheet-design-inspector",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": ".sheet-design-preview [aria-label=\"Página esquerda\"]"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Escolher decorativo para fundo\"]"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Usar fundo Textura.png\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-decorative-applied=\"background-left\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-design-image-both",
+      "title": "Design da lâmina — sobreposição aplicada aos dois lados",
+      "implementationPath": "/workspace-preview.html?frame=decorations&context=sheet&decoration-state=neutral",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-design",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Design 0044: controles compactos compartilhados com o álbum, preservando o escopo e as operações existentes."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".sheet-design-inspector",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Escolher decorativo para sobreposição\"]"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Usar sobreposição Overlay.png\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-decorative-applied=\"overlay-bothSides\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-design-image-single",
+      "title": "Design da lâmina — imagem aplicada à página única",
+      "implementationPath": "/workspace-preview.html?frame=decorations&context=sheet&decoration-state=single",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-design",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Design 0044: controles compactos compartilhados com o álbum, preservando o escopo e as operações existentes."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".sheet-design-inspector",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        },
+        {
+          "type": "click",
+          "selector": "button[aria-label=\"Escolher decorativo para fundo\"]"
+        },
+        {
+          "type": "click",
+          "selector": "[role=\"menuitem\"][aria-label=\"Usar fundo Textura.png\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "body[data-decorative-applied=\"background-right\"]"
+        }
+      ]
+    },
+    {
+      "id": "workspace-sheet-design-color-split",
+      "title": "Design da lâmina — amostra com cores diferentes",
+      "implementationPath": "/workspace-preview.html?frame=decorations&context=sheet&decoration-state=local-color",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-design",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "Design 0044: controles compactos compartilhados com o álbum, preservando o escopo e as operações existentes."
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "readySelector": ".sheet-design-inspector",
+      "actions": [
+        {
+          "type": "assert",
+          "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))"
+        }
       ]
     }
   ]

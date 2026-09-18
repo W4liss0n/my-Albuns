@@ -94,96 +94,11 @@
   opacity: 0.36;
 }
 
-.sheet-design-scope-status {
-  margin: 0;
-  color: var(--ui-text-muted);
-  font-size: var(--ui-font-size-caption);
-  text-align: center;
-}
+.sheet-design-scope-status { margin: 0; }
 
-.sheet-design-role {
-  display: grid;
-  padding-top: var(--ui-space-3);
-  border-top: 1px solid var(--ui-border);
-  gap: var(--ui-space-2);
-}
-
-.sheet-design-role h3 {
-  margin: 0;
-  color: var(--ui-text-secondary);
-  font-size: var(--ui-font-size-support);
-  font-weight: 650;
-}
-
-.sheet-design-role__values {
+.sheet-design-controls {
   display: grid;
   gap: var(--ui-space-2);
 }
 
-.sheet-design-value {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: var(--ui-space-2);
-}
-
-.sheet-design-value__swatch {
-  width: 30px;
-  height: 30px;
-  border: 2px solid var(--ui-surface-raised);
-  flex: none;
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: contain;
-  box-shadow:
-    0 0 0 1px var(--ui-border),
-    var(--ui-shadow-thumbnail);
-}
-
-.sheet-design-value__swatch--none {
-  background: linear-gradient(
-    135deg,
-    var(--ui-surface-raised) 0 47%,
-    var(--ui-border-strong) 47% 53%,
-    var(--ui-surface-raised) 53%
-  );
-}
-
-.sheet-design-value__copy {
-  display: grid;
-  min-width: 0;
-  gap: 1px;
-}
-
-.sheet-design-value__copy strong {
-  overflow: hidden;
-  color: var(--ui-text-secondary);
-  font-size: var(--ui-font-size-caption);
-  font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sheet-design-value__copy small {
-  color: var(--ui-text-muted);
-  font-size: var(--ui-font-size-micro);
-}
-
-.sheet-design-role__actions {
-  position: relative;
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--ui-space-2);
-}
-
-.sheet-design-color {
-  display: flex;
-  align-items: center;
-  color: var(--ui-text-muted);
-  font-size: var(--ui-font-size-caption);
-  gap: var(--ui-space-2);
-}
-.sheet-design-color .ui-color-property-trigger { margin-top: 0; }
-.sheet-design-role__restore { justify-self: start; }
+.sheet-design-role { min-width: 0; }

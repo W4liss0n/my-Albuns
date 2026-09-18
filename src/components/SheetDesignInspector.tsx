@@ -1,14 +1,15 @@
 import { useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { RotateCcw, X } from "lucide-react";
 
 import type { VisualScope } from "../application/scopedValues";
 import type {
-  ComposedSheet, DecorativeScope, SheetVisualChange, SheetVisuals,
+  ComposedSheet, DecorativeRole, DecorativeScope, MediaCatalogItem, SheetVisualChange, SheetVisuals,
 } from "../domain/project";
-import { ActionButton } from "../ui";
+import { ActionButton, AppIcon } from "../ui";
 import { ColorPropertyControl } from "../ui/ColorPropertyControl";
 import { VisualScopeControls } from "../ui/visualPreview/VisualScopeControls";
 import { SheetPreview } from "./SheetPreview";
-import { SHEET_VISUAL_STYLE } from "./sheetVisualStyle";
+import { VisualDesignControl } from "./VisualDesignControl";
 import "./SheetDesignInspector.css";
 
 export type SheetDesignScope = VisualScope;
@@ -16,12 +17,14 @@ export type SheetDesignScope = VisualScope;
 export interface SheetDesignActions {
   disabled: boolean;
   onChange(sheetId: string, scope: DecorativeScope, change: SheetVisualChange): Promise<boolean>;
+  onApplyDecorative(sheetId: string, scope: DecorativeScope, role: DecorativeRole, mediaId: string): Promise<boolean>;
 }
 
 interface SheetDesignInspectorProps {
   actions?: SheetDesignActions;
   visuals?: SheetVisuals;
   saveLayout?: { enabled: boolean; onSave(): void; feedback?: ReactNode };
+  mediaItems?: readonly MediaCatalogItem[];
   mediaPreviewUrls: Readonly<Record<string, string>>;
   scope: SheetDesignScope;
   sheet: ComposedSheet;
@@ -32,6 +35,7 @@ export function SheetDesignInspector({
   actions,
   visuals,
   saveLayout,
+  mediaItems = [],
   mediaPreviewUrls,
   scope,
   sheet,
@@ -45,12 +49,12 @@ export function SheetDesignInspector({
   const disabled = !actions || actions.disabled || pending;
   const backgroundValues = visualValues(sheet, scope, "background", visuals);
   const overlayValues = visualValues(sheet, scope, "overlay", visuals);
-  const apply = async (change: SheetVisualChange) => {
+  const apply = async (operation: (actions: SheetDesignActions, scope: DecorativeScope) => Promise<boolean>) => {
     if (!actions || disabled || pendingRef.current) return;
     pendingRef.current = true;
     setPending(true);
     try {
-      await actions.onChange(sheet.sheetId, scope === "both" ? "bothSides" : scope, change);
+      await operation(actions, scope === "both" ? "bothSides" : scope);
     } finally {
       pendingRef.current = false;
       setPending(false);
@@ -67,24 +71,19 @@ export function SheetDesignInspector({
         onHoveredScopeChange={setHoveredScope}
         onScopeChange={onScopeChange}
       />
-      <p aria-live="polite" className="sheet-design-scope-status">
+      <p aria-live="polite" className="ui-section-eyebrow sheet-design-scope-status">
         {scopeLabel(scope)}
       </p>
 
-      <SheetVisualRole
-        key={`background:${sheet.sheetId}:${scope}`}
+      <SheetVisualControls
+        key={`${sheet.sheetId}:${scope}`}
         disabled={disabled}
-        onChange={(change) => { void apply(change); }}
-        role="Fundo"
-        values={backgroundValues}
+        backgroundValues={backgroundValues}
+        overlayValues={overlayValues}
+        mediaItems={mediaItems}
         mediaPreviewUrls={mediaPreviewUrls}
-      />
-      <SheetVisualRole
-        disabled={disabled}
-        onChange={(change) => { void apply(change); }}
-        role="Sobreposição"
-        values={overlayValues}
-        mediaPreviewUrls={mediaPreviewUrls}
+        onChange={(change) => { void apply((actions, target) => actions.onChange(sheet.sheetId, target, change)); }}
+        onSelectMedia={(role, mediaId) => { void apply((actions, target) => actions.onApplyDecorative(sheet.sheetId, target, role, mediaId)); }}
       />
 
       <div className="sheet-design-save-layout">
@@ -190,77 +189,70 @@ type VisualValue = (
   | { kind: "none"; label: string }
 ) & { custom: boolean; side?: string };
 
-function SheetVisualRole({ mediaPreviewUrls, disabled, role, values, onChange }: {
-  mediaPreviewUrls: Readonly<Record<string, string>>;
+function SheetVisualControls({
+  disabled, backgroundValues, overlayValues, mediaItems, mediaPreviewUrls, onChange, onSelectMedia,
+}: {
   disabled: boolean;
-  role: "Fundo" | "Sobreposição";
-  values: readonly VisualValue[];
+  backgroundValues: readonly VisualValue[];
+  overlayValues: readonly VisualValue[];
+  mediaItems: readonly MediaCatalogItem[];
+  mediaPreviewUrls: Readonly<Record<string, string>>;
   onChange(change: SheetVisualChange): void;
+  onSelectMedia(role: DecorativeRole, mediaId: string): void;
 }) {
-  const decorativeRole = role === "Fundo" ? "background" : "overlay";
-  return (
-    <section className="sheet-design-role" aria-label={role}>
-      <h3>{role}</h3>
-      <div className="sheet-design-role__values">
-        {values.map((value, index) => (
-          <div className="sheet-design-value" key={value.side ?? index}>
-            <VisualSwatch mediaPreviewUrls={mediaPreviewUrls} value={value} />
-            <span className="sheet-design-value__copy">
-              {value.side ? <small>{value.side}</small> : null}
-              <strong>{value.label}</strong>
-              <small>{value.custom ? "Personalizado nesta lâmina" : "Usando o padrão do álbum"}</small>
-            </span>
-          </div>
-        ))}
-      </div>
-      <div className="sheet-design-role__actions">
-        {role === "Fundo" ? (
-          <div className="sheet-design-color">
-            <span>Cor</span>
+  const [openPicker, setOpenPicker] = useState<"Fundo" | "Sobreposição" | null>(null);
+  const decorativeMedia = mediaItems.filter((media) => media.kind === "decorative");
+  return <div className="sheet-design-controls">
+    {(["Fundo", "Sobreposição"] as const).map((role) => {
+      const background = role === "Fundo";
+      const decorativeRole = background ? "background" : "overlay";
+      const values = background ? backgroundValues : overlayValues;
+      const first = values[0];
+      const selectedMediaId = first?.kind === "media" && values.every(value => value.kind === "media" && value.mediaId === first.mediaId)
+        ? first.mediaId : null;
+      const description = values.map(value =>
+        `${value.side ? value.side + ": " : ""}${value.label}. ${value.custom ? "Personalizado nesta lâmina" : "Usando o padrão do álbum"}.`,
+      ).join(" ");
+      return <section className="sheet-design-role" aria-label={role} key={role}>
+        <VisualDesignControl
+          decorativeMedia={decorativeMedia}
+          disabled={disabled}
+          label={role}
+          mediaPreviewUrls={mediaPreviewUrls}
+          description={description}
+          noneSelected={values.every(value => value.kind === "none")}
+          open={openPicker === role}
+          selectedMediaId={selectedMediaId}
+          onClear={background ? undefined : () => onChange({ kind: "remove", role: "overlay" })}
+          onOpenChange={(open) => setOpenPicker(open ? role : null)}
+          onSelect={(mediaId) => onSelectMedia(decorativeRole, mediaId)}
+          actions={<>
+            {background && <ActionButton aria-label="Remover" title="Remover fundo" density="compact" disabled={disabled}
+              type="button" variant="quiet" onClick={() => onChange({ kind: "remove", role: decorativeRole })}>
+              <AppIcon icon={X} size={14} />
+            </ActionButton>}
+            {values.some(value => value.custom) && <ActionButton aria-label="Usar padrão do álbum" title="Usar padrão do álbum"
+              className="sheet-design-role__restore" density="compact" disabled={disabled}
+              type="button" variant="quiet" onClick={() => onChange({ kind: "restoreAlbum", role: decorativeRole })}>
+              <AppIcon icon={RotateCcw} size={14} />
+            </ActionButton>}
+          </>}
+        >
+          {background && <div className="visual-design-color-property" title={description}
+            style={backgroundSwatchStyle(values)}>
             <ColorPropertyControl label="do fundo da lâmina" defaultRgb="#FFFFFF"
               disabled={disabled} rgb={sharedBackgroundColor(values)}
               onCommit={(rgb) => onChange({ kind: "backgroundColor", rgb })} />
-          </div>
-        ) : null}
-        <ActionButton density="compact" disabled={disabled} type="button" variant="quiet"
-          onClick={() => onChange({ kind: "remove", role: decorativeRole })}>
-          Remover
-        </ActionButton>
-      </div>
-      {values.some((value) => value.custom) && (
-        <ActionButton className="sheet-design-role__restore" density="compact" disabled={disabled}
-          type="button" variant="quiet" onClick={() => onChange({ kind: "restoreAlbum", role: decorativeRole })}>
-          Usar padrão do álbum
-        </ActionButton>
-      )}
-    </section>
-  );
+          </div>}
+        </VisualDesignControl>
+      </section>;
+    })}
+  </div>;
 }
 
-function VisualSwatch({
-  mediaPreviewUrls,
-  value,
-}: {
-  mediaPreviewUrls: Readonly<Record<string, string>>;
-  value: VisualValue;
-}) {
-  const previewUrl =
-    value.kind === "media" ? mediaPreviewUrls[value.mediaId] : undefined;
-  return (
-    <span
-      aria-hidden="true"
-      className={`sheet-design-value__swatch sheet-design-value__swatch--${value.kind}`}
-      style={
-        value.kind === "color"
-          ? { backgroundColor: value.rgb }
-          : previewUrl
-            ? { backgroundImage: `url("${previewUrl}")` }
-            : value.kind === "media"
-              ? { backgroundColor: SHEET_VISUAL_STYLE.mediaFallback.fill }
-              : undefined
-      }
-    />
-  );
+function backgroundSwatchStyle(values: readonly VisualValue[]): CSSProperties | undefined {
+  if (values.length !== 2 || values[0].kind !== "color" || values[1].kind !== "color") return undefined;
+  return { "--visual-design-color-preview": `linear-gradient(to right, ${values[0].rgb} 50%, ${values[1].rgb} 50%)` } as CSSProperties;
 }
 
 function visualValues(

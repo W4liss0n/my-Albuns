@@ -3,7 +3,6 @@ import {
   useLayoutEffect,
   useMemo,
   useState,
-  type ReactNode,
 } from "react";
 
 import {
@@ -44,10 +43,9 @@ import {
   setAlbumOverlay,
   type AlbumDesignScope,
 } from "./albumDesignDraft";
-import { DecorativeMediaPicker } from "./DecorativeMediaPicker";
+import { VisualDesignControl } from "./VisualDesignControl";
 import { useSemanticBaseline } from "./useSemanticBaseline";
 import "./AlbumDesignForm.css";
-import "./VisualDefaultPicker.css";
 
 const DEFAULT_FRAME_BORDER = { rgb: "#2C2924", widthUm: 1_000 };
 
@@ -311,7 +309,7 @@ export function AlbumDesignForm({
         <p className="ui-section-eyebrow album-design-scope-label">
           {scopeLabel(scope)}
         </p>
-        <VisualDefaultControl
+        <VisualDesignControl
           decorativeMedia={decorativeMedia}
           label="Fundo"
           mediaPreviewUrls={mediaPreviewUrls}
@@ -323,12 +321,12 @@ export function AlbumDesignForm({
           onSelect={(mediaId) => chooseBackground({ kind: "media", mediaId })}
         >
           <label
-            className="visual-default-picker__option visual-default-picker__color"
+            className="visual-design-picker__option visual-design-picker__color"
             data-selected={background?.kind === "color" || undefined}
           >
             <span
               aria-hidden="true"
-              className="visual-default-picker__tile"
+              className="visual-design-picker__tile"
               style={{ background: backgroundColor(background) }}
             />
             <input
@@ -343,8 +341,8 @@ export function AlbumDesignForm({
               }
             />
           </label>
-        </VisualDefaultControl>
-        <VisualDefaultControl
+        </VisualDesignControl>
+        <VisualDesignControl
           decorativeMedia={decorativeMedia}
           label="Sobreposição"
           mediaPreviewUrls={mediaPreviewUrls}
@@ -424,72 +422,6 @@ export function AlbumDesignForm({
         </label>
       </section>
     </form>
-  );
-}
-
-function VisualDefaultControl({
-  children,
-  decorativeMedia,
-  label,
-  mediaPreviewUrls,
-  noneSelected = false,
-  open,
-  onClear,
-  onOpenChange,
-  onSelect,
-  selectedMediaId,
-}: {
-  children?: ReactNode;
-  decorativeMedia: readonly MediaCatalogItem[];
-  label: "Fundo" | "Sobreposição";
-  mediaPreviewUrls: Readonly<Record<string, string>>;
-  /**
-   * Verdadeiro apenas quando o escopo inteiro está sem Overlay. Escopo com
-   * lados divergentes não é ausência, e não deve marcar `Sem Overlay`.
-   */
-  noneSelected?: boolean;
-  open: boolean;
-  onClear?: () => void;
-  onOpenChange(open: boolean): void;
-  onSelect(mediaId: string): void;
-  selectedMediaId: string | null;
-}) {
-  return (
-    <div className="visual-default-field">
-      <span className="visual-default-label">{label}</span>
-      <div
-        aria-label={`Opções de ${label.toLocaleLowerCase("pt-BR")}`}
-        className="visual-default-picker"
-        role="group"
-      >
-        {children}
-        {onClear ? (
-          <button
-            aria-label="Sem sobreposição"
-            aria-pressed={noneSelected}
-            className="visual-default-picker__option"
-            title="Sem sobreposição"
-            type="button"
-            onClick={onClear}
-          >
-            <span
-              aria-hidden="true"
-              className="visual-default-picker__tile visual-default-picker__preview--none"
-            />
-          </button>
-        ) : null}
-        <span aria-hidden="true" className="visual-default-picker__divider" />
-        <DecorativeMediaPicker
-          decorativeMedia={decorativeMedia}
-          label={label}
-          mediaPreviewUrls={mediaPreviewUrls}
-          open={open}
-          selectedMediaId={selectedMediaId}
-          onOpenChange={onOpenChange}
-          onSelect={onSelect}
-        />
-      </div>
-    </div>
   );
 }
 

@@ -417,6 +417,7 @@ export function InspectorPanel({
               actions={sheetDesign}
               visuals={sheetStateById.get(context.sheet.sheetId)?.visuals}
               saveLayout={saveLayout}
+              mediaItems={mediaItems}
               mediaPreviewUrls={mediaPreviewUrls}
               scope={selectedSheetScope}
               sheet={context.sheet}

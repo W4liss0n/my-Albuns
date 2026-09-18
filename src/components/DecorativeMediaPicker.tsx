@@ -11,11 +11,12 @@ import { AppIcon } from "../ui";
 import { useDismissableSurface } from "../ui/useDismissableSurface";
 import { MediaPreviewCard } from "./MediaPreviewCard";
 import "./DecorativeMediaPicker.css";
-import "./VisualDefaultPicker.css";
+import "./VisualDesignControl.css";
 
 const IMPORT_PLACEHOLDER_TITLE = "Ainda não disponível nesta versão";
 
 interface DecorativeMediaPickerProps {
+  disabled?: boolean;
   decorativeMedia: readonly MediaCatalogItem[];
   label: "Fundo" | "Sobreposição";
   mediaPreviewUrls: Readonly<Record<string, string>>;
@@ -26,6 +27,7 @@ interface DecorativeMediaPickerProps {
 }
 
 export function DecorativeMediaPicker({
+  disabled = false,
   decorativeMedia,
   label,
   mediaPreviewUrls,
@@ -108,7 +110,7 @@ export function DecorativeMediaPicker({
   }
 
   return (
-    <div className="visual-default-decorative" ref={rootRef}>
+    <div className="visual-design-decorative" ref={rootRef}>
       <button
         aria-expanded={open}
         aria-haspopup="menu"
@@ -117,8 +119,9 @@ export function DecorativeMediaPicker({
             ? `Decorativo ${label === "Fundo" ? "do fundo" : "da sobreposição"}: ${applied.name}. Escolher outro`
             : `Escolher decorativo para ${label.toLocaleLowerCase("pt-BR")}`
         }
-        className="visual-default-picker__option"
+        className="visual-design-picker__option"
         data-decorative-picker-trigger="true"
+        disabled={disabled}
         data-selected={applied ? true : undefined}
         ref={triggerRef}
         title={applied ? applied.name : "Escolher decorativo"}
@@ -128,13 +131,13 @@ export function DecorativeMediaPicker({
         {applied ? (
           <span
             aria-hidden="true"
-            className="visual-default-picker__tile"
+            className="visual-design-picker__tile"
             style={decorativePreview(applied, mediaPreviewUrls)}
           />
         ) : (
           <span
             aria-hidden="true"
-            className="visual-default-picker__tile visual-default-picker__tile--add"
+            className="visual-design-picker__tile visual-design-picker__tile--add"
           >
             <AppIcon icon={Plus} size={12} />
           </span>
@@ -143,13 +146,13 @@ export function DecorativeMediaPicker({
       {open ? (
         <div
           aria-label={`Decorativos para ${label.toLocaleLowerCase("pt-BR")}`}
-          className="ui-floating-surface visual-default-popup"
+          className="ui-floating-surface visual-design-popup"
           ref={menuRef}
           role="menu"
           tabIndex={-1}
           onKeyDown={navigateMenu}
         >
-          <div className="visual-default-popup__grid" role="none">
+          <div className="visual-design-popup__grid" role="none">
             {decorativeMedia.map((media) => {
               const selected = selectedMediaId === media.id;
               return (
@@ -158,6 +161,7 @@ export function DecorativeMediaPicker({
                     selected ? ". Selecionado" : ""
                   }`}
                   key={media.id}
+                  disabled={disabled}
                   kind="media"
                   loading="eager"
                   media={media}
