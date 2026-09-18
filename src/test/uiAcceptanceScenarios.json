@@ -11781,11 +11781,11 @@
         },
         {
           "type": "click",
-          "selector": "button[aria-label=\"Escolher decorativo para fundo\"]"
+          "selector": "button[aria-label=\"Decorativo do fundo: Textura.png. Escolher outro\"]"
         },
         {
           "type": "click",
-          "selector": "[role=\"menuitem\"][aria-label=\"Usar fundo Textura.png\"]"
+          "selector": "[role=\"menuitem\"][aria-label=\"Usar fundo Textura.png. Selecionado\"]"
         },
         {
           "type": "assert",
