@@ -77,8 +77,9 @@ Criar um Frame continua sendo responsabilidade do fluxo de edição. O
 perfil só pode ser consultado depois de existir uma geometria inicial
 válida. O retângulo temporário de 1 × 1 µm usado hoje durante a inserção
 normal não representa uma decisão de criar um Frame quadrado e não pode
-ser usado como perfil do Gerador. A integração deve atribuir a geometria
-inicial pelo mesmo caminho da criação manual antes de solicitar organização.
+ser usado como perfil do Gerador. A integração atribui a geometria inicial
+antes de solicitar organização: 3:2 para criação manual; 2:3, 3:2 ou 1:1
+conforme a orientação observada para criação por Foto, segundo o ADR 0014.
 
 O primeiro perfil de geração usa margem de 15 mm, intervalo de 5 mm e menor
 lado de 20 mm, como o experimento aprovado. São parâmetros explícitos da
@@ -318,6 +319,12 @@ Preservar V/H é uma invariante da geração de sugestões para os perfis
 consultados. Não acrescenta um filtro retroativo ao Último Layout ou aos
 Personalizados: reaplicar um Layout continua recuperando a geometria
 original, mesmo depois de uma edição manual dos Frames.
+
+Conforme o [ADR 0014](../adr/0014-orientar-novos-frames-pela-foto-inserida.md),
+a escolha automática percorre essa lista e usa o primeiro candidato que
+conserva a orientação de cada Frame. Isso impede que um Favorito horizontal
+transforme automaticamente em horizontal o Frame de uma Foto vertical recém-
+inserida. A listagem e a aplicação explícita preservam a regra anterior.
 
 Dentro de cada seção, a ordem é Último Layout compatível, Favoritos e demais
 candidatos. A nota do Gerador não ultrapassa essa prioridade. Uma definição

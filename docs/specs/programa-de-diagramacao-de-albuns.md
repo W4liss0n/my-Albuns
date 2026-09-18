@@ -839,13 +839,14 @@ validação das superfícies descritas nesta seção.
 - O comando cria imediatamente um único Frame centralizado, selecionado e com dimensões proporcionais à superfície ativa, sem modo de desenho nem ferramenta persistente.
 - Em Lâmina dupla, o Frame usa a Lâmina inteira como referência e pode atravessar a divisão; em Página única, usa somente a Página ativa.
 - A geometria inicial usa proporção `3:2` e largura de `40%` da superfície ativa, reduzida somente quando a altura disponível exigir; nunca representa um tamanho físico fixo. A criação é uma única ação de Undo/Redo e fica indisponível em Layout travado.
-- Fora do Modo de edição, inserir uma Foto em área livre cria um Frame e aplica o primeiro Layout compatível quando a organização está destravada.
+- Criar um Frame a partir de uma Foto usa sua orientação observada: perfil inicial 2:3 para vertical, 3:2 para horizontal e 1:1 para quadrada. Na ausência de dimensões observadas, conserva o perfil manual 3:2; a observação posterior não muda Frames existentes. A criação manual de placeholders continua em 3:2, conforme o ADR 0014.
+- Fora do Modo de edição, inserir uma Foto em área livre cria um Frame e aplica o primeiro Layout compatível que conserva as orientações dos Frames quando a organização está destravada. Essa condição vale também para a escolha automática de Último Layout, Favoritos e Personalizados; sem composição adequada, mantém-se a reserva do ADR 0008.
 - Inserir uma Foto sobre um placeholder preenche o Frame existente sem mudar sua geometria.
 - Arrastar uma Foto sobre qualquer Frame usa somente esse alvo: preenche um placeholder ou substitui a Foto existente, preservando geometria e estilo.
 - Se vários Frames contiverem o ponto da soltura, somente o mais acima na Pilha visual é atingido, ainda que esteja vazio, transparente ou com Opacidade reduzida.
-- Arrastar para área vazia cria um novo Frame: no Modo de edição, usa a geometria proporcional padrão centrada na soltura e limitada por deslocamento à superfície ativa; no modo normal, o primeiro Layout compatível decide a geometria.
+- Arrastar para área vazia cria um novo Frame: no Modo de edição, usa a geometria proporcional na orientação da Foto, centrada na soltura e limitada por deslocamento à superfície ativa; no modo normal, a escolha automática de Layout decide a geometria.
 - Layout travado aceita arraste de Foto somente sobre Frames existentes.
-- O duplo clique no Painel preenche o placeholder mais à esquerda da Lâmina de destino. Somente quando não houver placeholder cria um novo Frame; no Modo de edição, ele usa a mesma geometria centralizada e proporcional da Criação manual de Frame.
+- O duplo clique no Painel preenche o placeholder mais à esquerda da Lâmina de destino. Somente quando não houver placeholder cria um novo Frame; no Modo de edição, ele fica centralizado e proporcional à superfície ativa, na orientação da Foto.
 - Entre placeholders, menor borda esquerda prevalece e, em empate, menor borda superior.
 - Em Layout travado, o duplo clique só é válido quando houver placeholder; caso contrário, não altera o Projeto.
 - O Frame preenchido, substituído ou criado torna-se a única seleção; isso não adiciona outra entrada ao Histórico.

@@ -365,7 +365,13 @@ impl PersistentProjectSession {
                     return Err(CoreError::LockedLayoutHasNoPlaceholder);
                 }
                 let (next, frame_id) = project
-                    .with_added_photo(parsed_sheet, media_id.into_uuid(), mode, custom)
+                    .with_added_photo(
+                        parsed_sheet,
+                        media_id.into_uuid(),
+                        sources.get(&media_id.into_uuid()).copied(),
+                        mode,
+                        custom,
+                    )
                     .map_err(|()| {
                         CoreError::InvalidProject(
                             "não foi possível adicionar a Foto à Lâmina".into(),
@@ -388,8 +394,8 @@ impl PersistentProjectSession {
                     .with_dropped_photo(
                         parsed_sheet,
                         media_id.into_uuid(),
-                        x_um,
-                        y_um,
+                        sources.get(&media_id.into_uuid()).copied(),
+                        (x_um, y_um),
                         mode,
                         custom,
                     )

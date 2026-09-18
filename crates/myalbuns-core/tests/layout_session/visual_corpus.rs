@@ -146,10 +146,32 @@ fn layout_panel_corpus_is_produced_by_the_public_core() {
         ("empty-lock", 0),
         ("custom", 4),
         ("custom-save", 4),
+        ("portrait-insertion", 0),
     ] {
         let root = tempfile::tempdir().unwrap();
         let mut project = fixture_project(root.path(), count);
         let sheet = project.projection().state.album.sheets[0].id.clone();
+        if name == "portrait-insertion" {
+            let media_id = project.projection().state.album.media[0].id;
+            project
+                .observe_photo_source(
+                    media_id,
+                    PhotoSourceMetadata::new(
+                        400,
+                        600,
+                        ["#C22C24", "#248044", "#2454C2"].map(String::from),
+                    )
+                    .unwrap(),
+                )
+                .unwrap();
+            project
+                .apply(ProjectIntent::AddPhoto {
+                    sheet_id: sheet.clone(),
+                    media_id,
+                    mode: myalbuns_core::PhotoPlacementMode::Normal,
+                })
+                .unwrap();
+        }
         if name == "single" {
             project
                 .apply(ProjectIntent::ConvertEdgeSheet {
@@ -384,6 +406,17 @@ fn layout_panel_corpus_is_produced_by_the_public_core() {
                 ids.insert(frame.id.clone(), format!("lock-placeholder-{}", index + 1));
             }
             normalize(&mut entry, &ids);
+        }
+        if name == "portrait-insertion" {
+            let frame_id = entry["before"]["projection"]["state"]["album"]["sheets"][0]["frames"]
+                [0]["id"]
+                .as_str()
+                .unwrap()
+                .to_owned();
+            normalize(
+                &mut entry,
+                &BTreeMap::from([(frame_id, "inserted-portrait-frame".into())]),
+            );
         }
         cases.insert(name.into(), entry);
     }

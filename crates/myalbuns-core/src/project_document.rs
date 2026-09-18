@@ -873,6 +873,7 @@ impl ProjectDocument {
             sheet,
             candidate.document.sheet_width_um,
             candidate.document.sheet_height_um,
+            crate::FrameOrientation::Horizontal,
             None,
         )?;
         let frame_id = Uuid::new_v4();
@@ -885,6 +886,7 @@ impl ProjectDocument {
         &self,
         sheet_id: Uuid,
         media_id: Uuid,
+        source_dimensions: Option<(u32, u32)>,
         mode: PhotoPlacementMode,
         custom: &[crate::CustomLayout],
     ) -> Result<(Self, Uuid), ()> {
@@ -907,6 +909,7 @@ impl ProjectDocument {
                     candidate.document.sheet_width_um,
                     candidate.document.sheet_height_um,
                     media_id,
+                    source_dimensions,
                     mode,
                     None,
                 )?
@@ -926,8 +929,8 @@ impl ProjectDocument {
         &self,
         sheet_id: Uuid,
         media_id: Uuid,
-        x_um: i64,
-        y_um: i64,
+        source_dimensions: Option<(u32, u32)>,
+        point: (i64, i64),
         mode: PhotoPlacementMode,
         custom: &[crate::CustomLayout],
     ) -> Result<(Self, Uuid), ()> {
@@ -942,8 +945,8 @@ impl ProjectDocument {
             &candidate.sheets[sheet_index],
             candidate.document.sheet_width_um,
             candidate.document.sheet_height_um,
-            x_um,
-            y_um,
+            point.0,
+            point.1,
         );
         let affected = match target {
             PhotoDropTarget::Frame { frame_id } => {
@@ -960,8 +963,9 @@ impl ProjectDocument {
                 candidate.document.sheet_width_um,
                 candidate.document.sheet_height_um,
                 media_id,
+                source_dimensions,
                 mode,
-                Some((x_um, y_um)),
+                Some(point),
             )?,
             PhotoDropTarget::Invalid => return Err(()),
         };
@@ -1469,6 +1473,7 @@ fn add_frame(
     sheet_width_um: u64,
     sheet_height_um: u64,
     media_id: Uuid,
+    source_dimensions: Option<(u32, u32)>,
     mode: PhotoPlacementMode,
     point: Option<(i64, i64)>,
 ) -> Result<Uuid, ()> {
@@ -1478,7 +1483,18 @@ fn add_frame(
     } else {
         None
     };
-    let rect = proportional_frame_rect(sheet, sheet_width_um, sheet_height_um, initial_point)?;
+    let orientation = match source_dimensions {
+        Some((width, height)) if width < height => crate::FrameOrientation::Vertical,
+        Some((width, height)) if width == height => crate::FrameOrientation::Square,
+        _ => crate::FrameOrientation::Horizontal,
+    };
+    let rect = proportional_frame_rect(
+        sheet,
+        sheet_width_um,
+        sheet_height_um,
+        orientation,
+        initial_point,
+    )?;
     sheet.frames.push(ProjectFrame::new(
         id,
         rect,
@@ -1494,13 +1510,19 @@ fn proportional_frame_rect(
     sheet: &ProjectSheet,
     sheet_width_um: u64,
     sheet_height_um: u64,
+    orientation: crate::FrameOrientation,
     point: Option<(i64, i64)>,
 ) -> Result<ProjectRect, ()> {
     let width = active_surface_width(sheet, sheet_width_um);
+    let (width_parts, height_parts) = match orientation {
+        crate::FrameOrientation::Vertical => (2, 3),
+        crate::FrameOrientation::Horizontal => (3, 2),
+        crate::FrameOrientation::Square => (1, 1),
+    };
     let frame_width = (width.saturating_mul(2) / 5)
-        .min(sheet_height_um.saturating_mul(3) / 2)
+        .min(sheet_height_um.saturating_mul(width_parts) / height_parts)
         .max(1);
-    let frame_height = (frame_width.saturating_mul(2) / 3).max(1);
+    let frame_height = (frame_width.saturating_mul(height_parts) / width_parts).max(1);
     let (center_x, center_y) = point.unwrap_or((
         i64::try_from(width / 2).map_err(|_| ())?,
         i64::try_from(sheet_height_um / 2).map_err(|_| ())?,

@@ -7688,6 +7688,40 @@
       ]
     },
     {
+      "id": "workspace-layout-portrait-insertion",
+      "title": "Foto vertical — inserção cria Frame vertical",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=portrait-insertion&preview=palette",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "O ADR 0014 define a orientação inicial pela Foto. A geometria e as sugestões vêm do Core após AddPhoto normal com imagem 400 × 600; a paleta representa seu conteúdo."
+      },
+      "viewport": { "width": 1440, "height": 800 },
+      "readySelector": ".layout-panel__candidate",
+      "actions": [
+        { "type": "assert", "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))" },
+        { "type": "click", "selector": "button[aria-label=\"Layouts da Lâmina 01\"]" },
+        { "type": "hover", "selector": ".layout-panel__header" }
+      ]
+    },
+    {
+      "id": "workspace-layout-portrait-insertion-preview",
+      "title": "Foto vertical — alternativa conserva a orientação",
+      "implementationPath": "/workspace-preview.html?frame=layouts&layouts=portrait-insertion&preview=palette",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "layout-panel",
+        "reason": "O ADR 0014 conserva a orientação da Foto na criação. O hover mostra uma alternativa gerada pelo Core para o Frame vertical; a paleta representa seu conteúdo."
+      },
+      "viewport": { "width": 1440, "height": 800 },
+      "readySelector": ".layout-panel__candidate",
+      "actions": [
+        { "type": "assert", "selector": ".canvas-host:has(canvas):not(:has(.canvas-loading))" },
+        { "type": "click", "selector": "button[aria-label=\"Layouts da Lâmina 01\"]" },
+        { "type": "hover", "selector": ".layout-panel__candidate:nth-child(3)" }
+      ]
+    },
+    {
       "id": "workspace-layout-small-alternatives",
       "title": "Layouts pequenos — décima alternativa para dois Frames horizontais",
       "implementationPath": "/workspace-preview.html?frame=layouts&layouts=empty-lock",

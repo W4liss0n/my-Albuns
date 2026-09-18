@@ -740,7 +740,12 @@ impl EditableProject {
         if !self.session_valid {
             return Err(CoreError::EditableSessionInvalidated);
         }
-        let sources = if matches!(&intent, ProjectIntent::SetAlbumInformation { .. }) {
+        let sources = if matches!(
+            &intent,
+            ProjectIntent::SetAlbumInformation { .. }
+                | ProjectIntent::AddPhoto { .. }
+                | ProjectIntent::DropPhoto { .. }
+        ) {
             self.observed_photo_dimensions()
         } else {
             HashMap::new()

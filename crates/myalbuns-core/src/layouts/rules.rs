@@ -220,7 +220,21 @@ impl LayoutRules {
         if listing.generation_status == LayoutGenerationStatus::InvalidQuery {
             return Err(CoreError::InvalidLayoutQuery);
         }
-        if let Some(candidate) = listing.candidates.first() {
+        // Saved layouts remain available for explicit selection. Automatic
+        // arrangement must preserve the orientation of each current Frame.
+        if let Some(candidate) = listing.candidates.iter().find(|candidate| {
+            candidate
+                .layout
+                .definition
+                .positions
+                .iter()
+                .zip(&query.frame_orientations)
+                .all(|(rect, orientation)| match orientation {
+                    FrameOrientation::Vertical => rect.width < rect.height,
+                    FrameOrientation::Horizontal => rect.width > rect.height,
+                    FrameOrientation::Square => rect.width == rect.height,
+                })
+        }) {
             Self::resolve(
                 &candidate.layout,
                 &query.surface,
