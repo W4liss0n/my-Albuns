@@ -41,10 +41,10 @@ export function ProjectDialogView({
       cancelAction={{ label: "Cancelar", onClick: () => onAction("dismissExport") }}
       confirmAction={{ label: "Substituir", onClick: () => onAction("confirmExportOverwrite") }} />;
     case "mediaRemovalConfirmation":
-      return <ConfirmationDialog title={`Remover ${state.count} ${state.mediaKind === "photo" ? (state.count === 1 ? "Foto" : "Fotos") : (state.count === 1 ? "Decorativo" : "Decorativos")}?`} tone="danger"
+      return <ConfirmationDialog title={`Remover ${state.count} ${state.mediaKind === "photo" ? (state.count === 1 ? "foto" : "fotos") : (state.count === 1 ? "decorativo" : "decorativos")}?`} tone="danger"
         description={state.mediaKind === "photo"
-          ? `${state.usedCount} da seleção em uso, em ${state.usageCount} Quadros. Remover tudo exclui quadros destravados e mantém as posições travadas vazias.`
-          : `${state.usedCount} da seleção em uso. As aplicações removidas voltam ao padrão do álbum; padrões removidos passam a fundo branco ou sobreposição ausente.`}
+          ? `${state.usedCount} ${state.usedCount === 1 ? "foto está em uso" : "fotos estão em uso"} em ${state.usageCount} ${state.usageCount === 1 ? "quadro" : "quadros"}. Remover tudo também exclui os quadros destravados. Os quadros travados ficam vazios.`
+          : `${state.usedCount} ${state.usedCount === 1 ? "decorativo está em uso" : "decorativos estão em uso"}. Ao remover, as páginas voltam ao padrão do álbum. Se a imagem era o padrão, fica fundo branco ou sem sobreposição.`}
         cancelAction={{ label: "Cancelar", disabled: state.busy, onClick: () => onAction("cancelMediaRemoval") }}
         leadingAction={state.mediaKind === "photo" ? { label: "Remover imagens e manter quadros", disabled: state.busy, onClick: () => onAction("removeMediaKeepFrames") } : undefined}
         confirmAction={{ label: state.busy ? "Removendo…" : state.mediaKind === "photo" ? "Remover tudo" : "Remover", disabled: state.busy, onClick: () => onAction("removeAllMedia") }} />;
