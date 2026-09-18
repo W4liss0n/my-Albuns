@@ -142,7 +142,7 @@ test("composes machine-local State with roaming Settings and routes updates to t
 });
 
 test("storage exhaustion preserves the native partial-publication warning", async () => {
-  const message = "O álbum foi publicado parcialmente. Libere espaço e retome para concluir. Os arquivos já exportados foram mantidos.";
+  const message = "Alguns arquivos do álbum já foram exportados. Libere espaço e retome para concluir. Os arquivos já exportados foram mantidos.";
   vi.mocked(invoke).mockRejectedValueOnce({ code: "output_storage_full", message });
   const attempt = tauriExportPipelinePort.startSheet(exportSelection, vi.fn());
   await expect(attempt.completion).rejects.toBeInstanceOf(StorageFullError);

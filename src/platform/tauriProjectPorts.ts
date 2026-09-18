@@ -490,7 +490,7 @@ export const tauriExportPipelinePort: ExportPipelinePort = {
       .catch((error: unknown) => {
         if (typeof error === "object" && error !== null && "code" in error && error.code === "output_storage_full") {
           throw new StorageFullError("message" in error && typeof error.message === "string"
-            ? error.message : "Libere espaço para continuar. arquivos já exportados foram mantidos.");
+            ? error.message : "Libere espaço para continuar. Os arquivos já exportados foram mantidos.");
         }
         if (typeof error === "object" && error !== null && "code" in error && error.code === "export_conflict" && "conflicts" in error && Array.isArray(error.conflicts) && error.conflicts.every(file => typeof file === "string") && error.conflicts.length) throw new ExportConflictsError(error.conflicts);
         if (isCancelledExportError(error)) {

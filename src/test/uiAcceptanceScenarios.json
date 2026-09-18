@@ -9504,7 +9504,7 @@
     {
       "id": "storage-full-export-manual",
       "title": "Exportação — falta de espaço (manual)",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22storageFull%22%2C%22message%22%3A%22Libere%20espa%C3%A7o%20para%20continuar.%20arquivos%20j%C3%A1%20exportados%20foram%20mantidos.%22%2C%22canClearCache%22%3Afalse%2C%22busy%22%3Afalse%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22storageFull%22%2C%22message%22%3A%22Libere%20espa%C3%A7o%20para%20continuar.%20Os%20arquivos%20j%C3%A1%20exportados%20foram%20mantidos.%22%2C%22canClearCache%22%3Afalse%2C%22busy%22%3Afalse%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "batch-export-window",
@@ -9521,7 +9521,7 @@
     {
       "id": "storage-full-export-cleanup",
       "title": "Exportação — falta de espaço (cleanup)",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22storageFull%22%2C%22message%22%3A%22Libere%20espa%C3%A7o%20para%20continuar.%20arquivos%20j%C3%A1%20exportados%20foram%20mantidos.%22%2C%22canClearCache%22%3Atrue%2C%22busy%22%3Afalse%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22storageFull%22%2C%22message%22%3A%22Libere%20espa%C3%A7o%20para%20continuar.%20Os%20arquivos%20j%C3%A1%20exportados%20foram%20mantidos.%22%2C%22canClearCache%22%3Atrue%2C%22busy%22%3Afalse%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "batch-export-window",
@@ -9538,7 +9538,7 @@
     {
       "id": "storage-full-export-busy",
       "title": "Exportação — falta de espaço (busy)",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22storageFull%22%2C%22message%22%3A%22Libere%20espa%C3%A7o%20para%20continuar.%20arquivos%20j%C3%A1%20exportados%20foram%20mantidos.%22%2C%22canClearCache%22%3Atrue%2C%22busy%22%3Atrue%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22storageFull%22%2C%22message%22%3A%22Libere%20espa%C3%A7o%20para%20continuar.%20Os%20arquivos%20j%C3%A1%20exportados%20foram%20mantidos.%22%2C%22canClearCache%22%3Atrue%2C%22busy%22%3Atrue%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "batch-export-window",
@@ -9555,7 +9555,7 @@
     {
       "id": "storage-full-export-partial",
       "title": "Exportação — falta de espaço com publicação parcial",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22storageFull%22%2C%22message%22%3A%22O%20%C3%A1lbum%20foi%20publicado%20parcialmente.%20Libere%20espa%C3%A7o%20e%20retome%20para%20concluir.%20Os%20arquivos%20j%C3%A1%20exportados%20foram%20mantidos.%22%2C%22canClearCache%22%3Atrue%2C%22busy%22%3Afalse%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22storageFull%22%2C%22message%22%3A%22Alguns%20arquivos%20do%20%C3%A1lbum%20j%C3%A1%20foram%20exportados.%20Libere%20espa%C3%A7o%20e%20retome%20para%20concluir.%20Os%20arquivos%20j%C3%A1%20exportados%20foram%20mantidos.%22%2C%22canClearCache%22%3Atrue%2C%22busy%22%3Afalse%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "batch-export-window",

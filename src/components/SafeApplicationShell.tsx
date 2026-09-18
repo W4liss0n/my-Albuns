@@ -168,7 +168,7 @@ function SettingsSurface({
         >
           <h2>Desempenho</h2>
           <p>
-            O editor exige WebGL2 com aceleração por hardware. prévias temporárias e outras
+            O editor exige WebGL2 com aceleração por hardware. Prévias temporárias e outras
             preferências globais permanecem fora da Sessão do projeto.
           </p>
           <ActionButton onClick={onOpenDiagnostic}>
